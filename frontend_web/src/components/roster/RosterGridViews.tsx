@@ -49,10 +49,13 @@ import moment from 'moment';
 import apiClient from '../../utils/apiClient';
 import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
 import { type RosterGridViewsProps, getRoleStyle } from './RosterGridViews.model';
+import RosterStackedDayView from './RosterStackedDayView';
 export type { StaffShiftItem, StaffMemberSummary, StackedShiftItem, DayStackedBucket, RosterGridViewsProps } from './RosterGridViews.model';
 
 export default function RosterGridViews({
+  viewMode,
   staffViewData,
+  stackedViewData,
   weekStart,
   periodId,
   pharmacyId,
@@ -428,10 +431,10 @@ export default function RosterGridViews({
                   letterSpacing: '-0.01em',
                 }}
               >
-                Weekly Staff Schedule Matrix
+                {viewMode === 'STACKED' ? 'Daily staffing plan' : 'Weekly staff schedule'}
               </Typography>
               <Typography variant="body2" sx={{ color: BRAND_COLORS.body, fontSize: 13 }}>
-                Drag shifts or use dropdowns to reassign staff and change days across the week.
+                {viewMode === 'STACKED' ? 'Review coverage by day and edit draft shifts.' : 'Drag or use shift actions to reassign and change dates.'}
               </Typography>
             </Box>
 
@@ -445,27 +448,28 @@ export default function RosterGridViews({
               icon={<AccessTimeIcon sx={{ fontSize: 15 }} />}
               label={`${grandTotalWeeklyHours.toFixed(1)}h Total`}
               size="small"
-              sx={{ bgcolor: BRAND_COLORS.blueLight, color: BRAND_COLORS.blue, fontWeight: 700 }}
+              sx={{ bgcolor: BRAND_COLORS.blueLight, color: BRAND_COLORS.blueText, fontWeight: 700 }}
             />
             <Chip
               label={`${totalAssignedCount} Assigned`}
               size="small"
-              sx={{ bgcolor: BRAND_COLORS.cyanLight, color: BRAND_COLORS.cyan, fontWeight: 700 }}
+              sx={{ bgcolor: BRAND_COLORS.cyanLight, color: '#075B71', fontWeight: 700 }}
             />
             {vacantSlots.length > 0 && (
               <Chip
                 label={`${vacantSlots.length} Open`}
                 size="small"
-                sx={{ bgcolor: '#FEF3C7', color: '#D97706', fontWeight: 700 }}
+                sx={{ bgcolor: '#FEF3C7', color: '#7B4800', fontWeight: 700 }}
               />
             )}
           </Stack>
 
           {/* Right: Search & Role Filters */}
-          <Stack direction="row" spacing={1.5} alignItems="center">
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
             <TextField
               size="small"
-              placeholder="Search team member..."
+              label="Search team members"
+              placeholder="Name"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               InputProps={{
@@ -483,7 +487,7 @@ export default function RosterGridViews({
               }}
             />
 
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 150 }, width: { xs: '100%', sm: 'auto' } }}>
               <Select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
@@ -507,6 +511,103 @@ export default function RosterGridViews({
         </Stack>
       </Card>
 
+
+      {/* A day-by-day manager planner replaces the wide weekly matrix on small screens.
+          Mutations continue through the same validated draft-only handlers as desktop. */}
+      <Box component="section" aria-label="Mobile weekly roster" sx={{ display: viewMode === 'STAFF' ? { xs: 'block', lg: 'none' } : 'none', mt: 1.5 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography component="h3" sx={{ color: '#06123A', fontSize: 18, fontWeight: 800 }}>Daily schedule</Typography>
+            <Typography sx={{ color: '#445474', fontSize: 13, mt: 0.4 }}>Select a day to see shifts and staffing gaps.</Typography>
+          </Box>
+          <Chip size="small" label={isPublished ? 'Published' : 'Draft'} sx={{ bgcolor: isPublished ? '#E8F7F0' : '#FFF4DB', color: isPublished ? '#086046' : '#7B4800', fontWeight: 800, flexShrink: 0 }} />
+        </Stack>
+        <Stack spacing={1.5}>
+          {weekDays.map((day) => {
+            const dayVacancies = (vacantShiftsByDate[day.dateStr] || []).filter((slot) => roleFilter === 'ALL' || slot.role_needed === roleFilter);
+            const dayAssignments = filteredStaff.flatMap((staff) => staff.shifts
+              .filter((shift) => shift.date === day.dateStr)
+              .map((shift) => ({ staff, shift })))
+              .sort((a, b) => a.shift.start_time.localeCompare(b.shift.start_time));
+            return (
+              <Paper key={day.dateStr} component="article" variant="outlined" sx={{ borderColor: day.isToday ? '#BFADE7' : '#E0E7F1', borderRadius: '12px', boxShadow: 'none', overflow: 'hidden' }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ p: 1.75, bgcolor: day.isToday ? '#F2EDFC' : '#F8FAFE' }}>
+                  <Box>
+                    <Typography component="h4" sx={{ color: '#06123A', fontSize: 15, fontWeight: 800 }}>{day.momentObj.format('dddd D MMM')}</Typography>
+                    <Typography sx={{ color: '#445474', fontSize: 12.5 }}>{dayAssignments.length} assigned · {dayVacancies.length} open</Typography>
+                  </Box>
+                  <Button
+                    variant="outlined" size="small" startIcon={<AddIcon />}
+                    disabled={isPublished || !pharmacyId}
+                    onClick={() => openQuickAdd(day.dateStr)}
+                    sx={{ minHeight: 44, px: 1.5, borderColor: '#CDBBE9', color: '#5222B8', textTransform: 'none', fontWeight: 800 }}
+                    aria-label={'Add draft shift on ' + day.momentObj.format('dddd D MMM')}
+                  >
+                    Add
+                  </Button>
+                </Stack>
+                {dayVacancies.length === 0 && dayAssignments.length === 0 ? (
+                  <Typography sx={{ p: 2, color: '#445474', fontSize: 14 }}>No scheduled shifts for this day.</Typography>
+                ) : (
+                  <Stack spacing={0} sx={{ px: 1.75, pb: 1 }}>
+                    {dayVacancies.map((slot) => (
+                      <Stack key={'vacant-' + slot.slot_id} direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} sx={{ py: 1.5, borderBottom: '1px solid #EDF1F7' }}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ color: '#7B4800', fontWeight: 800, fontSize: 13.5 }}>{(slot.role_needed || 'Team member').replaceAll('_', ' ')} · Unassigned</Typography>
+                          <Typography sx={{ color: '#445474', fontSize: 13 }}>{String(slot.start_time || '').slice(0, 5)} – {String(slot.end_time || '').slice(0, 5)}</Typography>
+                        </Box>
+                        <Button size="small" disabled={!canEditSlot(slot.slot_id)}
+                          onClick={(event) => handleOpenMenu(event, {
+                            slotId: slot.slot_id, date: day.dateStr, workerId: null,
+                            role: slot.role_needed, startTime: slot.start_time, endTime: slot.end_time,
+                          })}
+                          sx={{ color: '#5222B8', minHeight: 44, flexShrink: 0, textTransform: 'none', fontWeight: 800 }}>
+                          Assign
+                        </Button>
+                      </Stack>
+                    ))}
+                    {dayAssignments.map(({ staff, shift }) => (
+                      <Stack key={staff.worker_id + '-' + shift.assignment_id} direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} sx={{ py: 1.5, borderBottom: '1px solid #EDF1F7' }}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ color: '#06123A', fontWeight: 800, fontSize: 14, overflowWrap: 'anywhere' }}>{staff.worker_name}</Typography>
+                          <Typography sx={{ color: '#445474', fontSize: 12.5 }}>
+                            {(shift.role || 'Staff').replaceAll('_', ' ')} · {shift.start_time.slice(0, 5)} – {shift.end_time.slice(0, 5)} · {shift.hours.toFixed(1)}h
+                          </Typography>
+                        </Box>
+                        {canEditSlot(shift.slot_id) ? (
+                          <Button size="small" onClick={(event) => handleOpenMenu(event, {
+                            slotId: shift.slot_id, assignmentId: shift.assignment_id, date: shift.date,
+                            workerId: staff.worker_id, workerName: staff.worker_name,
+                            role: shift.role, startTime: shift.start_time, endTime: shift.end_time,
+                          })}
+                            sx={{ color: '#5222B8', minHeight: 44, flexShrink: 0, textTransform: 'none', fontWeight: 800 }}>
+                            Edit
+                          </Button>
+                        ) : (
+                          <Typography sx={{ color: '#52617C', fontSize: 12, fontWeight: 750, flexShrink: 0 }}>View only</Typography>
+                        )}
+                      </Stack>
+                    ))}
+                  </Stack>
+                )}
+              </Paper>
+            );
+          })}
+        </Stack>
+      </Box>
+
+      {viewMode === 'STACKED' && (
+        <RosterStackedDayView
+          weekStart={weekStart}
+          days={stackedViewData}
+          isPublished={isPublished}
+          pharmacyId={pharmacyId ?? null}
+          canEditSlot={canEditSlot}
+          onAdd={(date) => openQuickAdd(date)}
+          onEdit={handleOpenMenu}
+        />
+      )}
+
       {/* 2. Horizontal 7-Day Matrix Table (Tanda / Roubler / RosterElf Standard) */}
       <TableContainer
         component={Paper}
@@ -517,6 +618,7 @@ export default function RosterGridViews({
           boxShadow: BRAND_SHADOWS.card,
           maxWidth: '100%',
           overflowX: 'auto',
+          display: viewMode === 'STAFF' ? { xs: 'none', lg: 'block' } : 'none',
           bgcolor: BRAND_COLORS.white,
         }}
       >
@@ -643,7 +745,7 @@ export default function RosterGridViews({
                       width: 32,
                       height: 32,
                       bgcolor: '#FEF3C7',
-                      color: '#D97706',
+                      color: '#A15C07',
                       fontSize: 13,
                       fontWeight: 700,
                     }}
@@ -657,7 +759,7 @@ export default function RosterGridViews({
                     >
                       Open / Vacant Shifts
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#D97706', fontWeight: 600 }}>
+                    <Typography variant="caption" sx={{ color: '#A15C07', fontWeight: 600 }}>
                       {vacantSlots.length} Unassigned
                     </Typography>
                   </Box>
@@ -686,7 +788,7 @@ export default function RosterGridViews({
                   >
                     {dayVacancies.length === 0 ? (
                       <Box sx={{ minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Typography variant="caption" sx={{ color: '#CBD5E1', fontSize: 11 }}>
+                        <Typography variant="caption" aria-label="No open shifts" sx={{ color: 'var(--ct-text-muted)', fontSize: 11 }}>
                           —
                         </Typography>
                       </Box>

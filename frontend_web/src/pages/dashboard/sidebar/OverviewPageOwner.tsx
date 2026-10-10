@@ -155,7 +155,7 @@ export default function OverviewPageOwner() {
         sx={{
           p: { xs: 3, md: 4 },
           borderRadius: { xs: 3, md: 4 },
-          backgroundImage: "var(--ct-dashboard-gradient, linear-gradient(135deg, #063BDA 0%, #6D28D9 52%, #EA0A8E 100%))",
+          backgroundImage: "var(--ct-dashboard-gradient, linear-gradient(135deg, #3C18A8 0%, #5222B8 52%, #EA0A8E 100%))",
           color: "#fff",
           overflow: "hidden",
           boxShadow: "0 18px 44px rgba(6, 26, 61, 0.10)",
@@ -168,7 +168,7 @@ export default function OverviewPageOwner() {
           justifyContent="space-between"
         >
           <Box>
-            <Typography variant="h4" fontWeight={800} gutterBottom>
+            <Typography variant="h4" gutterBottom>
               Hello, {welcomeName}!
             </Typography>
             <Typography variant="body1" sx={{ opacity: 0.92, maxWidth: 560, mb: 3 }}>
@@ -237,7 +237,7 @@ export default function OverviewPageOwner() {
               <Typography variant="subtitle2" color="var(--ct-dashboard-muted, #5E6B8D)">
                 {card.label}
               </Typography>
-              <Typography variant="h4" fontWeight={900} color="var(--ct-dashboard-title, #06123A)">
+              <Typography variant="h4" color="var(--ct-dashboard-title, #06123A)">
                 {card.value}
               </Typography>
             </Paper>

@@ -10,12 +10,21 @@ import {
     Stack,
     Paper,
     Divider,
-    Chip,
     CircularProgress,
     Rating,
     Skeleton,
     Pagination,
 } from '@mui/material';
+import { BellRing, CircleAlert, CreditCard, MapPin } from 'lucide-react';
+import { Pill } from '../../../../../../components/ui/Pill';
+import { CandidateProfile } from './CandidateProfile';
+
+const formatSlotDate = (value?: string | null) =>
+    value
+        ? new Date(value).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+        : 'Whole shift';
+
+const sectionTitleSx = { fontSize: 14.5, fontWeight: 600, color: 'var(--ct-text-primary)' } as const;
 
 const STATE_CODES = new Set(['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT']);
 
@@ -55,6 +64,9 @@ interface CounterOfferDialogProps {
     onReject: (offer: any) => void;
     onAssign?: (userId: number, slotId: number | null) => void;
     onPageChange: (_: React.ChangeEvent<unknown>, value: number) => void;
+    /** Sends the confirm-this-shift reminder (same action as Buzz on the card). */
+    onBuzz?: (offerId: number) => void;
+    buzzLoadingOfferId?: number | null;
 }
 
 export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
@@ -74,6 +86,8 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
     onReject,
     onAssign,
     onPageChange,
+    onBuzz,
+    buzzLoadingOfferId,
 }) => {
     const awaitingPayment = Boolean(
         candidate?.awaitingPayment ?? candidate?.awaiting_payment
@@ -82,6 +96,8 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
         candidate?.pendingConfirmation ?? candidate?.pending_confirmation
     );
     const offerStatus = String(offer?.status ?? '').toUpperCase();
+    const rawPendingOfferId = candidate?.pendingOfferId ?? candidate?.pending_offer_id ?? offer?.id ?? null;
+    const pendingOfferId = rawPendingOfferId != null ? Number(rawPendingOfferId) : null;
     const isActionableCounterOffer = Boolean(offer) && !pendingConfirmation && !awaitingPayment && offerStatus === 'PENDING';
     const counterOfferDetails =
         offer ||
@@ -102,48 +118,45 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-            <DialogTitle sx={{ fontWeight: 'bold' }}>
-                {awaitingPayment ? 'Awaiting Payment' : pendingConfirmation ? 'Pending Confirmation' : isActionableCounterOffer ? 'Counter Offer' : 'Candidate Review'}
+            <DialogTitle>
+                {awaitingPayment ? 'Awaiting payment' : pendingConfirmation ? 'Waiting for confirmation' : isActionableCounterOffer ? 'Counter offer' : 'Candidate review'}
             </DialogTitle>
             <DialogContent dividers>
                 {candidate || offer ? (
-                    <Stack spacing={1.5}>
+                    <Stack spacing={2}>
                         {/* Candidate Information */}
                         {candidate && (
-                            <Box sx={{ mb: 1 }}>
-                                <Typography variant="subtitle2">Candidate</Typography>
-                                <Typography variant="body2" fontWeight={600}>
-                                    {candidate.name || 'Candidate'}
-                                </Typography>
-                                {candidate.shortBio && (
-                                    <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                        {candidate.shortBio}
-                                    </Typography>
+                            <Stack spacing={1.5}>
+                                <CandidateProfile name={candidate.name || 'Candidate'} bio={candidate.shortBio} profile={candidate.profile} />
+                                {(pendingConfirmation || awaitingPayment) && (
+                                    <Stack
+                                        direction="row"
+                                        spacing={1.25}
+                                        alignItems="flex-start"
+                                        sx={{
+                                            p: 1.5,
+                                            borderRadius: '12px',
+                                            bgcolor: awaitingPayment ? 'var(--ct-status-red-bg)' : 'var(--ct-status-amber-bg)',
+                                            color: awaitingPayment ? 'var(--ct-status-red-fg)' : 'var(--ct-status-amber-fg)',
+                                            '& svg': { width: 18, height: 18, flexShrink: 0, mt: '1px' },
+                                        }}
+                                    >
+                                        {awaitingPayment ? <CreditCard /> : <CircleAlert />}
+                                        <Typography sx={{ fontSize: 13.5, fontWeight: 500, color: 'inherit', lineHeight: 1.45 }}>
+                                            {awaitingPayment
+                                                ? 'Candidate confirmed. Pay from the shift card to finalise the booking.'
+                                                : 'Offer sent. Waiting for the candidate to confirm. You can send them a reminder.'}
+                                        </Typography>
+                                    </Stack>
                                 )}
-                                {pendingConfirmation && (
-                                    <Chip
-                                        label="Offer sent. Waiting for candidate confirmation."
-                                        size="small"
-                                        color="warning"
-                                        sx={{ mt: 1, fontWeight: 700 }}
-                                    />
-                                )}
-                                {awaitingPayment && (
-                                    <Chip
-                                        label="Candidate confirmed. Payment is required to finalize."
-                                        size="small"
-                                        color="error"
-                                        sx={{ mt: 1, fontWeight: 700 }}
-                                    />
-                                )}
-                            </Box>
+                            </Stack>
                         )}
 
                         {/* Counter-offer details: candidate proposed time/rate/travel before owner accepts. */}
                         {counterOfferDetails && (
                             <>
-                                <Typography variant="subtitle1" fontWeight="bold">
-                                    Proposed Shift Terms
+                                <Typography component="h3" sx={sectionTitleSx}>
+                                    Proposed shift terms
                                 </Typography>
                                 {(() => {
                                     const rawSlots = counterOfferDetails._mappedSlots || counterOfferDetails.slots || [];
@@ -158,105 +171,91 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                     const slotsToRender = visible.length ? visible : rawSlots;
                                     if (!slotsToRender.length) {
                                         return (
-                                            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                                            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '12px' }}>
                                                 <Typography variant="body2" color="text.secondary">
                                                     No proposed slot details were attached to this counter offer.
                                                 </Typography>
                                             </Paper>
                                         );
                                     }
-                                    return slotsToRender.map((slot: any, idx: number) => (
-                                        <Paper
-                                            key={`${slot.slotId ?? slot.id ?? idx}-${slot.slotDate ?? slot.slot?.date ?? slot.date ?? idx
-                                                }`}
-                                            variant="outlined"
-                                            sx={{ p: 1.5, borderRadius: 2 }}
-                                        >
-                                            <Typography variant="body2" fontWeight="bold">
-                                                {slot.date || slot.slotDate || slot.slot?.date
-                                                    ? new Date(
-                                                        slot.date || slot.slotDate || slot.slot?.date!
-                                                    ).toLocaleDateString()
-                                                    : 'Shift-wide'}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                Proposed time:{' '}
-                                                {(
-                                                    slot.proposedStart ??
-                                                    slot.proposedStartTime ??
-                                                    slot.proposed_start_time ??
-                                                    slot.startTime ??
-                                                    slot.start_time
-                                                )?.slice(0, 5) || 'N/A'}{' '}
-                                                -{' '}
-                                                {(
-                                                    slot.proposedEnd ??
-                                                    slot.proposedEndTime ??
-                                                    slot.proposed_end_time ??
-                                                    slot.endTime ??
-                                                    slot.end_time
-                                                )?.slice(0, 5) || 'N/A'}
-                                            </Typography>
-                                            {slot.proposedRate != null ? (
-                                                <Typography variant="body2" color="text.secondary">
-                                                    Proposed rate: ${slot.proposedRate}
+                                    return slotsToRender.map((slot: any, idx: number) => {
+                                        const start = (slot.proposedStart ?? slot.proposedStartTime ?? slot.proposed_start_time ?? slot.startTime ?? slot.start_time)?.slice(0, 5);
+                                        const end = (slot.proposedEnd ?? slot.proposedEndTime ?? slot.proposed_end_time ?? slot.endTime ?? slot.end_time)?.slice(0, 5);
+                                        return (
+                                            <Box
+                                                key={`${slot.slotId ?? slot.id ?? idx}-${slot.slotDate ?? slot.slot?.date ?? slot.date ?? idx}`}
+                                                sx={{ p: 1.5, borderRadius: '12px', border: '1px solid var(--ct-border-color)', display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1.3fr 1fr 1fr' }, gap: { xs: 0.75, sm: 2 }, alignItems: 'center' }}
+                                            >
+                                                <Typography sx={{ fontSize: 14, fontWeight: 600, color: 'var(--ct-text-primary)' }}>
+                                                    {formatSlotDate(slot.date || slot.slotDate || slot.slot?.date)}
                                                 </Typography>
-                                            ) : (
-                                                <Typography variant="body2" color="text.secondary">
-                                                    Proposed rate: N/A
-                                                </Typography>
-                                            )}
-                                        </Paper>
-                                    ));
+                                                <Box>
+                                                    <Typography sx={{ fontSize: 12, color: 'var(--ct-text-muted)' }}>Proposed time</Typography>
+                                                    <Typography sx={{ fontSize: 14, fontWeight: 500, color: 'var(--ct-text-primary)' }}>
+                                                        {start || 'N/A'} – {end || 'N/A'}
+                                                    </Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography sx={{ fontSize: 12, color: 'var(--ct-text-muted)' }}>Proposed rate</Typography>
+                                                    <Typography sx={{ fontSize: 14, fontWeight: 500, color: 'var(--ct-text-primary)' }}>
+                                                        {slot.proposedRate != null ? `$${slot.proposedRate}` : 'N/A'}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        );
+                                    });
                                 })()}
 
-                                <Stack spacing={0.5}>
-                                    <Typography variant="subtitle2">Travel</Typography>
+                                <Stack spacing={0.75}>
+                                    <Typography component="h3" sx={sectionTitleSx}>Travel</Typography>
                                     {requestTravel ? (
-                                        <>
-                                            <Chip size="small" color="info" label="Requested travel support" sx={{ alignSelf: 'flex-start' }} />
-                                            <Typography variant="body2" color="text.secondary">
-                                                Traveling from: {travelSuburb || rawOrigin || 'Location not provided'}
-                                            </Typography>
-                                        </>
+                                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                                            <Pill tone="blue" label="Travel support requested" />
+                                            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: 'var(--ct-text-secondary)', '& svg': { width: 14, height: 14 } }}>
+                                                <MapPin />
+                                                <Typography sx={{ fontSize: 13.5, color: 'inherit' }}>
+                                                    From {travelSuburb || rawOrigin || 'an unspecified location'}
+                                                </Typography>
+                                            </Stack>
+                                        </Stack>
                                     ) : (
-                                        <Typography variant="body2" color="text.secondary">
+                                        <Typography sx={{ fontSize: 13.5, color: 'var(--ct-text-secondary)' }}>
                                             No travel support requested.
                                         </Typography>
                                     )}
                                 </Stack>
 
-                                <Divider sx={{ my: 2 }} />
+                                <Divider />
                             </>
                         )}
 
                         {/* Ratings & Reviews - Always show if we have candidate info */}
-                        <Typography variant="subtitle1" gutterBottom fontWeight="bold">
-                            Ratings & Reviews
+                        <Typography component="h3" sx={sectionTitleSx}>
+                            Ratings & reviews
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            {workerRatingSummary ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {workerRatingSummary?.count === 0 ? null : workerRatingSummary ? (
                                 <>
                                     <Rating
                                         value={workerRatingSummary.average}
                                         precision={0.5}
                                         readOnly
                                     />
-                                    <Typography variant="body1" color="text.secondary">
-                                        {workerRatingSummary.average.toFixed(1)} (
-                                        {workerRatingSummary.count} reviews)
+                                    <Typography sx={{ fontSize: 14, color: 'var(--ct-text-secondary)' }}>
+                                        <Box component="span" sx={{ fontWeight: 600, color: 'var(--ct-text-primary)' }}>{workerRatingSummary.average.toFixed(1)}</Box>
+                                        {' '}· {workerRatingSummary.count} {workerRatingSummary.count === 1 ? 'review' : 'reviews'}
                                     </Typography>
                                 </>
                             ) : (
                                 <Skeleton variant="rectangular" width={200} height={28} />
                             )}
                         </Box>
-                        <Box sx={{ display: 'grid', gap: 1.5, mt: 2 }}>
+                        <Box sx={{ display: 'grid', gap: 1.25 }}>
                             {workerRatingComments.map((comment) => (
                                 <Paper
                                     key={comment.id}
                                     variant="outlined"
-                                    sx={{ p: 1.5, borderRadius: 2, bgcolor: 'background.default' }}
+                                    sx={{ p: 1.5, borderRadius: '12px', bgcolor: 'var(--ct-subtle-bg)', borderColor: 'var(--ct-border-color)' }}
                                 >
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                         <Rating value={comment.stars} readOnly size="small" />
@@ -297,6 +296,16 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Close</Button>
+                {pendingConfirmation && pendingOfferId != null && onBuzz && (
+                    <Button
+                        variant="contained"
+                        onClick={() => onBuzz(pendingOfferId)}
+                        disabled={buzzLoadingOfferId === pendingOfferId}
+                        startIcon={buzzLoadingOfferId === pendingOfferId ? <CircularProgress size={16} color="inherit" /> : <BellRing size={16} />}
+                    >
+                        {buzzLoadingOfferId === pendingOfferId ? 'Sending…' : 'Send a reminder'}
+                    </Button>
+                )}
                 {!offer && !pendingConfirmation && !awaitingPayment && onAssign && candidate?.userId != null && (
                     <Button
                         variant="contained"
@@ -309,7 +318,7 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                             ) : undefined
                         }
                     >
-                        {assignLabel || 'Assign to Shift'}
+                        {assignLabel || 'Assign to shift'}
                     </Button>
                 )}
                 {isActionableCounterOffer && (

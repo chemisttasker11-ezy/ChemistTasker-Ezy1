@@ -47,7 +47,8 @@ export type DashboardPayload = {
     action_url?: string;
     actionUrl?: string;
   }>;
-  shifts?: any[];
+  shifts?: import('./WorkerShiftPreviews').DashboardWorkerShift[];
+  recommended_shifts?: import('./WorkerShiftPreviews').DashboardWorkerShift[];
   bills_summary?: { total_billed?: string | number; points?: string | number };
 };
 

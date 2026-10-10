@@ -28,6 +28,9 @@ export default function OwnerOverviewContainer() {
   const navigate = useNavigate();
   const [pharmacies, setPharmacies] = useState<PharmacyDTO[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [dashboardReloadToken, setDashboardReloadToken] = useState(0);
   const [membershipsByPharmacy, setMembershipsByPharmacy] = useState<Record<string, MembershipDTO[]>>({});
   const [adminAssignmentsByPharmacy, setAdminAssignmentsByPharmacy] = useState<Record<string, PharmacyAdminDTO[]>>({});
   const [searchParams, setSearchParams] = useSearchParams();
@@ -63,7 +66,7 @@ export default function OwnerOverviewContainer() {
     } catch (error) {
       console.error("Failed to reload memberships", error);
     }
-  }, [fetchMemberships, fetchAdmins, scopedPharmacyId]);
+  }, [fetchMemberships, fetchAdmins]);
 
   // Fetch pharmacies + memberships (like your Pharmacy page)
   useEffect(() => {
@@ -148,11 +151,15 @@ export default function OwnerOverviewContainer() {
           ? "billing"
           : "overview";
   const activePharmacyId = view === "pharmacy" && rawPharmacyId ? rawPharmacyId : null;
-  const urlScopePharmacyId = Number(
+  // A missing id must stay missing: Number(null) is 0, which the API rejects with 403.
+  const rawUrlScopePharmacyId = Number(
     searchParams.get("pharmacy_id") ??
     searchParams.get("pharmacy") ??
-    searchParams.get("pharmacyId")
+    searchParams.get("pharmacyId") ??
+    NaN
   );
+  const urlScopePharmacyId =
+    Number.isInteger(rawUrlScopePharmacyId) && rawUrlScopePharmacyId > 0 ? rawUrlScopePharmacyId : NaN;
 
   const activePharmacy = useMemo(
     () => pharmacies.find((p) => p.id === activePharmacyId) || null,
@@ -173,10 +180,14 @@ export default function OwnerOverviewContainer() {
 
   useEffect(() => {
     let mounted = true;
-    const dashboardParams =
-      overviewPharmacyId
-        ? { workspace: "internal", pharmacy_id: overviewPharmacyId }
-        : { workspace: "platform" };
+    // An all-pharmacies internal view must not accidentally request platform-only shifts.
+    const isInternalScope = workspace === "internal" || scopedPharmacyId != null;
+    const dashboardParams = isInternalScope
+      ? { workspace: "internal", ...(overviewPharmacyId != null ? { pharmacy_id: overviewPharmacyId } : {}) }
+      : { workspace: "platform" };
+    setDashboardLoading(true);
+    setDashboardError(null);
+    setDashboardData(null);
     apiClient
       .get("/dashboard/owner/", { params: dashboardParams })
       .then(({ data }) => {
@@ -184,12 +195,18 @@ export default function OwnerOverviewContainer() {
       })
       .catch((error: any) => {
         console.error("Owner dashboard analytics fetch error:", error);
-        if (mounted) setDashboardData(null);
+        if (mounted) {
+          setDashboardData(null);
+          setDashboardError("Your current overview could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) setDashboardLoading(false);
       });
     return () => {
       mounted = false;
     };
-  }, [overviewPharmacyId, workspace]);
+  }, [overviewPharmacyId, workspace, scopedPharmacyId, dashboardReloadToken]);
 
   const goHome = () => setViewParam("overview");
   const openPharmacies = (options?: { replace?: boolean }) => setViewParam("pharmacies", { replace: options?.replace });
@@ -210,8 +227,6 @@ export default function OwnerOverviewContainer() {
   const goToRoster = () => navigate(resolvePath("manage-pharmacies/roster"));
   const goToShifts = () => navigate(resolvePath("shift-center"));
   const goToPostShift = () => navigate(resolvePath("post-shift"));
-  const goToProfile = () => navigate(resolvePath("onboarding"));
-  const goToInterests = () => navigate(resolvePath("interests"));
   const goToManagePharmacies = () => {
     if (pharmacies.length === 1) {
       const pharmacyId = pharmacies[0].id;
@@ -223,7 +238,7 @@ export default function OwnerOverviewContainer() {
     navigate(resolvePath("manage-pharmacies/my-pharmacies"));
   };
   const goToPills = () => navigate("/dashboard/owner/pills");
-  const goToSettings = () => undefined;
+  const goToSettings = () => navigate("/dashboard/workforce/settings");
   const goToPharmacyManager = (query: string) =>
     navigate(`${resolvePath("manage-pharmacies/my-pharmacies")}${query}`);
   const handleEditPharmacy = (pharmacy: PharmacyDTO) => {
@@ -253,12 +268,14 @@ export default function OwnerOverviewContainer() {
             pharmacies={pharmacies}
             selectedPharmacyId={overviewPharmacyId}
             dashboardData={dashboardData}
+            dashboardLoading={dashboardLoading}
+            dashboardError={dashboardError}
+            onRetryDashboard={() => setDashboardReloadToken((value) => value + 1)}
+            workspace={workspace}
             onOpenManage={goToManagePharmacies}
             onOpenRoster={goToRoster}
             onOpenShifts={goToShifts}
             onPostShift={goToPostShift}
-            onOpenProfile={goToProfile}
-            onOpenInterests={goToInterests}
             onOpenSettings={goToSettings}
             onOpenPills={goToPills}
           />

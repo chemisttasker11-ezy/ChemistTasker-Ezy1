@@ -277,7 +277,7 @@ test('owner CONTACT membership never offers the quit action', async ({ page }) =
 
   await page.goto('/dashboard/admin-invitations');
   await expect(page.getByText('Smoke Pharmacy')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Quit membership' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Leave pharmacy' })).toHaveCount(0);
 });
 
 test.describe('public/auth wiring', () => {
@@ -582,8 +582,8 @@ test('attendance approval uses existing pharmacy-scoped pending and approve cont
   await expect(page.getByText('Smoke Pharmacist')).toBeVisible();
 
   await page.getByRole('button', { name: 'Approve' }).click();
-  await expect(page.getByText('Approve Provisional Shift')).toBeVisible();
-  await page.getByRole('button', { name: 'Approve & Backfill' }).click();
+  await expect(page.getByText("Approve Smoke Pharmacist's hours?")).toBeVisible();
+  await page.getByRole('button', { name: 'Approve hours' }).click();
 
   await expect(page.getByRole('alert')).toContainText(
     'Successfully approved shift for Smoke Pharmacist',
@@ -659,7 +659,8 @@ test('pharmacist membership accept uses the existing my-memberships action endpo
 
   await page.getByRole('button', { name: 'Accept' }).click();
 
-  await expect(page.getByText('Accepted')).toBeVisible();
+  await expect(page.getByText('Active', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Accept' })).toHaveCount(0);
   expect(observed).toEqual({
     method: 'POST',
     path: '/api/v1/my-memberships/701/accept/',

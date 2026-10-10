@@ -1,33 +1,30 @@
-import { Alert, Stack } from '@mui/material';
+import { Stack } from '@mui/material';
+import { Pill } from '../../components/ui/Pill';
+import { plural } from './timesheetDisplay';
 import type { TimesheetSummary } from './types';
 
+/** Period health as one row of readable counts; each pill says on hover what to do about it. */
 export default function TimesheetHealthBanners({ summary }: { summary: TimesheetSummary | null }) {
   if (!summary) return null;
+  const clear = summary.blocking_timesheets === 0 && summary.warning_checks === 0 && summary.pending_leave_requests === 0;
   return (
-    <Stack spacing={1}>
+    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" aria-label="Period health" role="list" sx={{ '& > *': { minHeight: 28 } }}>
       {summary.blocking_timesheets > 0 && (
-        <Alert severity="error">
-          {summary.blocking_timesheets} timesheet{summary.blocking_timesheets === 1 ? '' : 's'} contain blocking errors.
-        </Alert>
-      )}
-      {summary.pending_leave_requests > 0 && (
-        <Alert severity="info">
-          {summary.pending_leave_requests} leave request{summary.pending_leave_requests === 1 ? '' : 's'} are waiting for review.
-        </Alert>
+        <span role="listitem"><Pill tone="red" label={`${plural(summary.blocking_timesheets, 'timesheet')} with errors`} title="Errors block approval. Open each timesheet to fix them." /></span>
       )}
       {summary.warning_checks > 0 && (
-        <Alert severity="warning">
-          {summary.warning_checks} timesheet check{summary.warning_checks === 1 ? '' : 's'} need review.
-        </Alert>
+        <span role="listitem"><Pill tone="amber" label={`${plural(summary.warning_checks, 'check')} to review`} title="Warnings don't block approval, but resolve or waive them with a reason." /></span>
+      )}
+      {summary.pending_leave_requests > 0 && (
+        <span role="listitem"><Pill tone="blue" label={`${plural(summary.pending_leave_requests, 'leave request')} waiting`} title="Decide these in Leave so the hours count correctly." /></span>
       )}
       {summary.open_sessions > 0 && (
-        <Alert severity="warning">
-          {summary.open_sessions} attendance session{summary.open_sessions === 1 ? '' : 's'} are still open in this period.
-        </Alert>
+        <span role="listitem"><Pill tone="amber" label={`${plural(summary.open_sessions, 'worker')} still clocked in`} title="Open attendance sessions in this period. They count once the worker clocks out." /></span>
       )}
-      {summary.blocking_timesheets === 0 && summary.warning_checks === 0 && summary.pending_leave_requests === 0 && (
-        <Alert severity="success">No period-level exceptions are currently blocking review.</Alert>
+      {summary.ready_timesheets > 0 && (
+        <span role="listitem"><Pill tone="green" label={`${summary.ready_timesheets} ready to approve`} title="No open errors on these timesheets." /></span>
       )}
+      {clear && <span role="listitem"><Pill tone="green" label="No exceptions" title="Nothing in this period is blocking review." /></span>}
     </Stack>
   );
 }

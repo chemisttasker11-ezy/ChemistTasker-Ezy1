@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { fetchRatingsSummaryService, fetchRatingsPageService } from '@chemisttasker/shared-core';
 import { RatingSummary, RatingComment } from '../types';
 
@@ -7,8 +7,11 @@ export function useWorkerRatings() {
     const [comments, setComments] = useState<RatingComment[]>([]);
     const [page, setPage] = useState(1);
     const [pageCount, setPageCount] = useState(1);
+    const request = useRef(0);
+    useEffect(() => () => { request.current += 1; }, []);
 
     const loadRatings = useCallback(async (workerId: number, pageNum: number) => {
+        const generation = ++request.current;
         try {
             const summaryData = await fetchRatingsSummaryService({
                 targetType: 'worker',
@@ -20,6 +23,7 @@ export function useWorkerRatings() {
                 page: pageNum,
             });
 
+            if (generation !== request.current) return;
             setSummary({
                 average: summaryData.average ?? 0,
                 count: summaryData.count ?? 0,
@@ -29,6 +33,7 @@ export function useWorkerRatings() {
             const totalPages = pageData.count ? Math.ceil(pageData.count / 10) : 1;
             setPageCount(totalPages);
         } catch (error) {
+            if (generation !== request.current) return;
             console.error('Failed to load candidate ratings', error);
             setSummary(null);
             setComments([]);
@@ -36,6 +41,7 @@ export function useWorkerRatings() {
     }, []);
 
     const reset = useCallback(() => {
+        request.current += 1;
         setSummary(null);
         setComments([]);
         setPage(1);

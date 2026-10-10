@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { preview } from 'vite';
 
 const testRoot = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(testRoot, '..');
+const projectRoot = process.env.PLAYWRIGHT_APP_ROOT ? resolve(process.env.PLAYWRIGHT_APP_ROOT) : resolve(testRoot, '..');
 const port = Number(process.env.PLAYWRIGHT_PORT || 4173);
 const viteBin = resolve(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js');
 const playwrightCli = resolve(testRoot, 'node_modules', '@playwright', 'test', 'cli.js');
@@ -14,6 +14,9 @@ const env = {
   PLAYWRIGHT_PORT: String(port),
   VITE_API_URL: 'http://127.0.0.1:8000',
   VITE_API_BASE_URL: 'http://127.0.0.1:8000',
+  // Exercise the actual cross-origin Next/Vite URL builder, not same-origin fallback.
+  VITE_PUBLIC_SITE_URL: process.env.VITE_PUBLIC_SITE_URL || 'http://127.0.0.1:3000',
+  EXPECTED_NEXT_ORIGIN: process.env.EXPECTED_NEXT_ORIGIN || process.env.VITE_PUBLIC_SITE_URL || 'http://127.0.0.1:3000',
 };
 
 const build = spawnSync(process.execPath, [viteBin, 'build'], {

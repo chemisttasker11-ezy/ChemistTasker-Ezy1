@@ -94,6 +94,12 @@ jobs:
       - name: Typecheck Vite application
         run: npx tsc -p tsconfig.app.json --noEmit
         working-directory: frontend_web
+      - name: In-page Figma state contracts
+        working-directory: frontend_web
+        run: node scripts/audit-dashboard-visual-states.mjs
+      - name: UI ownership boundaries
+        working-directory: frontend_web
+        run: node scripts/audit-ui-boundaries.mjs
       - name: Cross-frontend auth flow tests
         run: node --test scripts/auth-flow.test.mjs
         working-directory: frontend_web
@@ -140,6 +146,9 @@ jobs:
       - name: Canonical API root normalization
         run: node --test lib/api-root.test.mjs
         working-directory: frontend_web/landing_next
+      - name: Public landing route contract
+        run: node --test lib/public-route-contract.test.mjs
+        working-directory: frontend_web/landing_next
       - run: npm run build
         working-directory: frontend_web/landing_next
 
@@ -174,6 +183,12 @@ jobs:
       - run: npm run lint
         working-directory: frontend_mobile
       - run: npx tsc --noEmit
+        working-directory: frontend_mobile
+      - name: Mobile dependency exploit and compatibility regressions
+        run: npm run test:security
+        working-directory: frontend_mobile
+      - name: Verify patched runtime dependencies and reject new advisories
+        run: npm run security:dependencies
         working-directory: frontend_mobile
 
   backend:
@@ -227,6 +242,7 @@ jobs:
           python -m unittest attendance_tests.test_pharmacy_pin_scope
           python -m unittest attendance_tests.test_worker_pin_setup
           python -m unittest attendance_tests.test_security_boundaries
+          python -m unittest attendance_tests.test_roster_worker_actions.RosterWorkerActionsTests.test_acknowledgement_action_available_only_on_published_week
       - name: Workforce and finance contracts
         run: python backend/manage.py test workforce.tests worker_finance.tests --settings=core.contract_test_settings
       - name: Isolated finance API contracts

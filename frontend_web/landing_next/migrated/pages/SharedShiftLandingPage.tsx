@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate, Link as RouterLink } from '@/public/navigation';
 import {
+  Alert,
+  Box,
+  Chip,
   Container,
   Typography,
-  Card,
-  CardContent,
   Button,
+  Stack,
   Dialog,
   DialogActions,
   DialogContent,
@@ -268,8 +270,23 @@ const SharedShiftLandingPage: React.FC = () => {
   }, [token, user, navigate]);
 
 
-  // FIX: The skeleton loader condition is simplified.
-  // It will show while the API call is loading OR if a user is logged in (to hide the page before redirect).
+  const retrySharedShift = async () => {
+    if (!token) return;
+    setError('');
+    setLoading(true);
+    try {
+      const response: any = await getViewSharedShift({ token });
+      const fetchedShift = response?.data ?? response;
+      setShift(mapSharedShift(fetchedShift));
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Could not load this shift.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Signed-in users intentionally remain in the loading presentation while the
+  // resolved share link redirects into their authenticated shift-detail route.
   const renderContent = () => {
     if (loading || user) {
       return (
@@ -292,16 +309,16 @@ const SharedShiftLandingPage: React.FC = () => {
 
     if (error) {
       return (
-        <Card sx={{ borderRadius: 3, boxShadow: 6 }}>
-          <CardContent sx={{ textAlign: 'center' }}>
-            <Typography variant="h5" color="error" gutterBottom>
-              {error}
-            </Typography>
-            <Button sx={{ mt: 2 }} variant="contained" component={RouterLink} to="/shifts/public-board">
-              Explore Other Shifts
-            </Button>
-          </CardContent>
-        </Card>
+        <Box sx={{ maxWidth: 760, mx: 'auto', py: { xs: 2, md: 4 } }}>
+          <Alert severity="error" sx={{ alignItems: 'flex-start', p: 2.5 }}>
+            <Typography variant="h5" sx={{ mb: .75 }}>This shared shift is unavailable</Typography>
+            <Typography variant="body2" sx={{ mb: 2 }}>{error}</Typography>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+              {token && <Button variant="contained" onClick={retrySharedShift}>Try again</Button>}
+              <Button variant="outlined" component={RouterLink} to="/shifts/public-board">Explore other shifts</Button>
+            </Stack>
+          </Alert>
+        </Box>
       );
     }
 
@@ -313,16 +330,33 @@ const SharedShiftLandingPage: React.FC = () => {
       (shift as any).closed_reason ??
       "This shift doesn't accept candidates anymore.";
 
+    const shiftRole = (shift as any).roleLabel ?? (shift as any).role_label ?? (shift as any).roleNeeded ?? 'Pharmacy shift';
+    const location = [(shift as any).uiLocationCity, (shift as any).uiLocationState].filter(Boolean).join(', ');
+
     return (
       <>
-        {isClosed && (
-          <Card sx={{ borderRadius: 3, boxShadow: 6, border: '1px solid #f5c6cb', backgroundColor: '#fff5f6', mb: 3 }}>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="h6" color="error" gutterBottom>
-                {closedReason}
+        <Box sx={{ mb: 2.5, p: { xs: 2.25, md: 3 }, borderRadius: 3, bgcolor: '#fff', border: '1px solid #E5ECF7', boxShadow: '0 10px 28px rgba(6,18,58,.045)' }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" spacing={1.5}>
+            <Box>
+              <Chip label={isClosed ? 'Shift closed' : 'Shared shift'} color={isClosed ? 'default' : 'primary'} size="small" />
+              <Typography variant="h4" sx={{ mt: 1.25 }}>{shiftRole}</Typography>
+              <Typography color="text.secondary" sx={{ mt: .5, lineHeight: 1.6 }}>
+                {location || 'Location shown according to the current shift privacy rules.'}
               </Typography>
-            </CardContent>
-          </Card>
+            </Box>
+            {!isClosed && (
+              <Typography sx={{ maxWidth: 330, color: 'text.secondary', fontSize: 13, lineHeight: 1.6 }}>
+                You can review the full shared opportunity here. Sign in or create an account only when you are ready to take an account action.
+              </Typography>
+            )}
+          </Stack>
+        </Box>
+
+        {isClosed && (
+          <Alert severity="info" sx={{ mb: 2.5 }}>
+            <Typography sx={{ fontWeight: 900 }}>This opportunity is no longer accepting candidates.</Typography>
+            <Typography variant="body2" sx={{ mt: .35 }}>{closedReason}</Typography>
+          </Alert>
         )}
         <ShiftsBoard
           title="Shift Details"
@@ -341,15 +375,7 @@ const SharedShiftLandingPage: React.FC = () => {
         actionDisabledGuard={() => isClosed}
         fallbackToAllShiftsWhenEmpty
         showAllSlots={isClosed}
-        onRefresh={() => {
-            if (!token) return;
-            return getViewSharedShift({ token })
-              .then((response: any) => {
-                const fetchedShift = response?.data ?? response;
-                setShift(mapSharedShift(fetchedShift));
-              })
-              .catch(() => setError("Could not load this shift."));
-          }}
+        onRefresh={retrySharedShift}
         />
       </>
     );

@@ -16,6 +16,7 @@ from organizations.models import Chain
 from organizations.serializers import user_can_view_full_pharmacy
 from shifts.emails import build_shift_email_context
 from shifts.pricing import expand_shift_slots
+from shifts.access import _user_can_perform_shift_role
 from shifts.travel import haversine_km
 from talent.models import UserAvailability
 
@@ -27,7 +28,6 @@ SHIFT_EMAIL_RECIPIENT_CAP = 50
 def _collect_membership_users(shift, pharmacy_ids, employment_types):
     qs = Membership.objects.filter(
         pharmacy_id__in=pharmacy_ids,
-        role=shift.role_needed,
         employment_type__in=employment_types,
         is_active=True,
         user__is_active=True,
@@ -38,6 +38,8 @@ def _collect_membership_users(shift, pharmacy_ids, employment_types):
         if not user or not user.email:
             continue
         if shift.created_by_id and user.id == shift.created_by_id:
+            continue
+        if not _user_can_perform_shift_role(user, shift.role_needed):
             continue
         users.append(user)
     return users
@@ -202,15 +204,6 @@ def _build_shift_email_slot_meta(shift, slot_entries, *, user=None):
         "rate_summary": rate_summary,
     }
 
-def _role_matches_shift(user_role, shift_role):
-    if shift_role == "PHARMACIST":
-        return user_role == "PHARMACIST"
-    if shift_role in ["ASSISTANT", "TECHNICIAN", "INTERN", "STUDENT"]:
-        return user_role == "OTHER_STAFF"
-    if shift_role == "EXPLORER":
-        return user_role == "EXPLORER"
-    return False
-
 def _availability_matches_slot(availability, slot_date, slot_start, slot_end):
     if not slot_date or not slot_start or not slot_end:
         return False
@@ -284,6 +277,65 @@ def _user_can_travel_to_shift(pref_row, shift):
         return False
     distance = haversine_km(float(user_lat), float(user_lon), float(pharm_lat), float(pharm_lon))
     return distance <= float(radius_km)
+
+def find_availability_matched_shifts(user, shifts_qs, *, limit=6):
+    """Return open shifts that genuinely fit this worker's declared availability and travel preferences.
+
+    This reuses the same availability/location rules used by new-shift notifications so dashboard recommendations
+    cannot drift from notification behaviour. The worker does not need to opt into notifications for the dashboard
+    to use availability they have already declared.
+    """
+    availabilities = list(
+        UserAvailability.objects.filter(user=user).select_related("user")
+    )
+    if not availabilities:
+        return []
+
+    role = str(getattr(user, "role", "") or "").upper()
+    prefs = _load_user_travel_prefs({role: [user.id]})
+    pref_row = prefs.get(user.id)
+    if not pref_row:
+        return []
+
+    today = timezone.localdate()
+    matches = []
+    candidates = (
+        shifts_qs.select_related("pharmacy")
+        .prefetch_related("slots")
+        .order_by("-created_at", "id")
+        .distinct()
+    )
+
+    for shift in candidates[:80]:
+        if not _user_can_perform_shift_role(user, shift.role_needed):
+            continue
+        if not _user_can_travel_to_shift(pref_row, shift):
+            continue
+
+        slot_entries = [
+            entry
+            for entry in expand_shift_slots(shift)
+            if entry.get("date") and entry["date"] >= today
+        ]
+        if not slot_entries:
+            continue
+
+        if any(
+            _availability_matches_slot(
+                availability,
+                entry.get("date"),
+                entry.get("start_time"),
+                entry.get("end_time"),
+            )
+            for availability in availabilities
+            for entry in slot_entries
+        ):
+            matches.append(shift)
+            if len(matches) >= limit:
+                break
+
+    return matches
+
 
 def announce_posted_shift(
     shift,
@@ -437,7 +489,7 @@ def announce_availability_matches(shift):
     user_ids_by_role = {"PHARMACIST": set(), "OTHER_STAFF": set(), "EXPLORER": set()}
     for availability in user_availabilities:
         user = availability.user
-        if not user or not _role_matches_shift(getattr(user, "role", None), shift.role_needed):
+        if not user or not _user_can_perform_shift_role(user, shift.role_needed):
             continue
         user_availability_map.setdefault(user.id, []).append(availability)
         if user.role in user_ids_by_role:

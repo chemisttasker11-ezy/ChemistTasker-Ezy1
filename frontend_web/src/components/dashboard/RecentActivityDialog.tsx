@@ -33,12 +33,12 @@ function activityIcon(event: DashboardActivity) {
 
 function activityColor(event: DashboardActivity) {
   if (event.color) return event.color;
-  if (event.kind === "hub") return "#063BDA";
+  if (event.kind === "hub") return "#0063A8";
   if (event.kind === "reveal") return "#EA0A8E";
   if (event.kind === "confirmed") return "#00C853";
-  if (event.kind === "pharmacy") return "#5B18E8";
+  if (event.kind === "pharmacy") return "#5222B8";
   if (event.kind === "invoice") return "#FF5A00";
-  return "#5B18E8";
+  return "#5222B8";
 }
 
 export default function RecentActivityDialog({
@@ -58,7 +58,7 @@ export default function RecentActivityDialog({
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle sx={{ pr: 7 }}>
         Recent Activity
-        <IconButton onClick={onClose} sx={{ position: "absolute", right: 12, top: 10 }}>
+        <IconButton aria-label="Close recent activity" onClick={onClose} sx={{ position: "absolute", right: 12, top: 10 }}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
@@ -95,7 +95,7 @@ export default function RecentActivityDialog({
                       textAlign: "left",
                       borderRadius: 1,
                       cursor: clickable ? "pointer" : "default",
-                      "&:hover": clickable ? { bgcolor: alpha("#5B18E8", 0.05) } : undefined,
+                      "&:hover": clickable ? { bgcolor: alpha("#5222B8", 0.05) } : undefined,
                     }}
                   >
                     <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ py: 1.6, px: 0.75 }}>

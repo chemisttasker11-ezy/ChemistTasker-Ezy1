@@ -25,6 +25,7 @@ import { useWorkspace } from '../../../contexts/WorkspaceContext';
 import { submitCounterOfferDirect } from './ShiftsBoard/utils/submitCounterOffer';
 import ShiftEngagementTermsDialog from './ShiftsBoard/components/ShiftEngagementTermsDialog';
 import type { ShiftOfferAcceptancePayload } from '@chemisttasker/shared-core';
+import PageHeader from "../../../components/ui/PageHeader";
 
 type FilterConfig = {
   city: string[];
@@ -187,14 +188,6 @@ export default function CommunityShiftsPage({
     }
   }, [workspace, location.pathname, navigate, user]);
 
-  const heroGradient = useMemo(
-    () =>
-      `linear-gradient(135deg, ${alpha(
-        theme.palette.primary.main,
-        0.94
-      )}, ${alpha(theme.palette.primary.dark, 0.74)})`,
-    [theme.palette.primary.dark, theme.palette.primary.main]
-  );
 
   const loadSaved = useCallback(async () => {
     try {
@@ -499,35 +492,7 @@ export default function CommunityShiftsPage({
         gap: { xs: 2.5, md: 3 },
       }}
     >
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: { xs: 3, md: 4 },
-          backgroundImage: heroGradient,
-          color: '#fff',
-          overflow: 'hidden',
-        }}
-      >
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          spacing={{ xs: 2, md: 3 }}
-          alignItems={{ xs: 'flex-start', md: 'center' }}
-          justifyContent="space-between"
-        >
-          <Box>
-            <Typography variant="overline" sx={{ opacity: 0.72, letterSpacing: '.1em' }}>
-              Shift Board
-            </Typography>
-            <Typography variant="h4" fontWeight={800} gutterBottom>
-              Discover shifts at a glance
-            </Typography>
-            <Typography variant="body1" sx={{ opacity: 0.92, maxWidth: 560 }}>
-              Browse open shifts, review your saved list, and track interested or rejected opportunities.
-            </Typography>
-          </Box>
-        </Stack>
-      </Paper>
+      <PageHeader title="Discover shifts at a glance" subtitle="Browse open shifts, review your saved list, and track interested or rejected opportunities." />
 
       {error && (
         <Typography color="error" sx={{ px: { xs: 2, lg: 3 }, py: 1 }}>

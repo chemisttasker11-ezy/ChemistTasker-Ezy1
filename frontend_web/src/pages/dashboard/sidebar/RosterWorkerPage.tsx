@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-  Container,
   Typography,
+  Button,
+  ToggleButton,
+  ToggleButtonGroup,
   Skeleton,
   Box,
   FormControl,
@@ -25,6 +27,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { calendarViews, calendarMessages, getDateRangeForView, CalendarViewKey } from './calendarViews';
 import { useAuth } from '../../../contexts/AuthContext'; // Using the corrected path
 import { ROSTER_COLORS } from '../../../constants/rosterColors';
+import { rosterEventForeground } from '../../../utils/rosterEventAppearance';
 import {
   fetchRosterWorkerPharmaciesService,
   fetchRosterWorkerAssignments,
@@ -51,20 +54,24 @@ import {
   ALL_STAFF,
 } from './RosterWorkerPage.model';
 import RosterWorkerDialogs from './RosterWorkerDialogs';
+import RosterWorkerAgenda from '../../../components/roster/RosterWorkerAgenda';
+import RosterWorkerAcknowledgements from '../../../components/roster/RosterWorkerAcknowledgements';
+import PageHeader from '../../../components/ui/PageHeader';
+import DashboardContentState from '../../../components/dashboard/DashboardContentState';
+import { CalendarDays } from 'lucide-react';
 const localizer = momentLocalizer(moment);
 
 // --- Skeleton Component for Unified Loading ---
 const RosterPageSkeleton = () => (
-    <Container maxWidth={false} disableGutters sx={{ width: '100%', py: { xs: 1, md: 2 } }}>
-        <Typography variant="h4" gutterBottom><Skeleton width="30%" /></Typography>
-        <Skeleton variant="rectangular" height={48} sx={{ mb: 3 }} />
-        <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2}}>
-            <Typography variant="h5"><Skeleton width="200px" /></Typography>
-            <Skeleton variant="rectangular" width={300} height={56} />
+    <Box role="status" aria-busy="true" aria-label="Loading your roster" sx={{ width: '100%' }}>
+        <Skeleton variant="rounded" height={48} sx={{ mb: 3 }} />
+        <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2}}>
+            <Skeleton width={200} height={32} />
+            <Skeleton variant="rounded" width={300} height={56} sx={{ maxWidth: '50%' }} />
         </Box>
-        <Typography variant="body2"><Skeleton width="80%" /></Typography>
-        <Skeleton variant="rectangular" height={600} sx={{ mt: 2 }} />
-    </Container>
+        <Skeleton width="80%" />
+        <Skeleton variant="rounded" height={600} sx={{ mt: 2 }} />
+    </Box>
 );
 // --- Main Component ---
 export default function RosterWorkerPage() {
@@ -88,9 +95,12 @@ export default function RosterWorkerPage() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isAssignmentsLoading, setIsAssignmentsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const rosterRequestSequence = useRef(0);
   // --- Calendar State ---
   const [calendarView, setCalendarView] = useState<CalendarViewKey>('week'); // Align with shared calendar configuration
   const [calendarDate, setCalendarDate] = useState<Date>(new Date());
+  const [mobileRosterView, setMobileRosterView] = useState<'AGENDA' | 'CALENDAR'>('AGENDA');
   
   // --- Dialogs and Forms State ---
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
@@ -188,14 +198,17 @@ export default function RosterWorkerPage() {
   // --- DATA LOADING ---
   useEffect(() => {
     const loadInitialData = async () => {
-      if (!currentUserId) return;
+      if (!currentUserId) {
+        setIsPageLoading(false);
+        return;
+      }
       setIsPageLoading(true);
       try {
         const loadedPharmacies = await fetchRosterWorkerPharmaciesService();
         const mapped = loadedPharmacies.map(mapPharmacySummaryToView);
         setPharmacies(mapped);
         if (mapped.length > 0) {
-          const initialId = initialPharmacyFromUrl ?? mapped[0].id;
+          const initialId = initialPharmacyFromUrl != null && mapped.some((p) => p.id === initialPharmacyFromUrl) ? initialPharmacyFromUrl : mapped[0].id;
           setSelectedPharmacyId(initialId);
         }
       } catch (err: any) { 
@@ -206,14 +219,17 @@ export default function RosterWorkerPage() {
     };
     
     loadInitialData();
-  }, [currentUserId, calendarDate, calendarView, initialPharmacyFromUrl]);
+  }, [currentUserId, initialPharmacyFromUrl]);
   useEffect(() => {
     if (!isPageLoading && selectedPharmacyId) {
-      reloadAssignments();
+      void reloadAssignments();
     }
-  }, [selectedPharmacyId, calendarDate, calendarView]);
+    return () => { rosterRequestSequence.current += 1; };
+  }, [selectedPharmacyId, calendarDate, calendarView, isPageLoading]);
 const reloadAssignments = async () => {
   if (!selectedPharmacyId) return;
+  const requestNumber = ++rosterRequestSequence.current;
+  setRosterError(null);
   const shouldShowSkeleton = isPageLoading;
   if (!shouldShowSkeleton) {
     setIsAssignmentsLoading(true);
@@ -227,6 +243,7 @@ const reloadAssignments = async () => {
       fetchCommunityShifts({ pharmacyId: selectedPharmacyId, startDate, endDate, unassigned: true }),
       fetchWorkerShiftRequestsService({ pharmacyId: selectedPharmacyId, startDate, endDate }),
     ]);
+    if (requestNumber !== rosterRequestSequence.current) return;
     const assignments = assignmentsRes.map(mapAssignmentToView);
     const openShiftResults = Array.isArray(openShiftsRes) ? openShiftsRes : openShiftsRes?.results ?? [];
     const openShifts = openShiftResults.map(mapOpenShiftToView);
@@ -336,13 +353,14 @@ const reloadAssignments = async () => {
 
     setAllAssignments(filteredAssignments);
   } catch (err: any) {
-    console.error("Failed to load roster assignments or cover requests", err);
-  } finally {
-    if (!shouldShowSkeleton) {
-      setIsAssignmentsLoading(false);
+    if (requestNumber === rosterRequestSequence.current) {
+      console.error("Failed to load roster assignments or cover requests", err);
+      setRosterError("We couldn't refresh your roster, so these shifts may be out of date. Try again before acting on them.");
     }
-    if (shouldShowSkeleton) {
-      setIsPageLoading(false);
+  } finally {
+    if (requestNumber === rosterRequestSequence.current) {
+      if (!shouldShowSkeleton) setIsAssignmentsLoading(false);
+      if (shouldShowSkeleton) setIsPageLoading(false);
     }
   }
 };
@@ -351,7 +369,6 @@ const reloadAssignments = async () => {
     if (!selectedAssignment || !selectedAssignment.isOpenShift || !selectedAssignment.originalShiftId) return;
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       await claimShiftService({
         shiftId: selectedAssignment.originalShiftId,
         slotId: selectedAssignment.slot_detail.id,
@@ -429,7 +446,6 @@ const handleSubmitLeaveRequest = async () => {
   }
   setIsSubmitting(true);
   try {
-    setIsPageLoading(true);
     if (isUpdate && existingLeave?.id) {
       await updateLeaveRequestService(existingLeave.id, {
         leave_type: leaveType,
@@ -466,7 +482,6 @@ const handleSubmitLeaveRequest = async () => {
     }
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       await deleteLeaveRequestService(existingLeave.id);
       setSnackbar({ open: true, message: "Leave request cancelled.", severity: "success" });
       setIsLeaveDialogOpen(false);
@@ -514,7 +529,6 @@ const handleSubmitLeaveRequest = async () => {
     const targetPharmacy = existingSwap?.pharmacy || selectedPharmacyId;
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       const payload = {
         pharmacy: targetPharmacy,
         role: roleNeeded,
@@ -553,7 +567,6 @@ const handleSubmitLeaveRequest = async () => {
     }
     setIsSubmitting(true);
     try {
-    setIsPageLoading(true);
       await deleteWorkerShiftRequestService(existingSwap.id);
       setSnackbar({ open: true, message: "Cover request cancelled.", severity: "success" });
       setIsSwapDialogOpen(false);
@@ -657,7 +670,7 @@ const handleSubmitLeaveRequest = async () => {
             resource: a
         };
     });
-  }, [allAssignments, roleFilters]);
+  }, [allAssignments, roleFilters, pharmacies, selectedPharmacyId]);
   // --- DYNAMIC EVENT STYLING ---
   const eventStyleGetter = (event: { resource: Assignment }) => {
     const assignment = event.resource;
@@ -686,8 +699,8 @@ const handleSubmitLeaveRequest = async () => {
     const style = {
         backgroundColor,
         borderRadius: '5px',
-        opacity: assignment.isOpenShift ? 0.9 : (isMyShift ? 0.8 : 0.5),
-        color: 'white', // Ensure text is white for better contrast on colored backgrounds
+        opacity: 1,
+        color: rosterEventForeground(backgroundColor),
         border: borderStyle,
         display: 'block',
         cursor: (isMyShift || assignment.isOpenShift) ? 'pointer' : 'not-allowed', // Allow clicking open shifts
@@ -700,25 +713,46 @@ const handleSubmitLeaveRequest = async () => {
   const canModifySwapRequest = swapRequestStatus === 'PENDING';
   // --- RENDER LOGIC ---
   if (isPageLoading) {
-    return <RosterPageSkeleton />;
+    return (
+      <Box sx={{ width: '100%', minWidth: 0 }}>
+        <PageHeader title="My roster" subtitle="See your next shifts, manage requests and find team cover." />
+        <RosterPageSkeleton />
+      </Box>
+    );
+  }
+  const header = <PageHeader title="My roster" subtitle="See your next shifts, manage requests and find team cover." />;
+  if (!selectedPharmacyId) {
+    return (
+      <Box sx={{ width: '100%', minWidth: 0 }}>
+        {header}
+        <DashboardContentState
+          kind="empty"
+          icon={<CalendarDays size={26} />}
+          title="No pharmacy roster yet"
+          description="Your shifts appear here once a pharmacy adds you to its team. Check Memberships for invitations."
+        />
+      </Box>
+    );
   }
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: 26, md: 34 }, fontWeight: 800 }}>
-        My Roster
-      </Typography>
+      {header}
+      {rosterError && <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => void reloadAssignments()} sx={{ minHeight: 44, fontWeight: 600, whiteSpace: 'nowrap' }}>Try again</Button>}>{rosterError}</Alert>}
       <Tabs
-        value={selectedPharmacyId}
+        aria-label="My roster pharmacy locations"
+        value={selectedPharmacyId ?? false}
         onChange={(_, val) => {
           setAllAssignments([]);
           setSelectedPharmacyId(val as number);
         }}
         sx={{
-          mb: { xs: 2, md: 3 },
+          mb: { xs: 2, md: 2.5 },
           maxWidth: '100%',
+          borderBottom: '1px solid var(--ct-border-color)',
           '& .MuiTabs-scroller': { overflowX: 'auto !important' },
           '& .MuiTab-root': {
-            minWidth: { xs: 170, md: 220 },
+            minHeight: 48,
+            minWidth: { xs: 150, md: 200 },
             maxWidth: { xs: 220, md: 320 },
             px: { xs: 1.5, md: 2 },
           },
@@ -731,22 +765,39 @@ const handleSubmitLeaveRequest = async () => {
       >
         {pharmacies.map(p => <Tab key={p.id} label={p.name} value={p.id} />)}
       </Tabs>
+      <RosterWorkerAcknowledgements pharmacyId={selectedPharmacyId} calendarDate={calendarDate} />
+      <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 2.5 }}>
+        <ToggleButtonGroup fullWidth exclusive size="small" value={mobileRosterView} onChange={(_, next: 'AGENDA' | 'CALENDAR' | null) => { if (next) setMobileRosterView(next); }} aria-label="Choose roster view" sx={{ bgcolor: 'var(--ct-subtle-bg)', borderRadius: '10px', p: 0.5, '& .MuiToggleButton-root': { flex: 1, minHeight: 44, border: 0, borderRadius: '8px !important', fontWeight: 600, textTransform: 'none', color: 'var(--ct-text-secondary)', '&.Mui-selected': { bgcolor: 'var(--ct-surface-bg)', color: 'var(--ct-accent-strong)', boxShadow: '0 2px 8px rgba(6,18,58,.08)' } } }}>
+          <ToggleButton value="AGENDA">My agenda</ToggleButton>
+          <ToggleButton value="CALENDAR">Calendar</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+      <Box sx={{ display: { xs: mobileRosterView === 'AGENDA' ? 'block' : 'none', md: 'none' }, mb: 2.5 }}>
+        <RosterWorkerAgenda
+          assignments={allAssignments}
+          userId={currentUserId}
+          calendarDate={calendarDate}
+          onNavigate={setCalendarDate}
+          onSelect={(assignment) => handleSelectEvent({ resource: assignment })}
+          loading={isAssignmentsLoading}
+        />
+      </Box>
       <Box sx={{
-        display: 'flex',
+        display: { xs: mobileRosterView === 'CALENDAR' ? 'flex' : 'none', md: 'flex' },
         justifyContent: 'space-between',
         alignItems: { xs: 'stretch', md: 'center' },
         flexDirection: { xs: 'column', md: 'row' },
         gap: { xs: 1.5, md: 2 },
         mb: 2,
       }}>
-          <Typography variant="h5">Roster Calendar</Typography>
+          <Typography component="h2" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 22, lineHeight: 1.2, color: 'var(--ct-text-primary)' }}>Pharmacy calendar</Typography>
           <FormControl sx={{ width: { xs: '100%', sm: 300 }, alignSelf: { xs: 'stretch', md: 'center' } }}>
-              <InputLabel>Filter by Role</InputLabel>
+              <InputLabel>Show roles</InputLabel>
               <Select
                   multiple
                   value={roleFilters}
                   onChange={handleRoleFilterChange}
-                  input={<OutlinedInput label="Filter by Role" />}
+                  input={<OutlinedInput label="Show roles" />}
                   renderValue={(selected) => (selected.includes(ALL_STAFF) ? 'All Staff' : selected.map(s => s.charAt(0) + s.slice(1).toLowerCase()).join(', '))}
               >
                   <MenuItem value={ALL_STAFF}>
@@ -762,8 +813,13 @@ const handleSubmitLeaveRequest = async () => {
               </Select>
           </FormControl>
       </Box>
-      <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>This calendar shows all shifts at the selected pharmacy. You can interact with your own shifts to request leave or cover, and claim open shifts.</Typography>
+      <Typography variant="body2" sx={{ mb: 2, display: { xs: mobileRosterView === 'CALENDAR' ? 'block' : 'none', md: 'block' }, color: 'var(--ct-text-secondary)', lineHeight: 1.6 }}>
+        {!isAssignmentsLoading && calendarEvents.length === 0
+          ? 'No published shifts in this period. Use Next to look ahead.'
+          : 'Select your shift to request leave or cover, or an open shift to claim it.'}
+      </Typography>
       <Box sx={{
+        display: { xs: mobileRosterView === 'CALENDAR' ? 'block' : 'none', md: 'block' },
         position: 'relative',
         width: '100%',
         minWidth: 0,
@@ -858,7 +914,7 @@ const handleSubmitLeaveRequest = async () => {
                 <Box sx={{ px: 0.5, py: 0.3 }}>
                   <Typography
                     variant="caption"
-                    sx={{ fontWeight: 600, color: "white", lineHeight: 1 }}
+                    sx={{ fontWeight: 750, color: 'inherit', lineHeight: 1.2 }}
                   >
                     {event.title}
                   </Typography>
@@ -867,8 +923,8 @@ const handleSubmitLeaveRequest = async () => {
                       variant="caption"
                       sx={{
                         display: "block",
-                        color: "#fff",
-                        fontWeight: 500,
+                        color: 'inherit',
+                        fontWeight: 650,
                         fontSize: "0.7rem",
                         mt: 0.3,
                       }}
@@ -881,8 +937,8 @@ const handleSubmitLeaveRequest = async () => {
                       variant="caption"
                       sx={{
                         display: "block",
-                        color: "#fff",
-                        fontWeight: 500,
+                        color: 'inherit',
+                        fontWeight: 650,
                         fontSize: "0.7rem",
                         mt: 0.3,
                       }}

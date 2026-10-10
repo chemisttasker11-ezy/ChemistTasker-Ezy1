@@ -1,630 +1,377 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  Alert,
   Box,
-  Paper,
-  Typography,
-  Stack,
   Button,
   ButtonBase,
   Chip,
-  CircularProgress,
+  Skeleton,
+  Stack,
+  Typography,
 } from "@mui/material";
-import StoreIcon from "@mui/icons-material/Store";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
-import AppsIcon from "@mui/icons-material/Apps";
-import PeopleIcon from "@mui/icons-material/People";
-import SettingsIcon from "@mui/icons-material/Settings";
-import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
-import CreditCardIcon from "@mui/icons-material/CreditCard";
-import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import ForumIcon from "@mui/icons-material/Forum";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import { alpha } from "@mui/material/styles";
+import {
+  ArrowRight,
+  Banknote,
+  Briefcase,
+  CalendarCheck,
+  CalendarDays,
+  ClipboardList,
+  Pill,
+  ReceiptText,
+  Settings,
+  ShieldCheck,
+  SquarePlus,
+  Store,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import apiClient from "../../../../utils/apiClient";
 import { useAuth } from "../../../../contexts/AuthContext";
+import apiClient from "../../../../utils/apiClient";
 import { dashboardGreetingName } from "../../../../utils/displayName";
-import RecentActivityDialog from "../../../../components/dashboard/RecentActivityDialog";
 import type { PharmacyDTO } from "./types";
 
-const DNA = {
-  ink: "#06123A",
-  muted: "#5E6B8D",
-  line: "#E5ECF7",
-  blue: "#063BDA",
-  violet: "#6D28D9",
-  magenta: "#EA0A8E",
-  cyan: "#08BEEA",
+import { formatShiftDate } from "../../../../utils/shiftDisplay";
+import ActivityList from "../../../../components/ui/ActivityList";
+import BrandBanner from "../../../../components/ui/BrandBanner";
+import IconTile, { type Tone } from "../../../../components/ui/IconTile";
+import MetricStrip from "../../../../components/ui/MetricStrip";
+import SectionCard, { ViewAllLink } from "../../../../components/ui/SectionCard";
+import StatList from "../../../../components/ui/StatList";
+type ShiftRecord = {
+  id: number;
+  pharmacy_name?: string | null;
+  date?: string | null;
 };
-
-type QuickAction = {
+type ActivityRecord = {
   title: string;
-  description: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-  tone: "blue" | "purple" | "pink" | "cyan";
-  wide?: boolean;
-};
-
-type StatItem = {
-  label: string;
-  value: string | number;
-  helper: string;
-  icon: React.ReactNode;
-  tone: "blue" | "purple" | "pink" | "cyan";
-};
-
-type ActivityItem = {
-  title: string;
-  description: string;
-  time: string;
-  icon?: React.ReactNode;
-  color?: string;
+  description?: string;
+  time?: string;
   kind?: string;
-  target_id?: number | string;
-  targetId?: number | string;
   action_url?: string;
   actionUrl?: string;
 };
-
-const toneStyles = {
-  blue: { bg: "#E7F0FF", color: "#063BDA", link: "#063BDA" },
-  purple: { bg: "#EFE7FF", color: "#6D28D9", link: "#4C0DDE" },
-  pink: { bg: "#FDE7F5", color: "#EA0A8E", link: "#EA0A8E" },
-  cyan: { bg: "#DDFBFF", color: "#008EA6", link: "#063BDA" },
+type OwnerData = {
+  shift_summary?: {
+    open_count?: number;
+    confirmed_count?: number;
+    upcoming_confirmed_count?: number;
+    all_count?: number;
+  };
+  upcoming_stats?: { today?: number; week?: number; month?: number };
+  workspace_upcoming_stats?: { today?: number; week?: number; month?: number };
+  invoice_summary?: {
+    unpaid_count?: number;
+    unpaid_total?: string;
+    total_billed?: string;
+  };
+  shifts?: ShiftRecord[];
+  activity?: ActivityRecord[];
+};
+type Metric = {
+  label: string;
+  value: number | undefined;
+  description: string;
+  icon: ReactNode;
+  action: () => void;
+  tone: Tone;
 };
 
-function activityIcon(event: ActivityItem) {
-  if (event.icon) return event.icon;
-  if (event.kind === "hub") return <ForumIcon />;
-  if (event.kind === "reveal") return <VisibilityIcon />;
-  if (event.kind === "confirmed") return <ShieldOutlinedIcon />;
-  if (event.kind === "invoice") return <CreditCardIcon />;
-  if (event.kind === "pharmacy") return <StoreIcon />;
-  return <CalendarMonthIcon />;
+const ink = "var(--ct-text-primary)";
+const muted = "var(--ct-text-secondary)";
+const line = "var(--ct-border-color)";
+
+function readableCount(value: number | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("en-AU") : "—";
 }
 
-function activityColor(event: ActivityItem) {
-  if (event.color) return event.color;
-  if (event.kind === "hub") return "#063BDA";
-  if (event.kind === "reveal") return "#EA0A8E";
-  if (event.kind === "confirmed") return "#00C853";
-  if (event.kind === "invoice") return "#FF5A00";
-  return "#5B18E8";
+function readableDate(raw?: string | null): string {
+  return formatShiftDate(raw) ?? "Date not provided";
+}
+
+function safeActivityUrl(record: ActivityRecord): string | null {
+  const path = record.actionUrl || record.action_url || "";
+  return path.startsWith("/dashboard/") && !path.startsWith("//") ? path : null;
 }
 
 export default function OwnerOverviewHome({
   totalPharmacies,
   pharmacies,
   selectedPharmacyId,
+  workspace,
+  dashboardData,
+  dashboardLoading,
+  dashboardError,
+  onRetryDashboard,
   onOpenManage,
   onOpenRoster,
   onOpenShifts,
   onPostShift,
-  onOpenProfile,
-  onOpenInterests,
   onOpenSettings,
   onOpenPills,
-  dashboardData,
 }: {
   totalPharmacies: number;
   pharmacies: PharmacyDTO[];
   selectedPharmacyId: number | null;
-  dashboardData?: any;
+  workspace: "internal" | "platform";
+  dashboardData?: OwnerData | null;
+  dashboardLoading: boolean;
+  dashboardError: string | null;
+  onRetryDashboard: () => void;
   onOpenManage: () => void;
   onOpenRoster: () => void;
   onOpenShifts: () => void;
   onPostShift: () => void;
-  onOpenProfile: () => void;
-  onOpenInterests: () => void;
   onOpenSettings: () => void;
   onOpenPills: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, activePersona } = useAuth();
   const navigate = useNavigate();
+  const canSeeOwnerFinance = activePersona !== "admin";
   const [pillBalance, setPillBalance] = useState<number | null>(null);
-  const [shiftPostCost, setShiftPostCost] = useState<number | null>(null);
-  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
-  const [activityDialogLoading, setActivityDialogLoading] = useState(false);
 
   useEffect(() => {
+    if (!canSeeOwnerFinance) return;
     let mounted = true;
-    apiClient
-      .get("/pill-rewards/balance/")
+    setPillBalance(null);
+    apiClient.get("/pill-rewards/balance/")
       .then(({ data }) => {
-        if (!mounted) return;
-        setPillBalance(Number(data?.balance ?? 0));
-        setShiftPostCost(Number(data?.shift_post_cost ?? 0));
+        const amount = Number(data?.balance);
+        if (mounted) setPillBalance(Number.isFinite(amount) ? amount : null);
       })
       .catch(() => {
-        if (!mounted) return;
-        setPillBalance(0);
-        setShiftPostCost(null);
+        if (mounted) setPillBalance(null);
       });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    return () => { mounted = false; };
+  }, [canSeeOwnerFinance]);
 
   const selectedPharmacy = useMemo(
     () => pharmacies.find((pharmacy) => Number(pharmacy.id) === Number(selectedPharmacyId)) ?? null,
-    [pharmacies, selectedPharmacyId]
+    [pharmacies, selectedPharmacyId],
   );
-  const activePharmacyName = selectedPharmacy?.name || "All pharmacies";
-  const todayShifts = Number(dashboardData?.upcoming_stats?.today ?? 0);
-  const weekShifts = Number(dashboardData?.upcoming_stats?.week ?? dashboardData?.upcoming_shifts_count ?? 0);
-  const monthShifts = Number(dashboardData?.upcoming_stats?.month ?? dashboardData?.upcoming_shifts_count ?? 0);
-  const openShiftCount = Number(dashboardData?.shift_summary?.open_count ?? 0);
-  const confirmedShiftCount = Number(dashboardData?.shift_summary?.confirmed_count ?? dashboardData?.confirmed_shifts_count ?? 0);
-  const allShiftCount = Number(dashboardData?.shift_summary?.all_count ?? dashboardData?.shift_summary?.upcoming_count ?? dashboardData?.upcoming_shifts_count ?? 0);
-  const unpaidInvoiceCount = Number(dashboardData?.invoice_summary?.unpaid_count ?? 0);
-  const unpaidInvoiceTotal = dashboardData?.invoice_summary?.unpaid_total ?? "$0.00";
-  const displayName = dashboardGreetingName(user);
+  const scopeName = selectedPharmacy?.name || (workspace === "platform" ? "Public platform" : "All pharmacies");
+  const shiftSummary = dashboardData?.shift_summary;
+  const upcoming = workspace === "internal" ? dashboardData?.workspace_upcoming_stats ?? dashboardData?.upcoming_stats : dashboardData?.upcoming_stats;
+  const invoiceSummary = dashboardData?.invoice_summary;
+  const upcomingShifts = Array.isArray(dashboardData?.shifts) ? dashboardData.shifts.slice(0, 5) : [];
+  const activity = Array.isArray(dashboardData?.activity) ? dashboardData.activity.slice(0, 5) : [];
+  const ready = !dashboardLoading && !dashboardError && Boolean(dashboardData);
 
-  const quickActions: QuickAction[] = [
+  const metrics: Metric[] = [
     {
-      title: totalPharmacies > 1 ? "Manage Pharmacies" : "Manage Pharmacy",
-      icon: <StoreIcon />,
-      description: totalPharmacies > 1 ? "Create, edit and configure stores" : "Manage staff",
-      onClick: onOpenManage,
+      label: "Open shifts",
+      value: shiftSummary?.open_count,
+      description: "Review staffing requests",
+      icon: <CalendarDays />,
+      action: onOpenShifts,
       tone: "blue",
     },
     {
-      title: "Internal Roster",
-      description: "Map out internal coverage",
-      icon: <CalendarMonthIcon />,
-      onClick: onOpenRoster,
-      tone: "purple",
+      label: "Confirmed cover",
+      value: workspace === "internal" ? shiftSummary?.upcoming_confirmed_count : shiftSummary?.confirmed_count,
+      description: "Upcoming confirmed shifts",
+      icon: <ShieldCheck />,
+      action: onOpenShifts,
+      tone: "violet",
     },
     {
-      title: "Post Shift",
-      description: "Publish an open shift in seconds",
-      icon: <ListAltIcon />,
-      onClick: onPostShift,
-      tone: "pink",
-    },
-    {
-      title: "Shift Centre",
-      description: "Upcoming & confirmed shifts",
-      icon: <WorkOutlineIcon />,
-      onClick: onOpenShifts,
+      label: "Due today",
+      value: upcoming?.today,
+      description: "Upcoming shift commitments",
+      icon: <Briefcase />,
+      action: onOpenRoster,
       tone: "cyan",
     },
-    {
-      title: "Invoices",
-      description: "Review received invoices",
-      icon: <CreditCardIcon />,
-      onClick: () => navigate("/dashboard/owner/invoice"),
-      tone: "purple",
-    },
-    {
-      title: "Talent Hub",
-      description: "Training & recommended topics",
-      icon: <AppsIcon />,
-      onClick: onOpenInterests,
-      tone: "blue",
-    },
-    {
-      title: "Profile & Verification",
-      description: "Manage your organisation profile",
-      icon: <PeopleIcon />,
-      onClick: onOpenProfile,
-      tone: "pink",
-    },
-    {
-      title: "Settings",
-      description: "Hours, rates and configurations",
-      icon: <SettingsIcon />,
-      onClick: onOpenSettings,
-      tone: "purple",
-      wide: true,
-    },
+    canSeeOwnerFinance
+      ? {
+          label: "Unpaid invoices",
+          value: invoiceSummary?.unpaid_count,
+          description: "Review outstanding invoices",
+          icon: <Banknote />,
+          action: () => navigate("/dashboard/owner/invoice"),
+          tone: "magenta",
+        }
+      : {
+          label: "Active shifts",
+          value: shiftSummary?.all_count,
+          description: "View current shift work",
+          icon: <ClipboardList />,
+          action: onOpenShifts,
+          tone: "magenta",
+        },
   ];
 
-  const stats: StatItem[] = [
-    { label: "Open Shifts", value: openShiftCount, helper: activePharmacyName, icon: <CalendarMonthIcon />, tone: "blue" },
-    { label: "Confirmed Shifts", value: confirmedShiftCount, helper: "Booked work", icon: <ShieldOutlinedIcon />, tone: "purple" },
-    { label: "Count of Shifts", value: allShiftCount, helper: "Active shift records", icon: <WorkOutlineIcon />, tone: "cyan" },
-    { label: "Unpaid Invoices", value: unpaidInvoiceCount, helper: unpaidInvoiceTotal, icon: <CreditCardIcon />, tone: "pink" },
+  const shortcuts = [
+    { label: "Manage pharmacy", icon: <Store />, action: onOpenManage },
+    { label: "Internal Roster", icon: <CalendarCheck />, action: onOpenRoster },
+    { label: "Shift Centre", icon: <Briefcase />, action: onOpenShifts },
+    ...(canSeeOwnerFinance
+      ? [{ label: "Workforce Settings", icon: <Settings />, action: onOpenSettings }]
+      : []),
   ];
-
-  const realActivity: ActivityItem[] = Array.isArray(dashboardData?.activity)
-    ? dashboardData.activity.map((event: any) => ({
-        title: event.title,
-        description: event.description,
-        time: event.time,
-        kind: event.kind,
-        target_id: event.target_id,
-        action_url: event.action_url,
-      }))
-    : [];
-  const activityItems: ActivityItem[] = realActivity;
-  const handleActivityClick = (event: ActivityItem) => {
-    const actionUrl = event.actionUrl || event.action_url;
-    if (actionUrl) {
-      navigate(actionUrl);
-    }
-  };
-  const handleOpenActivity = () => {
-    setActivityDialogLoading(true);
-    setActivityDialogOpen(true);
-    window.setTimeout(() => setActivityDialogLoading(false), 250);
-  };
+  const pharmacyCount = workspace === "internal" && !selectedPharmacy ? totalPharmacies : 0;
 
   return (
-    <Box
-      sx={{
-        width: "100%",
-        mx: "auto",
-        maxWidth: 1660,
-        py: { xs: 1.5, md: 3 },
-        color: DNA.ink,
-        fontFamily: '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif',
-        display: "flex",
-        flexDirection: "column",
-        gap: { xs: 2, md: 3.5 },
-      }}
-    >
-      <Box>
-        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-          <Typography sx={{ fontSize: { xs: 26, md: 34 }, lineHeight: 1.08, fontWeight: 950, color: DNA.ink, overflowWrap: "anywhere" }}>
-            Owner Dashboard
-          </Typography>
-          <Chip
-            label={selectedPharmacy ? "Internal workspace" : "Public platform"}
-            size="small"
-            sx={{
-              bgcolor: "#EAF2FF",
-              color: "#063BDA",
-              fontWeight: 950,
-              textTransform: "uppercase",
-              letterSpacing: ".05em",
-            }}
-          />
-        </Stack>
-        <Typography sx={{ mt: 1.25, color: DNA.muted, fontSize: { xs: 15, md: 17 }, fontWeight: 700, lineHeight: 1.45, overflowWrap: "anywhere" }}>
-          Manage {totalPharmacies} active {totalPharmacies === 1 ? "pharmacy" : "pharmacies"}, teams and operations
-        </Typography>
-      </Box>
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", xl: "minmax(0, 1fr) 388px" },
-          gap: { xs: 2, md: 3 },
-          alignItems: "start",
-          minWidth: 0,
-        }}
-      >
-        <Stack spacing={{ xs: 2, md: 3 }} sx={{ minWidth: 0 }}>
-          <Paper
-        sx={{
-          p: { xs: 2, sm: 3, md: 4 },
-          minHeight: { xs: "auto", md: 290 },
-          borderRadius: { xs: "18px", md: "22px" },
-          backgroundImage: "linear-gradient(135deg, #143EEA 0%, #2429B8 45%, #8B1CF6 72%, #D20DAE 100%)",
-          color: "#fff",
-          overflow: "hidden",
-          position: "relative",
-          boxShadow: "0 22px 54px rgba(6, 26, 61, 0.12)",
-        }}
-      >
-        <Box
-          sx={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage: [
-              `radial-gradient(circle at 64% 98%, ${alpha("#8FE8FF", 0.14)} 0 110px, transparent 111px)`,
-              `radial-gradient(circle at 72% 96%, ${alpha("#6FE7DD", 0.16)} 0 190px, transparent 191px)`,
-              `radial-gradient(circle at 66% 96%, ${alpha("#ffffff", 0.12)} 0 275px, transparent 276px)`,
-              `linear-gradient(100deg, transparent 0 78%, ${alpha("#D20DAE", 0.75)} 78% 100%)`,
-            ].join(", "),
-            pointerEvents: "none",
-          }}
+    <Stack spacing={{ xs: 2, md: 2.5 }} sx={{ maxWidth: 1600, mx: "auto", minWidth: 0 }}>
+      <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap gap={1.25}>
+        <Chip
+          size="small"
+          label={workspace === "platform" ? "Platform shifts" : selectedPharmacy ? "Selected pharmacy" : "Your pharmacy network"}
+          sx={{ height: 26, bgcolor: "var(--ct-tone-blue-bg)", color: "var(--ct-tone-blue-fg)", fontSize: 10.5, fontWeight: 600, letterSpacing: ".05em", textTransform: "uppercase" }}
         />
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={{ xs: 2.25, md: 5 }}
-          alignItems={{ xs: "stretch", md: "center" }}
-          justifyContent="space-between"
-          sx={{ position: "relative", zIndex: 1, minWidth: 0 }}
+        <Typography sx={{ color: muted, fontSize: 15 }}>
+          {pharmacyCount > 1
+            ? `Manage ${pharmacyCount} active pharmacies, teams and operations`
+            : `Here is what needs attention at ${scopeName}.`}
+        </Typography>
+      </Stack>
+
+      {dashboardError && (
+        <Alert
+          severity="error"
+          action={<Button color="inherit" onClick={onRetryDashboard} sx={{ minHeight: 44, fontWeight: 600 }}>Retry</Button>}
         >
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="h4" fontWeight={950} gutterBottom sx={{ fontSize: { xs: 28, sm: 38, md: 50 }, lineHeight: 1.08, overflowWrap: "anywhere" }}>
-              Welcome back, {displayName}!
-            </Typography>
-            <Typography variant="body1" sx={{ opacity: 0.96, maxWidth: 620, fontWeight: 800, fontSize: { xs: 15, md: 18 }, lineHeight: 1.45, overflowWrap: "anywhere" }}>
-              Here's what's happening across your pharmacies today.
-            </Typography>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: { xs: 2, md: 3 }, "& > *": { width: { xs: "100%", sm: "auto" } } }}>
-              <Button
-                variant="contained"
-                color="inherit"
-                startIcon={<CalendarMonthIcon />}
-                onClick={onPostShift}
-                sx={{ color: "#063BDA", borderRadius: "12px", fontWeight: 950, minHeight: { xs: 48, md: 56 }, px: { xs: 2, md: 3 }, justifyContent: "center" }}
-              >
-                Post a shift
-              </Button>
-              <Button
-                variant="outlined"
-                color="inherit"
-                startIcon={<StoreIcon />}
-                onClick={onOpenManage}
-                sx={{ borderColor: alpha("#ffffff", 0.34), color: "#fff", borderRadius: "12px", fontWeight: 950, minHeight: { xs: 48, md: 56 }, px: { xs: 2, md: 3 }, justifyContent: "center", bgcolor: alpha("#ffffff", 0.08) }}
-              >
-                Manage pharmacies
-              </Button>
-            </Stack>
-          </Box>
-          <Stack
-            role="button"
-            onClick={onOpenPills}
-            direction="row"
-            spacing={2}
-            alignItems="center"
-            sx={{
-              position: "relative",
-              zIndex: 1,
-              width: { xs: "100%", md: "auto" },
-              minWidth: { xs: 0, md: 320 },
-              p: { xs: 1.5, md: 2.5 },
-              borderRadius: { xs: "16px", md: "24px" },
-              cursor: "pointer",
-              bgcolor: alpha("#ffffff", 0.13),
-              border: `1px solid ${alpha("#ffffff", 0.26)}`,
-              boxShadow: `inset 0 1px 0 ${alpha("#ffffff", 0.18)}`,
-              transition: "transform 0.18s ease, background-color 0.18s ease",
-              "&:hover": {
-                transform: "translateY(-2px)",
-                bgcolor: alpha("#ffffff", 0.22),
-              },
-            }}
-          >
-            <Box
-              component="img"
-              src="/images/drugs.png"
-              alt=""
-              sx={{
-                width: { xs: 58, sm: 78, md: 98 },
-                height: { xs: 58, sm: 78, md: 98 },
-                objectFit: "contain",
-                flexShrink: 0,
-                filter: `contrast(1.08) saturate(1.08) drop-shadow(0 14px 22px ${alpha("#111827", 0.26)})`,
-              }}
-            />
-            <Stack spacing={0.75} sx={{ minWidth: 0 }}>
-              <Typography variant="body2" sx={{ textTransform: "uppercase", letterSpacing: ".08em", opacity: 0.72 }}>
-                Pill balance
+          {dashboardError} You can still use your workspace actions below.
+        </Alert>
+      )}
+
+      <BrandBanner
+        title={`Welcome back, ${dashboardGreetingName(user)}!`}
+        subtitle={workspace === "platform" ? "Here is your public platform activity today." : "Here's what's happening across your pharmacies today."}
+        primary={{ label: "Post a shift", icon: <SquarePlus />, onClick: onPostShift }}
+        secondary={{ label: "Manage pharmacies", icon: <Store />, onClick: onOpenManage }}
+        aside={canSeeOwnerFinance ? (
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Box sx={{ width: 56, height: 56, borderRadius: "16px", bgcolor: "rgba(255,255,255,0.14)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, "& svg": { width: 26, height: 26, strokeWidth: 1.75 } }}>
+              <Pill aria-hidden="true" />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ color: "#D9D0FA", fontSize: 10.5, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase" }}>Pill balance</Typography>
+              <Typography sx={{ fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: 40, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>
+                {pillBalance === null ? "—" : readableCount(pillBalance)}
+                <Box component="span" sx={{ fontFamily: "var(--ct-font-body)", fontSize: 14, fontWeight: 600, color: "#ECE8FC", ml: 0.75 }}>pills</Box>
               </Typography>
-              <Stack direction="row" spacing={1} alignItems="baseline">
-                {pillBalance == null ? (
-                  <CircularProgress size={22} sx={{ color: "#fff" }} />
-                ) : (
-                <Typography sx={{ fontSize: { xs: 34, md: 58 }, fontWeight: 950, lineHeight: 1 }}>
-                    {pillBalance}
-                  </Typography>
-                )}
-                <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 900, fontSize: { xs: 15, md: 18 } }}>
-                  pills
-                </Typography>
-              </Stack>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                <Chip
-                  size="small"
-                  label={shiftPostCost != null ? `${shiftPostCost} pills per shift post` : "Custom rates"}
-                  sx={{ maxWidth: "100%", bgcolor: alpha("#ffffff", 0.18), color: "#fff", fontWeight: 800, "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" } }}
-                />
-                <Chip size="small" label="View activity" sx={{ maxWidth: "100%", bgcolor: alpha("#ffffff", 0.18), color: "#fff", fontWeight: 800 }} />
-              </Stack>
-            </Stack>
+              <ButtonBase
+                onClick={onOpenPills}
+                sx={{ mt: 0.75, minHeight: 32, px: 1.25, borderRadius: "999px", bgcolor: "rgba(255,255,255,0.16)", color: "#FFFFFF", fontSize: 11.5, fontWeight: 600, "&:hover": { bgcolor: "rgba(255,255,255,0.24)" }, "&:focus-visible": { outline: "2px solid #FFFFFF", outlineOffset: 2 } }}
+              >
+                View activity
+              </ButtonBase>
+            </Box>
           </Stack>
-        </Stack>
-      </Paper>
+        ) : undefined}
+      />
 
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" },
-              gap: { xs: 1.5, md: 2.5 },
-              minWidth: 0,
-            }}
+      <MetricStrip
+        label="Operational overview"
+        loading={dashboardLoading}
+        items={metrics.map((metric) => ({
+          label: metric.label,
+          value: ready ? readableCount(metric.value) : "—",
+          caption: metric.description,
+          icon: metric.icon,
+          tone: metric.tone,
+          onClick: metric.action,
+        }))}
+      />
+
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", lg: "minmax(0,1.45fr) minmax(310px,1fr)" }, gap: 2.5, alignItems: "start" }}>
+        <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+          <SectionCard
+            title="Upcoming shifts"
+            icon={<CalendarDays />}
+            subtitle="The next commitments in your selected workspace."
+            action={<ViewAllLink onClick={onOpenShifts}>View all</ViewAllLink>}
           >
-            {quickActions.map((action) => {
-              const tone = toneStyles[action.tone];
-              return (
-                <Paper
-                  key={action.title}
-                  role="button"
-                  onClick={action.onClick}
-                  sx={{
-                    minHeight: { xs: 132, md: 196 },
-                    gridColumn: { lg: action.wide ? "span 2" : "span 1" },
-                    borderRadius: { xs: "16px", md: "20px" },
-                    bgcolor: "#FFFFFF",
-                    border: `1px solid ${DNA.line}`,
-                    boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
-                    transition: "all 0.2s ease",
-                    cursor: "pointer",
-                    p: { xs: 2, md: 3 },
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    "&:hover": {
-                      transform: { xs: "none", md: "translateY(-4px)" },
-                      boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)",
-                    },
-                  }}
-                >
-                  <Stack direction="row" spacing={{ xs: 1.75, md: 2.75 }} alignItems="flex-start" sx={{ minWidth: 0, width: "100%" }}>
-                    <Box
-                      sx={{
-                        width: { xs: 52, md: 64 },
-                        height: { xs: 52, md: 64 },
-                        borderRadius: { xs: "15px", md: "18px" },
-                        bgcolor: tone.bg,
-                        color: tone.color,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                        "& svg": { fontSize: { xs: 28, md: 34 } },
-                      }}
-                    >
-                      {action.icon}
-                    </Box>
-                    <Stack spacing={{ xs: 0.75, md: 1.15 }} sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography fontWeight={950} color={DNA.ink} sx={{ fontSize: { xs: 20, md: 22 }, lineHeight: 1.12, overflowWrap: "anywhere" }}>
-                        {action.title}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: DNA.muted, fontWeight: 800, fontSize: { xs: 15, md: 16 }, lineHeight: 1.32, maxWidth: action.wide ? 360 : { xs: "none", md: 220 }, overflowWrap: "anywhere" }}>
-                        {action.description}
-                      </Typography>
-                    </Stack>
-                  </Stack>
-                </Paper>
-              );
-            })}
-          </Box>
+            {dashboardLoading && <Stack spacing={1.2}>{[1, 2, 3].map((n) => <Skeleton key={n} height={58} />)}</Stack>}
+            {!dashboardLoading && !ready && <Typography sx={{ color: muted, fontSize: 14 }}>Shift details are unavailable. Retry the overview to see current work.</Typography>}
+            {ready && upcomingShifts.length === 0 && (
+              <Box sx={{ bgcolor: "var(--ct-page-bg)", px: 2, py: 2.5, borderRadius: "14px" }}>
+                <Typography sx={{ color: ink, fontWeight: 600 }}>No upcoming shifts in this view.</Typography>
+                <Typography sx={{ color: muted, fontSize: 14, mt: 0.5 }}>Use Shift Centre to check other staffing activity.</Typography>
+              </Box>
+            )}
+            {ready && upcomingShifts.map((shift) => (
+              <ButtonBase
+                key={shift.id}
+                onClick={onOpenShifts}
+                sx={{ display: "flex", width: "100%", textAlign: "left", alignItems: "center", gap: 1.5, py: 1.4, px: 0.5, borderTop: "1px solid " + line, borderRadius: "10px", "&:hover": { bgcolor: "var(--ct-hover-bg)" }, "&:focus-visible": { outline: "2px solid var(--ct-accent-strong)" } }}
+              >
+                <IconTile icon={<CalendarDays />} tone="violet" size={36} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ color: ink, fontSize: 14, fontWeight: 600, overflowWrap: "anywhere" }}>{shift.pharmacy_name || "Pharmacy shift"}</Typography>
+                  <Typography sx={{ color: "var(--ct-text-muted)", fontSize: 12.5 }}>{readableDate(shift.date)}</Typography>
+                </Box>
+                <Box component="span" aria-hidden="true" sx={{ color: "var(--ct-accent-strong)", display: "inline-flex", "& svg": { width: 18, height: 18 } }}><ArrowRight /></Box>
+              </ButtonBase>
+            ))}
+          </SectionCard>
+
+          <SectionCard title="Recent Activity" icon={<ClipboardList />}>
+            {dashboardLoading && <Stack spacing={1.2}>{[1, 2].map((n) => <Skeleton key={n} height={52} />)}</Stack>}
+            {!dashboardLoading && !ready && <Typography sx={{ color: muted, fontSize: 14 }}>Activity could not be loaded.</Typography>}
+            {ready && activity.length === 0 && <Typography sx={{ color: muted, fontSize: 14 }}>No recent activity to show in this workspace.</Typography>}
+            {ready && activity.length > 0 && (
+              <ActivityList
+                entries={activity.map((record) => {
+                  const url = safeActivityUrl(record);
+                  return {
+                    title: record.title,
+                    description: record.description,
+                    time: record.time,
+                    kind: record.kind,
+                    onOpen: url ? () => navigate(url) : null,
+                  };
+                })}
+              />
+            )}
+          </SectionCard>
         </Stack>
 
-        <Stack spacing={{ xs: 2.5, md: 3 }}>
-          <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
-              <CalendarMonthIcon sx={{ color: DNA.violet, fontSize: 30 }} />
-              <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>Upcoming Shifts</Typography>
-            </Stack>
-            <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
-              {[
-                ["Today", todayShifts],
-                ["This Week", weekShifts],
-                ["This Month", monthShifts],
-              ].map(([label, value]) => (
-                <Stack key={label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 1.8 }}>
-                  <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 16 }}>{label}</Typography>
-                  <Typography sx={{ color: "#5B18E8", fontWeight: 950, fontSize: 30, lineHeight: 1 }}>{value}</Typography>
-                </Stack>
-              ))}
-            </Stack>
-            <Button onClick={onOpenShifts} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
-              View all shifts
-            </Button>
-          </Paper>
+        <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+          <SectionCard title="Shift calendar snapshot" icon={<CalendarCheck />}>
+            <StatList
+              loading={dashboardLoading}
+              rows={[
+                { label: "Today", value: ready ? readableCount(upcoming?.today) : "—" },
+                { label: "Next 7 days", value: ready ? readableCount(upcoming?.week) : "—" },
+                { label: "Next 30 days", value: ready ? readableCount(upcoming?.month) : "—" },
+              ]}
+            />
+            <Box sx={{ mt: 1 }}><ViewAllLink onClick={onOpenRoster}>Open roster</ViewAllLink></Box>
+          </SectionCard>
 
-          <Paper sx={{ borderRadius: "22px", border: `1px solid ${DNA.line}`, bgcolor: "#fff", p: { xs: 2.5, md: 3.5 }, boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)" }}>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
-              <FavoriteBorderIcon sx={{ color: "#5B18E8", fontSize: 30 }} />
-              <Typography sx={{ fontSize: 24, fontWeight: 950, color: DNA.ink }}>Recent Activity</Typography>
-            </Stack>
-            <Stack divider={<Box sx={{ height: "1px", bgcolor: DNA.line }} />}>
-              {activityItems.length === 0 ? (
-                <Typography variant="body2" sx={{ color: DNA.muted, fontWeight: 700 }}>
-                  No recent activity yet.
-                </Typography>
-              ) : activityItems.map((event) => {
-                const actionUrl = event.actionUrl || event.action_url;
-                return (
-                <ButtonBase
-                  key={`${event.kind || "activity"}-${event.targetId || event.target_id || event.title}-${event.time}`}
-                  onClick={() => handleActivityClick(event)}
-                  disabled={!actionUrl}
-                  sx={{
-                    width: "100%",
-                    display: "block",
-                    textAlign: "left",
-                    borderRadius: 1,
-                    cursor: actionUrl ? "pointer" : "default",
-                    "&:hover": actionUrl ? { bgcolor: alpha("#5B18E8", 0.05) } : undefined,
-                  }}
-                >
-                <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ py: 1.8, px: 0.75 }}>
-                  <Box sx={{ color: activityColor(event), width: 24, pt: 0.25, "& svg": { fontSize: 24 } }}>{activityIcon(event)}</Box>
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography sx={{ color: DNA.ink, fontWeight: 950, fontSize: 14 }}>{event.title}</Typography>
-                    <Typography noWrap sx={{ color: DNA.muted, fontWeight: 700, fontSize: 13 }}>{event.description}</Typography>
-                  </Box>
-                  <Typography sx={{ color: "#7A86A3", fontWeight: 800, fontSize: 12, whiteSpace: "nowrap" }}>{event.time}</Typography>
-                </Stack>
-                </ButtonBase>
-              )})}
-            </Stack>
-            <Button onClick={handleOpenActivity} endIcon={<ArrowForwardIcon />} sx={{ mt: 2, px: 0, color: "#4C0DDE", fontWeight: 950 }}>
-              View all activity
-            </Button>
-          </Paper>
+          {canSeeOwnerFinance && (
+            <SectionCard title="Invoices" icon={<ReceiptText />}>
+              <Typography sx={{ color: muted, fontSize: 13 }}>Outstanding total</Typography>
+              <Typography sx={{ color: ink, fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: 30, lineHeight: 1.2, fontVariantNumeric: "tabular-nums", mb: 0.75 }}>
+                {dashboardLoading ? <Skeleton width={120} /> : ready ? invoiceSummary?.unpaid_total ?? "—" : "—"}
+              </Typography>
+              <Typography sx={{ color: "var(--ct-text-muted)", fontSize: 13 }}>
+                {ready ? readableCount(invoiceSummary?.unpaid_count) : "—"} unpaid invoices in this workspace
+              </Typography>
+              <Box sx={{ mt: 1 }}><ViewAllLink onClick={() => navigate("/dashboard/owner/invoice")}>Review invoices</ViewAllLink></Box>
+            </SectionCard>
+          )}
         </Stack>
       </Box>
 
-      <Paper
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", xl: "repeat(4, minmax(0, 1fr))" },
-          overflow: "hidden",
-          borderRadius: { xs: "16px", md: "20px" },
-          bgcolor: "#FFFFFF",
-          border: `1px solid ${DNA.line}`,
-          boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
-        }}
-      >
-        {stats.map((item, index) => {
-          const tone = toneStyles[item.tone];
-          const isInvoiceStat = item.label === "Unpaid Invoices";
-          return (
-            <Box
-              key={item.label}
-              role={isInvoiceStat ? "button" : undefined}
-              onClick={isInvoiceStat ? () => navigate("/dashboard/owner/invoice") : undefined}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: { xs: 1.5, md: 2.25 },
-                minHeight: { xs: 104, md: 132 },
-                px: { xs: 2, md: 4 },
-                py: { xs: 2, md: 2.5 },
-                borderLeft: { xl: index === 0 ? "none" : `1px solid ${DNA.line}` },
-                borderTop: { xs: index === 0 ? "none" : `1px solid ${DNA.line}`, sm: index < 2 ? "none" : `1px solid ${DNA.line}`, xl: "none" },
-                cursor: isInvoiceStat ? "pointer" : "default",
-                transition: "background-color 0.18s ease",
-                "&:hover": isInvoiceStat ? { bgcolor: alpha("#6D28D9", 0.04) } : undefined,
-              }}
+      <SectionCard title="Workspace tools" icon={<Settings />} dense>
+        <Stack direction="row" flexWrap="wrap" useFlexGap gap={1}>
+          {shortcuts.map((link) => (
+            <Button
+              key={link.label}
+              variant="outlined"
+              onClick={link.action}
+              startIcon={link.icon}
+              sx={{ minHeight: 44, borderRadius: "12px", color: "var(--ct-text-primary)", borderColor: "var(--ct-border-color)", fontWeight: 600, fontSize: 13, "& svg": { width: 18, height: 18, color: "var(--ct-accent-strong)" } }}
             >
-              <Box
-                sx={{
-                  width: { xs: 54, md: 66 },
-                  height: { xs: 54, md: 66 },
-                  borderRadius: { xs: "15px", md: "18px" },
-                  bgcolor: tone.bg,
-                  color: tone.color,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  "& svg": { fontSize: { xs: 30, md: 36 } },
-                }}
-              >
-                {item.icon}
-              </Box>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ color: DNA.muted, fontWeight: 800, fontSize: 14 }}>{item.label}</Typography>
-                <Typography sx={{ color: DNA.ink, fontWeight: 950, fontSize: { xs: 21, md: 24 }, lineHeight: 1.18, overflowWrap: "anywhere" }}>
-                  {item.value}
-                </Typography>
-                <Typography sx={{ color: DNA.muted, fontWeight: 700, fontSize: 13, mt: 0.5, overflowWrap: "anywhere" }}>{item.helper}</Typography>
-              </Box>
-            </Box>
-          );
-        })}
-      </Paper>
-      <RecentActivityDialog
-        open={activityDialogOpen}
-        onClose={() => setActivityDialogOpen(false)}
-        activity={activityItems}
-        loading={activityDialogLoading}
-        onActivityClick={handleActivityClick}
-      />
-    </Box>
+              {link.label}
+            </Button>
+          ))}
+        </Stack>
+      </SectionCard>
+      {totalPharmacies === 0 && workspace === "internal" && !dashboardLoading && (
+        <Alert severity="info">No pharmacies are linked to this workspace yet. Add a pharmacy to begin managing its staffing.</Alert>
+      )}
+    </Stack>
   );
 }

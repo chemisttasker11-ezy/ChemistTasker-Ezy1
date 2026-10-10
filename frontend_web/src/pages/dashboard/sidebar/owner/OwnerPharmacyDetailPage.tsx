@@ -1,91 +1,56 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Alert, Box, Button, CircularProgress, FormControlLabel, Switch, Typography } from "@mui/material";
-import PeopleIcon from "@mui/icons-material/People";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import StarOutlineIcon from "@mui/icons-material/StarOutline";
-import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
-import { useAuth } from '../../../../contexts/AuthContext';
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import SettingsIcon from "@mui/icons-material/Settings";
-import { MembershipDTO, PharmacyAdminDTO, PharmacyDTO, surface } from "./types";
-import { alpha, useTheme } from "@mui/material/styles";
-import StaffManager from "./StaffManager";
+import {
+  Alert,
+  Box,
+  Button,
+  Skeleton,
+  Stack,
+  Tab,
+  Tabs
+} from "@mui/material";
+import {
+  BadgeCheck,
+  Clock3,
+  Inbox,
+  Pencil,
+  Plus,
+  Star,
+  UserPlus,
+  Wallet
+} from "lucide-react";
+import React, { useCallback, useMemo, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import DashboardContentState from "../../../../components/dashboard/DashboardContentState";
+import { type Tone } from "../../../../components/ui/IconTile";
+import PageHeader from "../../../../components/ui/PageHeader";
+import { Pill } from "../../../../components/ui/Pill";
 import LocumManager from "./LocumManager";
 import PharmacyAdmins from "./PharmacyAdmins";
-import { useNavigate } from "react-router-dom";
-import { getPayrollConfiguration, updatePayrollConfiguration } from "../../../../features/workforce/api";
+import StaffManager from "./StaffManager";
+import { roleLabel } from "./teamUi";
+import { MembershipDTO, PharmacyAdminDTO, PharmacyDTO } from "./types";
 
-const DASHBOARD_FONT_FAMILY = '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif';
-const DASHBOARD_INK = "#06123A";
-const DASHBOARD_MUTED = "#5E6B8D";
+import PharmacyOverview from "./PharmacyOverview";
+import type { PharmacyProfileExtras } from "./PharmacyProfileCard";
+import PharmacySettings from "./PharmacySettings";
+import { TabLabel } from "./pharmacyDetailParts";
+import { usePayrollSetting } from "./usePayrollSetting";
+export type { PharmacyProfileExtras } from "./PharmacyProfileCard";
 
-function IconButtonCard({
-  title,
-  subtitle,
-  icon,
-  onClick,
-}: {
-  title: string;
-  subtitle?: string;
-  icon: React.ReactNode;
-  onClick?: () => void;
-}) {
-  const theme = useTheme();
-  const tokens = surface(theme);
-  return (
-    <Box
-      onClick={onClick}
-      sx={{
-        p: { xs: 2, md: 2.5 },
-        borderRadius: { xs: "16px", md: "20px" },
-        border: `1px solid #E5ECF7`,
-        background: tokens.bg,
-        cursor: onClick ? "pointer" : "default",
-        boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
-        transition: "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
-        ":hover": onClick
-          ? {
-              transform: { xs: "none", md: "translateY(-4px)" },
-              boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)",
-              borderColor: alpha("#063BDA", 0.18),
-            }
-          : undefined,
-      }}
-    >
-      <Box sx={{ display: "flex", gap: { xs: 1.5, md: 2.25 }, alignItems: "flex-start", minWidth: 0 }}>
-        <Box
-          sx={{
-            width: { xs: 52, md: 60 },
-            height: { xs: 52, md: 60 },
-            borderRadius: { xs: "14px", md: "18px" },
-            bgcolor: "#ECE9FF",
-            color: DASHBOARD_INK,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            "& svg": { fontSize: { xs: 28, md: 32 } },
-          }}
-        >
-          {icon}
-        </Box>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ color: DASHBOARD_INK, fontWeight: 950, fontSize: { xs: 20, md: 22 }, lineHeight: 1.12, overflowWrap: "anywhere" }}>
-            {title}
-          </Typography>
-          {subtitle && (
-            <Typography variant="body2" sx={{ mt: 0.75, color: DASHBOARD_MUTED, fontWeight: 800, lineHeight: 1.4, overflowWrap: "anywhere" }}>
-              {subtitle}
-            </Typography>
-          )}
-        </Box>
-      </Box>
-    </Box>
-  );
-}
+/* ---------- helpers ---------- */
+
+export type TabKey = "overview" | "staff" | "locums" | "admins" | "settings";
+const TABS: TabKey[] = ["overview", "staff", "locums", "admins", "settings"];
+
+const isPending = (m: MembershipDTO) =>
+  String(m.status || "").toUpperCase() === "PENDING" || (m.is_active ?? m.isActive) === false;
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/* ---------- page ---------- */
 
 interface OwnerPharmacyDetailPageProps {
   pharmacy: PharmacyDTO;
+  /** The full pharmacy record when the caller has it: opening hours, ABN, default rate. */
+  profile?: PharmacyProfileExtras;
   staffMemberships: MembershipDTO[];
   locumMemberships: MembershipDTO[];
   adminAssignments: PharmacyAdminDTO[];
@@ -93,6 +58,8 @@ interface OwnerPharmacyDetailPageProps {
   onMembershipsChanged: () => void;
   onEditPharmacy?: (pharmacy: PharmacyDTO) => void;
   membershipsLoading?: boolean;
+  /** Set when the team lists failed to load; the page offers Try again (onMembershipsChanged). */
+  membershipsError?: string;
   autoPublishWorkerRequests?: boolean;
   onToggleAutoPublishWorkerRequests?: (nextValue: boolean) => Promise<void> | void;
   autoPublishSaving?: boolean;
@@ -101,6 +68,7 @@ interface OwnerPharmacyDetailPageProps {
 
 export default function OwnerPharmacyDetailPage({
   pharmacy,
+  profile,
   staffMemberships,
   locumMemberships,
   adminAssignments,
@@ -108,269 +76,213 @@ export default function OwnerPharmacyDetailPage({
   onMembershipsChanged,
   onEditPharmacy,
   membershipsLoading = false,
+  membershipsError = "",
   autoPublishWorkerRequests = false,
   onToggleAutoPublishWorkerRequests,
   autoPublishSaving = false,
   autoPublishError = "",
 }: OwnerPharmacyDetailPageProps) {
-  const theme = useTheme();
-  const tokens = surface(theme);
   const navigate = useNavigate();
-  const { activePersona, activeAdminPharmacyId } = useAuth();
-  const scopedPharmacyId =
-    activePersona === "admin" && typeof activeAdminPharmacyId === "number"
-      ? activeAdminPharmacyId
-      : null;
-  const adminBasePath = scopedPharmacyId != null ? `/dashboard/admin/${scopedPharmacyId}` : null;
-  const resolvePath = (suffix: string) =>
-    adminBasePath ? `${adminBasePath}/${suffix}` : `/dashboard/owner/${suffix}`;
-  const staffSectionRef = useRef<HTMLDivElement>(null);
-  const locumSectionRef = useRef<HTMLDivElement>(null);
-  const adminsSectionRef = useRef<HTMLDivElement>(null);
-  const [payrollEnabled, setPayrollEnabled] = useState<boolean>(
-    Boolean((pharmacy as any).use_chemisttasker_payroll ?? (pharmacy as any).useChemisttaskerPayroll),
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Persona base (/dashboard/owner, /dashboard/organization, /dashboard/admin/12) so links stay in the current workspace.
+  const basePath = useMemo(() => {
+    const match = /^\/dashboard\/(admin\/\d+|[a-z-]+)/.exec(location.pathname);
+    return match ? `/dashboard/${match[1]}` : "/dashboard/owner";
+  }, [location.pathname]);
+  const go = useCallback((suffix: string) => navigate(`${basePath}/${suffix}`), [navigate, basePath]);
+  const chatPathFor = useCallback((userId: number) => `${basePath}/chat?startDmWithUser=${userId}`, [basePath]);
+
+  const rawTab = searchParams.get("tab") as TabKey | null;
+  const tab: TabKey = rawTab && TABS.includes(rawTab) ? rawTab : "overview";
+  const setTab = useCallback(
+    (next: TabKey) => {
+      const params = new URLSearchParams(searchParams);
+      if (next === "overview") params.delete("tab");
+      else params.set("tab", next);
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
   );
-  const [payrollLoading, setPayrollLoading] = useState(false);
-  const [payrollError, setPayrollError] = useState("");
 
-  useEffect(() => {
-    let cancelled = false;
-    setPayrollError("");
-    getPayrollConfiguration(Number(pharmacy.id))
-      .then((config) => {
-        if (!cancelled) setPayrollEnabled(Boolean(config.use_chemisttasker_payroll));
-      })
-      .catch((error: any) => {
-        if (!cancelled) setPayrollError(error?.message || "Unable to load payroll configuration.");
-      });
-    return () => {
-      cancelled = true;
+  const [staffApps, setStaffApps] = useState(0);
+  const [locumApps, setLocumApps] = useState(0);
+  const [inviteStaff, setInviteStaff] = useState(0);
+  const [inviteLocum, setInviteLocum] = useState(0);
+  const [inviteAdmin, setInviteAdmin] = useState(0);
+
+  const { payrollEnabled, payrollReady, payrollLoadError, payrollSaving, payrollSaveError, handlePayrollToggle, retryPayroll } = usePayrollSetting(Number(pharmacy.id));
+
+  const editPharmacy = useCallback(() => {
+    if (onEditPharmacy) onEditPharmacy(pharmacy);
+    else go("manage-pharmacies/my-pharmacies");
+  }, [onEditPharmacy, pharmacy, go]);
+
+  /* counts */
+  const counts = useMemo(() => {
+    const staffActive = staffMemberships.filter((m) => !isPending(m));
+    const locumActive = locumMemberships.filter((m) => !isPending(m));
+    const byRole: Record<string, number> = {};
+    const byType: Record<string, number> = {};
+    staffActive.forEach((m) => {
+      const r = String(m.role || "").toUpperCase();
+      const t = String(m.employment_type ?? m.employmentType ?? "").toUpperCase();
+      if (r) byRole[r] = (byRole[r] || 0) + 1;
+      if (t) byType[t] = (byType[t] || 0) + 1;
+    });
+    return {
+      staff: staffActive.length,
+      staffPending: staffMemberships.length - staffActive.length,
+      locums: locumActive.length,
+      locumPending: locumMemberships.length - locumActive.length,
+      admins: adminAssignments.filter((a) => a.is_active !== false && a.admin_level !== "OWNER").length,
+      adminPending: pendingAdminMemberships.length,
+      byRole,
+      byType,
     };
-  }, [pharmacy.id]);
+  }, [staffMemberships, locumMemberships, adminAssignments, pendingAdminMemberships]);
 
-  const handlePayrollToggle = async (enabled: boolean) => {
-    setPayrollLoading(true);
-    setPayrollError("");
-    try {
-      const config = await updatePayrollConfiguration(Number(pharmacy.id), enabled);
-      setPayrollEnabled(Boolean(config.use_chemisttasker_payroll));
-    } catch (error: any) {
-      setPayrollError(error?.message || "Unable to update payroll configuration.");
-    } finally {
-      setPayrollLoading(false);
-    }
-  };
+  const address = [pharmacy.street_address, pharmacy.suburb, pharmacy.state, pharmacy.postcode].filter(Boolean).join(", ");
+  const hasAnyMembers = staffMemberships.length + locumMemberships.length + adminAssignments.length > 0;
+  const firstLoad = membershipsLoading && !hasAnyMembers;
+  const listsUnavailable = Boolean(membershipsError) && !membershipsLoading;
+  const invitesWaiting = counts.staffPending + counts.locumPending + counts.adminPending;
+  const countsUnknown = firstLoad || (listsUnavailable && !hasAnyMembers);
+  const statValue = (n: number) => (firstLoad ? <Skeleton width={36} /> : countsUnknown ? "—" : n);
+  const statDetail = (pending: number, fallback: string) => (countsUnknown && !firstLoad ? "Not loaded" : pending ? `${pending} invited` : fallback);
 
-  const scrollTo = (ref: { current: HTMLElement | null }) => {
-    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  /* attention items */
+  const attention: { key: string; icon: React.ReactNode; tone: Tone; text: string; action: string; onClick: () => void }[] = [];
+  if (staffApps) attention.push({ key: "staff-apps", icon: <Inbox />, tone: "magenta", text: `${plural(staffApps, "staff application")} to review`, action: "Review", onClick: () => setTab("staff") });
+  if (locumApps) attention.push({ key: "locum-apps", icon: <Inbox />, tone: "magenta", text: `${plural(locumApps, "favourite locum application")} to review`, action: "Review", onClick: () => setTab("locums") });
+  if (payrollLoadError) attention.push({ key: "payroll", icon: <Wallet />, tone: "magenta", text: "The payroll setting didn't load", action: "Open settings", onClick: () => setTab("settings") });
+  if (!firstLoad && !listsUnavailable && counts.staff === 0) attention.push({ key: "no-staff", icon: <UserPlus />, tone: "violet", text: "Invite your team so you can roster them and post internal shifts", action: "Invite staff", onClick: () => { setTab("staff"); setInviteStaff((n) => n + 1); } });
+  if (!firstLoad && !listsUnavailable && counts.locums === 0) attention.push({ key: "no-locums", icon: <Star />, tone: "violet", text: "Add favourite locums so trusted people see your shifts first", action: "Add favourite", onClick: () => { setTab("locums"); setInviteLocum((n) => n + 1); } });
+  if (invitesWaiting) attention.push({ key: "invites", icon: <Clock3 />, tone: "cyan", text: `${plural(invitesWaiting, "invitation")} waiting for a reply`, action: "View", onClick: () => setTab(counts.staffPending ? "staff" : counts.locumPending ? "locums" : "admins") });
 
-  const handleManageStaff = () => scrollTo(staffSectionRef);
-  const handleManageLocums = () => scrollTo(locumSectionRef);
-  const handleManageAdmins = () => scrollTo(adminsSectionRef);
-  const handleCheckShifts = () => navigate(resolvePath("shift-center"));
-  const handlePostShift = () => navigate(resolvePath("post-shift"));
-  const handleFavouriteLocums = () => handleManageLocums();
-  const handleConfigurations = () => {
-    if (onEditPharmacy) {
-      onEditPharmacy(pharmacy);
-      return;
-    }
-    navigate(resolvePath("manage-pharmacies/my-pharmacies"));
-  };
+  const roleSummary = Object.entries(counts.byRole)
+    .sort((a, b) => b[1] - a[1])
+    .map(([role, n]) => `${n} ${roleLabel(role).toLowerCase()}${n === 1 ? "" : "s"}`)
+    .join(" · ");
+  const abnVerified = Boolean(profile?.abn_verified);
 
-  return (
-    <Box
-      sx={{
-        width: "100%",
-        maxWidth: "none",
-        mx: "auto",
-        px: { xs: 0, sm: 1.5, md: 2, xl: 3 },
-        py: { xs: 2, md: 3 },
-        color: DASHBOARD_INK,
-        fontFamily: DASHBOARD_FONT_FAMILY,
-      }}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: { xs: "column", md: "row" },
-          alignItems: { md: "flex-end" },
-          justifyContent: "space-between",
-          gap: 2,
-        }}
-      >
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography sx={{ fontSize: { xs: 30, md: 42 }, lineHeight: 1.04, fontWeight: 950, color: DASHBOARD_INK, overflowWrap: "anywhere" }}>
-            {pharmacy.name}
-          </Typography>
-          <Typography sx={{ mt: 1, color: DASHBOARD_MUTED, fontSize: { xs: 16, md: 18 }, fontWeight: 800, lineHeight: 1.45, overflowWrap: "anywhere" }}>
-            {[pharmacy.street_address, pharmacy.suburb, pharmacy.state, pharmacy.postcode].filter(Boolean).join(", ")}
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1, width: { xs: "100%", md: "auto" } }}>
-          <Button
-            variant="outlined"
-            onClick={() => (onEditPharmacy ? onEditPharmacy(pharmacy) : navigate(resolvePath("manage-pharmacies/my-pharmacies")))}
-            sx={{
-              minHeight: 44,
-              px: 2.25,
-              borderRadius: "12px",
-              borderColor: alpha("#063BDA", 0.16),
-              color: "#4C0DDE",
-              fontWeight: 900,
-              "&:hover": {
-                borderColor: "#063BDA",
-                bgcolor: alpha("#063BDA", 0.04),
-              },
-            }}
-          >
-            Edit
-          </Button>
-        </Box>
-      </Box>
-
-      <Box
-        sx={{
-          mt: 3,
-          display: "grid",
-          gap: { xs: 1.5, md: 2 },
-          gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", xl: "repeat(3, minmax(0, 1fr))" },
-        }}
-      >
-        <IconButtonCard title="Manage Staff" subtitle="Add/remove team" icon={<PeopleIcon />} onClick={handleManageStaff} />
-        <IconButtonCard title="Check Shifts" subtitle="Roster & history" icon={<CalendarMonthIcon />} onClick={handleCheckShifts} />
-        <IconButtonCard title="Favourite Locums" subtitle="Quick-pick shortlist" icon={<StarOutlineIcon />} onClick={handleFavouriteLocums} />
-        <IconButtonCard title="Admins" subtitle="Assign scoped admins" icon={<ManageAccountsIcon />} onClick={handleManageAdmins} />
-        <IconButtonCard title="Post Shift" subtitle="Publish an open shift" icon={<ListAltIcon />} onClick={handlePostShift} />
-        <IconButtonCard title="Configurations" subtitle="Hours, details, rates" icon={<SettingsIcon />} onClick={handleConfigurations} />
-      </Box>
-
-      <Box sx={{ mt: 3 }} ref={staffSectionRef}>
-        <Box
-          sx={{
-            mb: 2,
-            p: { xs: 2, md: 2.5 },
-            border: "1px solid #E5ECF7",
-            borderRadius: { xs: "16px", md: "20px" },
-            background: "#FFFFFF",
-          }}
-        >
-          <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, justifyContent: "space-between", gap: 2, alignItems: { md: "center" } }}>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ color: DASHBOARD_INK, fontSize: { xs: 22, md: 26 }, fontWeight: 950 }}>
-                Use ChemistTasker Payroll
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 0.75, color: DASHBOARD_MUTED, maxWidth: 780, fontWeight: 700, lineHeight: 1.45 }}>
-                Optional. Keep this off while you use your current payroll system. Staff can still be invited, rostered, clocked and timesheeted without entering Award classifications or ChemistTasker pay rates.
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
-              {payrollLoading ? <CircularProgress size={20} /> : null}
-              <FormControlLabel
-                control={<Switch checked={payrollEnabled} disabled={payrollLoading} onChange={(_, checked) => void handlePayrollToggle(checked)} />}
-                label={payrollEnabled ? "Enabled" : "Disabled"}
-                sx={{ m: 0 }}
-              />
-            </Box>
-          </Box>
-          {payrollEnabled ? (
-            <Alert severity="info" sx={{ mt: 1.5 }}>
-              ChemistTasker Payroll requires dated employment terms for TFN staff: employment type, Award classification, Award or above-award rates, and agreed part-time hours where applicable. Before payroll processing, the worker must also complete TFN and super fund details. ABN assignees continue through invoicing.
-            </Alert>
-          ) : (
-            <Alert severity="success" sx={{ mt: 1.5 }}>
-              Timesheet-only mode is active. No Award classification or pay-rate setup is required for direct pharmacy staff. Approved timesheets can be handed to your existing payroll system.
-            </Alert>
-          )}
-          {payrollError ? <Alert severity="error" sx={{ mt: 1.5 }}>{payrollError}</Alert> : null}
-        </Box>
-
-        <Box
-          sx={{
-            mb: 3,
-            p: { xs: 2.25, md: 3 },
-            borderRadius: { xs: "18px", md: "22px" },
-            border: `1px solid #E5ECF7`,
-            background: tokens.bg,
-            boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
-          }}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: { xs: "column", md: "row" },
-              gap: 2,
-              alignItems: { md: "center" },
-              justifyContent: "space-between",
-            }}
-          >
-            <Box>
-              <Typography sx={{ mb: 0.75, color: DASHBOARD_INK, fontSize: { xs: 22, md: 26 }, fontWeight: 950, lineHeight: 1.12 }}>
-                Staff Request Publishing
-              </Typography>
-              <Typography variant="body2" sx={{ color: DASHBOARD_MUTED, maxWidth: 720, fontWeight: 800, fontSize: { xs: 15, md: 16 }, lineHeight: 1.45 }}>
-                Allow pharmacy staff shift cover requests and swap requests to be published to your team automatically?
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              {autoPublishSaving ? <CircularProgress size={20} /> : null}
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={autoPublishWorkerRequests}
-                    onChange={(_, checked) => onToggleAutoPublishWorkerRequests?.(checked)}
-                    disabled={!onToggleAutoPublishWorkerRequests || autoPublishSaving}
-                  />
-                }
-                label={autoPublishWorkerRequests ? "Enabled" : "Disabled"}
-                sx={{ m: 0 }}
-              />
-            </Box>
-          </Box>
-          {autoPublishError ? (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {autoPublishError}
-            </Alert>
-          ) : null}
-        </Box>
-
-        <Typography sx={{ mb: 1.5, color: DASHBOARD_INK, fontSize: { xs: 24, md: 30 }, fontWeight: 950, lineHeight: 1.12 }}>
-          Staff
-        </Typography>
+  const teamPanels = (
+    <>
+      <Box hidden={tab !== "staff"} role="tabpanel" id="pharmacy-tab-staff" aria-labelledby="pharmacy-tab-btn-staff">
         <StaffManager
           pharmacyId={pharmacy.id}
           memberships={staffMemberships}
           onMembershipsChanged={onMembershipsChanged}
           pharmacyName={pharmacy.name}
           loading={membershipsLoading}
+          inviteRequest={inviteStaff}
+          onApplicationsCount={setStaffApps}
+          chatPathFor={chatPathFor}
         />
       </Box>
-
-      <Box sx={{ mt: 3 }} ref={locumSectionRef}>
-        <Typography sx={{ mb: 1.5, color: DASHBOARD_INK, fontSize: { xs: 24, md: 30 }, fontWeight: 950, lineHeight: 1.12 }}>
-          Favourite Locums
-        </Typography>
+      <Box hidden={tab !== "locums"} role="tabpanel" id="pharmacy-tab-locums" aria-labelledby="pharmacy-tab-btn-locums">
         <LocumManager
           pharmacyId={pharmacy.id}
           memberships={locumMemberships}
           onMembershipsChanged={onMembershipsChanged}
           pharmacyName={pharmacy.name}
           loading={membershipsLoading}
+          inviteRequest={inviteLocum}
+          onApplicationsCount={setLocumApps}
+          chatPathFor={chatPathFor}
         />
       </Box>
-
-      <Box sx={{ mt: 3 }} ref={adminsSectionRef}>
+      <Box hidden={tab !== "admins"} role="tabpanel" id="pharmacy-tab-admins" aria-labelledby="pharmacy-tab-btn-admins">
         <PharmacyAdmins
           pharmacyId={pharmacy.id}
           admins={adminAssignments}
           pendingAdminMemberships={pendingAdminMemberships}
           onAdminsChanged={onMembershipsChanged}
           loading={membershipsLoading}
+          inviteRequest={inviteAdmin}
+          chatPathFor={chatPathFor}
         />
       </Box>
+    </>
+  );
+
+  return (
+    <Box data-ct-tokens="" sx={{ width: "100%", maxWidth: 1240, mx: "auto", px: { xs: 0, sm: 1.5, md: 2 }, py: { xs: 2, md: 3 } }}>
+      <PageHeader
+        title={pharmacy.name}
+        subtitle={address || undefined}
+        actions={
+          <>
+            <Button variant="outlined" startIcon={<Pencil size={16} />} onClick={editPharmacy} sx={{ minHeight: 44 }}>
+              Edit details
+            </Button>
+            <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => go("post-shift")} sx={{ minHeight: 44 }}>
+              Post a shift
+            </Button>
+          </>
+        }
+      >
+        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+          {abnVerified ? <Pill label="ABN verified" tone="green" icon={<BadgeCheck size={13} />} /> : null}
+          {payrollReady ? (
+            <Pill label={payrollEnabled ? "ChemistTasker Payroll" : "Timesheet-only payroll"} tone={payrollEnabled ? "violet" : "neutral"} icon={<Wallet size={13} />} />
+          ) : null}
+          <Pill label={autoPublishWorkerRequests ? "Staff requests publish automatically" : "You review staff requests"} tone="neutral" icon={<Inbox size={13} />} />
+        </Stack>
+      </PageHeader>
+
+      <Box sx={{ borderBottom: "1px solid var(--ct-border-color)", mb: 3 }}>
+        <Tabs
+          value={tab}
+          onChange={(_, next) => setTab(next)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          aria-label="Pharmacy sections"
+          sx={{
+            minHeight: 48,
+            "& .MuiTab-root": { minHeight: 48, textTransform: "none", fontSize: 15, fontWeight: 600, color: "var(--ct-text-secondary)", px: 1.75 },
+            "& .MuiTab-root.Mui-selected": { color: "var(--ct-accent-strong)" },
+            "& .MuiTabs-indicator": { height: 3, borderRadius: "3px 3px 0 0", bgcolor: "var(--ct-accent-strong)" },
+          }}
+        >
+          <Tab value="overview" id="pharmacy-tab-btn-overview" aria-controls="pharmacy-tab-overview" label="Overview" />
+          <Tab value="staff" id="pharmacy-tab-btn-staff" aria-controls="pharmacy-tab-staff" label={<TabLabel label="Staff" count={countsUnknown ? undefined : counts.staff} attention={staffApps} />} />
+          <Tab value="locums" id="pharmacy-tab-btn-locums" aria-controls="pharmacy-tab-locums" label={<TabLabel label="Favourite locums" count={countsUnknown ? undefined : counts.locums} attention={locumApps} />} />
+          <Tab value="admins" id="pharmacy-tab-btn-admins" aria-controls="pharmacy-tab-admins" label={<TabLabel label="Admins" count={countsUnknown ? undefined : counts.admins} />} />
+          <Tab value="settings" id="pharmacy-tab-btn-settings" aria-controls="pharmacy-tab-settings" label="Settings" />
+        </Tabs>
+      </Box>
+
+      {listsUnavailable && hasAnyMembers ? (
+        <Alert severity="warning" sx={{ mb: 2.5 }} action={<Button color="inherit" size="small" onClick={onMembershipsChanged}>Try again</Button>}>
+          The team lists didn't refresh. You're seeing the last saved version.
+        </Alert>
+      ) : null}
+
+      <PharmacyOverview hidden={tab !== "overview"} firstLoad={firstLoad} listsUnavailable={listsUnavailable} hasAnyMembers={hasAnyMembers}
+          onMembershipsChanged={onMembershipsChanged} attention={attention} counts={counts} statValue={statValue} statDetail={statDetail}
+          roleSummary={roleSummary} setTab={setTab} profile={profile} editPharmacy={editPharmacy} go={go}
+          inviteStaff={() => setInviteStaff(n => n + 1)} inviteLocum={() => setInviteLocum(n => n + 1)} inviteAdmin={() => setInviteAdmin(n => n + 1)}
+          openWorkforce={() => navigate(`/dashboard/workforce/settings?pharmacy_id=${pharmacy.id}`)} />
+
+      {listsUnavailable && !hasAnyMembers && tab !== "overview" && tab !== "settings" ? (
+        <DashboardContentState
+          kind="error"
+          title="Team lists can't load right now"
+          description="Staff, favourite locums and admins didn't load. This is a connection problem, not an empty team."
+          actionLabel="Try again"
+          onAction={onMembershipsChanged}
+        />
+      ) : (
+        teamPanels
+      )}
+
+      <PharmacySettings hidden={tab !== "settings"} autoPublishWorkerRequests={autoPublishWorkerRequests} autoPublishSaving={autoPublishSaving} autoPublishError={autoPublishError}
+          onToggleAutoPublishWorkerRequests={onToggleAutoPublishWorkerRequests} payrollEnabled={payrollEnabled} payrollReady={payrollReady}
+          payrollLoadError={payrollLoadError} payrollSaving={payrollSaving} payrollSaveError={payrollSaveError} handlePayrollToggle={handlePayrollToggle}
+          retryPayroll={retryPayroll} editPharmacy={editPharmacy} />
     </Box>
   );
 }
-
-

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link as RouterLink, useSearchParams } from '@/public/navigation';
 import {
   Alert,
@@ -9,10 +9,10 @@ import {
   DialogContent,
   DialogTitle,
   Snackbar,
+  Stack,
   Typography,
 } from '@mui/material';
 import ShiftsBoard from './dashboard/sidebar/ShiftsBoard';
-import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import {
   Shift,
   ShiftCounterOfferPayload,
@@ -87,6 +87,7 @@ export default function PublicJobBoardPage() {
   const [appliedShiftIds, setAppliedShiftIds] = useState<number[]>([]);
   const [appliedSlotIds, setAppliedSlotIds] = useState<number[]>([]);
   const [isVerified, setIsVerified] = useState(false);
+  const latestResultsRequest = useRef(0);
 
   const coerceVerified = (value: any) => {
     if (value === true || value === 'true' || value === 'True') return true;
@@ -179,6 +180,7 @@ export default function PublicJobBoardPage() {
 
   const loadShifts = useCallback(
     async (activeFilters: FilterConfig, activePage: number) => {
+      const requestId = ++latestResultsRequest.current;
       setLoading(true);
       setError(null);
       try {
@@ -212,6 +214,8 @@ export default function PublicJobBoardPage() {
           getPublicJobBoard(payload),
           user?.id ? fetchShiftInterests({ userId: user.id }) : Promise.resolve([]),
         ]);
+        // Only the latest search/page request may replace the visible list.
+        if (requestId !== latestResultsRequest.current) return;
         const list = Array.isArray(publicShifts?.results)
           ? publicShifts.results
           : Array.isArray(publicShifts)
@@ -232,10 +236,12 @@ export default function PublicJobBoardPage() {
         setAppliedShiftIds(Array.from(nextShiftIds));
         setAppliedSlotIds(Array.from(nextSlotIds));
       } catch (err) {
-        console.error('Failed to load public shifts', err);
-        showError('Failed to load public shifts.');
+        if (requestId === latestResultsRequest.current) {
+          console.error('Failed to load public shifts', err);
+          showError('Failed to load public shifts.');
+        }
       } finally {
-        setLoading(false);
+        if (requestId === latestResultsRequest.current) setLoading(false);
       }
     },
     [searchParams, user?.id]
@@ -247,7 +253,8 @@ export default function PublicJobBoardPage() {
   }, [filters]);
 
   useEffect(() => {
-    loadShifts(debouncedFilters, page);
+    void loadShifts(debouncedFilters, page);
+    return () => { latestResultsRequest.current += 1; };
   }, [debouncedFilters, page, loadShifts]);
 
   const requireLogin = () => setLoginDialogOpen(true);
@@ -358,23 +365,53 @@ export default function PublicJobBoardPage() {
   };
 
   const handleFiltersChange = (nextFilters: FilterConfig) => {
+    setPage(1);
     setFilters(nextFilters);
   };
 
   const handleCloseError = () => setErrorOpen(false);
 
   return (
-    <>
-      <PublicLogoTopBar />
-      <AuthLayout title="Public Job Board" maxWidth={false} noCard showTitle={false}>
-        <Box sx={{ px: { xs: 2, lg: 3 }, py: 3, bgcolor: 'grey.50', minHeight: '100vh' }}>
-          {error && (
-            <Typography color="error" sx={{ mb: 1 }}>
-              {error}
-            </Typography>
-          )}
+    <AuthLayout title="Public Job Board" maxWidth={false} noCard showTitle={false}>
+      <Box sx={{ px: { xs: 0, md: 1 }, py: { xs: 1.5, md: 2.5 } }}>
+        {!user && <Box
+          sx={{
+            mb: 2,
+            p: { xs: 1.5, md: 2 },
+            border: '1px solid #E5ECF7',
+            borderRadius: '14px',
+            bgcolor: '#fff',
+            boxShadow: 'none',
+          }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5}>
+            <Box>
+              <Typography sx={{ fontWeight: 850, color: '#06123A', fontSize: 17 }}>
+                Browse first. Apply when ready.
+              </Typography>
+              <Typography sx={{ mt: .4, color: '#445474', fontSize: 14, lineHeight: 1.55 }}>
+                Compare dates, location and rates before signing in.
+              </Typography>
+            </Box>
+            {!user && (
+              <Stack direction="row" spacing={1}>
+                <Button component={RouterLink} to="/register?next=%2Fshifts%2Fpublic-board" variant="outlined">Create account</Button>
+                <Button component={RouterLink} to="/login?next=%2Fshifts%2Fpublic-board" variant="contained">Log in</Button>
+              </Stack>
+            )}
+          </Stack>
+        </Box>}
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error} Your filters are saved. Use Refresh to try again.
+          </Alert>
+        )}
+
+        <Box sx={{ minWidth: 0, width: '100%' }}>
           <ShiftsBoard
             title="Public Job Board"
+            publicPresentation
             shifts={shifts}
             loading={loading}
             useServerFiltering
@@ -401,6 +438,7 @@ export default function PublicJobBoardPage() {
             onRefresh={() => loadShifts(filters, page)}
           />
         </Box>
+      </Box>
 
         <Dialog open={loginDialogOpen} onClose={() => setLoginDialogOpen(false)}>
           <DialogTitle>Log in to apply</DialogTitle>
@@ -426,6 +464,5 @@ export default function PublicJobBoardPage() {
           </Alert>
         </Snackbar>
       </AuthLayout>
-    </>
   );
 }

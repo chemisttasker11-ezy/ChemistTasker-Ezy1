@@ -1,301 +1,18 @@
-import { ReactNode, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { type ReactNode, useState } from "react";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import {
-  Box,
-  Button,
-  Divider,
-  Menu,
-  MenuItem,
-  Stack,
-  Typography,
-} from "@mui/material";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import StoreIcon from "@mui/icons-material/Store";
-import PublicIcon from "@mui/icons-material/Public";
-import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import PersonIcon from "@mui/icons-material/Person";
-import { useAuth } from "../contexts/AuthContext";
-import { useWorkspace } from "../contexts/WorkspaceContext";
-import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
+import { Box, Button, IconButton, Stack, Typography, useTheme } from "@mui/material";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import TopBarActions from "./TopBarActions";
+import DashboardSideNav, { useActiveDashboardPageLabel } from "./DashboardSideNav";
 import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
-import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, hasVerifiedWorkerProfile, isAdminPersonaAssignment, isInternalPharmacyMembership } from "@chemisttasker/shared-core";
-import { dashboardTitleForRole, userRoleLabel } from "../utils/roleLabels";
-
-const DNA = {
-  navy: "#061A3D",
-  navy2: "#02122C",
-  blue: "#063BDA",
-  violet: "#6D28D9",
-  magenta: "#EA0A8E",
-  cyan: "#08BEEA",
-  ink: "#06123A",
-  muted: "#5E6B8D",
-  page: "#F7FAFF",
-  line: "#E5ECF7",
-};
-
-type PharmacyOption = {
-  id: number;
-  name: string;
-  helper?: string;
-};
-
-const dashboardAccents = [
-  {
-    gradient: `linear-gradient(135deg, ${DNA.blue} 0%, ${DNA.violet} 52%, ${DNA.magenta} 100%)`,
-    soft: "#EFE7FF",
-    text: "#4A16B8",
-  },
-  {
-    gradient: `linear-gradient(135deg, ${DNA.blue} 0%, ${DNA.violet} 52%, ${DNA.magenta} 100%)`,
-    soft: "#EFE7FF",
-    text: "#4A16B8",
-  },
-  {
-    gradient: `linear-gradient(135deg, ${DNA.blue} 0%, ${DNA.violet} 52%, ${DNA.magenta} 100%)`,
-    soft: "#EFE7FF",
-    text: "#4A16B8",
-  },
-];
-
-function accentForScope(_scopeId: number | null, _workspace: string) {
-  return dashboardAccents[0];
-}
-
-function workerOverviewPath(role?: string | null) {
-  const normalized = String(role || "").toUpperCase();
-  if (normalized === "PHARMACIST") return "/dashboard/pharmacist/overview";
-  if (normalized === "OTHER_STAFF") return "/dashboard/otherstaff/overview";
-  if (normalized === "EXPLORER") return "/dashboard/explorer/overview";
-  if (normalized === "OWNER") return "/dashboard/owner/overview";
-  return "/dashboard";
-}
-
-function addScopedParams(path: string, selectedPharmacyId: number | null) {
-  if (!selectedPharmacyId) return path;
-  const [pathname, query = ""] = path.split("?");
-  const params = new URLSearchParams(query);
-  const isRoster = pathname.includes("/manage-pharmacies/roster") || pathname.includes("/shifts/roster");
-  const isCalendar = pathname.endsWith("/calendar");
-  const isPostShift = pathname.endsWith("/post-shift");
-  const isMyPharmacies = pathname.includes("/manage-pharmacies/my-pharmacies");
-
-  params.set("workspace", "internal");
-  params.set("pharmacy_id", String(selectedPharmacyId));
-
-  if (isCalendar || isPostShift || isRoster) {
-    params.set("pharmacy", String(selectedPharmacyId));
-  }
-  if (isMyPharmacies) {
-    params.set("view", "detail");
-    params.set("pharmacyId", String(selectedPharmacyId));
-  }
-
-  const nextQuery = params.toString();
-  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
-}
-
-function normalizeSegment(parentPath: string, item: any) {
-  const segment = String(item?.segment || "").replace(/^\/+/, "");
-  if (!segment) return parentPath;
-  if (segment.startsWith("dashboard/")) return `/${segment}`;
-  return `${parentPath.replace(/\/+$/, "")}/${segment}`.replace(/\/+/g, "/");
-}
-
-function collectPharmacies(user: any, adminAssignments: any[]): PharmacyOption[] {
-  const byId = new Map<number, PharmacyOption>();
-  const add = (idRaw: unknown, nameRaw: unknown, helper?: string) => {
-    const id = Number(idRaw);
-    if (!Number.isFinite(id) || id <= 0) return;
-    const name = typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : `Pharmacy #${id}`;
-    if (!byId.has(id)) byId.set(id, { id, name, helper });
-  };
-
-  // Owner authority comes from OWNER-level admin rows; the owner's own membership is a CONTACT membership.
-  const ownedIds = new Set(
-    (adminAssignments ?? [])
-      .filter((assignment) => String(assignment?.admin_level ?? "").toUpperCase() === "OWNER")
-      .map((assignment) => Number(assignment?.pharmacy_id)),
-  );
-  const memberships = Array.isArray(user?.memberships) ? user.memberships : [];
-  memberships.forEach((membership: any) => {
-    const role = String(membership?.role ?? "").toUpperCase();
-    const pharmacyId = Number(membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id);
-    const employmentType = String(membership?.employment_type ?? membership?.employmentType ?? "").toUpperCase();
-    if (isInternalPharmacyMembership(membership)) {
-      add(
-        membership?.pharmacy_id ?? membership?.pharmacyId ?? membership?.pharmacy?.id,
-        membership?.pharmacy_name ?? membership?.pharmacyName ?? membership?.pharmacy?.name,
-        role === "OWNER" || role === "PHARMACY_OWNER" || membership?.is_pharmacy_owner === true || ownedIds.has(pharmacyId)
-          ? "Owner"
-          : employmentType === "LOCUM"
-            ? "Locum"
-            : employmentType === "SHIFT_HERO"
-              ? "Shift Hero"
-              : membership?.role
-      );
-    }
-    if (canAccessOrganizationPharmacies(membership) && Array.isArray(membership?.pharmacies)) {
-      membership.pharmacies.forEach((pharmacy: any) => add(pharmacy?.id, pharmacy?.name, "Organization pharmacy"));
-    }
-  });
-
-  adminAssignments.forEach((assignment: any) => {
-    add(assignment?.pharmacy_id, assignment?.pharmacy_name, assignment?.admin_level ?? "Admin assignment");
-  });
-
-  const ownerPharmacies = [user?.pharmacies, user?.owner_pharmacies, user?.owned_pharmacies].find(Array.isArray) ?? [];
-  ownerPharmacies.forEach((pharmacy: any) => {
-    add(pharmacy?.id, pharmacy?.name, "Owner");
-  });
-
-  return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function MegaMenu({
-  anchorEl,
-  open,
-  onClose,
-  selectedPharmacyId,
-}: {
-  anchorEl: HTMLElement | null;
-  open: boolean;
-  onClose: () => void;
-  selectedPharmacyId: number | null;
-}) {
-  const nav = useDashboardNavigation();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const groups = useMemo(() => {
-    const result: Array<{ title: string; items: Array<{ label: string; icon?: ReactNode; path: string; child?: boolean }> }> = [];
-    let current: { title: string; items: Array<{ label: string; icon?: ReactNode; path: string; child?: boolean }> } | null = null;
-
-    const addItem = (item: any, parentPath = "") => {
-      if (item?.kind === "header") {
-        current = { title: item.title, items: [] };
-        result.push(current);
-        return;
-      }
-      if (item?.kind === "divider") {
-        current = null;
-        return;
-      }
-      if (!item?.segment || !item?.title) return;
-      if (!current) {
-        current = { title: "Navigation", items: [] };
-        result.push(current);
-      }
-      const path = normalizeSegment(parentPath, item);
-      current.items.push({ label: item.title, icon: item.icon, path });
-      if (Array.isArray(item.children)) {
-        item.children.forEach((child: any) => {
-          const childPath = normalizeSegment(path, child);
-          current?.items.push({ label: child.title, icon: child.icon, path: childPath, child: true });
-        });
-      }
-    };
-
-    nav.forEach((item: any) => addItem(item));
-    return result.filter((group) => group.items.length > 0);
-  }, [nav]);
-
-  const handleNavigate = (path: string) => {
-    navigate(addScopedParams(path, selectedPharmacyId));
-    onClose();
-  };
-
-  return (
-    <Menu
-      anchorEl={anchorEl}
-      open={open}
-      onClose={onClose}
-      slotProps={{
-        paper: {
-          sx: {
-            mt: { xs: 0.5, md: 1 },
-            width: { xs: "calc(100vw - 16px)", md: "min(1460px, calc(100vw - 24px))" },
-            maxWidth: "none",
-            maxHeight: { xs: "calc(100dvh - 96px)", md: "calc(100dvh - 112px)" },
-            borderRadius: { xs: "0 22px 22px 0", md: "0 30px 30px 0" },
-            border: "1px solid var(--ct-border-color)",
-            boxShadow: "0 28px 70px rgba(2, 18, 44, 0.16)",
-            overflowX: "hidden",
-            overflowY: "auto",
-            WebkitOverflowScrolling: "touch",
-          },
-        },
-        list: {
-          sx: { p: 0 },
-        },
-      }}
-    >
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", lg: "repeat(4, minmax(0, 1fr))" },
-          gap: { xs: 1.25, md: 2 },
-          p: { xs: 1, md: 2 },
-          bgcolor: "var(--ct-elevated-bg)",
-        }}
-      >
-        {groups.map((group) => (
-          <Box key={group.title} sx={{ border: "1px solid var(--ct-border-color)", bgcolor: "var(--ct-page-bg)", borderRadius: { xs: 2.5, md: 3 }, p: { xs: 1, md: 1.5 } }}>
-            <Typography sx={{ px: 1, pb: 1, fontSize: 10, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ct-text-secondary)", textTransform: "uppercase" }}>
-              {group.title}
-            </Typography>
-            <Stack direction="row" flexWrap="wrap" gap={1}>
-              {group.items.map((item) => {
-                const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
-                return (
-                  <Button
-                    key={`${group.title}-${item.path}-${item.label}`}
-                    onClick={() => handleNavigate(item.path)}
-                    startIcon={item.icon}
-                    endIcon={item.child ? undefined : null}
-                    sx={{
-                      width: { xs: "100%", sm: "auto" },
-                      minHeight: { xs: 42, md: 46 },
-                      justifyContent: "flex-start",
-                      borderRadius: 2,
-                      px: 1.5,
-                      py: 1,
-                      textTransform: "none",
-                      fontSize: { xs: 12.5, md: 13 },
-                      fontWeight: 900,
-                      lineHeight: 1.2,
-                      color: active ? "var(--ct-dashboard-accent)" : item.child ? "var(--ct-text-secondary)" : "var(--ct-text-primary)",
-                      bgcolor: active ? "var(--ct-dashboard-soft)" : item.child ? "var(--ct-hover-bg)" : "var(--ct-surface-bg)",
-                      border: `1px solid ${active ? "#C4B5FD" : "transparent"}`,
-                      boxShadow: item.child ? "none" : "0 4px 14px rgba(6,18,58,0.05)",
-                      "&:hover": {
-                        bgcolor: active ? "var(--ct-dashboard-soft)" : "var(--ct-surface-bg)",
-                        borderColor: "var(--ct-border-color)",
-                        transform: "translateY(-1px)",
-                      },
-                      "& .MuiButton-startIcon": { color: active ? "var(--ct-dashboard-accent)" : "var(--ct-text-secondary)", mr: 0.75 },
-                    }}
-                  >
-                    {item.label}
-                  </Button>
-                );
-              })}
-            </Stack>
-          </Box>
-        ))}
-      </Box>
-      <Divider />
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 2.5, py: 1.5 }}>
-        <Button size="small" onClick={onClose} sx={{ textTransform: "none", fontWeight: 900, color: DNA.muted }}>
-          Collapse menu
-        </Button>
-      </Stack>
-    </Menu>
-  );
-}
+import { dashboardTitleForRole } from "../utils/roleLabels";
+import { publicSiteHomeUrl } from "../components/PublicRouteBridge";
+import { accentForScope } from "./dashboardShell/shellModel";
+import DashboardMegaMenu from "./dashboardShell/DashboardMegaMenu";
+import DashboardPharmacySelector from "./dashboardShell/DashboardPharmacySelector";
+import DashboardPersonaSwitcher from "./dashboardShell/DashboardPersonaSwitcher";
+import { useDashboardWorkspaceScope } from "./dashboardShell/useDashboardWorkspaceScope";
 
 export default function DashboardTopShell({
   children,
@@ -306,244 +23,37 @@ export default function DashboardTopShell({
   titleOverride?: string;
   forceAdminScope?: boolean;
 }) {
-  const {
-    user,
-    activePersona,
-    adminAssignments,
-    activeAdminPharmacyId,
-    isAdminUser,
-    selectRolePersona,
-    selectAdminPersona,
-    setActivePersona,
-  } = useAuth();
-  const {
-    workspace,
-    setWorkspace,
-    canUseInternal,
-    selectedPharmacyId: workspaceSelectedPharmacyId,
-    setSelectedPharmacyId: setWorkspacePharmacyId,
-  } = useWorkspace();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const scope = useDashboardWorkspaceScope(forceAdminScope);
+  const { user, workspace, selectedPharmacyId, otherStaffRoleType, showPharmacySelector, hasOwnPersona, isAdminUser } = scope;
+  const isDark = useTheme().palette.mode === "dark";
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
-  const [workspaceAnchor, setWorkspaceAnchor] = useState<HTMLElement | null>(null);
-  const [adminAnchor, setAdminAnchor] = useState<HTMLElement | null>(null);
-  const [selectedPharmacyId, setSelectedPharmacyId] = useState<number | null>(activeAdminPharmacyId ?? workspaceSelectedPharmacyId ?? null);
-  const [workerVerified, setWorkerVerified] = useState<boolean>(() => hasVerifiedWorkerProfile(user));
-  const [otherStaffRoleType, setOtherStaffRoleType] = useState<string | null>(() => {
-    return (user as any)?.other_staff_profile?.role_type ?? (user as any)?.otherStaffProfile?.roleType ?? null;
-  });
-
-  const [organizationPharmacies, setOrganizationPharmacies] = useState<PharmacyOption[]>([]);
-  const organizationId = getOrganizationMembership(user)?.organization_id;
-  useEffect(() => {
-    if (!organizationId) {
-      setOrganizationPharmacies([]);
-      return;
-    }
-    let active = true;
-    setOrganizationPharmacies([]);
-    fetchAccessibleOrganizationPharmacies(organizationId)
-      .then((items) => { if (active) setOrganizationPharmacies(items); })
-      .catch(() => { if (active) setOrganizationPharmacies([]); });
-    return () => { active = false; };
-  }, [organizationId]);
-  const pharmacies = useMemo(() => {
-    const byId = new Map(collectPharmacies(user, adminAssignments).map((item) => [item.id, item]));
-    organizationPharmacies.forEach((item) => byId.set(item.id, { ...item, helper: "Organization pharmacy" }));
-    let options = [...byId.values()];
-    // The Owner workspace is scoped to pharmacies the owner owns. A pharmacy they only manage for someone else is
-    // reached through the Admin switch, not listed as one of their own stores.
-    if (String(user?.role || "").toUpperCase() === "OWNER") {
-      const ownedIds = new Set(
-        adminAssignments
-          .filter((assignment) => String(assignment?.admin_level ?? "").toUpperCase() === "OWNER")
-          .map((assignment) => Number(assignment.pharmacy_id)),
-      );
-      if (ownedIds.size) options = options.filter((item) => ownedIds.has(item.id) || item.helper === "Organization pharmacy");
-    }
-    return options.sort((a, b) => a.name.localeCompare(b.name));
-  }, [user, adminAssignments, organizationPharmacies]);
-  const isOrgUser = hasOrganizationAccess(user);
-  const isOwner = String(user?.role || "").toUpperCase() === "OWNER";
-  const isWorker = ["PHARMACIST", "OTHER_STAFF"].includes(String(user?.role || "").toUpperCase());
-  // Owners and explorers can also hold a delegated admin assignment at another pharmacy; they switch the same way.
-  const hasOwnPersona = isWorker || ["OWNER", "EXPLORER"].includes(String(user?.role || "").toUpperCase());
-  const delegatedAdminAssignments = useMemo(
-    () => adminAssignments.filter((assignment) => isAdminPersonaAssignment(assignment)),
-    [adminAssignments],
-  );
-  const isFavoriteStaff = useMemo(() => hasFavoriteStaffMembership(user), [user]);
-  const canUsePlatformWorkspace = isWorker && (workerVerified || isFavoriteStaff) && activePersona !== "admin" && !forceAdminScope;
-  const hidePharmacyScope = forceAdminScope || activePersona === "admin";
-  const showPharmacySelector = !hidePharmacyScope && (isOwner || isOrgUser || isWorker) && (pharmacies.length > 0 || canUsePlatformWorkspace);
-  const selectedPharmacy = pharmacies.find((item) => item.id === selectedPharmacyId) ?? null;
-  const title = titleOverride ?? dashboardTitleForRole(forceAdminScope ? "ADMIN" : user?.role, otherStaffRoleType);
+  const activePageLabel = useActiveDashboardPageLabel();
+  const title = titleOverride ?? (activePageLabel && activePageLabel !== "Overview"
+    ? activePageLabel : dashboardTitleForRole(forceAdminScope ? "ADMIN" : user?.role, otherStaffRoleType));
   const accent = accentForScope(selectedPharmacyId, forceAdminScope ? "internal" : workspace);
-
-  useEffect(() => {
-    const initialVerified = hasVerifiedWorkerProfile(user);
-    setWorkerVerified(initialVerified);
-
-    if (!user || !isWorker) return;
-
-    let cancelled = false;
-    const roleKey = String(user.role).toUpperCase() === "PHARMACIST" ? "pharmacist" : "other_staff";
-
-    getOnboardingDetail(roleKey)
-      .then((onboarding: any) => {
-        if (cancelled) return;
-        setWorkerVerified(hasVerifiedWorkerProfile(onboarding));
-        if (roleKey === "other_staff") {
-          const roleType = onboarding?.role_type ?? onboarding?.data?.role_type ?? null;
-          setOtherStaffRoleType(roleType);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setWorkerVerified(initialVerified);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isWorker, user]);
-
-  useEffect(() => {
-    if (hidePharmacyScope) return;
-    const rawPharmacyId =
-      searchParams.get("pharmacy_id") ??
-      searchParams.get("pharmacy") ??
-      searchParams.get("pharmacyId");
-    const nextPharmacyId = Number(rawPharmacyId);
-    if (Number.isFinite(nextPharmacyId) && pharmacies.some((pharmacy) => pharmacy.id === nextPharmacyId)) {
-      setWorkspace("internal");
-      setSelectedPharmacyId(nextPharmacyId);
-      setWorkspacePharmacyId(nextPharmacyId);
-    }
-  }, [hidePharmacyScope, pharmacies, searchParams, setWorkspace, setWorkspacePharmacyId]);
-
-  useEffect(() => {
-    if (hidePharmacyScope || workspace === "platform") return;
-    if (workspaceSelectedPharmacyId != null && workspaceSelectedPharmacyId !== selectedPharmacyId) {
-      setSelectedPharmacyId(workspaceSelectedPharmacyId);
-    }
-  }, [hidePharmacyScope, selectedPharmacyId, workspace, workspaceSelectedPharmacyId]);
-
-  useEffect(() => {
-    if (canUsePlatformWorkspace || workspace !== "platform") return;
-    setWorkspace("internal");
-    // A valid pharmacy already named in the URL (for example a canonicalised stale link) wins over remembered state.
-    const urlPharmacyId = Number(searchParams.get("pharmacy_id") ?? searchParams.get("pharmacy"));
-    const urlPharmacy = pharmacies.some((pharmacy) => pharmacy.id === urlPharmacyId) ? urlPharmacyId : null;
-    const fallbackPharmacyId = isOrgUser ? null : urlPharmacy ?? selectedPharmacyId ?? workspaceSelectedPharmacyId ?? pharmacies[0]?.id ?? null;
-    setSelectedPharmacyId(fallbackPharmacyId);
-    setWorkspacePharmacyId(fallbackPharmacyId);
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("workspace", "internal");
-    nextParams.delete("pharmacy_id");
-    nextParams.delete("pharmacy");
-    if (fallbackPharmacyId != null) {
-      nextParams.set("pharmacy_id", String(fallbackPharmacyId));
-    }
-    setSearchParams(nextParams, { replace: true });
-  }, [
-    canUsePlatformWorkspace,
-    isOrgUser,
-    pharmacies,
-    searchParams,
-    selectedPharmacyId,
-    setSearchParams,
-    setWorkspace,
-    setWorkspacePharmacyId,
-    workspace,
-    workspaceSelectedPharmacyId,
-  ]);
-
-  useEffect(() => {
-    if (hidePharmacyScope) {
-      setSelectedPharmacyId(activeAdminPharmacyId ?? null);
-      setWorkspacePharmacyId(activeAdminPharmacyId ?? null);
-      return;
-    }
-    if (workspace === "platform") {
-      setSelectedPharmacyId(null);
-      setWorkspacePharmacyId(null);
-      return;
-    }
-    if (!isOrgUser && selectedPharmacyId == null && pharmacies[0]) {
-      setSelectedPharmacyId(pharmacies[0].id);
-      setWorkspacePharmacyId(pharmacies[0].id);
-    }
-  }, [activeAdminPharmacyId, hidePharmacyScope, isOrgUser, pharmacies, selectedPharmacyId, setWorkspacePharmacyId, workspace]);
-
-  const applyScopeToCurrentUrl = (pharmacyId: number | null) => {
-    const scoped = addScopedParams(`${location.pathname}?${searchParams.toString()}`, pharmacyId);
-    const [, query = ""] = scoped.split("?");
-    const nextParams = new URLSearchParams(query);
-    if (nextParams.toString() !== searchParams.toString()) {
-      setSearchParams(nextParams, { replace: true });
-    }
-  };
-
-  const handleSelectPlatform = () => {
-    if (!canUsePlatformWorkspace) {
-      setWorkspaceAnchor(null);
-      return;
-    }
-    setWorkspace("platform");
-    setSelectedPharmacyId(null);
-    setWorkspacePharmacyId(null);
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("workspace", "platform");
-    nextParams.delete("pharmacy_id");
-    nextParams.delete("pharmacy");
-    nextParams.delete("pharmacyId");
-    nextParams.delete("view");
-    setSearchParams(nextParams, { replace: true });
-    setWorkspaceAnchor(null);
-  };
-
-  const handleSelectPharmacy = (id: number) => {
-    setWorkspace("internal");
-    setSelectedPharmacyId(id);
-    setWorkspacePharmacyId(id);
-    applyScopeToCurrentUrl(id);
-    setWorkspaceAnchor(null);
-  };
-
-  const handleSelectAllOrganizationPharmacies = () => {
-    setWorkspace("internal");
-    setSelectedPharmacyId(null);
-    setWorkspacePharmacyId(null);
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("workspace", "internal");
-    nextParams.delete("pharmacy_id");
-    nextParams.delete("pharmacy");
-    nextParams.delete("pharmacyId");
-    nextParams.delete("view");
-    setSearchParams(nextParams, { replace: true });
-    setWorkspaceAnchor(null);
-  };
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box
         sx={{
           "--ct-dashboard-gradient": accent.gradient,
-          "--ct-dashboard-soft": accent.soft,
-          "--ct-dashboard-accent": accent.text,
-          "--ct-dashboard-card-bg": "#FFFFFF",
-          "--ct-dashboard-card-border": "#E5ECF7",
+          "--ct-dashboard-soft": isDark ? "rgba(130,102,232,.24)" : accent.soft,
+          "--ct-dashboard-accent": isDark ? "#C8B5FF" : accent.text,
+          "--ct-dashboard-card-bg": "var(--ct-surface-bg)",
+          "--ct-dashboard-card-border": "var(--ct-border-color)",
           "--ct-dashboard-card-shadow": "0 8px 24px rgba(6, 18, 58, 0.04)",
           "--ct-dashboard-card-shadow-hover": "0 18px 42px rgba(6, 18, 58, 0.10)",
-          "--ct-dashboard-icon-bg": "#EFE7FF",
-          "--ct-dashboard-title": DNA.ink,
-          "--ct-dashboard-muted": DNA.muted,
+          "--ct-dashboard-icon-bg": isDark ? "rgba(130,102,232,.18)" : "#EFE7FF",
+          "--ct-dashboard-title": "var(--ct-text-primary)",
+          "--ct-dashboard-muted": "var(--ct-text-secondary)",
           minHeight: "100vh",
+          width: "100%",
+          minWidth: 0,
+          maxWidth: "100%",
+          overflowX: "clip",
           bgcolor: "var(--ct-page-bg)",
           color: "var(--ct-text-primary)",
-          fontFamily: '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif',
+          fontFamily: "var(--ct-font-body)",
           position: "relative",
           isolation: "isolate",
           "&::before": {
@@ -566,6 +76,9 @@ export default function DashboardTopShell({
           },
         }}
       >
+      <Box sx={{ display: "flex", width: "100%", minWidth: 0 }}>
+      <DashboardSideNav selectedPharmacyId={selectedPharmacyId} />
+      <Box sx={{ flex: "1 1 0%", minWidth: 0, display: "flex", flexDirection: "column" }}>
       <Box
         component="header"
         sx={{
@@ -575,34 +88,13 @@ export default function DashboardTopShell({
           display: "flex",
           justifyContent: "center",
           alignItems: "stretch",
-          minHeight: { xs: 86, md: 104 },
-          background: "linear-gradient(90deg, rgba(6,59,218,0.12) 0%, rgba(109,40,217,0.11) 42%, rgba(234,10,142,0.10) 72%, rgba(8,190,234,0.10) 100%)",
-          backdropFilter: "blur(18px)",
-          borderBottom: "1px solid rgba(109,40,217,0.16)",
-          boxShadow: "0 12px 34px rgba(6,18,58,0.07)",
-          overflow: "hidden",
-          "&::before": {
-            content: '""',
-            position: "absolute",
-            left: "18%",
-            top: -120,
-            width: 320,
-            height: 320,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0) 72%)",
-            pointerEvents: "none",
-          },
-          "&::after": {
-            content: '""',
-            position: "absolute",
-            right: -60,
-            bottom: -140,
-            width: 360,
-            height: 360,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(139,28,246,0.18) 0%, rgba(139,28,246,0) 72%)",
-            pointerEvents: "none",
-          },
+          minWidth: 0,
+          maxWidth: "100%",
+          minHeight: { xs: 72, md: 85 },
+          background: "rgba(255,255,255,0.93)",
+          backdropFilter: "blur(15px)",
+          borderBottom: "1px solid #EDF0F5",
+          boxShadow: "0 6px 18px rgba(6,18,58,0.035)",
         }}
       >
         <Stack
@@ -612,42 +104,51 @@ export default function DashboardTopShell({
           sx={{
             width: "100%",
             maxWidth: 1660,
-            minHeight: { xs: 86, md: 104 },
-            px: { xs: 0.75, sm: 1.5, md: 2, xl: 3 },
-            overflow: "hidden",
+            minWidth: 0,
+            boxSizing: "border-box",
+            minHeight: { xs: 72, md: 85 },
+            px: { xs: 1.5, sm: 2.25, md: 2.5, xl: 4 },
           }}
         >
-        <Button
-          onClick={(event) => setMenuAnchor(event.currentTarget)}
+        <Box
           sx={{
-            position: "relative",
-            width: { xs: 84, sm: 190, md: 250, xl: 300 },
-            minHeight: { xs: 86, md: 104 },
-            flexShrink: 0,
-            borderRadius: "0 0 30px 0",
-            background: "linear-gradient(135deg, rgba(6,59,218,0.13) 0%, rgba(109,40,217,0.11) 52%, rgba(234,10,142,0.09) 100%)",
-            borderRight: "1px solid rgba(109,40,217,0.16)",
-            boxShadow: "0 18px 46px rgba(6, 26, 61, 0.12)",
-            p: { xs: 0.75, sm: 1.25, md: 2 },
-            "&:hover": {
-              background: "linear-gradient(135deg, rgba(6,59,218,0.18) 0%, rgba(109,40,217,0.15) 52%, rgba(234,10,142,0.12) 100%)",
-              filter: "brightness(1.02)",
-            },
-            "&:after": {
-              content: '""',
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 4,
-              background: `linear-gradient(90deg, ${DNA.violet}, ${DNA.magenta}, ${DNA.cyan})`,
-            },
+            width: { xs: 112, md: 132 },
+            flex: "0 0 auto",
+            display: { xs: "flex", lg: "none" },
+            alignItems: "center",
           }}
         >
-          <Box component="img" src={menuLogo} alt="ChemistTasker menu" sx={{ maxWidth: "100%", maxHeight: { xs: 54, md: 74 }, objectFit: "contain" }} />
-          <KeyboardArrowDownIcon sx={{ ml: { xs: 0.25, md: 1 }, fontSize: { xs: 18, md: 24 }, color: "var(--ct-text-primary)", transform: menuAnchor ? "rotate(180deg)" : "none", transition: "transform .18s" }} />
-        </Button>
-        <MegaMenu
+          <Button
+            href={publicSiteHomeUrl()}
+            aria-label="ChemistTasker home"
+            sx={{
+              width: "100%",
+              minWidth: 0,
+              minHeight: 44,
+              p: 0,
+              justifyContent: "flex-start",
+              borderRadius: 1.5,
+              "&:hover": { bgcolor: "transparent", opacity: 0.88 },
+              "&:focus-visible": {
+                outline: "3px solid rgba(0,141,219,.28)",
+                outlineOffset: 3,
+              },
+            }}
+          >
+            <Box
+              component="img"
+              src={menuLogo}
+              alt="ChemistTasker"
+              sx={{
+                display: "block",
+                width: { xs: 112, md: 132 },
+                height: "auto",
+                objectFit: "contain",
+              }}
+            />
+          </Button>
+        </Box>
+        <DashboardMegaMenu
           anchorEl={menuAnchor}
           open={Boolean(menuAnchor)}
           onClose={() => setMenuAnchor(null)}
@@ -659,28 +160,31 @@ export default function DashboardTopShell({
             minWidth: 0,
             flex: 1,
             display: "grid",
+            // Phones and small tablets: icons on the first row, menu + pharmacy selector on a full-width second
+            // row, so the selector never collapses to nothing beside the actions.
             gridTemplateColumns: {
-              xs: "minmax(0, 1fr) auto",
+              xs: "minmax(0, 1fr)",
               md: "minmax(0, 1fr) auto",
-              lg: "minmax(260px, 440px) minmax(210px, 1fr) auto",
-              xl: "minmax(360px, 520px) minmax(260px, 1fr) auto",
+              lg: "minmax(210px, 300px) minmax(0, 1fr) minmax(0, auto)",
+              xl: "minmax(280px, 360px) minmax(0, 1fr) minmax(0, auto)",
             },
             gridTemplateAreas: {
-              xs: '"scope actions"',
+              xs: '"actions" "scope"',
               md: '"scope actions"',
               lg: '"scope title actions"',
             },
             alignItems: "center",
             columnGap: { xs: 0.75, md: 1.25, xl: 2 },
+            rowGap: { xs: 0.75, md: 0 },
+            py: { xs: 0.75, md: 0 },
             px: { xs: 0.75, md: 1.5, xl: 2.5 },
-            minHeight: { xs: 86, md: 104 },
-            overflow: "hidden",
+            minHeight: { xs: 72, md: 85 },
           }}
         >
           <Stack
             direction="row"
             alignItems="center"
-            justifyContent={{ xs: "flex-start", md: "flex-end" }}
+            justifyContent={{ xs: "flex-start", md: "flex-end", lg: "flex-start" }}
             spacing={1}
             sx={{
               gridArea: "scope",
@@ -692,115 +196,29 @@ export default function DashboardTopShell({
               "&::-webkit-scrollbar": { display: "none" },
             }}
           >
-          {showPharmacySelector && (
-            <>
-              <Button
-                onClick={(event) => setWorkspaceAnchor(event.currentTarget)}
-                startIcon={selectedPharmacy ? <StoreIcon /> : <PublicIcon />}
-                endIcon={<KeyboardArrowDownIcon />}
-                sx={{
-                  height: { xs: 48, md: 58 },
-                  minWidth: 0,
-                  width: { xs: 176, sm: 220, md: 260, lg: 250, xl: 300 },
-                  maxWidth: "100%",
-                  flexShrink: 1,
-                  justifyContent: "flex-start",
-                  borderRadius: { xs: "14px", md: "18px" },
-                  border: "1px solid var(--ct-border-color)",
-                  bgcolor: "var(--ct-surface-bg)",
-                  px: { xs: 1.25, md: 2 },
-                  textTransform: "none",
-                  boxShadow: "0 4px 16px rgba(6,18,58,0.05)",
-                }}
-              >
-                <Box sx={{ minWidth: 0, textAlign: "left" }}>
-                  <Typography noWrap sx={{ fontSize: { xs: 12, md: 14 }, fontWeight: 900, color: "var(--ct-text-primary)" }}>
-                    {selectedPharmacy?.name ?? (isOrgUser && workspace === "internal" ? "All organization pharmacies" : "ChemistTasker Platform")}
-                  </Typography>
-                  <Typography noWrap sx={{ fontSize: { xs: 10, md: 12 }, fontWeight: 700, color: "var(--ct-text-secondary)" }}>
-                    {selectedPharmacy ? "Selected pharmacy scope" : isOrgUser && workspace === "internal" ? "Combined organization scope" : "Public platform workspace"}
-                  </Typography>
-                </Box>
-              </Button>
-              <Menu anchorEl={workspaceAnchor} open={Boolean(workspaceAnchor)} onClose={() => setWorkspaceAnchor(null)}>
-                {isOrgUser && <MenuItem onClick={handleSelectAllOrganizationPharmacies}>
-                  <StoreIcon sx={{ mr: 1.5, color: DNA.blue }} /> All organization pharmacies
-                </MenuItem>}
-                {canUsePlatformWorkspace && canUseInternal && (
-                  <MenuItem onClick={handleSelectPlatform}>
-                    <PublicIcon sx={{ mr: 1.5, color: DNA.violet }} /> ChemistTasker Platform
-                  </MenuItem>
-                )}
-                {pharmacies.map((pharmacy) => (
-                  <MenuItem key={pharmacy.id} onClick={() => handleSelectPharmacy(pharmacy.id)}>
-                    <StoreIcon sx={{ mr: 1.5, color: DNA.blue }} />
-                    <Box>
-                      <Typography sx={{ fontWeight: 800 }}>{pharmacy.name}</Typography>
-                      {pharmacy.helper && <Typography sx={{ fontSize: 12, color: DNA.muted }}>{pharmacy.helper}</Typography>}
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Menu>
-            </>
-          )}
-
-          {hasOwnPersona && isAdminUser && (
-            <Stack direction="row" alignItems="center" sx={{ height: { xs: 48, md: 58 }, border: "1px solid var(--ct-border-color)", bgcolor: "var(--ct-surface-bg)", borderRadius: 999, p: 0.5, flexShrink: 0 }}>
-              <Button
-                onClick={() => {
-                  const role = String(user?.role).toUpperCase();
-                  if (role === "PHARMACIST" || role === "OTHER_STAFF") selectRolePersona(role);
-                  else setActivePersona("staff");
-                  navigate(workerOverviewPath(role), { replace: true });
-                }}
-                sx={{
-                  borderRadius: 999,
-                  height: { xs: 38, md: 46 },
-                  px: { xs: 1.25, md: 2 },
-                  textTransform: "none",
-                  fontSize: { xs: 11, md: 12 },
-                  fontWeight: 900,
-                  color: activePersona === "admin" ? "var(--ct-text-secondary)" : DNA.violet,
-                  bgcolor: activePersona === "admin" ? "transparent" : "var(--ct-soft-primary)",
-                }}
-              >
-                <PersonIcon sx={{ fontSize: 16, mr: 0.75 }} /> {userRoleLabel(user?.role, otherStaffRoleType)}
-              </Button>
-              <Button
-                onClick={(event) => setAdminAnchor(event.currentTarget)}
-                sx={{
-                  borderRadius: 999,
-                  height: { xs: 38, md: 46 },
-                  px: { xs: 1.25, md: 2 },
-                  textTransform: "none",
-                  fontSize: { xs: 11, md: 12 },
-                  fontWeight: 900,
-                  color: activePersona === "admin" ? DNA.violet : "var(--ct-text-secondary)",
-                  bgcolor: activePersona === "admin" ? "var(--ct-soft-primary)" : "transparent",
-                }}
-              >
-                <AdminPanelSettingsIcon sx={{ fontSize: 16, mr: 0.75 }} /> Admin
-              </Button>
-              <Menu anchorEl={adminAnchor} open={Boolean(adminAnchor)} onClose={() => setAdminAnchor(null)}>
-                {delegatedAdminAssignments.map((assignment) => (
-                  <MenuItem
-                    key={assignment.id ?? assignment.pharmacy_id}
-                    onClick={() => {
-                      if (assignment.id != null) selectAdminPersona(assignment.id);
-                      navigate(`/dashboard/admin/${assignment.pharmacy_id}/overview`);
-                      setAdminAnchor(null);
-                    }}
-                  >
-                    <StoreIcon sx={{ mr: 1.5, color: DNA.blue }} />
-                    <Box>
-                      <Typography sx={{ fontWeight: 800 }}>{assignment.pharmacy_name ?? `Pharmacy #${assignment.pharmacy_id}`}</Typography>
-                      <Typography sx={{ fontSize: 12, color: DNA.muted }}>{assignment.admin_level}</Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Menu>
-            </Stack>
-          )}
+          <IconButton
+            aria-label="Open dashboard navigation"
+            aria-expanded={Boolean(menuAnchor)}
+            onClick={(event) => setMenuAnchor(event.currentTarget)}
+            sx={{
+              display: { xs: "inline-flex", lg: "none" },
+              width: 44,
+              height: 44,
+              flex: "0 0 auto",
+              color: "var(--ct-text-primary)",
+              border: "1px solid var(--ct-border-color)",
+              bgcolor: "var(--ct-surface-bg)",
+              "&:hover": { bgcolor: "var(--ct-hover-bg)" },
+              "&:focus-visible": {
+                outline: "3px solid rgba(0,141,219,.28)",
+                outlineOffset: 1,
+              },
+            }}
+          >
+            <MenuRoundedIcon />
+          </IconButton>
+          {showPharmacySelector && <DashboardPharmacySelector scope={scope} />}
+          {hasOwnPersona && isAdminUser && <DashboardPersonaSwitcher scope={scope} />}
           </Stack>
 
           <Box
@@ -814,10 +232,10 @@ export default function DashboardTopShell({
               maxWidth: "100%",
             }}
           >
-            <Typography noWrap sx={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase", color: DNA.violet }}>
+            <Typography noWrap sx={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ct-dashboard-accent)" }}>
               {forceAdminScope ? "Internal Workspace" : workspace === "platform" ? "Public Platform" : "Internal Workspace"}
             </Typography>
-            <Typography noWrap sx={{ fontSize: 18, fontWeight: 950, color: "var(--ct-text-primary)" }}>
+            <Typography component="div" noWrap sx={{ fontFamily: "var(--ct-font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1.2, color: "var(--ct-text-primary)" }}>
               {title}
             </Typography>
           </Box>
@@ -832,19 +250,18 @@ export default function DashboardTopShell({
               minWidth: 0,
               justifySelf: "end",
               display: "flex",
-              width: { xs: "auto", md: 390, lg: 420, xl: 460 },
+              width: "auto",
               maxWidth: "100%",
             }}
           >
             <TopBarActions
-              hideSearch
               iconSx={{
                 width: { xs: 38, md: 46 },
                 height: { xs: 38, md: 46 },
                 bgcolor: "var(--ct-surface-bg)",
                 color: "var(--ct-text-secondary)",
                 boxShadow: "0 3px 12px rgba(6,18,58,0.05)",
-                "&:hover": { bgcolor: "var(--ct-hover-bg)", color: DNA.violet },
+                "&:hover": { bgcolor: "var(--ct-hover-bg)", color: "var(--ct-dashboard-accent)" },
               }}
             />
           </Stack>
@@ -852,24 +269,27 @@ export default function DashboardTopShell({
         </Stack>
       </Box>
 
-      <Box
-        component="main"
-        sx={{
-          width: "100%",
-          maxWidth: "1660px",
-          minWidth: 0,
-          mx: "auto",
-          px: { xs: 1.5, sm: 2, md: 3 },
-          py: { xs: 1.5, md: 3 },
-          overflowX: "hidden",
-          position: "relative",
-          zIndex: 1,
-          "& .MuiPaper-root": {
-            borderColor: "var(--ct-border-color)",
-          },
-        }}
-      >
-        {children}
+        <Box
+          component="main"
+          sx={{
+            width: "100%",
+            flex: "1 1 0%",
+            maxWidth: "100%",
+            minWidth: 0,
+            mx: "auto",
+            px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
+            py: { xs: 2, md: 3.5 },
+            overflowX: "hidden",
+            position: "relative",
+            zIndex: 1,
+            "& .MuiPaper-root": {
+              borderColor: "var(--ct-border-color)",
+            },
+          }}
+        >
+          {children}
+        </Box>
+      </Box>
       </Box>
       </Box>
     </LocalizationProvider>

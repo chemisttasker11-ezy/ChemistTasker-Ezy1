@@ -1,44 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
     Alert,
     Box,
     Button,
-    Card,
-    CardContent,
     CircularProgress,
-    Divider,
-    FormControl,
-    FormControlLabel,
-    FormLabel,
-    Grid,
+    IconButton,
     Paper,
-    Radio,
-    RadioGroup,
     Stack,
-    TextField,
     Typography,
-    styled,
 } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { ArrowLeft, Check, CreditCard, Minus, Plus, ReceiptText, RefreshCw, Users } from 'lucide-react';
 import { createSubscriptionCheckout } from '@chemisttasker/shared-core';
 import { useToast } from '../../../../contexts/ToastContext';
 import apiClient from '../../../../utils/apiClient';
-import TopBar from './TopBar';
 import { useSearchParams } from 'react-router-dom';
-
-const PricingCard = styled(Card)(() => ({
-    borderRadius: '1.5rem',
-    border: '1px solid #e2e8f0',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
-    height: '100%',
-    position: 'relative',
-    overflow: 'visible',
-    '&:hover': {
-        transform: 'translateY(-10px)',
-        boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
-    },
-}));
+import PageHeader from '../../../../components/ui/PageHeader';
+import IconTile from '../../../../components/ui/IconTile';
+import DashboardContentState from '../../../../components/dashboard/DashboardContentState';
+import { Pill } from '../../../../components/ui/Pill';
 
 type SubscriptionState = {
     exists: boolean;
@@ -53,6 +32,44 @@ type SubscriptionState = {
 };
 
 type View = 'plans' | 'subscribe' | 'manage';
+
+const cardSx = { borderRadius: 'var(--ct-card-radius)', borderColor: 'var(--ct-border-color)', bgcolor: 'var(--ct-surface-bg)' } as const;
+const priceSx = { fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: { xs: 36, md: 40 }, lineHeight: 1.1, color: 'var(--ct-text-primary)' } as const;
+const titleSx = { fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 20, color: 'var(--ct-text-primary)' } as const;
+
+function Feature({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
+    return (
+        <Stack direction="row" spacing={1.25} alignItems="flex-start" component="li" sx={{ listStyle: 'none' }}>
+            <Box sx={{ mt: '2px', color: muted ? 'var(--ct-text-muted)' : 'var(--ct-accent-strong)', display: 'flex' }} aria-hidden>
+                <Check size={18} strokeWidth={2.25} />
+            </Box>
+            <Typography sx={{ color: muted ? 'var(--ct-text-secondary)' : 'var(--ct-text-primary)', fontSize: 15 }}>{children}</Typography>
+        </Stack>
+    );
+}
+
+function PaymentOption({ selected, onSelect, icon, title, body }: { selected: boolean; onSelect: () => void; icon: ReactNode; title: string; body: string }) {
+    return (
+        <Box
+            component="label"
+            sx={{
+                display: 'flex', gap: 1.5, alignItems: 'flex-start', p: 2, cursor: 'pointer', flex: 1,
+                borderRadius: '14px',
+                border: selected ? '2px solid var(--ct-accent-strong)' : '1px solid var(--ct-border-color)',
+                m: selected ? 0 : '1px',
+                bgcolor: selected ? 'var(--ct-tone-violet-bg)' : 'var(--ct-surface-bg)',
+                '&:has(input:focus-visible)': { outline: '2px solid var(--ct-accent-strong)', outlineOffset: 2 },
+            }}
+        >
+            <input type="radio" name="payment-method" checked={selected} onChange={onSelect} style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }} />
+            <IconTile icon={icon} size={40} />
+            <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 600, color: 'var(--ct-text-primary)' }}>{title}</Typography>
+                <Typography variant="body2" sx={{ color: selected ? 'var(--ct-text-primary)' : 'var(--ct-text-secondary)' }}>{body}</Typography>
+            </Box>
+        </Box>
+    );
+}
 
 const defaultSubscription: SubscriptionState = {
     exists: false,
@@ -77,10 +94,13 @@ export default function OwnerBillingPage({ onBack, totalPharmacies }: { onBack: 
     const [targetExtraSeats, setTargetExtraSeats] = useState<number>(0);
     const [loading, setLoading] = useState(false);
     const [loadingSubscription, setLoadingSubscription] = useState(true);
+    const [loadFailed, setLoadFailed] = useState(false);
+    const [loadedOnce, setLoadedOnce] = useState(false);
     const seatsOnlyMode = searchParams.get('mode') === 'seats';
 
     const loadSubscription = async () => {
         setLoadingSubscription(true);
+        setLoadFailed(false);
         try {
             const { data: res }: any = await apiClient.get('/billing/subscription/');
             const normalized: SubscriptionState = {
@@ -95,6 +115,7 @@ export default function OwnerBillingPage({ onBack, totalPharmacies }: { onBack: 
                 accountName: res.accountName ?? '',
             };
             setSubscription(normalized);
+            setLoadedOnce(true);
             setTargetStaffCount(Math.max(normalized.staffCount, 5));
             setTargetExtraSeats(Math.max(normalized.extraSeatCount, 0));
             if (seatsOnlyMode) {
@@ -102,8 +123,8 @@ export default function OwnerBillingPage({ onBack, totalPharmacies }: { onBack: 
             } else {
                 setView(normalized.active ? 'manage' : 'plans');
             }
-        } catch (err: any) {
-            showToast(err?.message || 'Failed to load subscription.', 'error');
+        } catch {
+            setLoadFailed(true);
         } finally {
             setLoadingSubscription(false);
         }
@@ -185,137 +206,91 @@ export default function OwnerBillingPage({ onBack, totalPharmacies }: { onBack: 
         return basePrice + extraStaff * 5;
     }, [subscription.active, targetExtraSeats, targetStaffCount]);
 
-    const nextInvoiceText = subscription.currentPeriodEnd
-        ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
-        : 'Not available yet';
+    const renewal = subscription.currentPeriodEnd
+        ? new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+        : null;
+    const seatsChanged = targetExtraSeats !== subscription.extraSeatCount;
+    const backButton = (onClick: () => void, label: string) => (
+        <Button variant="outlined" onClick={onClick} startIcon={<ArrowLeft size={16} />} sx={{ minHeight: 40 }}>{label}</Button>
+    );
 
-    if (loadingSubscription) {
+    if (loadingSubscription && !loadedOnce) {
         return (
-            <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 4 }, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <CircularProgress />
+            <Box>
+                <PageHeader title="Billing & subscription" />
+                <DashboardContentState kind="loading" title="Loading your subscription" />
+            </Box>
+        );
+    }
+
+    if (loadFailed && !loadedOnce) {
+        return (
+            <Box>
+                <PageHeader title="Billing & subscription" actions={backButton(onBack, 'Back to overview')} />
+                <DashboardContentState
+                    kind="error"
+                    title="We couldn't load your subscription"
+                    description="Your plan hasn't changed. Check your connection and try again."
+                    actionLabel="Try again"
+                    onAction={() => void loadSubscription()}
+                />
             </Box>
         );
     }
 
     if (view === 'plans') {
+        const pendingActivation = !subscription.active && subscription.exists && subscription.stripeCustomerId && !subscription.stripeSubscriptionId;
         return (
-            <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 4 } }}>
-                <TopBar onBack={onBack} breadcrumb={['Billing & Subscription']} />
+            <Box>
+                <PageHeader
+                    title="Billing & subscription"
+                    subtitle="Pay only when a shift is filled, or subscribe to halve your fees and connect your own team."
+                    actions={backButton(onBack, 'Back to overview')}
+                />
 
-                <Box sx={{ maxWidth: 1000, mx: 'auto', mt: 4 }}>
-                    <Typography variant="h4" fontWeight={800} gutterBottom textAlign="center">
-                        Choose Your Plan
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary" paragraph textAlign="center" sx={{ mb: 6 }}>
-                        Select the plan that best fits your pharmacy's needs.
-                    </Typography>
+                {pendingActivation && (
+                    <Alert
+                        severity="warning"
+                        sx={{ mb: 2.5 }}
+                        action={<Button color="inherit" size="small" onClick={() => void loadSubscription()} disabled={loadingSubscription}>Check again</Button>}
+                    >
+                        Your payment details are saved, but the subscription isn't active yet. This usually takes a minute.
+                    </Alert>
+                )}
 
-                    {!subscription.active && subscription.exists && subscription.stripeCustomerId && !subscription.stripeSubscriptionId && (
-                        <Alert severity="warning" sx={{ mb: 4 }}>
-                            A Stripe customer exists, but your subscription has not been activated locally yet. Make sure your webhook listener is running and then refresh this page.
-                        </Alert>
-                    )}
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 2.5, maxWidth: 980 }}>
+                    <Paper variant="outlined" sx={{ ...cardSx, p: { xs: 2.5, md: 3.5 }, display: 'flex', flexDirection: 'column' }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                            <Typography component="h2" sx={titleSx}>Pay as you go</Typography>
+                            <Pill tone="neutral" label="Current plan" />
+                        </Stack>
+                        <Typography color="text.secondary" sx={{ mt: 0.75 }}>For occasional cover. You pay only when a shift is filled.</Typography>
+                        <Typography sx={{ ...priceSx, mt: 2.5 }}>$0 <Box component="span" sx={{ fontSize: 16, color: 'var(--ct-text-secondary)', fontFamily: 'var(--ct-font-body)' }}>/ month</Box></Typography>
+                        <Typography sx={{ mt: 2.5, mb: 1.25, fontWeight: 600, color: 'var(--ct-text-primary)' }}>Fees when a shift is filled</Typography>
+                        <Stack component="ul" spacing={1.25} sx={{ p: 0, m: 0 }}>
+                            <Feature><strong>$30</strong> per locum shift</Feature>
+                            <Feature><strong>$80</strong> per part-time or full-time job</Feature>
+                            <Feature muted>No fee if the shift goes unfilled</Feature>
+                        </Stack>
+                    </Paper>
 
-                    <Grid container spacing={4} justifyContent="center" alignItems="stretch">
-                        <Grid size={{ xs: 12, md: 5 }}>
-                            <PricingCard>
-                                <CardContent sx={{ p: { xs: 4, md: 5 } }}>
-                                    <Typography variant="h4" color="text.primary" gutterBottom>
-                                        Pay As You Go
-                                    </Typography>
-                                    <Typography variant="body1" color="text.secondary" sx={{ mb: 4, minHeight: '48px' }}>
-                                        For occasional shift coverage. Only pay when a shift is successfully filled.
-                                    </Typography>
-
-                                    <Typography variant="h3" sx={{ mb: 1 }}>
-                                        $0 <Typography component="span" variant="h6" color="text.secondary">/ month</Typography>
-                                    </Typography>
-
-                                    <Box sx={{ mt: 4, mb: 4 }}>
-                                        <Divider sx={{ mb: 3 }} />
-                                        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
-                                            Shift Fulfillment Fees:
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                            <CheckCircleIcon sx={{ color: 'primary.main', mr: 2 }} />
-                                            <Typography><strong>$30</strong> per Locum Shift</Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                            <CheckCircleIcon sx={{ color: 'primary.main', mr: 2 }} />
-                                            <Typography><strong>$80</strong> per Part/Full Time Job</Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                            <CheckCircleIcon sx={{ color: 'primary.main', mr: 2 }} />
-                                            <Typography color="text.secondary">No fee if shift goes unfilled</Typography>
-                                        </Box>
-                                    </Box>
-
-                                    <Button variant="outlined" color="primary" fullWidth disabled sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
-                                        Current Plan
-                                    </Button>
-                                </CardContent>
-                            </PricingCard>
-                        </Grid>
-
-                        <Grid size={{ xs: 12, md: 5 }}>
-                            <PricingCard sx={{ border: '2px solid #00a99d' }}>
-                                <Box sx={{
-                                    position: 'absolute', top: -16, left: '50%', transform: 'translateX(-50%)',
-                                    bgcolor: 'primary.main', color: 'white', px: 3, py: 0.5, borderRadius: '20px',
-                                    fontWeight: 'bold', fontSize: '0.875rem', letterSpacing: '0.05em', zIndex: 1
-                                }}>
-                                    RECOMMENDED
-                                </Box>
-
-                                <CardContent sx={{ p: { xs: 4, md: 5 } }}>
-                                    <Typography variant="h4" color="primary.main" gutterBottom>
-                                        Owner Subscription
-                                    </Typography>
-                                    <Typography variant="body1" color="text.secondary" sx={{ mb: 4, minHeight: '48px' }}>
-                                        Best for active pharmacies. Get 50% off all your shift fulfillment fees.
-                                    </Typography>
-
-                                    <Typography variant="h3" sx={{ mb: 1 }}>
-                                        $30 <Typography component="span" variant="h6" color="text.secondary">/ month</Typography>
-                                    </Typography>
-
-                                    <Box sx={{ mt: 4, mb: 4 }}>
-                                        <Divider sx={{ mb: 3 }} />
-                                        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
-                                            Includes:
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                            <CheckCircleIcon sx={{ color: 'primary.main', mr: 2 }} />
-                                            <Typography>Connect up to <strong>5 internal staff</strong> per Pharmacy</Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                            <CheckCircleIcon sx={{ color: 'primary.main', mr: 2 }} />
-                                            <Typography><strong>$5</strong> per additional staff member</Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                            <CheckCircleIcon sx={{ color: 'secondary.main', mr: 2 }} />
-                                            <Typography fontWeight="bold">50% off public shift fees</Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                            <Typography sx={{ ml: 5, color: 'text.secondary', fontSize: '0.9rem' }}>
-                                                ($15 Locum / $40 Part/Full time)
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        fullWidth
-                                        onClick={() => setView('subscribe')}
-                                        sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}
-                                    >
-                                        Subscribe & Save
-                                    </Button>
-                                </CardContent>
-                            </PricingCard>
-                        </Grid>
-                    </Grid>
+                    <Paper variant="outlined" sx={{ ...cardSx, p: { xs: 2.5, md: 3.5 }, display: 'flex', flexDirection: 'column', borderWidth: 2, borderColor: 'var(--ct-accent-strong)' }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                            <Typography component="h2" sx={titleSx}>Owner subscription</Typography>
+                            <Pill tone="violet" label="Recommended" />
+                        </Stack>
+                        <Typography color="text.secondary" sx={{ mt: 0.75 }}>For active pharmacies. Half price on every filled public shift.</Typography>
+                        <Typography sx={{ ...priceSx, mt: 2.5 }}>$30 <Box component="span" sx={{ fontSize: 16, color: 'var(--ct-text-secondary)', fontFamily: 'var(--ct-font-body)' }}>/ month</Box></Typography>
+                        <Typography sx={{ mt: 2.5, mb: 1.25, fontWeight: 600, color: 'var(--ct-text-primary)' }}>Includes</Typography>
+                        <Stack component="ul" spacing={1.25} sx={{ p: 0, m: 0, flex: 1 }}>
+                            <Feature>Connect up to <strong>5 internal staff</strong> per pharmacy</Feature>
+                            <Feature><strong>$5</strong> a month per extra staff member</Feature>
+                            <Feature><strong>50% off public shift fees</strong>: $15 per locum shift, $40 per part-time or full-time job</Feature>
+                        </Stack>
+                        <Button variant="contained" size="large" fullWidth onClick={() => setView('subscribe')} sx={{ mt: 3, minHeight: 48 }}>
+                            Subscribe and save
+                        </Button>
+                    </Paper>
                 </Box>
             </Box>
         );
@@ -323,208 +298,158 @@ export default function OwnerBillingPage({ onBack, totalPharmacies }: { onBack: 
 
     if (view === 'subscribe') {
         return (
-            <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 4 } }}>
-                <TopBar onBack={() => setView('plans')} breadcrumb={['Billing & Subscription', 'Setup']} />
-
-                <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
-                    <Typography variant="h4" fontWeight={800} gutterBottom>
-                        Setup Subscription
-                    </Typography>
-                <Typography variant="body1" color="text.secondary" paragraph>
-                    Your subscription gives you access to full featured tools and locum booking for all your pharmacies.
-                </Typography>
+            <Box>
+                <PageHeader
+                    title="Set up your subscription"
+                    subtitle="Covers locum booking and team tools for all your pharmacies."
+                    actions={backButton(() => setView('plans'), 'Back to plans')}
+                />
 
                 {seatsOnlyMode && (
-                    <Alert severity="info" sx={{ mb: 3 }}>
-                        You opened billing from your profile section. Complete the base subscription first, then this page will switch to seat management only.
+                    <Alert severity="info" sx={{ mb: 2.5, maxWidth: 760 }}>
+                        Start the base subscription first. You can then add staff seats on this page.
                     </Alert>
                 )}
 
-                    <Card sx={{ mt: 4, borderRadius: 3, boxShadow: 3 }}>
-                        <CardContent sx={{ p: 4 }}>
-                            <Typography variant="h6" fontWeight={700} gutterBottom>
-                                Plan Details
+                <Paper variant="outlined" sx={{ ...cardSx, p: { xs: 2.5, md: 3.5 }, maxWidth: 760 }}>
+                    <Stack spacing={3}>
+                        <Box>
+                            <Typography component="h2" sx={titleSx}>Base subscription</Typography>
+                            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+                                $30 a month with 5 staff seats included. Extra seats are $5 a month each, added once you're subscribed.
                             </Typography>
-                            <Divider sx={{ mb: 3 }} />
+                        </Box>
 
-                            <Stack spacing={4}>
-                                <Paper sx={{ p: 3, bgcolor: 'background.default', borderRadius: 2 }}>
-                                    <Stack spacing={1}>
-                                        <Typography variant="subtitle1" fontWeight={700}>Base subscription</Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            The owner subscription is a fixed base plan: $30/month and 5 included seats.
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Extra seats are purchased later as a separate $5/month add-on product.
-                                        </Typography>
-                                    </Stack>
-                                </Paper>
-
-                                <Box>
-                                    <FormControl component="fieldset">
-                                        <FormLabel component="legend" sx={{ fontWeight: 600, color: 'text.primary', mb: 1 }}>
-                                            Payment Method
-                                        </FormLabel>
-                                        <RadioGroup value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'invoice')}>
-                                            <FormControlLabel
-                                                value="card"
-                                                control={<Radio />}
-                                                label={
-                                                    <Box>
-                                                        <Typography fontWeight={500}>Credit/Debit Card</Typography>
-                                                        <Typography variant="caption" color="text.secondary">Instant activation via Stripe secure checkout</Typography>
-                                                    </Box>
-                                                }
-                                                sx={{ mb: 1 }}
-                                            />
-                                            <FormControlLabel
-                                                value="invoice"
-                                                control={<Radio />}
-                                                label={
-                                                    <Box>
-                                                        <Typography fontWeight={500}>Invoice</Typography>
-                                                        <Typography variant="caption" color="text.secondary">We will email you an invoice with 7-day payment terms</Typography>
-                                                    </Box>
-                                                }
-                                            />
-                                        </RadioGroup>
-                                    </FormControl>
-                                </Box>
-
-                                <Paper sx={{ p: 3, bgcolor: 'background.default', borderRadius: 2 }}>
-                                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                        <Typography variant="h6" fontWeight={600}>Total / Month:</Typography>
-                                        <Typography variant="h5" fontWeight={800} color="primary">${calculateTotal} AUD</Typography>
-                                    </Stack>
-                                </Paper>
-
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    size="large"
-                                    fullWidth
-                                    disabled={loading || targetStaffCount < 5}
-                                    onClick={handleSubscribe}
-                                    sx={{ py: 1.5, fontSize: '1.1rem', fontWeight: 700 }}
-                                >
-                                    {loading ? <CircularProgress size={28} color="inherit" /> : `Subscribe with ${paymentMethod === 'card' ? 'Card' : 'Invoice'}`}
-                                </Button>
+                        <Box component="fieldset" sx={{ border: 0, p: 0, m: 0 }}>
+                            <Typography component="legend" sx={{ fontWeight: 600, color: 'var(--ct-text-primary)', mb: 1.25 }}>How would you like to pay?</Typography>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                                <PaymentOption selected={paymentMethod === 'card'} onSelect={() => setPaymentMethod('card')} icon={<CreditCard />} title="Card" body="Active straight away through Stripe's secure checkout." />
+                                <PaymentOption selected={paymentMethod === 'invoice'} onSelect={() => setPaymentMethod('invoice')} icon={<ReceiptText />} title="Invoice" body="We email an invoice with 7-day payment terms." />
                             </Stack>
-                        </CardContent>
-                    </Card>
-                </Box>
+                        </Box>
+
+                        <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ p: 2, borderRadius: '14px', bgcolor: 'var(--ct-subtle-bg)' }}>
+                            <Typography sx={{ fontWeight: 600, color: 'var(--ct-text-primary)' }}>Monthly total</Typography>
+                            <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 26, color: 'var(--ct-accent-strong)' }}>${calculateTotal} AUD</Typography>
+                        </Stack>
+
+                        <Button
+                            variant="contained"
+                            size="large"
+                            fullWidth
+                            disabled={loading || targetStaffCount < 5}
+                            onClick={handleSubscribe}
+                            startIcon={loading ? <CircularProgress size={18} color="inherit" /> : undefined}
+                            sx={{ minHeight: 48 }}
+                        >
+                            {paymentMethod === 'card' ? 'Continue to card payment' : 'Subscribe by invoice'}
+                        </Button>
+                    </Stack>
+                </Paper>
             </Box>
         );
     }
 
+    const statusLabel = subscription.active ? 'Active' : subscription.status.replaceAll('_', ' ');
     return (
-        <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 4 } }}>
-            <TopBar onBack={onBack} breadcrumb={['Billing & Subscription']} />
+        <Box>
+            <PageHeader
+                title={seatsOnlyMode ? 'Staff seats' : 'Billing & subscription'}
+                subtitle={`Your owner subscription covers all ${totalPharmacies} ${totalPharmacies === 1 ? 'pharmacy' : 'pharmacies'} on this account.`}
+                actions={
+                    <Stack direction="row" spacing={1}>
+                        <Button variant="outlined" onClick={() => void loadSubscription()} disabled={loadingSubscription || loading} startIcon={loadingSubscription ? <CircularProgress size={16} color="inherit" /> : <RefreshCw size={16} />} sx={{ minHeight: 40 }}>
+                            Refresh
+                        </Button>
+                        {backButton(onBack, 'Back')}
+                    </Stack>
+                }
+            />
 
-            <Box sx={{ maxWidth: 900, mx: 'auto', mt: 4 }}>
-                <Typography variant="h4" fontWeight={800} gutterBottom>
-                    Manage Subscription
-                </Typography>
-                <Typography variant="body1" color="text.secondary" paragraph>
-                    Your owner subscription is active for all {totalPharmacies} pharmacies under this billing account.
-                </Typography>
+            {loadFailed && (
+                <Alert severity="error" sx={{ mb: 2.5 }} onClose={() => setLoadFailed(false)}>We couldn't refresh your subscription. Showing the last details we had.</Alert>
+            )}
 
-                <Stack spacing={3}>
-                    <Alert severity="success">
-                        Subscription is active. Use the controls below to buy extra staff seats using your separate recurring add-on product.
-                    </Alert>
-
-                    <Card sx={{ borderRadius: 3, boxShadow: 3 }}>
-                        <CardContent sx={{ p: 4 }}>
-                            <Stack spacing={3}>
-                                {!seatsOnlyMode && (
-                                    <>
-                                        <Box>
-                                            <Typography variant="h6" fontWeight={700}>Current Subscription</Typography>
-                                            <Typography color="text.secondary">
-                                                Billing account: <strong>{subscription.accountName || 'Owner account'}</strong>
-                                            </Typography>
-                                        </Box>
-
-                                        <Divider />
-
-                                        <Grid container spacing={3}>
-                                            <Grid size={{ xs: 12, md: 4 }}>
-                                                <Paper sx={{ p: 3, borderRadius: 2 }}>
-                                                    <Typography variant="subtitle2" color="text.secondary">Status</Typography>
-                                                    <Typography variant="h6" fontWeight={800} color="primary.main">
-                                                        {subscription.status}
-                                                    </Typography>
-                                                </Paper>
-                                            </Grid>
-                                            <Grid size={{ xs: 12, md: 4 }}>
-                                                <Paper sx={{ p: 3, borderRadius: 2 }}>
-                                                    <Typography variant="subtitle2" color="text.secondary">Staff seats</Typography>
-                                                    <Typography variant="h6" fontWeight={800}>
-                                                        {subscription.staffCount}
-                                                    </Typography>
-                                                </Paper>
-                                            </Grid>
-                                            <Grid size={{ xs: 12, md: 4 }}>
-                                                <Paper sx={{ p: 3, borderRadius: 2 }}>
-                                                    <Typography variant="subtitle2" color="text.secondary">Extra seats</Typography>
-                                                    <Typography variant="h6" fontWeight={800}>
-                                                        {subscription.extraSeatCount}
-                                                    </Typography>
-                                                </Paper>
-                                            </Grid>
-                                        </Grid>
-
-                                        <Paper sx={{ p: 3, bgcolor: 'background.default', borderRadius: 2 }}>
-                                            <Stack spacing={1}>
-                                                <Typography variant="subtitle1" fontWeight={700}>Renewal details</Typography>
-                                                <Typography color="text.secondary">Next period end: {nextInvoiceText}</Typography>
-                                                <Typography color="text.secondary">Stripe subscription ID: {subscription.stripeSubscriptionId || 'Not synced yet'}</Typography>
-                                            </Stack>
-                                        </Paper>
-                                    </>
-                                )}
-
-                                <Box>
-                                    <Typography variant="h6" fontWeight={700} gutterBottom>
-                                        Buy extra seats
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                                        Base plan includes 5 staff seats. Each extra seat is billed at $5/month using your separate Stripe add-on product.
-                                    </Typography>
-                                    <TextField
-                                        type="number"
-                                        size="small"
-                                        label="Extra seats"
-                                        value={targetExtraSeats}
-                                        onChange={(e) => setTargetExtraSeats(Math.max(parseInt(e.target.value, 10) || 0, 0))}
-                                        inputProps={{ min: 0 }}
-                                        sx={{ width: 180, mt: 1 }}
-                                    />
+            <Stack spacing={2.5} sx={{ maxWidth: 980 }} aria-busy={loadingSubscription}>
+                {!seatsOnlyMode && (
+                    <Paper variant="outlined" sx={{ ...cardSx, p: { xs: 2.5, md: 3 } }}>
+                        <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap>
+                            <Typography component="h2" sx={titleSx}>Owner subscription</Typography>
+                            <Pill tone={subscription.active ? 'green' : 'amber'} label={statusLabel} />
+                        </Stack>
+                        <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+                            Billing account: <Box component="strong" sx={{ color: 'var(--ct-text-primary)', fontWeight: 600 }}>{subscription.accountName || 'Owner account'}</Box>
+                        </Typography>
+                        <Box sx={{ mt: 2.5, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1.5 }}>
+                            {[
+                                ['Staff seats', String(subscription.staffCount), subscription.extraSeatCount > 0 ? `5 included + ${subscription.extraSeatCount} extra` : '5 included'],
+                                ['Renews', renewal ?? 'Not set yet', renewal ? 'Next billing date' : 'Appears after the first payment'],
+                                ['Monthly total', `$${30 + subscription.extraSeatCount * 5}`, 'AUD, before shift fees'],
+                            ].map(([label, value, hint]) => (
+                                <Box key={label} sx={{ p: 2, borderRadius: '14px', border: '1px solid var(--ct-border-color)' }}>
+                                    <Typography variant="body2" color="text.secondary">{label}</Typography>
+                                    <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 24, color: 'var(--ct-text-primary)' }}>{value}</Typography>
+                                    <Typography variant="body2" color="text.secondary">{hint}</Typography>
                                 </Box>
+                            ))}
+                        </Box>
+                        {subscription.stripeSubscriptionId && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+                                Reference for support: {subscription.stripeSubscriptionId}
+                            </Typography>
+                        )}
+                    </Paper>
+                )}
 
-                                <Paper sx={{ p: 3, bgcolor: 'background.default', borderRadius: 2 }}>
-                                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                        <Typography variant="h6" fontWeight={600}>New monthly total:</Typography>
-                                        <Typography variant="h5" fontWeight={800} color="primary">
-                                            ${calculateTotal} AUD
-                                        </Typography>
-                                    </Stack>
-                                </Paper>
+                <Paper variant="outlined" sx={{ ...cardSx, p: { xs: 2.5, md: 3 } }}>
+                    <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                        <IconTile icon={<Users />} size={44} />
+                        <Box sx={{ minWidth: 0 }}>
+                            <Typography component="h2" sx={titleSx}>Extra staff seats</Typography>
+                            <Typography color="text.secondary" sx={{ mt: 0.25 }}>
+                                5 seats are included. Each extra seat is $5 a month, so you can connect more of your own staff.
+                            </Typography>
+                        </Box>
+                    </Stack>
 
-                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                                    <Button variant="contained" onClick={handleSeatUpdate} disabled={loading || targetExtraSeats < 1}>
-                                        {loading ? <CircularProgress size={24} color="inherit" /> : 'Buy Extra Seats'}
-                                    </Button>
-                                    <Button variant="outlined" onClick={loadSubscription} disabled={loading}>
-                                        Refresh Status
-                                    </Button>
-                                </Stack>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} alignItems={{ sm: 'center' }} sx={{ mt: 2.5 }}>
+                        <Box>
+                            <Typography id="extra-seats-label" variant="body2" sx={{ fontWeight: 600, color: 'var(--ct-text-primary)', mb: 0.75 }}>Extra seats</Typography>
+                            <Stack direction="row" alignItems="center" spacing={1} role="group" aria-labelledby="extra-seats-label">
+                                <IconButton aria-label="One fewer extra seat" onClick={() => setTargetExtraSeats((n) => Math.max(n - 1, 0))} disabled={loading || targetExtraSeats <= 0} sx={{ width: 44, height: 44, border: '1px solid var(--ct-border-color)' }}>
+                                    <Minus size={18} />
+                                </IconButton>
+                                <Typography aria-live="polite" sx={{ minWidth: 40, textAlign: 'center', fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 26, color: 'var(--ct-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                                    {targetExtraSeats}
+                                </Typography>
+                                <IconButton aria-label="One more extra seat" onClick={() => setTargetExtraSeats((n) => n + 1)} disabled={loading} sx={{ width: 44, height: 44, border: '1px solid var(--ct-border-color)' }}>
+                                    <Plus size={18} />
+                                </IconButton>
                             </Stack>
-                        </CardContent>
-                    </Card>
-                </Stack>
-            </Box>
+                        </Box>
+                        <Box sx={{ flex: 1, p: 2, borderRadius: '14px', bgcolor: 'var(--ct-subtle-bg)' }}>
+                            <Typography variant="body2" color="text.secondary">New monthly total</Typography>
+                            <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 26, color: 'var(--ct-accent-strong)' }}>${calculateTotal} AUD</Typography>
+                            <Typography variant="body2" color="text.secondary">$30 base + {targetExtraSeats} × $5 · {5 + targetExtraSeats} seats in total</Typography>
+                        </Box>
+                    </Stack>
+
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }} sx={{ mt: 2.5 }}>
+                        <Button
+                            variant="contained"
+                            onClick={handleSeatUpdate}
+                            disabled={loading || targetExtraSeats < 1 || !seatsChanged}
+                            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : undefined}
+                            sx={{ minHeight: 44 }}
+                        >
+                            {seatsChanged ? `Change to ${targetExtraSeats} extra ${targetExtraSeats === 1 ? 'seat' : 'seats'}` : 'Change extra seats'}
+                        </Button>
+                        <Typography variant="body2" color="text.secondary">
+                            {seatsChanged ? 'You will confirm the change on Stripe\'s secure checkout.' : 'Use + and − to choose how many extra seats you need.'}
+                        </Typography>
+                    </Stack>
+                </Paper>
+            </Stack>
         </Box>
     );
 }

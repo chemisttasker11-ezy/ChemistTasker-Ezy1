@@ -1,34 +1,25 @@
 import { useEffect } from "react";
-import { Container, Paper, Typography, Box, Divider } from "@mui/material";
-import PublicLogoTopBar from "../components/PublicLogoTopBar";
+import { Box, Divider, Typography } from "@mui/material";
+import LegalDocumentShell from "../components/LegalDocumentShell";
 import { setCanonical, setPageMeta, setSocialMeta } from "../utils/seo";
 
 export default function PrivacyPolicyPage() {
   useEffect(() => {
     const title = "Privacy Policy | ChemistTasker";
-    const description =
-      "Read how ChemistTasker collects, uses, and protects your data across the website and mobile app.";
+    const description = "Read how ChemistTasker collects, uses, and protects your data across the website and mobile app.";
     const origin = window.location.origin;
     const url = `${origin}/privacy-policy`;
-    const image = `${origin}/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png`;
     setPageMeta(title, description);
     setCanonical(url);
-    setSocialMeta({ title, description, url, image, type: "website" });
+    setSocialMeta({ title, description, url, type: "website" });
   }, []);
 
   return (
-    <>
-      <PublicLogoTopBar />
-      <Container maxWidth="md" sx={{ mt: 8, mb: 8 }}>
-        <Paper elevation={3} sx={{ p: { xs: 2, sm: 5 }, borderRadius: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom align="center">
-          Privacy Policy
-        </Typography>
-        <Typography variant="subtitle2" color="text.secondary" align="center" gutterBottom>
-          Effective Date: 15 January 2026
-        </Typography>
-
-        <Box sx={{ mt: 4 }}>
+    <LegalDocumentShell
+      title="Privacy Policy"
+      effectiveDate="Effective Date: 15 January 2026"
+    >
+      <Box sx={{ mt: 4 }}>
           <Typography variant="h5" gutterBottom>1. Scope</Typography>
           <Typography paragraph>
             This Privacy Policy explains how CHEMISTTASKER PTY LTD ("ChemistTasker", "we", "us")
@@ -286,14 +277,6 @@ export default function PrivacyPolicyPage() {
             <a href="mailto:info@chemisttasker.com">info@chemisttasker.com.au</a>
           </Typography>
         </Box>
-
-        <Box sx={{ mt: 6, textAlign: "center" }}>
-          <Typography variant="subtitle2" color="text.secondary">
-            &copy; {new Date().getFullYear()} CHEMISTTASKER PTY LTD. All rights reserved.
-          </Typography>
-        </Box>
-        </Paper>
-      </Container>
-    </>
+    </LegalDocumentShell>
   );
 }

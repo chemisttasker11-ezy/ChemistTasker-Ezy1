@@ -1,35 +1,36 @@
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import {
-    Accordion,
-    AccordionDetails,
-    AccordionSummary,
-    alpha,
     Box,
     Button,
     Card,
-    CardContent,
-    CardHeader,
     Checkbox,
-    Chip,
-    CircularProgress,
     Divider,
     FormControlLabel,
     IconButton,
+    Skeleton,
     Stack,
     Tooltip,
     Typography,
 } from '@mui/material';
 import {
-    Edit,
-    Delete as Trash2,
-    Share as Share2,
-    Business as Building,
-    CalendarToday as CalendarDays,
-    FavoriteBorder,
-    Groups,
-    LocationOn,
-    ExpandMore,
-} from '@mui/icons-material';
+    Building2,
+    CalendarDays,
+    ChevronDown,
+    CreditCard,
+    Lock,
+    MapPin,
+    Pencil,
+    Share2,
+    Trash2,
+    UserCheck,
+    Users,
+} from 'lucide-react';
+import IconTile, { type Tone } from '../../../../components/ui/IconTile';
+import { NewActivityBadge, PlatformMark } from '../../shiftCenter/ShiftCentreParts';
+import { Hint } from '../../../../components/ui/Hint';
+import { Pill } from '../../../../components/ui/Pill';
+import { getAudienceLevel } from './utils/audience';
+import { humanizeEnum } from '../../../../utils/labels';
 import type {
     Shift,
     ShiftMemberStatus,
@@ -45,7 +46,7 @@ import {
     deriveLevelSequence,
 } from './utils/shiftHelpers';
 import { dedupeMembers } from './utils/candidateHelpers';
-import { getCardBorderColor, getLocationText } from './utils/displayHelpers';
+import { getLocationText } from './utils/displayHelpers';
 import {
     toFiniteNumber,
     resolveSlotId,
@@ -117,7 +118,7 @@ type Props = {
 export default function ActiveShiftCard({
     shift,
     dedicated,
-    isDarkMode,
+    isDarkMode: _isDarkMode,
     data,
     state,
     actions,
@@ -176,6 +177,9 @@ export default function ActiveShiftCard({
             const data = communityTabData[index];
             return !data || data.loading;
         });
+        // Candidate counts are only final once every audience list has loaded; until then show a placeholder, not 0.
+        const publicTabData = viewableLevelKeys.includes(PUBLIC_LEVEL_KEY) ? tabData[getTabKey(shift.id, PUBLIC_LEVEL_KEY)] : undefined;
+        const countsLoading = communityDataLoading || (viewableLevelKeys.includes(PUBLIC_LEVEL_KEY) && (!publicTabData || publicTabData.loading));
         const selectedSlotId = isSingleUserShift
             ? null
             : selectedSlotByShift[shift.id] ?? shift.slots?.[0]?.id ?? null;
@@ -209,7 +213,6 @@ export default function ActiveShiftCard({
             ? consolidatedMembers
             : consolidatedMembersBySlot[selectedSlotId ?? -1] || [];
 
-        const cardBorderColor = getCardBorderColor((shift as any).visibility ?? 'PLATFORM');
         const summaryText = getShiftSummary(shift);
         const location = getLocationText(shift);
         const labelOverrides = undefined;
@@ -344,87 +347,55 @@ export default function ActiveShiftCard({
                 noResponse: countUniquePeople(selectedMembers.filter((member: any) => member?.status === 'no_response')),
             };
         }
-        const metricItems = [
-            { label: 'Slots', value: slotsCount || '-', icon: <CalendarDays fontSize="small" /> },
-            { label: 'Candidates', value: candidatesCount, icon: <Groups fontSize="small" /> },
-            { label: 'Interests', value: interestsCount, icon: <FavoriteBorder fontSize="small" /> },
+        const updatedSlotCount = Object.values(slotHasUpdatesByShift[shift.id] || {}).filter(Boolean).length;
+        const audience = getAudienceLevel(shiftLevel);
+        const audienceLabel = audience ? (labelOverrides?.[audience.key] ?? audience.label) : null;
+        const AudienceIcon = audience?.icon;
+        const internalAudienceLabels = communityLevelKeys
+            .map((level) => getAudienceLevel(level)?.label)
+            .filter((label): label is string => Boolean(label));
+        const pharmacyName = (shift as any).pharmacyDetail?.name ?? 'Unnamed Pharmacy';
+        const metricItems: Array<{ label: string; value: number | string; icon: ReactNode; tone: Tone; hint: string; loading?: boolean }> = [
+            { label: 'Slots', value: slotsCount || '-', icon: <CalendarDays />, tone: 'violet', hint: 'Dates in this shift. Each date is filled separately.' },
+            { label: 'Candidates', value: candidatesCount, icon: <Users />, tone: 'magenta', hint: 'Everyone who responded or was invited, across all dates and audiences.', loading: countsLoading },
+            { label: 'Interested', value: interestsCount, icon: <UserCheck />, tone: 'cyan', hint: 'Said yes or sent an offer, and are waiting for your review.', loading: countsLoading },
         ];
-        const headerActions = (
-            <Box
-                onClick={(event) => event.stopPropagation()}
-                sx={{ display: 'flex', gap: 0.5, alignItems: 'center', justifyContent: 'flex-end' }}
-            >
-                <Tooltip title="Share">
-                    <span>
-                        <IconButton
-                            size="small"
-                            sx={{
-                                color: isDarkMode ? alpha('#FFFFFF', 0.86) : '#475569',
-                                bgcolor: isDarkMode ? alpha('#FFFFFF', 0.08) : 'transparent',
-                                border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
-                                '&:hover': {
-                                    bgcolor: isDarkMode ? alpha('#8B5CF6', 0.22) : alpha('#8B5CF6', 0.08),
-                                    color: isDarkMode ? '#FFFFFF' : '#6D28D9',
-                                },
-                                '&.Mui-disabled': {
-                                    color: isDarkMode ? alpha('#FFFFFF', 0.28) : undefined,
-                                },
-                            }}
-                            onClick={e => {
-                                e.stopPropagation();
-                                handleShare(shift);
-                            }}
-                            disabled={sharingShiftId === shift.id}
-                        >
-                            <Share2 fontSize="small" />
-                        </IconButton>
-                    </span>
-                </Tooltip>
-                <Tooltip title="Edit">
-                    <IconButton
-                        size="small"
-                        sx={{
-                            color: isDarkMode ? alpha('#FFFFFF', 0.86) : '#475569',
-                            bgcolor: isDarkMode ? alpha('#FFFFFF', 0.08) : 'transparent',
-                            border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
-                            '&:hover': {
-                                bgcolor: isDarkMode ? alpha('#8B5CF6', 0.22) : alpha('#8B5CF6', 0.08),
-                                color: isDarkMode ? '#FFFFFF' : '#6D28D9',
-                            },
-                        }}
-                        onClick={e => {
-                            e.stopPropagation();
-                            handleEditShift(shift.id);
-                        }}
-                    >
-                        <Edit fontSize="small" />
-                    </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete">
-                    <IconButton
-                        size="small"
-                        sx={{
-                            color: isDarkMode ? alpha('#FFFFFF', 0.86) : '#475569',
-                            bgcolor: isDarkMode ? alpha('#FFFFFF', 0.08) : 'transparent',
-                            border: isDarkMode ? `1px solid ${alpha('#FFFFFF', 0.12)}` : '1px solid transparent',
-                            '&:hover': {
-                                bgcolor: isDarkMode ? alpha('#EF4444', 0.2) : alpha('#EF4444', 0.08),
-                                color: isDarkMode ? '#FCA5A5' : '#DC2626',
-                            },
-                            '&.Mui-disabled': {
-                                color: isDarkMode ? alpha('#FFFFFF', 0.28) : undefined,
-                            },
-                        }}
-                        onClick={e => {
-                            e.stopPropagation();
-                            setDeleteConfirmDialog({ open: true, shiftId: shift.id });
-                        }}
-                        disabled={actionLoading[`delete_${shift.id}`]}
-                    >
-                        <Trash2 fontSize="small" />
-                    </IconButton>
-                </Tooltip>
+        const iconButtonSx = {
+            width: 36,
+            height: 36,
+            borderRadius: '10px',
+            color: 'var(--ct-text-secondary)',
+            '& svg': { width: 18, height: 18 },
+            '&:hover': { bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-accent-strong)' },
+        };
+        const candidatesLoading = (
+            <Box role="status" aria-label="Loading candidates" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', xl: 'repeat(4, 1fr)' }, gap: 1.5 }}>
+                {[0, 1, 2, 3].map((index) => (
+                    <Skeleton key={index} variant="rounded" height={168} sx={{ borderRadius: '16px' }} />
+                ))}
             </Box>
+        );
+        const communityView = (showSlotSelector: boolean) => (
+            communityDataLoading ? candidatesLoading : (
+                <CommunityLevelView
+                    shift={shift}
+                    members={membersForView}
+                    selectedSlotId={selectedSlotId}
+                    slotHasUpdates={slotHasUpdatesByShift[shift.id] || {}}
+                    slotCandidateCounts={slotCandidateCounts}
+                    slotStatusCounts={slotStatusCounts}
+                    offers={offers || []}
+                    showSlotSelector={showSlotSelector}
+                    audienceLabels={internalAudienceLabels}
+                    onSelectSlot={(slotId) => handleSlotSelection(shift.id, slotId)}
+                    onReviewCandidate={(member, _shiftId, offer, slotId) =>
+                        handleReviewCandidate(shift, member, offer, slotId)
+                    }
+                    reviewLoadingId={reviewLoadingId}
+                    onBuzzWorker={handleBuzzWorker}
+                    buzzLoadingOfferId={buzzLoadingOfferId}
+                />
+            )
         );
 
         return (
@@ -432,329 +403,282 @@ export default function ActiveShiftCard({
                 id={`active-shift-card-${shift.id}`}
                 key={shift.id}
                 onClick={() => toggleShiftExpansion(shift.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        toggleShiftExpansion(shift.id);
-                    }
-                }}
                 sx={{
                     position: 'relative',
                     overflow: 'hidden',
                     maxWidth: '100%',
-                    borderRadius: 6,
-                    border: '1px solid #D9E2F2',
-                    background: 'linear-gradient(180deg, #F6FBFF 0%, #F8FAFC 46%, #FFFFFF 100%)',
-                    boxShadow: '0 24px 60px rgba(15, 23, 42, 0.08)',
+                    borderRadius: 'var(--ct-card-radius)',
+                    border: '1px solid',
+                    borderColor: isExpanded ? 'var(--ct-tone-violet-bg)' : 'var(--ct-border-color)',
+                    background: 'var(--ct-surface-bg)',
+                    boxShadow: isExpanded ? '0 14px 36px rgba(6, 18, 58, 0.08)' : 'none',
                     cursor: 'pointer',
-                    transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
+                    transition: 'border-color 0.2s, box-shadow 0.2s',
                     '&:hover': {
-                        transform: 'translateY(-1px)',
-                        borderColor: '#C7D2FE',
-                        boxShadow: '0 28px 66px rgba(15, 23, 42, 0.10)',
+                        borderColor: 'var(--ct-tone-violet-bg)',
+                        boxShadow: '0 10px 28px rgba(6, 18, 58, 0.07)',
                     },
-                    '&:focus-visible': {
-                        outline: '3px solid rgba(124,58,237,.28)',
-                        outlineOffset: 3,
-                    },
-                    '&:before': {
-                        content: '""',
-                        position: 'absolute',
-                        inset: 0,
-                        pointerEvents: 'none',
-                        background: 'radial-gradient(circle at top right, rgba(37,99,235,.10), transparent 32%), radial-gradient(circle at top left, rgba(124,58,237,.10), transparent 28%)',
-                    },
+                    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
                 }}
             >
-                <CardHeader
-                    disableTypography
-                    sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 1.5, minWidth: 0, position: 'relative' }}
-                    title={
-                        <Stack direction={{ xs: 'column', xl: 'row' }} spacing={{ xs: 1.5, md: 2 }} justifyContent="space-between" alignItems={{ xs: 'stretch', xl: 'flex-start' }} sx={{ width: '100%', minWidth: 0 }}>
-                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.25, sm: 2 }} sx={{ minWidth: 0, width: { xs: '100%', xl: 'auto' }, maxWidth: { xl: '52%' } }}>
-                                <Box
-                                    sx={{
-                                        width: { xs: 54, sm: 58 },
-                                        height: { xs: 54, sm: 58 },
-                                        flexShrink: 0,
-                                        display: 'grid',
-                                        placeItems: 'center',
-                                        borderRadius: 3.5,
-                                        color: '#fff',
-                                        background: 'linear-gradient(135deg, #5EEAD4 0%, #7C3AED 100%)',
-                                        boxShadow: '0 18px 40px rgba(124,58,237,.24)',
-                                    }}
-                                >
-                                    <Building />
-                                </Box>
-                                <Box sx={{ minWidth: 0 }}>
-                                    <Typography variant="h6" component="div" sx={{ fontWeight: 900, color: '#111827', fontSize: { xs: 21, sm: 24 }, lineHeight: 1.18, overflowWrap: 'anywhere' }}>
-                                        {(shift as any).pharmacyDetail?.name ?? "Unnamed Pharmacy"}
-                                    </Typography>
-                                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
-                                        {roleNeeded && (
-                                            <Chip label={roleNeeded} size="small" sx={{ bgcolor: cardBorderColor, color: '#fff', fontWeight: 800 }} />
-                                        )}
-                                        {employmentType && (
-                                            <Chip label={employmentType} size="small" sx={{ bgcolor: '#F8FAFC', border: '1px solid #E5E7EB', fontWeight: 700 }} />
-                                        )}
-                                        {isUrgent && <Chip label="Urgent" color="error" size="small" sx={{ fontWeight: 800 }} />}
-                                        {summaryText && (
-                                            <Chip
-                                                icon={<CalendarDays sx={{ fontSize: 15 }} />}
-                                                label={summaryText}
-                                                size="small"
-                                                variant="outlined"
-                                                sx={{ color: '#475569', fontWeight: 600 }}
-                                            />
-                                        )}
-                                        {showPaymentRequired && (
-                                            <Chip label="Payment Required" color="error" size="small" sx={{ fontWeight: 800 }} />
-                                        )}
-                                    </Stack>
+                {/* Summary: what, where, when, and how it is going. */}
+                <Box
+                    sx={{
+                        p: { xs: 2, md: 3 },
+                        pb: { xs: 2, md: 2.5 },
+                        display: 'grid',
+                        gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) auto' },
+                        gap: { xs: 2, lg: 3 },
+                        alignItems: 'start',
+                    }}
+                >
+                    <Stack direction="row" spacing={2} sx={{ minWidth: 0 }}>
+                        <IconTile icon={<Building2 />} tone="violet" size={48} />
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+                                <Typography component="h3" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, color: 'var(--ct-text-primary)', fontSize: { xs: 18, sm: 20 }, lineHeight: 1.25, overflowWrap: 'anywhere' }}>
+                                    {pharmacyName}
+                                </Typography>
+                                <Box onClick={(event) => event.stopPropagation()} sx={{ display: { xs: 'flex', lg: 'none' }, gap: 0.25, flexShrink: 0 }}>
+                                    {/* Phone/tablet: actions sit beside the title. */}
+                                    {renderShiftActions()}
                                 </Box>
                             </Stack>
-                            <Stack sx={{ ml: { xl: 'auto' }, width: '100%', maxWidth: { xs: '100%', xl: 520 }, alignItems: { xs: 'stretch', xl: 'flex-end' }, minWidth: 0 }}>
-                                {headerActions}
-                                <Box
-                                    sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                                        gap: { xs: 0.75, sm: 1.25 },
-                                        width: '100%',
-                                        mt: 1.25,
-                                    }}
-                                >
-                                    {metricItems.map((item) => (
-                                        <Box
-                                            key={item.label}
-                                            sx={{
-                                                borderRadius: 3,
-                                                border: `1px solid ${isDarkMode ? alpha('#FFFFFF', 0.14) : '#D9E2F2'}`,
-                                                background: isDarkMode ? alpha('#FFFFFF', 0.075) : '#FFFFFFCC',
-                                                minWidth: 0,
-                                                width: '100%',
-                                                px: { xs: 1.25, sm: 2 },
-                                                py: { xs: 1.25, sm: 1.75 },
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: { xs: 0.75, sm: 1.25 },
-                                                boxShadow: isDarkMode
-                                                    ? `0 12px 28px ${alpha('#000000', 0.16)}`
-                                                    : '0 12px 24px rgba(15,23,42,.05)',
+                            <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+                                {roleNeeded && <Pill tone="navy" label={humanizeEnum(roleNeeded)} />}
+                                {employmentType && <Pill outlined label={humanizeEnum(employmentType)} />}
+                                {isUrgent && <Pill tone="red" label="Urgent" />}
+                                {summaryText && <Pill outlined icon={<CalendarDays />} label={summaryText} />}
+                                {dedicated && <Pill tone="blue" icon={<Lock />} label="Direct / Private" />}
+                                {dedicated && <Pill tone="amber" label="Pending" />}
+                            </Stack>
+                            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 1.25, color: 'var(--ct-text-secondary)', '& svg': { width: 15, height: 15, flexShrink: 0 } }}>
+                                <MapPin />
+                                <Typography sx={{ fontSize: 13.5, color: 'inherit', overflowWrap: 'anywhere' }}>{location}</Typography>
+                            </Stack>
+                        </Box>
+                    </Stack>
+
+                    <Stack spacing={1.25} alignItems={{ xs: 'stretch', lg: 'flex-end' }} sx={{ minWidth: 0 }}>
+                        <Box onClick={(event) => event.stopPropagation()} sx={{ display: { xs: 'none', lg: 'flex' }, gap: 0.25 }}>
+                            {renderShiftActions()}
+                        </Box>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1, width: { xs: '100%', lg: 408 } }}>
+                            {metricItems.map((item) => (
+                                <Hint key={item.label} title={item.loading ? `Counting ${item.label.toLowerCase()}` : `${item.value} ${item.label.toLowerCase()}`} body={item.hint}>
+                                    <Stack
+                                        direction="row"
+                                        spacing={1.25}
+                                        alignItems="center"
+                                        sx={{ minWidth: 0, p: { xs: 1, sm: 1.25 }, borderRadius: '14px', border: '1px solid var(--ct-border-color)', bgcolor: 'var(--ct-surface-bg)', cursor: 'help' }}
+                                    >
+                                        <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                                            <IconTile icon={item.icon} tone={item.tone} size={36} />
+                                        </Box>
+                                        <Box sx={{ minWidth: 0 }}>
+                                            <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 22, lineHeight: 1.05, color: 'var(--ct-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                                                {item.loading ? <Skeleton variant="text" width={26} aria-label="Loading" /> : item.value}
+                                            </Typography>
+                                            <Typography sx={{ fontSize: 12, color: 'var(--ct-text-secondary)', lineHeight: 1.3 }}>{item.label}</Typography>
+                                        </Box>
+                                    </Stack>
+                                </Hint>
+                            ))}
+                        </Box>
+                    </Stack>
+                </Box>
+
+                {/* Status bar: who can see it, what needs attention, and the candidates toggle. */}
+                <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1.25}
+                    alignItems={{ xs: 'stretch', sm: 'center' }}
+                    justifyContent="space-between"
+                    sx={{ px: { xs: 2, md: 3 }, py: 1.25, borderTop: '1px solid var(--ct-border-color)', bgcolor: 'var(--ct-subtle-bg)' }}
+                >
+                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center" sx={{ minWidth: 0 }}>
+                        {audienceLabel && (
+                            <Hint
+                                title={audience?.scope === 'platform' ? 'Open to the ChemistTasker platform' : 'Internal only'}
+                                body={`Visible now to ${audience?.reach}.${audience?.scope === 'internal' ? ' Escalate inside the card to reach more people.' : ''}`}
+                            >
+                                <Box component="span" tabIndex={0} onClick={(event) => event.stopPropagation()} sx={{ display: 'inline-flex', borderRadius: '999px', '&:focus-visible': { outline: '2px solid var(--ct-accent-strong)', outlineOffset: 2 } }}>
+                                    <Pill
+                                        tone={audience?.scope === 'platform' ? 'cyan' : 'violet'}
+                                        icon={audience?.scope === 'platform' ? <PlatformMark size={15} /> : AudienceIcon ? <AudienceIcon /> : undefined}
+                                        label={`${audience?.scope === 'platform' ? 'Platform' : 'Internal'} · ${audienceLabel}`}
+                                    />
+                                </Box>
+                            </Hint>
+                        )}
+                        {interestsCount > 0 && (
+                            <Pill tone="cyan" icon={<UserCheck />} label={`${interestsCount} waiting for review`} />
+                        )}
+                        {showPaymentRequired && <Pill tone="red" icon={<CreditCard />} label="Payment required" />}
+                        {updatedSlotCount > 0 && (
+                            <Box component="span" onClick={(event) => event.stopPropagation()}>
+                                <NewActivityBadge
+                                    label={`New activity${slotsCount > 1 ? ` on ${updatedSlotCount} ${updatedSlotCount === 1 ? 'date' : 'dates'}` : ''}`}
+                                    hint="Someone showed interest, sent an offer or replied since you last looked. Open the candidates and select the marked date to review it."
+                                />
+                            </Box>
+                        )}
+                    </Stack>
+                    <Button
+                        size="small"
+                        aria-expanded={isExpanded}
+                        aria-controls={`active-shift-details-${shift.id}`}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            toggleShiftExpansion(shift.id);
+                        }}
+                        endIcon={<ChevronDown style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />}
+                        sx={{ alignSelf: { xs: 'flex-end', sm: 'center' }, minHeight: 36, px: 1.5, borderRadius: '10px', color: 'var(--ct-accent-strong)', fontWeight: 600, '&:hover': { bgcolor: 'var(--ct-tone-violet-bg)' }, '& .MuiButton-endIcon svg': { width: 16, height: 16 } }}
+                    >
+                        {isExpanded ? 'Hide candidates' : 'Manage candidates'}
+                    </Button>
+                </Stack>
+
+                {isExpanded && (
+                    <Stack
+                        id={`active-shift-details-${shift.id}`}
+                        spacing={3}
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        sx={{ px: { xs: 2, md: 3 }, py: { xs: 2.5, md: 3 }, borderTop: '1px solid var(--ct-border-color)' }}
+                    >
+                        <EscalationStepper
+                            shift={shift}
+                            currentLevel={shiftLevel}
+                            selectedLevel={selectedLevel}
+                            onSelectLevel={(levelKey) => handleLevelChange(shift, levelKey)}
+                            onEscalate={async (_s, levelKey) => {
+                                const success = await handleEscalate(shift.id, levelKey);
+                                if (!success) return;
+                                const updatedShift = { ...shift, visibility: levelKey, visibilityLevel: levelKey } as Shift;
+                                setSelectedLevelByShift(prev => ({ ...prev, [shift.id]: levelKey }));
+                                await loadTabDataForShift(updatedShift, levelKey);
+                                await loadShifts();
+                            }}
+                            escalating={actionLoading[`escalate_${shift.id}`]}
+                            labelOverrides={labelOverrides}
+                            showPrivateFirst={dedicated}
+                        />
+
+                        {showPaymentRequired && (
+                            <Box component="section" aria-label="Payment required" sx={{ borderRadius: '16px', border: '1px solid var(--ct-status-red-bg)', overflow: 'hidden' }}>
+                                <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between" sx={{ px: 2, py: 1.5, bgcolor: 'var(--ct-status-red-bg)' }}>
+                                    <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+                                        <Box sx={{ color: 'var(--ct-status-red-fg)', display: 'grid', '& svg': { width: 20, height: 20 } }}><CreditCard /></Box>
+                                        <Box sx={{ minWidth: 0 }}>
+                                            <Typography component="h3" sx={{ fontSize: 15, fontWeight: 600, color: 'var(--ct-status-red-fg)' }}>Payment required to confirm</Typography>
+                                            <Typography sx={{ fontSize: 12.5, color: 'var(--ct-text-secondary)' }}>
+                                                {isSingleUserShift
+                                                    ? `${paymentRequiredOffers.length} bundle payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`
+                                                    : `${paymentUnitCount} selected of ${paymentRequiredOffers.length} payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`}
+                                            </Typography>
+                                        </Box>
+                                    </Stack>
+                                    <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 20, color: 'var(--ct-text-primary)', whiteSpace: 'nowrap' }}>
+                                        ${paymentUnitCount * 30} <Box component="span" sx={{ fontSize: 13, color: 'var(--ct-text-secondary)', fontFamily: 'var(--ct-font-body)' }}>AUD</Box>
+                                    </Typography>
+                                </Stack>
+                                <Stack spacing={1} sx={{ p: 1.5, bgcolor: 'var(--ct-surface-bg)' }}>
+                                    {paymentRequiredOffers.map((item) => {
+                                        const checked = selectedPaymentOfferIds.includes(item.offerId);
+                                        const bundleSlots = isSingleUserShift ? (((shift as any).slots || []) as any[]) : [];
+                                        return (
+                                            <Stack
+                                                key={`${shift.id}-${item.offerId}`}
+                                                direction="row"
+                                                alignItems="center"
+                                                justifyContent="space-between"
+                                                spacing={2}
+                                                sx={{ px: 1.25, py: 1, borderRadius: '12px', border: '1px solid var(--ct-border-color)' }}
+                                            >
+                                                {isSingleUserShift ? (
+                                                    <Box sx={{ minWidth: 0 }}>
+                                                        <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ct-text-primary)' }}>
+                                                            {item.name} · Offer #{item.offerId}
+                                                        </Typography>
+                                                        <Stack spacing={0.25} sx={{ mt: 0.5 }}>
+                                                            {(bundleSlots.length > 0 ? bundleSlots : [item.slot]).filter(Boolean).map((slot: any, idx: number) => (
+                                                                <Typography key={resolveSlotId(slot) ?? idx} sx={{ fontSize: 12.5, color: 'var(--ct-text-secondary)' }}>
+                                                                    {formatAuSlotDateTime(slot)}
+                                                                </Typography>
+                                                            ))}
+                                                        </Stack>
+                                                    </Box>
+                                                ) : (
+                                                    <FormControlLabel
+                                                        sx={{ m: 0, minWidth: 0 }}
+                                                        control={
+                                                            <Checkbox
+                                                                checked={checked}
+                                                                onChange={(event) => {
+                                                                    const isChecked = event.target.checked;
+                                                                    setPaymentSlotSelection((prev) => {
+                                                                        const current = new Set(prev[shift.id] ?? defaultPaymentOfferIds);
+                                                                        if (isChecked) {
+                                                                            paymentRequiredOffers
+                                                                                .filter((candidate) => candidate.slotId === item.slotId)
+                                                                                .forEach((candidate) => current.delete(candidate.offerId));
+                                                                            current.add(item.offerId);
+                                                                        } else {
+                                                                            current.delete(item.offerId);
+                                                                        }
+                                                                        return { ...prev, [shift.id]: Array.from(current) };
+                                                                    });
+                                                                }}
+                                                            />
+                                                        }
+                                                        label={
+                                                            <Box sx={{ minWidth: 0 }}>
+                                                                <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ct-text-primary)' }}>
+                                                                    {formatAuSlotDateTime(item.slot)}
+                                                                </Typography>
+                                                                <Typography sx={{ fontSize: 12.5, color: 'var(--ct-text-secondary)' }}>
+                                                                    {item.name} · Offer #{item.offerId}
+                                                                </Typography>
+                                                            </Box>
+                                                        }
+                                                    />
+                                                )}
+                                                <Pill tone="red" label="Payment pending" />
+                                            </Stack>
+                                        );
+                                    })}
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="flex-end" sx={{ pt: 0.5 }}>
+                                        <Button
+                                            variant="contained"
+                                            disabled={paymentUnitCount === 0}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                void handlePayWithStripe(shift, effectivePaymentOfferIds);
                                             }}
                                         >
-                                            <Box
-                                                sx={{
-                                                    width: { xs: 30, sm: 36 },
-                                                    height: { xs: 30, sm: 36 },
-                                                    borderRadius: '50%',
-                                                    bgcolor: isDarkMode ? alpha('#A78BFA', 0.18) : '#F3E8FF',
-                                                    color: isDarkMode ? '#C4B5FD' : '#7C3AED',
-                                                    display: 'grid',
-                                                    placeItems: 'center',
-                                                    flexShrink: 0,
-                                                    '& svg': { fontSize: { xs: 18, sm: 20 } },
-                                                }}
-                                            >
-                                                {item.icon}
-                                            </Box>
-                                            <Box sx={{ minWidth: 0, textAlign: 'center' }}>
-                                                <Typography sx={{ fontWeight: 800, color: isDarkMode ? '#F8FAFC' : '#0F172A', lineHeight: 1.05, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-                                                    {item.value}
-                                                </Typography>
-                                                <Typography
-                                                    variant="caption"
-                                                    sx={{
-                                                        color: isDarkMode ? alpha('#FFFFFF', 0.72) : '#64748B',
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: { xs: 0.2, sm: 0.6 },
-                                                        fontSize: { xs: '0.62rem', sm: '0.75rem' },
-                                                        fontWeight: 400,
-                                                    }}
-                                                >
-                                                    {item.label}
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-                                    ))}
-                                </Box>
-                            </Stack>
-                        </Stack>
-                    }
-                />
-                <CardContent sx={{ px: { xs: 2, md: 3 }, pt: 0, minWidth: 0, position: 'relative' }}>
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            gap: 1,
-                            alignItems: 'center',
-                            mb: 2,
-                            color: isDarkMode ? alpha('#FFFFFF', 0.66) : '#64748B',
-                        }}
-                    >
-                        <LocationOn sx={{ fontSize: 17 }} />
-                        <Typography variant="body2" sx={{ color: 'inherit' }}>
-                            {location}
-                        </Typography>
-                    </Box>
+                                            {isSingleUserShift ? 'Pay with Stripe' : 'Pay selected with Stripe'}
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            disabled={paymentUnitCount === 0 || pillPayingShiftId === shift.id}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                void handlePayWithPills(shift, effectivePaymentOfferIds);
+                                            }}
+                                        >
+                                            {pillPayingShiftId === shift.id ? 'Paying…' : isSingleUserShift ? 'Pay with Pills' : 'Pay selected with Pills'}
+                                        </Button>
+                                    </Stack>
+                                </Stack>
+                            </Box>
+                        )}
 
-                    {dedicated && (
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
-                            <Chip label="Direct / Private" color="info" size="small" />
-                            <Chip label="Pending" variant="outlined" size="small" />
-                        </Box>
-                    )}
+                        <Divider />
 
-                    {isExpanded && (
-                        <Box
-                            onClick={(event) => event.stopPropagation()}
-                            onKeyDown={(event) => event.stopPropagation()}
-                        >
-                            <Divider sx={{ my: 2.5 }} />
-
-                            <EscalationStepper
-                                shift={shift}
-                                currentLevel={shiftLevel}
-                                selectedLevel={selectedLevel}
-                                onSelectLevel={(levelKey) => handleLevelChange(shift, levelKey)}
-                                onEscalate={async (_s, levelKey) => {
-                                    const success = await handleEscalate(shift.id, levelKey);
-                                    if (!success) return;
-                                    const updatedShift = { ...shift, visibility: levelKey, visibilityLevel: levelKey } as Shift;
-                                    setSelectedLevelByShift(prev => ({ ...prev, [shift.id]: levelKey }));
-                                    await loadTabDataForShift(updatedShift, levelKey);
-                                    await loadShifts();
-                                }}
-                                escalating={actionLoading[`escalate_${shift.id}`]}
-                                labelOverrides={labelOverrides}
-                                showPrivateFirst={dedicated}
-                            />
-
-                            {showPaymentRequired && (
-                                <Accordion
-                                    defaultExpanded
-                                    sx={{ mt: 3, border: '1px solid #FCA5A5', bgcolor: '#FEF2F2', boxShadow: 'none', borderRadius: 2, '&:before': { display: 'none' } }}
-                                >
-                                    <AccordionSummary expandIcon={<ExpandMore />}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 1 }}>
-                                            <Box>
-                                                <Typography variant="h6" color="error.main">
-                                                    Payments Required
-                                                </Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    {isSingleUserShift
-                                                        ? `${paymentRequiredOffers.length} bundle payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`
-                                                        : `${paymentUnitCount} selected from ${paymentRequiredOffers.length} payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`}
-                                                </Typography>
-                                            </Box>
-                                            <Chip label={`$${paymentUnitCount * 30} AUD`} color="error" sx={{ fontWeight: 800 }} />
-                                        </Box>
-                                    </AccordionSummary>
-                                    <AccordionDetails>
-                                        <Stack spacing={1.25}>
-                                            {paymentRequiredOffers.map((item) => {
-                                                const checked = selectedPaymentOfferIds.includes(item.offerId);
-                                                const bundleSlots = isSingleUserShift ? (((shift as any).slots || []) as any[]) : [];
-                                                return (
-                                                    <Box
-                                                        key={`${shift.id}-${item.offerId}`}
-                                                        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 1.25, bgcolor: 'background.paper', borderRadius: 1.5, border: '1px solid #FECACA' }}
-                                                    >
-                                                        {isSingleUserShift ? (
-                                                            <Box>
-                                                                <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                                                                    {item.name} | Offer #{item.offerId}
-                                                                </Typography>
-                                                                <Stack spacing={0.25} sx={{ mt: 0.75 }}>
-                                                                    {(bundleSlots.length > 0 ? bundleSlots : [item.slot]).filter(Boolean).map((slot: any, idx: number) => (
-                                                                        <Typography key={resolveSlotId(slot) ?? idx} variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                                                            {formatAuSlotDateTime(slot)}
-                                                                        </Typography>
-                                                                    ))}
-                                                                </Stack>
-                                                            </Box>
-                                                        ) : (
-                                                            <FormControlLabel
-                                                                control={
-                                                                    <Checkbox
-                                                                        checked={checked}
-                                                                        onChange={(event) => {
-                                                                            const isChecked = event.target.checked;
-                                                                            setPaymentSlotSelection((prev) => {
-                                                                                const current = new Set(prev[shift.id] ?? defaultPaymentOfferIds);
-                                                                                if (isChecked) {
-                                                                                    paymentRequiredOffers
-                                                                                        .filter((candidate) => candidate.slotId === item.slotId)
-                                                                                        .forEach((candidate) => current.delete(candidate.offerId));
-                                                                                    current.add(item.offerId);
-                                                                                } else {
-                                                                                    current.delete(item.offerId);
-                                                                                }
-                                                                                return { ...prev, [shift.id]: Array.from(current) };
-                                                                            });
-                                                                        }}
-                                                                    />
-                                                                }
-                                                                label={
-                                                                    <Box>
-                                                                        <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                                                                            {formatAuSlotDateTime(item.slot)}
-                                                                        </Typography>
-                                                                        <Typography variant="caption" color="text.secondary">
-                                                                            {item.name} | Offer #{item.offerId}
-                                                                        </Typography>
-                                                                    </Box>
-                                                                }
-                                                            />
-                                                        )}
-                                                        <Chip label="Payment pending" color="error" size="small" />
-                                                    </Box>
-                                                );
-                                            })}
-                                        </Stack>
-                                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap', mt: 2 }}>
-                                            <Button
-                                                variant="contained"
-                                                color="error"
-                                                disabled={paymentUnitCount === 0}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    void handlePayWithStripe(shift, effectivePaymentOfferIds);
-                                                }}
-                                            >
-                                                {isSingleUserShift ? 'Pay with Stripe' : 'Pay selected with Stripe'}
-                                            </Button>
-                                            <Button
-                                                variant="contained"
-                                                disabled={paymentUnitCount === 0 || pillPayingShiftId === shift.id}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    void handlePayWithPills(shift, effectivePaymentOfferIds);
-                                                }}
-                                            >
-                                                {pillPayingShiftId === shift.id ? 'Paying...' : isSingleUserShift ? 'Pay with Pills' : 'Pay selected with Pills'}
-                                            </Button>
-                                        </Box>
-                                    </AccordionDetails>
-                                </Accordion>
-                            )}
-
-                            <Divider sx={{ my: 2.5 }} />
-
-                            {currentTabData.loading ? (
-                                <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-                                    <CircularProgress />
-                                </Box>
-                            ) : selectedLevel === PUBLIC_LEVEL_KEY ? (
-                                counterOffersLoading || !counterOffersLoaded ? (
-                                    <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-                                        <CircularProgress />
-                                    </Box>
-                                ) : (
+                        {currentTabData.loading ? candidatesLoading : selectedLevel === PUBLIC_LEVEL_KEY ? (
+                            <>
+                                {counterOffersLoading || !counterOffersLoaded ? candidatesLoading : (
                                     <PublicLevelView
                                         shift={shift}
                                         slotId={selectedSlotId}
@@ -773,61 +697,61 @@ export default function ActiveShiftCard({
                                         onBuzzWorker={handleBuzzWorker}
                                         buzzLoadingOfferId={buzzLoadingOfferId}
                                     />
-                                )
-                            ) : (
-                                communityDataLoading ? (
-                                    <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-                                        <CircularProgress />
-                                    </Box>
-                                ) : (
-                                    <CommunityLevelView
-                                        shift={shift}
-                                        members={membersForView}
-                                        selectedSlotId={selectedSlotId}
-                                        slotHasUpdates={slotHasUpdatesByShift[shift.id] || {}}
-                                        slotCandidateCounts={slotCandidateCounts}
-                                        slotStatusCounts={slotStatusCounts}
-                                        offers={offers || []}
-                                        onSelectSlot={(slotId) => handleSlotSelection(shift.id, slotId)}
-                                        onReviewCandidate={(member, _shiftId, offer, slotId) =>
-                                            handleReviewCandidate(shift, member, offer, slotId)
-                                        }
-                                        reviewLoadingId={reviewLoadingId}
-                                        onBuzzWorker={handleBuzzWorker}
-                                        buzzLoadingOfferId={buzzLoadingOfferId}
-                                    />
-                                )
-                            )}
-                            {selectedLevel === PUBLIC_LEVEL_KEY && (
-                                <Box sx={{ mt: 2.5 }}>
-                                    {communityDataLoading ? (
-                                        <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-                                            <CircularProgress />
-                                        </Box>
-                                    ) : (
-                                        <CommunityLevelView
-                                            shift={shift}
-                                            members={membersForView}
-                                            selectedSlotId={selectedSlotId}
-                                            slotHasUpdates={slotHasUpdatesByShift[shift.id] || {}}
-                                            slotCandidateCounts={slotCandidateCounts}
-                                            slotStatusCounts={slotStatusCounts}
-                                            offers={offers || []}
-                                            showSlotSelector={false}
-                                            onSelectSlot={(slotId) => handleSlotSelection(shift.id, slotId)}
-                                            onReviewCandidate={(member, _shiftId, offer, slotId) =>
-                                                handleReviewCandidate(shift, member, offer, slotId)
-                                            }
-                                            reviewLoadingId={reviewLoadingId}
-                                            onBuzzWorker={handleBuzzWorker}
-                                            buzzLoadingOfferId={buzzLoadingOfferId}
-                                        />
-                                    )}
-                                </Box>
-                            )}
-                        </Box>
-                    )}
-                </CardContent>
+                                )}
+                                {communityView(false)}
+                            </>
+                        ) : communityView(true)}
+                    </Stack>
+                )}
             </Card>
         );
+
+        function renderShiftActions() {
+            return (
+                <>
+                    <Tooltip title="Share shift link">
+                        <span>
+                            <IconButton
+                                aria-label="Share shift link"
+                                sx={iconButtonSx}
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    handleShare(shift);
+                                }}
+                                disabled={sharingShiftId === shift.id}
+                            >
+                                <Share2 />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                    <Tooltip title="Edit shift">
+                        <IconButton
+                            aria-label="Edit shift"
+                            sx={iconButtonSx}
+                            onClick={e => {
+                                e.stopPropagation();
+                                handleEditShift(shift.id);
+                            }}
+                        >
+                            <Pencil />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete shift">
+                        <span>
+                            <IconButton
+                                aria-label="Delete shift"
+                                sx={{ ...iconButtonSx, '&:hover': { bgcolor: 'var(--ct-status-red-bg)', color: 'var(--ct-status-red-fg)' } }}
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    setDeleteConfirmDialog({ open: true, shiftId: shift.id });
+                                }}
+                                disabled={actionLoading[`delete_${shift.id}`]}
+                            >
+                                <Trash2 />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                </>
+            );
+        }
     }

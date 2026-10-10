@@ -1,3 +1,4 @@
+import { visuallyHidden } from '@mui/utils';
 import { useEffect, useState } from 'react';
 import {
   Box,
@@ -28,11 +29,11 @@ import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
 
 const gradientButtonSx = {
   borderRadius: 999,
-  background: 'linear-gradient(135deg, #8B5CF6 0%, #2563EB 100%)',
+  background: '#5222B8',
   color: '#fff',
   fontWeight: 800,
   textTransform: 'none',
-  '&:hover': { background: 'linear-gradient(135deg, #7C3AED 0%, #1D4ED8 100%)' },
+  '&:hover': { background: '#40168F' },
 };
 
 export default function HistoryShiftsPage() {
@@ -116,21 +117,14 @@ export default function HistoryShiftsPage() {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
-          Shift History
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
-          Review completed shifts and rate assigned team members
-        </Typography>
-      </Box>
+    <Container maxWidth={false} disableGutters>
+      <Typography component="h2" sx={visuallyHidden}>Shift History</Typography>
 
       <OwnerAssignedShiftBoard
         title="Shift History"
         shifts={shifts}
         loading={loading}
-        emptyText="No past shifts found."
+        emptyText="Finished shifts show here, so you can check them and rate the team."
         mode="history"
         onViewAssigned={openProfile}
         onRateAssigned={openRateWorker}

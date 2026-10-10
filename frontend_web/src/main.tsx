@@ -1,5 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+// The same bundled typefaces and weights used by the Next.js public app.
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/outfit/500.css';
+import '@fontsource/outfit/600.css';
 import { Outlet, Navigate } from 'react-router-dom';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -71,6 +77,7 @@ const AdminPosterShiftDetailPage = React.lazy(() => import('./pages/dashboard/ad
 const AdminDashboardWrapper = React.lazy(() => import('./layouts/adminDashboard'));
 const PharmacistDashboardWrapper = React.lazy(() => import('./layouts/pharmacistDashboard'));
 const HubDashboardWrapper = React.lazy(() => import('./layouts/HubDashboardWrapper'));
+const SharedDashboardWrapper = React.lazy(() => import('./layouts/SharedDashboardWrapper'));
 const OtherstaffDashboardWrapper = React.lazy(() => import('./layouts/otherStaffDashboard'));
 const ExplorerDashboardWrapper = React.lazy(() => import('./layouts/explorerDashboard'));
 const OwnerShiftCenterPage = React.lazy(() => import('./pages/dashboard/shiftCenter/ShiftCenterPage').then((module) => ({ default: module.OwnerShiftCenterPage })));
@@ -177,45 +184,55 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      // Workforce pages reached by direct URL: same dashboard shell, own guards
       {
-        path: 'dashboard/workforce/timesheets',
-        element: (
-          <ProtectedRoute requiredCapability="MANAGE_ROSTER">
-            <TimesheetsPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'dashboard/workforce/leave',
-        element: (
-          <ProtectedRoute requiredCapability="MANAGE_ROSTER">
-            <ManagerLeavePage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'dashboard/workforce/settings',
-        element: (
-          <ProtectedRoute requiredAnyCapabilities={["MANAGE_STAFF", "MANAGE_ROSTER"]}>
-            <WorkforceSettingsPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'dashboard/my-hours',
-        element: (
+        Component: () => (
           <ProtectedRoute>
-            <MyHoursPage />
+            <SharedDashboardWrapper />
           </ProtectedRoute>
         ),
-      },
-      {
-        path: 'dashboard/my-leave',
-        element: (
-          <ProtectedRoute>
-            <MyLeavePage />
-          </ProtectedRoute>
-        ),
+        children: [
+          {
+            path: 'dashboard/workforce/timesheets',
+            element: (
+              <ProtectedRoute requiredCapability="MANAGE_ROSTER">
+                <TimesheetsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'dashboard/workforce/leave',
+            element: (
+              <ProtectedRoute requiredCapability="MANAGE_ROSTER">
+                <ManagerLeavePage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'dashboard/workforce/settings',
+            element: (
+              <ProtectedRoute requiredAnyCapabilities={["MANAGE_STAFF", "MANAGE_ROSTER"]}>
+                <WorkforceSettingsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'dashboard/my-hours',
+            element: (
+              <ProtectedRoute>
+                <MyHoursPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'dashboard/my-leave',
+            element: (
+              <ProtectedRoute>
+                <MyLeavePage />
+              </ProtectedRoute>
+            ),
+          },
+        ],
       },
 
       // Orgnization
@@ -556,8 +573,12 @@ const router = createBrowserRouter([
               { index: true, element: <PublicShiftsPage /> },
               { path: 'public', element: <PublicShiftsPage /> },
               { path: 'community', element: <CommunityShiftsPage /> },
+              { path: 'confirmed', element: <MyConfirmedShiftsPage /> },
+              { path: 'history', element: <MyHistoryShiftsPage /> },
+              { path: ':id', element: <WorkerShiftDetailPage /> },
             ],
           },
+          { path: 'availability', element: <SetAvailabilityPage /> },
           { path: 'interests', element: <TalentBoard /> },
           { path: 'chat', element: <ChatPage /> },
           { path: 'learning', element: <LearningMaterialsPage /> },

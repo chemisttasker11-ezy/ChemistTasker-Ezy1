@@ -12,7 +12,7 @@ import {
   getExplorerNav,
 } from "./navigation";
 import { DashboardNavigationProvider } from "./contexts/DashboardNavigationContext";
-import { getOnboarding, hasOrganizationAccess } from "@chemisttasker/shared-core";
+import { getOnboarding, getOrganizationMembership, hasOrganizationAccess } from "@chemisttasker/shared-core";
 
 // ✨ HOOK 1: Your existing hook for onboarding progress
 function useOnboardingProgress(user: any, persona: string) {
@@ -80,6 +80,7 @@ export default function App() {
   }, [activeAdminPharmacyId, fallbackAdminAssignment]);
 
   const hasOrgRole = useMemo(() => hasOrganizationAccess(user), [user]);
+  const orgMembership = useMemo(() => getOrganizationMembership(user), [user]);
   const isOrgPersona = hasOrgRole && (
     location.pathname.startsWith('/dashboard/organization/') ||
     (activePersona !== 'admin' && ['ORGANIZATION', 'ORG_OWNER', 'ORG_STAFF', 'ORG_ADMIN', 'CHIEF_ADMIN', 'REGION_ADMIN'].includes(user?.role ?? ''))
@@ -136,7 +137,7 @@ export default function App() {
     const hasUnreadMessages = unreadCount > 0;
 
     if (isOrgPersona) {
-      return getOrganizationNav(hasUnreadMessages);
+      return getOrganizationNav(hasUnreadMessages, orgMembership?.capabilities ?? []);
     }
 
     const hasAdminAssignments = adminAssignments.length > 0;
@@ -179,6 +180,7 @@ export default function App() {
     scopedAdminPharmacyId,
     fallbackAdminAssignment,
     isOrgPersona,
+    orgMembership,
   ]);
 
   if (isLoading) return null;

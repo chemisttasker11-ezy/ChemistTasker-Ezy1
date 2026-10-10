@@ -31,12 +31,12 @@ export function useRevealInterest(
                     const nextInterestsBySlot: Record<number, any[]> = {};
                     Object.entries(current.interestsBySlot || {}).forEach(([sid, list]) => {
                         nextInterestsBySlot[Number(sid)] = (list as any[]).map(item =>
-                            item.id === interest.id ? { ...item, revealed: true, user: userDetail, user_detail: userDetail } : item
+                            item.id === interest.id ? { ...item, revealed: true, user: userDetail, userDetail } : item
                         );
                     });
 
                     const nextInterestsAll = (current.interestsAll || []).map((item: any) =>
-                        item.id === interest.id ? { ...item, revealed: true, user: userDetail, user_detail: userDetail } : item
+                        item.id === interest.id ? { ...item, revealed: true, user: userDetail, userDetail } : item
                     );
 
                     return {

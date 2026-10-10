@@ -136,29 +136,59 @@ def reveal_candidate(*, request, shift, candidate, slot_id, slot):
     return revealed_profile(candidate, build_absolute_uri=request.build_absolute_uri)
 
 
-def revealed_profile(candidate, *, build_absolute_uri):
-    try:
-        po = PharmacistOnboarding.objects.get(user=candidate)
-        profile_data = {
-            'phone_number': candidate.mobile_number,
-            'short_bio': po.short_bio,
-            'resume': build_absolute_uri(po.resume.url) if po.resume else None,
+def work_profile(candidate, *, build_absolute_uri):
+    """What a manager sees of a candidate's work profile: photo, bio, skills (catalogue codes), role, experience,
+    location and verification. Never contact details or the CV; those are only for booked workers."""
+    po = PharmacistOnboarding.objects.filter(user=candidate).first()
+    os = None if po else OtherStaffOnboarding.objects.filter(user=candidate).first()
+    profile = po or os
+    if not profile:
+        return {'profile_photo': None, 'short_bio': None, 'skills': [], 'role_label': None, 'verified': False}
+    data = {
+        'profile_photo': build_absolute_uri(profile.profile_photo.url) if profile.profile_photo else None,
+        'short_bio': profile.short_bio,
+        'skills': list(profile.skills or []),
+        'suburb': profile.suburb or None,
+        'state': profile.state or None,
+        'open_to_travel': bool(profile.open_to_travel),
+        'travel_states': list(profile.travel_states or []),
+        'coverage_radius_km': profile.coverage_radius_km,
+        'verified': bool(profile.verified),
+        'gov_id_verified': bool(profile.gov_id_verified),
+        'abn_verified': bool(profile.abn_verified),
+    }
+    if po:
+        first = po.ahpra_first_registration_date
+        data.update({
+            'role_label': 'Pharmacist',
+            'classification': None,
+            'ahpra_verified': bool(po.ahpra_verified),
+            'registered_since': first.isoformat() if first else None,
+            'years_experience': None,
             'rate_preference': po.rate_preference or None,
-        }
-    except PharmacistOnboarding.DoesNotExist:
-        os = OtherStaffOnboarding.objects.get(user=candidate)
-        profile_data = {
-            'phone_number': candidate.mobile_number,
-            'short_bio': os.short_bio,
-            'resume': build_absolute_uri(os.resume.url) if os.resume else None,
-        }
+        })
+    else:
+        classification = (os.get_classification_level_display() if os.classification_level
+                          else os.get_student_year_display() if os.student_year
+                          else os.get_intern_half_display() if os.intern_half else None)
+        data.update({
+            'role_label': os.get_role_type_display() if os.role_type else None,
+            'classification': classification,
+            'ahpra_verified': bool(os.ahpra_proof_verified),
+            'registered_since': None,
+            'years_experience': os.years_experience or None,
+            'rate_preference': None,
+        })
+    return data
 
+
+def revealed_profile(candidate, *, build_absolute_uri):
+    """A revealed (not yet booked) candidate: name and work profile, no contact details or CV (owner decision)."""
     return {
         'id': candidate.id,
         'first_name': candidate.first_name,
         'last_name': candidate.last_name,
-        'email': candidate.email,
-        **profile_data
+        **work_profile(candidate, build_absolute_uri=build_absolute_uri),
     }
 
 
@@ -483,6 +513,8 @@ def assigned_profile(*, request, shift, candidate, slot_id, slot):
         'id': candidate.id,
         'first_name': candidate.first_name,
         'last_name': candidate.last_name,
+        **work_profile(candidate, build_absolute_uri=request.build_absolute_uri),
+        # Booked workers: contact details and CV as before.
         'email': candidate.email,
         **profile_data
     }

@@ -12,7 +12,6 @@ import {
   Stack,
 } from '@mui/material';
 import AuthLayout from '../layouts/AuthLayout';
-import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import apiClient from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -27,6 +26,13 @@ export default function MobileOTPVerify() {
   const [status, setStatus]   = useState('');
   const [error, setError]     = useState('');
   const [identityLocked, setIdentityLocked] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setInterval(() => setResendCooldown((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
 
   useEffect(() => {
     if (!user) return;
@@ -61,6 +67,7 @@ export default function MobileOTPVerify() {
         mobile_number: mobile,
       });
       setStatus('We sent a code to your mobile.');
+      setResendCooldown(30);
     } catch (err) {
       setError(extractError(err, 'Failed to send code.'));
     } finally {
@@ -109,6 +116,7 @@ export default function MobileOTPVerify() {
     try {
       await apiClient.post('/users/mobile/resend-otp/', {});
       setStatus('A new code has been sent to your mobile.');
+      setResendCooldown(30);
     } catch (err) {
       setError(extractError(err, 'Could not resend code.'));
     } finally {
@@ -117,23 +125,10 @@ export default function MobileOTPVerify() {
   };
 
   return (
-    <>
-      <PublicLogoTopBar />
       <AuthLayout title="Mobile Verification">
-        <Box
-          sx={{
-            mb: 3,
-            p: 2.25,
-            borderRadius: 3,
-            background: 'linear-gradient(135deg, rgba(0,169,157,0.12), rgba(15,23,42,0.04))',
-            border: '1px solid rgba(148,163,184,0.22)',
-          }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Confirm your mobile number
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            This step happens after email verification and login when your mobile number has not been verified yet. We use it to lock your legal name, username, and mobile number for account security.
+        <Box sx={{ mb: 2.5 }}>
+          <Typography variant="body1" sx={{ color: '#243451', lineHeight: 1.55 }}>
+            Enter your mobile details and use the code we send to confirm your number.
           </Typography>
         </Box>
 
@@ -146,6 +141,7 @@ export default function MobileOTPVerify() {
               fullWidth
               margin="normal"
               label="First Legal Name"
+              autoComplete="given-name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               required
@@ -156,6 +152,7 @@ export default function MobileOTPVerify() {
               fullWidth
               margin="normal"
               label="Last Legal Name"
+              autoComplete="family-name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               required
@@ -166,6 +163,7 @@ export default function MobileOTPVerify() {
               fullWidth
               margin="normal"
               label="Username"
+              autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -176,6 +174,8 @@ export default function MobileOTPVerify() {
               fullWidth
               margin="normal"
               label="Mobile Number"
+              type="tel"
+              autoComplete="tel"
               value={mobile}
               onChange={(e) => setMobile(e.target.value)}
               placeholder="e.g., 041x xxx xxx"
@@ -199,9 +199,11 @@ export default function MobileOTPVerify() {
             <TextField
               fullWidth
               margin="normal"
-              label="Enter OTP Code"
+              label="Verification code"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
+              autoComplete="one-time-code"
+              inputProps={{ inputMode: 'numeric' }}
               required
             />
           </Stack>
@@ -212,7 +214,7 @@ export default function MobileOTPVerify() {
               type="submit"
               variant="contained"
               disabled={loading}
-              sx={{ py: 1.5, backgroundColor: '#5222B8', '&:hover': { backgroundColor: '#00877d' } }}
+              sx={{ py: 1.5 }}
             >
               {loading ? <CircularProgress size={24} color="inherit" /> : 'Verify'}
             </Button>
@@ -220,8 +222,8 @@ export default function MobileOTPVerify() {
         </form>
 
         <Box mt={2} textAlign="center">
-          <Link component="button" onClick={handleResend} disabled={loading} color="#5222B8">
-            Resend Code
+          <Link component="button" onClick={handleResend} disabled={loading || resendCooldown > 0} color="primary.main">
+            {resendCooldown > 0 ? `Resend available in ${resendCooldown}s` : 'Resend code'}
           </Link>
         </Box>
 
@@ -232,6 +234,5 @@ export default function MobileOTPVerify() {
           </Link>
         </Typography>
       </AuthLayout>
-    </>
   );
 }

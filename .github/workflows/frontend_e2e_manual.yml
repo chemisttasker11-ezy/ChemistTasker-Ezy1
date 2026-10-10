@@ -1,6 +1,13 @@
 name: Frontend E2E Manual Verification
 
 on:
+  pull_request:
+    paths:
+      - "frontend_web/src/**"
+      - "frontend_web/e2e/**"
+      - "frontend_web/landing_next/shared-ui/**"
+      - "frontend_web/vite.config.ts"
+      - ".github/workflows/frontend_e2e_manual.yml"
   workflow_dispatch:
 
 permissions:
@@ -36,13 +43,120 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run Vite Playwright suite
         working-directory: frontend_web/e2e
-        run: npm test
+        run: npm test -- --grep-invert "real Next login hands off"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: failure()
+        if: always()
         with:
-          name: vite-playwright-failure-artifacts
+          name: vite-playwright-artifacts
           path: |
             frontend_web/e2e/playwright-report
             frontend_web/e2e/test-results
           if-no-files-found: ignore
           retention-days: 7
+
+  vite-appearance:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend_web/package-lock.json
+            frontend_web/e2e/package-lock.json
+      - name: Install application dependencies
+        working-directory: frontend_web
+        run: npm ci
+      - name: Install locked Playwright package
+        working-directory: frontend_web/e2e
+        run: npm ci
+      - name: Install Chromium
+        working-directory: frontend_web/e2e
+        run: npx playwright install chromium
+      - name: Compare the existing mobile and desktop appearance
+        working-directory: frontend_web/e2e
+        run: npm test -- frontend-appearance.spec.mjs --workers=2
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: vite-appearance-artifacts
+          path: |
+            frontend_web/e2e/playwright-report
+            frontend_web/e2e/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+
+  vite-to-next-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend_web/package-lock.json
+            frontend_web/landing_next/package-lock.json
+            frontend_web/e2e/package-lock.json
+      - name: Install Next app
+        run: npm ci
+        working-directory: frontend_web/landing_next
+      - name: Install Vite app
+        run: npm ci
+        working-directory: frontend_web
+      - name: Install Playwright
+        run: npm ci && npx playwright install --with-deps chromium
+        working-directory: frontend_web/e2e
+      - name: Start real Next server
+        run: |
+          (cd frontend_web/landing_next && npm run dev > /tmp/chemisttasker-next.log 2>&1 &)
+          for n in $(seq 1 90); do
+            if curl --silent --fail http://127.0.0.1:3000/ > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/chemisttasker-next.log
+          exit 1
+      - name: Browser cross-origin integration
+        working-directory: frontend_web/e2e
+        env:
+          VITE_PUBLIC_SITE_URL: http://127.0.0.1:3000
+          EXPECTED_NEXT_ORIGIN: http://127.0.0.1:3000
+          CT_RUN_LIVE_NEXT: '1'
+        run: npm test -- frontend-next-live.spec.mjs --workers=1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: vite-next-live-artifacts
+          path: |
+            frontend_web/e2e/test-results
+            frontend_web/e2e/playwright-report
+          if-no-files-found: ignore
+
+
+  wiring-diff-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Compare every recorded API, destination and route against remote main
+        run: |
+          git fetch --no-tags origin main
+          mkdir -p .ci-artifacts
+          node scripts/audit-wiring-diff.mjs origin/main HEAD --json > .ci-artifacts/frontend-wiring-diff.json
+          node -e 'const r=require("./.ci-artifacts/frontend-wiring-diff.json"); console.log(JSON.stringify({changedPages:r.pageChanges.length, removedGlobal:r.removed.length, addedGlobal:r.added.length, nextCopiesDrifted:r.migratedDrift.length}, null, 2));'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: frontend-main-vs-pr160-wiring
+          path: .ci-artifacts/frontend-wiring-diff.json
+          if-no-files-found: warn

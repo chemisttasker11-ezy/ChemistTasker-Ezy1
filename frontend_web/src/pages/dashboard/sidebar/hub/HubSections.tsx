@@ -1,41 +1,45 @@
-﻿import { useCallback, useEffect, useState } from 'react';
-import {
-  Alert,
-  Avatar,
-  Box,
-  Card,
-  CardContent,
-  CardMedia,
-  Chip,
-  CircularProgress,
-  IconButton,
-  LinearProgress,
-  Menu,
-  MenuItem,
-  Stack,
-  Tooltip,
-  Typography,
-} from '@mui/material';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
-import TagIcon from '@mui/icons-material/Tag';
-import { getCurrentUser } from '@chemisttasker/shared-core';
+import { Box,IconButton,Menu,MenuItem,Typography } from '@mui/material';
+import { MoreHorizontal } from 'lucide-react';
+import { useCallback,useState } from 'react';
 
-import { fetchHubGroupMembers } from '../../../../api/hub';
+import { fetchHubGroup,fetchHubGroupMembers } from '../../../../api/hub';
+import { Pill } from '../../../../components/ui/Pill';
 import type {
-  HubChemistTaskerHub,
-  HubGroup,
-  HubGroupMemberOption,
-  HubPharmacy,
-  HubScopeSelection,
+HubChemistTaskerHub,
+HubGroup,
+HubGroupMemberOption,
+HubPharmacy,
+HubScopeSelection,
 } from '../../../../types/hub';
 import { ScopeFeed } from './HubFeed';
-import { formatMemberLabel, getMemberDisplayName } from './hubUtils';
+import HubSpace,{ type HubPerson } from './HubSpace';
+import { getMemberDisplayName } from './hubUtils';
+
+/** Group members with the admin flag the group API already returns. */
+const loadGroupPeople = async (groupId: number): Promise<HubPerson[]> => {
+  const group = await fetchHubGroup(groupId, { includeMembers: true });
+  return (group.members ?? []).map((entry) => ({
+    membershipId: entry.membershipId,
+    userId: entry.member?.userDetails?.id ?? null,
+    fullName: getMemberDisplayName({ firstName: entry.member?.userDetails?.firstName, lastName: entry.member?.userDetails?.lastName, username: entry.member?.userDetails?.username }),
+    email: null,
+    role: entry.member?.role ?? 'MEMBER',
+    employmentType: entry.member?.employmentType ?? null,
+    pharmacyId: entry.pharmacyId ?? group.pharmacyId ?? null,
+    pharmacyName: entry.pharmacyName ?? group.pharmacyName ?? null,
+    jobTitle: entry.jobTitle ?? null,
+    profilePhotoUrl: entry.member?.userDetails?.profilePhotoUrl ?? null,
+    isAdmin: Boolean(entry.isAdmin),
+  }));
+};
 
 const STAFF_EMPLOYMENT_TYPES = new Set(['FULL_TIME', 'PART_TIME', 'CASUAL']);
+/** A pharmacy's members are its team (full time, part time and casual). */
 const filterPharmacyStaffMembers = (members: HubGroupMemberOption[]) =>
   members.filter((member) => STAFF_EMPLOYMENT_TYPES.has(member.employmentType || ''));
+
 interface HomePageContentProps {
+  onMemberCount?: (count: number) => void;
   details: {
     id: number;
     coverImage: string;
@@ -61,203 +65,40 @@ export function HomePageContent({
   membersLoader,
   targetPostId,
   onTargetPostHandled,
+  onMemberCount,
 }: HomePageContentProps) {
   return (
-    <Box sx={{ width: '100%', mx: 'auto' }}>
-      <Card sx={{ borderRadius: 2, boxShadow: 3, width: '100%', position: 'relative' }}>
-        {details.canManageProfile && onOpenSettings && (
-          <Tooltip title="Edit pharmacy profile">
-            <IconButton
-              onClick={onOpenSettings}
-              size="small"
-              sx={{ position: 'absolute', top: 16, right: 16, bgcolor: 'white', boxShadow: 2, zIndex: 2 }}
-            >
-              <SettingsOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        )}
-        <Box sx={{ position: 'relative', height: { xs: 220, md: 260 }, overflow: 'hidden', borderRadius: '16px 16px 0 0' }}>
-          <CardMedia
-            component="img"
-            height="100%"
-            image={details.coverImage}
-            alt="Pharmacy cover"
-            sx={{ objectFit: 'cover', width: '100%', filter: 'brightness(0.85)' }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              pointerEvents: 'none',
-              background: 'linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.8) 100%)',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: 24,
-              left: 24,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 0.5,
-              color: 'common.white',
-              pointerEvents: 'none',
-            }}
-          >
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              {details.name}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-              Pharmacy Hub Overview
-            </Typography>
-          </Box>
-        </Box>
-        <CardContent sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-            {details.name}
-          </Typography>
-          <Typography variant="h5" component="h2" sx={{ fontWeight: 'semibold', color: 'text.secondary' }}>
-            About Us
-          </Typography>
-          <Typography variant="body1" sx={{ lineHeight: 1.75, color: 'text.secondary' }}>
-            {details.about}
-          </Typography>
-        </CardContent>
-      </Card>
-      <MembersPreviewPanel
-        loadMembers={membersLoader}
-        title="Pharmacy Members"
-        emptyMessage={`Invite teammates to ${details.name} to start collaborating.`}
+    <HubSpace
+      kind="pharmacy"
+      name={details.name}
+      eyebrow="Pharmacy hub"
+      privacy="Private to your pharmacy team"
+      coverImage={details.coverImage}
+      about={details.about}
+      aboutFallback={`Add a short introduction so new team members know what ${details.name} uses this hub for.`}
+      membersLoader={membersLoader}
+      memberFilter={filterPharmacyStaffMembers}
+      onOpenSettings={details.canManageProfile ? onOpenSettings : undefined}
+      settingsLabel="Edit pharmacy profile"
+      onMemberCount={onMemberCount}
+    >
+      <ScopeFeed
+        key={`${scope.type}:${scope.id}`}
+        scope={scope}
+        canCreatePost={canCreatePost}
+        membersLoader={membersLoader}
+        audienceName={details.name}
+        emptyTitle="No posts yet"
+        emptyDescription="Share the first update with your pharmacy team."
+        targetPostId={targetPostId}
+        onTargetPostHandled={onTargetPostHandled}
       />
-      <Box sx={{ mt: 3 }}>
-
-        <ScopeFeed
-          key={`${scope.type}:${scope.id}`}
-          scope={scope}
-          canCreatePost={canCreatePost}
-          membersLoader={membersLoader}
-          emptyTitle="No updates yet."
-          emptyDescription="Share the first update with your pharmacy."
-          targetPostId={targetPostId}
-          onTargetPostHandled={onTargetPostHandled}
-        />
-      </Box>
-    </Box>
+    </HubSpace>
   );
 }
 
-interface MembersPreviewPanelProps {
-  loadMembers?: () => Promise<HubGroupMemberOption[]>;
-  title: string;
-  emptyMessage: string;
-}
-
-function MembersPreviewPanel({ loadMembers, title, emptyMessage }: MembersPreviewPanelProps) {
-  const [members, setMembers] = useState<HubGroupMemberOption[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!loadMembers) {
-      setMembers([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    let isMounted = true;
-    setLoading(true);
-    setError(null);
-    loadMembers()
-      .then((list) => {
-        if (isMounted) {
-          setMembers(filterPharmacyStaffMembers(list));
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load member preview', err);
-        if (isMounted) {
-          setMembers([]);
-          setError('Unable to load members right now.');
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [loadMembers]);
-
-  if (!loadMembers) {
-    return null;
-  }
-
-  const preview = members.slice(0, 12);
-  const remaining = members.length - preview.length;
-  const initialsFor = (label: string) => {
-    const parts = label.trim().split(/\s+/);
-    return `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase() || 'U';
-  };
-
-  return (
-    <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: 'grey.200', boxShadow: 0, mt: 3 }}>
-      <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="h6">{title}</Typography>
-          {loading ? (
-            <CircularProgress size={16} />
-          ) : (
-            <Chip
-              label={`${members.length} member${members.length === 1 ? '' : 's'}`}
-              size="small"
-              color="primary"
-              variant="outlined"
-            />
-          )}
-        </Stack>
-        {error ? (
-          <Alert severity="error">{error}</Alert>
-        ) : loading && !members.length ? (
-          <LinearProgress />
-        ) : members.length ? (
-          <Stack direction="row" flexWrap="wrap" gap={1}>
-            {preview.map((member) => {
-              const baseName = getMemberDisplayName(member);
-              return (
-                <Chip
-                  key={member.membershipId}
-                  avatar={
-                    <Avatar
-                      src={member.profilePhotoUrl || undefined}
-                      sx={{ width: 28, height: 28, fontSize: '0.75rem' }}
-                    >
-                      {initialsFor(baseName)}
-                    </Avatar>
-                  }
-                  label={formatMemberLabel(baseName, member.role, member.jobTitle)}
-                  size="small"
-                  variant="outlined"
-                />
-              );
-            })}
-            {remaining > 0 && (
-              <Chip label={`+${remaining} more`} size="small" color="primary" variant="outlined" />
-            )}
-          </Stack>
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            {emptyMessage}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// --- Org Home Page Content ---
 interface OrgHomePageContentProps {
+  onMemberCount?: (count: number) => void;
   details: {
     id: number;
     name: string;
@@ -283,87 +124,34 @@ export function OrgHomePageContent({
   membersLoader,
   targetPostId,
   onTargetPostHandled,
+  onMemberCount,
 }: OrgHomePageContentProps) {
   return (
-    <Box sx={{ width: '100%', mx: 'auto' }}>
-      <Card sx={{ borderRadius: 2, boxShadow: 3, width: '100%', position: 'relative' }}>
-        {details.canManageProfile && onOpenSettings && (
-          <Tooltip title="Edit organization profile">
-            <IconButton
-              onClick={onOpenSettings}
-              size="small"
-              sx={{ position: 'absolute', top: 16, right: 16, bgcolor: 'white', boxShadow: 2, zIndex: 2 }}
-            >
-              <SettingsOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        )}
-        <Box sx={{ position: 'relative', height: { xs: 220, md: 260 }, overflow: 'hidden', borderRadius: '16px 16px 0 0' }}>
-          <CardMedia
-            component="img"
-            height="100%"
-            image={details.coverImage}
-            alt="Organization cover"
-            sx={{ objectFit: 'cover', width: '100%', filter: 'brightness(0.85)' }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              pointerEvents: 'none',
-              background: 'linear-gradient(180deg, rgba(2,6,23,0.2) 0%, rgba(2,6,23,0.85) 100%)',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: 24,
-              left: 24,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 0.5,
-              color: 'common.white',
-              pointerEvents: 'none',
-            }}
-          >
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              {details.name}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-              Organization Workspace
-            </Typography>
-          </Box>
-        </Box>
-        <CardContent sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="h3" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-            {details.name}
-          </Typography>
-          <Typography variant="h5" component="h2" sx={{ fontWeight: 'semibold', color: 'text.secondary' }}>
-            About Our Organization
-          </Typography>
-          <Typography variant="body1" sx={{ lineHeight: 1.75, color: 'text.secondary' }}>
-            {details.about}
-          </Typography>
-        </CardContent>
-      </Card>
-      <MembersPreviewPanel
-        loadMembers={membersLoader}
-        title="Organization Members"
-        emptyMessage={`Invite members to ${details.name} to collaborate across pharmacies.`}
+    <HubSpace
+      kind="organization"
+      name={details.name}
+      eyebrow="Organisation hub"
+      privacy="Private to your organisation"
+      coverImage={details.coverImage}
+      about={details.about}
+      aboutFallback={`Add a short introduction so everyone across ${details.name} knows what this hub is for.`}
+      membersLoader={membersLoader}
+      onOpenSettings={details.canManageProfile ? onOpenSettings : undefined}
+      settingsLabel="Edit organisation profile"
+      onMemberCount={onMemberCount}
+    >
+      <ScopeFeed
+        key={`${scope.type}:${scope.id}`}
+        scope={scope}
+        canCreatePost={canCreatePost}
+        membersLoader={membersLoader}
+        audienceName={details.name}
+        emptyTitle="No posts yet"
+        emptyDescription="Share the first announcement with your organisation."
+        targetPostId={targetPostId}
+        onTargetPostHandled={onTargetPostHandled}
       />
-      <Box sx={{ mt: 3 }}>
-        <ScopeFeed
-          key={`${scope.type}:${scope.id}`}
-          scope={scope}
-          canCreatePost={canCreatePost}
-          membersLoader={membersLoader}
-          emptyTitle="No updates yet."
-          emptyDescription="Share the first announcement with your organization."
-          targetPostId={targetPostId}
-          onTargetPostHandled={onTargetPostHandled}
-        />
-      </Box>
-    </Box>
+    </HubSpace>
   );
 }
 
@@ -374,82 +162,61 @@ interface ChemistTaskerHubContentProps {
   onTargetPostHandled?: () => void;
 }
 
+const AUDIENCE_ABOUT: Record<string, string> = {
+  PUBLIC: 'Platform-wide discussion open to everyone on ChemistTasker.',
+  OWNER: 'A hub for pharmacy owners across ChemistTasker.',
+  PHARMACIST: 'A shared space for pharmacists across the platform.',
+  INTERN: 'A shared space for intern pharmacists across the platform.',
+  STAFF: 'A shared space for pharmacy staff across the platform.',
+};
+
 export function ChemistTaskerHubContent({ hub, scope, targetPostId, onTargetPostHandled }: ChemistTaskerHubContentProps) {
-  const [opening,setOpening]=useState(true);
-  useEffect(()=>{let active=true;setOpening(true);
-    getCurrentUser().then((user: {public_community_enabled?: boolean})=>{
-      if(!active)return;
-      if(user.public_community_enabled&&['public','pharmacist','intern','staff','explorer','owner'].includes(hub.key))window.location.assign(targetPostId?`/hubs/posts/${targetPostId}`:`/hubs/${hub.key}`);
-      else setOpening(false);
-    }).catch(()=>{if(active)setOpening(false);});return()=>{active=false;};},[hub.key,targetPostId]);
-  if(opening)return <Box role="status" sx={{p:3}}>Opening your community…</Box>;
-
-  const subtitleByAudience: Record<string, string> = {
-    PUBLIC: "Platform-wide discussion open to everyone on ChemistTasker.",
-    OWNER: "A hub for pharmacy owners across ChemistTasker.",
-    PHARMACIST: "A shared space for pharmacists across the platform.",
-    INTERN: "A shared space for intern pharmacists across the platform.",
-    STAFF: "A shared space for non-intern staff across the platform.",
-  };
-
+  // Dashboard communities use the existing scoped hub API and stay in the Vite workspace.
+  const isEveryone = hub.audienceType === 'PUBLIC' || hub.audienceType === 'ALL';
   return (
-    <Box sx={{ width: '100%', mx: 'auto' }}>
-      <Card sx={{ borderRadius: 2, boxShadow: 3, width: '100%' }}>
-        <Box sx={{ position: 'relative', height: { xs: 220, md: 260 }, overflow: 'hidden', borderRadius: '16px 16px 0 0' }}>
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(135deg, #111827 0%, #1d4ed8 55%, #0f766e 100%)',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              pointerEvents: 'none',
-              background: 'linear-gradient(180deg, rgba(15,23,42,0.1) 0%, rgba(15,23,42,0.78) 100%)',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: 24,
-              left: 24,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 0.5,
-              color: 'common.white',
-            }}
-          >
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              {hub.label}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-              ChemistTasker Hub
-            </Typography>
-          </Box>
-        </Box>
-        <CardContent sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-            {hub.label}
-          </Typography>
-          <Typography variant="body1" sx={{ lineHeight: 1.75, color: 'text.secondary' }}>
-            {subtitleByAudience[hub.audienceType] ?? "Platform-wide discussion on ChemistTasker."}
-          </Typography>
-        </CardContent>
-      </Card>
-      <Box sx={{ mt: 3 }}>
-        <ScopeFeed
-          key={`${scope.type}:${scope.id}`}
-          scope={scope}
-          canCreatePost
-          emptyTitle="No updates yet."
-          emptyDescription={`Share the first update in ${hub.label}.`}
-          targetPostId={targetPostId}
-          onTargetPostHandled={onTargetPostHandled}
-        />
-      </Box>
+    <HubSpace
+      kind="platform"
+      name={hub.label}
+      eyebrow="ChemistTasker community"
+      privacy={isEveryone ? 'Everyone on ChemistTasker' : `${hub.label.replace(/ Hub$/, '')}s on ChemistTasker`}
+      isPublic={isEveryone}
+      about={AUDIENCE_ABOUT[hub.audienceType] ?? 'Platform-wide discussion on ChemistTasker.'}
+      aboutFallback="Platform-wide discussion on ChemistTasker."
+    >
+      <ScopeFeed
+        key={`${scope.type}:${scope.id}`}
+        scope={scope}
+        canCreatePost
+        audienceName={hub.label}
+        emptyTitle="No posts yet"
+        emptyDescription={`Start the first conversation in ${hub.label}.`}
+        targetPostId={targetPostId}
+        onTargetPostHandled={onTargetPostHandled}
+      />
+    </HubSpace>
+  );
+}
+
+function GroupMenu({ group, onEditGroup, onDeleteGroup }: { group: HubGroup; onEditGroup: (group: HubGroup) => void; onDeleteGroup: (group: HubGroup) => void }) {
+  const [anchor, setAnchor] = useState<null | HTMLElement>(null);
+  if (!(group.isAdmin || group.isCreator)) return null;
+  return (
+    <>
+      <IconButton aria-label={`Options for ${group.name}`} aria-haspopup="menu" onClick={(event) => setAnchor(event.currentTarget)} sx={{ width: 40, height: 40, border: '1px solid var(--ct-border-color)' }}>
+        <MoreHorizontal size={18} />
+      </IconButton>
+      <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
+        <MenuItem onClick={() => { setAnchor(null); onEditGroup(group); }}>Edit group</MenuItem>
+        <MenuItem onClick={() => { setAnchor(null); onDeleteGroup(group); }} sx={{ color: 'error.main' }}>Delete group</MenuItem>
+      </Menu>
+    </>
+  );
+}
+
+function GroupNotFound({ label }: { label: string }) {
+  return (
+    <Box sx={{ display: 'flex', minHeight: 240, alignItems: 'center', justifyContent: 'center' }}>
+      <Typography color="text.secondary">{label}</Typography>
     </Box>
   );
 }
@@ -465,72 +232,35 @@ interface GroupContentProps {
 }
 
 export function GroupContent({ pharmacy, group, scope, onEditGroup, onDeleteGroup, targetPostId, onTargetPostHandled }: GroupContentProps) {
-  const [actionsAnchorEl, setActionsAnchorEl] = useState<null | HTMLElement>(null);
-  const actionsOpen = Boolean(actionsAnchorEl);
-
-  if (!group) {
-    return (
-      <Box sx={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography color="text.secondary">Group not found.</Typography>
-      </Box>
-    );
-  }
-
-  const membersLoader = useCallback(() => fetchHubGroupMembers(group.id), [group.id]);
-
+  const groupId = group?.id;
+  const membersLoader = useCallback(() => fetchHubGroupMembers(groupId as number), [groupId]);
+  const peopleLoader = useCallback(() => loadGroupPeople(groupId as number), [groupId]);
+  if (!group) return <GroupNotFound label="This group isn't available any more." />;
   return (
-    <Stack sx={{ width: '100%' }} spacing={3}>
-      <Card sx={{ borderRadius: 2, boxShadow: 3, background: 'linear-gradient(to right, #6D28D9, #4C1D95)', color: 'white', p: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            <TagIcon sx={{ fontSize: 32, opacity: 0.8 }} />
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>{group.name}</Typography>
-            {group.isCreator && (
-              <Chip
-                label="Created by you"
-                size="small"
-                sx={{
-                  bgcolor: 'rgba(255,255,255,0.15)',
-                  color: 'common.white',
-                  fontWeight: 600,
-                }}
-              />
-            )}
-          </Box>
-          {(group.isAdmin || group.isCreator) && (
-            <>
-              <IconButton onClick={(event) => setActionsAnchorEl(event.currentTarget)} sx={{ color: 'white' }}>
-                <MoreVertIcon />
-              </IconButton>
-              <Menu
-                anchorEl={actionsAnchorEl}
-                open={actionsOpen}
-                onClose={() => setActionsAnchorEl(null)}
-              >
-                <MenuItem onClick={() => { setActionsAnchorEl(null); onEditGroup(group); }}>Edit group</MenuItem>
-                <MenuItem onClick={() => { setActionsAnchorEl(null); onDeleteGroup(group); }}>Delete group</MenuItem>
-              </Menu>
-            </>
-          )}
-        </Box>
-        {pharmacy && (
-          <Typography variant="body2" sx={{ mt: 1, color: 'primary.light' }}>
-            This group is part of the <Typography component="span" sx={{ fontWeight: 'semibold' }}>{pharmacy.name}</Typography> hub.
-          </Typography>
-        )}
-      </Card>
-
+    <HubSpace
+      kind="group"
+      name={group.name}
+      eyebrow={pharmacy ? `Group in ${pharmacy.name}` : 'Community group'}
+      privacy="Private to group members"
+      about={group.description}
+      aboutFallback="No description yet."
+      membersLoader={peopleLoader}
+      badges={group.isCreator ? <Pill tone="violet" label="Created by you" /> : undefined}
+      actions={<GroupMenu group={group} onEditGroup={onEditGroup} onDeleteGroup={onDeleteGroup} />}
+      aboutFacts={pharmacy ? [{ label: 'Pharmacy', value: pharmacy.name }] : []}
+    >
       <ScopeFeed
         key={`${scope.type}:${scope.id}`}
         scope={scope}
         canCreatePost
         membersLoader={membersLoader}
-        emptyTitle="No updates yet."
-        emptyDescription="Start the conversation with your team above."
+        audienceName={group.name}
+        emptyTitle="No posts yet"
+        emptyDescription="Start the conversation with your group."
         targetPostId={targetPostId}
         onTargetPostHandled={onTargetPostHandled}
       />
-    </Stack>
+    </HubSpace>
   );
 }
 
@@ -544,76 +274,39 @@ interface OrgGroupContentProps {
 }
 
 export function OrgGroupContent({ group, scope, onEditGroup, onDeleteGroup, targetPostId, onTargetPostHandled }: OrgGroupContentProps) {
-  const [actionsAnchorEl, setActionsAnchorEl] = useState<null | HTMLElement>(null);
-  const actionsOpen = Boolean(actionsAnchorEl);
-
-  if (!group) {
-    return (
-      <Box sx={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography color="text.secondary">Organization Group not found.</Typography>
-      </Box>
-    );
-  }
-
-  const membersLoader = useCallback(() => fetchHubGroupMembers(group.id), [group.id]);
-
+  const groupId = group?.id;
+  const membersLoader = useCallback(() => fetchHubGroupMembers(groupId as number), [groupId]);
+  const peopleLoader = useCallback(() => loadGroupPeople(groupId as number), [groupId]);
+  if (!group) return <GroupNotFound label="This organisation group isn't available any more." />;
   return (
-    <Stack sx={{ width: '100%' }} spacing={3}>
-      <Card sx={{ borderRadius: 2, boxShadow: 3, background: 'linear-gradient(to right, #1976D2, #0D47A1)', color: 'white', p: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            <TagIcon sx={{ fontSize: 32, opacity: 0.8 }} />
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>{group.name} </Typography>
-            {group.isCreator && (
-              <Chip
-                label="Created by you"
-                size="small"
-                sx={{
-                  bgcolor: 'rgba(255,255,255,0.15)',
-                  color: 'common.white',
-                  fontWeight: 600,
-                }}
-              />
-            )}
-          </Box>
-          {(group.isAdmin || group.isCreator) && (
-            <>
-              <IconButton onClick={(event) => setActionsAnchorEl(event.currentTarget)} sx={{ color: 'white' }}>
-                <MoreVertIcon />
-              </IconButton>
-              <Menu
-                anchorEl={actionsAnchorEl}
-                open={actionsOpen}
-                onClose={() => setActionsAnchorEl(null)}
-              >
-                <MenuItem onClick={() => { setActionsAnchorEl(null); onEditGroup(group); }}>Edit group</MenuItem>
-                <MenuItem onClick={() => { setActionsAnchorEl(null); onDeleteGroup(group); }}>Delete group</MenuItem>
-              </Menu>
-            </>
-          )}
-        </Box>
-        <Typography variant="body2" sx={{ mt: 1, color: 'info.light' }}>
-          This is an organization-wide group.
-        </Typography>
-      </Card>
-
+    <HubSpace
+      kind="group"
+      name={group.name}
+      eyebrow="Organisation group"
+      privacy="Private to group members"
+      about={group.description}
+      aboutFallback="No description yet."
+      membersLoader={peopleLoader}
+      badges={group.isCreator ? <Pill tone="violet" label="Created by you" /> : undefined}
+      actions={<GroupMenu group={group} onEditGroup={onEditGroup} onDeleteGroup={onDeleteGroup} />}
+    >
       <ScopeFeed
         key={`${scope.type}:${scope.id}`}
         scope={scope}
         canCreatePost
         membersLoader={membersLoader}
-        emptyTitle="No updates yet."
-        emptyDescription="Start the conversation with your team."
+        audienceName={group.name}
+        emptyTitle="No posts yet"
+        emptyDescription="Start the conversation with your group."
         targetPostId={targetPostId}
         onTargetPostHandled={onTargetPostHandled}
       />
-    </Stack>
+    </HubSpace>
   );
 }
+
 export interface GroupModalFormValues {
   name: string;
   description: string;
   memberIds: number[];
 }
-
-

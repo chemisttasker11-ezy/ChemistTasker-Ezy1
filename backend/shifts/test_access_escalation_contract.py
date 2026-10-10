@@ -88,9 +88,10 @@ class ShiftRoleVisibilityTests(TestCase):
         cases = {
             "pharmacist": (make_user("PHARMACIST"), ["PHARMACIST"]),
             "explorer": (make_user("EXPLORER"), ["EXPLORER"]),
-            "intern": (other_staff("INTERN"), ["INTERN"]),
-            "assistant": (other_staff("ASSISTANT"), ["ASSISTANT", "TECHNICIAN", "STUDENT"]),
-            "student": (other_staff("STUDENT"), ["ASSISTANT", "TECHNICIAN", "STUDENT"]),
+            "intern": (other_staff("INTERN"), ["ASSISTANT", "INTERN"]),
+            "technician": (other_staff("TECHNICIAN"), ["ASSISTANT", "TECHNICIAN"]),
+            "assistant": (other_staff("ASSISTANT"), ["ASSISTANT"]),
+            "student": (other_staff("STUDENT"), ["ASSISTANT", "STUDENT"]),
             "owner": (make_user("OWNER"), ["PHARMACIST", "TECHNICIAN", "ASSISTANT", "EXPLORER", "INTERN", "STUDENT"]),
         }
         for label, (user, roles) in cases.items():

@@ -110,6 +110,14 @@ export default function InvoiceGeneratePage() {
     const [search] = useSearchParams();
     const prefillShiftId = search.get('shiftId');
 
+    // New invoices are created in Invoices (the finance workspace), which handles both ChemistTasker shifts
+    // and work outside ChemistTasker. A shift link opens a draft prefilled from that shift.
+    useEffect(() => {
+      if (!issuerWorkspace) return;
+      const base = pathname.replace(/\/new\/?$/, '');
+      navigate(`${base}?${prefillShiftId ? `shift=${encodeURIComponent(prefillShiftId)}` : 'new=1'}`, { replace: true });
+    }, [issuerWorkspace, pathname, prefillShiftId, navigate]);
+
     // --- Mode & Dates ---
     const [mode, setMode] = useState<'internal'|'external'>('internal');
     const today = new Date().toISOString().slice(0,10);
@@ -530,6 +538,10 @@ const handleGenerate = () => {
     .finally(() => setSubmitting(false));
 };
 
+
+  if (issuerWorkspace) {
+    return <Box role="status" sx={{ p: 4, color: 'var(--ct-text-secondary)' }}>Opening Invoices…</Box>;
+  }
 
   if (user && !issuerWorkspace) {
     return (

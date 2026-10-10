@@ -4,9 +4,7 @@ import {
   Alert,
   Paper,
   Snackbar,
-  Typography,
-  createTheme,
-  ThemeProvider,
+  useTheme,
   useMediaQuery,
   // Switch,
   // Divider,
@@ -60,6 +58,7 @@ import {
   ORG_ROLE_VALUES,
   readPostShiftPrefill,
 } from './PostShiftPage.helpers';
+import PageHeader from "../../../components/ui/PageHeader";
 
 type PostShiftPageProps = {
   onCompleted?: () => void;
@@ -804,7 +803,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
       backgroundColor,
       borderRadius: '6px',
       color: 'white',
-      border: '1px solid #6D28D9',
+      border: '1px solid #5222B8',
       boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
       padding: '2px 5px',
     };
@@ -1390,214 +1389,39 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
     }
   };
 
-  const theme = createTheme({
-    palette: {
-      mode,
-      primary: { main: '#6D28D9', light: '#8B5CF6', dark: '#5B21B6' },
-      secondary: { main: '#10B981', light: '#6EE7B7', dark: '#047857' },
-      background: {
-        default: isDarkMode ? '#07111f' : '#F9FAFB',
-        paper: isDarkMode ? '#101b2f' : '#FFFFFF',
-      },
-      text: {
-        primary: isDarkMode ? '#F8FAFC' : '#111827',
-        secondary: isDarkMode ? '#CBD5E1' : '#64748B',
-      },
-      divider: isDarkMode ? 'rgba(148, 163, 184, 0.28)' : 'rgba(15, 23, 42, 0.12)',
-    },
-    typography: {
-      fontFamily: "'Inter', sans-serif",
-      h4: { fontWeight: 700 },
-      h5: { fontWeight: 600 },
-      h6: { fontWeight: 600 },
-    },
-    shape: { borderRadius: 12 },
-    components: {
-      MuiPaper: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            boxShadow: theme.palette.mode === 'dark'
-              ? '0 18px 46px rgba(0,0,0,0.34)'
-              : '0 8px 32px 0 rgba(0,0,0,0.07)',
-            backgroundImage: 'none',
-            borderColor: theme.palette.divider,
-          }),
-        },
-      },
-      MuiOutlinedInput: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.78)' : theme.palette.background.paper,
-            color: theme.palette.text.primary,
-            '& .MuiOutlinedInput-notchedOutline': {
-              borderColor: theme.palette.mode === 'dark' ? 'rgba(148, 163, 184, 0.32)' : 'rgba(15, 23, 42, 0.18)',
-            },
-            '&:hover .MuiOutlinedInput-notchedOutline': {
-              borderColor: theme.palette.primary.light,
-            },
-            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-              borderColor: theme.palette.primary.main,
-            },
-          }),
-          input: ({ theme }) => ({
-            color: theme.palette.text.primary,
-            '&::placeholder': {
-              color: theme.palette.text.secondary,
-              opacity: 0.85,
-            },
-          }),
-        },
-      },
-      MuiInputLabel: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            color: theme.palette.text.secondary,
-            '&.Mui-focused': {
-              color: theme.palette.primary.light,
-            },
-          }),
-        },
-      },
-      MuiFormLabel: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            color: theme.palette.text.secondary,
-          }),
-        },
-      },
-      MuiFormControlLabel: {
-        styleOverrides: {
-          label: ({ theme }) => ({
-            color: theme.palette.text.primary,
-          }),
-        },
-      },
-      MuiSelect: {
-        styleOverrides: {
-          icon: ({ theme }) => ({
-            color: theme.palette.text.secondary,
-          }),
-        },
-      },
-      MuiMenu: {
-        styleOverrides: {
-          paper: ({ theme }) => ({
-            backgroundColor: theme.palette.background.paper,
-            color: theme.palette.text.primary,
-            border: `1px solid ${theme.palette.divider}`,
-          }),
-        },
-      },
-      MuiMenuItem: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            color: theme.palette.text.primary,
-            '&:hover': {
-              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(109, 40, 217, 0.18)' : 'rgba(109, 40, 217, 0.08)',
-            },
-          }),
-        },
-      },
-      MuiAccordion: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            backgroundColor: theme.palette.background.paper,
-            color: theme.palette.text.primary,
-            borderColor: theme.palette.divider,
-            backgroundImage: 'none',
-          }),
-        },
-      },
-      MuiAccordionSummary: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.84)' : '#F8FAFC',
-            color: theme.palette.text.primary,
-          }),
-        },
-      },
-      MuiChip: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            color: theme.palette.text.primary,
-            borderColor: theme.palette.divider,
-            fontWeight: 500,
-          }),
-          outlined: ({ theme }) => ({
-            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.72)' : '#FFFFFF',
-          }),
-        },
-      },
-      MuiCheckbox: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            color: theme.palette.mode === 'dark' ? '#94A3B8' : undefined,
-          }),
-        },
-      },
-      MuiToggleButton: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            color: theme.palette.text.secondary,
-            borderColor: theme.palette.divider,
-            '&.Mui-selected': {
-              color: `${theme.palette.common.white} !important`,
-            },
-          }),
-        },
-      },
-      MuiAlert: {
-        styleOverrides: {
-          root: ({ theme }) => ({
-            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(30, 41, 59, 0.92)' : undefined,
-            color: theme.palette.text.primary,
-          }),
-        },
-      },
-      MuiButton: {
-        styleOverrides: {
-          root: {
-            textTransform: 'none',
-            fontWeight: 600,
-            borderRadius: 8,
-          },
-        },
-      },
-    },
-  });
+  // Post Shift follows the shared dashboard theme (it used to build its own off-brand theme here).
+  const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   return (
-    <ThemeProvider theme={theme}>
       <Container
         maxWidth={false}
         sx={{
-          px: isEmbedded ? { xs: 1, sm: 2, md: 3 } : { xs: 1.5, sm: 2.5, md: 4 },
-          py: isEmbedded ? { xs: 1, sm: 1.5 } : 4,
-          bgcolor: isEmbedded ? 'transparent' : 'background.default',
-          minHeight: isEmbedded ? 'auto' : '100vh',
+          px: isEmbedded ? { xs: 1, sm: 2, md: 3 } : 0,
+          py: isEmbedded ? { xs: 1, sm: 1.5 } : 0,
+          bgcolor: 'transparent',
+          minHeight: 'auto',
           maxWidth: isEmbedded ? '100%' : { xs: '100%', lg: 1200, xl: 1400 },
         }}
       >
+        {!isEmbedded && (
+          <PageHeader
+            title={editingShiftId ? 'Edit Shift' : 'Create a New Shift'}
+            subtitle="Follow the steps to post a new shift opportunity."
+          />
+        )}
         <Paper
+          variant={isEmbedded ? undefined : 'outlined'}
           sx={{
-            p: isEmbedded ? 0 : { xs: 2, md: 4 },
-            borderRadius: isEmbedded ? 0 : 4,
-            boxShadow: isEmbedded ? 'none' : '0 8px 32px 0 rgba(0,0,0,0.1)',
-            bgcolor: isEmbedded ? 'transparent' : 'background.paper',
+            // One flat card for the wizard (stepper + current step), like every other dashboard card.
+            p: isEmbedded ? 0 : { xs: 2, md: 3.5 },
+            border: isEmbedded ? 'none' : undefined,
+            borderRadius: isEmbedded ? 0 : 'var(--ct-card-radius)',
+            boxShadow: 'none',
+            bgcolor: isEmbedded ? 'transparent' : 'var(--ct-surface-bg)',
             width: '100%',
           }}
         >
-          {!isEmbedded && (
-            <>
-              <Typography variant="h4" gutterBottom align="center" fontWeight={600}>
-                {editingShiftId ? 'Edit Shift' : 'Create a New Shift'}
-              </Typography>
-              <Typography variant="body1" color="text.secondary" align="center" mb={4}>
-                Follow the steps to post a new shift opportunity.
-              </Typography>
-            </>
-          )}
 
           <PostShiftWizardShell
             steps={steps}
@@ -1618,7 +1442,6 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
           <Alert onClose={() => setSnackbar(s => ({ ...s, open: false }))} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
         </Snackbar>
       </Container>
-    </ThemeProvider>
   );
 };
 

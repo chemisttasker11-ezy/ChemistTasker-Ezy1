@@ -23,7 +23,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   Favorite as FavoriteIcon,
   FilterList as FilterListIcon,
-  Flight as FlightIcon,
+  CommuteOutlined as CommuteIcon,
   Hotel as HotelIcon,
   Layers as LayersIcon,
   Paid as PaidIcon,
@@ -74,6 +74,7 @@ const openMapWindow = (address: string) => {
 
 type ShiftListProps = {
   loading?: boolean;
+  publicPresentation?: boolean;
   processedShifts: Shift[];
   clearAllFilters: () => void;
   hideCounterOffer?: boolean;
@@ -116,6 +117,7 @@ type ShiftListProps = {
 
 const ShiftList: React.FC<ShiftListProps> = ({
   loading,
+  publicPresentation = false,
   processedShifts,
   clearAllFilters,
   hideCounterOffer,
@@ -294,22 +296,34 @@ const ShiftList: React.FC<ShiftListProps> = ({
       const ratingSummary = pharmacyId != null ? pharmacyRatings[pharmacyId] : undefined;
       const isAnonymous = Boolean((shift as any).post_anonymously ?? shift.postAnonymously);
       const mapAddress = isAnonymous ? '' : buildMapAddress(shift);
+      const requiredLabels = Array.from(new Set((shift.mustHave || []).map(skill => skillLabel(skill))));
+      const preferredLabels = Array.from(new Set((shift.niceToHave || []).map(skill => skillLabel(skill))));
 
       return (
         <Paper
           key={shift.id}
           variant="outlined"
           sx={{
-            p: 2.5,
-            borderRadius: 3,
-            borderColor: urgent ? 'warning.main' : 'grey.200',
-            borderLeftWidth: urgent ? 4 : 1,
+            p: { xs: 2, md: publicPresentation ? 2.75 : 2.5 },
+            borderRadius: publicPresentation ? '14px' : 3,
+            borderColor: urgent ? '#B76A12' : publicPresentation ? '#DEE5EF' : 'grey.200',
+            borderLeftWidth: urgent && !publicPresentation ? 4 : 1,
             position: 'relative',
             bgcolor: 'background.paper',
-            boxShadow: urgent ? 4 : 2,
+            minWidth: 0,
+            maxWidth: '100%',
+            boxShadow: publicPresentation ? 'none' : urgent ? 4 : 2,
+            ...(publicPresentation ? {
+              '& .MuiChip-root': { maxWidth: '100%', minHeight: 28, height: 'auto', borderRadius: '8px', flexShrink: 0 },
+              '& .MuiChip-label': { display: 'block', whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', overflowWrap: 'anywhere', lineHeight: 1.35, fontSize: 12, py: '4px', px: '9px' },
+              '& .MuiChip-icon': { fontSize: 17, ml: '7px', mr: '-3px', flexShrink: 0 },
+            } : {}),
+            transition: publicPresentation ? 'border-color 180ms ease, box-shadow 180ms ease' : undefined,
+            '&:hover': publicPresentation ? { borderColor: '#B8A8DE', boxShadow: '0 12px 32px rgba(6,18,58,.085)' } : undefined,
+            '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
           }}
         >
-          {urgent && (
+          {urgent && !publicPresentation && (
             <Box
               sx={{
                 position: 'absolute',
@@ -331,12 +345,12 @@ const ShiftList: React.FC<ShiftListProps> = ({
               Urgent
             </Box>
           )}
-          <Stack spacing={2}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
-              <Box sx={{ flex: 1 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                  <Box>
-                    <Typography variant="h6" sx={{ cursor: 'pointer' }} onClick={() => toggleExpandedCard(shift.id)}>
+          <Stack spacing={publicPresentation ? 1.25 : 2}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={publicPresentation ? 2.5 : 2} justifyContent="space-between">
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ minWidth: 0 }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography component={publicPresentation ? 'h3' : 'h6'} variant="h6" sx={{ color: '#06123A', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: publicPresentation ? { xs: 21, md: 23 } : undefined, lineHeight: 1.3, overflowWrap: 'anywhere', cursor: publicPresentation ? 'default' : 'pointer' }} onClick={publicPresentation ? undefined : () => toggleExpandedCard(shift.id)}>
                       {getShiftPharmacyName(shift)}
                     </Typography>
                     {ratingSummary && ratingSummary.count > 0 && (
@@ -347,17 +361,18 @@ const ShiftList: React.FC<ShiftListProps> = ({
                         </Typography>
                       </Stack>
                     )}
-                    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
-                      <Chip icon={<WorkOutlineIcon />} label={getShiftRoleLabel(shift)} size="small" />
-                      {(shift.mustHave || []).map(skill => <Chip key={`required-${skill}`} icon={<SkillIcon skill={skill}/>} label={`Required: ${skillLabel(skill)}`} size="small" />)}
-                      {(shift.niceToHave || []).map(skill => <Chip key={`preferred-${skill}`} icon={<SkillIcon skill={skill}/>} label={`Preferred: ${skillLabel(skill)}`} size="small" variant="outlined" />)}
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center" sx={{ mt: 1 }}>
+                      <Chip icon={<WorkOutlineIcon />} label={getShiftRoleLabel(shift)} size="small" sx={publicPresentation ? { bgcolor: '#F0ECFC', color: '#5222B8', fontWeight: 800, borderRadius: '7px' } : undefined} />
+                      {publicPresentation && urgent && <Chip label="Urgent" size="small" sx={{ bgcolor: '#FFF0DB', color: '#805000', fontWeight: 800, borderRadius: '7px' }} />}
+                      {!publicPresentation && (shift.mustHave || []).map(skill => <Chip key={`required-${skill}`} icon={<SkillIcon skill={skill}/>} label={`Required: ${skillLabel(skill)}`} size="small" />)}
+                      {!publicPresentation && (shift.niceToHave || []).map(skill => <Chip key={`preferred-${skill}`} icon={<SkillIcon skill={skill}/>} label={`Preferred: ${skillLabel(skill)}`} size="small" variant="outlined" />)}
                       {(shift.hasTravel || shift.hasAccommodation) && (
-                        <Stack direction="row" spacing={0.5}>
-                          {shift.hasTravel && <Chip icon={<FlightIcon />} label="Travel" size="small" />}
-                          {shift.hasAccommodation && <Chip icon={<HotelIcon />} label="Accomm." size="small" />}
+                        <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ minWidth: 0 }}>
+                          {shift.hasTravel && <Chip icon={<CommuteIcon />} label={publicPresentation ? 'Travel covered' : 'Travel'} size="small" />}
+                          {shift.hasAccommodation && <Chip icon={<HotelIcon />} label={publicPresentation ? 'Accommodation' : 'Accomm.'} size="small" />}
                         </Stack>
                       )}
-                      {paymentType && (
+                      {paymentType && !publicPresentation && (
                         <Chip label={`Payment: ${paymentType}`} size="small" variant="outlined" />
                       )}
                       {isRejectedShift && <Chip label="Rejected" size="small" color="error" />}
@@ -379,13 +394,13 @@ const ShiftList: React.FC<ShiftListProps> = ({
                     )}
                   </Box>
                   {savedFeatureEnabled && !hideSaveToggle && (
-                    <IconButton onClick={() => toggleSaveShift(shift.id)}>
+                    <IconButton onClick={() => toggleSaveShift(shift.id)} aria-label={isSaved ? 'Remove saved shift' : 'Save shift'}>
                       <FavoriteIcon color={isSaved ? 'error' : 'disabled'} />
                     </IconButton>
                   )}
                 </Stack>
 
-                <Stack spacing={1} sx={{ mt: 2 }}>
+                <Stack spacing={publicPresentation ? 0.8 : 1} sx={{ mt: publicPresentation ? 1.5 : 2 }}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <CalendarTodayIcon fontSize="small" color="action" />
                     <Typography variant="body2">
@@ -411,6 +426,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                       <IconButton
                         size="small"
                         onClick={() => openMapWindow(mapAddress)}
+                        aria-label={`Show map for ${getShiftCity(shift)}`}
                         sx={{ ml: -0.5 }}
                       >
                         <PlaceIcon fontSize="small" color="action" />
@@ -418,16 +434,28 @@ const ShiftList: React.FC<ShiftListProps> = ({
                     ) : (
                       <PlaceIcon fontSize="small" color="action" />
                     )}
-                    <Typography variant="body2">{getShiftCity(shift)} ({getShiftState(shift)})</Typography>
+                    <Typography variant="body2" sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>{getShiftCity(shift)} ({getShiftState(shift)})</Typography>
                   </Stack>
                 </Stack>
+                {publicPresentation && (requiredLabels.length > 0 || preferredLabels.length > 0) && (
+                  <Stack spacing={0.75} sx={{ mt: 1.6, pt: 1.5, borderTop: '1px solid #E9EFF6' }}>
+                    {requiredLabels.length > 0 && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} alignItems={{ sm: 'baseline' }}>
+                      <Typography component="span" sx={{ color: '#5222B8', fontWeight: 850, fontSize: 13, minWidth: 76 }}>Required</Typography>
+                      <Typography component="span" sx={{ color: '#344563', fontSize: 13.5, lineHeight: 1.6, overflowWrap: 'anywhere' }}>{requiredLabels.join('  ·  ')}</Typography>
+                    </Stack>}
+                    {preferredLabels.length > 0 && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} alignItems={{ sm: 'baseline' }}>
+                      <Typography component="span" sx={{ color: '#52617C', fontWeight: 800, fontSize: 13, minWidth: 76 }}>Preferred</Typography>
+                      <Typography component="span" sx={{ color: '#445474', fontSize: 13.5, lineHeight: 1.6, overflowWrap: 'anywhere' }}>{preferredLabels.join('  ·  ')}</Typography>
+                    </Stack>}
+                  </Stack>
+                )}
               </Box>
 
-              <Box sx={{ minWidth: 180, textAlign: { xs: 'left', md: 'right' } }}>
+              <Box sx={{ minWidth: { xs: 0, md: 175 }, maxWidth: { xs: '100%', md: 190 }, flexShrink: 0, textAlign: { xs: 'left', md: 'right' }, borderTop: { xs: publicPresentation ? '1px solid #E4E9F2' : 'none', md: 'none' }, pt: { xs: publicPresentation ? 2 : 0, md: 0 } }}>
                 <Stack spacing={1} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
                   <Stack direction="row" spacing={0.5} alignItems="center">
                     <AttachMoneyIcon fontSize="small" color="success" />
-                    <Typography variant="h6">
+                    <Typography variant="h6" sx={publicPresentation ? { color: '#06123A', fontSize: 24, fontWeight: 800 } : undefined}>
                       {rateSummary.display}
                       <Typography component="span" variant="caption" color="text.secondary">
                         {rateSummary.unitLabel}
@@ -447,6 +475,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                   {showNegotiable && (
                     <Chip icon={<PaidIcon />} label="Negotiable" size="small" color="info" />
                   )}
+                  {publicPresentation && paymentType && <Typography sx={{ color: '#52617C', fontSize: 12.5, fontWeight: 750 }}>Payment: {paymentType}</Typography>}
                   {isPharmacistProvided && (
                     <Typography variant="caption" color="text.secondary">
                       Rate set by pharmacist, update your profile rates to improve matches.
@@ -455,6 +484,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                   <Stack spacing={1} sx={{ mt: 1 }}>
                     <Button
                       variant="contained"
+                      sx={publicPresentation ? { minHeight: 46, minWidth: { md: 144 }, bgcolor: '#5222B8', borderRadius: '9px', fontWeight: 800, textTransform: 'none', '&:hover': { bgcolor: '#40168F' } } : undefined}
                       disabled={shiftActionsDisabled || (!shift.singleUserOnly && hasRejectedSlots) || (isOffersMode && (!hasPendingOffer || hasAwaitingPaymentSlots))}
                       onClick={() => handleApplyAll(shift)}
                     >
@@ -505,8 +535,13 @@ const ShiftList: React.FC<ShiftListProps> = ({
               </Box>
             </Stack>
 
+            {publicPresentation && (
+              <Button variant='text' onClick={() => toggleExpandedCard(shift.id)} endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />} aria-expanded={isExpanded} aria-controls={`shift-detail-${shift.id}`} aria-label={(isExpanded ? 'Hide details for ' : 'Show details for ') + getShiftPharmacyName(shift)} sx={{ alignSelf: 'flex-start', px: 0, color: '#5222B8', textTransform: 'none', fontWeight: 800, minHeight: 44 }}>
+                {isExpanded ? 'Hide details' : 'View details and dates'}
+              </Button>
+            )}
             {isExpanded && (
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: 'grey.100' }}>
+              <Paper id={publicPresentation ? `shift-detail-${shift.id}` : undefined} variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: 'grey.100' }}>
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, lg: 6 }}>
                     <Stack spacing={1.5}>
@@ -702,7 +737,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                           <Typography variant="caption" color="text.secondary">Must have</Typography>
                           <Stack direction="row" spacing={0.5} flexWrap="wrap">
                             {shift.mustHave.map((item, idx) => (
-                              <Chip key={idx} label={item} size="small" />
+                              <Chip key={idx} label={skillLabel(item)} size="small" />
                             ))}
                           </Stack>
                         </Stack>
@@ -712,7 +747,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                           <Typography variant="caption" color="text.secondary">Nice to have</Typography>
                           <Stack direction="row" spacing={0.5} flexWrap="wrap">
                             {shift.niceToHave.map((item, idx) => (
-                              <Chip key={idx} label={item} size="small" variant="outlined" />
+                              <Chip key={idx} label={skillLabel(item)} size="small" variant="outlined" />
                             ))}
                           </Stack>
                         </Stack>
@@ -745,13 +780,13 @@ const ShiftList: React.FC<ShiftListProps> = ({
               </Paper>
             )}
 
-            <Button
+            {!publicPresentation && <Button
               onClick={() => toggleExpandedCard(shift.id)}
               endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
               sx={{ textTransform: 'none' }}
             >
               {isExpanded ? 'Hide Details' : 'Read More & Shift Breakdown'}
-            </Button>
+            </Button>}
           </Stack>
         </Paper>
       );

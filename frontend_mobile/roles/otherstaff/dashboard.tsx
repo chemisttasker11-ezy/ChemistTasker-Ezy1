@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import getShiftPharmacyName from '@/roles/shared/shifts/utils/getShiftPharmacyName';
+import WorkerShiftPreviews from '@/roles/shared/dashboard/WorkerShiftPreviews';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
 import ParityToolsCard from '@/components/ParityToolsCard';
 import {
@@ -244,46 +244,29 @@ export default function OtherStaffOverviewScreen() {
           <View pointerEvents="none" style={styles.heroAngleTwo} />
           <Text variant="headlineSmall" style={styles.shiftHeroTitle}>Welcome {displayName},</Text>
           <View style={styles.shiftHeroHeader}>
-            <Text variant="titleMedium" style={styles.shiftHeroSubtitle}>Upcoming shifts</Text>
+            <Text variant="titleMedium" style={styles.shiftHeroSubtitle}>Your upcoming work</Text>
             <TouchableOpacity onPress={() => router.push('/otherstaff/shifts')}>
               <Text style={styles.shiftHeroLink}>View all</Text>
             </TouchableOpacity>
           </View>
           {shifts.length > 0 ? (
-            shifts.slice(0, 3).map((shift) => (
-              <Card
-                key={shift.id}
-                style={styles.shiftPreviewCard}
-                onPress={() => router.push(`/otherstaff/shifts/${shift.id}` as any)}
-              >
-                <Card.Content style={styles.shiftPreviewContent}>
-                  <View style={styles.shiftPreviewLeft}>
-                    <View style={styles.shiftIconContainer}>
-                      <IconButton icon="calendar-clock" size={20} iconColor="#6366F1" />
-                    </View>
-                    <View>
-                      <Text variant="labelMedium" style={styles.shiftPharmacyName}>
-                        {getShiftPharmacyName(shift)}
-                      </Text>
-                      <Text variant="bodySmall" style={styles.shiftRole}>
-                        {formatShiftDate(shift.date || shift.startDatetime || shift.start_datetime)}
-                      </Text>
-                    </View>
-                  </View>
-                  <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
-                </Card.Content>
-              </Card>
-            ))
+            <WorkerShiftPreviews shifts={shifts} styles={styles} formatDate={formatShiftDate}
+              onOpen={id => router.push(`/otherstaff/shifts/${id}` as any)} />
           ) : (
             <View style={styles.shiftHeroEmpty}>
               <IconButton icon="calendar-blank" size={40} iconColor="rgba(255,255,255,0.86)" />
-              <Text variant="titleMedium" style={styles.shiftHeroEmptyTitle}>No upcoming shifts</Text>
+              <Text variant="titleMedium" style={styles.shiftHeroEmptyTitle}>No upcoming work</Text>
               <Text variant="bodySmall" style={styles.shiftHeroEmptyText}>Check the community board to find new opportunities.</Text>
               <Button mode="contained" buttonColor="#FFFFFF" textColor="#1D4ED8" style={styles.shiftHeroButton} onPress={() => router.push('/otherstaff/shifts')}>
                 Find Shifts
               </Button>
             </View>
           )}
+          {Boolean(data?.recommended_shifts?.length) && <>
+            <Text variant="titleMedium" style={styles.shiftHeroSubtitle}>Recommended shifts</Text>
+            <WorkerShiftPreviews shifts={data?.recommended_shifts ?? []} styles={styles} formatDate={formatShiftDate}
+              onOpen={id => router.push(`/otherstaff/shifts/${id}` as any)} />
+          </>}
         </LinearGradient>
 
         <DashboardStatsOverview data={data} />

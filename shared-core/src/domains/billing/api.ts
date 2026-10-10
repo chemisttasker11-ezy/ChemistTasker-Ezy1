@@ -28,9 +28,14 @@ export function updateSubscriptionSeats(payload: {
         })
     });
 }
-export function chargeShiftFulfillment(shiftId: number | string) {
-    return fetchApi(`/billing/charge-fulfillment/${shiftId}/`, {
-        method: 'POST'
+export function chargeShiftFulfillment(shiftId: number | string, payload?: { offerIds?: number[] }) {
+    // Existing callers send a bodyless POST. Shift-centre payment selections
+    // supply offer_ids exactly as the original Vite request did.
+    return fetchApi<{ url?: string; free?: boolean; message?: string }>(`/billing/charge-fulfillment/${shiftId}/`, {
+        method: 'POST',
+        ...(payload ? { body: JSON.stringify({
+            ...(payload.offerIds?.length ? { offer_ids: payload.offerIds } : {})
+        }) } : {})
     });
 }
 export function chargeShiftPenalty(shiftId: number | string, payload: {

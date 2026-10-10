@@ -266,7 +266,7 @@ export default function PostShiftSkillsStep({
                                 bgcolor:
                                   value === 'required'
                                     ? 'primary.dark'
-                                    : '#03694b',
+                                    : 'secondary.main',
                               },
                             },
                           }}

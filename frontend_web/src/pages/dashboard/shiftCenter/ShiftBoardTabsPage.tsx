@@ -1,8 +1,9 @@
-import { ComponentType, SyntheticEvent, useMemo, useState } from 'react';
-import { Box, Paper, Stack, Tabs, Tab, Typography, alpha, useTheme } from '@mui/material';
+import { ComponentType, SyntheticEvent, useState } from 'react';
+import { Box, Paper, Tabs, Tab, alpha, useTheme } from '@mui/material';
 import { useWorkspace } from '../../../contexts/WorkspaceContext';
 import PublicShiftsPage from '../sidebar/PublicShiftsPage';
 import CommunityShiftsPage from '../sidebar/CommunityShiftsPage';
+import PageHeader from "../../../components/ui/PageHeader";
 
 type ShiftBoardTab = 'browse' | 'saved' | 'interested' | 'rejected' | 'accepted';
 
@@ -19,14 +20,6 @@ export default function ShiftBoardTabsPage() {
   const { workspace } = useWorkspace();
   const [activeTab, setActiveTab] = useState<ShiftBoardTab>('browse');
 
-  const heroGradient = useMemo(
-    () =>
-      `linear-gradient(135deg, ${alpha(
-        theme.palette.primary.main,
-        0.94
-      )}, ${alpha(theme.palette.primary.dark, 0.74)})`,
-    [theme.palette.primary.dark, theme.palette.primary.main]
-  );
 
   const handleTabChange = (_: SyntheticEvent, value: ShiftBoardTab) => {
     setActiveTab(value);
@@ -56,35 +49,7 @@ export default function ShiftBoardTabsPage() {
         gap: { xs: 2.5, md: 3 },
       }}
     >
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: { xs: 3, md: 4 },
-          backgroundImage: heroGradient,
-          color: '#fff',
-          overflow: 'hidden',
-        }}
-      >
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          spacing={{ xs: 2, md: 3 }}
-          alignItems={{ xs: 'flex-start', md: 'center' }}
-          justifyContent="space-between"
-        >
-          <Box>
-            <Typography variant="overline" sx={{ opacity: 0.72, letterSpacing: '.1em' }}>
-              Shift Board
-            </Typography>
-            <Typography variant="h4" fontWeight={800} gutterBottom>
-              Discover shifts at a glance
-            </Typography>
-            <Typography variant="body1" sx={{ opacity: 0.92, maxWidth: 560 }}>
-              Browse open shifts, review your saved list, and track interested or rejected opportunities.
-            </Typography>
-          </Box>
-        </Stack>
-      </Paper>
+      <PageHeader title="Discover shifts at a glance" subtitle="Browse open shifts, review your saved list, and track interested or rejected opportunities." />
 
       <Paper
         elevation={0}

@@ -1,3 +1,4 @@
+import { visuallyHidden } from '@mui/utils';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -158,15 +159,8 @@ export default function ConfirmedShiftsPage() {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight={900} sx={{ color: '#111827', letterSpacing: '-0.03em' }}>
-          Confirmed Shifts
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 600 }}>
-          Review booked shifts and assigned chemists
-        </Typography>
-      </Box>
+    <Container maxWidth={false} disableGutters>
+      <Typography component="h2" sx={visuallyHidden}>Confirmed Shifts</Typography>
 
       {deferredPayrollOffers.length > 0 && (
         <Stack spacing={1.5} sx={{ mb: 3 }}>
@@ -216,7 +210,7 @@ export default function ConfirmedShiftsPage() {
         title="Confirmed Shifts"
         shifts={shifts}
         loading={loadingShifts}
-        emptyText="No confirmed shifts available."
+        emptyText="Shifts show here once a worker is booked and confirmed."
         mode="confirmed"
         onViewAssigned={openProfile}
       />

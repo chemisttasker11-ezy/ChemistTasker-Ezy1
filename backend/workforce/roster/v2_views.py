@@ -270,7 +270,7 @@ class WorkerPublishedRosterView(APIView):
             pid = period.id if period else None
             if pid:
                 period_ids.add(pid)
-            shift_items.append((a, pid))
+            shift_items.append((a, pid, bool(period and period.status == RosterPeriod.Status.PUBLISHED)))
 
         acked_period_ids = set(
             RosterAcknowledgement.objects.filter(
@@ -293,8 +293,9 @@ class WorkerPublishedRosterView(APIView):
                     "end_time": str(a.slot.end_time),
                     "role": a.shift.role_needed,
                     "is_acknowledged": (pid in acked_period_ids) if pid else False,
+                    "can_acknowledge": can_acknowledge,
                 }
-                for a, pid in shift_items
+                for a, pid, can_acknowledge in shift_items
             ],
         })
 

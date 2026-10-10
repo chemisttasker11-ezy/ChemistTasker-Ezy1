@@ -5,14 +5,16 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Container,
   Skeleton,
   Stack,
   Typography,
 } from "@mui/material";
-import {useAuth} from "../contexts/AuthContext";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
+import { useAuth } from "../contexts/AuthContext";
 import AuthLayout from "../layouts/AuthLayout";
-import PublicLogoTopBar from "../components/PublicLogoTopBar";
 import { getPublicOrganization } from "@chemisttasker/shared-core";
 import NotFoundPage from "./NotFoundPage";
 import { setCanonical, setPageMeta, setSocialMeta } from "../utils/seo";
@@ -26,7 +28,7 @@ type PublicOrganization = {
 };
 
 export default function PublicOrganizationPage() {
-  const {user}=useAuth();
+  const { user } = useAuth();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [org, setOrg] = useState<PublicOrganization | null>(null);
@@ -53,176 +55,121 @@ export default function PublicOrganizationPage() {
   }, [slug]);
 
   useEffect(() => {
+    const origin = window.location.origin;
+    const url = `${origin}/organization/${org?.slug ?? slug ?? ""}`.replace(/\/$/, "") || `${origin}/`;
     if (loading) {
-      const title = "Organization | ChemistTasker";
-      const description =
-        "Explore public organization profiles and open pharmacy shifts on ChemistTasker.";
-      const origin = window.location.origin;
-      const url = `${origin}/organization/${slug ?? ""}`.replace(/\/$/, "") || `${origin}/`;
-      const image = `${origin}/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png`;
-      setPageMeta(title, description);
+      setPageMeta("Organization | ChemistTasker", "Explore public organization profiles and open pharmacy shifts on ChemistTasker.");
       setCanonical(url);
-      setSocialMeta({ title, description, url, image, type: "website" });
       return;
     }
-
     if (error) {
-      const title = "Organization Not Found | ChemistTasker";
-      const description =
-        "This organization profile is unavailable. Browse public shifts on ChemistTasker.";
-      const origin = window.location.origin;
-      const url = `${origin}/organization/${slug ?? ""}`.replace(/\/$/, "") || `${origin}/`;
-      const image = `${origin}/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png`;
-      setPageMeta(title, description);
+      setPageMeta("Organization Not Found | ChemistTasker", "This organization profile is unavailable. Browse public shifts on ChemistTasker.");
       setCanonical(url);
-      setSocialMeta({ title, description, url, image, type: "website" });
       return;
     }
-
     if (org) {
-      const summary = org.about ? org.about.replace(/\s+/g, " ").trim() : "";
+      const summary = org.about?.replace(/\s+/g, " ").trim() || "";
       const description = summary
         ? `${summary.slice(0, 260)}${summary.length > 260 ? "..." : ""}`
         : `Explore open shifts posted by ${org.name} on ChemistTasker.`;
-      const title = `${org.name} | ChemistTasker`;
-      const origin = window.location.origin;
-      const url = `${origin}/organization/${org.slug}`;
-      const image = org.cover_image_url || `${origin}/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png`;
-      setPageMeta(title, description);
+      const image = org.cover_image_url || `${origin}/assets/pharmacist-rahul.jpg`;
+      setPageMeta(`${org.name} | ChemistTasker`, description);
       setCanonical(url);
-      setSocialMeta({ title, description, url, image, type: "organization" });
+      setSocialMeta({ title: `${org.name} | ChemistTasker`, description, url, image, type: "organization" });
     }
   }, [loading, error, org, slug]);
 
-  const heroImage = useMemo(() => {
-    return org?.cover_image_url ?? null;
-  }, [org]);
+  const heroImage = useMemo(() => org?.cover_image_url ?? null, [org]);
 
   const handleViewJobs = () => {
-    if (!org) return;
-    navigate(`/shifts/public-board?organization=${org.id}`);
+    if (org) navigate(`/shifts/public-board?organization=${org.id}`);
   };
 
   return (
-    <>
-      <PublicLogoTopBar />
-      <AuthLayout
-        title={org?.name || "Organization"}
-        maxWidth="xl"
-        noCard
-        showTitle={false}
-      >
-        <Container
-          maxWidth="xl"
-          sx={{
-            py: { xs: 5, md: 8 },
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <Box sx={{ width: "100%", maxWidth: 1200, px: { xs: 2, md: 0 } }}>
+    <AuthLayout title={org?.name || "Organization"} maxWidth={false} noCard showTitle={false}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
         {loading ? (
-          <Stack spacing={3}>
-            <Skeleton variant="rectangular" height={280} sx={{ borderRadius: 3 }} />
-            <Skeleton variant="rectangular" height={160} sx={{ borderRadius: 3 }} />
-            <Skeleton variant="rectangular" height={180} sx={{ borderRadius: 3 }} />
+          <Stack spacing={2.5} aria-label="Loading organization">
+            <Skeleton variant="rounded" height={300} sx={{ borderRadius: 4 }} />
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2.5 }}>
+              <Skeleton variant="rounded" height={190} sx={{ borderRadius: 4 }} />
+              <Skeleton variant="rounded" height={190} sx={{ borderRadius: 4 }} />
+            </Box>
           </Stack>
         ) : error ? (
           <NotFoundPage />
         ) : org ? (
-          <Stack spacing={3}>
+          <Stack spacing={2.5}>
             <Box
               sx={{
                 position: "relative",
-                borderRadius: 3,
+                minHeight: { xs: 280, md: 360 },
+                borderRadius: 4,
                 overflow: "hidden",
-                height: { xs: 260, md: 360 },
-                boxShadow: "0 24px 60px rgba(0,0,0,0.08)",
+                display: "flex",
+                alignItems: "flex-end",
+                p: { xs: 3, md: 5 },
+                color: "#fff",
+                boxShadow: "0 24px 64px rgba(6,18,58,.12)",
                 background: heroImage
-                  ? `linear-gradient(120deg, rgba(0,169,157,0.25), rgba(0,0,0,0.35)), url(${heroImage}) center/cover no-repeat`
-                  : "linear-gradient(120deg, #5222B8 0%, #006f66 100%)",
+                  ? `linear-gradient(105deg,rgba(6,18,58,.86) 0%,rgba(82,34,184,.58) 58%,rgba(0,189,210,.24) 100%),url("${heroImage}") center/cover no-repeat`
+                  : "radial-gradient(circle at 82% 22%,rgba(0,189,210,.28),transparent 30%),linear-gradient(135deg,#061B54 0%,#5222B8 60%,#B20FA6 100%)",
               }}
             >
-              <Box
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  background:
-                    "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.22), transparent 30%), radial-gradient(circle at 80% 0%, rgba(255,255,255,0.18), transparent 25%)",
-                }}
-              />
-              <Box
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-end",
-                  p: { xs: 3, md: 4 },
-                  color: "#fff",
-                  textShadow: "0 4px 12px rgba(0,0,0,0.25)",
-                }}
-              >
-                <Typography variant="overline" sx={{ letterSpacing: 2, opacity: 0.9 }}>
-                  Organization
-                </Typography>
-                <Typography variant="h3" fontWeight={700}>
+              <Box sx={{ maxWidth: 760, position: "relative" }}>
+                <Chip
+                  icon={<BusinessOutlinedIcon />}
+                  label="Public organisation profile"
+                  sx={{ bgcolor: "rgba(255,255,255,.14)", color: "#fff", "& .MuiChip-icon": { color: "#fff" } }}
+                />
+                <Typography variant="h2" component="h1" sx={{ mt: 2.25, color: "#fff", fontSize: { xs: 38, md: 56 } }}>
                   {org.name}
                 </Typography>
+                <Typography sx={{ mt: 1.5, color: "rgba(255,255,255,.82)", fontSize: { xs: 14.5, md: 16 }, lineHeight: 1.7 }}>
+                  Explore this organisation and move directly to the public pharmacy opportunities it has chosen to publish.
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: 3 }}>
+                  <Button variant="contained" color="inherit" startIcon={<WorkOutlineIcon />} onClick={handleViewJobs} sx={{ color: "#5222B8" }}>
+                    View this organisation&apos;s shifts
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    component={RouterLink}
+                    to={user ? "/dashboard" : "/register"}
+                    sx={{ color: "#fff", borderColor: "rgba(255,255,255,.45)" }}
+                  >
+                    {user ? "Open my dashboard" : "Join ChemistTasker"}
+                  </Button>
+                </Stack>
               </Box>
-              </Box>
+            </Box>
 
-            <Stack direction={{ xs: "column", md: "row" }} spacing={3}>
-              <Card
-                sx={{
-                  flex: 1,
-                  borderRadius: 3,
-                  boxShadow: "0 18px 40px rgba(0,0,0,0.08)",
-                  backdropFilter: "blur(4px)",
-                }}
-              >
-                <CardContent>
-                  <Typography variant="h5" gutterBottom>
-                    About {org.name}
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0,1.15fr) minmax(280px,.85fr)" }, gap: 2.5 }}>
+              <Card>
+                <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+                  <Typography variant="h4">About {org.name}</Typography>
+                  <Typography color="text.secondary" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8, mt: 1.5 }}>
                     {org.about || "This organization will share more details soon."}
                   </Typography>
                 </CardContent>
               </Card>
 
-              <Card
-                sx={{
-                  flex: 1,
-                  borderRadius: 3,
-                  boxShadow: "0 18px 40px rgba(0,0,0,0.06)",
-                  background: "linear-gradient(120deg, #5222B8 0%, #00877d 100%)",
-                  color: "#fff",
-                }}
-              >
-                <CardContent>
-                  <Typography variant="h5" gutterBottom fontWeight={700}>
-                    Work with {org.name}
+              <Card sx={{ bgcolor: "#F7F9FC" }}>
+                <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+                  <Typography variant="h5">Looking for work?</Typography>
+                  <Typography color="text.secondary" sx={{ mt: 1, lineHeight: 1.7 }}>
+                    The shift board keeps the full filter, availability and application journey in one place. This profile only narrows the board to opportunities from {org.name}.
                   </Typography>
-                  <Typography variant="body1" sx={{ mb: 2, opacity: 0.9 }}>
-                    Explore open shifts posted by {org.name} and its pharmacies.
-                  </Typography>
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                    <Button variant="contained" color="inherit" onClick={handleViewJobs} sx={{ color: "#006f66" }}>
-                      View Public Job Board
-                    </Button>
-                    <Button variant="outlined" color="inherit" component={RouterLink} to={user?'/dashboard':'/register'}>
-                      {user?'Open my dashboard':'Join ChemistTasker'}
-                    </Button>
-                  </Stack>
+                  <Button onClick={handleViewJobs} endIcon={<WorkOutlineIcon />} sx={{ mt: 2, px: 0 }}>
+                    Browse matching public shifts
+                  </Button>
                 </CardContent>
               </Card>
-            </Stack>
+            </Box>
           </Stack>
         ) : null}
-          </Box>
-        </Container>
-      </AuthLayout>
-    </>
+      </Container>
+    </AuthLayout>
   );
 }

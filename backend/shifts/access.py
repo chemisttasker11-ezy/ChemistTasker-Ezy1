@@ -74,11 +74,17 @@ def _shift_roles_visible_to_user(user):
         return ["EXPLORER"]
     if top_role == "OTHER_STAFF":
         staff_role = _otherstaff_onboarding_role(user)
+        # Pharmacy-assistant work is the broad Other Staff entry point and is
+        # visible to every Other Staff subtype. Specialist work stays exact:
+        # intern shifts only to interns, dispensary-technician shifts only to
+        # technicians, and student shifts only to students.
         if staff_role == "INTERN":
-            return ["INTERN"]
-        if staff_role in ALL_OTHER_STAFF_SHIFT_ROLES:
-            return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
-        return list(NON_INTERN_OTHER_STAFF_SHIFT_ROLES)
+            return ["ASSISTANT", "INTERN"]
+        if staff_role == "TECHNICIAN":
+            return ["ASSISTANT", "TECHNICIAN"]
+        if staff_role == "STUDENT":
+            return ["ASSISTANT", "STUDENT"]
+        return ["ASSISTANT"]
     return ["PHARMACIST", "TECHNICIAN", "ASSISTANT", "EXPLORER", "INTERN", "STUDENT"]
 
 

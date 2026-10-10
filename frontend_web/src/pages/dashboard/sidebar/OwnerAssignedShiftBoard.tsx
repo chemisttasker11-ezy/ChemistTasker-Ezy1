@@ -1,25 +1,27 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Box, Button, Collapse, Pagination, Skeleton, Stack, Typography } from '@mui/material';
 import {
-  Avatar,
-  Box,
-  Button,
-  Chip,
-  Collapse,
-  Pagination,
-  Paper,
-  Skeleton,
-  Stack,
-  Typography,
-} from '@mui/material';
-import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
-import Groups2RoundedIcon from '@mui/icons-material/Groups2Rounded';
-import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
-import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
-import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
-import AssignmentIndRoundedIcon from '@mui/icons-material/AssignmentIndRounded';
-import LockRoundedIcon from '@mui/icons-material/LockRounded';
+  Building2,
+  CalendarCheck,
+  CalendarDays,
+  ChevronDown,
+  Clock,
+  History,
+  Lock,
+  MapPin,
+  Star,
+  UserCheck,
+  Users,
+} from 'lucide-react';
 import type { Shift, ShiftAssignment } from '@chemisttasker/shared-core';
+import IconTile, { type Tone } from '../../../components/ui/IconTile';
+import DashboardContentState from '../../../components/dashboard/DashboardContentState';
+import { RowAction } from '../shiftCenter/ShiftCentreParts';
+import { Hint } from '../../../components/ui/Hint';
+import { InitialsAvatar } from '../../../components/ui/InitialsAvatar';
+import { Pill } from '../../../components/ui/Pill';
+import { humanizeEnum } from '../../../utils/labels';
 
 type AssignmentLike = ShiftAssignment | { slot_id?: number; user_id?: number; user?: any };
 
@@ -33,59 +35,6 @@ type Props = {
   title: string;
 };
 
-const palette = {
-  surface: '#FFFFFF',
-  page: 'linear-gradient(180deg, #F6FBFF 0%, #F8FAFC 46%, #FFFFFF 100%)',
-  border: '#D9E2F2',
-  text: '#0F172A',
-  muted: '#64748B',
-  violet: '#7C3AED',
-  violetSoft: '#F3E8FF',
-  cyan: '#06B6D4',
-  cyanSoft: '#ECFEFF',
-  emerald: '#10B981',
-  emeraldSoft: '#ECFDF5',
-  amber: '#F59E0B',
-  amberSoft: '#FFFBEB',
-};
-
-const statCardSx = {
-  borderRadius: 3,
-  border: `1px solid ${palette.border}`,
-  background: '#FFFFFFCC',
-  minWidth: 0,
-  width: '100%',
-  px: { xs: 1.25, sm: 2 },
-  py: { xs: 1.25, sm: 1.75 },
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: { xs: 0.75, sm: 1.25 },
-};
-
-const actionButtonSx = {
-  borderRadius: 999,
-  textTransform: 'none',
-  fontWeight: 700,
-  px: 1.75,
-};
-
-const primaryButtonSx = {
-  ...actionButtonSx,
-  color: '#fff',
-  background: 'linear-gradient(135deg, #8B5CF6 0%, #2563EB 100%)',
-  '&:hover': {
-    background: 'linear-gradient(135deg, #7C3AED 0%, #1D4ED8 100%)',
-  },
-};
-
-const secondaryButtonSx = {
-  ...actionButtonSx,
-  borderColor: '#BAE6FD',
-  color: '#0F172A',
-  backgroundColor: '#fff',
-};
-
 const getAssignmentSlotId = (assignment: AssignmentLike): number | null =>
   'slotId' in assignment ? assignment.slotId ?? null : assignment.slot_id ?? null;
 
@@ -97,8 +46,8 @@ const formatDateLabel = (rawDate?: string | null) => {
   const parsed = new Date(`${rawDate}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return { day: 'TBD', date: rawDate };
   return {
-    day: parsed.toLocaleDateString(undefined, { weekday: 'short' }),
-    date: parsed.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+    day: parsed.toLocaleDateString('en-AU', { weekday: 'short' }),
+    date: parsed.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }),
   };
 };
 
@@ -111,7 +60,7 @@ const formatClockTime = (rawTime?: string | null) => {
 const formatTimeRange = (slot: any) => {
   const start = formatClockTime(slot?.startTime ?? slot?.start_time);
   const end = formatClockTime(slot?.endTime ?? slot?.end_time);
-  return `${start} - ${end}`;
+  return `${start} – ${end}`;
 };
 
 const formatLockedRate = (slot: any) => {
@@ -143,7 +92,9 @@ const getAssignedName = (assignment?: AssignmentLike | null, member?: any) => {
 
 const getAssignedDetails = (assignment?: AssignmentLike | null, member?: any) => {
   const user = (assignment as any)?.user ?? {};
-  return user.email || user.phoneNumber || user.phone_number || member?.role || member?.employmentType || member?.employment_type || 'Profile locked to this slot';
+  // Names and roles on the card; contact details live in View profile (owner rule: names, not emails).
+  const role = user.role || member?.role || member?.employmentType || member?.employment_type;
+  return role ? humanizeEnum(role) : 'Booked for this date';
 };
 
 const getAssignedEntries = (shift: Shift) => {
@@ -199,30 +150,6 @@ const getSlotEntries = (shift: Shift) => {
   });
 };
 
-const StatCard = ({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-}) => (
-  <Paper elevation={0} sx={statCardSx}>
-    <Avatar sx={{ width: { xs: 30, sm: 36 }, height: { xs: 30, sm: 36 }, bgcolor: palette.violetSoft, color: palette.violet }}>
-      {icon}
-    </Avatar>
-    <Box sx={{ minWidth: 0, textAlign: 'center' }}>
-      <Typography variant="h6" sx={{ fontWeight: 800, color: palette.text, lineHeight: 1.05, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-        {value}
-      </Typography>
-      <Typography variant="caption" sx={{ color: palette.muted, textTransform: 'uppercase', letterSpacing: { xs: 0.2, sm: 0.6 }, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
-        {label}
-      </Typography>
-    </Box>
-  </Paper>
-);
-
 export default function OwnerAssignedShiftBoard({
   emptyText,
   loading,
@@ -232,6 +159,7 @@ export default function OwnerAssignedShiftBoard({
   shifts,
   title,
 }: Props) {
+  const navigate = useNavigate();
   const itemsPerPage = 6;
   const [page, setPage] = useState(1);
   const [expandedShiftIds, setExpandedShiftIds] = useState<Record<number, boolean>>({});
@@ -251,51 +179,29 @@ export default function OwnerAssignedShiftBoard({
 
   if (loading) {
     return (
-      <Box sx={{ display: 'grid', gap: 2.5 }}>
-        {[...Array(3)].map((_, index) => (
-          <Paper
-            key={index}
-            sx={{
-              p: 3,
-              borderRadius: 5,
-              border: `1px solid ${palette.border}`,
-              background: palette.surface,
-            }}
-          >
-            <Skeleton variant="text" width="42%" height={34} />
-            <Skeleton variant="text" width="24%" height={22} />
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5, mt: 2 }}>
-              {[...Array(3)].map((__, slotIndex) => (
-                <Skeleton key={slotIndex} variant="rounded" height={144} />
-              ))}
-            </Box>
-          </Paper>
+      <Stack spacing={2.5} role="status" aria-label={`Loading ${title.toLowerCase()}`}>
+        {[0, 1, 2].map((index) => (
+          <Skeleton key={index} variant="rounded" height={196} sx={{ borderRadius: 'var(--ct-card-radius)' }} />
         ))}
-      </Box>
+      </Stack>
     );
   }
 
   if (!shifts.length) {
     return (
-      <Paper
-        sx={{
-          p: 5,
-          textAlign: 'center',
-          borderRadius: 5,
-          border: `1px solid ${palette.border}`,
-          background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
-        }}
-      >
-        <Typography variant="h5" sx={{ fontWeight: 800, color: palette.text, mb: 1 }}>
-          {title}
-        </Typography>
-        <Typography sx={{ color: palette.muted }}>{emptyText}</Typography>
-      </Paper>
+      <DashboardContentState
+        kind="empty"
+        icon={mode === 'history' ? <History /> : <CalendarCheck />}
+        title={mode === 'history' ? 'No past shifts yet' : 'No confirmed shifts yet'}
+        description={emptyText}
+        actionLabel={mode === 'history' ? 'See confirmed shifts' : 'See active shifts'}
+        onAction={() => navigate(mode === 'history' ? '../confirmed' : '../active', { relative: 'path' })}
+      />
     );
   }
 
   return (
-    <Box sx={{ display: 'grid', gap: 3 }}>
+    <Stack spacing={2.5}>
       {visibleShifts.map((shift) => {
         const shiftAny = shift as any;
         const assignedEntries = getAssignedEntries(shift);
@@ -303,297 +209,198 @@ export default function OwnerAssignedShiftBoard({
         const totalSlots = (shift.slots ?? []).length;
         const interests = shiftAny.interestedUsersCount ?? shiftAny.interested_users_count ?? 0;
         const location = shift.uiAddressLine ?? shiftAny.ui_address_line ?? shift.pharmacyDetail?.streetAddress ?? '';
-        const modeChip = mode === 'history'
-          ? { label: 'Completed', fg: palette.amber, bg: palette.amberSoft }
-          : { label: 'Assigned', fg: palette.emerald, bg: palette.emeraldSoft };
         const isExpanded = Boolean(expandedShiftIds[shift.id]);
+        const roleLabel = shift.roleLabel ?? shift.roleNeeded ?? shiftAny.role_needed;
+        const metrics: Array<{ label: string; value: number; icon: React.ReactNode; tone: Tone; hint: string }> = [
+          { label: 'Slots', value: totalSlots, icon: <CalendarDays />, tone: 'violet', hint: 'Dates in this shift.' },
+          { label: 'Assigned', value: assignedEntries.length, icon: <UserCheck />, tone: 'magenta', hint: mode === 'history' ? 'Dates that had someone booked.' : 'Dates with a confirmed, booked person.' },
+          { label: 'Interested', value: interests, icon: <Users />, tone: 'cyan', hint: 'People who showed interest while the shift was open.' },
+        ];
 
         return (
-          <Paper
+          <Box
             key={shift.id}
-            elevation={0}
-            role="button"
-            tabIndex={0}
-            aria-expanded={isExpanded}
+            component="article"
             onClick={() => toggleShift(shift.id)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                toggleShift(shift.id);
-              }
-            }}
             sx={{
-              p: { xs: 2, md: 3 },
-              borderRadius: 6,
-              border: `1px solid ${palette.border}`,
-              background: palette.page,
+              borderRadius: 'var(--ct-card-radius)',
+              border: '1px solid',
+              borderColor: isExpanded ? 'var(--ct-tone-violet-bg)' : 'var(--ct-border-color)',
+              bgcolor: 'var(--ct-surface-bg)',
               overflow: 'hidden',
-              position: 'relative',
               cursor: 'pointer',
-              transition: 'transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
-              '&:hover': {
-                transform: 'translateY(-1px)',
-                boxShadow: '0 18px 42px rgba(15,23,42,.08)',
-                borderColor: '#C7D2FE',
-              },
-              '&:focus-visible': {
-                outline: '3px solid rgba(124,58,237,.28)',
-                outlineOffset: 3,
-              },
+              boxShadow: isExpanded ? '0 14px 36px rgba(6, 18, 58, 0.08)' : 'none',
+              transition: 'box-shadow 160ms ease, border-color 160ms ease',
+              '&:hover': { boxShadow: '0 10px 28px rgba(6, 18, 58, 0.07)', borderColor: 'var(--ct-tone-violet-bg)' },
+              '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
             }}
           >
             <Box
               sx={{
-                position: 'absolute',
-                inset: 0,
-                pointerEvents: 'none',
-                background: 'radial-gradient(circle at top right, rgba(37,99,235,.10), transparent 32%), radial-gradient(circle at top left, rgba(124,58,237,.10), transparent 28%)',
+                p: { xs: 2, md: 3 },
+                pb: { xs: 2, md: 2.5 },
+                display: 'grid',
+                gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) auto' },
+                gap: { xs: 2, lg: 3 },
+                alignItems: 'center',
               }}
-            />
-
-            <Stack spacing={2} sx={{ position: 'relative' }}>
-              <Stack
-                direction={{ xs: 'column', xl: 'row' }}
-                justifyContent="space-between"
-                spacing={2}
-                alignItems={{ xs: 'stretch', xl: 'flex-start' }}
-              >
-                <Stack spacing={1.5} sx={{ minWidth: 0, flex: 1 }}>
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Avatar
-                      variant="rounded"
-                      sx={{
-                        width: 58,
-                        height: 58,
-                        borderRadius: 3.5,
-                        background: 'linear-gradient(135deg, #5EEAD4 0%, #7C3AED 100%)',
-                        boxShadow: '0 18px 40px rgba(124,58,237,.24)',
-                      }}
-                    >
-                      <AssignmentIndRoundedIcon />
-                    </Avatar>
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="h5" sx={{ fontWeight: 900, color: palette.text, lineHeight: 1.05 }}>
-                        {shift.pharmacyDetail?.name ?? 'Unknown Pharmacy'}
-                      </Typography>
-                      <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
-                        <Chip
-                          size="small"
-                          label={shift.roleLabel ?? shift.roleNeeded ?? shiftAny.role_needed ?? 'Role'}
-                          sx={{ bgcolor: palette.emeraldSoft, color: palette.emerald, fontWeight: 800 }}
-                        />
-                        {shift.employmentType && (
-                          <Chip
-                            size="small"
-                            label={String(shift.employmentType).replace('_', ' ')}
-                            sx={{ bgcolor: '#E0F2FE', color: '#0369A1', fontWeight: 800 }}
-                          />
-                        )}
-                        {shift.uiIsUrgent && (
-                          <Chip
-                            size="small"
-                            label="Urgent"
-                            sx={{ bgcolor: '#FEE2E2', color: '#DC2626', fontWeight: 800 }}
-                          />
-                        )}
-                      </Stack>
-                    </Box>
+            >
+              <Stack direction="row" spacing={2} sx={{ minWidth: 0 }}>
+                <IconTile icon={<Building2 />} tone="violet" size={48} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography component="h3" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: { xs: 18, sm: 20 }, color: 'var(--ct-text-primary)', lineHeight: 1.25, overflowWrap: 'anywhere' }}>
+                    {shift.pharmacyDetail?.name ?? 'Unknown Pharmacy'}
+                  </Typography>
+                  <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+                    {roleLabel && <Pill tone="navy" label={humanizeEnum(roleLabel)} />}
+                    {shift.employmentType && <Pill outlined label={humanizeEnum(shift.employmentType)} />}
+                    {shift.uiIsUrgent && <Pill tone="red" label="Urgent" />}
                   </Stack>
-
                   {location && (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <LocationOnOutlinedIcon sx={{ fontSize: 18, color: palette.muted }} />
-                      <Typography variant="body2" sx={{ color: palette.muted }}>
-                        {location}
-                      </Typography>
+                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 1.25, color: 'var(--ct-text-secondary)', '& svg': { width: 15, height: 15, flexShrink: 0 } }}>
+                      <MapPin />
+                      <Typography sx={{ fontSize: 13.5, color: 'inherit', overflowWrap: 'anywhere' }}>{location}</Typography>
                     </Stack>
                   )}
-                </Stack>
-
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                    gap: { xs: 0.75, sm: 1.25 },
-                    width: '100%',
-                    maxWidth: { xs: '100%', xl: 520 },
-                    alignSelf: { xs: 'stretch', xl: 'flex-end' },
-                  }}
-                >
-                  <StatCard icon={<CalendarMonthRoundedIcon fontSize="small" />} label="Slots" value={totalSlots} />
-                  <StatCard icon={<Groups2RoundedIcon fontSize="small" />} label="Assigned" value={assignedEntries.length} />
-                  <StatCard icon={<FavoriteBorderRoundedIcon fontSize="small" />} label="Interests" value={interests} />
                 </Box>
               </Stack>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1, width: { xs: '100%', lg: 408 } }}>
+                {metrics.map((item) => (
+                  <Hint key={item.label} title={`${item.value} ${item.label.toLowerCase()}`} body={item.hint}>
+                    <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0, p: { xs: 1, sm: 1.25 }, borderRadius: '14px', border: '1px solid var(--ct-border-color)', cursor: 'help' }}>
+                      <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                        <IconTile icon={item.icon} tone={item.tone} size={36} />
+                      </Box>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 22, lineHeight: 1.05, color: 'var(--ct-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                          {item.value}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: 'var(--ct-text-secondary)' }}>{item.label}</Typography>
+                      </Box>
+                    </Stack>
+                  </Hint>
+                ))}
+              </Box>
+            </Box>
 
-              <Collapse in={isExpanded} timeout="auto" unmountOnExit onClick={(event) => event.stopPropagation()}>
-                <Box
-                  sx={{
-                    pt: 2.5,
-                    borderTop: `1px solid ${palette.border}`,
-                    position: 'relative',
-                  }}
-                >
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 900, color: palette.text }}>
-                      {mode === 'history' ? 'Shift Slot Grid' : 'Assigned Slot Grid'}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      label={modeChip.label}
-                      sx={{ bgcolor: modeChip.bg, color: modeChip.fg, fontWeight: 800 }}
-                    />
-                  </Stack>
+            <Stack
+              direction="row"
+              spacing={1.25}
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ px: { xs: 2, md: 3 }, py: 1.25, borderTop: '1px solid var(--ct-border-color)', bgcolor: 'var(--ct-subtle-bg)' }}
+            >
+              <Pill
+                tone={mode === 'history' ? 'neutral' : 'green'}
+                icon={mode === 'history' ? <History /> : <CalendarCheck />}
+                label={mode === 'history'
+                  ? `Completed · ${assignedEntries.length} of ${totalSlots} ${totalSlots === 1 ? 'date' : 'dates'} booked`
+                  : `Confirmed · ${assignedEntries.length} ${assignedEntries.length === 1 ? 'date' : 'dates'} booked`}
+              />
+              <Button
+                size="small"
+                color="inherit"
+                aria-expanded={isExpanded}
+                aria-controls={`assigned-shift-details-${shift.id}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleShift(shift.id);
+                }}
+                endIcon={<ChevronDown style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />}
+                sx={{ minHeight: 36, px: 1.5, borderRadius: '10px', color: 'var(--ct-accent-strong)', fontWeight: 600, '&:hover': { bgcolor: 'var(--ct-tone-violet-bg)' }, '& .MuiButton-endIcon svg': { width: 16, height: 16 } }}
+              >
+                {isExpanded ? 'Hide dates' : mode === 'history' ? 'View dates' : 'View booked dates'}
+              </Button>
+            </Stack>
 
-                  <Typography variant="body2" sx={{ color: palette.muted, mb: 2.25 }}>
-                    {mode === 'history'
-                      ? 'All past slots are shown. Assigned ones keep profile and rating actions.'
-                      : 'Focused on paid and assigned chemists only.'}
-                  </Typography>
+            <Collapse in={isExpanded} timeout="auto" unmountOnExit onClick={(event) => event.stopPropagation()}>
+              <Box id={`assigned-shift-details-${shift.id}`} sx={{ px: { xs: 2, md: 3 }, py: { xs: 2.5, md: 3 }, borderTop: '1px solid var(--ct-border-color)', cursor: 'default' }}>
+                <Typography component="h4" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 17, color: 'var(--ct-text-primary)' }}>
+                  {mode === 'history' ? 'Shift dates' : 'Booked dates'}
+                </Typography>
+                <Typography sx={{ fontSize: 13, color: 'var(--ct-text-secondary)', mb: 1.75 }}>
+                  {mode === 'history'
+                    ? 'Every past date. Booked ones keep the profile and rating actions.'
+                    : 'Dates with a paid, confirmed booking.'}
+                </Typography>
 
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(3, 1fr)' }, gap: 1.75 }}>
-                    {slotEntries.map(({ slot, userId, assigned, assignment }) => {
-                      const dateBits = formatDateLabel(slot?.date);
-                      const assignedMember = getAssignedMember(shift, userId);
-                      const assignedName = getAssignedName(assignment, assignedMember);
-                      const assignedDetails = getAssignedDetails(assignment, assignedMember);
-                      const lockedRate = formatLockedRate(slot);
-                      return (
-                        <Paper
-                          key={`${shift.id}_${slot?.id}`}
-                          elevation={0}
-                          sx={{
-                            p: 2,
-                            borderRadius: 4,
-                            border: `1px solid ${assigned ? (mode === 'history' ? '#FDE68A' : '#C7D2FE') : palette.border}`,
-                            background: assigned
-                              ? (mode === 'history'
-                                ? 'linear-gradient(180deg, #FFFFFF 0%, #FFFBEB 100%)'
-                                : 'linear-gradient(180deg, #FFFFFF 0%, #EFF6FF 100%)')
-                              : 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
-                            cursor: assigned ? 'pointer' : 'default',
-                            transition: 'transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
-                            '&:hover': assigned ? {
-                              transform: 'translateY(-2px)',
-                              boxShadow: '0 16px 30px rgba(15,23,42,.10)',
-                              borderColor: mode === 'history' ? '#F59E0B' : '#6366F1',
-                            } : undefined,
-                          }}
-                          onClick={assigned ? () => onViewAssigned(shift.id, slot?.id ?? null, userId as number) : undefined}
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 1.5 }}>
+                  {slotEntries.map(({ slot, userId, assigned, assignment }) => {
+                    const dateBits = formatDateLabel(slot?.date);
+                    const assignedMember = getAssignedMember(shift, userId);
+                    const assignedName = getAssignedName(assignment, assignedMember);
+                    const assignedDetails = getAssignedDetails(assignment, assignedMember);
+                    const lockedRate = formatLockedRate(slot);
+                    return (
+                      <Box
+                        key={`${shift.id}_${slot?.id}`}
+                        sx={{ p: 1.75, borderRadius: '14px', border: '1px solid var(--ct-border-color)', bgcolor: 'var(--ct-surface-bg)', minWidth: 0 }}
+                      >
+                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                          <Box>
+                            <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'var(--ct-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              {dateBits.day}
+                            </Typography>
+                            <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 18, color: 'var(--ct-text-primary)', lineHeight: 1.2 }}>
+                              {dateBits.date}
+                            </Typography>
+                          </Box>
+                          <Pill
+                            tone={assigned ? (mode === 'history' ? 'neutral' : 'green') : 'amber'}
+                            label={assigned ? (mode === 'history' ? 'Worked' : 'Booked') : 'Not filled'}
+                          />
+                        </Stack>
+                        <Box
+                          component="span"
+                          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, mt: 1, px: 1, py: 0.35, borderRadius: '999px', bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-tone-violet-fg)', fontSize: 12, fontWeight: 600, '& svg': { width: 13, height: 13 } }}
                         >
-                          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-                            <Box>
-                              <Typography variant="caption" sx={{ color: palette.muted, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                                {dateBits.day}
-                              </Typography>
-                              <Typography variant="h6" sx={{ color: palette.text, fontWeight: 900, lineHeight: 1.1 }}>
-                                {dateBits.date}
-                              </Typography>
-                            </Box>
-                            <Stack spacing={0.75} alignItems="flex-end">
-                              <Chip
-                                size="small"
-                                label={assigned ? 'Assigned' : 'Open'}
-                                sx={{
-                                  bgcolor: assigned
-                                    ? (mode === 'history' ? palette.amberSoft : palette.cyanSoft)
-                                    : '#E2E8F0',
-                                  color: assigned
-                                    ? (mode === 'history' ? palette.amber : palette.cyan)
-                                    : palette.muted,
-                                  fontWeight: 800,
-                                }}
-                              />
-                              <Avatar sx={{ width: 36, height: 36, bgcolor: assigned ? (mode === 'history' ? palette.amberSoft : palette.cyanSoft) : '#E2E8F0', color: assigned ? (mode === 'history' ? palette.amber : palette.cyan) : palette.muted }}>
-                                <PersonRoundedIcon fontSize="small" />
-                              </Avatar>
-                            </Stack>
-                          </Stack>
+                          <Clock />
+                          {formatTimeRange(slot)}
+                        </Box>
 
-                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1.25 }}>
-                            <AccessTimeRoundedIcon sx={{ fontSize: 16, color: palette.violet }} />
-                            <Typography variant="body2" sx={{ color: palette.violet, fontWeight: 800 }}>
-                              {formatTimeRange(slot)}
-                            </Typography>
-                          </Stack>
-
-                          <Paper
-                            elevation={0}
-                            sx={{
-                              mt: 1.75,
-                              p: 1.5,
-                              borderRadius: 3,
-                              border: `1px solid ${palette.border}`,
-                              background: '#FFFFFFD9',
-                            }}
-                          >
-                            <Typography variant="body2" sx={{ color: palette.text, fontWeight: 800 }}>
-                              {assigned ? assignedName : 'Unassigned Slot'}
-                            </Typography>
-                            {assigned ? (
-                              <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                                <Typography variant="caption" sx={{ color: palette.muted }}>
+                        <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid var(--ct-border-color)' }}>
+                          {assigned ? (
+                            <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ minWidth: 0 }}>
+                              <InitialsAvatar name={assignedName} tone={mode === 'history' ? 'magenta' : 'violet'} />
+                              <Box sx={{ minWidth: 0, flex: 1 }}>
+                                <Typography sx={{ fontSize: 14, fontWeight: 600, color: 'var(--ct-text-primary)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {assignedName}
+                                </Typography>
+                                <Typography sx={{ fontSize: 12.5, color: 'var(--ct-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {assignedDetails}
                                 </Typography>
-                                <Stack direction="row" spacing={0.5} alignItems="center">
-                                  <LockRoundedIcon sx={{ fontSize: 14, color: mode === 'history' ? palette.amber : palette.cyan }} />
-                                  <Typography variant="caption" sx={{ color: palette.text, fontWeight: 800 }}>
-                                    {lockedRate}
-                                  </Typography>
-                                </Stack>
-                              </Stack>
-                            ) : (
-                              <Typography variant="caption" sx={{ color: palette.muted }}>
-                                No one was assigned to this slot
-                              </Typography>
-                            )}
-                          </Paper>
+                                <Hint title="Rate locked" body="The agreed rate for this date is fixed and can no longer be changed.">
+                                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5, width: 'fit-content', cursor: 'help', color: 'var(--ct-text-primary)', '& svg': { width: 13, height: 13, color: 'var(--ct-text-secondary)' } }}>
+                                    <Lock />
+                                    <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: 'inherit' }}>{lockedRate}</Typography>
+                                  </Stack>
+                                </Hint>
+                              </Box>
+                            </Stack>
+                          ) : (
+                            <Typography sx={{ fontSize: 13, color: 'var(--ct-text-muted)' }}>No one was booked for this date.</Typography>
+                          )}
+                        </Box>
 
-                          <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1.75 }}>
-                            {assigned ? (
-                              <Button
-                                variant="contained"
-                                size="small"
-                                sx={primaryButtonSx}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onViewAssigned(shift.id, slot?.id ?? null, userId as number);
-                                }}
-                              >
-                                View Assigned
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                sx={secondaryButtonSx}
-                                disabled
-                              >
-                                No Assignment
-                              </Button>
-                            )}
-                            {assigned && mode === 'history' && onRateAssigned && (
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                sx={secondaryButtonSx}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onRateAssigned(userId as number);
-                                }}
-                              >
-                                Rate Chemist
-                              </Button>
+                        {assigned && (
+                          <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mt: 1.5 }}>
+                            <RowAction kind="primary" onClick={() => onViewAssigned(shift.id, slot?.id ?? null, userId as number)}>
+                              View profile
+                            </RowAction>
+                            {mode === 'history' && onRateAssigned && (
+                              <RowAction kind="secondary" startIcon={<Star />} onClick={() => onRateAssigned(userId as number)}>
+                                Rate
+                              </RowAction>
                             )}
                           </Stack>
-                        </Paper>
-                      );
-                    })}
-                  </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
                 </Box>
-              </Collapse>
-            </Stack>
-          </Paper>
+              </Box>
+            </Collapse>
+          </Box>
         );
       })}
 
@@ -610,6 +417,6 @@ export default function OwnerAssignedShiftBoard({
           />
         </Box>
       )}
-    </Box>
+    </Stack>
   );
 }

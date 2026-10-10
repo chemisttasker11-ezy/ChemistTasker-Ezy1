@@ -488,6 +488,36 @@ class RosterWorkerActionsTests(unittest.TestCase):
         audits = resp.data["audits"]
         self.assertGreaterEqual(len(audits), 3)
 
+
+    def test_acknowledgement_action_available_only_on_published_week(self):
+        """Archived rosters stay readable but cannot be acknowledged again."""
+        period = RosterPeriod.objects.create(
+            pharmacy=self.pharmacy,
+            week_start=self.monday,
+            status=RosterPeriod.Status.DRAFT,
+        )
+        RosterPeriod.objects.filter(pk=period.id).update(status=RosterPeriod.Status.PUBLISHED)
+        client = APIClient()
+        client.force_authenticate(user=self.worker_a)
+        query = {
+            "start_date": str(self.monday),
+            "end_date": str(self.monday + timedelta(days=6)),
+        }
+
+        published = client.get("/attendance/roster/worker/", query)
+        self.assertEqual(published.status_code, 200, published.data)
+        published_item = next(row for row in published.data["shifts"] if row["assignment_id"] == self.assignment.id)
+        self.assertEqual(published_item["period_id"], period.id)
+        self.assertTrue(published_item["can_acknowledge"])
+
+        RosterPeriod.objects.filter(pk=period.id).update(status=RosterPeriod.Status.ARCHIVED)
+        archived = client.get("/attendance/roster/worker/", query)
+        self.assertEqual(archived.status_code, 200, archived.data)
+        archived_item = next(row for row in archived.data["shifts"] if row["assignment_id"] == self.assignment.id)
+        self.assertFalse(archived_item["can_acknowledge"])
+        refused = client.post("/attendance/roster/acknowledge/", {"period_id": period.id}, format="json")
+        self.assertEqual(refused.status_code, 400)
+
     def test_worker_roster_view_excludes_draft_roster_periods(self):
         """
         RosterWorkerViewSet must strictly exclude rostered shifts falling into DRAFT periods,

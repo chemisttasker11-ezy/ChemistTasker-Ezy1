@@ -34,13 +34,13 @@ def worker_issues(pharmacy, worker, work_date, start_time, end_time, role, exclu
     if not worker.is_active or not memberships:
         error("INACTIVE_MEMBERSHIP", f"Worker {name} requires an active accepted membership at this pharmacy.")
 
-    # Membership roles are the existing pharmacy-specific specialties. Other
-    # staff retain ChemistTasker's non-intern cross-role compatibility.
+    # Membership roles remain pharmacy-specific, while the canonical shift
+    # access helper owns the product-wide Other Staff visibility matrix.
     roles = {m.role for m in memberships}
     matches = role in roles or getattr(worker, "role", "") == role
     if not matches and getattr(worker, "role", "") == "OTHER_STAFF":
-        from shifts.access import NON_INTERN_OTHER_STAFF_SHIFT_ROLES
-        matches = role in NON_INTERN_OTHER_STAFF_SHIFT_ROLES and bool(roles.intersection(NON_INTERN_OTHER_STAFF_SHIFT_ROLES))
+        from shifts.access import _user_can_perform_shift_role
+        matches = _user_can_perform_shift_role(worker, role)
     if not matches:
         error("ROLE_MISMATCH", f"Worker {name} role does not match required role {role}.", required_role=role)
 

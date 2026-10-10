@@ -14,7 +14,7 @@ import type { OwnerClaimDialogState, Pharmacy } from "./PharmacyPage.model";
 
 const LIGHT_SURFACE = "#FFFFFF";
 const LIGHT_BORDER = "#D9E2F2";
-const HERO_GRADIENT_START = "#143EEA";
+const HERO_GRADIENT_START = "#3C18A8";
 
 const pharmacyFormLightSx = {
   color: "#111827",
