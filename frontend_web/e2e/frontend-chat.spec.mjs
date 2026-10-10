@@ -112,3 +112,27 @@ test('loading older messages preserves the visible message and issues one pagina
   expect(Math.abs(after.y - before.y)).toBeLessThan(5);
   expect(fixture.moreCalls()).toBe(1);
 });
+
+test('chat attachments reject executable schemes and unrelated hosts while retaining backend media links', async ({ page }) => {
+  const messages = [
+    { ...message(81, ''), attachment_url: 'javascript:alert(1)//.png', attachment_filename: 'unsafe-script.png' },
+    { ...message(82, ''), attachment_url: 'data:image/svg+xml,%3Csvg%20onload%3Dalert(1)%3E', attachment_filename: 'unsafe-data.png' },
+    { ...message(83, ''), attachment_url: 'https://untrusted.example/attachment.png', attachment_filename: 'unsafe-host.png' },
+    { ...message(84, ''), attachment_url: '/media/chat/allowed-image.png', attachment_filename: 'allowed-image.png' },
+    { ...message(85, ''), attachment_url: 'http://127.0.0.1:8000/media/chat/allowed-file.pdf', attachment_filename: 'allowed-file.pdf' },
+    { ...message(86, ''), attachment_url: 'https://exampleaccount.blob.core.windows.net/attachments/allowed-azure.png?sv=1', attachment_filename: 'allowed-azure.png' },
+  ];
+  await openChat(page, { messages });
+  const log = page.getByRole('log');
+  await expect(log.getByText('Attachment unavailable', { exact: true })).toHaveCount(3);
+  await expect(log.locator('a[href^="javascript:"]')).toHaveCount(0);
+  await expect(log.locator('a[href^="data:"]')).toHaveCount(0);
+  await expect(log.locator('a[href*="untrusted.example"]')).toHaveCount(0);
+  await expect(log.locator('img[src*="untrusted.example"]')).toHaveCount(0);
+  await expect(log.getByRole('link', { name: 'Open image allowed-image.png' }))
+    .toHaveAttribute('href', 'http://127.0.0.1:8000/media/chat/allowed-image.png');
+  await expect(log.getByRole('link', { name: 'allowed-file.pdf' }))
+    .toHaveAttribute('href', 'http://127.0.0.1:8000/media/chat/allowed-file.pdf');
+  await expect(log.getByRole('link', { name: 'Open image allowed-azure.png' }))
+    .toHaveAttribute('href', 'https://exampleaccount.blob.core.windows.net/attachments/allowed-azure.png?sv=1');
+});

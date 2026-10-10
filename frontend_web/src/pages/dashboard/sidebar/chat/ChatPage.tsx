@@ -71,7 +71,8 @@ const useIsMobile = (breakpoint = 768) => {
   return isMobile;
 };
 
-const BACKEND_MEDIA_URL = API_BASE_URL.endsWith('/api') ? API_BASE_URL.slice(0, -4) : API_BASE_URL;
+// Chat attachments use Django MEDIA_URL (/media/), not the versioned /api/v1 prefix.
+const BACKEND_MEDIA_URL = new URL(API_BASE_URL, window.location.origin).origin;
 
 const makeWsTicketUrl = (path: string, ticket: string) =>
   buildWsUrl(path, API_BASE_URL, window.location.origin, ticket);
