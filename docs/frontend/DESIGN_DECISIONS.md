@@ -184,3 +184,19 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
   pharmacy skeleton, *Staff not loaded* + *Try again*, *No staff yet*. All saves show a busy spinner and lock the
   dialog; buttons name their action (*Create chain* / *Save changes*, not *OK*).
 - Checked: 1440 and 390 (empty, filled, error, delete dialog); AA sweep 0 failures.
+
+## Memberships (2026-10-10)
+
+- `PageHeader` *Memberships*; one amber pill counts what is *waiting for your answer* (no "N active" pill — the
+  cards already say it).
+- Cards keep Figma's structure (tile, name + status, role line, address · inviter) on the shared `IconTile`, Lucide
+  icons and status-tone `Pill`s with readable labels and hints: *Waiting for you*, *Active*, *Declined*, *Left*
+  (was raw *Pending/Accepted/Rejected* chips). Pending invitations sort first and get an amber edge; admin
+  invitations use the same card with a shield tile.
+- Copy: *Reject* → *Decline*, *Quit membership* → *Leave pharmacy*; the dialog names the pharmacy.
+- States: shared loading; error with *Try again* (a failed load used to show an alert *and* "No memberships yet");
+  empty explains where invitations come from; refreshes keep the list on screen (`aria-busy`) instead of blanking;
+  action errors are dismissible; buttons show a spinner and the leave dialog locks while working. Weights 800–950
+  replaced by the 500/600 scale.
+- Checked: 1440 and 390 (active, mocked pending/active/left, error, leave dialog); AA sweep 0 failures; smoke test
+  *owner CONTACT membership never offers the quit action* updated to the new label and passing.

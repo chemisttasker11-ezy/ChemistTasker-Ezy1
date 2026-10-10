@@ -277,7 +277,7 @@ test('owner CONTACT membership never offers the quit action', async ({ page }) =
 
   await page.goto('/dashboard/admin-invitations');
   await expect(page.getByText('Smoke Pharmacy')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Quit membership' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Leave pharmacy' })).toHaveCount(0);
 });
 
 test.describe('public/auth wiring', () => {

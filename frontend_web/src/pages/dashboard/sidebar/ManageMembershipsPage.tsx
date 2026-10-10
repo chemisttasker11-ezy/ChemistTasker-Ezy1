@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -13,10 +12,11 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import StoreIcon from "@mui/icons-material/Store";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import CancelIcon from "@mui/icons-material/Cancel";
-import LogoutIcon from "@mui/icons-material/Logout";
+import { Check, LogOut, ShieldCheck, Store, X } from "lucide-react";
+import PageHeader from "../../../components/ui/PageHeader";
+import IconTile from "../../../components/ui/IconTile";
+import DashboardContentState from "../../../components/dashboard/DashboardContentState";
+import { Pill, type ShiftTone } from "../shiftCenter/ShiftCentreParts";
 import apiClient from "../../../utils/apiClient";
 import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from "@chemisttasker/shared-core";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -75,6 +75,18 @@ function adminCapabilitiesText(membership: Membership) {
   return `Capabilities: ${capabilities.map((capability) => capability.replace(/_/g, " ").toLowerCase()).join(", ")}`;
 }
 
+const STATUS: Record<Membership["status"], { label: string; tone: ShiftTone; hint: string; order: number }> = {
+  PENDING: { label: "Waiting for you", tone: "amber", hint: "Accept to join this pharmacy's team.", order: 0 },
+  ACCEPTED: { label: "Active", tone: "green", hint: "You're a member of this pharmacy.", order: 1 },
+  REJECTED: { label: "Declined", tone: "neutral", hint: "You declined this invitation.", order: 2 },
+  LEFT: { label: "Left", tone: "neutral", hint: "You left this pharmacy.", order: 3 },
+};
+
+const cardSx = { p: { xs: 2, md: 2.5 }, borderRadius: "var(--ct-card-radius)", border: "1px solid var(--ct-border-color)", boxShadow: "none" };
+const nameSx = { fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: 19, lineHeight: 1.25, color: "var(--ct-text-primary)", overflowWrap: "anywhere" } as const;
+const metaSx = { color: "text.secondary", fontSize: 13.5, mt: 0.5 } as const;
+const busyIcon = (busy: boolean, icon: ReactNode) => (busy ? <CircularProgress size={16} color="inherit" /> : icon);
+
 export default function ManageMembershipsPage() {
   const { setUser } = useAuth();
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -83,6 +95,7 @@ export default function ManageMembershipsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actingId, setActingId] = useState<number | null>(null);
   const [quitTarget, setQuitTarget] = useState<Membership | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const loadMemberships = async () => {
     setLoading(true);
@@ -94,8 +107,10 @@ export default function ManageMembershipsPage() {
       setMemberships(Array.isArray(data) ? data : data?.results || []);
       setAdminInvitations(Array.isArray(invitations) ? invitations : []);
       setActionError(null);
+      setLoadFailed(false);
     } catch (error: any) {
       setActionError(error?.response?.data?.detail || "Unable to load memberships.");
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -135,113 +150,121 @@ export default function ManageMembershipsPage() {
     }
   };
 
+  const sorted = [...memberships].sort((a, b) => STATUS[a.status].order - STATUS[b.status].order);
+  const waitingCount = memberships.filter((m) => m.status === "PENDING").length + adminInvitations.filter((i) => !memberships.some((m) => m.id === i.membership_id && m.status === "PENDING")).length;
+  const showLoadError = loadFailed && memberships.length === 0 && adminInvitations.length === 0;
+
   return (
-    <Box sx={{ display: "grid", gap: 2.5 }}>
-      <Box>
-        <Typography variant="h4" sx={{ color: "var(--ct-dashboard-title)" }}>
-          Manage Memberships
-        </Typography>
-        <Typography sx={{ mt: 0.5, color: "var(--ct-dashboard-muted)", fontWeight: 700 }}>
-          Review pharmacy invitations and manage the pharmacies you belong to.
-        </Typography>
-      </Box>
+    <Box sx={{ display: "grid", gap: 2 }}>
+      <PageHeader title="Memberships" subtitle="Answer pharmacy invitations and manage the pharmacies you belong to.">
+        {!loading && !showLoadError && waitingCount > 0 && (
+          <Pill tone="amber" label={`${waitingCount} waiting for your answer`} />
+        )}
+      </PageHeader>
 
-      {actionError && <Alert severity="error">{actionError}</Alert>}
+      {actionError && !showLoadError && (
+        <Alert severity="error" onClose={() => setActionError(null)}>{actionError}</Alert>
+      )}
 
-      {adminInvitations.map((invitation) => (
-        <Paper key={`admin-${invitation.id}`} sx={{ p: 2.5, borderRadius: 3, border: '1px solid var(--ct-border-color)' }}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} justifyContent="space-between">
-            <Box>
-              <Typography variant="h6" fontWeight={800}>{invitation.pharmacy_name}</Typography>
-              <Typography color="text.secondary">
-                {label(invitation.admin_level)} admin invitation{invitation.job_title ? ` · ${invitation.job_title}` : ''}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">{invitation.membership_status === 'ACCEPTED' ? 'Your current pharmacy membership stays active while you decide.' : 'Accepting grants both pharmacy membership and admin access.'}</Typography>
-            </Box>
-            <Stack direction="row" spacing={1}>
-              <Button variant="contained" disabled={actingId === invitation.id} onClick={() => respondToAdmin(invitation, true)}>Accept admin access</Button>
-              <Button variant="outlined" color="error" disabled={actingId === invitation.id} onClick={() => respondToAdmin(invitation, false)}>Decline</Button>
+      {adminInvitations.map((invitation) => {
+        const busy = actingId === invitation.id;
+        return (
+          <Paper key={`admin-${invitation.id}`} sx={{ ...cardSx, borderColor: "var(--ct-status-amber-fg)" }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }} justifyContent="space-between">
+              <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
+                <IconTile icon={<ShieldCheck size={22} />} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Typography component="h2" sx={nameSx}>{invitation.pharmacy_name}</Typography>
+                    <Pill tone="amber" label="Admin invitation" title="Accepting gives you admin access to this pharmacy." />
+                  </Stack>
+                  <Typography sx={{ ...metaSx, color: "text.primary" }}>
+                    {label(invitation.admin_level)} admin{invitation.job_title ? ` · ${invitation.job_title}` : ""}
+                  </Typography>
+                  <Typography sx={metaSx}>
+                    {invitation.membership_status === "ACCEPTED" ? "Your current membership stays active while you decide." : "Accepting gives you both membership and admin access."}
+                  </Typography>
+                </Box>
+              </Stack>
+              <Stack direction="row" spacing={1} flexShrink={0}>
+                <Button variant="contained" disabled={busy} startIcon={busyIcon(busy, <Check size={18} />)} onClick={() => respondToAdmin(invitation, true)} sx={{ minHeight: 44 }}>
+                  Accept admin access
+                </Button>
+                <Button variant="outlined" color="error" disabled={busy} startIcon={<X size={18} />} onClick={() => respondToAdmin(invitation, false)} sx={{ minHeight: 44 }}>
+                  Decline
+                </Button>
+              </Stack>
             </Stack>
-          </Stack>
-        </Paper>
-      ))}
+          </Paper>
+        );
+      })}
 
-      {loading ? (
-        <Paper sx={{ p: 4, borderRadius: 3, textAlign: "center" }}>
-          <CircularProgress />
-        </Paper>
+      {loading && memberships.length === 0 ? (
+        <DashboardContentState kind="loading" title="Loading your memberships…" />
+      ) : showLoadError ? (
+        <DashboardContentState
+          kind="error"
+          title="We couldn't load your memberships"
+          description="Check your connection and try again."
+          actionLabel="Try again"
+          onAction={() => void loadMemberships()}
+        />
       ) : memberships.length === 0 ? (
-        <Paper sx={{ p: 4, borderRadius: 3, border: "1px solid var(--ct-border-color)" }}>
-          <Typography sx={{ fontWeight: 900 }}>No memberships yet</Typography>
-          <Typography sx={{ color: "var(--ct-dashboard-muted)", mt: 0.5 }}>
-            Pharmacy invitations will appear here when an owner or admin invites you.
-          </Typography>
-        </Paper>
+        <DashboardContentState
+          kind="empty"
+          icon={<Store size={26} />}
+          title="No memberships yet"
+          description="When a pharmacy owner or admin invites you, the invitation appears here for you to accept."
+        />
       ) : (
-        <Stack spacing={1.5}>
-          {memberships.map((membership) => {
+        <Stack spacing={1.5} aria-busy={loading}>
+          {sorted.map((membership) => {
             const pharmacy = membership.pharmacy_detail;
+            const status = STATUS[membership.status] ?? STATUS.LEFT;
             const isPending = membership.status === "PENDING";
             const isAccepted = membership.status === "ACCEPTED";
+            const busy = actingId === membership.id;
             const hasAdminInvitation = adminInvitations.some((invitation) => invitation.membership_id === membership.id);
             const capabilitiesText = adminCapabilitiesText(membership);
             return (
-              <Paper
-                key={membership.id}
-                sx={{
-                  p: { xs: 2, md: 2.5 },
-                  borderRadius: 3,
-                  border: "1px solid var(--ct-border-color)",
-                  boxShadow: "var(--ct-dashboard-card-shadow)",
-                }}
-              >
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between">
+              <Paper key={membership.id} sx={{ ...cardSx, ...(isPending ? { borderColor: "var(--ct-status-amber-fg)" } : {}) }}>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" alignItems={{ md: "center" }}>
                   <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
-                    <Box sx={{ width: 46, height: 46, borderRadius: 2, bgcolor: "var(--ct-dashboard-soft)", display: "grid", placeItems: "center", color: "var(--ct-dashboard-accent)", flexShrink: 0 }}>
-                      <StoreIcon />
-                    </Box>
+                    <IconTile icon={<Store size={22} />} />
                     <Box sx={{ minWidth: 0 }}>
-                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                        <Typography variant="h6" sx={{ fontWeight: 950 }}>
-                          {pharmacy?.name || "Pharmacy"}
-                        </Typography>
-                        <Chip size="small" label={label(membership.status)} color={isPending ? "warning" : isAccepted ? "success" : "default"} />
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Typography component="h2" sx={nameSx}>{pharmacy?.name || "Pharmacy"}</Typography>
+                        <Pill tone={status.tone} label={status.label} title={status.hint} />
                       </Stack>
-                      <Typography sx={{ color: "var(--ct-dashboard-muted)", fontWeight: 700, mt: 0.25 }}>
+                      <Typography sx={{ ...metaSx, color: "text.primary" }}>
                         {membership.is_pharmacy_admin
                           ? `Admin · ${membership.admin_level_label || "Admin"}`
                           : `${label(membership.role)} · ${label(membership.employment_type)}`}
                         {membership.job_title ? ` · ${membership.job_title}` : ""}
                       </Typography>
-                      {membership.is_pharmacy_admin && capabilitiesText ? (
-                        <Typography sx={{ color: "var(--ct-dashboard-muted)", fontSize: 13, mt: 0.5 }}>
-                          {capabilitiesText}
-                        </Typography>
-                      ) : null}
-                      <Typography sx={{ color: "var(--ct-dashboard-muted)", fontSize: 13, mt: 0.5 }}>
-                        {[pharmacy?.suburb, pharmacy?.state, pharmacy?.postcode].filter(Boolean).join(", ") || "Address details not provided"}
-                      </Typography>
-                      <Typography sx={{ color: "var(--ct-dashboard-muted)", fontSize: 13, mt: 0.5 }}>
-                        Invited by {inviterName(membership)}
+                      {membership.is_pharmacy_admin && capabilitiesText ? <Typography sx={metaSx}>{capabilitiesText}</Typography> : null}
+                      <Typography sx={metaSx}>
+                        {[pharmacy?.suburb, pharmacy?.state, pharmacy?.postcode].filter(Boolean).join(", ") || "Address not provided"}
+                        {" · "}Invited by {inviterName(membership)}
                       </Typography>
                     </Box>
                   </Stack>
 
-                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap flexShrink={0}>
                     {isPending && !hasAdminInvitation && (
                       <>
-                        <Button variant="contained" startIcon={<CheckCircleIcon />} disabled={actingId === membership.id} onClick={() => runAction(membership, "accept")}>
+                        <Button variant="contained" startIcon={busyIcon(busy, <Check size={18} />)} disabled={busy} onClick={() => runAction(membership, "accept")} sx={{ minHeight: 44 }}>
                           Accept
                         </Button>
-                        <Button variant="outlined" color="error" startIcon={<CancelIcon />} disabled={actingId === membership.id} onClick={() => runAction(membership, "reject")}>
-                          Reject
+                        <Button variant="outlined" color="error" startIcon={<X size={18} />} disabled={busy} onClick={() => runAction(membership, "reject")} sx={{ minHeight: 44 }}>
+                          Decline
                         </Button>
                       </>
                     )}
-                    {isPending && hasAdminInvitation && <Typography variant="body2" color="text.secondary">Respond to the admin invitation above.</Typography>}
+                    {isPending && hasAdminInvitation && <Typography variant="body2" color="text.secondary">Answer the admin invitation above.</Typography>}
                     {isAccepted && !membership.is_pharmacy_owner && membership.role !== "OWNER" && (
-                      <Button variant="outlined" color="error" startIcon={<LogoutIcon />} disabled={actingId === membership.id} onClick={() => setQuitTarget(membership)}>
-                        Quit membership
+                      <Button variant="outlined" color="error" startIcon={<LogOut size={18} />} disabled={busy} onClick={() => setQuitTarget(membership)} sx={{ minHeight: 44 }}>
+                        Leave pharmacy
                       </Button>
                     )}
                   </Stack>
@@ -252,17 +275,23 @@ export default function ManageMembershipsPage() {
         </Stack>
       )}
 
-      <Dialog open={Boolean(quitTarget)} onClose={() => setQuitTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Quit membership?</DialogTitle>
+      <Dialog open={Boolean(quitTarget)} onClose={quitTarget && actingId === quitTarget.id ? undefined : () => setQuitTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Leave {quitTarget?.pharmacy_detail?.name || "this pharmacy"}?</DialogTitle>
         <DialogContent>
-          <Typography>
-            This action cannot be undone. If you want to join this pharmacy again, the owner or admin will need to invite you all over again.
+          <Typography color="text.secondary">
+            You can't undo this. To join again, the owner or an admin will need to invite you again.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setQuitTarget(null)}>Cancel</Button>
-          <Button color="error" variant="contained" disabled={!quitTarget || actingId === quitTarget.id} onClick={() => quitTarget && runAction(quitTarget, "quit")}>
-            Quit membership
+          <Button onClick={() => setQuitTarget(null)} disabled={Boolean(quitTarget && actingId === quitTarget.id)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={!quitTarget || actingId === quitTarget.id}
+            startIcon={quitTarget && actingId === quitTarget.id ? <CircularProgress size={16} color="inherit" /> : undefined}
+            onClick={() => quitTarget && runAction(quitTarget, "quit")}
+          >
+            Leave pharmacy
           </Button>
         </DialogActions>
       </Dialog>
