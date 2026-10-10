@@ -88,6 +88,11 @@ class ShiftInterestSerializer(serializers.ModelSerializer):
         user = getattr(obj, 'user', None)
         if not user:
             return None
+        if is_public:
+            # Revealed platform candidates: the same work profile as reveal_profile, without contact details.
+            from shifts.candidates import revealed_profile
+            request = self.context.get('request')
+            return revealed_profile(user, build_absolute_uri=request.build_absolute_uri if request else (lambda url: url))
         return {
             'id': user.id,
             'first_name': user.first_name,

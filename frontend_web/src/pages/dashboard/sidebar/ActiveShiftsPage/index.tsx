@@ -41,7 +41,7 @@ import { useShiftActions } from './hooks/useShiftActions';
 import { useShareShift } from './hooks/useShareShift';
 
 // Components
-import { DeleteConfirmDialog } from './components/Dialogs/DeleteConfirmDialog';
+import { ConfirmDialog } from '../owner/teamUi';
 import { CounterOfferDialog } from './components/Dialogs/CounterOfferDialog';
 
 import ActiveShiftCard from './ActiveShiftCard';
@@ -99,7 +99,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     // Snackbar
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
-    const [buzzDialog, setBuzzDialog] = useState({ open: false, message: '' });
+    const [buzzDialog, setBuzzDialog] = useState({ open: false, message: '', sent: true });
     const [pillPayingShiftId, setPillPayingShiftId] = useState<number | null>(null);
     const itemsPerPage = 6;
     const [page, setPage] = useState(1);
@@ -390,6 +390,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                         || 'Candidate',
             email: userObj?.email || interestAny?.email || '',
             shortBio: userObj?.shortBio || userObj?.short_bio || interestAny?.shortBio || interestAny?.short_bio || '',
+            profile: userObj,
             pendingConfirmation: Boolean(interestAny?.pendingConfirmation ?? interestAny?.pending_confirmation),
             pendingOfferId: interestAny?.pendingOfferId ?? interestAny?.pending_offer_id ?? null,
             awaitingPayment: Boolean(interestAny?.awaitingPayment ?? interestAny?.awaiting_payment),
@@ -467,6 +468,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                                 'Candidate',
                         email: userObj?.email || interestAny?.email,
                         shortBio: userObj?.shortBio || interestAny?.shortBio || interestAny?.short_bio || '',
+                        profile: userObj,
                     }
                     : null;
 
@@ -569,6 +571,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                         : revealedUserObj?.name || revealedUserObj?.displayName || revealedUserObj?.display_name || member.displayName || (member as any).email || 'Candidate',
                 email: revealedUserObj?.email || (member as any).email || '',
                 shortBio: revealedUserObj?.shortBio || revealedUserObj?.short_bio || (member as any).shortBio || '',
+                profile: revealedUserObj,
                 pendingConfirmation: !offer && Boolean((member as any).pendingConfirmation ?? (member as any).pending_confirmation),
                 pendingOfferId: (member as any).pendingOfferId ?? (member as any).pending_offer_id ?? null,
                 pendingConfirmationCounterOffer,
@@ -766,7 +769,8 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 const result = response.data;
                 setBuzzDialog({
                     open: true,
-                    message: result?.detail || "Reminder sent. We've gently nudged the candidate to confirm this shift.",
+                    sent: true,
+                    message: result?.detail || "We've nudged the candidate to confirm this shift.",
                 });
             } catch (error) {
                 console.error('Failed to send confirmation reminder', error);
@@ -774,8 +778,8 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     (error as any)?.response?.data?.detail ||
                     (error as any)?.data?.detail ||
                     (error as any)?.message ||
-                    'Failed to send confirmation reminder';
-                setBuzzDialog({ open: true, message });
+                    "The reminder didn't go through. Try again in a moment.";
+                setBuzzDialog({ open: true, message, sent: false });
                 await loadShifts();
             } finally {
                 setBuzzLoadingOfferId(null);
@@ -1071,9 +1075,13 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 )}
 
                 {/* Dialogs */}
-                <DeleteConfirmDialog
+                <ConfirmDialog
                     open={deleteConfirmDialog.open}
-                    loading={deleteConfirmDialog.shiftId ? actionLoading[`delete_${deleteConfirmDialog.shiftId}`] ?? false : false}
+                    title="Delete this shift?"
+                    body={`${(shifts.find((s) => s.id === deleteConfirmDialog.shiftId) as any)?.pharmacyDetail?.name ?? 'This shift'} will be removed. Candidates can no longer see or apply for it, and you can't undo this.`}
+                    confirmLabel="Delete shift"
+                    busyLabel="Deleting…"
+                    busy={deleteConfirmDialog.shiftId ? actionLoading[`delete_${deleteConfirmDialog.shiftId}`] ?? false : false}
                     onClose={() => setDeleteConfirmDialog({ open: false, shiftId: null })}
                     onConfirm={async () => {
                         if (deleteConfirmDialog.shiftId) {
@@ -1092,8 +1100,8 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     slotId={reviewOfferDialog.slotId}
                     assignLabel={
                         reviewOfferDialog.slotId != null
-                            ? 'Assign to Slot'
-                            : 'Assign to Shift'
+                            ? 'Assign to this date'
+                            : 'Assign to shift'
                     }
                     assignLoading={
                         reviewOfferDialog.shiftId != null && reviewOfferDialog.candidate?.userId != null
@@ -1109,6 +1117,8 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     onAccept={(offer) => handleAcceptOffer(offer, reviewOfferDialog.shiftId, reviewOfferDialog.slotId)}
                     onReject={(offer) => handleRejectOffer(offer, reviewOfferDialog.shiftId)}
                     onAssign={(userId, slotId) => handleAssignCandidate(userId, reviewOfferDialog.shiftId, slotId)}
+                    onBuzz={(offerId) => void handleBuzzWorker(offerId)}
+                    buzzLoadingOfferId={buzzLoadingOfferId}
                     onPageChange={(_, value) => {
                         if (reviewOfferDialog.candidate) {
                             // Re-load ratings for the new page
@@ -1133,28 +1143,20 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 />
                 <Dialog
                     open={buzzDialog.open}
-                    onClose={() => setBuzzDialog({ open: false, message: '' })}
+                    onClose={() => setBuzzDialog({ open: false, message: '', sent: true })}
                     fullWidth
                     maxWidth="xs"
+                    aria-labelledby="buzz-title"
                 >
-                    <DialogTitle sx={{ fontWeight: 900 }}>Buzz reminder</DialogTitle>
+                    <DialogTitle id="buzz-title" sx={{ fontWeight: 600 }}>{buzzDialog.sent ? 'Reminder sent' : "Reminder not sent"}</DialogTitle>
                     <DialogContent>
-                        <Typography sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
+                        <Typography role={buzzDialog.sent ? 'status' : 'alert'} sx={{ color: 'var(--ct-text-secondary)', fontSize: 15, lineHeight: 1.55 }}>
                             {buzzDialog.message}
                         </Typography>
                     </DialogContent>
-                    <DialogActions>
-                        <Button
-                            variant="contained"
-                            onClick={() => setBuzzDialog({ open: false, message: '' })}
-                            sx={{
-                                bgcolor: '#E0AA3E',
-                                color: '#111827',
-                                fontWeight: 900,
-                                '&:hover': { bgcolor: '#B88A44' },
-                            }}
-                        >
-                            Close
+                    <DialogActions sx={{ px: 3, pb: 2.5 }}>
+                        <Button variant="contained" onClick={() => setBuzzDialog({ open: false, message: '', sent: true })} sx={{ minHeight: 40 }}>
+                            Done
                         </Button>
                     </DialogActions>
                 </Dialog>

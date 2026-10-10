@@ -175,12 +175,11 @@ class RevealProfileTests(ShiftActionFixture):
 
         response, sent = self.post(self.owner, f"shifts/{shift.id}/reveal_profile/", {"user_id": worker.id})
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(
-            set(response.data),
-            {"id", "first_name", "last_name", "email", "phone_number", "short_bio", "resume", "rate_preference"},
-        )
-        self.assertEqual((response.data["id"], response.data["short_bio"], response.data["phone_number"]),
-                         (worker.id, "Bio", "0411111111"))
+        # Owner decision: a revealed candidate shows the work profile, never contact details or the CV.
+        self.assertTrue({"id", "first_name", "last_name", "profile_photo", "short_bio", "skills", "role_label",
+                         "verified", "ahpra_verified", "rate_preference"} <= set(response.data))
+        self.assertFalse({"email", "phone_number", "resume"} & set(response.data))
+        self.assertEqual((response.data["id"], response.data["short_bio"]), (worker.id, "Bio"))
         shift.refresh_from_db()
         interest.refresh_from_db()
         self.assertEqual(shift.reveal_count, 1)
@@ -205,6 +204,18 @@ class RevealProfileTests(ShiftActionFixture):
         ShiftInterest.objects.create(shift=shift, slot=None, user=other)
         over_quota, _ = self.post(self.owner, f"shifts/{shift.id}/reveal_profile/", {"user_id": other.id})
         self.assertEqual((over_quota.status_code, over_quota.data["detail"]), (403, "Reveal quota exceeded."))
+
+    def test_revealed_platform_interest_lists_work_profile_without_contacts(self):
+        worker = self.worker()
+        shift = self.shift(visibility="PLATFORM")
+        ShiftInterest.objects.create(shift=shift, slot=None, user=worker, revealed=True)
+        response = client_for(self.owner).get(f"{API}shift-interests/?shift={shift.id}")
+        self.assertEqual(response.status_code, 200, response.data)
+        rows = response.data.get("results", response.data)
+        detail = rows[0]["user_detail"]
+        self.assertEqual((detail["id"], detail["short_bio"]), (worker.id, "Bio"))
+        self.assertIn("skills", detail)
+        self.assertFalse({"email", "phone_number", "resume"} & set(detail))
 
     def test_reveal_refusals(self):
         worker = self.worker()

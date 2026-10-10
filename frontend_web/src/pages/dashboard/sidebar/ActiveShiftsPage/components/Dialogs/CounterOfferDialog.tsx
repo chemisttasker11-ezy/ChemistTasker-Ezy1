@@ -15,8 +15,9 @@ import {
     Skeleton,
     Pagination,
 } from '@mui/material';
-import { CircleAlert, CreditCard, MapPin } from 'lucide-react';
-import { InitialsAvatar, Pill } from '../../../../shiftCenter/ShiftCentreParts';
+import { BellRing, CircleAlert, CreditCard, MapPin } from 'lucide-react';
+import { Pill } from '../../../../shiftCenter/ShiftCentreParts';
+import { CandidateProfile } from './CandidateProfile';
 
 const formatSlotDate = (value?: string | null) =>
     value
@@ -63,6 +64,9 @@ interface CounterOfferDialogProps {
     onReject: (offer: any) => void;
     onAssign?: (userId: number, slotId: number | null) => void;
     onPageChange: (_: React.ChangeEvent<unknown>, value: number) => void;
+    /** Sends the confirm-this-shift reminder (same action as Buzz on the card). */
+    onBuzz?: (offerId: number) => void;
+    buzzLoadingOfferId?: number | null;
 }
 
 export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
@@ -82,6 +86,8 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
     onReject,
     onAssign,
     onPageChange,
+    onBuzz,
+    buzzLoadingOfferId,
 }) => {
     const awaitingPayment = Boolean(
         candidate?.awaitingPayment ?? candidate?.awaiting_payment
@@ -90,6 +96,8 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
         candidate?.pendingConfirmation ?? candidate?.pending_confirmation
     );
     const offerStatus = String(offer?.status ?? '').toUpperCase();
+    const rawPendingOfferId = candidate?.pendingOfferId ?? candidate?.pending_offer_id ?? offer?.id ?? null;
+    const pendingOfferId = rawPendingOfferId != null ? Number(rawPendingOfferId) : null;
     const isActionableCounterOffer = Boolean(offer) && !pendingConfirmation && !awaitingPayment && offerStatus === 'PENDING';
     const counterOfferDetails =
         offer ||
@@ -119,22 +127,7 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                         {/* Candidate Information */}
                         {candidate && (
                             <Stack spacing={1.5}>
-                                <Stack direction="row" spacing={1.5} alignItems="center">
-                                    <InitialsAvatar name={candidate.name || 'Candidate'} size={44} />
-                                    <Box sx={{ minWidth: 0 }}>
-                                        <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'var(--ct-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                            Candidate
-                                        </Typography>
-                                        <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 19, color: 'var(--ct-text-primary)', lineHeight: 1.25 }}>
-                                            {candidate.name || 'Candidate'}
-                                        </Typography>
-                                    </Box>
-                                </Stack>
-                                {candidate.shortBio && (
-                                    <Typography sx={{ fontSize: 14, color: 'var(--ct-text-secondary)', lineHeight: 1.55 }}>
-                                        {candidate.shortBio}
-                                    </Typography>
-                                )}
+                                <CandidateProfile name={candidate.name || 'Candidate'} bio={candidate.shortBio} profile={candidate.profile} />
                                 {(pendingConfirmation || awaitingPayment) && (
                                     <Stack
                                         direction="row"
@@ -151,8 +144,8 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                         {awaitingPayment ? <CreditCard /> : <CircleAlert />}
                                         <Typography sx={{ fontSize: 13.5, fontWeight: 500, color: 'inherit', lineHeight: 1.45 }}>
                                             {awaitingPayment
-                                                ? 'Candidate confirmed. Payment is required to finalise the booking.'
-                                                : 'Offer sent. Waiting for the candidate to confirm.'}
+                                                ? 'Candidate confirmed. Pay from the shift card to finalise the booking.'
+                                                : 'Offer sent. Waiting for the candidate to confirm. You can send them a reminder.'}
                                         </Typography>
                                     </Stack>
                                 )}
@@ -241,7 +234,7 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                             Ratings & reviews
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            {workerRatingSummary ? (
+                            {workerRatingSummary?.count === 0 ? null : workerRatingSummary ? (
                                 <>
                                     <Rating
                                         value={workerRatingSummary.average}
@@ -303,6 +296,16 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Close</Button>
+                {pendingConfirmation && pendingOfferId != null && onBuzz && (
+                    <Button
+                        variant="contained"
+                        onClick={() => onBuzz(pendingOfferId)}
+                        disabled={buzzLoadingOfferId === pendingOfferId}
+                        startIcon={buzzLoadingOfferId === pendingOfferId ? <CircularProgress size={16} color="inherit" /> : <BellRing size={16} />}
+                    >
+                        {buzzLoadingOfferId === pendingOfferId ? 'Sending…' : 'Send a reminder'}
+                    </Button>
+                )}
                 {!offer && !pendingConfirmation && !awaitingPayment && onAssign && candidate?.userId != null && (
                     <Button
                         variant="contained"
@@ -315,7 +318,7 @@ export const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                             ) : undefined
                         }
                     >
-                        {assignLabel || 'Assign to Shift'}
+                        {assignLabel || 'Assign to shift'}
                     </Button>
                 )}
                 {isActionableCounterOffer && (

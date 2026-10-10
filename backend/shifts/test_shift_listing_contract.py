@@ -222,8 +222,9 @@ class AssignedProfileTests(ShiftListingFixture):
                 response = client_for(self.owner).post(f"{API}{endpoint}{shift.id}/view_assigned_profile/",
                                                        {"user_id": staff.id}, format="json")
                 self.assertEqual(response.status_code, 200, response.data)
-                self.assertEqual(set(response.data), {"id", "first_name", "last_name", "email", "phone_number",
-                                                      "short_bio", "resume", "rate_preference"})
+                # Booked workers keep contact details and the CV, plus the work profile.
+                self.assertTrue({"id", "first_name", "last_name", "email", "phone_number", "short_bio", "resume",
+                                 "rate_preference", "skills", "profile_photo"} <= set(response.data))
                 self.assertEqual(response.data["id"], staff.id)
                 self.assertTrue(ShiftProfileAccessAudit.objects.filter(
                     shift=shift, target_user=staff, action=ShiftProfileAccessAudit.Action.VIEW_ASSIGNED_PROFILE,

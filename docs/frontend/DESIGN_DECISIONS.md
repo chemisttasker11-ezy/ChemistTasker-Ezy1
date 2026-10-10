@@ -532,3 +532,24 @@ layout (cover → About → members → large composer), so they were not follow
 - Fixed in `ShiftsBoard/hooks/useFilterSort.ts` (Vite and `landing_next/migrated`): filter toggles called the page's
   `onFiltersChange` inside a state updater, which React runs during render ("Cannot update a component while
   rendering a different component"). The next filters are now worked out first, then set and reported.
+
+## Shift Centre dialogs and the revealed candidate profile (2026-10-10)
+
+- Figma is a reference here: the Shift Centre already meets the standard, so only real gaps were changed.
+- **Delete:** the one-off dialog is replaced by the shared `ConfirmDialog`: *Delete this shift?*, names the pharmacy,
+  says candidates can no longer see or apply, *Delete shift* / *Deleting…*.
+- **Buzz reminder:** *Reminder sent* or *Reminder not sent* (it showed the same title for both), plain message, theme
+  button *Done* (was a gold hex button at weight 900).
+- **Waiting for confirmation:** the review dialog now offers *Send a reminder* (same action as Buzz on the card).
+  **Awaiting payment:** the banner says to pay from the shift card, where both payment methods live.
+- **Revealed candidate = full work profile, no contacts (owner decision):** photo, name, role and classification,
+  verification (*Profile verified*, AHPRA/registration, ID, ABN), bio, suburb and travel, years registered or
+  experience, preferred rates, skills grouped like the Talent board (*Dispensing software*, *Clinical services*,
+  *Expanded scope*), then ratings and reviews. The *Candidate* eyebrow label is gone.
+- **Backend:** `reveal_profile` and revealed platform interests (`/shift-interests/` `user_detail`) return the work
+  profile (`shifts.candidates.work_profile`) and no longer send email, phone or the CV. Booked workers
+  (`view_assigned_profile`) keep contact details and CV, plus the same work profile. Contract tests updated; a new test
+  checks the interest list never carries contacts.
+- Copy: *Assign to Slot* → *Assign to this date*; empty reviews show only *No reviews yet*.
+- Checked: real playground candidate and a mocked full profile at 1440 and 390; AA sweep 0 failures light and dark;
+  detector clean; backend `shifts` tests 76/76.
