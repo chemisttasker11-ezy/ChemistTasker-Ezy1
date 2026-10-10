@@ -147,22 +147,6 @@ export default function HubSpace({
     </Button>
   ) : null;
 
-  const aboutCard = (
-    <Paper variant="outlined" sx={{ ...cardSx, p: 2.25 }}>
-      <Typography component="h2" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 18, color: 'var(--ct-text-primary)' }}>About</Typography>
-      <Typography variant="body2" sx={{ mt: 0.75, color: 'var(--ct-text-secondary)', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', whiteSpace: 'pre-line' }}>
-        {aboutText || aboutFallback}
-      </Typography>
-      <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 1.25, color: 'var(--ct-text-secondary)' }}>
-        {isPublic ? <Globe size={15} aria-hidden /> : <Lock size={15} aria-hidden />}
-        <Typography variant="body2" sx={{ color: 'inherit' }}>{privacy}</Typography>
-      </Stack>
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1, ml: -1 }}>
-        <Button size="small" onClick={() => setTab('about')} sx={{ minHeight: 36, px: 1 }}>More about this hub</Button>
-        {seeMembers}
-      </Stack>
-    </Paper>
-  );
 
 
   return (
@@ -238,14 +222,7 @@ export default function HubSpace({
         </Box>
       </Paper>
 
-      {tab === 'discussion' && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', xl: 'minmax(0, 1fr) 320px' }, gap: 3, alignItems: 'start' }}>
-          <Box sx={{ minWidth: 0, maxWidth: 760, width: '100%', mx: { xl: 'auto' } }}>{children}</Box>
-          <Stack spacing={2} sx={{ display: { xs: 'none', xl: 'flex' }, position: 'sticky', top: 96 }} component="aside" aria-label="About and members">
-            {aboutCard}
-          </Stack>
-        </Box>
-      )}
+      {tab === 'discussion' && <Box sx={{ minWidth: 0, maxWidth: 760, width: '100%', mx: 'auto' }}>{children}</Box>}
 
       <Dialog open={membersOpen} onClose={() => setMembersOpen(false)} fullScreen={phone} fullWidth maxWidth="sm" aria-labelledby="hub-members-title">
         <DialogTitle id="hub-members-title" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>

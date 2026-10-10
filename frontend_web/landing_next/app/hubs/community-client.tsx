@@ -103,12 +103,6 @@ export default function CommunityFeed({hub,label,initial}:{hub:string;label:stri
     <Paging page={page} next={!!feed.next} onPage={setPage}/>
     {!!polls?.results.length&&<section className="ct-card"><h2 className="ct-section-title"><BarChart3 size={18} aria-hidden="true"/> Community polls</h2>{polls.results.map(p=>{const total=p.options.reduce((s,o)=>s+o.votes,0);return <div key={p.id} className="ct-poll"><h3>{p.question}</h3>{p.options.map(o=><button className="ct-poll-option" key={o.id} disabled={busy||!p.can_interact||p.is_closed} onClick={()=>void vote(p.id,o.id)} style={{['--pct' as string]:`${total?Math.round(o.votes/total*100):0}%`}}><span>{o.text}</span><span>{o.votes} {o.votes===1?'vote':'votes'}</span></button>)}{p.is_closed&&<p className="ct-muted">Voting closed</p>}</div>;})}<Paging page={pollPage} next={!!polls.next} onPage={setPollPage}/></section>}
    </div>
-   <aside className="ct-card ct-group-rail" aria-label="About this group">
-    <h2>About</h2>
-    <p className="ct-clamp">{about}</p>
-    <p className="ct-about-fact"><Globe size={15} aria-hidden="true"/> Public group</p>
-    <button className="ct-link-button" onClick={()=>setTab('about')}>More about this group</button>
-   </aside>
   </div>}
  </main>;
 }

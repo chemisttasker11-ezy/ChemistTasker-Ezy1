@@ -407,8 +407,8 @@ layout (cover → About → members → large composer), so they were not follow
   Cover band (brand gradient when there is no photo or it fails; it used to show a broken image with "Pharmacy
   cover"), kind tile, *Pharmacy hub* eyebrow, the name once (it was printed twice), *Private to your pharmacy team*,
   and the member count as a link. Tabs: *Discussion · About*. Settings for managers in the header.
-- **About is out of the way:** its own tab (full text, who can see it, members); on wide screens a 4-line About
-  summary sits in a right rail beside the feed with *More about this hub* and *See N members*.
+- **About is out of the way (owner decision):** only under its own tab (full text, who can see it, *See N members*);
+  no About card beside the feed, in Vite and Next alike. Discussion is the feed alone, centred, up to 760px.
 - **Members on demand (owner decision):** no member list on the page. The count in the header, the rail and About
   open a members dialog (full screen on phones) with search, **Admins** first with an *Admin* pill, then members;
   each shows role in the backend's words, contract and pharmacy, never an email. Group admins come from the group
@@ -446,9 +446,8 @@ layout (cover → About → members → large composer), so they were not follow
   eyebrow, name, *Public group* line. **Real tabs** (*Discussion · About · Discover hubs*); *About* was an anchor to
   a card that sat beside the feed on desktop and above it on phones. Search moved into the tab row behind an icon
   (it sat between the composer and the feed).
-- **About** has its own tab (who it is for, public visibility, posting access); wide screens show a 4-line About
-  rail with *More about this group*; it disappears below 1100px where the tab covers it. Feed and rail are centred
-  as a pair.
+- **About** only under its own tab (who it is for, public visibility, posting access), the same as Vite; no About
+  card beside the feed (an earlier pass had a rail on wide screens; removed so both apps match).
 - **Composer collapsed** (*Write something to {hub}…* + *Photo or file*), expands in place with the author line,
   visibility note, paste/drop files with thumbnails, *Cancel* / *Post*; a failed post keeps the text.
 - **Posts and comments:** relative times with the full date on hover, clickable links and highlighted @mentions,

@@ -24,7 +24,7 @@
 .ct-tab-search{display:flex;align-items:center;gap:8px;border:1px solid #C7CFDC;border-radius:12px;padding:0 6px 0 12px;margin:6px 0;min-width:0;flex:0 1 320px}
 .community-app .ct-tab-search input{border:0;min-height:38px;padding:6px 0;background:transparent}
 .community-app .ct-tab-search button{border:0;min-height:36px;width:36px;padding:0}
-.ct-group-layout{display:grid;grid-template-columns:minmax(0,720px) 300px;gap:24px;align-items:start;justify-content:center}
+.ct-group-layout{display:grid;grid-template-columns:minmax(0,720px);gap:24px;align-items:start;justify-content:center}
 .ct-group-layout .ct-feed{gap:16px;min-width:0;width:100%}
 .ct-discussion>h2{font:500 20px Outfit,sans-serif;margin:8px 0 4px;color:#06214A}
 .community-app .ct-group-rail{position:sticky;top:100px;padding:20px}
