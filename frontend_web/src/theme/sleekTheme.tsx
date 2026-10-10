@@ -275,6 +275,7 @@ export function createSleekTheme(mode: Mode): Theme {
           // Error red (#C9364A) is 3.4:1 on the dark surface; a lighter red keeps destructive labels readable.
           { props: { variant: "text", color: "error" }, style: isLight ? {} : { color: "#FF8A97" } },
           { props: { variant: "outlined", color: "error" }, style: isLight ? {} : { color: "#FF8A97", borderColor: "rgba(255,138,151,0.5)" } },
+          { props: { variant: "outlined", color: "warning" }, style: isLight ? {} : { color: "#F5B85A", borderColor: "rgba(245,184,90,0.5)" } },
         ],
       },
       MuiIconButton: {
@@ -318,7 +319,8 @@ export function createSleekTheme(mode: Mode): Theme {
         },
       },
       MuiInputLabel: {
-        styleOverrides: { root: { fontSize: 14 } },
+        // Focused labels use the AA accent; brand violet is 1.8:1 on the dark field.
+        styleOverrides: { root: { fontSize: 14, "&.Mui-focused:not(.Mui-error)": { color: "var(--ct-accent-strong)" } } },
       },
       MuiChip: {
         styleOverrides: {

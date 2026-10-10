@@ -495,3 +495,40 @@ layout (cover → About → members → large composer), so they were not follow
 - **Where invoicing happens:** *Invoices* (`FinanceWorkspace` + `InvoiceComposer`) on `invoicing.Invoice` (`request_key`, `payload`, `InvoiceRevision`). It covers both ChemistTasker shifts (prefilled from accepted terms; hours, rate and description editable, each save an audited revision with the original snapshot kept for the owner's review) and work outside ChemistTasker (your own customers and items). The old `InvoiceRecord` model is retired.
 - **Old links now forward into it:** `/invoice/new?shiftId=` opens a new invoice prefilled from that shift; plain `/invoice/new` opens a blank one; `/invoice/:id` opens that invoice (composer for the issuer, review history for the recipient). The old detail page is shown only for **legacy invoices** the workspace doesn't manage (old external ones). The backend already refuses legacy loads of managed invoices (409). The hand-off uses a one-time sessionStorage note (`pages/finance/handoff.ts`) plus `?invoice=` / `?shift=` / `?new=1`, because the dashboard shell rewrites the query string while it settles the workspace scope on first load.
 - **Composer:** the Discount column is removed from the UI (the value stays in the payload and the backend maths, for the marketplace). Columns were rebalanced, which also fixed the clipped work date. A full design pass on the list, composer, received view and payment dialogs is the next step.
+
+## Invoices design pass (2026-10-10)
+
+- **List (worker):** `PageHeader` with tool tabs; header pills (*N overdue*, *N need changes*); `MetricStrip` (Drafts,
+  Awaiting payment, Overdue, Received) whose cells filter the list; status tabs with counts; one row per invoice
+  (customer + status pill, number · issued · due/overdue, amount, *Open* or *Fix* + *More actions*). A failed load shows
+  an error with *Try again* (it used to show the empty state). One wording per state in `financeParts.financeState`.
+- **Pharmacy side:** tabs *To review / With contractor / Approved / Paid*, to-review first; *Review* opens a right panel
+  (full width on phone) with the invoice document, copyable pay-to, history and sticky *Mark as paid / Ask for changes /
+  Approve for payment*.
+- **Composer:** `PageHeader` with the status pill and *From a ChemistTasker shift*; sections *Start from a shift*,
+  *Customer and dates*, *Work and costs*, then *Business details*, *Where to pay you* (summary shows BSB and account
+  ending), *Superannuation*, *Revision history*. Sticky bottom bar with the live total and *Save invoice* / *Save
+  revision* (spinner while saving). Lines are a row on wide screens and a card per line below 1200px with the amount
+  and a labelled remove button; the duplicated column header is gone (each field has its label). Shift lines say *From
+  the shift* and can't be removed (hint says why).
+- **Hours helper → line:** *Work out hours from start and finish* now applies its result: *Use on {line}* for every
+  hours line, or *Add as a new line*. Errors stay inside the helper.
+- **Validation:** missing customer / business name show inline at the field and in a focused error at the top; empty
+  lines say so in the empty state. Amounts that can't be priced yet say *Not yet* with one line on why.
+- **No browser pop-ups:** leaving with unsaved changes (composer and every finance form) uses `ConfirmDialog`
+  *Discard your changes?*, and only when something changed. Fixed: a new invoice counted as changed as soon as the
+  saved business details filled in, so *Back* always asked.
+- **Payments:** *Mark as paid* is the main action (first in the menu, now also for super requests; the backend
+  already allowed it). *Record a payment* stays as the optional way to log a part payment: still owed shown first,
+  inline check against the balance, part-payment remainder in the hint, *Record payment* button.
+- **Removed:** the unused legacy `InvoiceEditor` in `Editors.tsx`.
+- **Theme (all pages):** focused field labels use the AA accent in dark mode (brand violet was 1.8:1); outlined
+  warning buttons get a dark-mode amber (was 3.35:1).
+- Checked: 1440 and 390, light and dark (new, changes requested, part paid, payment dialog, discard dialog, review
+  panel); AA sweep 0 failures; impeccable detector clean; breadth tests for every persona's invoice route pass.
+
+## Shift boards: filter render warning (2026-10-10)
+
+- Fixed in `ShiftsBoard/hooks/useFilterSort.ts` (Vite and `landing_next/migrated`): filter toggles called the page's
+  `onFiltersChange` inside a state updater, which React runs during render ("Cannot update a component while
+  rendering a different component"). The next filters are now worked out first, then set and reported.
