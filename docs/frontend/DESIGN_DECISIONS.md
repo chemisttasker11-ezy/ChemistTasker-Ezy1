@@ -379,5 +379,17 @@ server changed. Figma: *Chat / Conversation*, *Message Hover Actions*, *Error (S
   log; reduced-motion respected for typing dots and shimmer.
 - Checked: 1440 and 390 (list, thread, hover toolbar, edit mode, emoji picker, send failure, empty, load error); AA
   sweep 0 failures; all six persona chat route checks pass.
+- **New conversation dialog (owner decisions):** people are grouped *My pharmacy* (the pharmacy selected in the top
+  bar) → *My chain* (your other pharmacies with the same owner, by pharmacy) → *My favourites* → *My organisation*
+  (other pharmacies in the same organisation), then *Other pharmacies*; each person appears once, in the first group
+  that applies. Groups follow `backend/memberships/models.py`: team = full time, part time **and casual** (a casual
+  is a team member on a casual contract); favourites = locum and Shift Hero. **Fixed:** the dialog had casual under
+  favourites and locum under staff. Each row shows the role in the backend's words and the contract (*Casual*,
+  *Full time*); favourites also show their pharmacy. **No emails** in the picker, and search matches names only (as in
+  the Hub). Kept: one tap opens a direct message; suggested group name. Added: *Select all / Clear* per group, *Start
+  group chat (2)*, explained empty list, accessible names, busy state, phone layout. AA sweep 0 failures.
+- **@all (owner decision, instead of a "message the whole team" button):** group chats offer *@all · Everyone in
+  {group}* first in the mention picker; it is highlighted like other mentions. Every group participant is already
+  notified of each message (`backend/chat/signals.py`), so no API change.
 - **Backend follow-ups (not done, need API fields):** reply-to/quote threads, *Seen* receipts (only my own last-read
   time is sent), online presence, a wider reaction set.

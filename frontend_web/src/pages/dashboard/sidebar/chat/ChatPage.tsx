@@ -10,7 +10,8 @@ import { API_BASE_URL } from '../../../../constants/api';
 import { fetchWsTicket } from '../../../../utils/tokenService';
 import { buildWsUrl } from '../../../../utils/wsUrl';
 import { useAuth } from '../../../../contexts/AuthContext';
-import { ChatRoom, ChatMessage, MemberCache, CachedMember } from './types';
+import { ChatRoom, ChatMessage, MemberCache, CachedMember, PharmacyRef } from './types';
+import { useWorkspace } from '../../../../contexts/WorkspaceContext';
 import { ChatSidebar } from './ChatSidebar';
 import { ConversationPanel } from './ConversationPanel';
 import { NewChatModal } from './NewChatModal';
@@ -37,7 +38,7 @@ import {
 
 dayjs.extend(utc);
 
-type Pharmacy = { id: number; name: string };
+type Pharmacy = PharmacyRef;
 type ShiftContact = {
   pharmacy_id: number | null;
   pharmacy_name: string;
@@ -81,6 +82,7 @@ type ChatPageProps = {
 
 const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
   const { user, refreshUnreadCount, isAdminUser } = useAuth();
+  const { selectedPharmacyId: workspacePharmacyId } = useWorkspace();
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -220,7 +222,13 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
         memberships.forEach((membership: any) => {
           const detail = membership.pharmacyDetail;
           if (detail) {
-            uniquePharmacies.set(detail.id, { id: detail.id, name: detail.name });
+            const refId = (value: any) => (value && typeof value === 'object' ? value.id : value) ?? null;
+            uniquePharmacies.set(detail.id, {
+              id: detail.id,
+              name: detail.name,
+              ownerId: refId(detail.owner),
+              organizationId: refId(detail.organization),
+            });
           }
         });
         const pharms = Array.from(uniquePharmacies.values());
@@ -994,6 +1002,7 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
         currentUserId={user?.id}
         editingRoom={editingRoom}
         onDmSelect={handleStartDm}
+        homePharmacyId={workspacePharmacyId}
         onNotify={(severity, message) => pushToast(message, severity)}
       />
       <Snackbar

@@ -24,6 +24,7 @@ type ShiftContactUser = Omit<UserLite, 'first_name' | 'last_name' | 'email'> & {
 };
 
 type MentionOption = { label: string; membershipId: number };
+const ALL_MENTION_ID = -1;
 type MentionState = {
   options: MentionOption[];
   triggerIndex: number;
@@ -147,7 +148,10 @@ export const ConversationPanel: FC<Props> = ({
       }
     });
 
-    return Array.from(map.entries()).map(([membershipId, label]) => ({ membershipId, label }));
+    const people = Array.from(map.entries()).map(([membershipId, label]) => ({ membershipId, label }));
+    // Group chats offer @all first. Every group participant is already notified of each message
+    // (backend chat/signals.py); @all tells them the message is meant for everyone.
+    return activeRoom.type === 'GROUP' ? [{ membershipId: ALL_MENTION_ID, label: 'all' }, ...people] : people;
   }, [activeRoom, memberCache, messages, myMembershipId]);
 
   const resolveMemberDetails = useCallback(
@@ -918,10 +922,14 @@ return 'Direct Message';
                   aria-selected={idx === mentionState.activeIndex}
                   onMouseDown={(event) => { event.preventDefault(); handleMentionPick(option); }}
                 >
-                  <Avatar sx={{ width: 28, height: 28, mr: 1.25, fontSize: 11, fontWeight: 600, bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-tone-violet-fg)' }}>
-                    {initialsOf(null, null, option.label)}
+                  <Avatar sx={{ width: 28, height: 28, mr: 1.25, fontSize: 11, fontWeight: 600, bgcolor: option.membershipId === ALL_MENTION_ID ? 'var(--ct-accent-strong)' : 'var(--ct-tone-violet-bg)', color: option.membershipId === ALL_MENTION_ID ? '#fff' : 'var(--ct-tone-violet-fg)' }}>
+                    {option.membershipId === ALL_MENTION_ID ? '@' : initialsOf(null, null, option.label)}
                   </Avatar>
-                  <ListItemText primary={option.label} />
+                  {option.membershipId === ALL_MENTION_ID ? (
+                    <ListItemText primary="@all" secondary={`Everyone in ${headerTitle} (${Math.max(0, memberCount - 1)})`} />
+                  ) : (
+                    <ListItemText primary={option.label} />
+                  )}
                 </ListItemButton>
               ))}
             </List>

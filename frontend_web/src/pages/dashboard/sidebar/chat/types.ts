@@ -17,4 +17,7 @@ export type MemberCache = Record<number, Record<number, CachedMember>>;
 export type PharmacyRef = {
   id: number;
   name: string;
+  /** Owner and organisation ids from the membership's pharmacy detail; used to group people as chain / organisation. */
+  ownerId?: number | null;
+  organizationId?: number | null;
 };
