@@ -294,43 +294,23 @@ const ShiftList: React.FC<ShiftListProps> = ({
           key={shift.id}
           variant="outlined"
           sx={{
-            p: 2.5,
-            borderRadius: 3,
-            borderColor: urgent ? 'warning.main' : 'grey.200',
-            borderLeftWidth: urgent ? 4 : 1,
+            p: { xs: 2, md: 2.5 },
+            borderRadius: 'var(--ct-card-radius)',
+            borderColor: urgent ? 'var(--ct-status-amber-fg)' : 'var(--ct-border-color)',
             position: 'relative',
-            bgcolor: 'background.paper',
-            boxShadow: urgent ? 4 : 2,
+            bgcolor: 'var(--ct-surface-bg)',
+            boxShadow: 'none',
+            transition: 'border-color 160ms ease, box-shadow 160ms ease',
+            '&:hover': { borderColor: 'var(--ct-accent-strong)', boxShadow: '0 10px 28px rgba(6, 18, 58, 0.08)' },
+            '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
           }}
         >
-          {urgent && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                px: 1.5,
-                py: 0.5,
-                bgcolor: 'warning.main',
-                color: 'common.white',
-                borderBottomRightRadius: 8,
-                fontSize: 10,
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-              }}
-            >
-              <BoltIcon sx={{ fontSize: 12 }} />
-              Urgent
-            </Box>
-          )}
           <Stack spacing={2}>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
               <Box sx={{ flex: 1 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                   <Box>
-                    <Typography variant="h6" sx={{ cursor: 'pointer' }} onClick={() => toggleExpandedCard(shift.id)}>
+                    <Typography component="h3" sx={{ cursor: 'pointer', fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: { xs: 18, md: 19 }, lineHeight: 1.3, color: 'var(--ct-text-primary)' }} onClick={() => toggleExpandedCard(shift.id)}>
                       {getShiftPharmacyName(shift)}
                     </Typography>
                     {ratingSummary && ratingSummary.count > 0 && (
@@ -342,7 +322,8 @@ const ShiftList: React.FC<ShiftListProps> = ({
                       </Stack>
                     )}
                     <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
-                      <Chip icon={<WorkOutlineIcon />} label={getShiftRoleLabel(shift)} size="small" />
+                      {urgent && <Chip icon={<BoltIcon />} label="Urgent" size="small" sx={{ bgcolor: 'var(--ct-status-amber-bg)', color: 'var(--ct-status-amber-fg)', '& .MuiChip-icon': { color: 'inherit' } }} />}
+                      <Chip icon={<WorkOutlineIcon />} label={getShiftRoleLabel(shift)} size="small" sx={{ bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-tone-violet-fg)', '& .MuiChip-icon': { color: 'inherit' } }} />
                       {(shift.hasTravel || shift.hasAccommodation) && (
                         <Stack direction="row" spacing={0.5}>
                           {shift.hasTravel && <Chip icon={<FlightIcon />} label="Travel" size="small" />}

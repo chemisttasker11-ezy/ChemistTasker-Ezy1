@@ -1009,16 +1009,6 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
               overflow: "visible",
             }}
           >
-            {publicPresentation && (
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.25, pt: 2, pb: 0.25, gap: 1 }}>
-                <Typography component="h3" sx={{ color: "#06123A", fontSize: 16, fontWeight: 800 }}>Refine results</Typography>
-                {activeFilterCount > 0 && (
-                  <Button type="button" onClick={clearAllFilters} size="small" sx={{ minHeight: 36, px: 0.5, fontSize: 12.5, fontWeight: 800, color: "#5222B8", whiteSpace: "nowrap" }}>
-                    Clear all
-                  </Button>
-                )}
-              </Stack>
-            )}
             <FiltersSidebar
               hideSearch={publicPresentation}
               filters={filters}

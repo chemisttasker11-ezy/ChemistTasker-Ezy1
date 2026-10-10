@@ -145,17 +145,18 @@ test('public shift filters occupy natural page height without a nested desktop s
   assert.doesNotMatch(page, /borderRadius: 3, overflow: 'hidden'/);
 });
 
-test('filter controls use legible icons, real checkbox states and responsive time labels', () => {
+test('filter controls use legible icons, real toggle states and responsive time labels', () => {
   const filters = read('shared-ui/shifts/FiltersSidebar.tsx');
-  assert.match(filters, /aria-pressed=\{active\}/);
-  assert.match(filters, /flexDirection: 'column'/);
-  assert.match(filters, /minWidth: 0, minHeight: 68/);
+  const parts = read('shared-ui/filterParts.tsx');
+  assert.match(parts, /aria-pressed=\{selected\}/);
+  assert.match(parts, /flexWrap: 'wrap'/);
+  assert.match(parts, /onClick=\{\(\) => setIsOpen\(\(open\) => !open\)\}/);
   assert.match(filters, /CommuteOutlined as CommuteIcon/);
   assert.match(filters, /AccessTimeOutlined as AccessTimeIcon/);
   assert.match(filters, /EventRepeat as EventRepeatIcon/);
+  assert.match(filters, /label: 'Morning'/);
   assert.match(filters, /min=\{0\}/);
   assert.match(filters, /aria-label="Minimum hourly rate"/);
-  assert.match(filters, /onClick=\{\(\) => setIsOpen\(\(open\) => !open\)\}/);
   assert.doesNotMatch(filters, /checkedIcon=\{<BoltIcon/);
   assert.doesNotMatch(filters, /type="range"/);
 });
@@ -177,9 +178,14 @@ test('public talent filters use the same natural-height collapsible sidebar patt
   assert.match(board, /maxHeight: "none"/);
   assert.match(board, /overflow: "visible"/);
   assert.doesNotMatch(board, /calc\(100dvh - 124px\)/);
-  assert.match(filters, /const \[isOpen, setIsOpen\] = useState\(true\)/);
-  assert.match(filters, /onClick=\{\(\) => setIsOpen\(\(open\) => !open\)\}/);
-  assert.match(filters, /CommuteOutlined as CommuteIcon/);
-  assert.match(filters, /SchoolOutlined as SchoolIcon/);
-  assert.match(filters, /Students & interns seeking placements/);
+  // The public site wraps the shared talent filters and adds its skill icons.
+  assert.match(filters, /shared-ui\/talent\/FiltersSidebar/);
+  assert.match(filters, /renderSkillIcon=/);
+  const shared = read('shared-ui/talent/FiltersSidebar.tsx');
+  const parts = read('shared-ui/filterParts.tsx');
+  assert.match(parts, /const \[isOpen, setIsOpen\] = useState\(true\)/);
+  assert.match(parts, /onClick=\{\(\) => setIsOpen\(\(open\) => !open\)\}/);
+  assert.match(shared, /CommuteOutlined as CommuteIcon/);
+  assert.match(shared, /SchoolOutlined as SchoolIcon/);
+  assert.match(shared, /Students & interns seeking placements/);
 });

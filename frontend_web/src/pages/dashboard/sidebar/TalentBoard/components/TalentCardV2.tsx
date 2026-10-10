@@ -21,12 +21,10 @@ import {
   FavoriteRounded as FavoriteRoundedIcon,
   CalendarTodayOutlined as CalendarTodayOutlinedIcon,
   WorkOutline as WorkOutlineIcon,
-  SchoolOutlined as SchoolOutlinedIcon,
-  LocalPharmacyOutlined as LocalPharmacyOutlinedIcon,
-  PersonOutline as PersonOutlineIcon,
   ExpandMore as ExpandMoreIcon,
   AccessTime as AccessTimeIcon,
 } from "@mui/icons-material";
+import { RoleTile } from "../../../../../../landing_next/shared-ui/talent/RoleTile";
 import dayjs from "dayjs";
 import { Candidate } from "../types";
 
@@ -63,20 +61,6 @@ export default function TalentCard({
   canViewAvailability?: boolean;
   canRequestBooking?: boolean;
 }) {
-  let roleColor: "primary" | "success" | "warning" = "primary";
-  let RoleIcon = WorkOutlineIcon;
-
-  if (candidate.role.includes("Student") || candidate.role.includes("Intern")) {
-    roleColor = "success";
-    RoleIcon = SchoolOutlinedIcon;
-  } else if (candidate.role.includes("Pharmacist")) {
-    roleColor = "primary";
-    RoleIcon = LocalPharmacyOutlinedIcon;
-  } else if (candidate.role.includes("Junior")) {
-    roleColor = "warning";
-    RoleIcon = PersonOutlineIcon;
-  }
-
   const availabilitySlots = (candidate.availableSlots || [])
     .filter((slot) => slot?.date)
     .sort((a, b) => `${a.date}T${a.startTime || ""}`.localeCompare(`${b.date}T${b.startTime || ""}`));
@@ -94,64 +78,25 @@ export default function TalentCard({
 
   return (
     <Card
+      component="article"
       variant="outlined"
+      aria-label={candidate.role + " talent profile"}
       sx={{
-        borderRadius: 3,
+        borderRadius: "var(--ct-card-radius)",
         overflow: "hidden",
         position: "relative",
-        bgcolor: "background.paper",
-        borderColor: "divider",
+        bgcolor: "var(--ct-surface-bg)",
+        borderColor: "var(--ct-border-color)",
+        boxShadow: "none",
+        transition: "border-color 160ms ease, box-shadow 160ms ease",
+        "&:hover": { borderColor: "var(--ct-accent-strong)", boxShadow: "0 10px 28px rgba(6, 18, 58, 0.08)" },
+        "@media (prefers-reduced-motion: reduce)": { transition: "none" },
       }}
     >
-      <Box
-        sx={(theme) => ({
-          px: 2.5,
-          py: 1.5,
-          bgcolor: theme.palette.mode === "dark"
-            ? alpha(theme.palette.common.white, 0.04)
-            : theme.palette.action.hover,
-          borderBottom: 1,
-          borderColor: "divider",
-        })}
-      >
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <LocationOnOutlinedIcon fontSize="small" />
-            <Typography variant="body2" fontWeight={600} color="text.primary">
-              {candidate.city || candidate.state}
-            </Typography>
-            <Chip
-              size="small"
-              icon={<FlightTakeoffOutlinedIcon fontSize="inherit" />}
-              label={travelStateLabel}
-              variant="outlined"
-              sx={{ borderColor: "divider", color: "text.secondary" }}
-            />
-          </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-            {candidate.refId}
-          </Typography>
-        </Stack>
-      </Box>
-
       <CardContent sx={{ pt: 2.5 }}>
         <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "flex-start", md: "stretch" }}>
           <Stack alignItems="center" spacing={1} sx={{ minWidth: 80 }}>
-            <Box
-              sx={(theme) => ({
-                width: 56,
-                height: 56,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                bgcolor: alpha(theme.palette[roleColor].main, theme.palette.mode === "dark" ? 0.2 : 0.12),
-                border: 1,
-                borderColor: alpha(theme.palette[roleColor].main, 0.35),
-              })}
-            >
-              <RoleIcon color={roleColor} />
-            </Box>
+            <RoleTile role={candidate.role} size={56} />
             <Stack direction="row" spacing={0.5} alignItems="center">
               <StarIcon fontSize="small" color="warning" />
               <Typography variant="caption" fontWeight={700}>
@@ -164,7 +109,7 @@ export default function TalentCard({
             <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} alignItems={{ xs: "flex-start", sm: "flex-start" }}>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                  <Typography variant="h6" fontWeight={700}>
+                  <Typography component="h3" sx={{ fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: { xs: 19, md: 21 }, lineHeight: 1.25, color: "var(--ct-text-primary)" }}>
                     {candidate.role}
                   </Typography>
                   {candidate.experienceBadge && (
@@ -176,22 +121,38 @@ export default function TalentCard({
                     />
                   )}
                 </Stack>
-                <Typography variant="subtitle2" color="text.secondary">
+                <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 14, mt: 0.5 }}>
                   {candidate.headline}
                 </Typography>
+                <Stack direction="row" spacing={0} useFlexGap flexWrap="wrap" gap={1.5} sx={{ mt: 1.25, color: "var(--ct-text-secondary)", "& svg": { fontSize: 18 } }}>
+                  {(candidate.city || candidate.state) && (
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <LocationOnOutlinedIcon aria-hidden />
+                      <Typography sx={{ fontSize: 13.5, color: "inherit" }}>{[candidate.city, candidate.state].filter((part, index, all) => part && all.indexOf(part) === index).join(", ")}</Typography>
+                    </Stack>
+                  )}
+                  {travelStateLabel && (
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <FlightTakeoffOutlinedIcon aria-hidden />
+                      <Typography sx={{ fontSize: 13.5, color: "inherit" }}>{travelStateLabel}</Typography>
+                    </Stack>
+                  )}
+                </Stack>
                 {candidate.pitch ? (
-                  <Typography variant="body2" sx={{ mt: 1, fontStyle: "italic" }} color="text.secondary">
-                    "{candidate.pitch}"
+                  <Typography sx={{ mt: 1.25, fontSize: 14, lineHeight: 1.6, color: "var(--ct-text-primary)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    {candidate.pitch}
                   </Typography>
                 ) : null}
-              </Box>
-              <Box sx={{ width: { xs: "100%", sm: "auto" }, maxWidth: { sm: 260 }, flexShrink: 0, display: "flex", justifyContent: { xs: "flex-start", sm: "flex-end" } }}>
-                <Chip
-                  size="small"
-                  label={`Engagement: ${candidate.workTypes.length ? candidate.workTypes.join(", ") : "-"}`}
-                  variant="outlined"
-                  sx={{ maxWidth: "100%", borderColor: "divider" }}
-                />
+                {(candidate.workTypes.length > 0 || (candidate.refId && candidate.refId !== "REF-0000")) && (
+                  <Stack direction="row" useFlexGap flexWrap="wrap" alignItems="center" gap={0.75} sx={{ mt: 1.25 }}>
+                    {candidate.workTypes.map((type) => (
+                      <Chip key={type} size="small" label={type} sx={{ bgcolor: "var(--ct-subtle-bg)", color: "var(--ct-text-primary)", fontWeight: 600 }} />
+                    ))}
+                    {candidate.refId && candidate.refId !== "REF-0000" && (
+                      <Typography sx={{ fontSize: 11.5, color: "var(--ct-text-muted)", ml: 0.5 }}>{candidate.refId}</Typography>
+                    )}
+                  </Stack>
+                )}
               </Box>
             </Stack>
 

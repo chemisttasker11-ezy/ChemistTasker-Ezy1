@@ -77,29 +77,6 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const [ratingSummary, setRatingSummary] = useState<Record<number, { average: number; count: number }>>({});
   const ratingFetchRef = useRef<Set<number>>(new Set());
 
-  useEffect(() => {
-    if (!user) return;
-    const ids = new Set<number>();
-    posts.forEach((post) => {
-      if (typeof post.authorUserId === "number") ids.add(post.authorUserId);
-    });
-
-    ids.forEach((id) => {
-      if (ratingFetchRef.current.has(id)) return;
-      ratingFetchRef.current.add(id);
-      getRatingsSummary({ target_type: "worker", target_id: id })
-        .then((res: any) => {
-          const averageRaw = Number(res?.average ?? 0);
-          const countRaw = Number(res?.count ?? 0);
-          const average = Number.isFinite(averageRaw) ? averageRaw : 0;
-          const count = Number.isFinite(countRaw) ? countRaw : 0;
-          setRatingSummary((prev) => ({ ...prev, [id]: { average, count } }));
-        })
-        .catch(() => {
-          // Leave unset so we can fall back to any rating data already in the post payload.
-        });
-    });
-  }, [posts, user?.id]);
 
   const candidates = useMemo<Candidate[]>(() => {
     return posts.map((post) => {
@@ -285,6 +262,30 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     const start = (page - 1) * pageSize;
     return processedCandidates.slice(start, start + pageSize);
   }, [processedCandidates, page]);
+
+  // Ratings for the people on the visible page only (one request each, applied together). Fetching every
+  // profile's rating up front sent hundreds of requests and re-rendered the board for each answer.
+  useEffect(() => {
+    if (!user) return;
+    const ids = Array.from(new Set(pagedCandidates.map((candidate) => candidate.authorUserId)))
+      .filter((id): id is number => typeof id === "number" && !ratingFetchRef.current.has(id));
+    if (!ids.length) return;
+    ids.forEach((id) => ratingFetchRef.current.add(id));
+    Promise.allSettled(ids.map((id) => getRatingsSummary({ target_type: "worker", target_id: id }))).then((results) => {
+      const next: Record<number, { average: number; count: number }> = {};
+      results.forEach((result, index) => {
+        if (result.status !== "fulfilled") {
+          ratingFetchRef.current.delete(ids[index]); // retry next time the person is shown
+          return; // leave unset so any rating data already in the post payload is used
+        }
+        const res: any = result.value;
+        const average = Number(res?.average ?? 0);
+        const count = Number(res?.count ?? 0);
+        next[ids[index]] = { average: Number.isFinite(average) ? average : 0, count: Number.isFinite(count) ? count : 0 };
+      });
+      if (Object.keys(next).length) setRatingSummary((prev) => ({ ...prev, ...next }));
+    });
+  }, [pagedCandidates, user?.id]);
 
   const activeFilterCount =
     filters.roles.length +

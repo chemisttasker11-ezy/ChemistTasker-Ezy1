@@ -739,10 +739,9 @@ export default function PublicShiftsPage({
                 border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
                 transition: theme.transitions.create(['color', 'background-color', 'border-color', 'box-shadow']),
                 '&.Mui-selected': {
-                  color: theme.palette.primary.main,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.15),
-                  borderColor: alpha(theme.palette.primary.main, 0.45),
-                  boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.18)}`,
+                  color: 'var(--ct-accent-strong)',
+                  backgroundColor: 'var(--ct-tone-violet-bg)',
+                  borderColor: 'transparent',
                 },
                 '&:not(.Mui-selected):hover': {
                   backgroundColor: alpha(theme.palette.primary.main, 0.08),

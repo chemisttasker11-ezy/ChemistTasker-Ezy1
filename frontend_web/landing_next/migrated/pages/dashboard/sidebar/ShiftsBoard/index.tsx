@@ -563,6 +563,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
       toggleStateSelection={toggleStateSelection}
       toggleFilter={toggleFilter}
       toggleBooleanFilter={toggleBooleanFilter}
+      onClearAll={clearAllFilters}
     />
   );
 
@@ -680,12 +681,6 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
               overflow: 'visible',
             }}
           >
-            {publicPresentation && (
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.25, pt: 2, pb: 0.25, gap: 1 }}>
-                <Typography component="h3" sx={{ fontSize: 16, fontWeight: 850, color: '#06123A' }}>Refine results</Typography>
-                {activeFilterCount > 0 && <Button type="button" onClick={clearAllFilters} size="small" sx={{ minHeight: 36, px: 0.5, fontSize: 12.5, fontWeight: 800, color: '#5222B8', whiteSpace: 'nowrap' }}>Clear all</Button>}
-              </Stack>
-            )}
             {sidebarContent}
           </Paper>
         )}
@@ -712,10 +707,10 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
                 <Chip key={role} label={role} onDelete={() => toggleFilter('roles', role)} size="small" />
               ))}
               {filterConfig.employmentTypes.map((type) => (
-                <Chip key={type} label={type} onDelete={() => toggleFilter('employmentTypes', type)} size="small" />
+                <Chip key={type} label={({ FULL_TIME: 'Full-time', PART_TIME: 'Part-time', LOCUM: 'Locum' } as Record<string, string>)[type] ?? type} onDelete={() => toggleFilter('employmentTypes', type)} size="small" />
               ))}
               {filterConfig.timeOfDay.map((time) => (
-                <Chip key={time} label={time} onDelete={() => toggleFilter('timeOfDay', time)} size="small" />
+                <Chip key={time} label={time.charAt(0).toUpperCase() + time.slice(1)} onDelete={() => toggleFilter('timeOfDay', time)} size="small" />
               ))}
               <Button size="small" onClick={clearAllFilters} startIcon={<CloseIcon fontSize="small" />}>
                 Clear all

@@ -574,3 +574,24 @@ layout (cover → About → members → large composer), so they were not follow
   for owner, admin and organisation Shift Centre pass.
 - **Finding (performance, not changed):** the org Active list fires 144 `member_status` / `shift-interests` requests
   (one per date per audience). A batch endpoint would cut the 12 s load.
+
+## Shift and talent boards: stronger filters and cards (2026-10-11)
+
+- **Why:** both boards read as long checkbox forms with identical cards. Making the filters shared did not change their
+  look (the shared file was the old Vite one); the weakness was the design, plus hard-coded hex colours that ignored dark
+  mode in Vite.
+- **Filters (one implementation for Vite and Next):** `landing_next/shared-ui/filterParts.tsx` (toggle chips with
+  `aria-pressed` and a check mark, collapsible sections, *Filters* header with the active count and *Clear all*). The
+  shift sidebar and a new shared talent sidebar (`shared-ui/talent/FiltersSidebar.tsx`; Next adds its skill icons via
+  `renderSkillIcon`) use them. Colours are theme variables with the brand light values as fallbacks, so Vite gets light
+  and dark and Next keeps its look. Next's own "Refine results" headers were removed (the shared header replaces them).
+- **Talent cards:** `shared-ui/talent/RoleTile.tsx` gives each role its own icon and tone (pharmacist violet, intern
+  blue, student magenta, assistant/technician cyan, career switcher amber) instead of one identical tile. The Vite card
+  loses its grey top strip and monospace reference; location, travel, pitch and engagement chips read in one column.
+- **Vite shift board:** flat card on theme tokens (no heavy shadow, no 4px amber stripe or corner ribbon; *Urgent* is a
+  pill), compact section heading under the page header, sticky filter panel, readable active-filter chips
+  (*Full-time*, not FULL_TIME). Selected board tab uses the AA accent pair (was 1.8:1 in dark mode).
+- **Performance fix (old, from main):** the Vite talent board requested a rating summary for every profile (662 requests,
+  one re-render each) and appeared stuck loading; it now fetches ratings for the visible page only, applied together.
+- Checked: Next and Vite boards at 1440 and 390, Vite light and dark; AA sweep 0 failures on all four boards; appearance
+  baselines for shift filters regenerated (geometry updated); Next contract tests updated to the shared files.

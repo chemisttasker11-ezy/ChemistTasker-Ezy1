@@ -43,6 +43,8 @@ import ReviewCounterOfferDialog from './components/ReviewCounterOfferDialog';
 import { useCounterOffers } from './hooks/useCounterOffers';
 import { useFilterSort } from './hooks/useFilterSort';
 import { useShiftPersistence } from './hooks/useShiftPersistence';
+
+const EMPLOYMENT_LABELS: Record<string, string> = { FULL_TIME: 'Full-time', PART_TIME: 'Part-time', LOCUM: 'Locum' };
 import { getUpcomingSlotsForDisplay, getShiftPharmacyId } from './utils/shift';
 
 const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
@@ -549,6 +551,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
       toggleStateSelection={toggleStateSelection}
       toggleFilter={toggleFilter}
       toggleBooleanFilter={toggleBooleanFilter}
+      onClearAll={clearAllFilters}
     />
   );
 
@@ -587,8 +590,8 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
 
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', mb: 2 }}>
         <Box>
-          <Typography variant="h4">{title}</Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography component="h2" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: { xs: 20, md: 22 }, color: 'var(--ct-text-primary)' }}>{title}</Typography>
+          <Typography variant="body2" sx={{ color: 'var(--ct-text-secondary)' }}>
             {activeTab === 'saved'
               ? `${displayShifts.length} saved items`
               : useServerFiltering && typeof totalCount === 'number' && slotFilterMode === 'all'
@@ -624,7 +627,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
 
       <Box sx={{ display: 'flex', gap: 3 }}>
         {!isMobile && !hideFiltersAndSort && (
-          <Paper variant="outlined" sx={{ width: 320, flexShrink: 0, borderRadius: 3, borderColor: 'grey.200' }}>
+          <Paper variant="outlined" component="aside" aria-label="Shift filters" sx={{ width: 320, flexShrink: 0, alignSelf: 'flex-start', position: 'sticky', top: 96, maxHeight: 'calc(100vh - 112px)', overflowY: 'auto', borderRadius: 'var(--ct-card-radius)', borderColor: 'var(--ct-border-color)', bgcolor: 'var(--ct-surface-bg)', boxShadow: 'none' }}>
             {sidebarContent}
           </Paper>
         )}
@@ -651,10 +654,10 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
                 <Chip key={role} label={role} onDelete={() => toggleFilter('roles', role)} size="small" />
               ))}
               {filterConfig.employmentTypes.map((type) => (
-                <Chip key={type} label={type} onDelete={() => toggleFilter('employmentTypes', type)} size="small" />
+                <Chip key={type} label={EMPLOYMENT_LABELS[type] ?? type} onDelete={() => toggleFilter('employmentTypes', type)} size="small" />
               ))}
               {filterConfig.timeOfDay.map((time) => (
-                <Chip key={time} label={time} onDelete={() => toggleFilter('timeOfDay', time)} size="small" />
+                <Chip key={time} label={time.charAt(0).toUpperCase() + time.slice(1)} onDelete={() => toggleFilter('timeOfDay', time)} size="small" />
               ))}
               <Button size="small" onClick={clearAllFilters} startIcon={<CloseIcon fontSize="small" />}>
                 Clear all

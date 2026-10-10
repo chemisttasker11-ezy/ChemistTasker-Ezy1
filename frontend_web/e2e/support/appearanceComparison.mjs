@@ -7,7 +7,7 @@ import pixelmatch from 'pixelmatch';
 // solely from current geometry: moving or resizing an input must fail as well.
 export const dateGeometry = {
   invoices: [{ x: 1033, y: 594, width: 170, height: 40.125 }, { x: 1215, y: 594, width: 170, height: 40.125 }],
-  'shift-filters': [{ x: 388, y: 684.15625, width: 274, height: 40 }, { x: 388, y: 736.15625, width: 274, height: 40 }],
+  'shift-filters': [{ x: 386, y: 832.140625, width: 278, height: 40 }, { x: 386, y: 882.140625, width: 278, height: 40 }],
 };
 export function compareOutsideDateText(actualBuffer, expectedBuffer, boxes) {
   const actual = PNG.sync.read(actualBuffer);

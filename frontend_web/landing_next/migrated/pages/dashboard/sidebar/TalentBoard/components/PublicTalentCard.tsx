@@ -5,11 +5,11 @@ import {
   FavoriteBorderOutlined as FavoriteBorderOutlinedIcon,
   FlightTakeoffOutlined as FlightTakeoffOutlinedIcon,
   LocationOnOutlined as LocationOnOutlinedIcon,
-  PersonSearchOutlined as PersonSearchOutlinedIcon,
   StarRounded as StarRoundedIcon,
   WorkOutlineRounded as WorkOutlineRoundedIcon,
 } from "@mui/icons-material";
 import type { Candidate } from "../types";
+import { RoleTile } from "../../../../../../shared-ui/talent/RoleTile";
 
 type PublicTalentCardProps = {
   candidate: Candidate;
@@ -69,13 +69,7 @@ export default function PublicTalentCard({
       <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 2.25, md: 3 }} alignItems="stretch">
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" spacing={1.5} alignItems="flex-start">
-            <Box sx={{
-              width: 50, height: 50, borderRadius: "14px", bgcolor: "#EEEAF9",
-              color: PURPLE, display: "grid", placeItems: "center", flexShrink: 0,
-              "& svg": { fontSize: 26 },
-            }}>
-              <PersonSearchOutlinedIcon aria-hidden="true" />
-            </Box>
+            <RoleTile role={candidate.role} />
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography component="h3" sx={{ color: INK, fontFamily: "Outfit, sans-serif", fontSize: { xs: 21, md: 24 }, fontWeight: 650, lineHeight: 1.2, overflowWrap: "anywhere" }}>
                 {roleLabel}
