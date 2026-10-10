@@ -1,0 +1,62 @@
+name: Owner Frontend Packet Bridge (temporary)
+
+on:
+  push:
+    branches: [ops/frontend-transfer-build-20261011]
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout owner-approved frontend source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+
+      - name: Install Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Build fresh-history frontend snapshot with credential scanner
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/transfer-parts"
+          node scripts/frontend-contractor-bridge.mjs export --source . --dest "$RUNNER_TEMP/frontend-export"
+          test -e "$RUNNER_TEMP/frontend-export/frontend_web/package.json"
+          test -e "$RUNNER_TEMP/frontend-export/frontend_web/landing_next/package.json"
+          test -e "$RUNNER_TEMP/frontend-export/frontend_mobile/package.json"
+          test -e "$RUNNER_TEMP/frontend-export/shared-core/package.json"
+          test ! -e "$RUNNER_TEMP/frontend-export/backend"
+          test ! -e "$RUNNER_TEMP/frontend-export/.git"
+          test ! -e "$RUNNER_TEMP/frontend-export/frontend_web/src-tauri"
+          test ! -e "$RUNNER_TEMP/frontend-export/frontend_mobile/google-services.json"
+          tar -C "$RUNNER_TEMP/frontend-export" -czf "$RUNNER_TEMP/frontend-export.tgz" .
+          # 640k binary chunks produce about 853k base64 text each, below GitHub's 1 MB contents ceiling.
+          split -b 640000 -d -a 4 "$RUNNER_TEMP/frontend-export.tgz" "$RUNNER_TEMP/transfer-parts/part-"
+          for chunk in "$RUNNER_TEMP"/transfer-parts/part-*; do
+            base64 -w 0 "$chunk" > "$chunk.b64"
+            rm -- "$chunk"
+          done
+          sha256sum "$RUNNER_TEMP/frontend-export.tgz" | awk '{print $1}' > "$RUNNER_TEMP/transfer-parts/checksum.txt"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/transfer-parts/source-commit.txt"
+          printf '%s\n' "$(find "$RUNNER_TEMP/transfer-parts" -name '*.b64' | wc -l)" > "$RUNNER_TEMP/transfer-parts/part-count.txt"
+
+      - name: Publish only encoded frontend packet to PRIVATE owner branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch --orphan ops/frontend-export-packet-20261011
+          test -z "$(git ls-files)"
+          mkdir -p transfer-packet
+          cp "$RUNNER_TEMP/transfer-parts/"* transfer-packet/
+          git add transfer-packet
+          git -c user.name='ChemistTasker Owner Transfer' -c user.email='actions@users.noreply.github.com' commit -m 'Temporary encoded, checked frontend snapshot (no Django or source Git history)'
+          git push origin HEAD:refs/heads/ops/frontend-export-packet-20261011
+          echo 'Created temporary frontend-only packet in original PRIVATE repository.'
