@@ -138,3 +138,24 @@ jobs:
             frontend_web/e2e/test-results
             frontend_web/e2e/playwright-report
           if-no-files-found: ignore
+
+
+  wiring-diff-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Compare every recorded API, destination and route against remote main
+        run: |
+          git fetch --no-tags origin main
+          mkdir -p .ci-artifacts
+          node scripts/audit-wiring-diff.mjs origin/main HEAD --json > .ci-artifacts/frontend-wiring-diff.json
+          node -e 'const r=require("./.ci-artifacts/frontend-wiring-diff.json"); console.log(JSON.stringify({changedPages:r.pageChanges.length, removedGlobal:r.removed.length, addedGlobal:r.added.length, nextCopiesDrifted:r.migratedDrift.length}, null, 2));'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: frontend-main-vs-pr160-wiring
+          path: .ci-artifacts/frontend-wiring-diff.json
+          if-no-files-found: warn
