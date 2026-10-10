@@ -1,5 +1,5 @@
 'use client';
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import Link from 'next/link';
 import {ArrowLeft,MessageCircle,Globe,Users,ImagePlus,Search,X,Send,BarChart3} from 'lucide-react';
 import PostEntry from './post-entry';
@@ -33,11 +33,9 @@ export default function CommunityFeed({hub,label,initial}:{hub:string;label:stri
  const session=useSession();
  const [tab,setTab]=useState<'discussion'|'about'>('discussion');
  const [files,setFiles]=useState<File[]>([]);
- // One object URL per selected image, released when the file leaves the composer (was created on every render).
- const previewUrls=useRef(new Map<File,string>());
- const previewFor=(file:File)=>{if(!file.type.startsWith('image/'))return '';let url=previewUrls.current.get(file);if(!url){url=URL.createObjectURL(file);previewUrls.current.set(file,url);}return url.startsWith('blob:')?url:'';};
- useEffect(()=>{for(const [file,url] of previewUrls.current){if(!files.includes(file)){URL.revokeObjectURL(url);previewUrls.current.delete(file);}}},[files]);
- useEffect(()=>{const urls=previewUrls.current;return()=>{urls.forEach(url=>URL.revokeObjectURL(url));urls.clear();};},[]);const [feed,setFeed]=useState(initial);const [page,setPage]=useState(1);
+ // One object URL per selected image, released when the selection changes (was created on every render).
+ const previews=useMemo(()=>files.map(file=>({file,url:file.type.startsWith('image/')?URL.createObjectURL(file):null})),[files]);
+ useEffect(()=>()=>previews.forEach(p=>p.url&&URL.revokeObjectURL(p.url)),[previews]);const [feed,setFeed]=useState(initial);const [page,setPage]=useState(1);
  const [query,setQuery]=useState('');const [search,setSearch]=useState('');const [searchOpen,setSearchOpen]=useState(false);
  const [body,setBody]=useState('');const [composerOpen,setComposerOpen]=useState(false);const [allowed,setAllowed]=useState(false);
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [polls,setPolls]=useState<Page<Poll>>();const [pollPage,setPollPage]=useState(1);
@@ -92,7 +90,7 @@ export default function CommunityFeed({hub,label,initial}:{hub:string;label:stri
      <form className="ct-card ct-composer" onSubmit={e=>{e.preventDefault();void post();}} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();addFiles(Array.from(e.dataTransfer.files||[]));}}>
       <div className="ct-composer-head"><span className="ct-avatar" aria-hidden="true">{initials(meName||'Me')}</span><div><strong>{meName||'You'}</strong><span> · posting to {label}</span></div></div>
       <textarea ref={textRef} aria-label="Post text" placeholder="What would you like to share with the group?" required maxLength={10000} value={body} onChange={e=>{setBody(e.target.value);sessionStorage.setItem(`ct:hub-draft:${hub}`,e.target.value);}} onPaste={e=>{const pasted=Array.from(e.clipboardData.files||[]);if(pasted.length){e.preventDefault();addFiles(pasted);}}}/>
-      {files.length>0&&<div className="ct-selected-files">{files.map((file,index)=><span key={index}>{previewFor(file)?<img src={previewFor(file)} alt=""/>:null}{file.name}<button type="button" onClick={()=>setFiles(files.filter((_,i)=>i!==index))} aria-label={`Remove ${file.name}`}><X size={14}/></button></span>)}</div>}
+      {previews.length>0&&<div className="ct-selected-files">{previews.map(({file,url},index)=><span key={index}>{url?<img src={url} alt=""/>:null}{file.name}<button type="button" onClick={()=>setFiles(files.filter((_,i)=>i!==index))} aria-label={`Remove ${file.name}`}><X size={14}/></button></span>)}</div>}
       <p className="ct-composer-note"><Globe size={13} aria-hidden="true"/> Everyone can see this post, including visitors who aren’t signed in.</p>
       <div className="ct-composer-actions">
        <button type="button" className="ct-ghost" title="Photos, PDF or Word documents, up to 15 MB each" onClick={()=>fileRef.current?.click()}><ImagePlus size={18}/> Photo or file</button>
