@@ -1,0 +1,190 @@
+diff --git a/node_modules/braces/lib/compile.js b/node_modules/braces/lib/compile.js
+index dce69be..c6fa546 100644
+--- a/node_modules/braces/lib/compile.js
++++ b/node_modules/braces/lib/compile.js
+@@ -4,7 +4,9 @@ const fill = require('fill-range');
+ const utils = require('./utils');
+ 
+ const compile = (ast, options = {}) => {
+-  const walk = (node, parent = {}) => {
++  require('./validate-depth')(ast);
++  const walk = (node, parent = {}, depth = 0) => {
++    if (depth > 64) throw new SyntaxError('Brace AST nesting exceeds 64 levels or contains a cycle');
+     const invalidBlock = utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+     const invalid = invalidBlock === true || invalidNode === true;
+@@ -47,7 +49,7 @@ const compile = (ast, options = {}) => {
+ 
+     if (node.nodes) {
+       for (const child of node.nodes) {
+-        output += walk(child, node);
++        output += walk(child, node, depth + 1);
+       }
+     }
+ 
+diff --git a/node_modules/braces/lib/expand.js b/node_modules/braces/lib/expand.js
+index 35b2c41..089553a 100644
+--- a/node_modules/braces/lib/expand.js
++++ b/node_modules/braces/lib/expand.js
+@@ -4,7 +4,8 @@ const fill = require('fill-range');
+ const stringify = require('./stringify');
+ const utils = require('./utils');
+ 
+-const append = (queue = '', stash = '', enclose = false) => {
++const append = (queue = '', stash = '', enclose = false, depth = 0) => {
++  if (depth > 64) throw new SyntaxError('Brace value nesting exceeds 64 levels or contains a cycle');
+   const result = [];
+ 
+   queue = [].concat(queue);
+@@ -18,12 +19,12 @@ const append = (queue = '', stash = '', enclose = false) => {
+   for (const item of queue) {
+     if (Array.isArray(item)) {
+       for (const value of item) {
+-        result.push(append(value, stash, enclose));
++        result.push(append(value, stash, enclose, depth + 1));
+       }
+     } else {
+       for (let ele of stash) {
+         if (enclose === true && typeof ele === 'string') ele = `{${ele}}`;
+-        result.push(Array.isArray(ele) ? append(item, ele, enclose) : item + ele);
++        result.push(Array.isArray(ele) ? append(item, ele, enclose, depth + 1) : item + ele);
+       }
+     }
+   }
+@@ -31,15 +32,19 @@ const append = (queue = '', stash = '', enclose = false) => {
+ };
+ 
+ const expand = (ast, options = {}) => {
++  require('./validate-depth')(ast);
+   const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;
+ 
+-  const walk = (node, parent = {}) => {
++  const walk = (node, parent = {}, depth = 0) => {
++    if (depth > 64) throw new SyntaxError('Brace AST nesting exceeds 64 levels or contains a cycle');
+     node.queue = [];
+ 
+     let p = parent;
+     let q = parent.queue;
++    let parentDepth = 0;
+ 
+     while (p.type !== 'brace' && p.type !== 'root' && p.parent) {
++      if (++parentDepth > 64) throw new SyntaxError('Brace parent nesting exceeds 64 levels or contains a cycle');
+       p = p.parent;
+       q = p.queue;
+     }
+@@ -74,8 +79,10 @@ const expand = (ast, options = {}) => {
+     const enclose = utils.encloseBrace(node);
+     let queue = node.queue;
+     let block = node;
++    let blockDepth = 0;
+ 
+     while (block.type !== 'brace' && block.type !== 'root' && block.parent) {
++      if (++blockDepth > 64) throw new SyntaxError('Brace parent nesting exceeds 64 levels or contains a cycle');
+       block = block.parent;
+       queue = block.queue;
+     }
+@@ -100,7 +107,7 @@ const expand = (ast, options = {}) => {
+       }
+ 
+       if (child.nodes) {
+-        walk(child, node);
++        walk(child, node, depth + 1);
+       }
+     }
+ 
+diff --git a/node_modules/braces/lib/parse.js b/node_modules/braces/lib/parse.js
+index 3a6988e..f87bc60 100644
+--- a/node_modules/braces/lib/parse.js
++++ b/node_modules/braces/lib/parse.js
+@@ -143,6 +143,7 @@ const parse = (input, options = {}) => {
+      */
+ 
+     if (value === CHAR_LEFT_PARENTHESES) {
++      if (stack.length >= 64) throw new SyntaxError('Brace pattern nesting exceeds 64 levels');
+       block = push({ type: 'paren', nodes: [] });
+       stack.push(block);
+       push({ type: 'text', value });
+@@ -195,6 +196,7 @@ const parse = (input, options = {}) => {
+      */
+ 
+     if (value === CHAR_LEFT_CURLY_BRACE) {
++      if (stack.length >= 64) throw new SyntaxError('Brace pattern nesting exceeds 64 levels');
+       depth++;
+ 
+       const dollar = prev.value && prev.value.slice(-1) === '$' || block.dollar === true;
+diff --git a/node_modules/braces/lib/stringify.js b/node_modules/braces/lib/stringify.js
+index 8bcf872..9f79c6e 100644
+--- a/node_modules/braces/lib/stringify.js
++++ b/node_modules/braces/lib/stringify.js
+@@ -3,7 +3,9 @@
+ const utils = require('./utils');
+ 
+ module.exports = (ast, options = {}) => {
+-  const stringify = (node, parent = {}) => {
++  require('./validate-depth')(ast);
++  const stringify = (node, parent = {}, depth = 0) => {
++    if (depth > 64) throw new SyntaxError('Brace AST nesting exceeds 64 levels or contains a cycle');
+     const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+     let output = '';
+@@ -21,7 +23,7 @@ module.exports = (ast, options = {}) => {
+ 
+     if (node.nodes) {
+       for (const child of node.nodes) {
+-        output += stringify(child);
++        output += stringify(child, node, depth + 1);
+       }
+     }
+     return output;
+diff --git a/node_modules/braces/lib/utils.js b/node_modules/braces/lib/utils.js
+index d19311f..16a67f6 100644
+--- a/node_modules/braces/lib/utils.js
++++ b/node_modules/braces/lib/utils.js
+@@ -101,12 +101,13 @@ exports.reduce = nodes => nodes.reduce((acc, node) => {
+ exports.flatten = (...args) => {
+   const result = [];
+ 
+-  const flat = arr => {
++  const flat = (arr, depth = 0) => {
++    if (depth > 64) throw new SyntaxError('Brace array nesting exceeds 64 levels');
+     for (let i = 0; i < arr.length; i++) {
+       const ele = arr[i];
+ 
+       if (Array.isArray(ele)) {
+-        flat(ele);
++        flat(ele, depth + 1);
+         continue;
+       }
+ 
+diff --git a/node_modules/braces/lib/validate-depth.js b/node_modules/braces/lib/validate-depth.js
+new file mode 100644
+index 0000000..5ed7774
+--- /dev/null
++++ b/node_modules/braces/lib/validate-depth.js
+@@ -0,0 +1,26 @@
++'use strict';
++
++// Public walkers also accept caller-created ASTs, so parser checks alone
++// cannot enforce a safe recursion bound. Ignore parent/prev back references.
++module.exports = ast => {
++  const active = new Set();
++  const pending = [{ node: ast, depth: 0 }];
++  while (pending.length) {
++    const item = pending.pop();
++    if (item.leave) {
++      active.delete(item.node);
++      continue;
++    }
++    if (!item.node || typeof item.node !== 'object') continue;
++    if (item.depth > 64 || active.has(item.node)) {
++      throw new SyntaxError('Brace AST nesting exceeds 64 levels or contains a cycle');
++    }
++    active.add(item.node);
++    pending.push({ node: item.node, leave: true });
++    if (Array.isArray(item.node.nodes)) {
++      for (let i = item.node.nodes.length - 1; i >= 0; i--) {
++        pending.push({ node: item.node.nodes[i], depth: item.depth + 1 });
++      }
++    }
++  }
++};

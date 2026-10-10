@@ -1,0 +1,13 @@
+{
+  "files": {
+    "node_modules/braces/lib/validate-depth.js": "8047d8b6ff56707f21701992ee1be67bc963b192d49a05d18cacdb48834b5d50",
+    "node_modules/braces/lib/parse.js": "80652ef26b3a8a8bd908998a22fad2acfe3f65cd2373177e4d5a5fc14a4f7e70",
+    "node_modules/braces/lib/compile.js": "95dcf374a7ccafe26742fa8e76c99a7036b603e9842ff7fdcdde3f86d1216eaa",
+    "node_modules/braces/lib/expand.js": "19d9497d82c3e5d1e7c2944d1be503402dacbf829e42f5089422c2804b5f6ac0",
+    "node_modules/braces/lib/stringify.js": "c95abf85ab3c3b62399e98ee65aabfc17e672d6b4cc48b454df5a8c6adaf59a7",
+    "node_modules/braces/lib/utils.js": "35f0d608bd905438e3114da522d9d7473a1b7b2a117ee47efd75833dfc393e42",
+    "node_modules/node-forge/lib/rsa.js": "96c154db17c611f81eeb48aed2c064c80d87517df2fff24cf574fbd1ac050492",
+    "node_modules/metro/src/Assets.js": "2e134bfefd838b7b24293c4c94ff7096a2c558b93e94185438a7b71dc5296458",
+    "node_modules/metro/src/Assets.js.flow": "e0786623f5e9b1f1d995e54fee1a3993dc7e4e223bc466169924316ed8087c90"
+  }
+}

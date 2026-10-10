@@ -184,6 +184,12 @@ jobs:
         working-directory: frontend_mobile
       - run: npx tsc --noEmit
         working-directory: frontend_mobile
+      - name: Mobile dependency exploit and compatibility regressions
+        run: npm run test:security
+        working-directory: frontend_mobile
+      - name: Verify patched runtime dependencies and reject new advisories
+        run: npm run security:dependencies
+        working-directory: frontend_mobile
 
   backend:
     runs-on: ubuntu-latest

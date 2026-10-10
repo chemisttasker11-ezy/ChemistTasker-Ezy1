@@ -1,0 +1,26 @@
+diff --git a/node_modules/metro/src/Assets.js b/node_modules/metro/src/Assets.js
+index 0870a4c..f6bb26c 100644
+--- a/node_modules/metro/src/Assets.js
++++ b/node_modules/metro/src/Assets.js
+@@ -14,7 +14,7 @@ var AssetPaths = _interopRequireWildcard(
+ );
+ var _crypto = _interopRequireDefault(require("crypto"));
+ var _fs = _interopRequireDefault(require("fs"));
+-var _imageSize = _interopRequireDefault(require("image-size"));
++var _imageSize = _interopRequireDefault(require("image-size").imageSize);
+ var _path = _interopRequireDefault(require("path"));
+ function _interopRequireDefault(e) {
+   return e && e.__esModule ? e : { default: e };
+diff --git a/node_modules/metro/src/Assets.js.flow b/node_modules/metro/src/Assets.js.flow
+index 3abcf7e..0536ee0 100644
+--- a/node_modules/metro/src/Assets.js.flow
++++ b/node_modules/metro/src/Assets.js.flow
+@@ -15,7 +15,7 @@ import {normalizePathSeparatorsToPosix} from './lib/pathUtils';
+ import * as AssetPaths from './node-haste/lib/AssetPaths';
+ import crypto from 'crypto';
+ import fs from 'fs';
+-import getImageSize from 'image-size';
++import {imageSize as getImageSize} from 'image-size';
+ import path from 'path';
+ 
+ export type AssetInfo = {
