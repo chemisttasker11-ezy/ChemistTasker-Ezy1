@@ -254,3 +254,38 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
   labelled 40px correct buttons, correction form on theme tokens (was hex violets).
 - Checked: 1440 and 390 (empty, mocked list, clock-times dialog, error); AA sweep 0 failures; smoke tests
   *Attendance approvals* route and *attendance approval uses existing … contracts* updated and passing.
+
+## Workforce pages in the shell (2026-10-10)
+
+- Timesheets, Leave, Workforce & Payroll, My Hours and My Leave were top-level routes with no dashboard layout, so
+  their sidebar links dropped people out of the shell and theme (MUI default look). They now sit under one pathless
+  layout route (`SharedDashboardWrapper`: theme + `DashboardTopShell`). URLs and each page's own capability guard are
+  unchanged; the delegated-admin redirect in `HubDashboardWrapper` is deliberately not used.
+
+## Timesheets (2026-10-10)
+
+- No Figma frames exist for timesheets; the page follows the Attendance approvals pattern.
+- `PageHeader` *Timesheets*; pharmacy picker in the header actions (only when there is more than one); the page's own
+  `Container`, hex colours and weight 900 removed.
+- Period card: period dates (status as a separate pill, not repeated in the field), *Open current fortnight*,
+  *Recalculate* and *Lock period* with hover hints; a locked period shows only *Correct period*. Period health is one
+  row of counted pills with hover guidance (*1 timesheet with errors*, *2 checks to review*, *1 leave request
+  waiting*, *1 worker still clocked in*, *1 ready to approve*, or *No exceptions*), replacing a stack of five alerts.
+- The 9-column table (980px minimum, scrolled sideways on phones, row clickable by mouse only) becomes one keyboard-
+  reachable row card per worker: initials, name, status in words (*Needs review*, *Ready to approve*, ...), *Needs
+  recalculating*, *Worked 66.5 h · Rostered 76 h · ...*, and *1 error · 1 warning · 2 comments* pills (were raw
+  codes, `0.00 h` figures and "0 blocking" chips).
+- `window.confirm` / `window.prompt` replaced by dialogs: *Lock {dates}?* and *Correct {dates}?* with a required,
+  explained reason; both lock and show a spinner while saving.
+- States: pharmacies loading/error/none; periods loading/error; no periods with *Open current fortnight*; timesheets
+  loading, error with *Try again*, empty, and *No timesheets match* with *Clear filters*. Refreshes keep the list on
+  screen (`aria-busy`). Before, every failure became one alert above an empty table that said "No timesheets".
+- Detail drawer (shared with My Hours): status/severity in words (*Error*, *Warning*, *Note*, *Waived*), totals as a
+  2/3-column grid, days with worked hours, checks as cards with a severity edge; *Recalculate* labelled (was an
+  unlabelled icon); approve button names the hours (*Approve 66.5 h*) and says why it is disabled (*Fix 1 error
+  first.*); missing clock-time dialog in plain words; comments show *Managers only*. Busy spinners everywhere, and a
+  failed resolve/waive now shows an error (it failed silently). Loading and load-error states with retry.
+- Checked: 1440 and 390 (filled, drawer, checks, lock dialog, no periods, load error, empty); AA sweep 0 failures on
+  page and drawer; Recalculate contract and the five workforce route checks passing.
+- **Finding (not changed):** the drawer offers *Resolve*/*Waive* on checks in worker mode (My Hours) too; the server
+  decides whether a worker may do this. Worth hiding for workers once the rule is confirmed.
