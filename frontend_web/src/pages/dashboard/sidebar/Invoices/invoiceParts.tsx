@@ -13,7 +13,7 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { Lock, Plus, Trash2 } from 'lucide-react';
+import { Copy, Lock, Plus, Trash2 } from 'lucide-react';
 import IconTile, { type Tone } from '../../../../components/ui/IconTile';
 import { Pill, type ShiftTone } from '../../shiftCenter/ShiftCentreParts';
 
@@ -134,6 +134,33 @@ export function TotalsBreakdown({ totals, gstRegistered }: { totals: Totals; gst
         <Typography sx={{ color: 'var(--ct-accent-strong)', fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 28, fontVariantNumeric: 'tabular-nums' }}>{money(totals.grandTotal)}</Typography>
       </Stack>
     </Box>
+  );
+}
+
+/** Bank details with copy buttons and the amount due: what the payer needs to make the transfer. */
+export function PayToDetails({ rows, amountDue, onCopy }: { rows: [string, string | undefined][]; amountDue: ReactNode; onCopy: (label: string, value: string) => void }) {
+  return (
+    <Stack spacing={1.25}>
+      {rows.map(([label, value]) => (
+        <Stack key={label} direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5 }}>{label}</Typography>
+            <Typography sx={{ color: 'var(--ct-text-primary)', fontSize: 15, fontWeight: 500, fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{value || 'Not given'}</Typography>
+          </Box>
+          {value ? (
+            <Tooltip title={`Copy ${label.toLowerCase()}`}>
+              <IconButton aria-label={`Copy ${label.toLowerCase()}`} onClick={() => onCopy(label, value)} sx={{ width: 40, height: 40 }}>
+                <Copy size={16} />
+              </IconButton>
+            </Tooltip>
+          ) : null}
+        </Stack>
+      ))}
+      <Box sx={{ pt: 1.25, borderTop: '1px solid var(--ct-border-color)' }}>
+        <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5 }}>Amount due</Typography>
+        <Typography sx={{ color: 'var(--ct-accent-strong)', fontFamily: 'var(--ct-font-display)', fontSize: 26, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{amountDue}</Typography>
+      </Box>
+    </Stack>
   );
 }
 

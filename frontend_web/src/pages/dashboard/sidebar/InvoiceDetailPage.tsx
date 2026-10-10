@@ -5,12 +5,12 @@ import {
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import {
-  ArrowLeft, Building2, CalendarDays, Check, CheckCircle2, Copy, Download, FileText, Flag, Landmark, ListChecks, MapPin, PiggyBank, UserRound,
+  ArrowLeft, Building2, CalendarDays, Check, CheckCircle2, Download, FileText, Flag, Landmark, ListChecks, MapPin, PiggyBank, UserRound,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import DashboardContentState from '../../../components/dashboard/DashboardContentState';
 import {
-  Facts, InvoiceSection, LineItemsEditor, LineItemsReadOnly, StatusPill, TotalsBreakdown, descriptionForSave, formatDay, invoiceStatus, money, splitDescription, syncDescription, type Totals,
+  Facts, InvoiceSection, LineItemsEditor, LineItemsReadOnly, PayToDetails, StatusPill, TotalsBreakdown, descriptionForSave, formatDay, invoiceStatus, money, splitDescription, syncDescription, type Totals,
 } from './Invoices/invoiceParts';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -618,31 +618,11 @@ export default function InvoiceDetailPage() {
           </Stack>
           <Stack spacing={2.5} sx={{ minWidth: 0 }}>
             <InvoiceSection icon={<Landmark />} tone="cyan" title="Pay to">
-              <Stack spacing={1.25}>
-                {[
-                  ['Account name', bankAccountName],
-                  ['BSB', bsb],
-                  ['Account number', accountNumber],
-                ].map(([label, value]) => (
-                  <Stack key={label} direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5 }}>{label}</Typography>
-                      <Typography sx={{ color: 'var(--ct-text-primary)', fontSize: 15, fontWeight: 500, fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{value || '—'}</Typography>
-                    </Box>
-                    {value ? (
-                      <Tooltip title={`Copy ${label.toLowerCase()}`}>
-                        <IconButton aria-label={`Copy ${label.toLowerCase()}`} size="small" onClick={() => void copyValue(label, value)}>
-                          <Copy size={16} />
-                        </IconButton>
-                      </Tooltip>
-                    ) : null}
-                  </Stack>
-                ))}
-                <Box sx={{ pt: 1.25, borderTop: '1px solid var(--ct-border-color)' }}>
-                  <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5 }}>Amount due</Typography>
-                  <Typography sx={{ color: 'var(--ct-accent-strong)', fontFamily: 'var(--ct-font-display)', fontSize: 26, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{money(grandTotal)}</Typography>
-                </Box>
-              </Stack>
+              <PayToDetails
+                rows={[['Account name', bankAccountName], ['BSB', bsb], ['Account number', accountNumber]]}
+                amountDue={money(grandTotal)}
+                onCopy={(label, value) => void copyValue(label, value)}
+              />
             </InvoiceSection>
             {Number(superAmount) > 0 || superFundName ? (
               <InvoiceSection icon={<PiggyBank />} tone="magenta" title="Superannuation">
