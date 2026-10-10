@@ -6,7 +6,10 @@ from memberships.models import (
     PHARMACY_STAFF_EMPLOYMENT_TYPES,
 )
 from organizations.models import Pharmacy, PharmacyClaim
-from shifts.models import Shift, ShiftProfileAccessAudit
+from shifts.models import (
+    Shift, ShiftCounterOffer, ShiftInterest, ShiftOffer, ShiftProfileAccessAudit,
+    ShiftSlotAssignment,
+)
 from invoicing.models import Invoice
 from invoicing.navigation import invoice_action_url
 from pharmacy_hub.models import PharmacyHubPost
@@ -83,12 +86,11 @@ def _public_platform_shifts(today, now):
 
 
 def _user_confirmed_platform_shifts(user, today, now):
+    future_assignments = _worker_upcoming_activity(user, today, now)["assignments"]
     return Shift.objects.filter(
         visibility="PLATFORM",
-        slot_assignments__user=user,
-    ).filter(
-        _future_shift_filter(today, now)
-    ).distinct()
+        pk__in=future_assignments.values("shift_id"),
+    ).filter(_future_shift_filter(today, now)).distinct()
 
 
 def _pharmacy_confirmed_shifts(pharmacy_ids):
@@ -192,35 +194,113 @@ def _dashboard_shift_box(shift):
     }
 
 
+def _future_slot_date_filter(today, now):
+    """Upcoming slots, including today's slots which have not ended."""
+    return Q(date__gt=today) | Q(date=today, end_time__gt=now)
+
+
+def _worker_upcoming_activity(user, today, now):
+    """Match a worker's action to its own upcoming slot, not another shift slot."""
+    assignments = ShiftSlotAssignment.objects.filter(user=user).filter(
+        Q(slot_date__gt=today)
+        | Q(slot_date=today, slot__end_time__gt=now)
+        | Q(slot_date__isnull=True, slot__date__gt=today)
+        | Q(slot_date__isnull=True, slot__date=today, slot__end_time__gt=now)
+    )
+    interests = ShiftInterest.objects.filter(user=user).filter(
+        Q(slot__isnull=True)
+        | Q(slot__date__gt=today)
+        | Q(slot__date=today, slot__end_time__gt=now)
+    )
+    # Explicit offered dates supersede recurring/template slot dates.
+    offer_still_open_today = (
+        Q(offered_end_time__gt=now)
+        | Q(offered_end_time__isnull=True, slot__end_time__gt=now)
+    )
+    offers = ShiftOffer.objects.filter(
+        user=user, status__in=["PENDING", "ACCEPTED_AWAITING_PAYMENT", "ACCEPTED"],
+    ).filter(
+        Q(slot__isnull=True, offered_slot_date__isnull=True)
+        | Q(offered_slot_date__gt=today)
+        | (Q(offered_slot_date=today) & offer_still_open_today)
+        | Q(offered_slot_date__isnull=True, slot__date__gt=today)
+        | (
+            Q(offered_slot_date__isnull=True, slot__date=today)
+            & offer_still_open_today
+        )
+    )
+    # An offer without slot selections is shift-wide; otherwise match the
+    # actual selected slot's proposed date and end time.
+    counter_offers = ShiftCounterOffer.objects.filter(
+        user=user, status__in=["PENDING", "ACCEPTED"],
+    ).filter(
+        Q(slots__isnull=True)
+        | Q(slots__slot__isnull=True, slots__slot_date__isnull=True)
+        | Q(slots__slot_date__gt=today)
+        | Q(slots__slot_date=today, slots__proposed_end_time__gt=now)
+        | Q(slots__slot_date__isnull=True, slots__slot__date__gt=today)
+        | Q(
+            slots__slot_date__isnull=True,
+            slots__slot__date=today,
+            slots__proposed_end_time__gt=now,
+        )
+    ).distinct()
+    return {
+        "assignments": assignments,
+        "interests": interests,
+        "offers": offers,
+        "counter_offers": counter_offers,
+    }
+
+
 def _worker_related_shifts(user, shifts_qs, today, now):
-    """Future shifts this worker has actually acted on or committed to."""
+    """Only shifts with a worker action still relevant to an upcoming slot."""
+    activity = _worker_upcoming_activity(user, today, now)
     return shifts_qs.filter(_future_shift_filter(today, now)).filter(
-        Q(slot_assignments__user=user)
-        | Q(interests__user=user)
-        | Q(counter_offers__user=user, counter_offers__status__in=["PENDING", "ACCEPTED"])
-        | Q(offers__user=user, offers__status__in=["PENDING", "ACCEPTED_AWAITING_PAYMENT", "ACCEPTED"])
+        Q(pk__in=activity["assignments"].values("shift_id"))
+        | Q(pk__in=activity["interests"].values("shift_id"))
+        | Q(pk__in=activity["counter_offers"].values("shift_id"))
+        | Q(pk__in=activity["offers"].values("shift_id"))
         | Q(dedicated_user=user)
     ).distinct()
 
 
-def _worker_shift_status(shift, user):
-    if shift.slot_assignments.filter(user=user).exists():
+def _worker_shift_status(shift, user, activity):
+    if activity["assignments"].filter(shift_id=shift.pk).exists():
         return "Confirmed"
-    if shift.offers.filter(user=user, status__in=["ACCEPTED_AWAITING_PAYMENT", "ACCEPTED"]).exists():
+    if activity["offers"].filter(shift_id=shift.pk, status__in=["ACCEPTED_AWAITING_PAYMENT", "ACCEPTED"]).exists():
         return "Committed"
-    if shift.counter_offers.filter(user=user, status="ACCEPTED").exists():
+    if activity["counter_offers"].filter(shift_id=shift.pk, status="ACCEPTED").exists():
         return "Committed"
-    if shift.offers.filter(user=user, status="PENDING").exists() or shift.dedicated_user_id == user.id:
+    if activity["offers"].filter(shift_id=shift.pk, status="PENDING").exists() or shift.dedicated_user_id == user.id:
         return "Offer"
-    if shift.counter_offers.filter(user=user, status="PENDING").exists():
+    if activity["counter_offers"].filter(shift_id=shift.pk, status="PENDING").exists():
         return "Applied"
-    if shift.interests.filter(user=user).exists():
+    if activity["interests"].filter(shift_id=shift.pk).exists():
         return "Interested"
     return "In progress"
 
 
-def _dashboard_worker_shift_box(shift, user, *, recommended=False):
-    slot = shift.slots.order_by("date", "start_time").first()
+def _dashboard_worker_shift_box(shift, user, *, recommended=False, today=None, now=None):
+    today = today if today is not None else date.today()
+    now = now if now is not None else timezone.now().time()
+    upcoming_slots = shift.slots.filter(_future_slot_date_filter(today, now)).order_by("date", "start_time")
+    activity = None if recommended else _worker_upcoming_activity(user, today, now)
+    slot = None
+    if activity:
+        # Prefer the upcoming slot assigned to or applied for by this worker.
+        for source, field in (
+            ("assignments", "slot_id"),
+            ("offers", "slot_id"),
+            ("counter_offers", "slots__slot_id"),
+            ("interests", "slot_id"),
+        ):
+            slot = upcoming_slots.filter(
+                pk__in=activity[source].filter(shift_id=shift.pk).values_list(field, flat=True)
+            ).first()
+            if slot is not None:
+                break
+    slot = slot or upcoming_slots.first()
     return {
         "id": shift.id,
         "pharmacy_name": shift.pharmacy.name if shift.pharmacy else "",
@@ -228,7 +308,7 @@ def _dashboard_worker_shift_box(shift, user, *, recommended=False):
         "date": slot.date if slot else None,
         "start_time": slot.start_time if slot else None,
         "end_time": slot.end_time if slot else None,
-        "status": "Recommended" if recommended else _worker_shift_status(shift, user),
+        "status": "Recommended" if recommended else _worker_shift_status(shift, user, activity),
         "reason": "Matches your availability and travel area" if recommended else None,
     }
 

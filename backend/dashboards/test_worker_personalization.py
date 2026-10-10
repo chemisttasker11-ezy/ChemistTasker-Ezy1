@@ -4,7 +4,10 @@ from django.test import TestCase
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from onboarding.models import ExplorerOnboarding, PharmacistOnboarding
-from shifts.models import Shift, ShiftInterest, ShiftSlot, ShiftSlotAssignment
+from shifts.models import (
+    Shift, ShiftCounterOffer, ShiftCounterOfferSlot, ShiftInterest, ShiftOffer,
+    ShiftSlot, ShiftSlotAssignment,
+)
 from talent.models import UserAvailability
 
 
@@ -80,6 +83,65 @@ class WorkerDashboardPersonalizationTests(TestCase):
         )
         self.assertEqual(response.data["upcoming_shifts_count"], 2)
         self.assertEqual(response.data["shift_summary"]["open_count"], 1)
+
+
+    def test_expired_worker_actions_do_not_claim_an_unrelated_upcoming_slot(self):
+        shift, _ = self.shift()
+        past_date = date.today() - timedelta(days=3)
+        past = ShiftSlot.objects.create(
+            shift=shift, date=past_date, start_time=time(9, 0), end_time=time(17, 0)
+        )
+        ShiftSlotAssignment.objects.create(shift=shift, slot=past, slot_date=past_date, user=self.worker)
+        ShiftInterest.objects.create(shift=shift, slot=past, user=self.worker)
+        ShiftOffer.objects.create(
+            shift=shift, slot=past, user=self.worker,
+            offered_slot_date=past_date, status="PENDING",
+        )
+        counter = ShiftCounterOffer.objects.create(shift=shift, user=self.worker, status="PENDING")
+        ShiftCounterOfferSlot.objects.create(
+            offer=counter, slot=past, slot_date=past_date,
+            proposed_start_time=time(9, 0), proposed_end_time=time(17, 0),
+        )
+
+        response = client_for(self.worker).get(API, {"workspace": "platform"})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertNotIn(shift.id, {item["id"] for item in response.data["shifts"]})
+        self.assertEqual(response.data["upcoming_shifts_count"], 0)
+        self.assertEqual(response.data["confirmed_shifts_count"], 0)
+
+    def test_upcoming_interest_has_correct_date_and_does_not_inherit_past_confirmation(self):
+        shift, upcoming = self.shift()
+        past_date = date.today() - timedelta(days=3)
+        past = ShiftSlot.objects.create(
+            shift=shift, date=past_date, start_time=time(9, 0), end_time=time(17, 0)
+        )
+        ShiftSlotAssignment.objects.create(shift=shift, slot=past, slot_date=past_date, user=self.worker)
+        ShiftInterest.objects.create(shift=shift, slot=upcoming, user=self.worker)
+
+        response = client_for(self.worker).get(API, {"workspace": "platform"})
+        self.assertEqual(response.status_code, 200, response.data)
+        item = next(item for item in response.data["shifts"] if item["id"] == shift.id)
+        self.assertEqual(item["date"], self.day)
+        self.assertEqual(item["status"], "Interested")
+        self.assertEqual(response.data["confirmed_shifts_count"], 0)
+
+    def test_upcoming_assignment_prefers_worker_slot_over_earlier_open_slot(self):
+        shift, assigned_slot = self.shift()
+        earlier = ShiftSlot.objects.create(
+            shift=shift, date=self.day - timedelta(days=1),
+            start_time=time(10, 0), end_time=time(14, 0),
+        )
+        ShiftInterest.objects.create(shift=shift, slot=earlier, user=self.worker)
+        ShiftSlotAssignment.objects.create(
+            shift=shift, slot=assigned_slot, slot_date=self.day, user=self.worker
+        )
+
+        response = client_for(self.worker).get(API, {"workspace": "platform"})
+        self.assertEqual(response.status_code, 200, response.data)
+        item = next(item for item in response.data["shifts"] if item["id"] == shift.id)
+        self.assertEqual(item["date"], self.day)
+        self.assertEqual(item["status"], "Confirmed")
+        self.assertEqual(response.data["confirmed_shifts_count"], 1)
 
 
 class ExplorerDashboardPersonalizationTests(TestCase):
