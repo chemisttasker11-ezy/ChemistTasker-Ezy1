@@ -8,7 +8,9 @@ import { readFileSync } from 'node:fs';
 const [baseRef = 'origin/main', headRef = 'HEAD'] = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
 const asJson = process.argv.includes('--json');
 const ROOTS = ['frontend_web/src', 'frontend_web/landing_next', 'shared-core/src'];
-const SKIP = /(node_modules|\.next|\/dist\/|\.test\.|\.spec\.|\/migrated\/)/; // migrated is compared separately below
+// Migrated pages also need a comparison with main. The twin comparison below
+// only identifies duplicate source; it cannot detect a changed Next destination.
+const SKIP = /(node_modules|\.next|\/dist\/|\.test\.|\.spec\.)/;
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 const listing = (ref, roots) => ref === 'WORKTREE'
