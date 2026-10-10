@@ -171,3 +171,16 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
 | 5 | Invoices list/detail/editor | status pills, empty/error, review actions |
 | 6 | Overviews (all personas) | attention items, empty feeds |
 | 7 | Chat, Pharmacy Hub, Talent Hub, Calendar, Availability, Onboarding | page headers, states, contrast leftovers |
+
+## My Chain (2026-10-10)
+
+- `PageHeader` *My chain* (Figma's *Manage Chains* duplicated the top bar); the page's own `Container` removed.
+- Chain card: logo or violet `IconTile`, name, contact email; 44px labelled edit/delete buttons with hover hints and
+  *Manage pharmacies*. **Delete now asks to confirm** (it deleted on one click before).
+- *Staff by pharmacy* shows the pharmacy count; each pharmacy row shows *N staff*. Members show name first, then
+  role in plain words · email (was email + raw role code).
+- States: shared loading; error with *Try again* (a failed load used to claim "no chain yet"); empty with *Create
+  chain* (one action, not a header button plus an empty-state button); no pharmacies with *Add pharmacies*; per
+  pharmacy skeleton, *Staff not loaded* + *Try again*, *No staff yet*. All saves show a busy spinner and lock the
+  dialog; buttons name their action (*Create chain* / *Save changes*, not *OK*).
+- Checked: 1440 and 390 (empty, filled, error, delete dialog); AA sweep 0 failures.
