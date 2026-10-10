@@ -110,13 +110,13 @@ export function buzzShiftOffer(offerId: number | string) {
     return fetchApi(`/shift-offers/${offerId}/buzz/`, { method: 'POST' });
 }
 export function getCommunityShiftDetail(id: number | string) {
-    return fetchApi<ShiftApi>(`/community-shifts/${id}`);
+    return fetchApi<ShiftApi>(API_ENDPOINTS.getCommunityShiftDetail(id));
 }
 export function getPublicShiftDetail(id: number | string) {
-    return fetchApi<ShiftApi>(`/public-shifts/${id}`);
+    return fetchApi<ShiftApi>(API_ENDPOINTS.getPublicShiftDetail(id));
 }
 export function getActiveShiftDetail(id: number | string) {
-    return fetchApi<ShiftApi>(`/shifts/active/${id}`);
+    return fetchApi<ShiftApi>(API_ENDPOINTS.getActiveShiftDetail(id));
 }
 export function deleteActiveShift(id: number | string) {
     return fetchApi(`/shifts/active/${id}/`, { method: 'DELETE' });

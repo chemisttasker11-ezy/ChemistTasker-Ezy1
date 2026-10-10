@@ -92,7 +92,13 @@ export default function HubPage() {
 
   useEffect(() => {
     const getScopedViewFromSearch = (data: HubContext): SelectedView | null => {
-      const scope = searchParams.get('scope');
+      // The dashboard pharmacy selector uses workspace/pharmacy_id. Explicit hub
+      // deep links still take precedence for posts, groups and organisations.
+      const scope = searchParams.get('scope') ?? (
+        searchParams.get('workspace') === 'internal' && searchParams.has('pharmacy_id')
+          ? 'pharmacy'
+          : null
+      );
       if (!scope) return null;
 
       if (scope === 'pharmacy') {
@@ -134,10 +140,13 @@ export default function HubPage() {
       return null;
     };
 
+    let active = true;
     const getHubContext = async () => {
       try {
         setLoading(true);
+        setError(null);
         const data = await fetchHubContext();
+        if (!active) return;
         setHubContext(data);
         const scopedView = getScopedViewFromSearch(data);
         if (scopedView) {
@@ -156,13 +165,15 @@ export default function HubPage() {
           setSelectedView({ type: 'platformHome', id: data.chemisttaskerHubs[0].key });
         }
       } catch (err) {
+        if (!active) return;
         console.error('Failed to fetch hub context:', err);
         setError('Failed to load hub data. Please try again.');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     void getHubContext();
+    return () => { active = false; };
   }, [searchParams]);
 
   const pharmacies = useMemo(() => hubContext?.pharmacies || [], [hubContext]);

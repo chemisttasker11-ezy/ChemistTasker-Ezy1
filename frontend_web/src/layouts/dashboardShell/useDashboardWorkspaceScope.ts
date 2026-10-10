@@ -166,10 +166,11 @@ export function useDashboardWorkspaceScope(forceAdminScope: boolean) {
   useEffect(() => {
     if (canUsePlatformWorkspace || workspace !== "platform") return;
     setWorkspace("internal");
-    // A valid pharmacy already named in the URL (for example a canonicalised stale link) wins over remembered state.
-    const urlPharmacyId = Number(searchParams.get("pharmacy_id") ?? searchParams.get("pharmacy"));
-    const urlPharmacy = pharmacies.some((pharmacy) => pharmacy.id === urlPharmacyId) ? urlPharmacyId : null;
-    const fallbackPharmacyId = isOrgUser ? null : urlPharmacy ?? selectedPharmacyId ?? workspaceSelectedPharmacyId ?? pharmacies[0]?.id ?? null;
+    // Preserve an explicit requested scope while the authorised pharmacy list loads.
+    // Django validates access; normalisation must not widen the request to all locations.
+    const urlPharmacyId = Number(searchParams.get("pharmacy_id") ?? searchParams.get("pharmacy") ?? searchParams.get("pharmacyId"));
+    const urlPharmacy = Number.isFinite(urlPharmacyId) && urlPharmacyId > 0 ? urlPharmacyId : null;
+    const fallbackPharmacyId = urlPharmacy ?? (isOrgUser ? null : selectedPharmacyId ?? workspaceSelectedPharmacyId ?? pharmacies[0]?.id ?? null);
     setSelectedPharmacyId(fallbackPharmacyId);
     setWorkspacePharmacyId(fallbackPharmacyId);
     setSearchParams((current) => {
@@ -177,6 +178,7 @@ export function useDashboardWorkspaceScope(forceAdminScope: boolean) {
       nextParams.set("workspace", "internal");
       nextParams.delete("pharmacy_id");
       nextParams.delete("pharmacy");
+      nextParams.delete("pharmacyId");
       if (fallbackPharmacyId != null) {
         nextParams.set("pharmacy_id", String(fallbackPharmacyId));
       }

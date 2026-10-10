@@ -6,7 +6,7 @@ import {safeHubAttachmentUrl} from '../landing_next/lib/safe-hub-attachment.ts';
 
 test('return links preserve permitted destinations and reject external or login loops',()=>{
  for(const path of ['/content','/content/invite/example','/hubs/posts/12?reply=4#comments','/dashboard/pharmacist/overview'])assert.equal(safeNext(path),path);
- for(const path of ['https://example.com','//example.com','/\\example.com','/login?next=/login','javascript:alert(1)','/hubs/../../login',null])assert.equal(safeNext(path),null);
+ for(const path of ['https://example.com','//example.com','/\\example.com','/login?next=/login','javascript:alert(1)','/hubs/../../login','/dashboard/owner/logout?workspace=internal&pharmacy_id=2','/dashboard/admin/1/logout/','/dashboard/pharmacist/%6cogout',null])assert.equal(safeNext(path),null);
 });
 
 test('cookie authority only reconciles a known cross-user bearer identity',()=>{
