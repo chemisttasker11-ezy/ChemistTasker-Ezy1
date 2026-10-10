@@ -15,7 +15,8 @@ import {
 } from '@mui/material';
 import { Copy, Lock, Plus, Trash2 } from 'lucide-react';
 import IconTile, { type Tone } from '../../../../components/ui/IconTile';
-import { Pill, type ShiftTone } from '../../shiftCenter/ShiftCentreParts';
+import { Pill } from '../../../../components/ui/Pill';
+import { type StatusTone } from '../../../../components/ui/tone';
 
 export const CATEGORY_CHOICES = [
   { code: 'ProfessionalServices', label: 'Professional services' },
@@ -38,7 +39,7 @@ export const formatDay = (iso?: string | null) => {
 };
 
 /** Draft / Sent / Paid, plus Overdue when a sent invoice is past its due date. */
-export function invoiceStatus(status?: string | null, dueDate?: string | null): { label: string; tone: ShiftTone; hint: string } {
+export function invoiceStatus(status?: string | null, dueDate?: string | null): { label: string; tone: StatusTone; hint: string } {
   const s = String(status || '').toLowerCase();
   if (s === 'paid') return { label: 'Paid', tone: 'green', hint: 'Payment recorded' };
   if (s === 'sent' || s === 'pending') {

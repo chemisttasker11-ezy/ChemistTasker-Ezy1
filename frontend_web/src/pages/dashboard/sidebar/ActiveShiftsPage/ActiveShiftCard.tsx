@@ -26,8 +26,11 @@ import {
     Users,
 } from 'lucide-react';
 import IconTile, { type Tone } from '../../../../components/ui/IconTile';
-import { Hint, NewActivityBadge, Pill, PlatformMark } from '../../shiftCenter/ShiftCentreParts';
-import { getAudienceLevel, humanizeEnum } from './utils/audience';
+import { NewActivityBadge, PlatformMark } from '../../shiftCenter/ShiftCentreParts';
+import { Hint } from '../../../../components/ui/Hint';
+import { Pill } from '../../../../components/ui/Pill';
+import { getAudienceLevel } from './utils/audience';
+import { humanizeEnum } from '../../../../utils/labels';
 import type {
     Shift,
     ShiftMemberStatus,

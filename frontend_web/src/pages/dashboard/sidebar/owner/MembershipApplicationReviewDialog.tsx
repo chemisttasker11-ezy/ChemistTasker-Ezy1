@@ -23,7 +23,7 @@ import {
   useTheme,
 } from '@mui/material';
 import { Check } from 'lucide-react';
-import { Pill } from '../../shiftCenter/ShiftCentreParts';
+import { Pill } from '../../../../components/ui/Pill';
 import { PersonAvatar, employmentLabel, roleLabel, roleTone } from './teamUi';
 import dayjs from 'dayjs';
 import {

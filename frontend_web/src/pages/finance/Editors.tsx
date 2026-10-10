@@ -1,7 +1,7 @@
 import { useState, useRef, type ReactNode, type FormEvent } from 'react';
 import { Alert, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, InputAdornment, MenuItem, Stack, TextField, Typography } from '@mui/material';
-import { ConfirmDialog } from '../dashboard/sidebar/owner/teamUi';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { finance, type FinanceCustomer, type FinanceCustomerInput, type FinanceItem, type FinanceItemInput,
   type FinanceInvoice, type FinanceExpense, type FinanceExpenseInput,
   type FinanceTaxCode, type FinanceCategory, type FinanceUnit } from '@chemisttasker/shared-core';

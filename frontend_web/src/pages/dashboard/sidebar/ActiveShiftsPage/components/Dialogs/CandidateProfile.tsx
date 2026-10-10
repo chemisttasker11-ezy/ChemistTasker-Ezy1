@@ -3,7 +3,8 @@
 import { Avatar, Box, Stack, Typography } from '@mui/material';
 import { BadgeCheck, BriefcaseBusiness, MapPin, Wallet } from 'lucide-react';
 import skillsCatalog from '../../../../../../../../shared-core/skills_catalog.json';
-import { InitialsAvatar, Pill } from '../../../../shiftCenter/ShiftCentreParts';
+import { InitialsAvatar } from '../../../../../../components/ui/InitialsAvatar';
+import { Pill } from '../../../../../../components/ui/Pill';
 
 type CatalogItem = { code: string; label: string };
 type Catalog = Record<string, Record<string, CatalogItem[]>>;

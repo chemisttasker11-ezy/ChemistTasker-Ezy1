@@ -19,24 +19,8 @@ import {
   Typography,
 } from "@mui/material";
 import { Link2, MessageCircle, Plus, Send, Star, StarOff, UserPlus } from "lucide-react";
-import {
-  ConfirmDialog,
-  EmptyTeam,
-  InviteLinkDialog,
-  MemberRow,
-  TeamList,
-  TeamListSkeleton,
-  TeamSection,
-  TeamToolbar,
-  actionButtonSx,
-  employmentLabel,
-  formatDate,
-  membershipClassification,
-  membershipPhoto,
-  membershipUserId,
-  roleLabel,
-  roleTone,
-} from "./teamUi";
+import { EmptyTeam, InviteLinkDialog, MemberRow, TeamList, TeamListSkeleton, TeamSection, TeamToolbar, actionButtonSx, employmentLabel, formatDate, membershipClassification, membershipPhoto, membershipUserId, roleLabel, roleTone } from "./teamUi";
+import { ConfirmDialog } from "../../../../components/ui/ConfirmDialog";
 import {
   createMembershipInviteLinkService,
   deleteMembershipService,

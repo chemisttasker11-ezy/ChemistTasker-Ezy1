@@ -38,9 +38,10 @@ import LocumManager from "./LocumManager";
 import PharmacyAdmins from "./PharmacyAdmins";
 import { getPayrollConfiguration, updatePayrollConfiguration } from "../../../../features/workforce/api";
 import PageHeader from "../../../../components/ui/PageHeader";
+import SectionCard from "../../../../components/ui/SectionCard";
 import IconTile, { type Tone } from "../../../../components/ui/IconTile";
 import DashboardContentState from "../../../../components/dashboard/DashboardContentState";
-import { Pill } from "../../shiftCenter/ShiftCentreParts";
+import { Pill } from "../../../../components/ui/Pill";
 import { roleLabel } from "./teamUi";
 
 /* ---------- helpers ---------- */
@@ -99,25 +100,6 @@ const RATE_LABELS: Record<string, string> = {
 };
 
 /* ---------- small parts ---------- */
-
-function Card({ title, action, children, padded = true }: { title?: string; action?: React.ReactNode; children: React.ReactNode; padded?: boolean }) {
-  return (
-    <Paper
-      variant="outlined"
-      component="section"
-      aria-label={title}
-      sx={{ borderRadius: "var(--ct-card-radius)", borderColor: "var(--ct-border-color)", bgcolor: "var(--ct-surface-bg)", boxShadow: "none", overflow: "hidden" }}
-    >
-      {title ? (
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.25, pt: 2, pb: padded ? 0 : 1.25 }}>
-          <Typography component="h2" sx={{ color: "var(--ct-text-primary)", fontWeight: 600, fontSize: 16 }}>{title}</Typography>
-          {action}
-        </Stack>
-      ) : null}
-      <Box sx={padded ? { p: 2.25, pt: title ? 1.5 : 2.25 } : undefined}>{children}</Box>
-    </Paper>
-  );
-}
 
 function ActionRow({ icon, tone, title, detail, onClick, emphasis = false }: { icon: React.ReactNode; tone: Tone; title: string; detail?: string; onClick: () => void; emphasis?: boolean }) {
   return (
@@ -526,7 +508,7 @@ export default function OwnerPharmacyDetailPage({
           }}
         >
           <Box sx={{ gridArea: "attention", minWidth: 0 }}>
-            <Card title="Needs your attention" padded={false}>
+            <SectionCard dense flush title="Needs your attention">
               {firstLoad ? (
                 <Box sx={{ px: 2.25, pb: 2 }}>
                   <Skeleton height={44} />
@@ -571,11 +553,11 @@ export default function OwnerPharmacyDetailPage({
                   ))}
                 </Box>
               )}
-            </Card>
+            </SectionCard>
           </Box>
 
           <Box sx={{ gridArea: "team", minWidth: 0 }}>
-            <Card title="Your team">
+            <SectionCard dense title="Your team">
               <Box sx={{ display: "grid", gap: { xs: 1, sm: 1.5 }, gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
                 <StatButton
                   icon={<Users />}
@@ -607,11 +589,11 @@ export default function OwnerPharmacyDetailPage({
                   Team mix: <Box component="span" sx={{ color: "var(--ct-text-primary)" }}>{roleSummary}</Box>
                 </Typography>
               ) : null}
-            </Card>
+            </SectionCard>
           </Box>
 
           <Box sx={{ gridArea: "profile", minWidth: 0 }}>
-            <Card title="Pharmacy profile" action={<Button size="small" startIcon={<Pencil size={14} />} onClick={editPharmacy}>Edit</Button>}>
+            <SectionCard dense title="Pharmacy profile" action={<Button size="small" startIcon={<Pencil size={14} />} onClick={editPharmacy}>Edit</Button>}>
               <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) minmax(0, 1fr)" } }}>
               <Stack spacing={1.5} sx={{ minWidth: 0 }}>
                 {profile?.email ? (
@@ -656,11 +638,11 @@ export default function OwnerPharmacyDetailPage({
                     Add opening hours, ABN and a default rate so workers know what to expect.
                   </Typography>
                 ) : null}
-            </Card>
+            </SectionCard>
           </Box>
 
           <Box sx={{ gridArea: "actions", minWidth: 0 }}>
-            <Card title="Quick actions" padded={false}>
+            <SectionCard dense flush title="Quick actions">
               <ActionRow icon={<ClipboardList />} tone="violet" title="Post a shift" detail="Open, internal or to favourites" onClick={() => go("post-shift")} emphasis />
               <ActionRow icon={<UserPlus />} tone="magenta" title="Invite staff" detail="By email or invite link" onClick={() => { setTab("staff"); setInviteStaff((n) => n + 1); }} />
               <ActionRow icon={<Star />} tone="violet" title="Add a favourite locum" onClick={() => { setTab("locums"); setInviteLocum((n) => n + 1); }} />
@@ -668,7 +650,7 @@ export default function OwnerPharmacyDetailPage({
               <ActionRow icon={<CalendarClock />} tone="cyan" title="Internal roster" detail="Plan your team's week" onClick={() => go("manage-pharmacies/roster")} />
               <ActionRow icon={<CalendarClock />} tone="blue" title="Shift Centre" detail="Active, confirmed and past shifts" onClick={() => go("shift-center")} />
               <ActionRow icon={<Wallet />} tone="cyan" title="Workforce & payroll" detail="Timesheets, leave and pay settings" onClick={() => navigate(`/dashboard/workforce/settings?pharmacy_id=${pharmacy.id}`)} />
-            </Card>
+            </SectionCard>
           </Box>
         </Box>
       </Box>

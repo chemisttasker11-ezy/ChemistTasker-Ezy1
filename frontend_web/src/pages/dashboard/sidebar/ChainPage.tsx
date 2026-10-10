@@ -14,7 +14,7 @@ import { API_BASE_URL } from '../../../constants/api';
 import PageHeader from '../../../components/ui/PageHeader';
 import IconTile from '../../../components/ui/IconTile';
 import DashboardContentState from '../../../components/dashboard/DashboardContentState';
-import { humanizeEnum } from './ActiveShiftsPage/utils/audience';
+import { humanizeEnum } from '../../../utils/labels';
 import {
   Chain,
   PharmacySummary,

@@ -25,7 +25,8 @@ import dayjs from 'dayjs';
 import { fetchPharmaciesService } from '@chemisttasker/shared-core';
 import PageHeader from '../../components/ui/PageHeader';
 import DashboardContentState from '../../components/dashboard/DashboardContentState';
-import { InitialsAvatar, Pill } from '../../pages/dashboard/shiftCenter/ShiftCentreParts';
+import { InitialsAvatar } from '../../components/ui/InitialsAvatar';
+import { Pill } from '../../components/ui/Pill';
 import {
   fetchTimesheetSummary,
   listTimesheetPeriods,

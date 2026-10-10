@@ -3,7 +3,8 @@ import { Box, Stack } from '@mui/material';
 import { Tag, UserCheck } from 'lucide-react';
 import { Shift, ShiftInterest } from '@chemisttasker/shared-core';
 import { SlotSelector } from './SlotSelector';
-import { CandidateColumn, CandidateRow, Pill, PlatformMark, RowAction, SourceSection } from '../../../../shiftCenter/ShiftCentreParts';
+import { CandidateColumn, CandidateRow, PlatformMark, RowAction, SourceSection } from '../../../../shiftCenter/ShiftCentreParts';
+import { Pill } from '../../../../../../components/ui/Pill';
 import { getInterestDisplayName } from '../../utils/candidateHelpers';
 
 interface PublicLevelViewProps {

@@ -42,7 +42,7 @@ import { useShiftActions } from './hooks/useShiftActions';
 import { useShareShift } from './hooks/useShareShift';
 
 // Components
-import { ConfirmDialog } from '../owner/teamUi';
+import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog';
 import { CounterOfferDialog } from './components/Dialogs/CounterOfferDialog';
 
 import ActiveShiftCard from './ActiveShiftCard';

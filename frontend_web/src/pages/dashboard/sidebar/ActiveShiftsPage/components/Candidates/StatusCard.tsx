@@ -1,7 +1,10 @@
 import React from 'react';
 import { ShiftMemberStatus } from '@chemisttasker/shared-core';
-import { CandidateColumn, CandidateRow, Pill, RowAction, type ShiftTone } from '../../../../shiftCenter/ShiftCentreParts';
-import { getAudienceLevel, humanizeEnum } from '../../utils/audience';
+import { CandidateColumn, CandidateRow, RowAction } from '../../../../shiftCenter/ShiftCentreParts';
+import { Pill } from '../../../../../../components/ui/Pill';
+import { type StatusTone } from '../../../../../../components/ui/tone';
+import { getAudienceLevel } from '../../utils/audience';
+import { humanizeEnum } from '../../../../../../utils/labels';
 
 interface StatusCardProps {
     title: string;
@@ -10,7 +13,7 @@ interface StatusCardProps {
     emptyText: string;
     members: ShiftMemberStatus[];
     icon: React.ReactElement;
-    tone: ShiftTone;
+    tone: StatusTone;
     /** Only the Interested column offers review / buzz actions. */
     actionable?: boolean;
     shiftId: number;

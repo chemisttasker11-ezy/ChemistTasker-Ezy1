@@ -2,6 +2,9 @@ import {useEffect} from 'react';
 import {useLocation} from 'react-router-dom';
 import {safeNext} from '../../landing_next/shared/browser-session';
 
+/** The public (Next) site's home page: where the ChemistTasker logo goes from inside the dashboard, as on main. */
+export const publicSiteHomeUrl=()=>`${(import.meta.env.VITE_PUBLIC_SITE_URL||window.location.origin).replace(/\/$/,'')}/`;
+
 export default function PublicRouteBridge({children}:{children:React.ReactNode}){
  const location=useLocation();
  const publicSiteOrigin=(import.meta.env.VITE_PUBLIC_SITE_URL||window.location.origin).replace(/\/$/,'');

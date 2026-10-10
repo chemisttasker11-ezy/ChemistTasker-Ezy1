@@ -3,7 +3,9 @@ import { Box, Button, ButtonBase, CircularProgress, Stack, Typography } from '@m
 import { ArrowRight, Lock, TrendingUp } from 'lucide-react';
 import { Shift, EscalationLevelKey } from '@chemisttasker/shared-core';
 import { AUDIENCE_LEVELS, type AudienceScope } from '../../utils/audience';
-import { Hint, InfoHint, Pill, PlatformMark } from '../../../../shiftCenter/ShiftCentreParts';
+import { PlatformMark } from '../../../../shiftCenter/ShiftCentreParts';
+import { Hint, InfoHint } from '../../../../../../components/ui/Hint';
+import { Pill } from '../../../../../../components/ui/Pill';
 
 interface EscalationStepperProps {
     shift: Shift;

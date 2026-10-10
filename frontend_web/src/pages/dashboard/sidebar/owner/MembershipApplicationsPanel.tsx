@@ -1,23 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Button, Stack } from "@mui/material";
 import { Clock3, MailCheck } from "lucide-react";
-import { Pill, type ShiftTone } from "../../shiftCenter/ShiftCentreParts";
-import {
-  ConfirmDialog,
-  MemberRow,
-  TeamList,
-  TeamListSkeleton,
-  TeamSection,
-  actionButtonSx,
-  employmentLabel,
-  formatDate,
-  membershipEmail,
-  membershipName,
-  membershipPhoto,
-  prettyCode,
-  roleLabel,
-  roleTone,
-} from "./teamUi";
+import { Pill } from "../../../../components/ui/Pill";
+import { type StatusTone } from "../../../../components/ui/tone";
+import { MemberRow, TeamList, TeamListSkeleton, TeamSection, actionButtonSx, employmentLabel, formatDate, membershipEmail, membershipName, membershipPhoto, prettyCode, roleLabel, roleTone } from "./teamUi";
+import { ConfirmDialog } from "../../../../components/ui/ConfirmDialog";
 import {
   fetchMembershipApplicationsService,
   rejectMembershipApplicationService,
@@ -81,7 +68,7 @@ const paymentProfileLabel = (status: ReturnType<typeof paymentProfile>) => {
   return 'Payment preference required';
 };
 
-const paymentProfileTone = (status: ReturnType<typeof paymentProfile>): ShiftTone =>
+const paymentProfileTone = (status: ReturnType<typeof paymentProfile>): StatusTone =>
   (status?.paymentPreference === 'TFN' && status?.payrollReady) || (status?.paymentPreference === 'ABN' && status?.invoiceReady) ? 'green' : 'amber';
 
 const readValue = (app: MembershipApplication, camelKey: string, snakeKey: string) =>

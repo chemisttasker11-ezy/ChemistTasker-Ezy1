@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import { ChevronLeft, ChevronRight, FileText, Megaphone, MessageCircle, MoreHorizontal, Pin, SendHorizontal, ThumbsUp } from 'lucide-react';
 import { EMOJI_FONT, fullTimestamp, initialsOf, relativeTime, renderRichText, roleLabel } from '../../../../components/social/socialFormat';
-import { Pill } from '../../shiftCenter/ShiftCentreParts';
+import { Pill } from '../../../../components/ui/Pill';
 
 import {
   createHubComment,

@@ -21,8 +21,9 @@ import { attendance, rosterV2 } from "@chemisttasker/shared-core";
 import PageHeader from "../../components/ui/PageHeader";
 import IconTile from "../../components/ui/IconTile";
 import DashboardContentState from "../../components/dashboard/DashboardContentState";
-import { Hint, Pill } from "../dashboard/shiftCenter/ShiftCentreParts";
-import { humanizeEnum } from "../dashboard/sidebar/ActiveShiftsPage/utils/audience";
+import { Hint } from "../../components/ui/Hint";
+import { Pill } from "../../components/ui/Pill";
+import { humanizeEnum } from "../../utils/labels";
 
 const cardSx = { borderRadius: "var(--ct-card-radius)", border: "1px solid var(--ct-border-color)", boxShadow: "none", bgcolor: "var(--ct-surface-bg)", overflow: "hidden" };
 const cardTitleSx = { fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: 19, lineHeight: 1.25, color: "var(--ct-text-primary)" };

@@ -30,16 +30,18 @@ import { Check, ClipboardCheck, History, PencilLine, RefreshCw, X } from "lucide
 import { attendance, fetchPharmaciesService } from "@chemisttasker/shared-core";
 import PageHeader from "../../components/ui/PageHeader";
 import DashboardContentState from "../../components/dashboard/DashboardContentState";
-import { InitialsAvatar, Pill, type ShiftTone } from "../dashboard/shiftCenter/ShiftCentreParts";
-import { humanizeEnum } from "../dashboard/sidebar/ActiveShiftsPage/utils/audience";
+import { InitialsAvatar } from "../../components/ui/InitialsAvatar";
+import { Pill } from "../../components/ui/Pill";
+import { type StatusTone } from "../../components/ui/tone";
+import { humanizeEnum } from "../../utils/labels";
 
-const COVER_TYPES: Record<string, { label: string; tone: ShiftTone; hint: string }> = {
+const COVER_TYPES: Record<string, { label: string; tone: StatusTone; hint: string }> = {
   UNROSTERED_LOCAL: { label: "Not on the roster", tone: "blue", hint: "Worked at this pharmacy without a rostered shift." },
   CROSS_SITE_CHAIN: { label: "Cover from a sister store", tone: "violet", hint: "Usually works at another pharmacy in your chain." },
   CROSS_SITE_ORG: { label: "Cover from your organisation", tone: "amber", hint: "Usually works at another pharmacy in your organisation." },
 };
 
-const EVENT_TONES: Record<string, ShiftTone> = { CLOCK_IN: "green", CLOCK_OUT: "navy" };
+const EVENT_TONES: Record<string, StatusTone> = { CLOCK_IN: "green", CLOCK_OUT: "navy" };
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 type PendingReview = {
@@ -331,7 +333,7 @@ export default function ManagerAttendanceReviewPage() {
           const startTime = new Date(row.started_at);
           const endTime = row.ended_at ? new Date(row.ended_at) : null;
           const hours = endTime ? (endTime.getTime() - startTime.getTime()) / (1000 * 3600) : null;
-          const cover = COVER_TYPES[row.cover_type] ?? { label: humanizeEnum(row.cover_type), tone: "neutral" as ShiftTone, hint: "" };
+          const cover = COVER_TYPES[row.cover_type] ?? { label: humanizeEnum(row.cover_type), tone: "neutral" as StatusTone, hint: "" };
           const time = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
           return (

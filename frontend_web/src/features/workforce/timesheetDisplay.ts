@@ -1,7 +1,7 @@
-import type { ShiftTone } from '../../pages/dashboard/shiftCenter/ShiftCentreParts';
+import type { StatusTone } from '../../components/ui/tone';
 import type { TimesheetPeriod, TimesheetStatus } from './types';
 
-type Display = { label: string; tone: ShiftTone; hint: string };
+type Display = { label: string; tone: StatusTone; hint: string };
 
 /** Timesheet statuses in plain words, shared by the manager page, the detail drawer and My Hours. */
 export const TIMESHEET_STATUS: Record<TimesheetStatus, Display> = {

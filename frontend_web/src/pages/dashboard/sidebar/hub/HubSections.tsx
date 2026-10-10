@@ -11,7 +11,7 @@ import type {
   HubPharmacy,
   HubScopeSelection,
 } from '../../../../types/hub';
-import { Pill } from '../../shiftCenter/ShiftCentreParts';
+import { Pill } from '../../../../components/ui/Pill';
 import { ScopeFeed } from './HubFeed';
 import HubSpace, { type HubPerson } from './HubSpace';
 import { getMemberDisplayName } from './hubUtils';

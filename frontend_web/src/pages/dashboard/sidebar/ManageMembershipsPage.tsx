@@ -16,7 +16,8 @@ import { Check, LogOut, ShieldCheck, Store, X } from "lucide-react";
 import PageHeader from "../../../components/ui/PageHeader";
 import IconTile from "../../../components/ui/IconTile";
 import DashboardContentState from "../../../components/dashboard/DashboardContentState";
-import { Pill, type ShiftTone } from "../shiftCenter/ShiftCentreParts";
+import { Pill } from "../../../components/ui/Pill";
+import { type StatusTone } from "../../../components/ui/tone";
 import apiClient from "../../../utils/apiClient";
 import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from "@chemisttasker/shared-core";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -75,7 +76,7 @@ function adminCapabilitiesText(membership: Membership) {
   return `Capabilities: ${capabilities.map((capability) => capability.replace(/_/g, " ").toLowerCase()).join(", ")}`;
 }
 
-const STATUS: Record<Membership["status"], { label: string; tone: ShiftTone; hint: string; order: number }> = {
+const STATUS: Record<Membership["status"], { label: string; tone: StatusTone; hint: string; order: number }> = {
   PENDING: { label: "Waiting for you", tone: "amber", hint: "Accept to join this pharmacy's team.", order: 0 },
   ACCEPTED: { label: "Active", tone: "green", hint: "You're a member of this pharmacy.", order: 1 },
   REJECTED: { label: "Declined", tone: "neutral", hint: "You declined this invitation.", order: 2 },

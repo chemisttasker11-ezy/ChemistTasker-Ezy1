@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer,
-  IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Paper, Snackbar, Stack, Tab, Tabs, Table, TableBody, TableCell,
+  IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Snackbar, Stack, Tab, Tabs, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, TextField, Tooltip, Typography } from '@mui/material';
 import { AlertTriangle, CheckCircle2, CircleDollarSign, Clock3, Copy, Download, FileText, History, Mail, MoreHorizontal,
   Pencil, PiggyBank, Plus, RefreshCw, Send, Wallet, X } from 'lucide-react';
@@ -8,14 +8,14 @@ import { useSearchParams } from 'react-router-dom';
 import { finance, financeStatus, type FinanceCustomer, type FinanceItem, type FinanceInvoice, type FinanceExpense, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import { CustomerEditor, ItemEditor, ExpenseEditor, PaymentEditor } from './Editors';
 import InvoiceComposer from './InvoiceComposer';
-import { takeFinanceHandoff } from './handoff';
 import { today, dollars, download, downloadCsv, errorMessage } from './helpers';
 import { FinanceStatusPill, InvoiceDocument, dueText } from './financeParts';
 import DashboardContentState from '../../components/dashboard/DashboardContentState';
 import { buildInvoiceStats, filterInvoicesByTimeframe, INVOICE_TIMEFRAME_OPTIONS, type InvoiceTimeframe } from '../dashboard/sidebar/Invoices/invoiceStats';
 import { formatDay } from '../dashboard/sidebar/Invoices/invoiceParts';
-import { Pill } from '../dashboard/shiftCenter/ShiftCentreParts';
-import { ConfirmDialog } from '../dashboard/sidebar/owner/teamUi';
+import { Pill } from '../../components/ui/Pill';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import SectionCard from '../../components/ui/SectionCard';
 import PageHeader from '../../components/ui/PageHeader';
 import MetricStrip from '../../components/ui/MetricStrip';
 
@@ -59,20 +59,9 @@ function receivedKey(invoice: FinanceInvoice): Exclude<ReceivedKey, 'all'> {
 }
 const receivedOrder: Record<Exclude<ReceivedKey, 'all'>, number> = { review: 0, approved: 1, waiting: 2, paid: 3 };
 
-const panelSx = { p: { xs: 2, md: 2.5 }, borderRadius: 'var(--ct-card-radius)', borderColor: 'var(--ct-border-color)', bgcolor: 'var(--ct-surface-bg)', boxShadow: 'none', minWidth: 0 } as const;
 const rowTitle = { color: 'var(--ct-text-primary)', fontWeight: 600, fontSize: 15 } as const;
 const rowMeta = { color: 'var(--ct-text-secondary)', fontSize: 13.5, lineHeight: 1.5 } as const;
 const amountSx = { color: 'var(--ct-text-primary)', fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 19, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' } as const;
-
-function Panel({ title, action, children }: { title?: string; action?: ReactNode; children: ReactNode }) {
-  return <Paper variant="outlined" component="section" aria-label={title} sx={panelSx}>
-    {title || action ? <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} sx={{ mb: 2 }}>
-      {title ? <Typography component="h2" sx={{ color: 'var(--ct-text-primary)', fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 18 }}>{title}</Typography> : <span />}
-      {action}
-    </Stack> : null}
-    {children}
-  </Paper>;
-}
 
 function Empty({ title, detail, actionLabel, onAction }: { title: string; detail: string; actionLabel?: string; onAction?: () => void }) {
   return <DashboardContentState kind="empty" title={title} description={detail} actionLabel={actionLabel} onAction={onAction} compact />;
@@ -151,39 +140,59 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const copy = (label: string, value: string) => {
     navigator.clipboard.writeText(value).then(() => setToast(`${label} copied`), () => setToast(`Couldn't copy the ${label.toLowerCase()}`));
   };
-  // Deep links: ?invoice=<id> opens that invoice (composer for the issuer, history for the recipient),
-  // ?shift=<id> starts a new invoice prefilled from that accepted shift, ?new=1 starts a blank one.
-  const handledLink = useRef(false);
+  // The URL owns which invoice is open: ?invoice=<id> (composer for the issuer, review for the recipient),
+  // ?shift=<id> (or ?shiftId=) a new invoice prefilled from that accepted shift, ?new=1 a blank one. Links work on
+  // first load and while the page is open; a link that arrives during a failed load opens after Try again.
+  const linkInvoice = params.get('invoice');
+  const linkShift = params.get('shift') ?? params.get('shiftId');
+  const linkNew = params.get('new');
+  const linkKey = `${linkInvoice ?? ''}|${linkShift ?? ''}|${linkNew ?? ''}`;
+  const linkRequest = useRef(0);
+  const setLink = (link: { invoice?: string | number; shift?: string | number; new?: boolean } | null) => {
+    const opening = Boolean(link);
+    setParams(current => {
+      const next = new URLSearchParams(current);
+      ['invoice', 'shift', 'shiftId', 'new'].forEach(key => next.delete(key));
+      if (link && !receivedMode) next.delete('tool'); // the composer belongs to the Invoices tool
+      if (link?.invoice != null) next.set('invoice', String(link.invoice));
+      else if (link?.shift != null) next.set('shift', String(link.shift));
+      else if (link?.new) next.set('new', '1');
+      return next;
+    }, { replace: !opening });
+  };
   useEffect(() => {
-    if (loading || handledLink.current) return;
-    const handoff = takeFinanceHandoff();
-    const invoiceId = params.get('invoice') ?? handoff?.invoice ?? null;
-    const shiftId = params.get('shift') ?? params.get('shiftId') ?? handoff?.shift ?? null;
-    const fresh = params.get('new') ?? (handoff?.new ? '1' : null);
-    if (!invoiceId && !shiftId && !fresh) return;
-    handledLink.current = true;
-    const next = new URLSearchParams(params);
-    ['invoice', 'shift', 'shiftId', 'pharmacyId', 'new'].forEach(key => next.delete(key));
-    setParams(next, { replace: true });
-    const matches = (invoice: FinanceInvoice) => String(invoice.id) === invoiceId || String(invoice.invoice_id) === invoiceId;
-    if (invoiceId && receivedMode) {
-      const found = receivedInvoices.find(matches);
-      if (found) openHistory(found);
-      else setError(`Invoice ${invoiceId} isn't in your received invoices. It may have been replaced by a newer revision.`);
-    } else if (invoiceId) {
-      const found = invoices.find(matches);
-      if (found) setEditor({ kind: 'invoice', value: found });
-      else void finance.invoice(invoiceId).then(value => setEditor({ kind: 'invoice', value })).catch(() => setError(`Invoice ${invoiceId} couldn't be opened. It may have been removed.`));
-    } else if (!receivedMode) {
-      setEditor({ kind: 'invoice', prefillShiftId: shiftId ? Number(shiftId) : undefined });
+    const request = ++linkRequest.current;
+    if (!linkInvoice && !linkShift && !linkNew) {
+      setEditor(current => current?.kind === 'invoice' ? null : current);
+      if (receivedMode) { setHistoryInvoice(null); setHistoryDocument(null); }
+      return;
     }
-    // Runs once, after the first load.
+    if (loading || loadFailed) return; // Kept in the URL; handled once the list has loaded.
+    const matches = (invoice: FinanceInvoice) => String(invoice.id) === linkInvoice || String(invoice.invoice_id) === linkInvoice;
+    if (receivedMode) {
+      if (!linkInvoice) return;
+      const found = receivedInvoices.find(matches);
+      if (found) { setHistoryInvoice(found); setHistoryDocument(null); }
+      else { setError(`Invoice ${linkInvoice} isn't in your received invoices. It may have been replaced by a newer revision.`); setLink(null); }
+      return;
+    }
+    if (linkInvoice) {
+      const found = invoices.find(matches);
+      if (found) { setEditor({ kind: 'invoice', value: found }); return; }
+      finance.invoice(linkInvoice)
+        .then(value => { if (request === linkRequest.current) setEditor({ kind: 'invoice', value }); })
+        .catch(() => { if (request === linkRequest.current) { setError(`Invoice ${linkInvoice} couldn't be opened. It may have been removed.`); setLink(null); } });
+      return;
+    }
+    setEditor({ kind: 'invoice', prefillShiftId: linkShift ? Number(linkShift) : undefined });
+    // Re-runs when the link or the loaded lists change; the editor and review state follow the URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [linkKey, loading, loadFailed, invoices, receivedInvoices]);
   const changeTool = (value: string) => { const next = new URLSearchParams(params); next.set('tool', value); setParams(next); setSearch(''); };
   const ask = (confirm: Confirmation) => { setError(''); setMenu(null); setConfirmation(confirm); };
-  const openHistory = (invoice: FinanceInvoice) => { setHistoryInvoice(invoice); setHistoryDocument(null); setMenu(null); };
-  const closeHistory = () => { if (!busy) { setHistoryInvoice(null); setHistoryDocument(null); } };
+  // Pharmacy side: the review panel follows ?invoice= like the issuer's composer. The issuer's history panel is local.
+  const openHistory = (invoice: FinanceInvoice) => { setMenu(null); if (receivedMode) setLink({ invoice: invoice.id }); else { setHistoryInvoice(invoice); setHistoryDocument(null); } };
+  const closeHistory = () => { if (busy) return; if (receivedMode) setLink(null); else { setHistoryInvoice(null); setHistoryDocument(null); } };
   const openRevision = (invoice: FinanceInvoice, version: number) => void run(async () => {
     const document = receivedMode
       ? await finance.receivedRevision(invoice.id, version)
@@ -208,7 +217,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   })), snapshotTimeframe);
   const stats = buildInvoiceStats(snapshotInvoices);
   const countOf = (predicate: (item: (typeof snapshotInvoices)[number]) => boolean) => snapshotInvoices.filter(predicate).length;
-  const viewInvoice = (invoice: FinanceInvoice) => setEditor({ kind: 'invoice', value: invoice });
+  const viewInvoice = (invoice: FinanceInvoice) => setLink({ invoice: invoice.id });
   const filtersActive = invoiceStatus !== 'all' || customerFilter !== 'all' || Boolean(fromDate || toDate || search);
   const resetFilters = () => { setInvoiceStatus('all'); setCustomerFilter('all'); setFromDate(''); setToDate(''); setSearch(''); };
   const otherFilters = (invoice: FinanceInvoice) => (customerFilter === 'all' || String(invoice.payload.customer_id) === customerFilter)
@@ -230,7 +239,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const expenseCsv = () => downloadCsv('workspace-expenses.csv', [['Supplier', 'Description', 'Incurred', 'Paid', 'Gross AUD', 'GST AUD', 'Creditable business use %', 'Estimated GST credit AUD', 'Reference'],
     ...expenses.map(expense => [expense.supplier, expense.description, expense.incurred_on, expense.paid_on || '', expense.amount, expense.gst_amount, expense.business_use_percent, expense.gst_credit, expense.reference])]);
 
-  if (editor?.kind === 'invoice') return <Box data-ct-tokens="" sx={{ maxWidth: 1600, mx: 'auto' }}><InvoiceComposer key={editor.value?.id ?? 'new'} initial={editor.value} prefillShiftId={editor.prefillShiftId} previous={serviceInvoices[0]} customers={customers} items={items} onClose={() => setEditor(null)} onSaved={refreshAfterSave} /></Box>;
+  if (editor?.kind === 'invoice') return <Box data-ct-tokens="" sx={{ maxWidth: 1600, mx: 'auto' }}><InvoiceComposer key={linkKey} initial={editor.value} prefillShiftId={editor.prefillShiftId} previous={serviceInvoices[0]} customers={customers} items={items} onClose={() => setLink(null)} onSaved={refreshAfterSave} /></Box>;
 
   const headerPills = receivedMode
     ? (toReview ? <Pill tone="amber" label={`${toReview} to review`} title="Invoices waiting for you to approve or ask for changes" /> : null)
@@ -310,7 +319,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
       actions={<>
         {headerPills}
         <Button variant="outlined" disabled={busy || loading} startIcon={busy ? <CircularProgress size={15} color="inherit" /> : <RefreshCw size={15} />} onClick={() => void run(load, 'Up to date.')} sx={{ minHeight: 44 }}>Refresh</Button>
-        {!receivedMode && <Button variant="contained" disabled={loading || busy} startIcon={<Plus size={16} />} onClick={() => { changeTool('invoices'); setEditor({ kind: 'invoice' }); }} sx={{ minHeight: 44 }}>New invoice</Button>}
+        {!receivedMode && <Button variant="contained" disabled={loading || busy} startIcon={<Plus size={16} />} onClick={() => setLink({ new: true })} sx={{ minHeight: 44 }}>New invoice</Button>}
       </>}
     >
       {availableTools.length > 1 ? <Tabs value={tool} variant="scrollable" scrollButtons={false} onChange={(_, value: string) => changeTool(value)} aria-label="Finance tools" sx={{ borderBottom: '1px solid var(--ct-border-color)' }}>
@@ -340,7 +349,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               { label: 'Received', value: dollars(stats.paymentsReceived), caption: `${timeframeLabel(snapshotTimeframe)}`, icon: <Wallet />, tone: 'cyan', onClick: () => setInvoiceStatus('paid') },
             ]} />
           </Stack> : null}
-          <Panel title="Your invoices" action={invoices.length ? <Button startIcon={<Download size={15} />} onClick={invoiceCsv} disabled={!visibleInvoices.length}>Export CSV</Button> : undefined}>
+          <SectionCard dense title="Your invoices" action={invoices.length ? <Button startIcon={<Download size={15} />} onClick={invoiceCsv} disabled={!visibleInvoices.length}>Export CSV</Button> : undefined}>
             {invoices.length ? <>
               <Tabs value={invoiceStatus} onChange={(_, next: StatusKey) => setInvoiceStatus(next)} variant="scrollable" scrollButtons={false} aria-label="Invoice status" sx={{ mb: 2, minHeight: 40 }}>
                 {statusTabs.map(([key, label]) => <Tab key={key} value={key} label={`${label} ${statusCount(key)}`} sx={{ minHeight: 40 }} />)}
@@ -357,11 +366,11 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               {visibleInvoices.length
                 ? <Box component="ul" aria-label="Invoices" aria-busy={busy} sx={{ listStyle: 'none', m: 0, p: 0 }}>{visibleInvoices.map(invoiceRow)}</Box>
                 : <Empty title="No invoices match" detail="Change the status, customer, dates or search to see more." actionLabel="Clear filters" onAction={resetFilters} />}
-            </> : <Empty title="No invoices yet" detail="Create one from a shift you worked, or start a blank invoice. Nothing is emailed until you choose to send it." actionLabel="New invoice" onAction={() => setEditor({ kind: 'invoice' })} />}
-          </Panel>
+            </> : <Empty title="No invoices yet" detail="Create one from a shift you worked, or start a blank invoice. Nothing is emailed until you choose to send it." actionLabel="New invoice" onAction={() => setLink({ new: true })} />}
+          </SectionCard>
         </>}
 
-        {tool === 'received' && <Panel title="Received invoices">
+        {tool === 'received' && <SectionCard dense title="Received invoices">
           {receivedInvoices.length ? <>
             <Tabs value={receivedFilter} onChange={(_, next: ReceivedKey) => setReceivedFilter(next)} variant="scrollable" scrollButtons={false} aria-label="Invoice review status" sx={{ mb: 2, minHeight: 40 }}>
               {receivedTabs.map(([key, label, hint]) => <Tab key={key} value={key} title={hint || undefined} label={`${label} ${key === 'all' ? searchedReceived.length : searchedReceived.filter(invoice => receivedKey(invoice) === key).length}`} sx={{ minHeight: 40 }} />)}
@@ -371,9 +380,9 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               ? <Box component="ul" aria-label="Received invoices" aria-busy={busy} sx={{ listStyle: 'none', m: 0, p: 0 }}>{visibleReceived.map(receivedRow)}</Box>
               : <Empty title="Nothing here" detail={search ? 'No invoices match your search.' : 'No invoices are in this group right now.'} actionLabel={search ? 'Clear search' : 'Show all'} onAction={() => { setSearch(''); setReceivedFilter('all'); }} />}
           </> : <Empty title="No invoices yet" detail="When a locum or contractor sends an invoice for a shift at your pharmacy, it appears here for you to check and approve." />}
-        </Panel>}
+        </SectionCard>}
 
-        {tool === 'customers' && <Panel title="Customers" action={<Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => setEditor({ kind: 'customer' })}>Add customer</Button>}>
+        {tool === 'customers' && <SectionCard dense title="Customers" action={<Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => setEditor({ kind: 'customer' })}>Add customer</Button>}>
           {customers.length ? <>
             <TextField size="small" label="Search" placeholder="Name or ABN" value={search} onChange={event => setSearch(event.target.value)} sx={{ mb: 1, maxWidth: { md: 420 } }} />
             <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>{customers.filter(customer => matches(customer.name, customer.abn, customer.legal_name)).map(customer => <Box component="li" key={customer.id} sx={{ py: 2, borderTop: '1px solid var(--ct-border-color)', '&:first-of-type': { borderTop: 'none' } }}>
@@ -391,9 +400,9 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               </Stack>
             </Box>)}</Box>
           </> : <Empty title="No customers yet" detail="Save each pharmacy or business you bill once: legal name, ABN, invoice email and payment terms." actionLabel="Add customer" onAction={() => setEditor({ kind: 'customer' })} />}
-        </Panel>}
+        </SectionCard>}
 
-        {tool === 'items' && <Panel title="Saved items" action={<Stack direction="row" spacing={1}>{!items.length && <Button disabled={busy} onClick={() => void run(async () => { await finance.seedItems(); await load(); }, 'Starter items added. Check the rates and GST before you use them.')}>Add starter items</Button>}<Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => setEditor({ kind: 'item' })}>Add item</Button></Stack>}>
+        {tool === 'items' && <SectionCard dense title="Saved items" action={<Stack direction="row" spacing={1}>{!items.length && <Button disabled={busy} onClick={() => void run(async () => { await finance.seedItems(); await load(); }, 'Starter items added. Check the rates and GST before you use them.')}>Add starter items</Button>}<Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => setEditor({ kind: 'item' })}>Add item</Button></Stack>}>
           {items.length ? <TableContainer><Table aria-label="Saved items"><TableHead><TableRow><TableCell>Item</TableCell><TableCell>Category</TableCell><TableCell align="right">Price</TableCell><TableCell>GST and super</TableCell><TableCell /></TableRow></TableHead>
             <TableBody>{items.filter(item => matches(item.code, item.name, item.category)).map(item => <TableRow key={item.id}>
               <TableCell><Typography sx={{ ...rowTitle, fontSize: 14 }}>{item.name}</Typography><Typography sx={{ ...rowMeta, fontSize: 12.5 }}>{item.code}{!item.active ? ' · Archived' : ''}</Typography></TableCell>
@@ -403,9 +412,9 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               <TableCell align="right"><Button onClick={() => setEditor({ kind: 'item', value: item })}>Edit</Button></TableCell>
             </TableRow>)}</TableBody></Table></TableContainer>
             : <Empty title="Save your rates once" detail="Add starter items for hours, travel, accommodation and super, then set your prices and GST." />}
-        </Panel>}
+        </SectionCard>}
 
-        {tool === 'expenses' && <Panel title="Expenses" action={<Stack direction="row" spacing={1}>{expenses.length ? <Button startIcon={<Download size={15} />} onClick={expenseCsv}>Export CSV</Button> : null}<Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => setEditor({ kind: 'expense' })}>Add expense</Button></Stack>}>
+        {tool === 'expenses' && <SectionCard dense title="Expenses" action={<Stack direction="row" spacing={1}>{expenses.length ? <Button startIcon={<Download size={15} />} onClick={expenseCsv}>Export CSV</Button> : null}<Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => setEditor({ kind: 'expense' })}>Add expense</Button></Stack>}>
           <Typography sx={{ ...rowMeta, mb: 1.5 }}>Receipts are private to you. PDF, PNG or JPEG up to 5 MB each, 50 MB in total. Nothing is read automatically or claimed for you.</Typography>
           {expenses.length ? <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>{expenses.filter(expense => matches(expense.supplier, expense.description, expense.reference)).map(expense => <Box component="li" key={expense.id} sx={{ py: 2, borderTop: '1px solid var(--ct-border-color)', '&:first-of-type': { borderTop: 'none' } }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between">
@@ -421,9 +430,9 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               </Stack>
             </Stack>
           </Box>)}</Box> : <Empty title="No expenses yet" detail="Record travel, accommodation, registration, training and other business costs, with their receipts." actionLabel="Add expense" onAction={() => setEditor({ kind: 'expense' })} />}
-        </Panel>}
+        </SectionCard>}
 
-        {tool === 'bas' && <Panel title="GST worksheet">
+        {tool === 'bas' && <SectionCard dense title="GST worksheet">
           <Stack spacing={2.5}>
             <Alert severity="warning">A starting point only: not a full BAS, not lodged for you and not tax advice. Older invoices and unsupported adjustments are left out.</Alert>
             <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1.4fr auto' }, alignItems: 'center' }}>
@@ -444,7 +453,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               <Button startIcon={<Download size={15} />} sx={{ alignSelf: 'flex-start' }} onClick={() => downloadCsv('gst-worksheet-DRAFT.csv', [['DRAFT ONLY', 'Not a complete BAS'], ['Start', worksheet.start], ['End', worksheet.end], ['Basis', worksheet.basis], ['G1', worksheet.G1], ['1A', worksheet['1A']], ['1B', worksheet['1B']], ['Estimated GST net', worksheet.estimated_gst_net], ['Excluded legacy invoices', worksheet.excluded_legacy_invoice_count]])}>Download worksheet (CSV)</Button>
             </>}
           </Stack>
-        </Panel>}
+        </SectionCard>}
       </>}
     </Stack>
 
@@ -457,7 +466,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
           item(<History size={17} />, 'History', () => openHistory(invoice)),
           item(<Download size={17} />, 'Download PDF', () => { setMenu(null); void run(async () => download(await finance.pdf(invoice.id), `${invoice.number}.pdf`)); }),
           item(<Mail size={17} />, 'Email to customer', () => ask({ title: `Email ${invoice.number} to ${invoice.payload.customer?.name || 'the customer'}?`, body: `The saved PDF (revision ${invoice.version}) goes to ${invoice.payload.customer?.email || 'the customer, but no invoice email is saved for them'}. If you change it later, you can send the new revision.`, confirmLabel: 'Send email', busyLabel: 'Sending…', action: async () => { const result = await finance.send(invoice.id, invoice.version); setNotice(result.detail); await load(); } })),
-          item(<Copy size={17} />, 'Duplicate', () => { const key = crypto.randomUUID(); ask({ title: `Duplicate ${invoice.number}?`, body: 'Creates a new draft with the same customer and lines. Shift links, payments and email history are not copied.', confirmLabel: 'Duplicate', busyLabel: 'Duplicating…', action: async () => { const result = await finance.duplicate(invoice.id, key); await load(); setEditor({ kind: 'invoice', value: result }); } }); }, !isInvoice),
+          item(<Copy size={17} />, 'Duplicate', () => { const key = crypto.randomUUID(); ask({ title: `Duplicate ${invoice.number}?`, body: 'Creates a new draft with the same customer and lines. Shift links, payments and email history are not copied.', confirmLabel: 'Duplicate', busyLabel: 'Duplicating…', action: async () => { const result = await finance.duplicate(invoice.id, key); await load(); setLink({ invoice: result.id }); } }); }, !isInvoice),
           <Divider key="divider" />,
           item(<CheckCircle2 size={17} />, 'Mark as paid', () => ask({ title: `Mark ${invoice.number} as paid?`, body: 'Use this when the full amount has arrived. You can still edit the invoice later if something needs correcting.', confirmLabel: 'Mark as paid', busyLabel: 'Saving…', action: async () => { await finance.markPaid(invoice.id, invoice.version); await load(); } }), invoice.status === 'paid'),
           item(<CircleDollarSign size={17} />, 'Record a payment', () => { setEditor({ kind: 'payment', value: invoice }); setMenu(null); }, Number(invoice.balance || '0') <= 0, Number(invoice.balance || '0') <= 0 ? 'Nothing owed' : 'Optional, for part payments'),
@@ -486,7 +495,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
           {!receivedMode && reviewInvoice.has_unsent_revision && <Alert severity="info">You have a newer saved version that hasn't been sent. The pharmacy only sees sent versions.</Alert>}
           {historyDocument && <Alert severity="info" action={<Button color="inherit" onClick={() => setHistoryDocument(null)}>Show current</Button>}>You're looking at revision {historyDocument.version}.</Alert>}
           <InvoiceDocument invoice={shown} onCopy={copy} />
-          <Panel title="History">
+          <SectionCard dense title="History">
             {reviewInvoice.revisions?.length ? <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
               {reviewInvoice.revisions.map(revision => <Stack component="li" key={revision.version} direction="row" alignItems="center" spacing={1} sx={{ py: 1.25, borderTop: '1px solid var(--ct-border-color)', '&:first-of-type': { borderTop: 'none' } }}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -497,7 +506,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
                 <Tooltip title="Download this revision"><IconButton aria-label={`Download revision ${revision.version} PDF`} disabled={busy} onClick={() => downloadRevision(reviewInvoice, revision.version)} sx={{ width: 40, height: 40 }}><Download size={17} /></IconButton></Tooltip>
               </Stack>)}
             </Box> : <Typography sx={rowMeta}>No earlier revisions.</Typography>}
-          </Panel>
+          </SectionCard>
         </Stack>
         <Stack direction={{ xs: 'column-reverse', sm: 'row' }} spacing={1} justifyContent="flex-end" sx={{ position: 'sticky', bottom: 0, px: { xs: 2, sm: 3 }, py: 1.75, borderTop: '1px solid var(--ct-border-color)', bgcolor: 'var(--ct-surface-bg)' }}>
           {receivedMode ? <>

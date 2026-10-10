@@ -2,14 +2,15 @@
 import { Box, Stack, Typography } from '@mui/material';
 import { FileText, Landmark, ListChecks, PiggyBank } from 'lucide-react';
 import { financeStatus, type FinanceInvoice, type FinanceTaxCode } from '@chemisttasker/shared-core';
-import { Pill, type ShiftTone } from '../dashboard/shiftCenter/ShiftCentreParts';
+import { Pill } from '../../components/ui/Pill';
+import { type StatusTone } from '../../components/ui/tone';
 import { Facts, InvoiceSection, PayToDetails, formatDay } from '../dashboard/sidebar/Invoices/invoiceParts';
 import { dollars } from './helpers';
 
 export const taxLabels: Record<FinanceTaxCode, string> = { GST: 'GST 10%', GST_FREE: 'GST-free', INPUT_TAXED: 'Input taxed', OUT_OF_SCOPE: 'No GST' };
 
 /** One wording and tone per invoice state, so the list, editor and review all say the same thing. */
-export function financeState(invoice: FinanceInvoice): { label: string; tone: ShiftTone; hint: string } {
+export function financeState(invoice: FinanceInvoice): { label: string; tone: StatusTone; hint: string } {
   const status = financeStatus(invoice);
   switch (status) {
     case 'Paid': return { label: 'Paid', tone: 'green', hint: 'Payment recorded' };

@@ -17,8 +17,11 @@ import {
 import type { Shift, ShiftAssignment } from '@chemisttasker/shared-core';
 import IconTile, { type Tone } from '../../../components/ui/IconTile';
 import DashboardContentState from '../../../components/dashboard/DashboardContentState';
-import { Hint, InitialsAvatar, Pill, RowAction } from '../shiftCenter/ShiftCentreParts';
-import { humanizeEnum } from './ActiveShiftsPage/utils/audience';
+import { RowAction } from '../shiftCenter/ShiftCentreParts';
+import { Hint } from '../../../components/ui/Hint';
+import { InitialsAvatar } from '../../../components/ui/InitialsAvatar';
+import { Pill } from '../../../components/ui/Pill';
+import { humanizeEnum } from '../../../utils/labels';
 
 type AssignmentLike = ShiftAssignment | { slot_id?: number; user_id?: number; user?: any };
 

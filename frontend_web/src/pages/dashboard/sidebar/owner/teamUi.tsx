@@ -22,13 +22,14 @@ import {
   useTheme,
 } from "@mui/material";
 import { Check, ChevronDown, Copy, Link2, Search } from "lucide-react";
-import { Pill, toneColors, type ShiftTone } from "../../shiftCenter/ShiftCentreParts";
+import { Pill } from "../../../../components/ui/Pill";
+import { toneColors, type StatusTone } from "../../../../components/ui/tone";
 import { EMPLOYMENT_LABELS, roleLabel } from "../../../../components/social/socialFormat";
 import type { MembershipDTO } from "./types";
 
 /* ---------- labels ---------- */
 
-export const ROLE_TONE: Record<string, ShiftTone> = {
+export const ROLE_TONE: Record<string, StatusTone> = {
   PHARMACIST: "violet",
   INTERN: "magenta",
   TECHNICIAN: "cyan",
@@ -36,7 +37,7 @@ export const ROLE_TONE: Record<string, ShiftTone> = {
   STUDENT: "amber",
   CONTACT: "neutral",
 };
-export const roleTone = (role?: string | null): ShiftTone => ROLE_TONE[String(role || "").toUpperCase()] ?? "neutral";
+export const roleTone = (role?: string | null): StatusTone => ROLE_TONE[String(role || "").toUpperCase()] ?? "neutral";
 export const employmentLabel = (value?: string | null) => {
   const key = String(value || "").toUpperCase();
   if (!key) return "";
@@ -95,7 +96,7 @@ export const membershipClassification = (m: MembershipDTO) =>
 
 /* ---------- avatar ---------- */
 
-export function PersonAvatar({ name, photoUrl, tone = "violet", size = 40 }: { name: string; photoUrl?: string; tone?: ShiftTone; size?: number }) {
+export function PersonAvatar({ name, photoUrl, tone = "violet", size = 40 }: { name: string; photoUrl?: string; tone?: StatusTone; size?: number }) {
   const [failed, setFailed] = useState(false);
   const { bg, fg } = toneColors(tone);
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?";
@@ -170,7 +171,7 @@ export function MemberRow({
   name: string;
   photoUrl?: string;
   role: ReactNode;
-  tone: ShiftTone;
+  tone: StatusTone;
   trailing?: ReactNode;
   details: Detail[];
   actions?: ReactNode;
@@ -287,7 +288,7 @@ export function TeamSection({
   count?: number;
   description?: string;
   actions?: ReactNode;
-  tone?: ShiftTone;
+  tone?: StatusTone;
   children: ReactNode;
 }) {
   return (
@@ -365,50 +366,6 @@ export function EmptyTeam({ icon, title, body, action }: { icon: ReactNode; titl
 }
 
 /* ---------- dialogs ---------- */
-
-export function ConfirmDialog({
-  open,
-  title,
-  body,
-  confirmLabel,
-  busyLabel,
-  busy,
-  destructive = true,
-  onConfirm,
-  onClose,
-}: {
-  open: boolean;
-  title: string;
-  body: ReactNode;
-  confirmLabel: string;
-  busyLabel: string;
-  busy: boolean;
-  destructive?: boolean;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <Dialog open={open} onClose={() => !busy && onClose()} maxWidth="xs" fullWidth aria-labelledby="ct-confirm-title">
-      <DialogTitle id="ct-confirm-title" sx={{ fontWeight: 600 }}>{title}</DialogTitle>
-      <DialogContent>
-        <Typography component="div" sx={{ color: "var(--ct-text-secondary)", fontSize: 15, lineHeight: 1.55 }}>{body}</Typography>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={onClose} disabled={busy} sx={{ minHeight: 40 }}>Cancel</Button>
-        <Button
-          variant="contained"
-          color={destructive ? "error" : "primary"}
-          onClick={onConfirm}
-          disabled={busy}
-          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}
-          sx={{ minHeight: 40 }}
-        >
-          {busy ? busyLabel : confirmLabel}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
 
 const EXPIRY_PRESETS = ["7", "14", "30"];
 

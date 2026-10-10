@@ -17,7 +17,7 @@ import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../../components/ui/PageHeader';
 import IconTile from '../../../../components/ui/IconTile';
 import DashboardContentState from '../../../../components/dashboard/DashboardContentState';
-import { Pill } from '../../shiftCenter/ShiftCentreParts';
+import { Pill } from '../../../../components/ui/Pill';
 
 type SubscriptionState = {
     exists: boolean;

@@ -19,7 +19,6 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { finance, getInvoiceDetail, reportInvoiceIssue, updateInvoice } from '@chemisttasker/shared-core';
 import { isIssuerWorkspace } from '../../../utils/invoiceIssuer';
-import { setFinanceHandoff } from '../../finance/handoff';
 import apiClient from '../../../utils/apiClient';
 
 dayjs.extend(utc);
@@ -160,7 +159,6 @@ export default function InvoiceDetailPage() {
     managed
       .then(() => {
         if (cancelled) return;
-        setFinanceHandoff({ invoice: String(id) });
         navigate(`${listBase}?invoice=${id}`, { replace: true });
       })
       .catch(() => {

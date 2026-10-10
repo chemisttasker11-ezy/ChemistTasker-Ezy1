@@ -28,6 +28,7 @@ import { addDashboardScopeParams, normalizeDashboardSegment } from "./dashboardR
 import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
 import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOnboardingDetail, getOrganizationMembership, hasFavoriteStaffMembership, hasOrganizationAccess, hasVerifiedWorkerProfile, isAdminPersonaAssignment, isInternalPharmacyMembership, fetchPharmaciesService } from "@chemisttasker/shared-core";
 import { dashboardTitleForRole, userRoleLabel } from "../utils/roleLabels";
+import { publicSiteHomeUrl } from "../components/PublicRouteBridge";
 
 const DNA = {
   navy: "#061A3D",
@@ -403,12 +404,6 @@ export default function DashboardTopShell({
       ? activePageLabel
       : dashboardTitleForRole(forceAdminScope ? "ADMIN" : user?.role, otherStaffRoleType));
   const accent = accentForScope(selectedPharmacyId, forceAdminScope ? "internal" : workspace);
-  const dashboardHomePath =
-    forceAdminScope && activeAdminPharmacyId
-      ? `/dashboard/admin/${activeAdminPharmacyId}/overview`
-      : isOrgUser && location.pathname.startsWith("/dashboard/organization/")
-        ? "/dashboard/organization/overview"
-        : workerOverviewPath(user?.role);
 
   useEffect(() => {
     const initialVerified = hasVerifiedWorkerProfile(user);
@@ -467,14 +462,16 @@ export default function DashboardTopShell({
     const fallbackPharmacyId = isOrgUser ? null : urlPharmacy ?? selectedPharmacyId ?? workspaceSelectedPharmacyId ?? pharmacies[0]?.id ?? null;
     setSelectedPharmacyId(fallbackPharmacyId);
     setWorkspacePharmacyId(fallbackPharmacyId);
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("workspace", "internal");
-    nextParams.delete("pharmacy_id");
-    nextParams.delete("pharmacy");
-    if (fallbackPharmacyId != null) {
-      nextParams.set("pharmacy_id", String(fallbackPharmacyId));
-    }
-    setSearchParams(nextParams, { replace: true });
+    setSearchParams((current) => {
+      const nextParams = new URLSearchParams(current);
+      nextParams.set("workspace", "internal");
+      nextParams.delete("pharmacy_id");
+      nextParams.delete("pharmacy");
+      if (fallbackPharmacyId != null) {
+        nextParams.set("pharmacy_id", String(fallbackPharmacyId));
+      }
+      return nextParams;
+    }, { replace: true });
   }, [
     canUsePlatformWorkspace,
     isOrgUser,
@@ -506,12 +503,12 @@ export default function DashboardTopShell({
   }, [activeAdminPharmacyId, hidePharmacyScope, isOrgUser, pharmacies, selectedPharmacyId, setWorkspacePharmacyId, workspace]);
 
   const applyScopeToCurrentUrl = (pharmacyId: number | null) => {
-    const scoped = addDashboardScopeParams(`${location.pathname}?${searchParams.toString()}`, pharmacyId);
-    const [, query = ""] = scoped.split("?");
-    const nextParams = new URLSearchParams(query);
-    if (nextParams.toString() !== searchParams.toString()) {
-      setSearchParams(nextParams, { replace: true });
-    }
+    setSearchParams((current) => {
+      const scoped = addDashboardScopeParams(`${location.pathname}?${current.toString()}`, pharmacyId);
+      const [, query = ""] = scoped.split("?");
+      const nextParams = new URLSearchParams(query);
+      return nextParams.toString() === current.toString() ? current : nextParams;
+    }, { replace: true });
   };
 
   const handleSelectPlatform = () => {
@@ -522,13 +519,15 @@ export default function DashboardTopShell({
     setWorkspace("platform");
     setSelectedPharmacyId(null);
     setWorkspacePharmacyId(null);
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("workspace", "platform");
-    nextParams.delete("pharmacy_id");
-    nextParams.delete("pharmacy");
-    nextParams.delete("pharmacyId");
-    nextParams.delete("view");
-    setSearchParams(nextParams, { replace: true });
+    setSearchParams((current) => {
+      const nextParams = new URLSearchParams(current);
+      nextParams.set("workspace", "platform");
+      nextParams.delete("pharmacy_id");
+      nextParams.delete("pharmacy");
+      nextParams.delete("pharmacyId");
+      nextParams.delete("view");
+      return nextParams;
+    }, { replace: true });
     setWorkspaceAnchor(null);
   };
 
@@ -556,13 +555,15 @@ export default function DashboardTopShell({
     setWorkspace("internal");
     setSelectedPharmacyId(null);
     setWorkspacePharmacyId(null);
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("workspace", "internal");
-    nextParams.delete("pharmacy_id");
-    nextParams.delete("pharmacy");
-    nextParams.delete("pharmacyId");
-    nextParams.delete("view");
-    setSearchParams(nextParams, { replace: true });
+    setSearchParams((current) => {
+      const nextParams = new URLSearchParams(current);
+      nextParams.set("workspace", "internal");
+      nextParams.delete("pharmacy_id");
+      nextParams.delete("pharmacy");
+      nextParams.delete("pharmacyId");
+      nextParams.delete("view");
+      return nextParams;
+    }, { replace: true });
     setWorkspaceAnchor(null);
   };
 
@@ -611,7 +612,7 @@ export default function DashboardTopShell({
         }}
       >
       <Box sx={{ display: "flex", width: "100%", minWidth: 0 }}>
-      <DashboardSideNav selectedPharmacyId={selectedPharmacyId} homePath={dashboardHomePath} />
+      <DashboardSideNav selectedPharmacyId={selectedPharmacyId} />
       <Box sx={{ flex: "1 1 0%", minWidth: 0, display: "flex", flexDirection: "column" }}>
       <Box
         component="header"
@@ -653,8 +654,8 @@ export default function DashboardTopShell({
           }}
         >
           <Button
-            onClick={() => navigate(dashboardHomePath)}
-            aria-label="ChemistTasker dashboard home"
+            href={publicSiteHomeUrl()}
+            aria-label="ChemistTasker home"
             sx={{
               width: "100%",
               minWidth: 0,

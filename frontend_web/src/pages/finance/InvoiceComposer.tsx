@@ -6,9 +6,9 @@ import { CustomerEditor, ItemEditor } from './Editors';
 import { dollars, errorMessage } from './helpers';
 import { FinanceStatusPill, taxLabels } from './financeParts';
 import PageHeader from '../../components/ui/PageHeader';
-import { Pill } from '../dashboard/shiftCenter/ShiftCentreParts';
+import { Pill } from '../../components/ui/Pill';
 import { InvoiceSection, formatDay } from '../dashboard/sidebar/Invoices/invoiceParts';
-import { ConfirmDialog } from '../dashboard/sidebar/owner/teamUi';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 
 const grid = { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 };
 const lineColumns = 'minmax(200px, 2.4fr) 150px .7fr 1fr 1fr 1.1fr 1fr 44px';

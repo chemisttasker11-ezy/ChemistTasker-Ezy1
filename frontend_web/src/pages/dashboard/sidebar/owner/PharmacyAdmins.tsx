@@ -17,17 +17,9 @@ import {
   Typography,
 } from "@mui/material";
 import { MessageCircle, Send, ShieldCheck, ShieldOff, ShieldPlus } from "lucide-react";
-import { Pill } from "../../shiftCenter/ShiftCentreParts";
-import {
-  ConfirmDialog,
-  EmptyTeam,
-  MemberRow,
-  TeamList,
-  TeamListSkeleton,
-  TeamSection,
-  actionButtonSx,
-  prettyCode,
-} from "./teamUi";
+import { Pill } from "../../../../components/ui/Pill";
+import { EmptyTeam, MemberRow, TeamList, TeamListSkeleton, TeamSection, actionButtonSx, prettyCode } from "./teamUi";
+import { ConfirmDialog } from "../../../../components/ui/ConfirmDialog";
 import {
   AdminLevel,
   AdminStaffRole,

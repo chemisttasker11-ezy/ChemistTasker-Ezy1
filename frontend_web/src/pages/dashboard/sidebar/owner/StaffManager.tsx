@@ -41,24 +41,8 @@ import {
 } from "@chemisttasker/shared-core";
 import MembershipApplicationsPanel, { PendingDirectInvitationsPanel } from "./MembershipApplicationsPanel";
 import { useAuth } from "../../../../contexts/AuthContext";
-import {
-  ConfirmDialog,
-  EmptyTeam,
-  InviteLinkDialog,
-  MemberRow,
-  TeamList,
-  TeamListSkeleton,
-  TeamSection,
-  TeamToolbar,
-  actionButtonSx,
-  employmentLabel,
-  formatDate,
-  membershipClassification,
-  membershipPhoto,
-  membershipUserId,
-  roleLabel,
-  roleTone,
-} from "./teamUi";
+import { EmptyTeam, InviteLinkDialog, MemberRow, TeamList, TeamListSkeleton, TeamSection, TeamToolbar, actionButtonSx, employmentLabel, formatDate, membershipClassification, membershipPhoto, membershipUserId, roleLabel, roleTone } from "./teamUi";
+import { ConfirmDialog } from "../../../../components/ui/ConfirmDialog";
 
 const EMPLOYMENT_TYPES = ["FULL_TIME", "PART_TIME", "CASUAL"] as const;
 const employmentNeedsJobTitle = (value: string) =>

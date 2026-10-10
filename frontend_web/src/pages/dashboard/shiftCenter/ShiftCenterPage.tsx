@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Box } from "@mui/material";
 import { CircleCheck, History, Play } from "lucide-react";
 import PageHeader from "../../../components/ui/PageHeader";
-import SegmentTabs from "../../../components/ui/SegmentTabs";
+import SegmentTabs, { tabPanelProps } from "../../../components/ui/SegmentTabs";
 import ActiveShiftsPage from "../sidebar/ActiveShiftsPage";
 import ConfirmedShiftsPage from "../sidebar/ConfirmedShiftsPage";
 import HistoryShiftsPage from "../sidebar/HistoryShiftsPage";
@@ -91,9 +91,9 @@ function ShiftCenterLayout({ scope, basePath, title, subtitle }: BaseProps) {
   return (
     <Box sx={{ width: "100%", maxWidth: 1600, minWidth: 0, mx: "auto", overflowX: "hidden" }}>
       <PageHeader title={title} subtitle={subtitle}>
-        <SegmentTabs label="Shift Centre sections" tabs={tabItems} value={currentSection} onChange={handleTabChange} />
+        <SegmentTabs label="Shift Centre sections" idPrefix="shift-centre" tabs={tabItems} value={currentSection} onChange={handleTabChange} />
       </PageHeader>
-      <Box sx={{ minWidth: 0, maxWidth: "100%" }}>
+      <Box {...tabPanelProps("shift-centre", currentSection)} sx={{ minWidth: 0, maxWidth: "100%", "&:focus-visible": { outline: "2px solid var(--ct-accent-strong)", outlineOffset: 4, borderRadius: 2 } }}>
         <SectionComponent />
       </Box>
     </Box>

@@ -1,5 +1,5 @@
 import { Box, ButtonBase, Paper, Stack, Typography } from "@mui/material";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 
 /** Figma "View all shifts →" style link: bold deep-violet text with an arrow. */
@@ -36,6 +36,7 @@ export default function SectionCard({
   action,
   children,
   dense = false,
+  flush = false,
   component = "section",
 }: {
   title?: ReactNode;
@@ -44,14 +45,20 @@ export default function SectionCard({
   action?: ReactNode;
   children?: ReactNode;
   dense?: boolean;
+  /** Body runs edge to edge (lists with their own row padding); the header keeps the card padding. */
+  flush?: boolean;
   component?: "section" | "div";
 }) {
+  const titleId = useId();
+  const pad = dense ? { xs: 2, md: 2.25 } : { xs: 2.25, md: 3 };
   return (
     <Paper
       component={component}
       variant="outlined"
+      aria-labelledby={title && component === "section" ? titleId : undefined}
       sx={{
-        p: dense ? { xs: 2, md: 2.25 } : { xs: 2.25, md: 3 },
+        p: flush ? 0 : pad,
+        overflow: flush ? "hidden" : undefined,
         borderRadius: "var(--ct-card-radius)",
         borderColor: "var(--ct-border-color)",
         bgcolor: "var(--ct-surface-bg)",
@@ -60,7 +67,7 @@ export default function SectionCard({
       }}
     >
       {(title || action) && (
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1.5} sx={{ mb: subtitle ? 2 : 1.75 }}>
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1.5} sx={{ mb: subtitle ? 2 : 1.75, ...(flush ? { px: pad, pt: pad } : {}) }}>
           <Box sx={{ minWidth: 0 }}>
             {title && (
               <Stack direction="row" spacing={1.1} alignItems="center">
@@ -69,7 +76,7 @@ export default function SectionCard({
                     {icon}
                   </Box>
                 )}
-                <Typography component="h2" sx={{ color: "var(--ct-text-primary)", fontFamily: "var(--ct-font-display)", fontSize: 18, fontWeight: 500, letterSpacing: "-0.015em", lineHeight: 1.3 }}>
+                <Typography component="h2" id={titleId} sx={{ color: "var(--ct-text-primary)", fontFamily: "var(--ct-font-display)", fontSize: 18, fontWeight: 500, letterSpacing: "-0.015em", lineHeight: 1.3 }}>
                   {title}
                 </Typography>
               </Stack>

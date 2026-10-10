@@ -1,27 +1,15 @@
-import type { ReactElement, ReactNode } from 'react';
-import { Box, Button, CircularProgress, Stack, Tooltip, Typography } from '@mui/material';
+import type { ReactNode } from 'react';
+import { Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
 import type { ButtonProps } from '@mui/material';
 import { keyframes } from '@mui/system';
-import { BellRing, EyeOff, Info, Star } from 'lucide-react';
+import { BellRing, Star } from 'lucide-react';
+import { toneColors, type StatusTone } from '../../../components/ui/tone';
+import { CountBadge } from '../../../components/ui/Pill';
+import { InitialsAvatar } from '../../../components/ui/InitialsAvatar';
+import { Hint, InfoHint } from '../../../components/ui/Hint';
 
-/** Shift Centre building blocks. Colours come from theme variables so light/dark and contrast stay in one place. */
-
-export type ShiftTone = 'violet' | 'blue' | 'cyan' | 'magenta' | 'green' | 'amber' | 'red' | 'neutral' | 'navy';
-
-export const toneColors = (tone: ShiftTone): { bg: string; fg: string } => {
-    switch (tone) {
-        case 'green':
-        case 'amber':
-        case 'red':
-            return { bg: `var(--ct-status-${tone}-bg)`, fg: `var(--ct-status-${tone}-fg)` };
-        case 'neutral':
-            return { bg: 'var(--ct-subtle-bg)', fg: 'var(--ct-text-secondary)' };
-        case 'navy':
-            return { bg: '#06214A', fg: '#FFFFFF' };
-        default:
-            return { bg: `var(--ct-tone-${tone}-bg)`, fg: `var(--ct-tone-${tone}-fg)` };
-    }
-};
+/** Shift Centre building blocks (candidate rows, columns, sources, row actions). Generic pills, avatars, hints and
+ * tones live in components/ui. */
 
 const pulse = keyframes`
     0% { box-shadow: 0 0 0 0 rgba(163, 0, 143, 0.45); }
@@ -30,152 +18,6 @@ const pulse = keyframes`
 `;
 
 const iconSize = (size: number) => ({ '& svg': { width: size, height: size, flexShrink: 0, strokeWidth: 2 } });
-
-/** Short label on a tinted background (role, status, source). */
-export function Pill({ label, tone = 'neutral', icon, outlined = false, title }: {
-    label: ReactNode;
-    tone?: ShiftTone;
-    icon?: ReactNode;
-    outlined?: boolean;
-    title?: string;
-}) {
-    const { bg, fg } = toneColors(tone);
-    return (
-        <Box
-            component="span"
-            title={title}
-            sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 0.5,
-                minHeight: 24,
-                px: 1,
-                borderRadius: '999px',
-                fontSize: 12,
-                fontWeight: 600,
-                lineHeight: 1.2,
-                whiteSpace: 'nowrap',
-                maxWidth: '100%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                color: outlined ? 'var(--ct-text-primary)' : fg,
-                bgcolor: outlined ? 'transparent' : bg,
-                border: outlined ? '1px solid var(--ct-border-color)' : '1px solid transparent',
-                ...iconSize(13),
-            }}
-        >
-            {icon}
-            {label}
-        </Box>
-    );
-}
-
-export function CountBadge({ value, tone = 'violet', label }: { value: number; tone?: ShiftTone; label?: string }) {
-    const { bg, fg } = toneColors(tone);
-    return (
-        <Box
-            component="span"
-            aria-label={label}
-            sx={{
-                minWidth: 24,
-                height: 24,
-                px: 0.75,
-                borderRadius: '999px',
-                display: 'inline-grid',
-                placeItems: 'center',
-                fontSize: 12,
-                fontWeight: 600,
-                fontVariantNumeric: 'tabular-nums',
-                color: fg,
-                bgcolor: bg,
-            }}
-        >
-            {value}
-        </Box>
-    );
-}
-
-const initialsOf = (name: string) =>
-    name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join('') || '?';
-
-export function InitialsAvatar({ name, tone = 'violet', anonymous = false, size = 34 }: {
-    name: string;
-    tone?: ShiftTone;
-    anonymous?: boolean;
-    size?: number;
-}) {
-    const { bg, fg } = toneColors(anonymous ? 'neutral' : tone);
-    return (
-        <Box
-            component="span"
-            aria-hidden="true"
-            sx={{
-                width: size,
-                height: size,
-                flex: `0 0 ${size}px`,
-                borderRadius: '50%',
-                display: 'grid',
-                placeItems: 'center',
-                fontSize: size * 0.36,
-                fontWeight: 600,
-                color: fg,
-                bgcolor: bg,
-                ...iconSize(size * 0.45),
-            }}
-        >
-            {anonymous ? <EyeOff /> : initialsOf(name)}
-        </Box>
-    );
-}
-
-/** Hover / focus explanation: a bold line and a sentence of context. */
-export function Hint({ title, body, children }: { title: string; body?: ReactNode; children: ReactElement }) {
-    return (
-        <Tooltip
-            arrow
-            enterDelay={150}
-            title={
-                <Box sx={{ p: 0.25, maxWidth: 260 }}>
-                    <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: 'inherit', lineHeight: 1.35 }}>{title}</Typography>
-                    {body && <Typography sx={{ fontSize: 12, color: 'inherit', opacity: 0.86, lineHeight: 1.45, mt: 0.35 }}>{body}</Typography>}
-                </Box>
-            }
-        >
-            {children}
-        </Tooltip>
-    );
-}
-
-/** Small "i" that explains a heading on hover or keyboard focus. */
-export function InfoHint({ title, body }: { title: string; body?: ReactNode }) {
-    return (
-        <Hint title={title} body={body}>
-            <Box
-                component="span"
-                tabIndex={0}
-                role="img"
-                aria-label={`${title}${typeof body === 'string' ? `. ${body}` : ''}`}
-                sx={{
-                    display: 'inline-grid',
-                    placeItems: 'center',
-                    color: 'var(--ct-text-muted)',
-                    cursor: 'help',
-                    borderRadius: '50%',
-                    '&:hover, &:focus-visible': { color: 'var(--ct-accent-strong)' },
-                    '&:focus-visible': { outline: '2px solid var(--ct-accent-strong)', outlineOffset: 2 },
-                    ...iconSize(15),
-                }}
-            >
-                <Info />
-            </Box>
-        </Hint>
-    );
-}
 
 export const NEW_ACTIVITY_HINT =
     'Someone showed interest, sent an offer or replied since you last opened this date. Select the date to review it and clear the marker.';
@@ -269,7 +111,7 @@ export function CandidateRow({ name, meta, rating, pills, actions, tone = 'viole
     rating?: number | null;
     pills?: ReactNode;
     actions?: ReactNode;
-    tone?: ShiftTone;
+    tone?: StatusTone;
     anonymous?: boolean;
 }) {
     return (
@@ -320,7 +162,7 @@ export function CandidateRow({ name, meta, rating, pills, actions, tone = 'viole
 export function CandidateColumn({ title, helper, tone, icon, count, emptyText, children }: {
     title: string;
     helper: string;
-    tone: ShiftTone;
+    tone: StatusTone;
     icon: ReactNode;
     count: number;
     emptyText: string;
@@ -372,7 +214,7 @@ export function CandidateColumn({ title, helper, tone, icon, count, emptyText, c
 export function SourceSection({ title, subtitle, tone, icon, count, hint, children }: {
     title: string;
     subtitle: string;
-    tone: ShiftTone;
+    tone: StatusTone;
     icon: ReactNode;
     count: number;
     hint?: { title: string; body: string };

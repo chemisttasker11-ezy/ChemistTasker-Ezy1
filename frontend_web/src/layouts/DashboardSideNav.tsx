@@ -21,6 +21,7 @@ import menuLogo from "../assets/clipsnap-edit-6-1-2026.png";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDashboardNavigation } from "../contexts/DashboardNavigationContext";
 import { addDashboardScopeParams, normalizeDashboardSegment } from "./dashboardRouteScope";
+import { publicSiteHomeUrl } from "../components/PublicRouteBridge";
 
 /**
  * Presentation only: every route, child route, icon and capability still comes
@@ -179,11 +180,8 @@ function NavSymbol({ icon, active, small = false }: { icon?: ReactNode; active: 
 
 export default function DashboardSideNav({
   selectedPharmacyId,
-  homePath,
 }: {
   selectedPharmacyId: number | null;
-  /** Where the sidebar logo leads (the persona's dashboard home). */
-  homePath: string;
 }) {
   const navigation = useDashboardNavigation();
   const navigate = useNavigate();
@@ -470,8 +468,9 @@ export default function DashboardSideNav({
         >
           {!collapsed && (
             <ButtonBase
-              onClick={() => navigate(homePath)}
-              aria-label="ChemistTasker dashboard home"
+              component="a"
+              href={publicSiteHomeUrl()}
+              aria-label="ChemistTasker home"
               sx={{
                 borderRadius: "10px",
                 "&:hover": { opacity: 0.88 },

@@ -1,7 +1,9 @@
 import React from 'react';
 import { Box, ButtonBase, Stack, Typography } from '@mui/material';
 import { Clock, Users } from 'lucide-react';
-import { Hint, InfoHint, NewActivityBadge, toneColors, type ShiftTone } from '../../../../shiftCenter/ShiftCentreParts';
+import { NewActivityBadge } from '../../../../shiftCenter/ShiftCentreParts';
+import { Hint, InfoHint } from '../../../../../../components/ui/Hint';
+import { toneColors, type StatusTone } from '../../../../../../components/ui/tone';
 
 type SlotStatusCounts = {
     interested: number;
@@ -19,7 +21,7 @@ interface SlotSelectorProps {
     slotStatusCounts?: Record<number, SlotStatusCounts>;
 }
 
-const STATUS_PARTS: Array<{ key: keyof SlotStatusCounts; label: string; tone: ShiftTone; title: string; body: string }> = [
+const STATUS_PARTS: Array<{ key: keyof SlotStatusCounts; label: string; tone: StatusTone; title: string; body: string }> = [
     { key: 'interested', label: 'interested', tone: 'cyan', title: 'Interested', body: 'Said yes or sent an offer for this date. Waiting for you to review them.' },
     { key: 'assigned', label: 'assigned', tone: 'green', title: 'Assigned', body: 'Booked for this date.' },
     { key: 'noResponse', label: 'no reply', tone: 'amber', title: 'No reply yet', body: 'Notified about this date but have not answered.' },

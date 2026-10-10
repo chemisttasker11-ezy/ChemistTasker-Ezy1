@@ -16,7 +16,7 @@ import {
     Pagination,
 } from '@mui/material';
 import { BellRing, CircleAlert, CreditCard, MapPin } from 'lucide-react';
-import { Pill } from '../../../../shiftCenter/ShiftCentreParts';
+import { Pill } from '../../../../../../components/ui/Pill';
 import { CandidateProfile } from './CandidateProfile';
 
 const formatSlotDate = (value?: string | null) =>

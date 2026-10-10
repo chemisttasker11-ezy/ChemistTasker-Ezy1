@@ -30,7 +30,8 @@ import {
   reopenTimesheet,
 } from './api';
 import DashboardContentState from '../../components/dashboard/DashboardContentState';
-import { Pill, type ShiftTone } from '../../pages/dashboard/shiftCenter/ShiftCentreParts';
+import { Pill } from '../../components/ui/Pill';
+import { type StatusTone } from '../../components/ui/tone';
 import { formatHours, plural, timesheetStatus } from './timesheetDisplay';
 import type { TimesheetCheck, TimesheetDetail } from './types';
 
@@ -49,7 +50,7 @@ const errorText = (error: any, fallback: string) => {
   return payload?.error || payload?.message || payload?.detail || error?.message || fallback;
 };
 
-const SEVERITY: Record<string, { label: string; tone: ShiftTone; edge: string }> = {
+const SEVERITY: Record<string, { label: string; tone: StatusTone; edge: string }> = {
   BLOCKER: { label: 'Error', tone: 'red', edge: 'var(--ct-status-red-fg)' },
   WARNING: { label: 'Warning', tone: 'amber', edge: 'var(--ct-status-amber-fg)' },
   INFO: { label: 'Note', tone: 'blue', edge: 'var(--ct-tone-blue-fg)' },

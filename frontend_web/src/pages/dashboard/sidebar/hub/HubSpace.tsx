@@ -6,7 +6,7 @@ import { brandPanelBackground } from '../../../../components/ui/BrandBanner';
 import DashboardContentState from '../../../../components/dashboard/DashboardContentState';
 import { EMPLOYMENT_LABELS, initialsOf, roleLabel } from '../../../../components/social/socialFormat';
 import { getMemberDisplayName } from './hubUtils';
-import { Pill } from '../../shiftCenter/ShiftCentreParts';
+import { Pill } from '../../../../components/ui/Pill';
 
 /** A member of a hub space; `isAdmin` is set where the API says who manages the space (groups). */
 export type HubPerson = HubGroupMemberOption & { isAdmin?: boolean };

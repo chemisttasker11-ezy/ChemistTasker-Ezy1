@@ -97,6 +97,9 @@ jobs:
       - name: In-page Figma state contracts
         working-directory: frontend_web
         run: node scripts/audit-dashboard-visual-states.mjs
+      - name: UI ownership boundaries
+        working-directory: frontend_web
+        run: node scripts/audit-ui-boundaries.mjs
       - name: Cross-frontend auth flow tests
         run: node --test scripts/auth-flow.test.mjs
         working-directory: frontend_web

@@ -1,5 +1,5 @@
 import { Stack } from '@mui/material';
-import { Pill } from '../../pages/dashboard/shiftCenter/ShiftCentreParts';
+import { Pill } from '../../components/ui/Pill';
 import { plural } from './timesheetDisplay';
 import type { TimesheetSummary } from './types';
 
