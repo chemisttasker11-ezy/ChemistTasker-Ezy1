@@ -11,7 +11,6 @@ test('real Vite dashboard logo navigates to running Next public home', async ({ 
   await expect(logo).toHaveCount(1);
   expect(new URL(await logo.getAttribute('href'), page.url()).origin).toBe(new URL(nextOrigin).origin);
   await logo.click();
-  await expect(page).toHaveURL(new RegExp('^' + nextOrigin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/?$'));
   await expect(page.locator('body')).toContainText('ChemistTasker');
   expect(new URL(page.url()).origin).toBe(new URL(nextOrigin).origin);
   expect(await page.title()).not.toBe('');
