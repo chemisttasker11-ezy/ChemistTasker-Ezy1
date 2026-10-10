@@ -388,6 +388,9 @@ server changed. Figma: *Chat / Conversation*, *Message Hover Actions*, *Error (S
   *Full time*); favourites also show their pharmacy. **No emails** in the picker, and search matches names only (as in
   the Hub). Kept: one tap opens a direct message; suggested group name. Added: *Select all / Clear* per group, *Start
   group chat (2)*, explained empty list, accessible names, busy state, phone layout. AA sweep 0 failures.
+- **Names only (owner decision):** chat never shows an email: list rows, headers, mentions, reactions and the
+  picker fall back to the invited name, *Team member* or *Direct message*. Emails are still used internally to match
+  shift contacts, never displayed.
 - **@all (owner decision, instead of a "message the whole team" button):** group chats offer *@all · Everyone in
   {group}* first in the mention picker; it is highlighted like other mentions. Every group participant is already
   notified of each message (`backend/chat/signals.py`), so no API change.

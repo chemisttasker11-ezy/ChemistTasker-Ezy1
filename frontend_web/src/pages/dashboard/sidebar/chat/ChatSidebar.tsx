@@ -272,7 +272,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
       if (full) return full;
       const invited = (invitedName || '').trim();
       if (invited) return invited;
-      return (details?.email || '').trim() || 'Direct Message';
+      return 'Direct Message';
     },
     [],
   );
@@ -477,7 +477,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
             label: initialsFromParts(
               memberDetails.first_name,
               memberDetails.last_name,
-              memberDetails.email || fallbackName,
+              fallbackName,
             ),
           };
         }
@@ -489,14 +489,14 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
             const u = mergeUserDetails(contact.user, partnerUserId);
             return {
               url: u.profile_photo_url ?? null,
-              label: initialsFromParts(u.first_name, u.last_name, u.email || fallbackName),
+              label: initialsFromParts(u.first_name, u.last_name, fallbackName),
             };
           }
           const byUserId = resolveUserDetailsByUserId(partnerUserId);
           if (byUserId) {
             return {
               url: byUserId.profile_photo_url ?? null,
-              label: initialsFromParts(byUserId.first_name, byUserId.last_name, byUserId.email || fallbackName),
+              label: initialsFromParts(byUserId.first_name, byUserId.last_name, fallbackName),
             };
           }
         }
@@ -506,7 +506,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
         const details = last.sender.user_details;
         return {
           url: details.profile_photo_url ?? null,
-          label: initialsFromParts(details.first_name, details.last_name, details.email || fallbackName),
+          label: initialsFromParts(details.first_name, details.last_name, fallbackName),
         };
       }
       const partnerUserId = partnerMembershipId ? resolveUserDetailsByMembership(partnerMembershipId)?.id : undefined;
@@ -516,7 +516,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
           const u = mergeUserDetails(contact.user, partnerUserId);
           return {
             url: u.profile_photo_url ?? null,
-            label: initialsFromParts(u.first_name, u.last_name, u.email || fallbackName),
+            label: initialsFromParts(u.first_name, u.last_name, fallbackName),
           };
         }
         const byUserId = resolveUserDetailsByUserId(partnerUserId);
@@ -524,7 +524,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
           const merged = mergeUserDetails(byUserId, partnerUserId);
           return {
             url: merged.profile_photo_url ?? null,
-            label: initialsFromParts(merged.first_name, merged.last_name, merged.email || fallbackName),
+            label: initialsFromParts(merged.first_name, merged.last_name, fallbackName),
           };
         }
       }
@@ -534,7 +534,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
           const u = contact.user;
           return {
             url: u.profile_photo_url ?? null,
-            label: initialsFromParts(u.first_name, u.last_name, u.email || fallbackName),
+            label: initialsFromParts(u.first_name, u.last_name, fallbackName),
           };
         }
       }
@@ -545,7 +545,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
           const u = contact.user;
           return {
             url: u.profile_photo_url ?? null,
-            label: initialsFromParts(u.first_name, u.last_name, u.email || fallbackName),
+            label: initialsFromParts(u.first_name, u.last_name, fallbackName),
           };
         }
       }
@@ -821,13 +821,13 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
             {!isCollapsed && <Box className="sidebar-section-label">SHIFTS</Box>}
             {unifiedShiftContacts.map((contact, idx) => {
               const user = contact.user || {};
-              const displayName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || 'Shift Contact';
+              const displayName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Shift contact';
               const pharmacyLabel =
                 contact.pharmacy_name ||
                 (contact.pharmacies && contact.pharmacies.length
                   ? contact.pharmacies.map((p: any) => p.name).filter(Boolean).join(', ')
                   : contact.pharmacy_name);
-              const avatarLabel = initialsFromParts(user.first_name, user.last_name, user.email);
+              const avatarLabel = initialsFromParts(user.first_name, user.last_name, displayName);
               const syntheticRoom = {
                 id: -100000 - idx,
                 type: 'GROUP',

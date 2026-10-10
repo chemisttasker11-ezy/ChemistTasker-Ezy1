@@ -146,14 +146,14 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
         const cachedParticipant = participantCache[partnerMembershipId]?.details;
         if (cachedParticipant) {
           const fullName = `${cachedParticipant.first_name || ''} ${cachedParticipant.last_name || ''}`.trim();
-          return fullName || cachedParticipant.email || 'Direct Message';
+          return fullName || 'Direct Message';
         }
         for (const pharmacyId in memberCache) {
           const member = memberCache[Number(pharmacyId)]?.[partnerMembershipId];
           if (member?.details) {
             const details = member.details;
             const fullName = `${details.first_name || ''} ${details.last_name || ''}`.trim();
-            return fullName || details.email || 'Direct Message';
+            return fullName || 'Direct Message';
           }
         }
       }

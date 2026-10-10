@@ -131,7 +131,7 @@ export const ConversationPanel: FC<Props> = ({
         const record = memberCache[Number(pharmacyId)]?.[membershipId];
         if (record?.details) {
           const details = record.details;
-          const label = `${details.first_name || ''} ${details.last_name || ''}`.trim() || details.email || `Member ${membershipId}`;
+          const label = `${details.first_name || ''} ${details.last_name || ''}`.trim() || record.invited_name || 'Team member';
           map.set(membershipId, label);
           break;
         }
@@ -143,7 +143,7 @@ export const ConversationPanel: FC<Props> = ({
       if (!membershipId || (myMembershipId && membershipId === myMembershipId) || map.has(membershipId)) return;
       const details = message.sender?.user_details;
       if (details) {
-        const label = `${details.first_name || ''} ${details.last_name || ''}`.trim() || details.email || `Member ${membershipId}`;
+        const label = `${details.first_name || ''} ${details.last_name || ''}`.trim() || 'Team member';
         map.set(membershipId, label);
       }
     });
@@ -466,7 +466,7 @@ if (partnerMembershipId) {
     if (memberCache[pharmacyId][partnerMembershipId]) {
       const partnerUser = memberCache[pharmacyId][partnerMembershipId].details;
       const fullName = `${partnerUser.first_name || ''} ${partnerUser.last_name || ''}`.trim();
-      return fullName || partnerUser.email || 'Direct Message';
+      return fullName || 'Direct Message';
     }
   }
 }
@@ -475,7 +475,7 @@ if (partnerMembershipId) {
 const lastFromPartner = [...messages].reverse().find(m => m.sender?.id !== myMembershipInRoom.id)?.sender?.user_details;
 if (lastFromPartner) {
   const fullName = `${lastFromPartner.first_name || ''} ${lastFromPartner.last_name || ''}`.trim();
-  return fullName || lastFromPartner.email || 'Direct Message';
+  return fullName || 'Direct Message';
 }
 
 return 'Direct Message';
@@ -505,7 +505,7 @@ return 'Direct Message';
   
   const resolveUserName = useCallback(
     (userId: number): string | null => {
-      const fromDetails = (d?: UserLite | null) => (d ? `${d.first_name || ''} ${d.last_name || ''}`.trim() || d.email || null : null);
+      const fromDetails = (d?: UserLite | null) => (d ? `${d.first_name || ''} ${d.last_name || ''}`.trim() || null : null);
       for (const cached of Object.values(participantCache)) {
         if (cached?.details?.id === userId) return fromDetails(cached.details);
       }
