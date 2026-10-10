@@ -95,6 +95,25 @@ test('patched image parsers reject zero-size entries and Metro keeps valid dimen
   `);
 });
 
+test('Metro reads filesystem images as bytes for image-size v2', () => {
+  isolated(`
+    const assert = require('node:assert/strict');
+    const path = require('node:path');
+    const { mkdtempSync, writeFileSync, rmSync } = require('node:fs');
+    const dir = mkdtempSync(path.join(require('node:os').tmpdir(), 'ct-metro-image-'));
+    const asset = path.join(dir, 'pixel.png');
+    writeFileSync(asset, Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489', 'hex'));
+    (async () => {
+      try {
+        const data = await require('metro/private/Assets').getAssetData(asset, 'pixel.png', [], 'web', '/assets');
+        assert.equal(data.width, 1);
+        assert.equal(data.height, 1);
+        assert.equal(data.type, 'png');
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+  `);
+});
+
 test('NYC YAML loading and Firestore Node client retain their public APIs', async () => {
   const folder = mkdtempSync(path.join(process.env.SECURITY_TEST_TMP || tmpdir(), 'mobile-security-yaml-'));
   try {

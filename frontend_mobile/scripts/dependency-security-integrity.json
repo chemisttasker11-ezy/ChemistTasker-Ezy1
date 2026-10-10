@@ -7,7 +7,7 @@
     "node_modules/braces/lib/stringify.js": "c95abf85ab3c3b62399e98ee65aabfc17e672d6b4cc48b454df5a8c6adaf59a7",
     "node_modules/braces/lib/utils.js": "35f0d608bd905438e3114da522d9d7473a1b7b2a117ee47efd75833dfc393e42",
     "node_modules/node-forge/lib/rsa.js": "96c154db17c611f81eeb48aed2c064c80d87517df2fff24cf574fbd1ac050492",
-    "node_modules/metro/src/Assets.js": "2e134bfefd838b7b24293c4c94ff7096a2c558b93e94185438a7b71dc5296458",
-    "node_modules/metro/src/Assets.js.flow": "e0786623f5e9b1f1d995e54fee1a3993dc7e4e223bc466169924316ed8087c90"
+    "node_modules/metro/src/Assets.js": "d6c19bdbcd1858c16ee7dce4b2301a18b735d017c4859eb93b1ad9cd12e03cd8",
+    "node_modules/metro/src/Assets.js.flow": "11f7bc3869f8c2f6621e393d773eff09530edd4f049e1840740004d57a413bfd"
   }
 }
