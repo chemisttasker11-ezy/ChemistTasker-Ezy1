@@ -13,7 +13,7 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { Plus, Trash2 } from 'lucide-react';
+import { Lock, Plus, Trash2 } from 'lucide-react';
 import IconTile, { type Tone } from '../../../../components/ui/IconTile';
 import { Pill, type ShiftTone } from '../../shiftCenter/ShiftCentreParts';
 
@@ -204,8 +204,9 @@ export function LineItemsEditor({
   onChange,
   onAdd,
   onRemove,
-  canEdit = true,
+  canEdit: canEditAll = true,
   isPriceLocked,
+  isRowLocked,
 }: {
   items: LineItemRow[];
   onChange: (idx: number, field: Field, value: string | number) => void;
@@ -214,11 +215,15 @@ export function LineItemsEditor({
   canEdit?: boolean;
   /** Rows whose price comes from the shift itself (the agreed rate) and can't be changed. */
   isPriceLocked?: (li: LineItemRow, idx: number) => boolean;
+  /** Rows built from accepted shift terms: shown, but changed only after the invoice exists. */
+  isRowLocked?: (li: LineItemRow, idx: number) => boolean;
 }) {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up(1360));
 
   const fields = (li: LineItemRow, idx: number) => {
+    const locked = Boolean(isRowLocked?.(li, idx));
+    const canEdit = canEditAll && !locked;
     const isSuper = li.category_code === 'Superannuation';
     const timed = li.category_code === 'ProfessionalServices';
     return {
@@ -265,6 +270,12 @@ export function LineItemsEditor({
           sx={inputSx}
         />
       ),
+      lockNote: locked ? (
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ color: 'var(--ct-text-secondary)', mt: 0.75 }}>
+          <Lock size={13} aria-hidden="true" />
+          <Typography sx={{ fontSize: 12.5 }}>Hours, rate and description come from the accepted shift, so they can't be changed here.</Typography>
+        </Stack>
+      ) : null,
       remove:
         canEdit && onRemove ? (
           <Tooltip title="Remove line">
@@ -277,7 +288,7 @@ export function LineItemsEditor({
   };
 
   const addButton =
-    canEdit && onAdd ? (
+    canEditAll && onAdd ? (
       <Button startIcon={<Plus size={16} />} onClick={onAdd} sx={{ minHeight: 40, alignSelf: 'flex-start' }}>
         Add line item
       </Button>
@@ -317,7 +328,7 @@ export function LineItemsEditor({
                   <Typography sx={{ color: 'var(--ct-text-primary)', fontWeight: 600, fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>{money(li.total)}</Typography>
                 </Box>
                 <Box role="cell" sx={{ textAlign: 'right' }}>{f.remove}</Box>
-                <Box role="cell" sx={{ gridColumn: '1 / -2' }}>{f.note}</Box>
+                <Box role="cell" sx={{ gridColumn: '1 / -2' }}>{f.note}{f.lockNote}</Box>
               </Box>
             );
           })}
@@ -349,7 +360,7 @@ export function LineItemsEditor({
               {f.unit}
               {f.quantity}
               <Box sx={{ gridColumn: '1 / -1' }}>{f.price}</Box>
-              <Box sx={{ gridColumn: '1 / -1' }}>{f.note}</Box>
+              <Box sx={{ gridColumn: '1 / -1' }}>{f.note}{f.lockNote}</Box>
             </Box>
           </Box>
         );

@@ -701,6 +701,7 @@ export default function InvoiceDetailPage() {
             onChange={(idx, field, value) => updateRow(idx, field, value)}
             onAdd={addRow}
             onRemove={removeRow}
+            isRowLocked={(li) => li.category_code === 'ProfessionalServices' && Boolean((li as any).source_assignment)}
           />
           <Box sx={{ mt: 2.5, ml: { sm: 'auto' }, maxWidth: { sm: 380 } }}>
             <TotalsBreakdown totals={totals} gstRegistered={gstRegistered} />
