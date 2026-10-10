@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Shift } from '@chemisttasker/shared-core';
+import { chargeShiftFulfillment, type Shift } from '@chemisttasker/shared-core';
 import apiClient from '../../../../../utils/apiClient';
 
 export function useShiftPaymentActions(loadShifts: () => Promise<void>, showSnackbar: (message: string) => void) {
@@ -29,9 +29,7 @@ export function useShiftPaymentActions(loadShifts: () => Promise<void>, showSnac
 
     const handlePayWithStripe = useCallback(async (shift: Shift, offerIds: number[] = []) => {
         try {
-            const { data: res } = await apiClient.post(`/billing/charge-fulfillment/${shift.id}/`, {
-                ...(offerIds.length > 0 ? { offer_ids: offerIds } : {}),
-            });
+            const res = await chargeShiftFulfillment(shift.id, { offerIds });
             if (res?.url) {
                 window.location.href = res.url;
             } else if (res?.free) {
