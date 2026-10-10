@@ -553,3 +553,24 @@ layout (cover → About → members → large composer), so they were not follow
 - Copy: *Assign to Slot* → *Assign to this date*; empty reviews show only *No reviews yet*.
 - Checked: real playground candidate and a mocked full profile at 1440 and 390; AA sweep 0 failures light and dark;
   detector clean; backend `shifts` tests 76/76.
+
+## Shift Centre for Organisation and Admin (2026-10-10)
+
+- Both already reuse the owner components (`ShiftCenterLayout` → `ActiveShiftsPage`, `ConfirmedShiftsPage`,
+  `HistoryShiftsPage`); checked with real org (10 pharmacies) and admin data at 1440 and 390, light and dark.
+- **One page title:** *Shift Centre* for every persona (was *Manage your pharmacy shifts* / *Organization shift
+  operations* / *Admin pharmacy shifts*), with a subtitle per persona. Tabs *Active / Confirmed / History* (sentence
+  case, no repeated "Shifts").
+- **No duplicate heading:** the section heading under the tabs repeated the selected tab; it stays as a screen-reader
+  heading only.
+- **Counts never lie while loading:** *Candidates* and *Interested* tiles show a placeholder until every audience list
+  has loaded (they showed 0 for ~12 s on the org account, then 36).
+- **Empty states:** *Shifts show here once a worker is booked and confirmed.* → *See active shifts*; *Finished shifts
+  show here, so you can check them and rate the team.* → *See confirmed shifts* (was "No confirmed shifts available.").
+- **Names, not emails:** a booked worker's row shows their role, not their email; contacts stay in *View profile*.
+- **Dark mode (all personas):** the primary row action (*Review*, *View profile*) used the light text violet as its fill
+  (2.15:1); it now uses the button fill.
+- Checked: AA sweep 0 failures light and dark on all three sections for org and admin; detector clean; breadth tests
+  for owner, admin and organisation Shift Centre pass.
+- **Finding (performance, not changed):** the org Active list fires 144 `member_status` / `shift-interests` requests
+  (one per date per audience). A batch endpoint would cut the 12 s load.

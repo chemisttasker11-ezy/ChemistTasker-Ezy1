@@ -19,6 +19,7 @@ import {
     Close as X,
 } from '@mui/icons-material';
 import { CalendarDays } from 'lucide-react';
+import { visuallyHidden } from '@mui/utils';
 import DashboardContentState from '../../../../components/dashboard/DashboardContentState';
 import { useLocation, useNavigate } from 'react-router-dom';
 import apiClient from '../../../../utils/apiClient';
@@ -962,14 +963,8 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     return (
         <>
             <Container maxWidth={false} disableGutters sx={{ overflowX: 'hidden' }}>
-                <Stack direction="row" alignItems="baseline" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-                    <Typography component="h2" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 20, color: 'var(--ct-text-primary)', letterSpacing: '-0.015em' }}>
-                        {title}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'var(--ct-text-secondary)' }}>
-                        Manage and track your live shifts
-                    </Typography>
-                </Stack>
+                {/* The Shift Centre tabs already name this section; the heading stays for screen readers. */}
+                <Typography component="h2" sx={visuallyHidden}>{title}</Typography>
 
                 {shiftsLoading && shifts.length === 0 ? (
                     <Stack spacing={2.5} role="status" aria-label="Loading active shifts">

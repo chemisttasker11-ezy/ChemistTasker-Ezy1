@@ -174,6 +174,9 @@ export default function ActiveShiftCard({
             const data = communityTabData[index];
             return !data || data.loading;
         });
+        // Candidate counts are only final once every audience list has loaded; until then show a placeholder, not 0.
+        const publicTabData = viewableLevelKeys.includes(PUBLIC_LEVEL_KEY) ? tabData[getTabKey(shift.id, PUBLIC_LEVEL_KEY)] : undefined;
+        const countsLoading = communityDataLoading || (viewableLevelKeys.includes(PUBLIC_LEVEL_KEY) && (!publicTabData || publicTabData.loading));
         const selectedSlotId = isSingleUserShift
             ? null
             : selectedSlotByShift[shift.id] ?? shift.slots?.[0]?.id ?? null;
@@ -349,10 +352,10 @@ export default function ActiveShiftCard({
             .map((level) => getAudienceLevel(level)?.label)
             .filter((label): label is string => Boolean(label));
         const pharmacyName = (shift as any).pharmacyDetail?.name ?? 'Unnamed Pharmacy';
-        const metricItems: Array<{ label: string; value: number | string; icon: ReactNode; tone: Tone; hint: string }> = [
+        const metricItems: Array<{ label: string; value: number | string; icon: ReactNode; tone: Tone; hint: string; loading?: boolean }> = [
             { label: 'Slots', value: slotsCount || '-', icon: <CalendarDays />, tone: 'violet', hint: 'Dates in this shift. Each date is filled separately.' },
-            { label: 'Candidates', value: candidatesCount, icon: <Users />, tone: 'magenta', hint: 'Everyone who responded or was invited, across all dates and audiences.' },
-            { label: 'Interested', value: interestsCount, icon: <UserCheck />, tone: 'cyan', hint: 'Said yes or sent an offer, and are waiting for your review.' },
+            { label: 'Candidates', value: candidatesCount, icon: <Users />, tone: 'magenta', hint: 'Everyone who responded or was invited, across all dates and audiences.', loading: countsLoading },
+            { label: 'Interested', value: interestsCount, icon: <UserCheck />, tone: 'cyan', hint: 'Said yes or sent an offer, and are waiting for your review.', loading: countsLoading },
         ];
         const iconButtonSx = {
             width: 36,
@@ -459,7 +462,7 @@ export default function ActiveShiftCard({
                         </Box>
                         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1, width: { xs: '100%', lg: 408 } }}>
                             {metricItems.map((item) => (
-                                <Hint key={item.label} title={`${item.value} ${item.label.toLowerCase()}`} body={item.hint}>
+                                <Hint key={item.label} title={item.loading ? `Counting ${item.label.toLowerCase()}` : `${item.value} ${item.label.toLowerCase()}`} body={item.hint}>
                                     <Stack
                                         direction="row"
                                         spacing={1.25}
@@ -471,7 +474,7 @@ export default function ActiveShiftCard({
                                         </Box>
                                         <Box sx={{ minWidth: 0 }}>
                                             <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 22, lineHeight: 1.05, color: 'var(--ct-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                                                {item.value}
+                                                {item.loading ? <Skeleton variant="text" width={26} aria-label="Loading" /> : item.value}
                                             </Typography>
                                             <Typography sx={{ fontSize: 12, color: 'var(--ct-text-secondary)', lineHeight: 1.3 }}>{item.label}</Typography>
                                         </Box>

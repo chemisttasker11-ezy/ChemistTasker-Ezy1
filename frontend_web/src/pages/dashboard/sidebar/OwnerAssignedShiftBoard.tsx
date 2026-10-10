@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Button, Collapse, Pagination, Skeleton, Stack, Typography } from '@mui/material';
 import {
   Building2,
@@ -88,7 +89,9 @@ const getAssignedName = (assignment?: AssignmentLike | null, member?: any) => {
 
 const getAssignedDetails = (assignment?: AssignmentLike | null, member?: any) => {
   const user = (assignment as any)?.user ?? {};
-  return user.email || user.phoneNumber || user.phone_number || member?.role || member?.employmentType || member?.employment_type || 'Profile locked to this slot';
+  // Names and roles on the card; contact details live in View profile (owner rule: names, not emails).
+  const role = user.role || member?.role || member?.employmentType || member?.employment_type;
+  return role ? humanizeEnum(role) : 'Booked for this date';
 };
 
 const getAssignedEntries = (shift: Shift) => {
@@ -153,6 +156,7 @@ export default function OwnerAssignedShiftBoard({
   shifts,
   title,
 }: Props) {
+  const navigate = useNavigate();
   const itemsPerPage = 6;
   const [page, setPage] = useState(1);
   const [expandedShiftIds, setExpandedShiftIds] = useState<Record<number, boolean>>({});
@@ -187,6 +191,8 @@ export default function OwnerAssignedShiftBoard({
         icon={mode === 'history' ? <History /> : <CalendarCheck />}
         title={mode === 'history' ? 'No past shifts yet' : 'No confirmed shifts yet'}
         description={emptyText}
+        actionLabel={mode === 'history' ? 'See confirmed shifts' : 'See active shifts'}
+        onAction={() => navigate(mode === 'history' ? '../confirmed' : '../active', { relative: 'path' })}
       />
     );
   }

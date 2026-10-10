@@ -73,17 +73,17 @@ function ShiftCenterLayout({ scope, basePath, title, subtitle }: BaseProps) {
   const tabItems = useMemo(() => [
     {
       value: "active" as Section,
-      label: "Active Shifts",
+      label: "Active",
       icon: <Play />,
     },
     {
       value: "confirmed" as Section,
-      label: "Confirmed Shifts",
+      label: "Confirmed",
       icon: <CircleCheck />,
     },
     {
       value: "history" as Section,
-      label: "Shifts History",
+      label: "History",
       icon: <History />,
     },
   ], []);
@@ -105,8 +105,8 @@ export function OwnerShiftCenterPage() {
     <ShiftCenterLayout
       scope="owner"
       basePath="/dashboard/owner/shift-center"
-      title="Manage your pharmacy shifts"
-      subtitle="Review upcoming, confirmed, and past shifts across your pharmacies."
+      title="Shift Centre"
+      subtitle="Fill open shifts, check who is booked and look back at past shifts across your pharmacies."
     />
   );
 }
@@ -116,8 +116,8 @@ export function OrganizationShiftCenterPage() {
     <ShiftCenterLayout
       scope="organization"
       basePath="/dashboard/organization/shift-center"
-      title="Organization shift operations"
-      subtitle="Track staffing progress and coverage across your claimed pharmacies."
+      title="Shift Centre"
+      subtitle="Fill open shifts and check coverage across your organisation's pharmacies."
     />
   );
 }
@@ -136,8 +136,8 @@ export function AdminShiftCenterPage() {
     <ShiftCenterLayout
       scope="admin"
       basePath={basePath}
-      title="Admin pharmacy shifts"
-      subtitle="Monitor shift activity and confirmations for your selected pharmacy."
+      title="Shift Centre"
+      subtitle="Fill open shifts and check who is booked at this pharmacy."
     />
   );
 }

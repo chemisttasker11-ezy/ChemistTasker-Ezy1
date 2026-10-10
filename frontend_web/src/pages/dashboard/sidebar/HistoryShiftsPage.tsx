@@ -1,3 +1,4 @@
+import { visuallyHidden } from '@mui/utils';
 import { useEffect, useState } from 'react';
 import {
   Box,
@@ -11,7 +12,6 @@ import {
   Rating,
   Skeleton,
   Snackbar,
-  Stack,
   TextField,
   Typography,
 } from '@mui/material';
@@ -118,20 +118,13 @@ export default function HistoryShiftsPage() {
 
   return (
     <Container maxWidth={false} disableGutters>
-      <Stack direction="row" alignItems="baseline" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-        <Typography component="h2" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 20, color: 'var(--ct-text-primary)', letterSpacing: '-0.015em' }}>
-          Shift History
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'var(--ct-text-secondary)' }}>
-          Review completed shifts and rate assigned team members
-        </Typography>
-      </Stack>
+      <Typography component="h2" sx={visuallyHidden}>Shift History</Typography>
 
       <OwnerAssignedShiftBoard
         title="Shift History"
         shifts={shifts}
         loading={loading}
-        emptyText="No past shifts found."
+        emptyText="Finished shifts show here, so you can check them and rate the team."
         mode="history"
         onViewAssigned={openProfile}
         onRateAssigned={openRateWorker}

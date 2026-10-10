@@ -232,7 +232,8 @@ export function RowAction({ kind = 'secondary', loading = false, children, ...pr
     const amber = toneColors('amber');
     const sx =
         kind === 'primary'
-            ? { bgcolor: 'var(--ct-accent-strong)', color: '#FFFFFF', '&:hover': { bgcolor: '#2E1288' } }
+            // Same fill as contained buttons: --ct-accent-strong is a light text violet in dark mode (white on it is 2.2:1).
+            ? { bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' } }
             : kind === 'buzz'
                 ? { bgcolor: amber.bg, color: amber.fg, border: '1px solid transparent', '&:hover': { bgcolor: amber.bg, borderColor: amber.fg } }
                 : { bgcolor: 'var(--ct-surface-bg)', color: 'var(--ct-text-primary)', border: '1px solid var(--ct-border-color)', '&:hover': { borderColor: 'var(--ct-accent-strong)', bgcolor: 'var(--ct-surface-bg)' } };
