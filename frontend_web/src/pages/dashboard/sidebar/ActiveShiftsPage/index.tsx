@@ -344,6 +344,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         if (!interest.revealed) {
             try {
                 revealedUser = await revealInterest(shift, interest, levelKey);
+                if (!revealedUser || request !== candidateReviewRequest.current) return;
 
 
                 // Update counter offer cache if they have an offer
@@ -442,6 +443,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 try {
                     const levelKey = selectedLevelByShift[shift.id] ?? PUBLIC_LEVEL_KEY;
                     revealedUser = await revealInterest(shift, interest, levelKey);
+                    if (!revealedUser || request !== candidateReviewRequest.current) return;
 
                     // Update offer cache
                     if (revealedUser) {
@@ -545,6 +547,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             if (interest && !(interest as any).revealed) {
                 try {
                     revealedUser = await revealInterest(shift, interest, levelKey);
+                    if (!revealedUser || request !== candidateReviewRequest.current) return;
                     await loadTabDataForShift(shift, levelKey);
                 } catch (error) {
                     console.error('Failed to reveal reviewed candidate', error);

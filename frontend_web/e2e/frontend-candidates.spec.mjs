@@ -26,6 +26,7 @@ for (const role of ['Student', 'Pharmacist']) for (const initiallyRevealed of [t
       if (path.endsWith('/shifts/51/reveal_profile/')) {
         reveals += 1;
         expect(route.request().postDataJSON()).toEqual({ user_id: 81, slot_id: 61 });
+        if (role === 'Student' && reveals === 1) return json(route, { detail: 'Reveal temporarily unavailable' }, 500);
         return json(route, profile);
       }
       if (path.includes('/counter-offers')) return json(route, []);
@@ -33,7 +34,14 @@ for (const role of ['Student', 'Pharmacist']) for (const initiallyRevealed of [t
     await page.goto('/dashboard/owner/shift-center/active?workspace=internal&pharmacy_id=101');
     await page.getByRole('button', { name: 'Manage candidates', exact: true }).click();
     if (!initiallyRevealed) await expect(page.getByText('Candidate biography', { exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: initiallyRevealed ? 'Review' : 'Reveal', exact: true }).click();
+    const review = page.getByRole('button', { name: initiallyRevealed ? 'Review' : 'Reveal', exact: true });
+    await review.click();
+    if (role === 'Student' && !initiallyRevealed) {
+      await expect(page.getByText('Failed to reveal candidate.', { exact: true })).toBeVisible();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(page.getByText('Candidate biography', { exact: true })).toHaveCount(0);
+      await review.click();
+    }
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText(role, { exact: true })).toBeVisible();
     await expect(dialog.getByText('Profile verified', { exact: true })).toBeVisible();
@@ -41,6 +49,49 @@ for (const role of ['Student', 'Pharmacist']) for (const initiallyRevealed of [t
     await expect(dialog.getByText('TEST_SKILL', { exact: true })).toBeVisible();
     await expect(dialog.getByText('3 years experience', { exact: true })).toBeVisible();
     await expect(dialog.getByText(/Bendigo, VIC/)).toBeVisible();
-    expect(reveals).toBe(initiallyRevealed ? 0 : 1);
+    expect(reveals).toBe(initiallyRevealed ? 0 : role === 'Student' ? 2 : 1);
   });
 }
+
+test('a slow earlier candidate review cannot replace the candidate selected afterward', async ({ page }) => {
+  let releaseFirst;
+  let firstStarted = false;
+  let firstFinished = false;
+  const pendingFirst = new Promise(resolve => { releaseFirst = resolve; });
+  await installApiFixture(page, roleUsers.owner, async (route, { path, url }) => {
+    if (path.endsWith('/shifts/active/')) return json(route, [{
+      id: 51, pharmacy: 101, pharmacy_detail: { id: 101, name: 'Review Pharmacy' },
+      visibility: 'PLATFORM', allowed_escalation_levels: ['PLATFORM'], role_needed: 'PHARMACIST',
+      employment_type: 'LOCUM', single_user_only: false,
+      slots: [{ id: 61, date: '2026-10-31', start_time: '09:00:00', end_time: '15:00:00' }],
+    }]);
+    if (path.endsWith('/shift-interests/')) return json(route, [81, 82].map(id => ({
+      id, shift: 51, slot_id: 61, user_id: id, revealed: true,
+      user: id === 81 ? 'First Candidate' : 'Second Candidate',
+      user_detail: { id, first_name: id === 81 ? 'First' : 'Second', last_name: 'Candidate', role_label: 'Student' },
+    })));
+    if (path.endsWith('/ratings/summary/')) {
+      if (url.searchParams.get('target_id') === '81') { firstStarted = true; await pendingFirst; }
+      return json(route, { average: 4, count: 1 });
+    }
+    if (path.endsWith('/ratings/')) {
+      const id = Number(url.searchParams.get('target_id'));
+      await json(route, { count: 1, results: [{ id, stars: 4, comment: id === 81 ? 'First review' : 'Second review' }] });
+      if (id === 81) firstFinished = true;
+      return true;
+    }
+  });
+  await page.goto('/dashboard/owner/shift-center/active');
+  await page.getByRole('button', { name: 'Manage candidates', exact: true }).click();
+  const reviews = page.getByRole('button', { name: 'Review', exact: true });
+  await reviews.nth(0).click();
+  await expect.poll(() => firstStarted).toBe(true);
+  await reviews.nth(1).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Second Candidate', { exact: true })).toBeVisible();
+  releaseFirst();
+  await expect.poll(() => firstFinished).toBe(true);
+  await expect(dialog.getByText('Second review', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('First Candidate', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('First review', { exact: true })).toHaveCount(0);
+});
