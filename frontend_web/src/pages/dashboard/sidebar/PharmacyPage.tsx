@@ -91,7 +91,6 @@ const LIGHT_SURFACE = "#FFFFFF";
 const LIGHT_BORDER = "#D9E2F2";
 const ACCENT = "#3C18A8"; // dashboard deep violet (was the old Figma blue #3C18A8)
 const DASHBOARD_FONT_FAMILY = '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif';
-const DASHBOARD_INK = "#06123A";
 
 const tabLabels = [
   { label: "Basic", icon: <BusinessRoundedIcon fontSize="small" /> },
@@ -257,6 +256,7 @@ export default function PharmacyPage({
   const [membershipsByPharmacy, setMembershipsByPharmacy] = useState<Record<string, MembershipDTO[]>>({});
   const [adminAssignmentsByPharmacy, setAdminAssignmentsByPharmacy] = useState<Record<string, PharmacyAdminDTO[]>>({});
   const [membershipsLoading, setMembershipsLoading] = useState<Record<string, boolean>>({});
+  const [membershipsError, setMembershipsError] = useState<Record<string, string>>({});
   const [view, setView] = useState<"list" | "detail">("list");
   const [activePharmacyId, setActivePharmacyId] = useState<string | null>(null);
   const [pendingDeletePharmacy, setPendingDeletePharmacy] = useState<Pharmacy | null>(null);
@@ -1380,8 +1380,10 @@ export default function PharmacyPage({
           ...prev,
           [pharmacyId]: Array.isArray(adminData) ? adminData : [],
         }));
+        setMembershipsError((prev) => ({ ...prev, [pharmacyId]: "" }));
       } catch (err) {
         console.error("Failed to load memberships", err);
+        setMembershipsError((prev) => ({ ...prev, [pharmacyId]: "Team lists didn't load." }));
       } finally {
         setMembershipsLoading((prev) => ({ ...prev, [pharmacyId]: false }));
       }
@@ -2101,7 +2103,7 @@ export default function PharmacyPage({
   }
 
   return (
-    <Box sx={{ flex: 1, minHeight: 0, width: "100%", color: DASHBOARD_INK, fontFamily: DASHBOARD_FONT_FAMILY }}>
+    <Box sx={{ flex: 1, minHeight: 0, width: "100%", color: "var(--ct-text-primary)", fontFamily: DASHBOARD_FONT_FAMILY }}>
       <GlobalStyles styles={{ ".pac-container": { zIndex: 1400 } }} />
       {!standalone && (
         <TopBar
@@ -2392,6 +2394,8 @@ export default function PharmacyPage({
       ) : activePharmacy ? (
         <OwnerPharmacyDetailPage
           pharmacy={toOwnerPharmacyDTO(activePharmacy)}
+          profile={activePharmacy as any}
+          membershipsError={membershipsError[activePharmacy.id] || ""}
           staffMemberships={staffMemberships}
           locumMemberships={locumMemberships}
           adminAssignments={activeAdminAssignments}

@@ -60,6 +60,8 @@ export default function AdminManagePharmaciesPage() {
   const [loading, setLoading] = useState(true);
   const [membershipsLoading, setMembershipsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [membershipsError, setMembershipsError] = useState("");
+  const [profile, setProfile] = useState<Record<string, unknown> | undefined>(undefined);
 
   const loadMemberships = useCallback(async () => {
     if (!pharmacyId) return;
@@ -71,8 +73,10 @@ export default function AdminManagePharmaciesPage() {
       ]);
       setMemberships(mappedMembers);
       setAdmins(Array.isArray(adminPayload) ? adminPayload : []);
+      setMembershipsError("");
     } catch (err) {
       console.error("Failed to load admin memberships", err);
+      setMembershipsError("Team lists didn't load.");
     } finally {
       setMembershipsLoading(false);
     }
@@ -85,6 +89,7 @@ export default function AdminManagePharmaciesPage() {
     try {
       const pharmacyRes = await getPharmacyById(pharmacyId);
       setPharmacy(toPharmacyDto(pharmacyRes as any));
+      setProfile(pharmacyRes as Record<string, unknown>);
       await loadMemberships();
     } catch (err) {
       console.error("Failed to load admin pharmacy page", err);
@@ -153,6 +158,8 @@ export default function AdminManagePharmaciesPage() {
           pendingAdminMemberships={pendingAdminMemberships}
           onMembershipsChanged={loadMemberships}
         membershipsLoading={membershipsLoading}
+        membershipsError={membershipsError}
+        profile={profile}
       />
     </Box>
   );

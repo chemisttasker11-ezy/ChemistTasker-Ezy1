@@ -1,34 +1,42 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
-  IconButton,
   InputLabel,
   MenuItem,
   Select,
   Snackbar,
   Stack,
   TextField,
-  Tooltip,
   Typography,
-  Skeleton,
 } from "@mui/material";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import AddIcon from "@mui/icons-material/Add";
-import LinkIcon from "@mui/icons-material/Link";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import { alpha } from "@mui/material/styles";
+import { Link2, MessageCircle, Plus, Send, Star, StarOff, UserPlus } from "lucide-react";
+import {
+  ConfirmDialog,
+  EmptyTeam,
+  InviteLinkDialog,
+  MemberRow,
+  TeamList,
+  TeamListSkeleton,
+  TeamSection,
+  TeamToolbar,
+  actionButtonSx,
+  employmentLabel,
+  formatDate,
+  membershipClassification,
+  membershipPhoto,
+  membershipUserId,
+  roleLabel,
+  roleTone,
+} from "./teamUi";
 import {
   createMembershipInviteLinkService,
   deleteMembershipService,
@@ -62,41 +70,6 @@ const inviteTextFieldSx = {
     px: 0.5,
   },
 };
-const DASHBOARD_FONT_FAMILY = '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif';
-const DASHBOARD_INK = "#06123A";
-const DASHBOARD_MUTED = "#5E6B8D";
-const LIGHT_BORDER = "#E5ECF7";
-
-const actionButtonSx = {
-  minHeight: 48,
-  px: 2.25,
-  borderRadius: "14px",
-  fontWeight: 900,
-  textTransform: "none",
-};
-
-const filterControlSx = {
-  minWidth: { xs: "100%", sm: 220 },
-  "& .MuiOutlinedInput-root": {
-    borderRadius: "14px",
-    bgcolor: "#FFFFFF",
-    fontWeight: 800,
-  },
-};
-
-const memberCardSx = {
-  borderRadius: { xs: "16px", md: "20px" },
-  borderColor: LIGHT_BORDER,
-  backgroundColor: "#FFFFFF",
-  boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
-  minWidth: 0,
-  transition: "transform 0.2s ease, box-shadow 0.2s ease",
-  "&:hover": {
-    transform: { xs: "none", md: "translateY(-4px)" },
-    boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)",
-  },
-};
-
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "PHARMACIST", label: "Pharmacist" },
   { value: "INTERN", label: "Intern Pharmacist" },
@@ -125,32 +98,16 @@ const createInviteRow = (): InviteRowState => ({
   error: null,
 });
 
-const getRoleChipColor = (role: Role) => {
-  switch (role) {
-    case "PHARMACIST":
-      return "success";
-    case "TECHNICIAN":
-      return "info";
-    case "ASSISTANT":
-      return "warning";
-    case "INTERN":
-      return "secondary";
-    case "STUDENT":
-      return "default";
-    case "CONTACT":
-      return "default";
-    default:
-      return "default";
-  }
-};
-
 type Locum = {
   id: string | number;
   name: string;
   email?: string;
   role: Role;
   workType: WorkType;
+  membership: MembershipDTO;
 };
+
+type SortKey = "name" | "role" | "workType";
 
 type LocumManagerProps = {
   pharmacyId: string;
@@ -158,6 +115,9 @@ type LocumManagerProps = {
   onMembershipsChanged: () => void;
   loading?: boolean;
   pharmacyName?: string;
+  inviteRequest?: number;
+  onApplicationsCount?: (count: number) => void;
+  chatPathFor?: (userId: number) => string;
 };
 
 const membershipStatus = (membership: MembershipDTO) =>
@@ -177,7 +137,11 @@ export default function LocumManager({
   onMembershipsChanged,
   loading = false,
   pharmacyName,
+  inviteRequest = 0,
+  onApplicationsCount,
+  chatPathFor,
 }: LocumManagerProps) {
+  const navigate = useNavigate();
   const derivedLocums: Locum[] = useMemo(() => {
     return (memberships || []).filter(membershipIsAccepted).map((m) => {
       const fullName =
@@ -192,6 +156,7 @@ export default function LocumManager({
         email,
         role: coerceRole(m.role),
         workType: coerceWorkType(m.employment_type),
+        membership: m,
       };
     });
   }, [memberships]);
@@ -199,18 +164,21 @@ export default function LocumManager({
   const [items, setItems] = useState<Locum[]>(derivedLocums);
   useEffect(() => setItems(derivedLocums), [derivedLocums]);
 
-  const [sortBy, setSortBy] = useState<"name" | "workType">("name");
+  const [sortBy, setSortBy] = useState<SortKey>("name");
+  const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState<Role | "ALL">("ALL");
   const [filterWork, setFilterWork] = useState<WorkType | "ALL">("ALL");
 
   const filteredLocums = useMemo(() => {
-    const sorted = [...items].sort((a, b) => (a[sortBy] > b[sortBy] ? 1 : -1));
+    const q = query.trim().toLowerCase();
+    const sorted = [...items].sort((a, b) => String(a[sortBy]).localeCompare(String(b[sortBy])) || a.name.localeCompare(b.name));
     return sorted.filter(
       (locum) =>
+        (!q || locum.name.toLowerCase().includes(q)) &&
         (filterRole === "ALL" || locum.role === filterRole) &&
         (filterWork === "ALL" || locum.workType === filterWork)
     );
-  }, [items, sortBy, filterRole, filterWork]);
+  }, [items, sortBy, filterRole, filterWork, query]);
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
@@ -335,6 +303,14 @@ export default function LocumManager({
       return next.length ? next : [createInviteRow()];
     });
 
+  useEffect(() => {
+    if (inviteRequest > 0) {
+      setInviteRows([createInviteRow()]);
+      setInviteError(null);
+      setInviteOpen(true);
+    }
+  }, [inviteRequest]);
+
   const openInviteDialog = () => {
     resetInviteRows();
     setInviteOpen(true);
@@ -434,12 +410,12 @@ export default function LocumManager({
         setInviteRows(nextRows);
         setInviteError(fallbackError);
         if ((response as any)?.results?.length) {
-          setToast({ message: "Some invites were sent.", severity: "success" });
+          setToast({ message: "Some invitations were sent. Check the ones marked below.", severity: "success" });
           onMembershipsChanged();
         }
         return;
       }
-      setToast({ message: "Invites sent!", severity: "success" });
+      setToast({ message: "Invitations sent. They'll appear under Invitations sent until accepted.", severity: "success" });
       setInviteOpen(false);
       resetInviteRows();
       onMembershipsChanged();
@@ -459,7 +435,7 @@ export default function LocumManager({
     setDeleteLoadingId(id);
     try {
       await deleteMembershipService(id);
-      setToast({ message: "Favourite removed", severity: "success" });
+      setToast({ message: "Removed from favourites.", severity: "success" });
       onMembershipsChanged();
     } catch (error: any) {
       setToast({ message: error?.response?.data?.detail || "Failed to remove favourite.", severity: "error" });
@@ -487,7 +463,7 @@ export default function LocumManager({
       const token = res.token;
       const url = `${window.location.origin}/membership/apply/${token}`;
       setLinkValue(url);
-      setToast({ message: "Favourite link generated", severity: "success" });
+      
     } catch (error: any) {
       setToast({ message: error?.response?.data?.detail || "Failed to generate link.", severity: "error" });
     } finally {
@@ -496,218 +472,149 @@ export default function LocumManager({
   };
 
   const handleCopyLink = async () => {
-    if (!linkValue) return;
+    if (!linkValue) return false;
     try {
       await navigator.clipboard.writeText(linkValue);
-      setToast({ message: "Link copied to clipboard", severity: "success" });
-      setLinkOpen(false);
+      return true;
     } catch {
-      setToast({ message: "Unable to copy link.", severity: "error" });
+      setToast({ message: "Couldn't copy the link. Select it and copy it instead.", severity: "error" });
+      return false;
     }
   };
 
+  const rowDetails = (item: Locum) => {
+    const m = item.membership;
+    const since = formatDate((m as any).responded_at ?? (m as any).respondedAt) || formatDate((m as any).created_at ?? (m as any).createdAt);
+    return [
+      { label: "Works as", value: employmentLabel(item.workType) },
+      { label: "Award classification", value: membershipClassification(m) },
+      { label: "Favourite since", value: since },
+      { label: "Email", value: item.email ? <Box component="a" href={`mailto:${item.email}`} sx={{ color: "var(--ct-accent-strong)" }}>{item.email}</Box> : "" },
+    ];
+  };
+
   return (
-    <Box sx={{ fontFamily: DASHBOARD_FONT_FAMILY }}>
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} sx={{ mb: 2.5, alignItems: { lg: "center" }, flexWrap: "wrap" }}>
-        <Button
-          variant="outlined"
-          startIcon={<FilterListIcon />}
-          onClick={() => setSortBy("name")}
-          sx={{
-            ...actionButtonSx,
-            borderColor: alpha("#3C18A8", 0.16),
-            color: "#5222B8",
-            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
-          }}
-        >
-          Sort: Name
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<FilterListIcon />}
-          onClick={() => setSortBy("workType")}
-          sx={{
-            ...actionButtonSx,
-            borderColor: alpha("#3C18A8", 0.16),
-            color: "#5222B8",
-            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
-          }}
-        >
-          Sort: Work Type
-        </Button>
-        <FormControl sx={filterControlSx}>
-          <InputLabel id="role-filter">Filter role</InputLabel>
-          <Select
-            labelId="role-filter"
-            label="Filter role"
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value as Role | "ALL")}
-          >
-            <MenuItem value="ALL">All roles</MenuItem>
-            {ROLE_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl sx={filterControlSx}>
-          <InputLabel id="work-type-filter">Filter work type</InputLabel>
-          <Select
-            labelId="work-type-filter"
-            label="Filter work type"
-            value={filterWork}
-            onChange={(e) => setFilterWork(e.target.value as WorkType | "ALL")}
-          >
-            <MenuItem value="ALL">All types</MenuItem>
-            {LOCUM_WORK_TYPES.map((type) => (
-              <MenuItem key={type} value={type}>
-                {type.replace("_", " ")}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={openInviteDialog}
-          sx={{ ...actionButtonSx, boxShadow: "0 12px 28px rgba(20, 62, 234, 0.18)" }}
-        >
-          Invite Favourite
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<LinkIcon />}
-          onClick={openLinkDialog}
-          sx={{
-            ...actionButtonSx,
-            borderColor: alpha("#3C18A8", 0.16),
-            color: "#5222B8",
-            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
-          }}
-        >
-          Generate Link
-        </Button>
-      </Stack>
+    <Box>
+      <MembershipApplicationsPanel
+        pharmacyId={pharmacyId}
+        category="LOCUM_CASUAL"
+        title="Applications to review"
+        allowedEmploymentTypes={Array.from(LOCUM_WORK_TYPES)}
+        defaultEmploymentType="LOCUM"
+        onApproved={onMembershipsChanged}
+        onNotification={handleApplicationsNotification}
+        onCountChange={onApplicationsCount}
+      />
 
-      {showSkeleton ? (
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 1.5 }}>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Card
-              key={`locum-skeleton-${index}`}
-              variant="outlined"
-              sx={memberCardSx}
-            >
-              <CardContent sx={{ display: "flex", gap: 2, alignItems: "flex-start", p: { xs: 2, md: 2.5 } }}>
-                <Skeleton variant="circular" width={40} height={40} />
-                <Box sx={{ flex: 1 }}>
-                  <Skeleton variant="text" width="80%" />
-                  <Skeleton variant="text" width="60%" />
-                  <Skeleton variant="text" width="40%" />
-                </Box>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
-      ) : filteredLocums.length === 0 ? (
-        <Alert severity="info">No favourite locums yet. Use "Invite Favourite" to add people.</Alert>
-      ) : (
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 1.5 }}>
-          {filteredLocums.map((locum) => (
-            <Card
-              key={locum.id}
-              variant="outlined"
-              sx={memberCardSx}
-            >
-              <CardContent sx={{ p: { xs: 2, md: 2.5 }, "&:last-child": { pb: { xs: 2, md: 2.5 } } }}>
-                <Stack spacing={1.5} sx={{ minWidth: 0 }}>
-                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
-                    <Chip label={locum.role.replace("_", " ")} color={getRoleChipColor(locum.role)} sx={{ fontWeight: 800 }} />
-                    <Chip label={locum.workType.replace("_", " ")} variant="outlined" sx={{ fontWeight: 800 }} />
-                  </Stack>
-                  <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ minWidth: 0 }}>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ color: DASHBOARD_INK, fontWeight: 950, fontSize: { xs: 20, md: 22 }, lineHeight: 1.2, overflowWrap: "anywhere" }}>
-                        {locum.name}
-                      </Typography>
-                      {locum.email && (
-                        <Typography sx={{ mt: 0.5, color: DASHBOARD_MUTED, fontWeight: 700, fontSize: 15, lineHeight: 1.45, overflowWrap: "anywhere" }}>
-                          {locum.email}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Box sx={{ flexShrink: 0 }}>
-                      <Tooltip title="Remove favourite">
-                        <span>
-                          <IconButton
-                            color="error"
-                            onClick={() => setConfirmRemove(locum)}
-                            disabled={deleteLoadingId === locum.id}
-                            sx={{ border: `1px solid ${alpha("#EF4444", 0.18)}` }}
-                          >
-                            {deleteLoadingId === locum.id ? <CircularProgress size={16} /> : <DeleteOutlineIcon fontSize="small" />}
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </Box>
-                  </Stack>
-                </Stack>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
-      )}
-
-      <Dialog
-        open={Boolean(confirmRemove)}
-        onClose={() => {
-          if (!deleteLoadingId) setConfirmRemove(null);
-        }}
-        maxWidth="xs"
-        fullWidth
+      <TeamSection
+        title="Favourite locums"
+        count={showSkeleton ? undefined : items.length}
+        tone="violet"
+        description="Locums and Shift Heroes who see your shifts first."
+        actions={
+          <>
+            <Button variant="outlined" startIcon={<Link2 size={16} />} onClick={openLinkDialog} sx={actionButtonSx}>
+              Invite link
+            </Button>
+            <Button variant="contained" startIcon={<UserPlus size={16} />} onClick={openInviteDialog} sx={actionButtonSx}>
+              Add favourite
+            </Button>
+          </>
+        }
       >
-        <DialogTitle>Remove Favourite</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {confirmRemove
-              ? `Remove ${confirmRemove.name} from your favourites? This action can't be undone.`
-              : "This action can't be undone."}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmRemove(null)} disabled={Boolean(deleteLoadingId)}>
-            Cancel
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => confirmRemove && handleRemoveMembership(confirmRemove.id)}
-            disabled={Boolean(deleteLoadingId)}
-          >
-            {deleteLoadingId === confirmRemove?.id ? "Removing..." : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {items.length > 3 ? (
+          <TeamToolbar
+            search={query}
+            onSearch={setQuery}
+            searchLabel="Search favourites by name"
+            filters={[
+              { label: "Role", value: filterRole, onChange: (v) => setFilterRole(v as Role | "ALL"), options: [{ value: "ALL", label: "All roles" }, ...ROLE_OPTIONS] },
+              { label: "Works as", value: filterWork, onChange: (v) => setFilterWork(v as WorkType | "ALL"), options: [{ value: "ALL", label: "All types" }, ...LOCUM_WORK_TYPES.map((t) => ({ value: t, label: employmentLabel(t) }))] },
+              { label: "Sort by", value: sortBy, onChange: (v) => setSortBy(v as SortKey), options: [{ value: "name", label: "Name" }, { value: "role", label: "Role" }, { value: "workType", label: "Works as" }] },
+            ]}
+          />
+        ) : null}
+        {showSkeleton ? (
+          <TeamListSkeleton label="Loading favourite locums" />
+        ) : items.length === 0 ? (
+          <EmptyTeam
+            icon={<Star size={22} />}
+            title="No favourite locums yet"
+            body="Add the locums and Shift Heroes you trust. Your favourites are offered your shifts before anyone else."
+            action={<Button variant="contained" startIcon={<UserPlus size={16} />} onClick={openInviteDialog} sx={actionButtonSx}>Add favourite</Button>}
+          />
+        ) : filteredLocums.length === 0 ? (
+          <EmptyTeam
+            icon={<Star size={22} />}
+            title="No one matches"
+            body="Try another name, role or type."
+            action={<Button onClick={() => { setQuery(""); setFilterRole("ALL"); setFilterWork("ALL"); }} sx={actionButtonSx}>Clear filters</Button>}
+          />
+        ) : (
+          <TeamList label="Favourite locums">
+            {filteredLocums.map((locum) => {
+              const userId = membershipUserId(locum.membership);
+              return (
+                <MemberRow
+                  key={locum.id}
+                  name={locum.name}
+                  photoUrl={membershipPhoto(locum.membership)}
+                  role={roleLabel(locum.role)}
+                  tone={roleTone(locum.role)}
+                  details={rowDetails(locum)}
+                  actions={
+                    <>
+                      {userId && chatPathFor ? (
+                        <Button variant="outlined" startIcon={<MessageCircle size={16} />} onClick={() => navigate(chatPathFor(userId))} sx={actionButtonSx}>
+                          Message
+                        </Button>
+                      ) : null}
+                      <Button color="error" startIcon={<StarOff size={16} />} onClick={() => setConfirmRemove(locum)} disabled={deleteLoadingId === locum.id} sx={actionButtonSx}>
+                        Remove from favourites
+                      </Button>
+                    </>
+                  }
+                />
+              );
+            })}
+          </TeamList>
+        )}
+      </TeamSection>
 
-      <Dialog open={inviteOpen} onClose={() => setInviteOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Invite Favourite Locums to {pharmacyName || pharmacyId}</DialogTitle>
-        <DialogContent sx={{ display: "grid", gap: 2, pt: 2 }}>
-          <Alert severity="info">
-            Favourite workers keep their own payment source of truth. Do not enter TFN or ABN details here: the worker's private ChemistTasker Payment Profile determines each accepted shift. TFN work routes to payroll/timesheets; verified ABN work routes to invoicing, with the accepted terms frozen on the shift.
-          </Alert>
+      <PendingDirectInvitationsPanel memberships={memberships} title="Invitations sent" />
+
+      <ConfirmDialog
+        open={Boolean(confirmRemove)}
+        title={confirmRemove ? `Remove ${confirmRemove.name} from favourites?` : "Remove favourite?"}
+        body="They'll stop seeing your shifts first. Shifts they've already accepted stay booked, and you can add them again later."
+        confirmLabel="Remove"
+        busyLabel="Removing…"
+        busy={Boolean(deleteLoadingId)}
+        onConfirm={() => confirmRemove && handleRemoveMembership(confirmRemove.id)}
+        onClose={() => setConfirmRemove(null)}
+      />
+
+      <Dialog open={inviteOpen} onClose={() => !inviteSubmitting && setInviteOpen(false)} fullWidth maxWidth="sm" aria-labelledby="invite-locum-title">
+        <DialogTitle id="invite-locum-title" sx={{ fontWeight: 600 }}>
+          Add favourite locums to {pharmacyName || "this pharmacy"}
+        </DialogTitle>
+        <DialogContent sx={{ display: "grid", gap: 2 }}>
+          <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 14.5, lineHeight: 1.55 }}>
+            Don't enter TFN or ABN details here. Each worker's private Payment Profile decides how every accepted shift is paid: TFN work goes to payroll and timesheets, verified ABN work goes to invoicing, and the agreed terms are locked on the shift.
+          </Typography>
           {inviteError ? <Alert severity="error">{inviteError}</Alert> : null}
           {inviteRows.map((row, idx) => (
             <Box
               key={idx}
-              sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, pt: 1 }}
+              sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, p: 2, borderRadius: "14px", border: "1px solid", borderColor: row.error ? "error.main" : "var(--ct-border-color)" }}
             >
-              <TextField
-                label="Full Name"
-                value={row.invited_name}
-                onChange={(e) => handleInviteFieldChange(idx, "invited_name", e.target.value)}
-                fullWidth
-                sx={inviteTextFieldSx}
-              />
+              {inviteRows.length > 1 ? (
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ gridColumn: "1 / -1" }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: 14, color: "var(--ct-text-secondary)" }}>Person {idx + 1}</Typography>
+                  <Button color="error" size="small" onClick={() => removeInviteRow(idx)}>Remove</Button>
+                </Stack>
+              ) : null}
+              <TextField label="Full name" value={row.invited_name} onChange={(e) => handleInviteFieldChange(idx, "invited_name", e.target.value)} fullWidth sx={inviteTextFieldSx} />
               <TextField
                 label="Email"
                 type="email"
@@ -720,12 +627,7 @@ export default function LocumManager({
               />
               <FormControl fullWidth error={Boolean(row.error)}>
                 <InputLabel id={`role-${idx}`}>Role</InputLabel>
-                <Select
-                  labelId={`role-${idx}`}
-                  label="Role"
-                  value={row.role}
-                  onChange={(e) => handleInviteFieldChange(idx, "role", e.target.value as Role)}
-                >
+                <Select labelId={`role-${idx}`} label="Role" value={row.role} onChange={(e) => handleInviteFieldChange(idx, "role", e.target.value as Role)}>
                   {ROLE_OPTIONS.map((opt) => {
                     const requiredRole = requiredUserRoleForMembership(opt.value);
                     const disableOption =
@@ -741,98 +643,56 @@ export default function LocumManager({
                   })}
                 </Select>
               </FormControl>
-              <Box sx={{ gridColumn: "span 2", minHeight: 20 }}>
-                {row.checking ? (
-                  <Typography variant="caption" color="text.secondary">
-                    Checking existing account...
-                  </Typography>
-                ) : row.error ? (
-                  <Typography variant="caption" color="error">
-                    {row.error}
-                  </Typography>
-                ) : (
-                  (() => {
-                    const label = formatExistingUserRole(row.existingUserRole);
-                    return label ? (
-                      <Typography variant="caption" color="text.secondary">
-                        {label}
-                      </Typography>
-                    ) : null;
-                  })()
-                )}
+              <Box sx={{ display: "flex", alignItems: "center", px: 1.5, borderRadius: "12px", bgcolor: "var(--ct-subtle-bg)", minHeight: 56 }}>
+                <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 14 }}>
+                  Joins as <Box component="strong" sx={{ color: "var(--ct-text-primary)", fontWeight: 600 }}>{employmentLabel(row.employment_type)}</Box>
+                </Typography>
               </Box>
-              <Box sx={{ gridColumn: "span 2", display: "flex", justifyContent: "flex-end", gap: 1 }}>
-                {inviteRows.length > 1 && (
-                  <Button color="error" onClick={() => removeInviteRow(idx)}>
-                    Remove
-                  </Button>
-                )}
-              </Box>
+              {row.checking || row.error || formatExistingUserRole(row.existingUserRole) ? (
+                <Typography variant="body2" role={row.error ? "alert" : undefined} sx={{ gridColumn: "1 / -1", color: row.error ? "error.main" : "var(--ct-text-secondary)" }}>
+                  {row.checking ? "Checking for an existing account…" : row.error || formatExistingUserRole(row.existingUserRole)}
+                </Typography>
+              ) : null}
             </Box>
           ))}
-          <Button onClick={addInviteRow}>Add another</Button>
+          <Button onClick={addInviteRow} startIcon={<Plus size={16} />} sx={{ justifySelf: "start", ...actionButtonSx }}>
+            Add another person
+          </Button>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setInviteOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSendInvites} disabled={inviteSubmitting}>
-            {inviteSubmitting ? "Sending..." : "Send Invites"}
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setInviteOpen(false)} disabled={inviteSubmitting} sx={actionButtonSx}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleSendInvites}
+            disabled={inviteSubmitting}
+            startIcon={inviteSubmitting ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />}
+            sx={actionButtonSx}
+          >
+            {inviteSubmitting ? "Sending…" : inviteRows.length > 1 ? `Send ${inviteRows.length} invitations` : "Send invitation"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={linkOpen} onClose={() => setLinkOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Generate Favourite Link</DialogTitle>
-        <DialogContent sx={{ display: "grid", gap: 2, pt: 2, overflow: "visible" }}>
-          <TextField
-            label="Expiry (days)"
-            type="number"
-            value={linkExpiry}
-            onChange={(e) => setLinkExpiry(e.target.value)}
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-            inputProps={{ min: 1, max: 90 }}
-          />
-          {linkValue && (
-            <TextField label="Shareable link" value={linkValue} fullWidth InputProps={{ readOnly: true }} />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLinkOpen(false)}>Close</Button>
-          <Button onClick={handleGenerateLink} startIcon={<LinkIcon />} disabled={linkSubmitting}>
-            {linkSubmitting ? "Generating..." : linkValue ? "Regenerate" : "Generate"}
-          </Button>
-          <Button onClick={handleCopyLink} startIcon={<ContentCopyIcon />} disabled={!linkValue}>
-            Copy & Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <InviteLinkDialog
+        open={linkOpen}
+        title="Invite link for favourite locums"
+        audience={`Share it with locums and Shift Heroes you'd like on ${pharmacyName || "this pharmacy"}'s favourites. You review every application first.`}
+        expiry={linkExpiry}
+        onExpiry={setLinkExpiry}
+        link={linkValue}
+        generating={linkSubmitting}
+        onGenerate={handleGenerateLink}
+        onCopy={handleCopyLink}
+        onClose={() => setLinkOpen(false)}
+      />
 
       {toast && (
-        <Snackbar
-          open
-          autoHideDuration={4000}
-          onClose={() => setToast(null)}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
+        <Snackbar open autoHideDuration={4000} onClose={() => setToast(null)} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
           <Alert severity={toast.severity} onClose={() => setToast(null)} sx={{ width: "100%" }}>
             {toast.message}
           </Alert>
         </Snackbar>
       )}
-
-      <MembershipApplicationsPanel
-        pharmacyId={pharmacyId}
-        category="LOCUM_CASUAL"
-        title="Pending Favourite Applications"
-        allowedEmploymentTypes={Array.from(LOCUM_WORK_TYPES)}
-        defaultEmploymentType="LOCUM"
-        onApproved={onMembershipsChanged}
-        onNotification={handleApplicationsNotification}
-      />
-      <PendingDirectInvitationsPanel
-        memberships={memberships}
-        title="Pending Favourite Invitations"
-      />
     </Box>
   );
 }

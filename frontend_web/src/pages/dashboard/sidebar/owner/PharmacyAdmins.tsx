@@ -1,32 +1,33 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
+  ButtonBase,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControl,
-  InputLabel,
   MenuItem,
-  Select,
-  IconButton,
-  TextField,
-  Tooltip,
-  Typography,
   Snackbar,
-  CircularProgress,
-  Skeleton,
   Stack,
+  TextField,
+  Typography,
 } from "@mui/material";
-import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
-import SecurityIcon from "@mui/icons-material/Security";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import { alpha, useTheme } from "@mui/material/styles";
+import { MessageCircle, Send, ShieldCheck, ShieldOff, ShieldPlus } from "lucide-react";
+import { Pill } from "../../shiftCenter/ShiftCentreParts";
+import {
+  ConfirmDialog,
+  EmptyTeam,
+  MemberRow,
+  TeamList,
+  TeamListSkeleton,
+  TeamSection,
+  actionButtonSx,
+  prettyCode,
+} from "./teamUi";
 import {
   AdminLevel,
   AdminStaffRole,
@@ -37,10 +38,9 @@ import {
   STAFF_ROLE_LABELS,
   STAFF_ROLE_OPTIONS,
   UserPortalRole,
-  surface,
 } from "./types";
 import type { MembershipDTO } from "@chemisttasker/shared-core";
-import { ADMIN_CAPABILITY_MANAGE_ADMINS, type AdminCapability } from "../../../../constants/adminCapabilities";
+import { ADMIN_CAPABILITY_MANAGE_ADMINS } from "../../../../constants/adminCapabilities";
 import { useAuth } from "../../../../contexts/AuthContext";
 import {
   fetchUserRoleByEmail,
@@ -50,38 +50,14 @@ import {
 import { createPharmacyAdminService, deletePharmacyAdminService } from "@chemisttasker/shared-core";
 import { PendingDirectInvitationsPanel } from "./MembershipApplicationsPanel";
 
-const DASHBOARD_FONT_FAMILY = '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif';
-const DASHBOARD_INK = "#06123A";
-const DASHBOARD_MUTED = "#5E6B8D";
-const LIGHT_BORDER = "#E5ECF7";
-
-const actionButtonSx = {
-  minHeight: 48,
-  px: 2.25,
-  borderRadius: "14px",
-  fontWeight: 900,
-  textTransform: "none",
-};
-
-const adminCardSx = {
-  borderRadius: { xs: "16px", md: "20px" },
-  borderColor: LIGHT_BORDER,
-  backgroundColor: "#FFFFFF",
-  boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
-  minWidth: 0,
-  transition: "transform 0.2s ease, box-shadow 0.2s ease",
-  "&:hover": {
-    transform: { xs: "none", md: "translateY(-4px)" },
-    boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)",
-  },
-};
-
 interface PharmacyAdminsProps {
   pharmacyId: string;
   admins: PharmacyAdminDTO[];
   pendingAdminMemberships?: MembershipDTO[];
   onAdminsChanged: () => void;
   loading?: boolean;
+  inviteRequest?: number;
+  chatPathFor?: (userId: number) => string;
 }
 
 type InviteFormState = {
@@ -106,9 +82,10 @@ export default function PharmacyAdmins({
   pendingAdminMemberships = [],
   onAdminsChanged,
   loading = false,
+  inviteRequest = 0,
+  chatPathFor,
 }: PharmacyAdminsProps) {
-  const theme = useTheme();
-  const tokens = surface(theme);
+  const navigate = useNavigate();
   const { user: authUser, setUser, hasCapability } = useAuth();
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -119,6 +96,10 @@ export default function PharmacyAdmins({
   const [confirmRemove, setConfirmRemove] = useState<PharmacyAdminDTO | null>(null);
   const [existingUserRole, setExistingUserRole] = useState<UserPortalRole | null | undefined>(undefined);
   const [checkingUserRole, setCheckingUserRole] = useState(false);
+
+  useEffect(() => {
+    if (inviteRequest > 0) setInviteOpen(true);
+  }, [inviteRequest]);
 
   const numericPharmacyId = useMemo(() => Number(pharmacyId), [pharmacyId]);
   const ownerPharmacyIds = useMemo(() => {
@@ -183,7 +164,7 @@ export default function PharmacyAdmins({
       return;
     }
     if (!trimmedEmail || !trimmedEmail.includes("@")) {
-      setToast({ message: "Please provide an email address.", severity: "error" });
+      setToast({ message: "Enter a valid email address.", severity: "error" });
       return;
     }
 
@@ -197,7 +178,7 @@ export default function PharmacyAdmins({
         staff_role: form.staff_role,
         job_title: form.job_title?.trim() || undefined,
       });
-      setToast({ message: "Admin invitation sent.", severity: "success" });
+      setToast({ message: "Admin invitation sent. It shows under Invitations sent until accepted.", severity: "success" });
       resetForm();
       onAdminsChanged();
     } catch (error: any) {
@@ -217,7 +198,7 @@ export default function PharmacyAdmins({
     setLoadingId(admin.id);
     try {
       await deletePharmacyAdminService(admin.id);
-      setToast({ message: "Admin removed.", severity: "success" });
+      setToast({ message: "Admin access removed.", severity: "success" });
       if (authUser) {
         setUser((prev) => {
           if (!prev) return prev;
@@ -248,257 +229,196 @@ export default function PharmacyAdmins({
     return name;
   };
 
-  return (
-    <Box sx={{ fontFamily: DASHBOARD_FONT_FAMILY }}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        alignItems={{ xs: "stretch", sm: "center" }}
-        justifyContent="space-between"
-        spacing={1.5}
-        sx={{ mb: 2.5 }}
-      >
-        <Typography sx={{ color: DASHBOARD_INK, fontSize: { xs: 24, md: 30 }, fontWeight: 950, lineHeight: 1.12 }}>
-          Admins
-        </Typography>
-        {canManageAdmins ? (
-          <Button
-            variant="contained"
-            startIcon={<ManageAccountsIcon />}
-            onClick={() => setInviteOpen(true)}
-            sx={{ ...actionButtonSx, boxShadow: "0 12px 28px rgba(20, 62, 234, 0.18)" }}
-          >
-            Invite Admin
-          </Button>
-        ) : null}
-      </Stack>
+  const levelOptions = ADMIN_LEVEL_OPTIONS.filter((opt) => opt.value !== "OWNER");
 
+  return (
+    <Box>
+      <TeamSection
+        title="Admins"
+        count={showSkeleton ? undefined : visibleAdmins.length}
+        tone="blue"
+        description="People who help you run this pharmacy. Each level controls what they can change."
+        actions={
+          canManageAdmins ? (
+            <Button variant="contained" startIcon={<ShieldPlus size={16} />} onClick={() => setInviteOpen(true)} sx={actionButtonSx}>
+              Invite admin
+            </Button>
+          ) : null
+        }
+      >
         {showSkeleton ? (
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 1.5 }}>
-            {Array.from({ length: 2 }).map((_, idx) => (
-              <Card key={idx} variant="outlined" sx={adminCardSx}>
-                <CardContent sx={{ display: "flex", gap: 2 }}>
-                  <Skeleton variant="circular" width={40} height={40} />
-                  <Box sx={{ flex: 1 }}>
-                    <Skeleton variant="text" width="80%" />
-                    <Skeleton variant="text" width="60%" />
-                  </Box>
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
+          <TeamListSkeleton rows={2} label="Loading admins" />
         ) : visibleAdmins.length === 0 ? (
-          <Alert severity="info">No admins yet. Use "Invite Admin" to add one.</Alert>
+          <EmptyTeam
+            icon={<ShieldCheck size={22} />}
+            title="No admins yet"
+            body="Admins can manage the roster, staff or team messages for you, so the pharmacy keeps running when you're away."
+            action={canManageAdmins ? <Button variant="contained" startIcon={<ShieldPlus size={16} />} onClick={() => setInviteOpen(true)} sx={actionButtonSx}>Invite admin</Button> : undefined}
+          />
         ) : (
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 1.5 }}>
+          <TeamList label="Admins">
             {visibleAdmins.map((admin) => {
-              const name =
-                admin.invited_name ||
-                [admin.user_details?.first_name, admin.user_details?.last_name].filter(Boolean).join(" ") ||
-                admin.email ||
-                "Admin";
+              const name = describeAdmin(admin) === "this admin" ? "Admin" : describeAdmin(admin);
               const email = admin.user_details?.email || admin.email;
               const adminLevel = ADMIN_LEVEL_LABELS[admin.admin_level] ?? admin.admin_level;
               const adminLevelHelper = ADMIN_LEVEL_HELPERS[admin.admin_level];
               const staffRoleLabel = admin.staff_role ? STAFF_ROLE_LABELS[admin.staff_role] : undefined;
-              const jobTitle = admin.job_title;
               const removable = (admin.can_remove ?? canManageAdmins) && canManageAdmins;
-
+              const userId = typeof admin.user === "number" ? admin.user : null;
+              const caps = admin.capabilities || [];
               return (
-                <Card
+                <MemberRow
                   key={admin.id}
-                  variant="outlined"
-                  sx={adminCardSx}
-                >
-                  <CardContent sx={{ p: { xs: 2, md: 2.5 }, "&:last-child": { pb: { xs: 2, md: 2.5 } } }}>
-                    <Stack spacing={1.5} sx={{ minWidth: 0 }}>
-                      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
-                        <Tooltip title={adminLevelHelper || "Admin access level"}>
-                          <Chip label={adminLevel} color="secondary" sx={{ fontWeight: 800 }} />
-                        </Tooltip>
-                        {staffRoleLabel && <Chip label={staffRoleLabel} variant="outlined" sx={{ fontWeight: 800 }} />}
-                        {jobTitle && <Chip label={jobTitle} variant="outlined" sx={{ fontWeight: 800, maxWidth: "100%" }} />}
-                      </Stack>
-                      {adminLevelHelper && (
-                        <Typography sx={{ color: DASHBOARD_MUTED, fontWeight: 700, fontSize: 14, lineHeight: 1.45 }}>
-                          {adminLevelHelper}
-                        </Typography>
-                      )}
-                      <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ minWidth: 0 }}>
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography sx={{ color: DASHBOARD_INK, fontWeight: 950, fontSize: { xs: 20, md: 22 }, lineHeight: 1.2, overflowWrap: "anywhere" }}>
-                            {name}
-                          </Typography>
-                          {email && (
-                            <Typography sx={{ mt: 0.5, color: DASHBOARD_MUTED, fontWeight: 700, fontSize: 15, lineHeight: 1.45, overflowWrap: "anywhere" }}>
-                              {email}
-                            </Typography>
-                          )}
-                        </Box>
-                        <Box sx={{ flexShrink: 0, display: "flex", gap: 0.5 }}>
-                          <Tooltip title={formatCapabilityTooltip(admin.capabilities)}>
-                            <IconButton size="small" sx={{ border: `1px solid ${alpha("#3C18A8", 0.16)}` }}>
-                              <SecurityIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          {removable && (
-                            <Tooltip title="Remove">
-                              <span>
-                                <IconButton
-                                  color="error"
-                                  onClick={() => setConfirmRemove(admin)}
-                                  disabled={loadingId === admin.id}
-                                  sx={{ border: `1px solid ${alpha("#EF4444", 0.18)}` }}
-                                >
-                                  {loadingId === admin.id ? (
-                                    <CircularProgress size={16} />
-                                  ) : (
-                                    <DeleteOutlineIcon fontSize="small" />
-                                  )}
-                                </IconButton>
-                              </span>
-                            </Tooltip>
-                          )}
-                        </Box>
-                      </Stack>
-                    </Stack>
-                  </CardContent>
-                </Card>
+                  name={name}
+                  photoUrl={(admin.user_details as any)?.profile_photo_url || ""}
+                  role={adminLevel}
+                  tone="blue"
+                  details={[
+                    { label: "Access", value: adminLevelHelper },
+                    { label: "Works as", value: staffRoleLabel },
+                    { label: "Job title", value: admin.job_title },
+                    {
+                      label: "Can",
+                      value: caps.length ? (
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap component="span">
+                          {caps.map((cap) => <Pill key={cap} label={CAPABILITY_LABELS[cap] ?? prettyCode(cap)} tone="blue" />)}
+                        </Stack>
+                      ) : "",
+                    },
+                    { label: "Email", value: email ? <Box component="a" href={`mailto:${email}`} sx={{ color: "var(--ct-accent-strong)" }}>{email}</Box> : "" },
+                  ]}
+                  actions={
+                    userId && chatPathFor || removable ? (
+                      <>
+                        {userId && chatPathFor ? (
+                          <Button variant="outlined" startIcon={<MessageCircle size={16} />} onClick={() => navigate(chatPathFor(userId))} sx={actionButtonSx}>
+                            Message
+                          </Button>
+                        ) : null}
+                        {removable ? (
+                          <Button color="error" startIcon={<ShieldOff size={16} />} onClick={() => setConfirmRemove(admin)} disabled={loadingId === admin.id} sx={actionButtonSx}>
+                            Remove admin access
+                          </Button>
+                        ) : null}
+                      </>
+                    ) : undefined
+                  }
+                />
               );
             })}
-          </Box>
+          </TeamList>
         )}
-        <PendingDirectInvitationsPanel
-          memberships={pendingAdminMemberships}
-          title="Pending Admin Invitations"
-        />
-      <Dialog
-        open={Boolean(confirmRemove)}
-        onClose={() => {
-          if (!loadingId) setConfirmRemove(null);
-        }}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Remove Admin</DialogTitle>
-        <DialogContent>
-          <Typography>{`Remove ${describeAdmin(confirmRemove)}? This action can't be undone.`}</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmRemove(null)} disabled={Boolean(loadingId)}>
-            Cancel
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => confirmRemove && handleRemove(confirmRemove)}
-            disabled={Boolean(loadingId)}
-          >
-            {loadingId === confirmRemove?.id ? "Removing..." : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </TeamSection>
 
-      <Dialog open={inviteOpen} onClose={resetForm} fullWidth maxWidth="sm">
-        <DialogTitle>Invite Admin</DialogTitle>
-        <DialogContent sx={{ display: "grid", gap: 2, pt: 2 }}>
-          <TextField
-            label="Full Name"
-            value={form.invited_name}
-            onChange={(e) => setForm((prev) => ({ ...prev, invited_name: e.target.value }))}
-            fullWidth
-          />
-          <TextField
-            label="Email"
-            type="email"
-            required
-            value={form.email}
-            onChange={(e) => {
-              const nextEmail = e.target.value;
-              setForm((prev) => ({ ...prev, email: nextEmail }));
-              setExistingUserRole(undefined);
-              setCheckingUserRole(false);
-            }}
-            onBlur={handleEmailBlur}
-            fullWidth
-            helperText={
-              checkingUserRole
-                ? "Checking account..."
-                : (() => {
-                    const message = formatExistingUserRole(existingUserRole);
-                    if (message) return message;
-                    if (existingUserRole === null) {
-                      return "No existing account found. A new user will be created.";
-                    }
-                    return undefined;
-                  })()
-            }
-          />
-          <FormControl fullWidth>
-            <InputLabel>Admin Level</InputLabel>
-            <Select
-              label="Admin Level"
-              value={form.admin_level}
+      <PendingDirectInvitationsPanel memberships={pendingAdminMemberships} title="Invitations sent" />
+
+      <ConfirmDialog
+        open={Boolean(confirmRemove)}
+        title={`Remove admin access for ${describeAdmin(confirmRemove)}?`}
+        body="They lose admin rights at this pharmacy straight away. If they're also on the team, they stay on it as staff."
+        confirmLabel="Remove access"
+        busyLabel="Removing…"
+        busy={Boolean(loadingId)}
+        onConfirm={() => confirmRemove && handleRemove(confirmRemove)}
+        onClose={() => setConfirmRemove(null)}
+      />
+
+      <Dialog open={inviteOpen} onClose={() => !submitting && resetForm()} fullWidth maxWidth="sm" aria-labelledby="invite-admin-title">
+        <DialogTitle id="invite-admin-title" sx={{ fontWeight: 600 }}>Invite an admin</DialogTitle>
+        <DialogContent sx={{ display: "grid", gap: 2 }}>
+          <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, pt: 0.5 }}>
+            <TextField label="Full name" value={form.invited_name} onChange={(e) => setForm((prev) => ({ ...prev, invited_name: e.target.value }))} fullWidth />
+            <TextField
+              label="Email"
+              type="email"
+              required
+              value={form.email}
               onChange={(e) => {
-                const nextLevel = e.target.value as AdminLevel;
-                setForm((prev) => ({
-                  ...prev,
-                  admin_level: nextLevel,
-                  staff_role: nextLevel === "OWNER" ? "PHARMACIST" : prev.staff_role,
-                }));
+                const nextEmail = e.target.value;
+                setForm((prev) => ({ ...prev, email: nextEmail }));
+                setExistingUserRole(undefined);
+                setCheckingUserRole(false);
               }}
-            >
-              {ADMIN_LEVEL_OPTIONS.filter((opt) => opt.value !== 'OWNER').map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  <Box sx={{ display: "flex", flexDirection: "column" }}>
-                    <Typography variant="body2" fontWeight={600}>
-                      {opt.label}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: tokens.textMuted }}>
-                      {ADMIN_LEVEL_HELPERS[opt.value]}
-                    </Typography>
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Staff Role</InputLabel>
-            <Select
-              label="Staff Role"
-              value={form.staff_role}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, staff_role: e.target.value as AdminStaffRole }))
+              onBlur={handleEmailBlur}
+              fullWidth
+              helperText={
+                checkingUserRole
+                  ? "Checking for an existing account…"
+                  : formatExistingUserRole(existingUserRole) || (existingUserRole === null ? "No account yet. We'll create one when they accept." : undefined)
               }
-              disabled={form.admin_level === "OWNER"}
+            />
+          </Box>
+          <Box role="radiogroup" aria-label="Admin level">
+            <Typography sx={{ fontWeight: 600, fontSize: 14, color: "var(--ct-text-primary)", mb: 1 }}>What can they do?</Typography>
+            <Stack spacing={1}>
+              {levelOptions.map((opt) => {
+                const selected = form.admin_level === opt.value;
+                return (
+                  <ButtonBase
+                    key={opt.value}
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setForm((prev) => ({ ...prev, admin_level: opt.value }))}
+                    sx={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "flex-start",
+                      gap: 1.5,
+                      p: 1.5,
+                      textAlign: "left",
+                      borderRadius: "12px",
+                      border: "1px solid",
+                      borderColor: selected ? "var(--ct-accent-strong)" : "var(--ct-border-color)",
+                      bgcolor: selected ? "var(--ct-tone-violet-bg)" : "transparent",
+                      "&.Mui-focusVisible": { outline: "2px solid var(--ct-accent-strong)", outlineOffset: 2 },
+                    }}
+                  >
+                    <Box
+                      aria-hidden="true"
+                      sx={{ mt: 0.25, width: 18, height: 18, flex: "0 0 18px", borderRadius: "50%", border: "2px solid", borderColor: selected ? "var(--ct-accent-strong)" : "var(--ct-text-muted)", display: "grid", placeItems: "center" }}
+                    >
+                      {selected ? <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "var(--ct-accent-strong)" }} /> : null}
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: 15, color: selected ? "var(--ct-tone-violet-fg)" : "var(--ct-text-primary)" }}>{opt.label}</Typography>
+                      <Typography sx={{ fontSize: 13.5, color: selected ? "var(--ct-tone-violet-fg)" : "var(--ct-text-secondary)" }}>{ADMIN_LEVEL_HELPERS[opt.value]}</Typography>
+                    </Box>
+                  </ButtonBase>
+                );
+              })}
+            </Stack>
+          </Box>
+          <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+            <TextField
+              select
+              label="Their role at the pharmacy"
+              value={form.staff_role}
+              onChange={(e) => setForm((prev) => ({ ...prev, staff_role: e.target.value as AdminStaffRole }))}
+              fullWidth
             >
               {STAFF_ROLE_OPTIONS.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </MenuItem>
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
               ))}
-            </Select>
-          </FormControl>
-          <TextField
-            label="Job Title (optional)"
-            value={form.job_title}
-            onChange={(e) => setForm((prev) => ({ ...prev, job_title: e.target.value }))}
-            fullWidth
-          />
-          <Typography variant="caption" sx={{ color: tokens.textMuted }}>
-            Admins inherit staff permissions based on level. Choose the level to control whether they
-            can manage roster, staff, or other admins.
-          </Typography>
+            </TextField>
+            <TextField label="Job title (optional)" value={form.job_title} onChange={(e) => setForm((prev) => ({ ...prev, job_title: e.target.value }))} fullWidth />
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={resetForm}>Cancel</Button>
-          <Button onClick={handleInvite} variant="contained" disabled={submitting}>
-            {submitting ? "Sending..." : "Send Invitation"}
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={resetForm} disabled={submitting} sx={actionButtonSx}>Cancel</Button>
+          <Button
+            onClick={handleInvite}
+            variant="contained"
+            disabled={submitting || !form.email.trim()}
+            startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />}
+            sx={actionButtonSx}
+          >
+            {submitting ? "Sending…" : "Send invitation"}
           </Button>
         </DialogActions>
       </Dialog>
 
       {toast && (
-        <Snackbar open autoHideDuration={4000} onClose={() => setToast(null)}>
+        <Snackbar open autoHideDuration={4000} onClose={() => setToast(null)} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
           <Alert severity={toast.severity} onClose={() => setToast(null)} sx={{ width: "100%" }}>
             {toast.message}
           </Alert>
@@ -508,11 +428,9 @@ export default function PharmacyAdmins({
   );
 }
 
-function formatCapabilityTooltip(capabilities?: AdminCapability[]) {
-  if (!capabilities || capabilities.length === 0) {
-    return "View capabilities";
-  }
-  return `Capabilities: ${capabilities
-    .map((cap) => cap.replace(/_/g, " ").toLowerCase())
-    .join(", ")}`;
-}
+const CAPABILITY_LABELS: Record<string, string> = {
+  MANAGE_ADMINS: "Manage admins",
+  MANAGE_STAFF: "Manage staff",
+  MANAGE_ROSTER: "Manage roster and shifts",
+  MANAGE_COMMUNICATIONS: "Send team messages",
+};

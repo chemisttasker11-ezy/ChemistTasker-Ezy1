@@ -4,29 +4,21 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
-  IconButton,
   InputLabel,
   MenuItem,
   Select,
+  Snackbar,
   Stack,
   TextField,
-  Tooltip,
   Typography,
-  Snackbar,
-  CircularProgress,
-  Skeleton,
 } from "@mui/material";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import AddIcon from "@mui/icons-material/Add";
+import { Link2, MessageCircle, Plus, Send, UserMinus, UserPlus, Users } from "lucide-react";
 import {
   Role,
   WorkType,
@@ -42,9 +34,6 @@ import {
   formatExistingUserRole,
   normalizeEmail,
 } from "./inviteUtils";
-import LinkIcon from "@mui/icons-material/Link";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import { alpha } from "@mui/material/styles";
 import {
   createMembershipInviteLinkService,
   deleteMembershipService,
@@ -52,6 +41,24 @@ import {
 } from "@chemisttasker/shared-core";
 import MembershipApplicationsPanel, { PendingDirectInvitationsPanel } from "./MembershipApplicationsPanel";
 import { useAuth } from "../../../../contexts/AuthContext";
+import {
+  ConfirmDialog,
+  EmptyTeam,
+  InviteLinkDialog,
+  MemberRow,
+  TeamList,
+  TeamListSkeleton,
+  TeamSection,
+  TeamToolbar,
+  actionButtonSx,
+  employmentLabel,
+  formatDate,
+  membershipClassification,
+  membershipPhoto,
+  membershipUserId,
+  roleLabel,
+  roleTone,
+} from "./teamUi";
 
 const EMPLOYMENT_TYPES = ["FULL_TIME", "PART_TIME", "CASUAL"] as const;
 const employmentNeedsJobTitle = (value: string) =>
@@ -63,41 +70,6 @@ const inviteTextFieldSx = {
     px: 0.5,
   },
 };
-const DASHBOARD_FONT_FAMILY = '"DM Sans Variable", "DM Sans", "Barlow", Arial, sans-serif';
-const DASHBOARD_INK = "#06123A";
-const DASHBOARD_MUTED = "#5E6B8D";
-const LIGHT_BORDER = "#E5ECF7";
-
-const actionButtonSx = {
-  minHeight: 48,
-  px: 2.25,
-  borderRadius: "14px",
-  fontWeight: 900,
-  textTransform: "none",
-};
-
-const filterControlSx = {
-  minWidth: { xs: "100%", sm: 220 },
-  "& .MuiOutlinedInput-root": {
-    borderRadius: "14px",
-    bgcolor: "#FFFFFF",
-    fontWeight: 800,
-  },
-};
-
-const memberCardSx = {
-  borderRadius: { xs: "16px", md: "20px" },
-  borderColor: LIGHT_BORDER,
-  backgroundColor: "#FFFFFF",
-  boxShadow: "0 8px 24px rgba(6, 18, 58, 0.06)",
-  minWidth: 0,
-  transition: "transform 0.2s ease, box-shadow 0.2s ease",
-  "&:hover": {
-    transform: { xs: "none", md: "translateY(-4px)" },
-    boxShadow: "0 18px 42px rgba(6, 18, 58, 0.12)",
-  },
-};
-
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "PHARMACIST", label: "Pharmacist" },
   { value: "INTERN", label: "Intern Pharmacist" },
@@ -128,25 +100,6 @@ const createInviteRow = (): InviteRowState => ({
   error: null,
 });
 
-const getRoleChipColor = (role: Role) => {
-  switch (role) {
-    case "PHARMACIST":
-      return "success";
-    case "TECHNICIAN":
-      return "info";
-    case "ASSISTANT":
-      return "warning";
-    case "INTERN":
-      return "secondary";
-    case "STUDENT":
-      return "default";
-    case "CONTACT":
-      return "default";
-    default:
-      return "default";
-  }
-};
-
 const membershipStatus = (membership: MembershipDTO) =>
   String((membership as any).status || "").toUpperCase();
 
@@ -165,7 +118,10 @@ type Staff = {
   role: Role;
   workType: WorkType;
   jobTitle?: string | null;
+  membership: MembershipDTO;
 };
+
+type SortKey = "name" | "role" | "workType";
 
 type StaffManagerProps = {
   pharmacyId: string;
@@ -173,6 +129,11 @@ type StaffManagerProps = {
   onMembershipsChanged: () => void;
   loading?: boolean;
   pharmacyName?: string;
+  /** Bumped by the pharmacy page to open the invite dialog from elsewhere (e.g. Overview). */
+  inviteRequest?: number;
+  onApplicationsCount?: (count: number) => void;
+  /** Route that opens a direct chat with a user; hides "Message" when absent. */
+  chatPathFor?: (userId: number) => string;
 };
 
 export default function StaffManager({
@@ -181,6 +142,9 @@ export default function StaffManager({
   onMembershipsChanged,
   loading = false,
   pharmacyName,
+  inviteRequest = 0,
+  onApplicationsCount,
+  chatPathFor,
 }: StaffManagerProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -220,6 +184,7 @@ export default function StaffManager({
         role: coerceRole(m.role),
         workType: coerceWorkType(m.employment_type),
         jobTitle: m.job_title ?? null,
+        membership: m,
       };
     });
   }, [memberships, user?.id, user?.email]);
@@ -227,20 +192,23 @@ export default function StaffManager({
   const [list, setList] = useState<Staff[]>(derivedStaff);
   useEffect(() => setList(derivedStaff), [derivedStaff]);
 
-  const [sortBy, setSortBy] = useState<"role" | "workType">("role");
+  const [sortBy, setSortBy] = useState<SortKey>("name");
+  const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState<Role | "ALL">("ALL");
   const [filterWork, setFilterWork] = useState<WorkType | "ALL">("ALL");
   const showSkeleton = loading && memberships.length === 0;
 
   const data = useMemo(() => {
+    const q = query.trim().toLowerCase();
     const copy = [...list];
-    copy.sort((a, b) => (a[sortBy] > b[sortBy] ? 1 : -1));
+    copy.sort((a, b) => String(a[sortBy]).localeCompare(String(b[sortBy])) || a.name.localeCompare(b.name));
     return copy.filter(
       (s) =>
+        (!q || s.name.toLowerCase().includes(q)) &&
         (filterRole === "ALL" || s.role === filterRole) &&
         (filterWork === "ALL" || s.workType === filterWork)
     );
-  }, [list, sortBy, filterRole, filterWork]);
+  }, [list, sortBy, filterRole, filterWork, query]);
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteRows, setInviteRows] = useState<InviteRowState[]>([createInviteRow()]);
@@ -259,6 +227,10 @@ export default function StaffManager({
   const [linkValue, setLinkValue] = useState("");
   const [linkSubmitting, setLinkSubmitting] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<Staff | null>(null);
+
+  useEffect(() => {
+    if (inviteRequest > 0) setInviteOpen(true);
+  }, [inviteRequest]);
 
   const resetInviteForm = () => {
     setInviteRows([createInviteRow()]);
@@ -382,7 +354,7 @@ export default function StaffManager({
       const token = response.token;
       const url = `${window.location.origin}/membership/apply/${token}`;
       setLinkValue(url);
-      setToast({ message: "Invite link generated", severity: "success" });
+      
     } catch (error: any) {
       setToast({ message: error?.response?.data?.detail || "Failed to generate link.", severity: "error" });
     } finally {
@@ -391,14 +363,14 @@ export default function StaffManager({
   };
 
   const handleCopyLink = async () => {
-    if (!linkValue) return;
+    if (!linkValue) return false;
     try {
       await navigator.clipboard.writeText(linkValue);
-      setToast({ message: "Link copied to clipboard", severity: "success" });
+      return true;
     } catch {
-      setToast({ message: "Unable to copy link", severity: "error" });
+      setToast({ message: "Couldn't copy the link. Select it and copy it instead.", severity: "error" });
+      return false;
     }
-    setLinkOpen(false);
   };
 
   const handleSendInvites = async () => {
@@ -513,7 +485,7 @@ export default function StaffManager({
           onMembershipsChanged();
         }
       } else {
-        setToast({ message: "Invitations sent!", severity: "success" });
+        setToast({ message: "Invitations sent. They'll appear under Invitations sent until accepted.", severity: "success" });
         setInviteOpen(false);
         resetInviteForm();
         onMembershipsChanged();
@@ -534,7 +506,7 @@ export default function StaffManager({
     setDeleteLoadingId(id);
     try {
       await deleteMembershipService(String(id));
-      setToast({ message: "Staff removed", severity: "success" });
+      setToast({ message: "Removed from the team.", severity: "success" });
       onMembershipsChanged();
     } catch (error: any) {
       setToast({ message: error?.response?.data?.detail || "Failed to remove", severity: "error" });
@@ -544,226 +516,163 @@ export default function StaffManager({
     }
   };
 
+  const rowDetails = (item: Staff) => {
+    const m = item.membership;
+    const joined = formatDate((m as any).responded_at ?? (m as any).respondedAt) || formatDate((m as any).created_at ?? (m as any).createdAt);
+    const invitedBy = (m as any).invited_by ?? (m as any).invitedBy;
+    return [
+      { label: "Employment", value: employmentLabel(item.workType) },
+      { label: "Job title", value: item.jobTitle || "" },
+      { label: "Award classification", value: membershipClassification(m) },
+      { label: "Member since", value: joined },
+      { label: "Invited by", value: typeof user?.id === "number" && invitedBy === user.id ? "You" : "" },
+      { label: "Email", value: item.email ? <Box component="a" href={`mailto:${item.email}`} sx={{ color: "var(--ct-accent-strong)" }}>{item.email}</Box> : "" },
+    ];
+  };
+
   return (
-    <Box sx={{ fontFamily: DASHBOARD_FONT_FAMILY }}>
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} sx={{ mb: 2.5, alignItems: { lg: "center" }, flexWrap: "wrap" }}>
-        <Button
-          variant="outlined"
-          startIcon={<FilterListIcon />}
-          onClick={() => setSortBy("role")}
-          sx={{
-            ...actionButtonSx,
-            borderColor: alpha("#3C18A8", 0.16),
-            color: "#5222B8",
-            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
-          }}
-        >
-          Sort: Role
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<FilterListIcon />}
-          onClick={() => setSortBy("workType")}
-          sx={{
-            ...actionButtonSx,
-            borderColor: alpha("#3C18A8", 0.16),
-            color: "#5222B8",
-            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
-          }}
-        >
-          Sort: Work Type
-        </Button>
-        <FormControl sx={filterControlSx}>
-          <InputLabel id="role-filter">Filter role</InputLabel>
-          <Select
-            labelId="role-filter"
-            label="Filter role"
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value as any)}
-          >
-            <MenuItem value="ALL">All roles</MenuItem>
-            {ROLE_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl sx={filterControlSx}>
-          <InputLabel id="work-filter">Filter work type</InputLabel>
-          <Select
-            labelId="work-filter"
-            label="Filter work type"
-            value={filterWork}
-            onChange={(e) => setFilterWork(e.target.value as any)}
-          >
-            <MenuItem value="ALL">All work types</MenuItem>
-            {EMPLOYMENT_TYPES.filter((type) => ["FULL_TIME", "PART_TIME", "CASUAL"].includes(type)).map((type) => (
-              <MenuItem key={type} value={type}>
-                {type.replace("_", " ")}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setInviteOpen(true)}
-          sx={{ ...actionButtonSx, boxShadow: "0 12px 28px rgba(20, 62, 234, 0.18)" }}
-        >
-          Invite Staff
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<LinkIcon />}
-          onClick={openLinkDialog}
-          sx={{
-            ...actionButtonSx,
-            borderColor: alpha("#3C18A8", 0.16),
-            color: "#5222B8",
-            "&:hover": { borderColor: "#3C18A8", bgcolor: alpha("#3C18A8", 0.04) },
-          }}
-        >
-          Generate Link
-        </Button>
-      </Stack>
+    <Box>
+      <MembershipApplicationsPanel
+        pharmacyId={pharmacyId}
+        category="FULL_PART_TIME"
+        title="Applications to review"
+        allowedEmploymentTypes={Array.from(EMPLOYMENT_TYPES)}
+        defaultEmploymentType="CASUAL"
+        onApproved={onMembershipsChanged}
+        onNotification={handleApplicationsNotification}
+        onCountChange={onApplicationsCount}
+      />
 
-      {showSkeleton ? (
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 1.5 }}>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Card
-              key={`staff-skeleton-${index}`}
-              variant="outlined"
-              sx={memberCardSx}
-            >
-              <CardContent sx={{ display: "flex", gap: 2, alignItems: "flex-start", p: { xs: 2, md: 2.5 } }}>
-                <Skeleton variant="circular" width={40} height={40} />
-                <Box sx={{ flex: 1 }}>
-                  <Skeleton variant="text" width="80%" />
-                  <Skeleton variant="text" width="60%" />
-                  <Skeleton variant="text" width="40%" />
-                </Box>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
-      ) : data.length === 0 ? (
-        <Alert severity="info">No staff yet. Use "Invite Staff" to add members.</Alert>
-      ) : (
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 1.5 }}>
-          {data.map((item) => (
-            <Card
-              key={item.id}
-              variant="outlined"
-              sx={memberCardSx}
-            >
-              <CardContent
-                sx={{
-                  p: { xs: 2, md: 2.5 },
-                  "&:last-child": { pb: { xs: 2, md: 2.5 } },
-                }}
-              >
-                <Stack spacing={1.5} sx={{ minWidth: 0 }}>
-                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
-                    <Chip label={item.role.replace("_", " ")} color={getRoleChipColor(item.role)} sx={{ fontWeight: 800 }} />
-                    <Chip label={item.workType.replace("_", " ")} variant="outlined" sx={{ fontWeight: 800 }} />
-                  </Stack>
-                  <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ minWidth: 0 }}>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ color: DASHBOARD_INK, fontWeight: 950, fontSize: { xs: 20, md: 22 }, lineHeight: 1.2, overflowWrap: "anywhere" }}>
-                        {item.name}
-                      </Typography>
-                      {item.jobTitle && (
-                        <Typography sx={{ mt: 0.5, color: "#5222B8", fontWeight: 800, fontSize: 14, overflowWrap: "anywhere" }}>
-                          {item.jobTitle}
-                        </Typography>
-                      )}
-                      {item.email && (
-                        <Typography sx={{ mt: 0.5, color: DASHBOARD_MUTED, fontWeight: 700, fontSize: 15, lineHeight: 1.45, overflowWrap: "anywhere" }}>
-                          {item.email}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Box sx={{ flexShrink: 0 }}>
-                      <Tooltip title="Remove">
-                        <span>
-                          <IconButton
-                            color="error"
-                            onClick={() => setConfirmRemove(item)}
-                            disabled={deleteLoadingId === item.id}
-                            sx={{ border: `1px solid ${alpha("#EF4444", 0.18)}` }}
-                          >
-                            {deleteLoadingId === item.id ? <CircularProgress size={16} /> : <DeleteOutlineIcon fontSize="small" />}
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </Box>
-                  </Stack>
-                </Stack>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
-      )}
-
-      <Dialog
-        open={Boolean(confirmRemove)}
-        onClose={() => {
-          if (!deleteLoadingId) setConfirmRemove(null);
-        }}
-        maxWidth="xs"
-        fullWidth
+      <TeamSection
+        title="Team members"
+        count={showSkeleton ? undefined : list.length}
+        tone="magenta"
+        description="Full-time, part-time and casual staff at this pharmacy."
+        actions={
+          <>
+            <Button variant="outlined" startIcon={<Link2 size={16} />} onClick={openLinkDialog} sx={actionButtonSx}>
+              Invite link
+            </Button>
+            <Button variant="contained" startIcon={<UserPlus size={16} />} onClick={() => setInviteOpen(true)} sx={actionButtonSx}>
+              Invite staff
+            </Button>
+          </>
+        }
       >
-        <DialogTitle>Remove Member</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {confirmRemove
-              ? `Remove ${confirmRemove.name} from this pharmacy? This action can't be undone.`
-              : "This action can't be undone."}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmRemove(null)} disabled={Boolean(deleteLoadingId)}>
-            Cancel
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => confirmRemove && handleRemoveMembership(confirmRemove.id)}
-            disabled={Boolean(deleteLoadingId)}
-          >
-            {deleteLoadingId === confirmRemove?.id ? "Removing..." : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {list.length > 3 ? (
+          <TeamToolbar
+            search={query}
+            onSearch={setQuery}
+            searchLabel="Search team by name"
+            filters={[
+              { label: "Role", value: filterRole, onChange: (v) => setFilterRole(v as Role | "ALL"), options: [{ value: "ALL", label: "All roles" }, ...ROLE_OPTIONS] },
+              { label: "Employment", value: filterWork, onChange: (v) => setFilterWork(v as WorkType | "ALL"), options: [{ value: "ALL", label: "All types" }, ...EMPLOYMENT_TYPES.map((t) => ({ value: t, label: employmentLabel(t) }))] },
+              { label: "Sort by", value: sortBy, onChange: (v) => setSortBy(v as SortKey), options: [{ value: "name", label: "Name" }, { value: "role", label: "Role" }, { value: "workType", label: "Employment" }] },
+            ]}
+          />
+        ) : null}
+        {showSkeleton ? (
+          <TeamListSkeleton label="Loading team members" />
+        ) : list.length === 0 ? (
+          <EmptyTeam
+            icon={<Users size={22} />}
+            title="No team members yet"
+            body="Invite your pharmacists, interns, technicians and assistants by email, or share an invite link they can apply through."
+            action={<Button variant="contained" startIcon={<UserPlus size={16} />} onClick={() => setInviteOpen(true)} sx={actionButtonSx}>Invite staff</Button>}
+          />
+        ) : data.length === 0 ? (
+          <EmptyTeam
+            icon={<Users size={22} />}
+            title="No one matches"
+            body="Try another name, role or employment type."
+            action={<Button onClick={() => { setQuery(""); setFilterRole("ALL"); setFilterWork("ALL"); }} sx={actionButtonSx}>Clear filters</Button>}
+          />
+        ) : (
+          <TeamList label="Team members">
+            {data.map((item) => {
+              const userId = membershipUserId(item.membership);
+              return (
+                <MemberRow
+                  key={item.id}
+                  name={item.name}
+                  photoUrl={membershipPhoto(item.membership)}
+                  role={roleLabel(item.role)}
+                  tone={roleTone(item.role)}
+                  details={rowDetails(item)}
+                  actions={
+                    <>
+                      {userId && chatPathFor ? (
+                        <Button variant="outlined" startIcon={<MessageCircle size={16} />} onClick={() => navigate(chatPathFor(userId))} sx={actionButtonSx}>
+                          Message
+                        </Button>
+                      ) : null}
+                      <Button
+                        color="error"
+                        startIcon={<UserMinus size={16} />}
+                        onClick={() => setConfirmRemove(item)}
+                        disabled={deleteLoadingId === item.id}
+                        sx={actionButtonSx}
+                      >
+                        Remove from pharmacy
+                      </Button>
+                    </>
+                  }
+                />
+              );
+            })}
+          </TeamList>
+        )}
+      </TeamSection>
 
-      <Dialog open={inviteOpen} onClose={() => setInviteOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Invite Staff to {pharmacyName || pharmacyId}</DialogTitle>
-        <DialogContent sx={{ display: "grid", gap: 2, pt: 2 }}>
-          <Alert
-            severity="info"
-            action={
-              <Button
-                color="inherit"
-                size="small"
-                onClick={() => navigate(`/dashboard/workforce/settings?pharmacy_id=${pharmacyId}`)}
-              >
-                Workforce & Payroll
-              </Button>
-            }
-          >
-            Pharmacy staff use the TFN employee pathway. This owner form records role and employment type only; DOB, TFN and super details are completed by the worker in their private profile and never exposed to the pharmacy. If you use ChemistTasker Payroll, add the dated EmploymentEngagement in Workforce & Payroll after the worker's private TFN/super setup is ready.
-          </Alert>
+      <PendingDirectInvitationsPanel
+        memberships={memberships.filter((m) => !Boolean((m as any).is_pharmacy_admin ?? (m as any).isPharmacyAdmin))}
+        title="Invitations sent"
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirmRemove)}
+        title={confirmRemove ? `Remove ${confirmRemove.name}?` : "Remove team member?"}
+        body={
+          <>
+            They'll lose access to {pharmacyName || "this pharmacy"}'s roster, chat and hub. Their past shifts and timesheets stay on record. You can invite them again later.
+          </>
+        }
+        confirmLabel="Remove"
+        busyLabel="Removing…"
+        busy={Boolean(deleteLoadingId)}
+        onConfirm={() => confirmRemove && handleRemoveMembership(confirmRemove.id)}
+        onClose={() => setConfirmRemove(null)}
+      />
+
+      <Dialog open={inviteOpen} onClose={() => !inviteSubmitting && setInviteOpen(false)} fullWidth maxWidth="sm" aria-labelledby="invite-staff-title">
+        <DialogTitle id="invite-staff-title" sx={{ fontWeight: 600 }}>
+          Invite staff to {pharmacyName || "this pharmacy"}
+        </DialogTitle>
+        <DialogContent sx={{ display: "grid", gap: 2 }}>
+          <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 14.5, lineHeight: 1.55 }}>
+            Staff join on the TFN employee pathway. You set their role and employment type; they add their own DOB, TFN and super details privately, and the pharmacy never sees them.{" "}
+            <Box
+              component="button"
+              type="button"
+              onClick={() => navigate(`/dashboard/workforce/settings?pharmacy_id=${pharmacyId}`)}
+              sx={{ display: "inline", p: 0, border: 0, bgcolor: "transparent", color: "var(--ct-accent-strong)", font: "inherit", fontWeight: 600, textAlign: "left", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}
+            >
+              Using ChemistTasker Payroll? Add their employment terms in Workforce & Payroll.
+            </Box>
+          </Typography>
           {inviteError ? <Alert severity="error">{inviteError}</Alert> : null}
           {inviteRows.map((row, idx) => (
-            <Box key={idx} sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, pt: 1 }}>
-              <TextField
-                label="Full Name"
-                value={row.invited_name}
-                onChange={(e) => handleInviteFieldChange(idx, "invited_name", e.target.value)}
-                fullWidth
-                sx={inviteTextFieldSx}
-              />
+            <Box
+              key={idx}
+              sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, p: 2, borderRadius: "14px", border: "1px solid", borderColor: row.error ? "error.main" : "var(--ct-border-color)" }}
+            >
+              {inviteRows.length > 1 ? (
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ gridColumn: "1 / -1" }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: 14, color: "var(--ct-text-secondary)" }}>Person {idx + 1}</Typography>
+                  <Button color="error" size="small" onClick={() => removeInviteRow(idx)}>Remove</Button>
+                </Stack>
+              ) : null}
+              <TextField label="Full name" value={row.invited_name} onChange={(e) => handleInviteFieldChange(idx, "invited_name", e.target.value)} fullWidth sx={inviteTextFieldSx} />
               <TextField
                 label="Email"
                 type="email"
@@ -776,12 +685,7 @@ export default function StaffManager({
               />
               <FormControl fullWidth error={Boolean(row.error)}>
                 <InputLabel id={`role-${idx}`}>Role</InputLabel>
-                <Select
-                  labelId={`role-${idx}`}
-                  label="Role"
-                  value={row.role}
-                  onChange={(e) => handleInviteFieldChange(idx, "role", e.target.value as Role)}
-                >
+                <Select labelId={`role-${idx}`} label="Role" value={row.role} onChange={(e) => handleInviteFieldChange(idx, "role", e.target.value as Role)}>
                   {ROLE_OPTIONS.map((opt) => {
                     const requiredRole = requiredUserRoleForMembership(opt.value);
                     const disableOption =
@@ -799,120 +703,70 @@ export default function StaffManager({
               </FormControl>
               <FormControl fullWidth>
                 <InputLabel id={`work-${idx}`}>Employment type</InputLabel>
-                <Select
-                  labelId={`work-${idx}`}
-                  label="Employment type"
-                  value={row.employment_type}
-                  onChange={(e) => handleInviteFieldChange(idx, "employment_type", e.target.value)}
-                >
+                <Select labelId={`work-${idx}`} label="Employment type" value={row.employment_type} onChange={(e) => handleInviteFieldChange(idx, "employment_type", e.target.value)}>
                   {EMPLOYMENT_TYPES.map((type) => (
                     <MenuItem key={type} value={type}>
-                      {type.replace("_", " ")}
+                      {employmentLabel(type)}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
               {employmentNeedsJobTitle(row.employment_type) && (
                 <TextField
-                  label="Job Title"
+                  label="Job title"
                   value={row.job_title}
                   onChange={(e) => handleInviteFieldChange(idx, "job_title", e.target.value)}
                   required
                   fullWidth
-                  sx={{ gridColumn: "span 2" }}
+                  helperText="Shown to the team, e.g. Dispensary lead"
+                  sx={{ gridColumn: "1 / -1" }}
                 />
               )}
-              <Box sx={{ gridColumn: "span 2", minHeight: 20 }}>
-                {row.checking ? (
-                  <Typography variant="caption" color="text.secondary">
-                    Checking existing account...
-                  </Typography>
-                ) : row.error ? (
-                  <Typography variant="caption" color="error">
-                    {row.error}
-                  </Typography>
-                ) : (
-                  (() => {
-                    const label = formatExistingUserRole(row.existingUserRole);
-                    return label ? (
-                      <Typography variant="caption" color="text.secondary">
-                        {label}
-                      </Typography>
-                    ) : null;
-                  })()
-                )}
-              </Box>
-              <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1, gridColumn: "span 2" }}>
-                {inviteRows.length > 1 && (
-                  <Button color="error" onClick={() => removeInviteRow(idx)}>
-                    Remove
-                  </Button>
-                )}
-              </Box>
+              {row.checking || row.error || formatExistingUserRole(row.existingUserRole) ? (
+                <Typography variant="body2" role={row.error ? "alert" : undefined} sx={{ gridColumn: "1 / -1", color: row.error ? "error.main" : "var(--ct-text-secondary)" }}>
+                  {row.checking ? "Checking for an existing account…" : row.error || formatExistingUserRole(row.existingUserRole)}
+                </Typography>
+              ) : null}
             </Box>
           ))}
-          <Button onClick={addInviteRow}>Add another</Button>
+          <Button onClick={addInviteRow} startIcon={<Plus size={16} />} sx={{ justifySelf: "start", ...actionButtonSx }}>
+            Add another person
+          </Button>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setInviteOpen(false)}>Cancel</Button>
-          <Button onClick={handleSendInvites} variant="contained" disabled={inviteSubmitting}>
-            {inviteSubmitting ? "Sending..." : "Send Invitations"}
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setInviteOpen(false)} disabled={inviteSubmitting} sx={actionButtonSx}>Cancel</Button>
+          <Button
+            onClick={handleSendInvites}
+            variant="contained"
+            disabled={inviteSubmitting}
+            startIcon={inviteSubmitting ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />}
+            sx={actionButtonSx}
+          >
+            {inviteSubmitting ? "Sending…" : inviteRows.length > 1 ? `Send ${inviteRows.length} invitations` : "Send invitation"}
           </Button>
         </DialogActions>
       </Dialog>
 
+      <InviteLinkDialog
+        open={linkOpen}
+        title="Invite link for staff"
+        audience={`Anyone with this link can apply to join ${pharmacyName || "this pharmacy"} as staff. You review every application before they join.`}
+        expiry={linkExpiry}
+        onExpiry={setLinkExpiry}
+        link={linkValue}
+        generating={linkSubmitting}
+        onGenerate={handleGenerateLink}
+        onCopy={handleCopyLink}
+        onClose={() => setLinkOpen(false)}
+      />
+
       {toast && (
-        <Snackbar
-          open
-          autoHideDuration={4000}
-          onClose={() => setToast(null)}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
+        <Snackbar open autoHideDuration={4000} onClose={() => setToast(null)} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
           <Alert severity={toast.severity} onClose={() => setToast(null)} sx={{ width: "100%" }}>
             {toast.message}
           </Alert>
         </Snackbar>
       )}
-
-      <MembershipApplicationsPanel
-        pharmacyId={pharmacyId}
-        category="FULL_PART_TIME"
-        title="Pending Staff Applications"
-        allowedEmploymentTypes={Array.from(EMPLOYMENT_TYPES)}
-        defaultEmploymentType="CASUAL"
-        onApproved={onMembershipsChanged}
-        onNotification={handleApplicationsNotification}
-      />
-      <PendingDirectInvitationsPanel
-        memberships={memberships.filter((m) => !Boolean((m as any).is_pharmacy_admin ?? (m as any).isPharmacyAdmin))}
-        title="Pending Staff Invitations"
-      />
-      <Dialog open={linkOpen} onClose={() => setLinkOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Generate Invite Link</DialogTitle>
-        <DialogContent sx={{ display: "grid", gap: 2, pt: 2, overflow: "visible" }}>
-          <TextField
-            label="Expiry (days)"
-            value={linkExpiry}
-            onChange={(e) => setLinkExpiry(e.target.value)}
-            type="number"
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-            inputProps={{ min: 1, max: 90 }}
-          />
-          {linkValue && (
-            <TextField label="Invite link" value={linkValue} fullWidth InputProps={{ readOnly: true }} />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLinkOpen(false)}>Close</Button>
-          <Button onClick={handleGenerateLink} startIcon={<LinkIcon />} disabled={linkSubmitting}>
-            {linkSubmitting ? "Generating..." : "Generate"}
-          </Button>
-          <Button onClick={handleCopyLink} startIcon={<ContentCopyIcon />} disabled={!linkValue}>
-            Copy & Close
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }

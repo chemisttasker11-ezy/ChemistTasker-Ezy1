@@ -1,28 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Box, Button, Stack } from "@mui/material";
+import { Clock3, MailCheck } from "lucide-react";
+import { Pill, type ShiftTone } from "../../shiftCenter/ShiftCentreParts";
 import {
-  Box,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
-  Button,
-  IconButton,
-  Stack,
-  Tooltip,
-  Typography,
-} from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+  ConfirmDialog,
+  MemberRow,
+  TeamList,
+  TeamListSkeleton,
+  TeamSection,
+  actionButtonSx,
+  employmentLabel,
+  formatDate,
+  membershipEmail,
+  membershipName,
+  membershipPhoto,
+  prettyCode,
+  roleLabel,
+  roleTone,
+} from "./teamUi";
 import {
   fetchMembershipApplicationsService,
   rejectMembershipApplicationService,
   type MembershipApplication,
   type MembershipDTO,
 } from "@chemisttasker/shared-core";
-import dayjs from "dayjs";
 import MembershipApplicationReviewDialog from "./MembershipApplicationReviewDialog";
-import utc from "dayjs/plugin/utc";
 
-dayjs.extend(utc);
 
 type MembershipApplicationsPanelProps = {
   pharmacyId: string;
@@ -32,17 +35,9 @@ type MembershipApplicationsPanelProps = {
   defaultEmploymentType: string;
   onApproved?: () => void;
   onNotification?: (message: string, severity: "success" | "error") => void;
+  /** Reports how many applications are waiting, so the page can surface them. */
+  onCountChange?: (count: number) => void;
 };
-
-const labelEmploymentType = (value?: string) =>
-  (value || "")
-    .toLowerCase()
-    .split("_")
-    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
-    .join(" ");
-
-const labelCategory = (category: "FULL_PART_TIME" | "LOCUM_CASUAL") =>
-  category === "FULL_PART_TIME" ? "Full/Part-time" : "Favourite (Locum/Shift Hero)";
 
 const deriveLocumEmploymentType = (role?: string) =>
   String(role || "").toUpperCase() === "PHARMACIST" ? "LOCUM" : "SHIFT_HERO";
@@ -86,32 +81,14 @@ const paymentProfileLabel = (status: ReturnType<typeof paymentProfile>) => {
   return 'Payment preference required';
 };
 
-const formatTimestamp = (value?: string | null) => {
-  if (!value) return "-";
-  const parsed = dayjs.utc(value);
-  return parsed.isValid() ? parsed.local().toDate().toLocaleString() : value;
-};
+const paymentProfileTone = (status: ReturnType<typeof paymentProfile>): ShiftTone =>
+  (status?.paymentPreference === 'TFN' && status?.payrollReady) || (status?.paymentPreference === 'ABN' && status?.invoiceReady) ? 'green' : 'amber';
 
 const readValue = (app: MembershipApplication, camelKey: string, snakeKey: string) =>
   (app as any)?.[camelKey] ?? (app as any)?.[snakeKey] ?? "";
 
 const readMembershipValue = (membership: MembershipDTO, camelKey: string, snakeKey: string) =>
   (membership as any)?.[camelKey] ?? (membership as any)?.[snakeKey] ?? "";
-
-const formatMembershipName = (membership: MembershipDTO) => {
-  const userDetails = (membership as any).userDetails ?? (membership as any).user_details ?? {};
-  return (
-    readMembershipValue(membership, "invitedName", "invited_name") ||
-    (membership as any).name ||
-    [userDetails.firstName ?? userDetails.first_name, userDetails.lastName ?? userDetails.last_name].filter(Boolean).join(" ") ||
-    "Invited team member"
-  );
-};
-
-const formatMembershipEmail = (membership: MembershipDTO) => {
-  const userDetails = (membership as any).userDetails ?? (membership as any).user_details ?? {};
-  return userDetails.email || (membership as any).email || "";
-};
 
 export function PendingDirectInvitationsPanel({
   memberships,
@@ -131,41 +108,35 @@ export function PendingDirectInvitationsPanel({
   }
 
   return (
-    <Box sx={{ mt: 3 }}>
-      <Typography variant="h6" sx={{ mb: 1 }}>
-        {title}
-      </Typography>
-      <Stack spacing={1.5}>
-        {pendingMemberships.map((membership) => {
-          const name = formatMembershipName(membership);
-          const email = formatMembershipEmail(membership);
-          const role = String((membership as any).role || "");
-          const workType = String(readMembershipValue(membership, "employmentType", "employment_type") || "");
-          const jobTitle = readMembershipValue(membership, "jobTitle", "job_title");
-          return (
-            <Card key={membership.id} variant="outlined">
-              <CardContent>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} justifyContent="space-between">
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography fontWeight={700}>{name}</Typography>
-                    {email ? (
-                      <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
-                        {email}
-                      </Typography>
-                    ) : null}
-                    <Stack direction="row" spacing={1} flexWrap="wrap" mt={1}>
-                      {role ? <Chip size="small" label={role.replace(/_/g, " ")} /> : null}
-                      {workType ? <Chip size="small" label={labelEmploymentType(workType)} color="warning" variant="outlined" /> : null}
-                      {jobTitle ? <Chip size="small" label={jobTitle} variant="outlined" /> : null}
-                    </Stack>
-                  </Box>
-                  <Chip label="Waiting for team member response" color="warning" sx={{ alignSelf: { xs: "flex-start", md: "center" }, fontWeight: 800 }} />
-                </Stack>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </Stack>
+    <Box sx={{ mt: 4 }}>
+      <TeamSection title={title} count={pendingMemberships.length} tone="amber" description="Waiting for the person to accept. They join the list above once they do.">
+        <TeamList label={title}>
+          {pendingMemberships.map((membership) => {
+            const name = membershipName(membership, "Invited person");
+            const role = String((membership as any).role || "");
+            const workType = String(readMembershipValue(membership, "employmentType", "employment_type") || "");
+            const jobTitle = readMembershipValue(membership, "jobTitle", "job_title");
+            const email = membershipEmail(membership);
+            const sent = formatDate(readMembershipValue(membership, "createdAt", "created_at"));
+            return (
+              <MemberRow
+                key={membership.id}
+                name={name}
+                photoUrl={membershipPhoto(membership)}
+                role={roleLabel(role) || "Invited"}
+                tone={roleTone(role)}
+                trailing={<Pill label="Waiting for reply" tone="amber" icon={<Clock3 size={13} />} />}
+                details={[
+                  { label: "Employment", value: employmentLabel(workType) },
+                  { label: "Job title", value: jobTitle },
+                  { label: "Invited on", value: sent },
+                  { label: "Sent to", value: email },
+                ]}
+              />
+            );
+          })}
+        </TeamList>
+      </TeamSection>
     </Box>
   );
 }
@@ -178,10 +149,17 @@ export default function MembershipApplicationsPanel({
   defaultEmploymentType,
   onApproved,
   onNotification,
+  onCountChange,
 }: MembershipApplicationsPanelProps) {
   const [applications, setApplications] = useState<MembershipApplication[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [reviewing, setReviewing] = useState<MembershipApplication | null>(null);
+  const [declining, setDeclining] = useState<MembershipApplication | null>(null);
+  const [declineBusy, setDeclineBusy] = useState(false);
+
+  useEffect(() => {
+    onCountChange?.(applications.length);
+  }, [applications.length, onCountChange]);
   const isFetchingRef = useRef(false);
 
   const notify = useCallback(
@@ -245,33 +223,53 @@ export default function MembershipApplicationsPanel({
 
   const handleReject = useCallback(
     async (app: MembershipApplication) => {
+      setDeclineBusy(true);
       try {
         await rejectMembershipApplicationService(app.id);
-        notify("Application rejected.", "success");
+        notify("Application declined.", "success");
         await fetchApplications();
       } catch (error: any) {
         const data = error?.response?.data;
-        notify(data?.detail || "Failed to reject application.", "error");
+        notify(data?.detail || "The application wasn't declined. Try again.", "error");
+      } finally {
+        setDeclineBusy(false);
+        setDeclining(null);
       }
     },
     [fetchApplications, notify]
   );
 
-  return (
-    <Box sx={{ mt: 3 }}>
-      <Typography variant="h6" sx={{ mb: 1 }}>
-        {title}
-      </Typography>
+  if (!loading && applications.length === 0) {
+    return (
+      <MembershipApplicationReviewDialog
+        open={Boolean(reviewing)}
+        application={reviewing}
+        defaultEmploymentType={reviewing?.category === "LOCUM_CASUAL" ? deriveLocumEmploymentType(reviewing?.role) : defaultEmploymentType}
+        allowedEmploymentTypes={allowedTypes}
+        onClose={() => setReviewing(null)}
+        onUpdated={(updated) => setReviewing(updated)}
+        onApproved={async () => {
+          setReviewing(null);
+          await fetchApplications();
+          onApproved?.();
+        }}
+        onNotification={notify}
+      />
+    );
+  }
 
-      {loading ? (
-        <Stack direction="row" spacing={1} alignItems="center">
-          <CircularProgress size={20} />
-          <Typography variant="body2" color="text.secondary">
-            Loading applications...
-          </Typography>
-        </Stack>
-      ) : applications.length === 0 ? null : (
-        <Stack spacing={1.5}>
+  return (
+    <Box sx={{ mb: 4 }}>
+      <TeamSection
+        title={title}
+        count={loading ? undefined : applications.length}
+        tone="magenta"
+        description="People who asked to join through your invite link. Review to set their role and approve."
+      >
+      {loading && applications.length === 0 ? (
+        <TeamListSkeleton rows={1} label="Loading applications" />
+      ) : (
+        <TeamList label={title}>
           {applications.map((app) => {
             const applicantName = [app.firstName, app.lastName].filter(Boolean).join(" ") || "Applicant";
             const classification = formatClassification(app);
@@ -281,120 +279,67 @@ export default function MembershipApplicationsPanel({
             const dateOfBirth = readValue(app, "dateOfBirth", "date_of_birth");
             const profile = paymentProfile(app);
             const payrollEnabled = Boolean((app as any).payrollEnabled ?? (app as any).payroll_enabled);
+            const submitted = formatDate(app.submittedAt);
 
             return (
-              <Card key={app.id} variant="outlined">
-                <CardContent
-                  sx={{
-                    display: "flex",
-                    flexDirection: { xs: "column", md: "row" },
-                    gap: 2,
-                    alignItems: { xs: "flex-start", md: "center" },
-                  }}
-                >
-                  <Box sx={{ flex: 1 }}>
-                    <Typography fontWeight={600}>{applicantName}</Typography>
-                    {app.email && (
-                      <Typography variant="body2" color="text.secondary">
-                        {app.email}
-                      </Typography>
-                    )}
-                    <Stack direction="row" spacing={1} flexWrap="wrap" mt={1}>
-                      <Chip size="small" label={app.role} />
-                      <Chip size="small" label={labelCategory(app.category)} color="primary" variant="outlined" />
-                      {classification && (
-                        <Chip size="small" label={classification} variant="outlined" />
-                      )}
-                      <Chip
-                        size="small"
-                        label={paymentProfileLabel(profile)}
-                        color={profile?.paymentPreference === 'TFN' && profile?.payrollReady ? 'success' : profile?.paymentPreference === 'ABN' && profile?.invoiceReady ? 'success' : 'warning'}
-                        variant="outlined"
-                      />
-                      {app.category === 'FULL_PART_TIME' && (
-                        <Chip
-                          size="small"
-                          label={payrollEnabled ? 'ChemistTasker Payroll on' : 'External payroll'}
-                          color={payrollEnabled ? 'primary' : 'default'}
-                          variant="outlined"
-                        />
-                      )}
-                    </Stack>
-                    <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.secondary" }}>
-                      Submitted: {formatTimestamp(app.submittedAt)}
-                    </Typography>
-                    <Box
-                      sx={{
-                        mt: 1.25,
-                        px: 1.25,
-                        py: 1,
-                        borderRadius: 2,
-                        bgcolor: "rgba(6, 18, 58, 0.04)",
-                      }}
-                    >
-                      <Typography variant="caption" sx={{ display: "block", fontWeight: 800, color: "text.secondary" }}>
-                        Candidate Summary
-                      </Typography>
-                      <Typography variant="body2" sx={{ mt: 0.5 }}>
-                        Role requested: {app.role}
-                      </Typography>
-                      {jobTitle ? (
-                        <Typography variant="body2">
-                          Job title: {jobTitle}
-                        </Typography>
-                      ) : null}
-                      {mobileNumber ? (
-                        <Typography variant="body2">
-                          Mobile: {mobileNumber}
-                        </Typography>
-                      ) : null}
-                      {dateOfBirth ? (
-                        <Typography variant="body2">
-                          Date of birth: {dateOfBirth}
-                        </Typography>
-                      ) : null}
-                      {username ? (
-                        <Typography variant="body2">
-                          Username: {username}
-                        </Typography>
-                      ) : null}
-                      {classification ? (
-                        <Typography variant="body2">
-                          Classification: {classification}
-                        </Typography>
-                      ) : null}
-                      {profile?.missingFields?.length ? (
-                        <Typography variant="body2" color="warning.main" sx={{ mt: 0.5 }}>
-                          Payment setup still needed: {profile.missingFields.map((field) => field.replaceAll('_', ' ')).join(', ')}
-                        </Typography>
-                      ) : null}
-                    </Box>
-                  </Box>
-
-                  <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={1}
-                    alignItems={{ xs: "stretch", sm: "center" }}
-                  >
-                    <Stack direction="row" spacing={0.5} alignItems="center">
-                      <Button variant="contained" size="small" onClick={() => setReviewing(app)}>
-                        Review
-                      </Button>
-                      <Tooltip title="Reject">
-                        <span>
-                          <IconButton color="error" onClick={() => handleReject(app)}>
-                            <CloseIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </Stack>
+              <MemberRow
+                key={app.id}
+                name={applicantName}
+                role={`${roleLabel(app.role)}${submitted ? ` · applied ${submitted}` : ""}`}
+                tone={roleTone(app.role)}
+                trailing={
+                  <Button variant="contained" size="small" onClick={() => setReviewing(app)} sx={{ ...actionButtonSx, minHeight: 36 }}>
+                    Review
+                  </Button>
+                }
+                note={
+                  <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                    <Pill label={paymentProfileLabel(profile)} tone={paymentProfileTone(profile)} />
+                    {app.category === 'FULL_PART_TIME' ? (
+                      <Pill label={payrollEnabled ? 'ChemistTasker Payroll on' : 'External payroll'} tone={payrollEnabled ? 'violet' : 'neutral'} />
+                    ) : null}
                   </Stack>
-                </CardContent>
-              </Card>
+                }
+                details={[
+                  { label: "Role requested", value: roleLabel(app.role) },
+                  { label: "Classification", value: classification },
+                  { label: "Job title", value: jobTitle },
+                  { label: "Mobile", value: mobileNumber },
+                  { label: "Date of birth", value: dateOfBirth },
+                  { label: "Username", value: username },
+                  { label: "Email", value: app.email },
+                  {
+                    label: "Payment setup still needed",
+                    value: profile?.missingFields?.length ? profile.missingFields.map((field) => prettyCode(field)).join(', ') : "",
+                  },
+                ]}
+                actions={
+                  <>
+                    <Button variant="contained" startIcon={<MailCheck size={16} />} onClick={() => setReviewing(app)} sx={actionButtonSx}>
+                      Review and approve
+                    </Button>
+                    <Button color="error" onClick={() => setDeclining(app)} sx={actionButtonSx}>
+                      Decline
+                    </Button>
+                  </>
+                }
+              />
             );
           })}
-        </Stack>
+        </TeamList>
       )}
+      </TeamSection>
+
+      <ConfirmDialog
+        open={Boolean(declining)}
+        title={declining ? `Decline ${[declining.firstName, declining.lastName].filter(Boolean).join(" ") || "this application"}?` : "Decline application?"}
+        body="They won't join this pharmacy. They can apply again with a new invite link."
+        confirmLabel="Decline"
+        busyLabel="Declining…"
+        busy={declineBusy}
+        onConfirm={() => declining && void handleReject(declining)}
+        onClose={() => setDeclining(null)}
+      />
 
       <MembershipApplicationReviewDialog
         open={Boolean(reviewing)}

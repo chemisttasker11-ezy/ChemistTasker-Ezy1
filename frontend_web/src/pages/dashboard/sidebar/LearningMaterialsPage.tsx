@@ -283,7 +283,7 @@ export default function LearningMaterialsPage() {
     : undefined;
 
   return (
-    <Box sx={{ maxWidth: 1240, mx: 'auto', width: '100%' }}>
+    <Box data-ct-tokens="" sx={{ maxWidth: 1240, mx: 'auto', width: '100%' }}>
       <PageHeader
         title="Learning materials"
         subtitle={

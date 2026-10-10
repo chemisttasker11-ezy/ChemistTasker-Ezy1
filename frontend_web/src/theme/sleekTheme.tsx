@@ -136,7 +136,9 @@ export function createSleekTheme(mode: Mode): Theme {
             color: `${textPrimary} !important`,
             borderColor: `${borderColor} !important`,
           },
-          "[data-ct-theme='dark'] .MuiTypography-root": {
+          // Legacy pages hard-code light-mode text colours, so in dark mode their text inherits from
+          // the surface instead. Pages built on the --ct-* tokens opt out with data-ct-tokens.
+          "[data-ct-theme='dark'] .MuiTypography-root:not([data-ct-tokens] .MuiTypography-root)": {
             color: "inherit",
           },
           "[data-ct-theme='dark'] .MuiTypography-colorTextSecondary, [data-ct-theme='dark'] .MuiFormHelperText-root": {
@@ -269,6 +271,10 @@ export function createSleekTheme(mode: Mode): Theme {
         // the nested selector out-ranked sx and painted labels the colour of their background.
         variants: [
           { props: { variant: "text", color: "primary" }, style: { color: isLight ? "#3C18A8" : primary[300] } },
+          { props: { variant: "outlined", color: "primary" }, style: { color: isLight ? "#3C18A8" : primary[300] } },
+          // Error red (#C9364A) is 3.4:1 on the dark surface; a lighter red keeps destructive labels readable.
+          { props: { variant: "text", color: "error" }, style: isLight ? {} : { color: "#FF8A97" } },
+          { props: { variant: "outlined", color: "error" }, style: isLight ? {} : { color: "#FF8A97", borderColor: "rgba(255,138,151,0.5)" } },
         ],
       },
       MuiIconButton: {
@@ -326,7 +332,30 @@ export function createSleekTheme(mode: Mode): Theme {
       },
       MuiTabs: {
         styleOverrides: {
-          root: { minHeight: 44 },
+          root: {
+            minHeight: 44,
+            // Phones: no sideways scrolling or arrow buttons. Scrollable tab bars wrap into a grid of
+            // pills so every section is visible and one tap away.
+            [`@media (max-width:${600 - 0.05}px)`]: {
+              "& .MuiTabs-scrollButtons": { display: "none" },
+              "& .MuiTabs-scrollableX": { overflowX: "visible !important", marginBottom: "0 !important" },
+              "& .MuiTabs-scrollableX .MuiTabs-flexContainer": { flexWrap: "wrap", gap: 8, paddingBlock: 4 },
+              "& .MuiTabs-scrollableX .MuiTabs-indicator": { display: "none" },
+              "& .MuiTabs-scrollableX .MuiTab-root": {
+                minHeight: 40,
+                minWidth: 0,
+                padding: "6px 14px",
+                borderRadius: 999,
+                border: `1px solid ${borderColor}`,
+                backgroundColor: "transparent",
+              },
+              "& .MuiTabs-scrollableX .MuiTab-root.Mui-selected": {
+                backgroundColor: "var(--ct-tone-violet-bg)",
+                borderColor: isLight ? "#3C18A8" : primary[300],
+                color: "var(--ct-tone-violet-fg)",
+              },
+            },
+          },
           indicator: { height: 3, borderRadius: "3px 3px 0 0", backgroundColor: isLight ? "#3C18A8" : primary[300] },
         },
       },

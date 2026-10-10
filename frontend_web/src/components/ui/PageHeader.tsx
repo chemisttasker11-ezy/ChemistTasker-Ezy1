@@ -18,7 +18,7 @@ export default function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <Box component="header" sx={{ mb: { xs: 2.5, md: 3 }, minWidth: 0 }}>
+    <Box component="header" data-ct-tokens="" sx={{ mb: { xs: 2.5, md: 3 }, minWidth: 0 }}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
         alignItems={{ xs: "stretch", sm: "flex-start" }}
