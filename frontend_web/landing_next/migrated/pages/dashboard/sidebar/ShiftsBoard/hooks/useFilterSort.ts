@@ -115,26 +115,20 @@ export const useFilterSort = ({
     return groups;
   }, [shifts]);
 
+  // Parent callbacks run outside state updaters: React calls updaters during render, and a parent
+  // setState from there triggers "Cannot update a component while rendering a different component".
+  const applyFilters = (next: FilterConfig) => {
+    setFilterConfig(next);
+    onFiltersChange?.(next);
+  };
+
   const toggleFilter = (key: keyof FilterConfig, value: string) => {
-    setFilterConfig((prev) => {
-      const current = prev[key] as string[];
-      if (current.includes(value)) {
-        const next = { ...prev, [key]: current.filter((item) => item !== value) };
-        onFiltersChange?.(next);
-        return next;
-      }
-      const next = { ...prev, [key]: [...current, value] };
-      onFiltersChange?.(next);
-      return next;
-    });
+    const current = filterConfig[key] as string[];
+    applyFilters({ ...filterConfig, [key]: current.includes(value) ? current.filter((item) => item !== value) : [...current, value] });
   };
 
   const toggleBooleanFilter = (key: keyof FilterConfig) => {
-    setFilterConfig((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      onFiltersChange?.(next);
-      return next;
-    });
+    applyFilters({ ...filterConfig, [key]: !filterConfig[key] });
   };
 
   const toggleStateExpand = (state: string) => {
@@ -142,16 +136,12 @@ export const useFilterSort = ({
   };
 
   const toggleStateSelection = (cities: string[]) => {
-    setFilterConfig((prev) => {
-      const current = prev.city;
-      const allSelected = cities.every((city) => current.includes(city));
-      const nextCities = allSelected
-        ? current.filter((city) => !cities.includes(city))
-        : [...current, ...cities.filter((city) => !current.includes(city))];
-      const next = { ...prev, city: nextCities };
-      onFiltersChange?.(next);
-      return next;
-    });
+    const current = filterConfig.city;
+    const allSelected = cities.every((city) => current.includes(city));
+    const nextCities = allSelected
+      ? current.filter((city) => !cities.includes(city))
+      : [...current, ...cities.filter((city) => !current.includes(city))];
+    applyFilters({ ...filterConfig, city: nextCities });
   };
 
   const handleSortChange = (key: SortKey) => {
@@ -177,8 +167,7 @@ export const useFilterSort = ({
       accommodationProvided: false,
       bulkShiftsOnly: false,
     };
-    setFilterConfig(nextFilters);
-    onFiltersChange?.(nextFilters);
+    applyFilters(nextFilters);
   };
 
   const activeFilterCount =
