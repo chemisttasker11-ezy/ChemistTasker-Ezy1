@@ -336,3 +336,48 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
   failures; talent route checks and the visual-states audit passing.
 - **For the job (shift) boards, later:** the Next copy of `ShiftsBoard` also has public-presentation changes in
   `index.tsx` and `ShiftList.tsx` to review when the worker shift boards are revised.
+
+## Chat (2026-10-10, Messenger-grade pass)
+
+Owner asked for a detailed, elegant chat with the features people expect from Facebook Messenger. Done on the
+existing chat API only (rooms, messages, reactions, pins, edit, delete, typing over the websocket); nothing on the
+server changed. Figma: *Chat / Conversation*, *Message Hover Actions*, *Error (Send Failed)*, *Mobile Thread*.
+
+- **Look:** own messages in deep violet `#3C18A8` (was an off-brand bright blue `#2f6fec`), others on white with a
+  hairline; violet-tone avatars (were grey); magenta unread counts (were blue/red); 20px card radius, no shadow;
+  Outfit titles; 500/600 weights only. Dark mode keeps its palette, own bubble brand violet `#5222B8`.
+- **Thread:** day separators (*Today*, *Yesterday*, *Monday 6 Oct*); consecutive messages from one person within 5
+  minutes are grouped (one name, one avatar, one time, chained corners); emoji-only messages shown large without a
+  bubble; links clickable; @mentions highlighted; *New messages* divider; *Start of your conversation* at the top;
+  *Loading earlier messages* pill; skeleton bubbles while loading; empty room shows the name, *Say hello* and a
+  one-tap *Wave 👋*.
+- **Scrolling:** the view follows new messages only when you are already at the bottom (or sent it yourself); otherwise
+  a *N new messages* / *Latest messages* button appears. It used to jump to the bottom on every update, pulling you
+  away from what you were reading.
+- **Header:** avatar, *Group · 3 members* or *Direct message*, live *Priya is typing…*, pin/unpin conversation. The
+  pinned message is a violet banner that jumps to the message and has its own unpin button.
+- **Message actions:** toolbar beside the bubble (above it on phones) on hover, keyboard focus or tap (was hover-only,
+  so unreachable by keyboard or touch): react, copy text, pin/unpin, edit and delete (own) or message privately
+  (others). Reactions stay 👍 ❤️ 🔥 💩 because the server only accepts those (`backend/chat/views.py`); chips show
+  the count, highlight your own and name who reacted on hover; tapping one toggles it.
+- **Red heart:** Inter/Outfit include a text glyph for U+2764, so ❤️ rendered as a black heart. Every emoji now uses a
+  colour-emoji font stack first (`EMOJI_FONT`).
+- **Edit** happens in the composer with an *Editing message* bar, Enter to save, Esc to cancel (was a dialog).
+  **Delete** asks in a dialog that says what others will see (was `window.confirm`).
+- **Composer:** rounded field with emoji picker, attach, paste an image, or drop files anywhere on the conversation
+  (*Drop files to attach*); image thumbnails and file chips with remove; filled send button with a spinner; Shift+Enter
+  for a new line. **A failed send keeps your text** and shows *Message not sent… Try again* (it used to toast and
+  clear the box, losing the message). Failed edits and reactions now say so (they failed silently).
+- **List:** last-message time (*1:30 AM*, *Yesterday*, *Mon*, *6 Oct*), *You:* prefix, bold unread rows, pin marker;
+  rows are real keyboard targets with a labelled options button. Search on its own full-width row (it was squeezed to
+  150px). Empty: *No conversations yet* with *Start a conversation* (or what to expect for staff); filters and search
+  explain empty results with *Clear search*.
+- **Page states:** skeleton list while loading (was a bare spinner); **load error** *We couldn't load your
+  conversations* with *Try again* (a failure used to look like an empty inbox); the right panel says *Your messages*
+  with *Start a conversation* (was "Welcome to Chemist Tasker Chat", misspelling the brand).
+- **Accessibility:** names for the composer, send, attach, emoji, back, list rows and options; the thread is a live
+  log; reduced-motion respected for typing dots and shimmer.
+- Checked: 1440 and 390 (list, thread, hover toolbar, edit mode, emoji picker, send failure, empty, load error); AA
+  sweep 0 failures; all six persona chat route checks pass.
+- **Backend follow-ups (not done, need API fields):** reply-to/quote threads, *Seen* receipts (only my own last-read
+  time is sent), online presence, a wider reaction set.

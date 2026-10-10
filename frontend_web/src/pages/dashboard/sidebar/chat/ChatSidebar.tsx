@@ -1,6 +1,7 @@
 import { FC, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Typography, Button, Divider, IconButton, Tooltip, TextField, InputAdornment } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import { MessagesSquare } from 'lucide-react';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import { ChatListItem } from './ChatListItem';
@@ -666,17 +667,17 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
               width: 40,
               height: 40,
               borderRadius: '50%',
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
+              bgcolor: 'var(--ct-tone-violet-bg)',
+              color: 'var(--ct-tone-violet-fg)',
               position: 'relative',
-              '&:hover': { bgcolor: 'primary.dark' },
+              '&:hover': { bgcolor: 'var(--chat-selected)' },
             }}
             onClick={() =>
               onSelectRoom({ type: room.type === 'DM' ? 'dm' : 'group', id: room.id })
             }
             aria-label={`Open ${getDisplayName(room)}`}
           >
-            <Typography variant="button" sx={{ fontWeight: 700 }}>
+            <Typography variant="button" sx={{ fontWeight: 600 }}>
               {initials}
             </Typography>
             {(room.unread_count || 0) > 0 && (
@@ -688,10 +689,10 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
                   minWidth: 18,
                   height: 18,
                   borderRadius: '50%',
-                  bgcolor: 'error.main',
+                  bgcolor: '#C000B4',
                   color: 'common.white',
                   fontSize: '0.65rem',
-                  fontWeight: 700,
+                  fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -711,43 +712,48 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
 
   return (
     <Box className={`chatpage-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-      <Box className="sidebar-header">
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flexShrink: 1 }}>
-            <Tooltip title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="right">
-                <IconButton onClick={onToggleCollapse} className="sidebar-toggle-button" size="small">
+      <Box className="sidebar-header" sx={{ flexWrap: 'wrap', rowGap: 1.25 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: 1 }}>
+            <Tooltip title={isCollapsed ? "Show conversation list" : "Hide conversation list"} placement="right">
+                <IconButton onClick={onToggleCollapse} className="sidebar-toggle-button" size="small" aria-label={isCollapsed ? "Show conversation list" : "Hide conversation list"}>
                     <ChevronLeftIcon />
                 </IconButton>
             </Tooltip>
-            {!isCollapsed && <Typography variant="h6" fontWeight={700} noWrap>Messages</Typography>}
+            {!isCollapsed && (
+              <Typography component="h2" noWrap sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 22, color: 'var(--chat-text)' }}>
+                Messages
+              </Typography>
+            )}
         </Box>
+        {!isCollapsed && canCreateChat && (
+          <Tooltip title="Start a conversation">
+            <IconButton
+              onClick={onNewChat}
+              aria-label="Start a conversation"
+              sx={{ width: 44, height: 44, borderRadius: '12px', bgcolor: 'var(--chat-me)', color: '#fff', '&:hover': { bgcolor: '#2E1287' } }}
+            >
+                <AddIcon />
+            </IconButton>
+          </Tooltip>
+        )}
         {!isCollapsed && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <TextField
-                    size="small"
-                    placeholder="Search (Ctrl+K)"
-                    variant="outlined"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    inputRef={searchInputRef}
-                    InputProps={{
-                        startAdornment: (
-                        <InputAdornment position="start">
-                            <SearchIcon fontSize="small" />
-                        </InputAdornment>
-                        ),
-                    }}
-                    sx={{ width: '150px' }}
-                />
-                {canCreateChat && (
-                  <IconButton
-                    color="primary"
-                    onClick={onNewChat}
-                    sx={{ bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } }}
-                  >
-                      <AddIcon />
-                  </IconButton>
-                )}
-            </Box>
+            <TextField
+                size="small"
+                placeholder="Search conversations"
+                variant="outlined"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                inputRef={searchInputRef}
+                inputProps={{ 'aria-label': 'Search conversations' }}
+                InputProps={{
+                    startAdornment: (
+                    <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                    ),
+                }}
+                sx={{ flexBasis: '100%' }}
+            />
         )}
       </Box>
       {isCollapsed && unreadRooms.length > 0 && (
@@ -937,6 +943,37 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
               );
             })}
           </>
+        )}
+        {!isCollapsed &&
+          chatsToDisplay.pinnedChats.length + chatsToDisplay.groupChats.length + chatsToDisplay.dmChats.length + chatsToDisplay.shiftChats.length === 0 &&
+          !(filter === 'shift' && shiftContacts && shiftContacts.length > 0) && (
+          <Box sx={{ px: 2.5, py: 5, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 52, height: 52, borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-tone-violet-fg)' }} aria-hidden>
+              <MessagesSquare size={24} />
+            </Box>
+            <Typography sx={{ fontWeight: 600, color: 'var(--chat-text)', mt: 0.5 }}>
+              {rooms.length === 0
+                ? 'No conversations yet'
+                : searchQuery.trim()
+                  ? 'No conversations match'
+                  : filter === 'dm' ? 'No direct messages' : filter === 'group' ? 'No group chats' : 'No shift chats'}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'var(--chat-muted)', maxWidth: 260, display: rooms.length === 0 ? { xs: 'block', md: 'none' } : 'block' }}>
+              {rooms.length === 0
+                ? canCreateChat
+                  ? 'Start a group for your team or message someone directly.'
+                  : 'Messages from your pharmacy team will appear here.'
+                : searchQuery.trim()
+                  ? `Nothing found for “${searchQuery.trim()}”. Try a name or pharmacy.`
+                  : 'Switch to All to see every conversation.'}
+            </Typography>
+            {rooms.length === 0 && canCreateChat && (
+              <Button variant="contained" onClick={onNewChat} sx={{ mt: 1, minHeight: 40, display: { xs: 'inline-flex', md: 'none' } }}>Start a conversation</Button>
+            )}
+            {rooms.length > 0 && searchQuery.trim() && (
+              <Button onClick={() => setSearchQuery('')} sx={{ mt: 0.5 }}>Clear search</Button>
+            )}
+          </Box>
         )}
       </Box>
     </Box>

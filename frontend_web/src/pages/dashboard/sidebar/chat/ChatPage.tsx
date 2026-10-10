@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, FC, useCallback, SyntheticEvent } from 'react';
-import { Box, CircularProgress, Typography, Snackbar, Button } from '@mui/material';
+import { Box, Typography, Snackbar, Button } from '@mui/material';
 import Alert, { AlertColor } from '@mui/material/Alert';
-import ChatIcon from '@mui/icons-material/Chat';
+import { MessagesSquare } from 'lucide-react';
+import DashboardContentState from '../../../../components/dashboard/DashboardContentState';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useSearchParams } from 'react-router-dom';
@@ -81,6 +82,8 @@ type ChatPageProps = {
 const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
   const { user, refreshUnreadCount, isAdminUser } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [myMemberships, setMyMemberships] = useState<any[]>([]);
@@ -112,11 +115,6 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
     },
     []
   );
-
-  const getErrorMessage = useCallback((error: unknown, fallback: string) => {
-    if (error instanceof Error && error.message) return error.message;
-    return fallback;
-  }, []);
 
   const pushToast = useCallback(
     (message: string, severity: AlertColor, roomId?: number) => {
@@ -188,6 +186,7 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
   useEffect(() => {
     const loadInitial = async () => {
       setIsLoading(true);
+      setLoadFailed(false);
       try {
         const [memberships, roomsList, participants, shifts] = await Promise.all([
           fetchMyMemberships({}),
@@ -258,12 +257,13 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
         setRooms(initialRooms);
       } catch (e) {
         console.error('loadInitial error', e);
+        setLoadFailed(true);
       } finally {
         setIsLoading(false);
       }
     };
     loadInitial();
-  }, []);
+  }, [loadAttempt]);
 
 
   useEffect(() => {
@@ -565,29 +565,21 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
       pushToast('Select or create a conversation first.', 'error');
       return;
     }
-    try {
-      await sendRoomMessageService(targetRoom.id, { body });
-      // Rely on the websocket message.created event to update UI (prevents sender duplicates)
-    } catch (e) {
-      console.error('send text error', e);
-      setToast({ message: getErrorMessage(e, 'Failed to send message'), severity: 'error' });
-    }
+    // Errors reach the composer, which keeps the text and offers Try again.
+    await sendRoomMessageService(targetRoom.id, { body });
+    // Rely on the websocket message.created event to update UI (prevents sender duplicates)
   };
 
   const handleSendAttachment = async (files: File[], body?: string) => {
     if (!activeRoomId) return;
-    try {
-      const form = new FormData();
-      if (body) form.append('body', body);
-      files.forEach(file => {
-        form.append('attachment', file);
-      });
-      await sendRoomMessageService(activeRoomId, form);
-      // Rely on websocket delivery to render the attachment once created
-    } catch (e) {
-      console.error('send attachment error', e);
-      setToast({ message: getErrorMessage(e, 'Failed to send attachment'), severity: 'error' });
-    }
+    const form = new FormData();
+    if (body) form.append('body', body);
+    files.forEach(file => {
+      form.append('attachment', file);
+    });
+    // Errors reach the composer, which keeps the attachments and offers Try again.
+    await sendRoomMessageService(activeRoomId, form);
+    // Rely on websocket delivery to render the attachment once created
   };
 
   const handleLoadMore = async () => {
@@ -734,21 +726,13 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
   };
 
   const handleEditMessage = async (messageId: number, newBody: string) => {
-    try {
-      await updateMessageService(messageId, newBody);
-    } catch (e) {
-      console.error('Failed to edit message', e);
-    }
+    // Errors reach the composer's edit bar.
+    await updateMessageService(messageId, newBody);
   };
 
   const handleDeleteMessage = async (messageId: number) => {
-    if (window.confirm('Are you sure you want to delete this message? This cannot be undone.')) {
-      try {
-        await deleteMessageService(messageId);
-      } catch (e) {
-        console.error('Failed to delete message', e);
-      }
-    }
+    // The conversation panel confirms first and reports a failure.
+    await deleteMessageService(messageId);
   };
 
   const handleReact = async (messageId: number, reaction: string) => {
@@ -756,6 +740,7 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
       await reactToMessageService(messageId, reaction);
     } catch (e) {
       console.error('Failed to send reaction', e);
+      pushToast("We couldn't add that reaction. Try again.", 'error');
     }
   };
 
@@ -874,7 +859,40 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
   const showConversation = isMobile ? !!activeRoomId : true;
   const rootClassName = `chatpage-root ${isMobile && activeRoomId ? 'mobile-conversation-active' : ''} ${isSidebarCollapsed ? 'sidebar-collapsed-view' : ''}`;
 
-  if (isLoading) { return (<Box className="chatpage-loading"><CircularProgress /></Box>); }
+  if (isLoading) {
+    return (
+      <Box className="chatpage-root" aria-busy="true" aria-label="Loading conversations">
+        <Box className="chatpage-sidebar" sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Box className="chat-skeleton" sx={{ height: 28, width: 140 }} />
+          <Box className="chat-skeleton" sx={{ height: 40, mb: 1 }} />
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Box key={i} sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box className="chat-skeleton" sx={{ width: 44, height: 44, borderRadius: '50% !important', flexShrink: 0 }} />
+              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Box className="chat-skeleton" sx={{ height: 12, width: `${70 - i * 6}%` }} />
+                <Box className="chat-skeleton" sx={{ height: 10, width: `${90 - i * 8}%` }} />
+              </Box>
+            </Box>
+          ))}
+        </Box>
+        <Box className="chatpage-main" sx={{ display: { xs: 'none', md: 'flex' } }} />
+      </Box>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <Box sx={{ pt: { xs: 1, md: 4 } }}>
+        <DashboardContentState
+          kind="error"
+          title="We couldn't load your conversations"
+          description="Your messages are safe. Check your connection and try again."
+          actionLabel="Try again"
+          onAction={() => setLoadAttempt((n) => n + 1)}
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box className={rootClassName}>
@@ -943,12 +961,25 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
           />
         ) : (
           !isMobile && (
-            <Box className="chatpage-empty">
-              <ChatIcon sx={{ fontSize: 64, mb: 1, color: 'grey.400' }} />
-              <Box>
-                <Typography variant="h5" fontWeight={700} color="text.secondary">Welcome to Chemist Tasker Chat</Typography>
-                <Typography color="text.secondary" sx={{ mt: .5 }}>Select a conversation to start chatting.</Typography>
+            <Box className="chatpage-empty" sx={{ gap: 1.25 }}>
+              <Box sx={{ width: 72, height: 72, borderRadius: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-tone-violet-fg)' }} aria-hidden>
+                <MessagesSquare size={34} />
               </Box>
+              <Typography component="h2" sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 24, color: 'var(--chat-text)', mt: 1 }}>
+                {rooms.length ? 'Your messages' : 'No conversations yet'}
+              </Typography>
+              <Typography sx={{ color: 'var(--chat-muted)', maxWidth: 360 }}>
+                {rooms.length
+                  ? 'Choose a conversation to read and reply. Pin the ones you use most to keep them on top.'
+                  : canCreateChat
+                    ? 'Start a group for your pharmacy team or message someone directly.'
+                    : 'When your pharmacy team messages you, the conversation appears here.'}
+              </Typography>
+              {canCreateChat && (
+                <Button variant="contained" onClick={() => setIsModalOpen(true)} sx={{ mt: 1, minHeight: 44 }}>
+                  Start a conversation
+                </Button>
+              )}
             </Box>
           )
         )

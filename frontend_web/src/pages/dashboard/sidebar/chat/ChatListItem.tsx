@@ -5,6 +5,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import { ChatRoom } from './types';
+import { listTimeLabel } from './chatFormat';
 
 interface ChatListItemProps {
   room: ChatRoom;
@@ -121,115 +122,115 @@ export const ChatListItem: FC<ChatListItemProps> = ({
   const preview =
     (previewOverride && previewOverride.trim()) ||
     (lastMessage?.body?.trim()) ||
-    (lastMessage ? '📎 Attachment' : 'No messages yet.');
+    (lastMessage ? '📎 Attachment' : 'No messages yet');
+
+  const unread = room.unread_count || 0;
+  const fromMe = Boolean(lastMessage && room.my_membership_id && lastMessage.sender === room.my_membership_id);
+  const stamp = listTimeLabel(lastMessage?.created_at || room.updated_at);
+  const label = `${displayName}${unread ? `, ${unread} unread` : ''}${room.is_pinned ? ', pinned' : ''}`;
 
   const listItemContent = (
     <Box
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      aria-current={isActive ? 'true' : undefined}
       onClick={() => onSelect(room.id)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(room.id); }
+      }}
       sx={{
         display: 'flex',
         gap: 1.5,
         alignItems: 'center',
         px: 1.25,
-        py: 1.0,
-        borderRadius: 2,
+        py: 1.1,
+        borderRadius: '14px',
         cursor: 'pointer',
-        bgcolor: isActive ? 'action.hover' : 'transparent',
-        '&:hover': { bgcolor: 'action.hover' },
+        bgcolor: isActive ? 'var(--chat-selected)' : 'transparent',
+        '&:hover': { bgcolor: isActive ? 'var(--chat-selected)' : 'var(--chat-hover)' },
+        '&:focus-visible': { outline: '2px solid var(--ct-accent-strong)', outlineOffset: -2 },
         width: isCollapsed ? 'fit-content' : '100%',
         margin: isCollapsed ? '0 auto' : '0',
-        '&:hover .options-button': { opacity: 1 },
+        '&:hover .options-button, &:focus-within .options-button': { opacity: 1 },
       }}
       className="sidebar-item"
     >
-      <Box sx={{ position: 'relative', width: 36, height: 36, flexShrink: 0 }}>
+      <Box sx={{ position: 'relative', width: 44, height: 44, flexShrink: 0 }}>
         <Avatar
           src={avatarUrl || undefined}
           alt={displayName}
           sx={{
-            width: 36,
-            height: 36,
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            bgcolor: avatarUrl ? 'transparent' : 'primary.main',
-            color: avatarUrl ? 'text.primary' : '#fff',
-            border: avatarUrl ? '1px solid rgba(15,23,42,0.08)' : undefined,
+            width: 44,
+            height: 44,
+            fontSize: 15,
+            fontWeight: 600,
+            bgcolor: avatarUrl ? 'transparent' : 'var(--ct-tone-violet-bg)',
+            color: avatarUrl ? 'inherit' : 'var(--ct-tone-violet-fg)',
           }}
         >
           {!avatarUrl ? avatarLabel : null}
         </Avatar>
-        {isCollapsed && (room.unread_count || 0) > 0 && (
+        {isCollapsed && unread > 0 && (
           <Box
+            aria-hidden
             sx={{
-              position: 'absolute',
-              bottom: -2,
-              right: -2,
-              minWidth: '16px',
-              height: '16px',
-              px: 0.5,
-              borderRadius: '999px',
-              bgcolor: '#d32f2f',
-              color: '#fff',
-              fontSize: '10px',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid #fff',
+              position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, px: 0.5, borderRadius: '999px',
+              bgcolor: '#C000B4', color: '#fff', fontSize: 10.5, fontWeight: 600,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--chat-surface)',
             }}
           >
-            {room.unread_count}
+            {unread > 99 ? '99+' : unread}
           </Box>
         )}
       </Box>
 
       {!isCollapsed && (
-        <Box sx={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'center' }} className="meta">
+        <Box sx={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'center', gap: 0.5 }} className="meta">
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="subtitle2" noWrap sx={{ fontWeight: 700 }} className="name">
-              {displayName}
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.25 }}>
+            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+              <Typography noWrap className="name" sx={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: unread ? 600 : 500, color: 'var(--chat-text)' }}>
+                {displayName}
+              </Typography>
+              {stamp && (
+                <Typography component="span" sx={{ flexShrink: 0, fontSize: 12, color: unread ? 'var(--ct-accent-strong)' : 'var(--chat-muted)', fontWeight: unread ? 600 : 400, fontVariantNumeric: 'tabular-nums' }}>
+                  {stamp}
+                </Typography>
+              )}
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25 }}>
               <Typography
-                variant="body2"
-                color="text.secondary"
                 noWrap
                 className="preview"
-                sx={{ flexGrow: 1, marginRight: 1 }}
+                sx={{ flex: 1, minWidth: 0, fontSize: 13, color: unread ? 'var(--chat-text)' : 'var(--chat-muted)', fontWeight: unread ? 600 : 400 }}
               >
-                {preview}
+                {room.is_pinned && <PushPinIcon sx={{ fontSize: 13, mr: 0.5, verticalAlign: '-2px', color: 'var(--chat-muted)' }} aria-hidden />}
+                {fromMe && preview === lastMessage?.body?.trim() ? `You: ${preview}` : preview}
               </Typography>
-              {(room.unread_count || 0) > 0 ? (
+              {unread > 0 && (
                 <Box
+                  aria-hidden
                   sx={{
-                    minWidth: '20px',
-                    height: '20px',
-                    padding: '0 6px',
-                    borderRadius: '999px',
-                    bgcolor: '#2f6fec',
-                    color: '#fff',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    ml: 1
+                    minWidth: 20, height: 20, px: 0.75, borderRadius: '999px', bgcolor: '#C000B4', color: '#fff',
+                    fontSize: 11.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}
                 >
-                  {room.unread_count}
+                  {unread > 99 ? '99+' : unread}
                 </Box>
-              ) : null}
+              )}
             </Box>
           </Box>
-          
+
           <IconButton
-              size="small"
-              className="options-button"
-              onClick={handleOpenMenu}
-              sx={{ opacity: isActive ? 1 : 0, transition: 'opacity 0.2s', ml: 1 }}
+            className="options-button"
+            onClick={handleOpenMenu}
+            onKeyDown={(e) => e.stopPropagation()}
+            aria-label={`Options for ${displayName}`}
+            aria-haspopup="menu"
+            sx={{ opacity: isActive ? 1 : 0, transition: 'opacity 0.15s', width: 32, height: 32, color: 'var(--chat-muted)' }}
           >
-              <MoreHorizIcon />
+            <MoreHorizIcon fontSize="small" />
           </IconButton>
         </Box>
       )}
@@ -253,19 +254,19 @@ export const ChatListItem: FC<ChatListItemProps> = ({
                 handleCloseMenu();
             }}>
                 <ListItemIcon><PushPinIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>{room.is_pinned ? 'Unpin Chat' : 'Pin Chat'}</ListItemText>
+                <ListItemText>{room.is_pinned ? 'Unpin conversation' : 'Pin conversation'}</ListItemText>
             </MenuItem>
         )}
         {canShowEdit && (
           <MenuItem onClick={() => { onEdit(room); handleCloseMenu(); }}>
             <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
-            <ListItemText>Edit Group</ListItemText>
+            <ListItemText>Edit group</ListItemText>
           </MenuItem>
         )}
         {canShowDelete && (
           <MenuItem onClick={() => { onDelete(room.id, displayName); handleCloseMenu(); }} sx={{ color: 'error.main' }}>
             <ListItemIcon><DeleteIcon fontSize="small" /></ListItemIcon>
-            <ListItemText>Delete Chat</ListItemText>
+            <ListItemText>Delete conversation</ListItemText>
           </MenuItem>
         )}
       </Menu>
