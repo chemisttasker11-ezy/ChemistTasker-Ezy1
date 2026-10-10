@@ -397,9 +397,9 @@ test('worker QR clock-in uses the existing attendance contract once and renders 
   });
 
   await page.goto('/dashboard/pharmacist/attendance');
-  await page.getByRole('button', { name: 'Scan Pharmacy QR' }).click();
-  await page.getByLabel('QR Code Token').fill('smoke-qr-token');
-  await page.getByRole('button', { name: 'Confirm Clock In' }).click();
+  await page.getByRole('button', { name: 'Scan pharmacy QR' }).click();
+  await page.getByLabel('QR code').fill('smoke-qr-token');
+  await page.getByRole('button', { name: 'Clock in', exact: true }).click();
 
   await expect(page.getByRole('alert')).toContainText('Clocked in successfully at Smoke Pharmacy.');
   expect(clockInPosts).toBe(1);
@@ -434,9 +434,9 @@ test('worker QR clock-in handles server failure without duplicate submission or 
   });
 
   await page.goto('/dashboard/pharmacist/attendance');
-  await page.getByRole('button', { name: 'Scan Pharmacy QR' }).click();
-  await page.getByLabel('QR Code Token').fill('smoke-failing-token');
-  const confirm = page.getByRole('button', { name: 'Confirm Clock In' });
+  await page.getByRole('button', { name: 'Scan pharmacy QR' }).click();
+  await page.getByLabel('QR code').fill('smoke-failing-token');
+  const confirm = page.getByRole('button', { name: 'Clock in', exact: true });
   await confirm.click();
 
   await expect(page.getByRole('alert')).toContainText('Request failed with status 500');
@@ -489,9 +489,9 @@ test('worker roster acknowledgement uses the established acknowledgement endpoin
 
   await page.goto('/dashboard/pharmacist/attendance');
   await expect(page.getByRole('heading', { name: 'Smoke Pharmacy' })).toBeVisible();
-  await page.getByRole('button', { name: 'Acknowledge Shifts' }).click();
+  await page.getByRole('button', { name: 'Acknowledge week' }).click();
 
-  await expect(page.getByText('ACKNOWLEDGED', { exact: true })).toBeVisible();
+  await expect(page.getByText('Acknowledged', { exact: true })).toBeVisible();
   expect(acknowledgePosts).toBe(1);
   expect(observedAcknowledge).toEqual({
     method: 'POST',

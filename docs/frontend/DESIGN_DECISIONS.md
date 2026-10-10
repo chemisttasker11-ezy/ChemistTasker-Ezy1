@@ -217,3 +217,21 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
   platform workspace (e.g. the overview's *My Roster* shortcut). *My Roster* only exists in the internal workspace
   menu, so the shell falls back to the parent item. Fix = switch to the internal workspace when opening the roster
   (owner decision: routes unchanged for now).
+
+## Worker attendance (2026-10-10)
+
+- `PageHeader` *My attendance*; the page's own 860px centred box (offset from every other page) removed.
+- Desktop layout: clock-in status (wide) beside the kiosk PIN card; *Published shifts* below as a plain section
+  (heading + rows), so empty/error states are not cards inside cards. Mobile stacks.
+- Flat cards on theme tokens (were elevation shadows and Tailwind hexes; PIN used off-brand `#a855f7`), `IconTile`s,
+  Lucide icons. Status as one `Pill` (*Clocked in*, *On break*, *Not clocked in*) instead of a title plus an
+  all-caps chip. Shift timer in the display face with tabular figures (was a monospace costume at 800).
+- Published shifts: plain date tile, pharmacy, role pill in words, *Acknowledged* / *Not acknowledged*. One
+  *Acknowledge week* button per published week (it acknowledges the whole period; it repeated on every shift) with a
+  hover hint. The header pill counts only what needs acknowledging.
+- States: loading; **status error** (*We couldn't check whether you're clocked in*) — a failed load used to say *Not
+  clocked in*; **shifts error** with *Try again* — a failed load used to say *No published shifts yet*; empty; busy
+  spinners on break/clock/acknowledge/PIN; dialogs lock while saving; PIN confirm shows *PINs don't match yet* inline.
+- Copy in sentence case: *Scan pharmacy QR*, *Clock in* / *Clock out*, *Kiosk PIN*, *Change PIN*.
+- Checked: 1440 and 390 (not clocked in, mocked clocked in + shifts, mocked errors); AA sweep 0 failures; breadth
+  tests (QR clock-in success/failure, roster acknowledgement) updated to the new copy and passing.
