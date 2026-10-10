@@ -9,9 +9,11 @@ interface UseShiftsDataParams {
 export function useShiftsData({ selectedPharmacyId: _selectedPharmacyId, shiftId }: UseShiftsDataParams) {
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const loadShifts = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             if (shiftId != null) {
                 const detail = await fetchPosterShiftDetailService(shiftId);
@@ -23,6 +25,7 @@ export function useShiftsData({ selectedPharmacyId: _selectedPharmacyId, shiftId
         } catch (error) {
             console.error('Failed to load active shifts', error);
             setShifts([]);
+            setError('We could not load your active shifts.');
         } finally {
             setLoading(false);
         }
@@ -36,6 +39,7 @@ export function useShiftsData({ selectedPharmacyId: _selectedPharmacyId, shiftId
         shifts,
         setShifts,
         loading,
+        error,
         loadShifts,
     };
 }

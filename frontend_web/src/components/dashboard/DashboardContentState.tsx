@@ -49,14 +49,14 @@ export default function DashboardContentState({
         role="status"
         data-ct-state="loading"
         sx={{
-          borderRadius: 3,
-          borderColor: "divider",
-          bgcolor: "background.paper",
+          borderRadius: "var(--ct-card-radius)",
+          borderColor: "var(--ct-border-color)",
+          bgcolor: "var(--ct-surface-bg)",
           p: { xs: 2.25, md: compact ? 2.5 : 3 },
         }}
       >
         <Stack spacing={1.75}>
-          <Typography component="span" color="text.secondary" sx={{ fontSize: 14, fontWeight: 650 }}>
+          <Typography component="span" sx={{ fontSize: 14, fontWeight: 600, color: "var(--ct-text-secondary)" }}>
             {title}
           </Typography>
           {Array.from({ length: compact ? 2 : 3 }, (_, index) => (
@@ -66,13 +66,12 @@ export default function DashboardContentState({
                 display: "flex",
                 gap: 1.75,
                 alignItems: "center",
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 2,
+                border: "1px solid var(--ct-border-color)",
+                borderRadius: "14px",
                 p: 1.5,
               }}
             >
-              <Skeleton variant="rounded" width={44} height={44} sx={{ borderRadius: 1.5, flexShrink: 0 }} />
+              <Skeleton variant="rounded" width={44} height={44} sx={{ borderRadius: "12px", flexShrink: 0 }} />
               <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0 }}>
                 <Skeleton variant="text" width={index === 1 ? "60%" : "45%"} height={22} />
                 <Skeleton variant="text" width="75%" height={18} />
@@ -92,11 +91,11 @@ export default function DashboardContentState({
       role={isError ? "alert" : "status"}
       sx={{
         width: "100%",
-        borderRadius: 3,
-        p: { xs: 2.5, md: compact ? 3 : 4 },
+        borderRadius: "var(--ct-card-radius)",
+        p: { xs: 3, md: compact ? 3.5 : 5 },
         textAlign: "center",
-        bgcolor: "background.paper",
-        borderColor: isError ? "error.light" : "divider",
+        bgcolor: "var(--ct-surface-bg)",
+        borderColor: isError ? "var(--ct-status-red-bg)" : "var(--ct-border-color)",
       }}
     >
       <Stack alignItems="center" spacing={1.25} sx={{ maxWidth: 520, mx: "auto", minWidth: 0 }}>
@@ -105,21 +104,21 @@ export default function DashboardContentState({
           sx={{
             width: 56,
             height: 56,
-            borderRadius: "18px",
+            borderRadius: "16px",
             display: "grid",
             placeItems: "center",
-            bgcolor: isError ? "error.light" : "action.hover",
-            color: isError ? "error.dark" : "text.secondary",
-            "& svg": { fontSize: 27 },
+            bgcolor: isError ? "var(--ct-status-red-bg)" : "var(--ct-tone-violet-bg)",
+            color: isError ? "var(--ct-status-red-fg)" : "var(--ct-tone-violet-fg)",
+            "& svg": { fontSize: 26, width: 26, height: 26 },
           }}
         >
           {icon ?? (isError ? <ErrorOutlineIcon /> : actionLabel ? <SearchOffOutlinedIcon /> : <InboxOutlinedIcon />)}
         </Box>
-        <Typography component="h3" variant="h6" sx={{ fontWeight: 800, lineHeight: 1.3, overflowWrap: "anywhere" }}>
+        <Typography component="h3" sx={{ fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: 19, lineHeight: 1.3, color: "var(--ct-text-primary)", overflowWrap: "anywhere" }}>
           {title}
         </Typography>
         {description && (
-          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6, overflowWrap: "anywhere" }}>
+          <Typography sx={{ fontSize: 14, color: "var(--ct-text-secondary)", lineHeight: 1.6, overflowWrap: "anywhere" }}>
             {description}
           </Typography>
         )}
@@ -134,7 +133,7 @@ export default function DashboardContentState({
             variant={isError ? "outlined" : "contained"}
             color={isError ? "error" : "primary"}
             onClick={onAction}
-            sx={{ mt: 1, minHeight: 44, px: 2.5, borderRadius: 2 }}
+            sx={{ mt: 1, minHeight: 44, px: 2.5 }}
           >
             {actionLabel}
           </Button>

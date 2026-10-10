@@ -3,7 +3,7 @@ import {
     Container,
     Typography,
     Box,
-    CircularProgress,
+    Skeleton,
     Snackbar,
     Stack,
     IconButton,
@@ -18,6 +18,8 @@ import {
 import {
     Close as X,
 } from '@mui/icons-material';
+import { CalendarDays } from 'lucide-react';
+import DashboardContentState from '../../../../components/dashboard/DashboardContentState';
 import { useLocation, useNavigate } from 'react-router-dom';
 import apiClient from '../../../../utils/apiClient';
 import {
@@ -144,7 +146,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     );
 
     // Data hooks
-    const { shifts, setShifts, loading: shiftsLoading, loadShifts } = useShiftsData({ selectedPharmacyId, shiftId: routeShiftId });
+    const { shifts, setShifts, loading: shiftsLoading, error: shiftsError, loadShifts } = useShiftsData({ selectedPharmacyId, shiftId: routeShiftId });
     const { tabData, setTabData, loadTabDataForShift } = useTabData(shifts, selectedLevelByShift, getTabKey);
     const lastNotificationNavigationRef = React.useRef<string | null>(null);
 
@@ -842,15 +844,18 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         markSlotSeen(shiftId, slotId);
     }, [markSlotSeen]);
 
+    const postShiftRoute =
+        scopedPharmacyId != null
+            ? `/dashboard/admin/${scopedPharmacyId}/post-shift`
+            : user?.role?.startsWith('ORG_')
+                ? '/dashboard/organization/post-shift'
+                : '/dashboard/owner/post-shift';
+
     const handleEditShift = useCallback((shiftId: number) => {
-        const baseRoute =
-            scopedPharmacyId != null
-                ? `/dashboard/admin/${scopedPharmacyId}/post-shift`
-                : user?.role?.startsWith('ORG_')
-                    ? '/dashboard/organization/post-shift'
-                    : '/dashboard/owner/post-shift';
-        navigate(`${baseRoute}?edit=${shiftId}`);
-    }, [navigate, scopedPharmacyId, user?.role]);
+        navigate(`${postShiftRoute}?edit=${shiftId}`);
+    }, [navigate, postShiftRoute]);
+
+    const handlePostShift = useCallback(() => navigate(postShiftRoute), [navigate, postShiftRoute]);
 
     const isDedicatedShift = useCallback((shift: Shift) => {
         const shiftAny = shift as any;
@@ -950,16 +955,6 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         }
     }, [page, pageCount]);
 
-    if (shiftsLoading) {
-        return (
-            <Container maxWidth="xl" sx={{ py: 4, overflowX: 'hidden' }}>
-                <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
-                    <CircularProgress />
-                </Box>
-            </Container>
-        );
-    }
-
     return (
         <>
             <Container maxWidth={false} disableGutters sx={{ overflowX: 'hidden' }}>
@@ -972,10 +967,29 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     </Typography>
                 </Stack>
 
-                {shifts.length === 0 ? (
-                    <Typography variant="body1" color="text.secondary">
-                        No active shifts found.
-                    </Typography>
+                {shiftsLoading && shifts.length === 0 ? (
+                    <Stack spacing={2.5} role="status" aria-label="Loading active shifts">
+                        {[0, 1, 2].map((index) => (
+                            <Skeleton key={index} variant="rounded" height={196} sx={{ borderRadius: 'var(--ct-card-radius)' }} />
+                        ))}
+                    </Stack>
+                ) : shiftsError ? (
+                    <DashboardContentState
+                        kind="error"
+                        title="Active shifts did not load"
+                        description={`${shiftsError} Check your connection and try again.`}
+                        actionLabel="Try again"
+                        onAction={() => { void loadShifts(); }}
+                    />
+                ) : shifts.length === 0 ? (
+                    <DashboardContentState
+                        kind="empty"
+                        icon={<CalendarDays />}
+                        title="No active shifts"
+                        description="Shifts you post appear here while they are being filled."
+                        actionLabel="Post a shift"
+                        onAction={handlePostShift}
+                    />
                 ) : (
                     <Stack spacing={2.5}>
                         {visibleShifts.map((shift, idx) => {

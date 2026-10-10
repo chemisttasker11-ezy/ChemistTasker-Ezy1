@@ -1,15 +1,10 @@
 import React from 'react';
-import { Box, Stack, Divider, Chip } from '@mui/material';
-import {
-    CheckCircle as Check,
-    PersonAdd as UserCheck,
-    PersonRemove as UserX,
-    HourglassEmpty as Clock,
-    Store,
-} from '@mui/icons-material';
+import { Box, Stack } from '@mui/material';
+import { CircleCheck, Clock, UserCheck, UserX, Users } from 'lucide-react';
 import { Shift, ShiftMemberStatus } from '@chemisttasker/shared-core';
 import { StatusCard } from './StatusCard';
 import { SlotSelector } from './SlotSelector';
+import { SourceSection } from '../ShiftCentreParts';
 import { dedupeMembers, findOfferForMemberInShift } from '../../utils/candidateHelpers';
 
 interface CommunityLevelViewProps {
@@ -21,6 +16,8 @@ interface CommunityLevelViewProps {
     slotStatusCounts?: Record<number, { interested: number; assigned: number; rejected: number; noResponse: number }>;
     offers: any[];
     showSlotSelector?: boolean;
+    /** Audiences already reached inside the poster's own network, e.g. ["My Pharmacy", "Favourites"]. */
+    audienceLabels?: string[];
     onSelectSlot: (slotId: number) => void;
     onReviewCandidate: (member: ShiftMemberStatus, shiftId: number, offer: any | null, slotId: number | null) => void;
     reviewLoadingId?: number | null;
@@ -37,6 +34,7 @@ export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
     slotStatusCounts,
     offers,
     showSlotSelector = true,
+    audienceLabels,
     onSelectSlot,
     onReviewCandidate,
     reviewLoadingId,
@@ -50,7 +48,6 @@ export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
     // names vary between API payloads and double-filtering can freeze/empty the view.
     const slotMembers = dedupeMembers(members);
 
-    // Categorize members by status
     const interested = slotMembers.filter((m) => m.status === 'interested');
     const assigned = slotMembers.filter((m) => m.status === 'accepted');
     const rejected = slotMembers.filter((m) => m.status === 'rejected');
@@ -62,9 +59,11 @@ export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
         return { offer, slotId: multiSlots ? selectedSlotId : null };
     };
 
+    const reached = audienceLabels && audienceLabels.length > 0 ? audienceLabels.join(', ') : 'your team';
+    const shared = { shiftId: shift.id, onReviewCandidate, getOfferForMember, reviewLoadingId };
+
     return (
-        <Stack spacing={2}>
-            {/* Slot Selector for multi-slot shifts */}
+        <Stack spacing={3}>
             {showSlotSelector && multiSlots && (
                 <SlotSelector
                     slots={slots}
@@ -76,86 +75,69 @@ export const CommunityLevelView: React.FC<CommunityLevelViewProps> = ({
                 />
             )}
 
-            <Divider>
-                <Chip
-                    icon={<Store />}
-                    label="Community Candidates"
-                    sx={{
-                        height: 38,
-                        px: 0.75,
-                        bgcolor: '#ECFDF5',
-                        color: '#065F46',
-                        border: '1px solid #A7F3D0',
-                        boxShadow: '0 10px 22px rgba(16,185,129,.14)',
-                        fontWeight: 950,
-                        '& .MuiChip-icon': {
-                            color: '#059669',
-                            fontSize: 20,
-                        },
-                        '& .MuiChip-label': {
-                            px: 1,
-                            fontSize: { xs: 12, sm: 14 },
-                        },
-                    }}
-                />
-            </Divider>
-
-            <Box
-                sx={{
-                    display: 'grid',
-                    gridTemplateColumns: {
-                        xs: 'repeat(2, minmax(0, 1fr))',
-                        sm: 'repeat(2, minmax(0, 1fr))',
-                        lg: 'repeat(4, minmax(230px, 1fr))',
-                    },
-                    gap: { xs: 1.25, sm: 2 },
-                    alignItems: 'stretch',
-                    justifyContent: 'center',
+            <SourceSection
+                title="Your network"
+                subtitle={`Internal candidates reached through ${reached}.`}
+                tone="violet"
+                icon={<Users />}
+                count={slotMembers.length}
+                hint={{
+                    title: 'Internal candidates',
+                    body: 'People already connected to you: your team, favourites, chain or organisation. Their names are always visible.',
                 }}
             >
-                <StatusCard
-                    title="Interested"
-                    members={interested}
-                    icon={<UserCheck />}
-                    color="success"
-                    shiftId={shift.id}
-                    onReviewCandidate={onReviewCandidate}
-                    getOfferForMember={getOfferForMember}
-                    reviewLoadingId={reviewLoadingId}
-                    onBuzzWorker={onBuzzWorker}
-                    buzzLoadingOfferId={buzzLoadingOfferId}
-                />
-                <StatusCard
-                    title="Assigned"
-                    members={assigned}
-                    icon={<Check />}
-                    color="info"
-                    shiftId={shift.id}
-                    onReviewCandidate={onReviewCandidate}
-                    getOfferForMember={getOfferForMember}
-                    reviewLoadingId={reviewLoadingId}
-                />
-                <StatusCard
-                    title="Rejected"
-                    members={rejected}
-                    icon={<UserX />}
-                    color="error"
-                    shiftId={shift.id}
-                    onReviewCandidate={onReviewCandidate}
-                    getOfferForMember={getOfferForMember}
-                    reviewLoadingId={reviewLoadingId}
-                />
-                <StatusCard
-                    title="No Response"
-                    members={noResponse}
-                    icon={<Clock />}
-                    color="warning"
-                    shiftId={shift.id}
-                    onReviewCandidate={onReviewCandidate}
-                    getOfferForMember={getOfferForMember}
-                    reviewLoadingId={reviewLoadingId}
-                />
-            </Box>
+                <Box
+                    sx={{
+                        display: 'grid',
+                        // Sized by the card, not the window: 1, 2 or 4 columns.
+                        gridTemplateColumns: 'minmax(0, 1fr)',
+                        '@container (min-width: 540px)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
+                        '@container (min-width: 960px)': { gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' },
+                        gap: 1.5,
+                        alignItems: 'stretch',
+                    }}
+                >
+                    <StatusCard
+                        title="Interested"
+                        helper="Said yes. Review and assign."
+                        emptyText="No one has responded yet."
+                        members={interested}
+                        icon={<UserCheck />}
+                        tone="cyan"
+                        actionable
+                        onBuzzWorker={onBuzzWorker}
+                        buzzLoadingOfferId={buzzLoadingOfferId}
+                        {...shared}
+                    />
+                    <StatusCard
+                        title="Assigned"
+                        helper="Booked for this date."
+                        emptyText="No one assigned yet."
+                        members={assigned}
+                        icon={<CircleCheck />}
+                        tone="green"
+                        {...shared}
+                    />
+                    <StatusCard
+                        title="No reply"
+                        helper="Notified, has not answered."
+                        emptyText="Everyone notified has replied."
+                        members={noResponse}
+                        icon={<Clock />}
+                        tone="amber"
+                        {...shared}
+                    />
+                    <StatusCard
+                        title="Rejected"
+                        helper="You turned them down."
+                        emptyText="No one rejected."
+                        members={rejected}
+                        icon={<UserX />}
+                        tone="red"
+                        {...shared}
+                    />
+                </Box>
+            </SourceSection>
         </Stack>
     );
 };

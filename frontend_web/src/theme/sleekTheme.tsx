@@ -101,6 +101,14 @@ export function createSleekTheme(mode: Mode): Theme {
             "--ct-tone-cyan-fg": isLight ? "#007486" : "#7FDCE6",
             "--ct-tone-magenta-bg": isLight ? "#FCE6F8" : alpha("#D63BC4", 0.18),
             "--ct-tone-magenta-fg": isLight ? "#A3008F" : "#F09BE4",
+            // Status tones (booked / waiting / declined). Foregrounds keep >= 4.5:1 on their own tint.
+            "--ct-status-green-bg": isLight ? "#E4F5EA" : alpha("#34C27A", 0.18),
+            "--ct-status-green-fg": isLight ? "#17663A" : "#8EE0B3",
+            "--ct-status-amber-bg": isLight ? "#FDF0D9" : alpha("#F0A83A", 0.18),
+            "--ct-status-amber-fg": isLight ? "#8A4B00" : "#F6C77E",
+            "--ct-status-red-bg": isLight ? "#FDE8E7" : alpha("#F06A5E", 0.18),
+            "--ct-status-red-fg": isLight ? "#B42318" : "#F7A39B",
+            "--ct-subtle-bg": isLight ? "#F7F8FC" : alpha("#FFFFFF", 0.03),
           },
           "html, body, #root": {
             minHeight: "100%",
