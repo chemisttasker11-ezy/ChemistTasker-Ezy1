@@ -1,0 +1,83 @@
+name: Frontend Contractor Initial Export
+
+# Owner-only one-time transfer. The target private repository must be README-only.
+# Only the original private owner repository has access to FRONTEND_DEST_WRITE_TOKEN.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chemisttasker-initial-frontend-export
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout trusted owner source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: owner
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout destination through restricted token
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: chemisttasker11-ezy/ChemistTasker_Front
+          ref: main
+          path: destination
+          fetch-depth: 0
+          token: ${{ secrets.FRONTEND_DEST_WRITE_TOKEN }}
+          persist-credentials: true
+
+      - name: Verify destination is PRIVATE and empty apart from README
+        env:
+          DEST_TOKEN: ${{ secrets.FRONTEND_DEST_WRITE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$DEST_TOKEN" ]]; then echo '::error::FRONTEND_DEST_WRITE_TOKEN is missing.'; exit 1; fi
+          private="$(curl -fsS -H "Authorization: Bearer $DEST_TOKEN" -H 'Accept: application/vnd.github+json' \
+            https://api.github.com/repos/chemisttasker11-ezy/ChemistTasker_Front | jq -r '.private')"
+          if [[ "$private" != 'true' ]]; then echo '::error::Contractor repo must be PRIVATE.'; exit 1; fi
+          unexpected="$(git -C destination ls-files | grep -Ev '^(README.md|\.gitignore)$' || true)"
+          if [[ -n "$unexpected" ]]; then echo '::error::Destination contains source already; refusing initial bootstrap.'; exit 1; fi
+          unexpected_history="$(git -C destination log --all --name-only --pretty=format: | \
+            grep -Ev '^$|^(README.md|\.gitignore)$' || true)"
+          if [[ -n "$unexpected_history" ]]; then echo '::error::Destination Git history contains unexpected files.'; exit 1; fi
+
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Export allowlisted React Next Expo and shared-core source
+        shell: bash
+        run: |
+          set -euo pipefail
+          node owner/scripts/frontend-contractor-bridge.mjs export --source owner --dest snapshot
+          test ! -e snapshot/backend
+          test ! -e snapshot/.git
+          test ! -e snapshot/frontend_web/src-tauri
+          test ! -e snapshot/frontend_mobile/google-services.json
+          test ! -e snapshot/frontend_mobile/GoogleService-Info.plist
+          cp -a snapshot/. destination/
+          git -C destination add --all
+          git -C destination -c user.name='ChemistTasker Owner Automation' \
+            -c user.email='actions@users.noreply.github.com' \
+            commit -m 'Initial frontend-only ChemistTasker source snapshot'
+          node destination/scripts/check-frontend-boundary.mjs
+          printf '## Frontend export\n' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Source commit: `%s`\n\n' "$(git -C owner rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Destination files: `%s`\n\n' "$(git -C destination ls-files | wc -l)" >> "$GITHUB_STEP_SUMMARY"
+          printf 'React/Vite, Next.js, Expo mobile and shared-core only. No backend source.\n' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Push checked snapshot to PRIVATE destination
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C destination push origin HEAD:refs/heads/main
