@@ -659,7 +659,8 @@ test('pharmacist membership accept uses the existing my-memberships action endpo
 
   await page.getByRole('button', { name: 'Accept' }).click();
 
-  await expect(page.getByText('Accepted')).toBeVisible();
+  await expect(page.getByText('Active', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Accept' })).toHaveCount(0);
   expect(observed).toEqual({
     method: 'POST',
     path: '/api/v1/my-memberships/701/accept/',
