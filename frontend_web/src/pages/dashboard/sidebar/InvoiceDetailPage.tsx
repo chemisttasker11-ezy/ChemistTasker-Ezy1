@@ -1,11 +1,18 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Container, Paper, Typography, Box, TextField, MenuItem,
-  Table, TableHead, TableRow, TableCell, TableBody, Button,
-  IconButton, TableContainer, Snackbar
+  Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
+  IconButton, InputAdornment, Paper, Skeleton, Snackbar, Stack, Switch, TextField, Tooltip, Typography,
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, Close as CloseIcon } from '@mui/icons-material';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Close as CloseIcon } from '@mui/icons-material';
+import {
+  ArrowLeft, Building2, CalendarDays, Check, CheckCircle2, Copy, Download, FileText, Flag, Landmark, ListChecks, MapPin, PiggyBank, UserRound,
+} from 'lucide-react';
+import PageHeader from '../../../components/ui/PageHeader';
+import DashboardContentState from '../../../components/dashboard/DashboardContentState';
+import {
+  Facts, InvoiceSection, LineItemsEditor, LineItemsReadOnly, StatusPill, TotalsBreakdown, formatDay, invoiceStatus, money, type Totals,
+} from './Invoices/invoiceParts';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 import dayjs from 'dayjs';
@@ -17,14 +24,7 @@ dayjs.extend(utc);
 
 const GOOGLE_LIBRARIES: ('places')[] = ['places'];
 
-const CATEGORY_CHOICES = [
-  { code: 'ProfessionalServices', label: 'Professional services' },
-  { code: 'Superannuation', label: 'Superannuation' },
-  { code: 'Transportation', label: 'Transportation' },
-  { code: 'Accommodation', label: 'Accommodation' },
-  { code: 'Miscellaneous', label: 'Miscellaneous reimbursements' },
-];
-const UNIT_CHOICES = ['Hours', 'Lump Sum'];
+const pageSx = { width: '100%', maxWidth: 1240, mx: 'auto', px: { xs: 0, sm: 1.5, md: 2 }, py: { xs: 2, md: 3 } } as const;
 
 const dashboardRoleSegment = (role?: string | null) => {
   const normalized = String(role || '').toUpperCase();
@@ -37,6 +37,7 @@ const dashboardRoleSegment = (role?: string | null) => {
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const isOwner = user?.role === 'OWNER';
 
@@ -45,6 +46,11 @@ export default function InvoiceDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, msg: '' });
   const [invoice, setInvoice] = useState<any | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [actionError, setActionError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportNote, setReportNote] = useState('');
 
   // All editable fields
   const [external, setExternal] = useState(false);
@@ -143,6 +149,7 @@ export default function InvoiceDetailPage() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
+    setInvoice(null);
     getInvoiceDetail(Number(id))
       .then((data: any) => {
         setInvoice(data);
@@ -202,10 +209,10 @@ export default function InvoiceDetailPage() {
         );
       })
       .catch(() => {
-        setSnackbar({ open: true, msg: 'Failed to load invoice' });
+        setInvoice(null);
       })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, loadAttempt]);
 
   // --- Totals ---
   const subtotal = lineItems
@@ -249,12 +256,8 @@ export default function InvoiceDetailPage() {
   ) => {
     const c = [...lineItems];
     c[idx][field] = value;
-    if (field === 'start_time' || field === 'end_time') {
-      const { date, start_time, end_time } = c[idx];
-      const start = dayjs.utc(`${date}T${start_time}`).local();
-      const end = dayjs.utc(`${date}T${end_time}`).local();
-      c[idx].quantity = parseFloat(((end.valueOf() - start.valueOf()) / 3600000).toFixed(2));
-    }
+    // Start and end are for information only: paid hours (quantity) are entered directly,
+    // because an unpaid break can sit between them.
     if (field === 'category_code' && ['Transportation', 'Accommodation'].includes(value)) {
       c[idx].quantity = 1;
     }
@@ -290,6 +293,7 @@ export default function InvoiceDetailPage() {
   const handleSave = () => {
     if (!invoice) return;
     setSubmitting(true);
+    setActionError('');
     updateInvoice(Number(id), {
       // All fields for save
       external,
@@ -339,19 +343,25 @@ export default function InvoiceDetailPage() {
     }
   }, 700);
 })
-.catch(() => setSnackbar({ open: true, msg: 'Save failed' }))
+.catch((error: any) => {
+  const detail = error?.response?.data?.detail;
+  setActionError(typeof detail === 'string' && detail ? `Your changes weren't saved: ${detail}` : "Your changes weren't saved. Check your connection and try again; nothing you typed has been lost.");
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+})
 .finally(() => setSubmitting(false));
   };
 
   const handleStatusChange = (status: 'sent' | 'paid') => {
     if (!invoice) return;
     setSubmitting(true);
+    setActionError('');
+    setNotice('');
     updateInvoice(Number(id), { status } as any)
       .then((updated: any) => {
         setInvoice(updated || { ...invoice, status });
         setSnackbar({ open: true, msg: status === 'paid' ? 'Invoice marked as paid' : 'Invoice marked as unpaid' });
       })
-      .catch(() => setSnackbar({ open: true, msg: 'Status update failed' }))
+      .catch(() => setActionError(status === 'paid' ? "The invoice wasn't marked as paid. Try again." : "The invoice wasn't marked as unpaid. Try again."))
       .finally(() => setSubmitting(false));
   };
 
@@ -370,493 +380,403 @@ export default function InvoiceDetailPage() {
         link.remove();
         window.URL.revokeObjectURL(url);
       })
-      .catch(() => setSnackbar({ open: true, msg: 'Failed to download invoice PDF' }));
+      .catch(() => setActionError("The PDF didn't download. Try again in a moment."));
   };
 
   const handleReportIssue = () => {
     if (!invoice) return;
     setSubmitting(true);
-    reportInvoiceIssue(invoice.id)
-      .then(() => setSnackbar({ open: true, msg: 'Issue reported to sender' }))
-      .catch(() => setSnackbar({ open: true, msg: 'Failed to report invoice issue' }))
+    setActionError('');
+    const message = reportNote.trim();
+    reportInvoiceIssue(invoice.id, message ? { message } : {})
+      .then(() => {
+        setReportOpen(false);
+        setNotice(`Issue reported. ${`${issuerFirstName} ${issuerLastName}`.trim() || 'The sender'} has been notified.`);
+      })
+      .catch((error: any) => {
+        const detail = error?.response?.data?.detail;
+        setReportOpen(false);
+        setActionError(typeof detail === 'string' && detail ? detail : "The issue wasn't reported. Try again.");
+      })
       .finally(() => setSubmitting(false));
+  };
+
+  const copyValue = async (label: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setSnackbar({ open: true, msg: `${label} copied` });
+    } catch {
+      setSnackbar({ open: true, msg: `Couldn't copy the ${label.toLowerCase()}` });
+    }
   };
 
   
   // --- UI ---
+  const totals: Totals = {
+    subtotal,
+    transportation,
+    accommodation,
+    gst,
+    superRate: superRateSnapshot,
+    superAmount: Number(superAmount),
+    grandTotal,
+  };
+  const statusKey = String(invoice?.status || '').toLowerCase();
+  const issuerName = `${issuerFirstName} ${issuerLastName}`.trim();
+  const billToName = external ? customBillToName : `${billToFirstName} ${billToLastName}`.trim();
+  const listPath = location.pathname.replace(/\/[^/]+\/?$/, '') || `/dashboard/${dashboardRoleSegment(user?.role)}/invoice`;
+  const backLink = (
+    <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(listPath)} sx={{ minHeight: 36, ml: -1.25, mb: 1, color: 'var(--ct-text-secondary)', fontWeight: 600 }}>
+      Invoices
+    </Button>
+  );
+
   if (loading) {
     return (
-      <Container sx={{ textAlign: 'center', py: 4 }}>
-        <Typography variant="h6">Loading invoice...</Typography>
-      </Container>
+      <Box data-ct-tokens="" sx={pageSx} role="status" aria-busy="true" aria-label="Loading invoice">
+        {backLink}
+        <Skeleton width={260} height={44} />
+        <Skeleton width={340} />
+        <Stack spacing={2} sx={{ mt: 3 }}>
+          {[160, 220, 280].map((h) => <Skeleton key={h} variant="rounded" height={h} sx={{ borderRadius: 'var(--ct-card-radius)' }} />)}
+        </Stack>
+      </Box>
     );
   }
 
-  return (
-    <Container maxWidth="lg">
-      <Paper sx={{ p: 4, mt: 4 }}>
-        <Typography variant="h5" gutterBottom>
-          Invoice #{id}
-        </Typography>
-        {isOwner && (
-          <Box display="flex" gap={1} flexWrap="wrap" mt={2}>
-            {String(invoice?.status || '').toLowerCase() === 'paid' ? (
-              <Button variant="outlined" onClick={() => handleStatusChange('sent')} disabled={submitting}>
-                Mark as Unpaid
-              </Button>
-            ) : (
-              <Button
-                variant="contained"
-                onClick={() => handleStatusChange('paid')}
-                disabled={submitting || !['sent', 'pending'].includes(String(invoice?.status || '').toLowerCase())}
-              >
-                Mark as Paid
-              </Button>
-            )}
-            <Button variant="outlined" onClick={handleDownloadPdf}>
-              Download PDF
-            </Button>
-            <Button variant="outlined" color="warning" onClick={handleReportIssue} disabled={submitting}>
-              Report Issue to Sender
-            </Button>
-          </Box>
-        )}
-
-        <Box component="fieldset" disabled={isOwner} sx={{ border: 0, m: 0, p: 0 }}>
-        {/* Dates */}
-        <Box mt={3} display="flex" gap={2}>
-          <TextField
-            label="Invoice Date"
-            type="date"
-            value={invoiceDate}
-            onChange={e => setInvoiceDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            label="Due Date"
-            type="date"
-            value={dueDate}
-            onChange={e => setDueDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-        </Box>
-
-        {/* Bill-To Section */}
-        <Typography variant="h6" gutterBottom mt={4}>
-          Billing-To Details
-        </Typography>
-        <Box display="flex" gap={2} flexWrap="wrap" mb={4}>
-          {external ? (
-            <>
-              <Box flex="1 1 45%">
-                <TextField
-                  label="Bill-To Name"
-                  value={customBillToName}
-                  onChange={e => setCustomBillToName(e.target.value)}
-                  fullWidth
-                />
-              </Box>
-              <Box flex="1 1 45%">
-                {isLoaded ? (
-                  <Autocomplete
-                    onLoad={(ref) => (externalAutocompleteRef.current = ref)}
-                    onPlaceChanged={handleExternalPlaceChanged}
-                    options={{ componentRestrictions: { country: 'au' } }} 
-                  >
-                    <TextField
-                      label="Bill-To Address"
-                      value={customBillToAddress}
-                      onChange={e => setCustomBillToAddress(e.target.value)}
-                      fullWidth
-                    />
-                  </Autocomplete>
-                ) : (
-                  <TextField
-                    label="Bill-To Address"
-                    value={customBillToAddress}
-                    onChange={e => setCustomBillToAddress(e.target.value)}
-                    fullWidth
-                  />
-                )}
-              </Box>
-              <Box flex="1 1 45%">
-                <TextField
-                  label="Bill-To Email"
-                  value={billToEmail}
-                  onChange={e => setBillToEmail(e.target.value)}
-                  fullWidth
-                />
-              </Box>
-              <Box flex="1 1 45%">
-                <TextField
-                  label="Bill-To ABN"
-                  value={billToAbn}
-                  onChange={e => setBillToAbn(e.target.value)}
-                  fullWidth
-                />
-              </Box>
-            </>
-          ) : (
-            <>
-              <Box flex="1 1 30%">
-                <TextField label="Facility Name" value={pharmacyNameSnapshot} InputProps={{ readOnly: true }} fullWidth />
-              </Box>
-              <Box flex="1 1 15%">
-                <TextField label="Facility ABN" value={pharmacyAbnSnapshot} InputProps={{ readOnly: true }} fullWidth />
-              </Box>
-              <Box flex="1 1 20%">
-
-                {isLoaded ? (
-                  <Autocomplete
-                    onLoad={(ref) => (internalAutocompleteRef.current = ref)}
-                    onPlaceChanged={handleInternalPlaceChanged}
-                    options={{ componentRestrictions: { country: 'au' } }} 
-                  >
-                    <TextField
-                      label="Facility Address"
-                      value={pharmacyAddressSnapshot}
-                      onChange={e => setPharmacyAddressSnapshot(e.target.value)}
-                      fullWidth
-                    />
-                  </Autocomplete>
-                ) : (
-                  <TextField
-                    label="Facility Address"
-                    value={pharmacyAddressSnapshot}
-                    onChange={e => setPharmacyAddressSnapshot(e.target.value)}
-                    fullWidth
-                  />
-                )}
-
-              </Box>
-              {/* <Box flex="1 1 15%">
-                <TextField label="Facility State" value={pharmacyStateSnapshot} InputProps={{ readOnly: true }} fullWidth />
-              </Box> */}
-              <Box flex="1 1 30%">
-                <TextField label="Bill-To Name" value={`${billToFirstName} ${billToLastName}`} InputProps={{ readOnly: true }} fullWidth />
-              </Box>
-              <Box flex="1 1 30%">
-                <TextField label="Bill-To Email" value={billToEmail} InputProps={{ readOnly: true }} fullWidth />
-              </Box>
-            </>
-          )}
-          <Box flex="1 1 45%">
-            <TextField label="CC Emails" helperText="Comma-separated" value={ccEmails} onChange={e => setCcEmails(e.target.value)} fullWidth />
-          </Box>
-        </Box>
-
-        {/* Issuer info */}
-        <Typography variant="h6" gutterBottom>
-          Issuer Information
-        </Typography>
-        <Box display="flex" justifyContent="flex-start" mb={4}>
-          <Box>
-            <Typography>{issuerFirstName} {issuerLastName}</Typography>
-            <Typography>{issuerEmail}</Typography>
-            <Typography variant="body2">ABN: {issuerAbn}</Typography>
-          </Box>
-        </Box>
-
-        {/* GST & Super */}
-        <Typography variant="h6" gutterBottom>
-          GST Information
-        </Typography>
-        <Box display="flex" gap={2} alignItems="center" mb={4}>
-          <Box>
-            <label>
-              <input
-                type="checkbox"
-                checked={!!gstRegistered}
-                onChange={e => setGstRegistered(e.target.checked)}
-                style={{ marginRight: 8 }}
-              />
-              GST Registered
-            </label>
-          </Box>
-        </Box>
-        <Typography variant="h6" gutterBottom>
-          Superannuation
-        </Typography>
-        <Box display="flex" gap={2} flexWrap="wrap" mb={4}>
-          <Box sx={{ flex: '1 1 20%' }}>
-            <TextField
-              fullWidth
-              label="Super Rate (%)"
-              type="number"
-              value={superRateSnapshot}
-              onChange={e => setSuperRateSnapshot(Number(e.target.value))}
-            />
-          </Box>
-          <Box sx={{ flex: '1 1 40%' }}>
-            <TextField
-              fullWidth
-              label="Super Fund Name"
-              value={superFundName}
-              onChange={e => setSuperFundName(e.target.value)}
-            />
-          </Box>
-          <Box sx={{ flex: '1 1 20%' }}>
-            <TextField
-              fullWidth
-              label="Super USI"
-              value={superUsi}
-              onChange={e => setSuperUsi(e.target.value)}
-            />
-          </Box>
-          <Box sx={{ flex: '1 1 20%' }}>
-            <TextField
-              fullWidth
-              label="Member #"
-              value={superMemberNumber}
-              onChange={e => setSuperMemberNumber(e.target.value)}
-            />
-          </Box>
-        </Box>
-
-        {/* Banking */}
-        <Typography variant="h6" gutterBottom>
-          Banking Details
-        </Typography>
-        <Box display="flex" gap={2} flexWrap="wrap" mb={4}>
-          <Box sx={{ flex: '1 1 45%' }}>
-            <TextField
-              fullWidth
-              label="Account Name"
-              value={bankAccountName}
-              onChange={e => setBankAccountName(e.target.value)}
-            />
-          </Box>
-          <Box sx={{ flex: '1 1 25%' }}>
-            <TextField
-              fullWidth
-              label="BSB"
-              value={bsb}
-              onChange={e => setBsb(e.target.value)}
-            />
-          </Box>
-          <Box sx={{ flex: '1 1 25%' }}>
-            <TextField
-              fullWidth
-              label="Account Number"
-              value={accountNumber}
-              onChange={e => setAccountNumber(e.target.value)}
-            />
-          </Box>
-        </Box>
-
-        {/* Line Items Table */}
-        <Box mt={3}>
-<TableContainer sx={{ maxWidth: '100%', overflowX: 'auto' }}>
-  <Table size="medium" padding="checkbox" stickyHeader>
-    <TableHead>
-      <TableRow>
-        <TableCell align="center" sx={{ width: '20%' }}>Category</TableCell>
-        <TableCell align="center" sx={{ width: '10%' }}>Date</TableCell>
-        <TableCell align="center" sx={{ width: '10%' }}>Start</TableCell>
-        <TableCell align="center" sx={{ width: '8%'  }}>End</TableCell>
-        <TableCell align="center" sx={{ width: '5%'  }}>Hours</TableCell>
-        <TableCell align="center" sx={{ width: '5%'  }}>Unit</TableCell>
-        <TableCell align="center" sx={{ width: '20%' }}>Price</TableCell>
-        <TableCell align="center" sx={{ width: '5%'  }}>Discount</TableCell>
-        <TableCell align="center" sx={{ width: '10%' }}>Amount</TableCell>
-        <TableCell align="center" sx={{ width: '100%' }} />
-      </TableRow>
-    </TableHead>
-
-    <TableBody>
-      {lineItems.map((li, idx) => (
-        <TableRow key={li.id || idx}>
-          {/* Category (uses category_code) */}
-          <TableCell align="center">
-            <TextField
-              variant="standard"
-              select
-              size="small"
-              fullWidth
-              value={li.category_code}
-              onChange={e => updateRow(idx, 'category_code', e.target.value)}
-              disabled={li.category_code === 'Superannuation'}
-            >
-              {CATEGORY_CHOICES.map(c => (
-                <MenuItem key={c.code} value={c.code}>{c.label}</MenuItem>
-              ))}
-            </TextField>
-          </TableCell>
-
-          {/* Date/Start/End only for Professional services */}
-          {li.category_code === 'ProfessionalServices' ? (
-            <>
-              <TableCell align="center">
-                <TextField
-                  variant="standard"
-                  size="small"
-                  type="date"
-                  fullWidth
-                  value={li.date || ''}
-                  onChange={e => updateRow(idx, 'date', e.target.value)}
-                  InputProps={{ sx: { textAlign: 'center' } }}
-                />
-              </TableCell>
-
-              <TableCell align="center">
-                <TextField
-                  variant="standard"
-                  size="small"
-                  type="time"
-                  value={li.start_time?.slice(0, 5) || '00:00'}
-                  onChange={e => {
-                    const raw = e.target.value;
-                    const newVal = raw ? raw + ':00' : '00:00:00';
-                    updateRow(idx, 'start_time', newVal);
-                  }}
-                  sx={{ minWidth: 110 }}
-                  InputProps={{ sx: { textAlign: 'center' } }}
-                />
-              </TableCell>
-
-              <TableCell align="center">
-                <TextField
-                  variant="standard"
-                  size="small"
-                  type="time"
-                  value={li.end_time?.slice(0, 5) || '00:00'}
-                  onChange={e => {
-                    const raw = e.target.value;
-                    const newVal = raw ? raw + ':00' : '00:00:00';
-                    updateRow(idx, 'end_time', newVal);
-                  }}
-                  sx={{ minWidth: 110 }}
-                  InputProps={{ sx: { textAlign: 'center' } }}
-                />
-              </TableCell>
-
-              {/* Hours (read only) */}
-              <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                {Number(li.quantity || 0).toFixed(2)}
-              </TableCell>
-            </>
-          ) : (
-            <>
-              <TableCell align="center" />
-              <TableCell align="center" />
-              <TableCell align="center" />
-              {/* Transportation/Accommodation: fixed 1.00 */}
-              <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                {['Transportation', 'Accommodation'].includes(li.category_code) ? '1.00' : ''}
-              </TableCell>
-            </>
-          )}
-
-          {/* Unit */}
-          <TableCell align="center">
-            <TextField
-              variant="standard"
-              select
-              size="small"
-              fullWidth
-              value={li.unit}
-              onChange={e => updateRow(idx, 'unit', e.target.value)}
-            >
-              {UNIT_CHOICES.map(u => (
-                <MenuItem key={u} value={u}>{u}</MenuItem>
-              ))}
-            </TextField>
-          </TableCell>
-
-          {/* Price */}
-          <TableCell align="center">
-            <TextField
-              variant="standard"
-              size="small"
-              type="number"
-              inputProps={{ step: 0.01, min: 0 }}
-              value={li.unit_price}
-              onChange={e => updateRow(idx, 'unit_price', +e.target.value)}
-              disabled={li.category_code === 'Superannuation'}
-              sx={{ width: 140 }}
-              InputProps={{ sx: { textAlign: 'right', px: 0 } }}
-            />
-          </TableCell>
-
-          {/* Discount (%) */}
-          <TableCell align="center">
-            <TextField
-              variant="standard"
-              size="small"
-              type="number"
-              inputProps={{ min: 0, max: 100 }}
-              value={li.discount}
-              onChange={e => updateRow(idx, 'discount', +e.target.value)}
-              sx={{ width: 90 }}
-              InputProps={{ sx: { textAlign: 'right', px: 0 } }}
-            />
-          </TableCell>
-
-          {/* Amount (read-only) */}
-          <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-            {Number(li.total || 0).toFixed(2)}
-          </TableCell>
-
-          {/* Delete */}
-          <TableCell align="center">
-            {!isOwner && (
-              <IconButton onClick={() => removeRow(idx)} size="small">
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            )}
-          </TableCell>
-        </TableRow>
-      ))}
-    </TableBody>
-  </Table>
-</TableContainer>
-
-          <Box mt={1}>
-            {!isOwner && (
-              <Button startIcon={<AddIcon />} onClick={addRow} size="small">
-                Add Line Item
-              </Button>
-            )}
-          </Box>
-        </Box>
-
-        {/* Totals & Save */}
-        <Box mt={4} textAlign="right">
-          <Typography>Subtotal: ${Number(subtotal).toFixed(2)}</Typography>
-          <Typography>Transportation: ${Number(transportation).toFixed(2)}</Typography>
-          <Typography>Accommodation: ${Number(accommodation).toFixed(2)}</Typography>
-          <Typography>GST (10%): ${Number(gst).toFixed(2)}</Typography>
-          <Typography>Super ({superRateSnapshot}%): ${Number(superAmount).toFixed(2)}</Typography>
-          <Typography variant="h6">Grand Total: ${Number(grandTotal).toFixed(2)}</Typography>
-        </Box>
-        </Box>
-
-        {/* Save button */}
-        <Box mt={2} textAlign="right">
-          {!isOwner && (
-            <Button
-              variant="contained"
-              onClick={handleSave}
-              disabled={submitting}
-            >
-              {submitting ? 'Saving...' : 'Save Changes'}
-            </Button>
-          )}
-        </Box>
-
-        {/* Snackbar */}
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={4000}
-          onClose={() => setSnackbar({ open: false, msg: '' })}
-          message={snackbar.msg}
-          action={
-            <IconButton size="small" onClick={() => setSnackbar({ open: false, msg: '' })} color="inherit">
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          }
+  if (!invoice) {
+    return (
+      <Box data-ct-tokens="" sx={pageSx}>
+        {backLink}
+        <DashboardContentState
+          kind="error"
+          title={`Invoice #${id} can't load right now`}
+          description="This is a connection problem, or the invoice is no longer available to you. Nothing has been changed."
+          actionLabel="Try again"
+          onAction={() => setLoadAttempt((n) => n + 1)}
         />
+      </Box>
+    );
+  }
+
+  const header = (
+    <PageHeader
+      title={
+        <Stack component="span" direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap>
+          <span>Invoice #{id}</span>
+          <StatusPill status={invoice.status} dueDate={dueDate} />
+        </Stack>
+      }
+      subtitle={
+        isOwner
+          ? [issuerName && `From ${issuerName}`, dueDate && `due ${formatDay(dueDate)}`].filter(Boolean).join(' · ')
+          : [billToName && `To ${billToName}`, dueDate && `due ${formatDay(dueDate)}`].filter(Boolean).join(' · ')
+      }
+      actions={
+        isOwner ? (
+          <>
+            <Button variant="outlined" startIcon={<Download size={16} />} onClick={handleDownloadPdf} sx={{ minHeight: 44 }}>Download PDF</Button>
+            <Button variant="outlined" color="warning" startIcon={<Flag size={16} />} onClick={() => { setReportNote(''); setReportOpen(true); }} disabled={submitting} sx={{ minHeight: 44 }}>
+              Report an issue
+            </Button>
+            {statusKey === 'paid' ? (
+              <Button variant="outlined" onClick={() => handleStatusChange('sent')} disabled={submitting} sx={{ minHeight: 44 }}>Mark as unpaid</Button>
+            ) : (
+              <Tooltip title={['sent', 'pending'].includes(statusKey) ? 'Record that you have paid this invoice' : 'Only sent invoices can be marked paid'}>
+                <span>
+                  <Button
+                    variant="contained"
+                    startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <CheckCircle2 size={16} />}
+                    onClick={() => handleStatusChange('paid')}
+                    disabled={submitting || !['sent', 'pending'].includes(statusKey)}
+                    sx={{ minHeight: 44 }}
+                  >
+                    Mark as paid
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+          </>
+        ) : (
+          <Button variant="outlined" startIcon={<Download size={16} />} onClick={handleDownloadPdf} sx={{ minHeight: 44 }}>Download PDF</Button>
+        )
+      }
+    />
+  );
+
+  const notices = (
+    <Stack spacing={1.25} sx={{ mb: notice || actionError ? 2.5 : 0 }}>
+      {actionError ? <Alert severity="error" onClose={() => setActionError('')}>{actionError}</Alert> : null}
+      {notice ? <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert> : null}
+    </Stack>
+  );
+
+  const reportDialog = (
+    <Dialog open={reportOpen} onClose={() => !submitting && setReportOpen(false)} fullWidth maxWidth="sm" aria-labelledby="report-issue-title">
+      <DialogTitle id="report-issue-title" sx={{ fontWeight: 600 }}>Report an issue with invoice #{id}</DialogTitle>
+      <DialogContent sx={{ display: 'grid', gap: 2 }}>
+        <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 15, lineHeight: 1.55 }}>
+          {issuerName || 'The sender'} gets a notification so they can fix and resend the invoice. The invoice itself isn't changed.
+        </Typography>
+        <TextField
+          label="What needs fixing? (optional)"
+          placeholder="For example: the 9 October shift should be 8 hours, not 9."
+          multiline
+          minRows={3}
+          value={reportNote}
+          onChange={(e) => setReportNote(e.target.value)}
+          inputProps={{ maxLength: 1000 }}
+          fullWidth
+        />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={() => setReportOpen(false)} disabled={submitting}>Cancel</Button>
+        <Button variant="contained" onClick={handleReportIssue} disabled={submitting} startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <Flag size={16} />}>
+          {submitting ? 'Sending…' : 'Send to sender'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
+  const snack = (
+    <Snackbar
+      open={snackbar.open}
+      autoHideDuration={4000}
+      onClose={() => setSnackbar({ open: false, msg: '' })}
+      message={snackbar.msg}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      action={
+        <IconButton size="small" aria-label="Close" onClick={() => setSnackbar({ open: false, msg: '' })} color="inherit">
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      }
+    />
+  );
+
+  /* ---------- recipient (owner): a read-only invoice document ---------- */
+  if (isOwner) {
+    return (
+      <Box data-ct-tokens="" sx={pageSx}>
+        {backLink}
+        {header}
+        {notices}
+        <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 2fr) minmax(300px, 1fr)' }, alignItems: 'start' }}>
+          <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+            <InvoiceSection icon={<FileText />} tone="violet" title="Invoice">
+              <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, mb: 2.5 }}>
+                <Box>
+                  <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5, mb: 0.5 }}>From</Typography>
+                  <Typography sx={{ color: 'var(--ct-text-primary)', fontWeight: 600 }}>{issuerName || '—'}</Typography>
+                  {issuerEmail ? <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 14 }}>{issuerEmail}</Typography> : null}
+                  {issuerAbn ? <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 14 }}>ABN {issuerAbn}</Typography> : null}
+                  <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 14 }}>{gstRegistered ? 'GST registered' : 'Not GST registered'}</Typography>
+                </Box>
+                <Box>
+                  <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5, mb: 0.5 }}>Bill to</Typography>
+                  <Typography sx={{ color: 'var(--ct-text-primary)', fontWeight: 600 }}>{external ? customBillToName || '—' : pharmacyNameSnapshot || '—'}</Typography>
+                  {(external ? customBillToAddress : pharmacyAddressSnapshot) ? (
+                    <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 14 }}>{external ? customBillToAddress : pharmacyAddressSnapshot}</Typography>
+                  ) : null}
+                  {(external ? billToAbn : pharmacyAbnSnapshot) ? <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 14 }}>ABN {external ? billToAbn : pharmacyAbnSnapshot}</Typography> : null}
+                  {!external && `${billToFirstName} ${billToLastName}`.trim() ? (
+                    <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 14 }}>Attention {`${billToFirstName} ${billToLastName}`.trim()}</Typography>
+                  ) : null}
+                </Box>
+              </Box>
+              <Facts
+                columns={3}
+                items={[
+                  { label: 'Invoice date', value: formatDay(invoiceDate) },
+                  { label: 'Due date', value: formatDay(dueDate) },
+                  { label: 'Status', value: invoiceStatus(invoice.status, dueDate).label },
+                ]}
+              />
+            </InvoiceSection>
+            <InvoiceSection icon={<ListChecks />} tone="magenta" title="Line items">
+              <LineItemsReadOnly items={lineItems} />
+              <Box sx={{ mt: 2, ml: { sm: 'auto' }, maxWidth: { sm: 360 } }}>
+                <TotalsBreakdown totals={totals} gstRegistered={gstRegistered} />
+              </Box>
+            </InvoiceSection>
+          </Stack>
+          <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+            <InvoiceSection icon={<Landmark />} tone="cyan" title="Pay to">
+              <Stack spacing={1.25}>
+                {[
+                  ['Account name', bankAccountName],
+                  ['BSB', bsb],
+                  ['Account number', accountNumber],
+                ].map(([label, value]) => (
+                  <Stack key={label} direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5 }}>{label}</Typography>
+                      <Typography sx={{ color: 'var(--ct-text-primary)', fontSize: 15, fontWeight: 500, fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{value || '—'}</Typography>
+                    </Box>
+                    {value ? (
+                      <Tooltip title={`Copy ${label.toLowerCase()}`}>
+                        <IconButton aria-label={`Copy ${label.toLowerCase()}`} size="small" onClick={() => void copyValue(label, value)}>
+                          <Copy size={16} />
+                        </IconButton>
+                      </Tooltip>
+                    ) : null}
+                  </Stack>
+                ))}
+                <Box sx={{ pt: 1.25, borderTop: '1px solid var(--ct-border-color)' }}>
+                  <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5 }}>Amount due</Typography>
+                  <Typography sx={{ color: 'var(--ct-accent-strong)', fontFamily: 'var(--ct-font-display)', fontSize: 26, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{money(grandTotal)}</Typography>
+                </Box>
+              </Stack>
+            </InvoiceSection>
+            {Number(superAmount) > 0 || superFundName ? (
+              <InvoiceSection icon={<PiggyBank />} tone="magenta" title="Superannuation">
+                <Facts
+                  items={[
+                    { label: 'Rate', value: `${superRateSnapshot}%` },
+                    { label: 'Amount', value: money(superAmount) },
+                    { label: 'Fund', value: superFundName },
+                    { label: 'USI', value: superUsi },
+                    { label: 'Member number', value: superMemberNumber },
+                  ]}
+                />
+              </InvoiceSection>
+            ) : null}
+            {ccEmails ? (
+              <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 13.5, px: 0.5 }}>Copies sent to {ccEmails}</Typography>
+            ) : null}
+          </Stack>
+        </Box>
+        {reportDialog}
+        {snack}
+      </Box>
+    );
+  }
+
+  /* ---------- issuer (worker): editable invoice ---------- */
+  const autocompleteField = (
+    refHolder: { current: google.maps.places.Autocomplete | null },
+    onPlace: () => void,
+    label: string,
+    value: string,
+    onValue: (v: string) => void,
+  ) =>
+    isLoaded ? (
+      <Autocomplete onLoad={(ref) => (refHolder.current = ref)} onPlaceChanged={onPlace} options={{ componentRestrictions: { country: 'au' } }}>
+        <TextField label={label} value={value} onChange={(e) => onValue(e.target.value)} fullWidth InputProps={{ endAdornment: <InputAdornment position="end"><MapPin size={16} /></InputAdornment> }} />
+      </Autocomplete>
+    ) : (
+      <TextField label={label} value={value} onChange={(e) => onValue(e.target.value)} fullWidth />
+    );
+
+  return (
+    <Box data-ct-tokens="" sx={pageSx}>
+      {backLink}
+      {header}
+      {notices}
+      <Stack spacing={2.5}>
+        <InvoiceSection icon={<CalendarDays />} tone="violet" title="Dates">
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, minmax(0, 1fr))' } }}>
+            <TextField label="Invoice date" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth />
+            <TextField label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth />
+          </Box>
+        </InvoiceSection>
+
+        <InvoiceSection icon={<Building2 />} tone="cyan" title="Bill to">
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
+            {external ? (
+              <>
+                <TextField label="Name" value={customBillToName} onChange={(e) => setCustomBillToName(e.target.value)} fullWidth />
+                {autocompleteField(externalAutocompleteRef, handleExternalPlaceChanged, 'Address', customBillToAddress, setCustomBillToAddress)}
+                <TextField label="Email" value={billToEmail} onChange={(e) => setBillToEmail(e.target.value)} fullWidth />
+                <TextField label="ABN" value={billToAbn} onChange={(e) => setBillToAbn(e.target.value)} fullWidth />
+              </>
+            ) : (
+              <>
+                <TextField label="Pharmacy" value={pharmacyNameSnapshot} InputProps={{ readOnly: true }} helperText="From the shift" fullWidth />
+                <TextField label="Pharmacy ABN" value={pharmacyAbnSnapshot} InputProps={{ readOnly: true }} fullWidth />
+                {autocompleteField(internalAutocompleteRef, handleInternalPlaceChanged, 'Pharmacy address', pharmacyAddressSnapshot, setPharmacyAddressSnapshot)}
+                <TextField label="Attention" value={`${billToFirstName} ${billToLastName}`.trim()} InputProps={{ readOnly: true }} fullWidth />
+                <TextField label="Send to" value={billToEmail} InputProps={{ readOnly: true }} fullWidth />
+              </>
+            )}
+            <TextField label="Copy to (CC)" helperText="Separate several emails with commas" value={ccEmails} onChange={(e) => setCcEmails(e.target.value)} fullWidth />
+          </Box>
+        </InvoiceSection>
+
+        <InvoiceSection icon={<ListChecks />} tone="magenta" title="Line items">
+          <LineItemsEditor
+            items={lineItems}
+            onChange={(idx, field, value) => updateRow(idx, field, value)}
+            onAdd={addRow}
+            onRemove={removeRow}
+          />
+          <Box sx={{ mt: 2.5, ml: { sm: 'auto' }, maxWidth: { sm: 380 } }}>
+            <TotalsBreakdown totals={totals} gstRegistered={gstRegistered} />
+          </Box>
+        </InvoiceSection>
+
+        <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: '1fr 1fr' } }}>
+          <InvoiceSection icon={<UserRound />} tone="violet" title="From">
+            <Typography sx={{ color: 'var(--ct-text-primary)', fontWeight: 600 }}>{issuerName || '—'}</Typography>
+            {issuerEmail ? <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 14 }}>{issuerEmail}</Typography> : null}
+            {issuerAbn ? <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 14 }}>ABN {issuerAbn}</Typography> : null}
+            <FormControlLabel
+              sx={{ mt: 1.5 }}
+              control={<Switch checked={!!gstRegistered} onChange={(e) => setGstRegistered(e.target.checked)} />}
+              label={<Typography sx={{ fontSize: 14.5 }}>GST registered <Box component="span" sx={{ color: 'var(--ct-text-secondary)' }}>· adds 10% GST to professional services</Box></Typography>}
+            />
+          </InvoiceSection>
+          <InvoiceSection icon={<Landmark />} tone="cyan" title="Pay to">
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
+              <TextField label="Account name" value={bankAccountName} onChange={(e) => setBankAccountName(e.target.value)} fullWidth sx={{ gridColumn: '1 / -1' }} />
+              <TextField label="BSB" value={bsb} onChange={(e) => setBsb(e.target.value)} fullWidth />
+              <TextField label="Account number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} fullWidth />
+            </Box>
+          </InvoiceSection>
+        </Box>
+
+        <InvoiceSection icon={<PiggyBank />} tone="magenta" title="Superannuation">
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: '120px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr)' } }}>
+            <TextField label="Rate (%)" type="number" value={superRateSnapshot} onChange={(e) => setSuperRateSnapshot(Number(e.target.value))} fullWidth />
+            <TextField label="Fund name" value={superFundName} onChange={(e) => setSuperFundName(e.target.value)} fullWidth />
+            <TextField label="USI" value={superUsi} onChange={(e) => setSuperUsi(e.target.value)} fullWidth />
+            <TextField label="Member number" value={superMemberNumber} onChange={(e) => setSuperMemberNumber(e.target.value)} fullWidth />
+          </Box>
+        </InvoiceSection>
+
+      </Stack>
+
+      <Paper
+        elevation={0}
+        sx={{
+          position: 'sticky',
+          bottom: { xs: 8, md: 16 },
+          zIndex: 20,
+          mt: 3,
+          px: { xs: 2, md: 2.5 },
+          py: 1.25,
+          border: '1px solid var(--ct-border-color)',
+          bgcolor: 'var(--ct-surface-bg)',
+          borderRadius: 'var(--ct-card-radius)',
+          boxShadow: '0 12px 32px rgba(6, 18, 58, 0.12)',
+        }}
+      >
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 12.5 }}>Total</Typography>
+            <Typography sx={{ color: 'var(--ct-text-primary)', fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 22, fontVariantNumeric: 'tabular-nums' }}>{money(grandTotal)}</Typography>
+          </Box>
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            disabled={submitting}
+            startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <Check size={16} />}
+            sx={{ minHeight: 46, px: 3 }}
+          >
+            {submitting ? 'Saving…' : 'Save changes'}
+          </Button>
+        </Stack>
       </Paper>
-    </Container>
+      {snack}
+    </Box>
   );
 }

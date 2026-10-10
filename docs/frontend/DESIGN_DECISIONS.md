@@ -478,3 +478,14 @@ layout (cover → About → members → large composer), so they were not follow
 - **Dark mode:** a global legacy rule forced every Typography to inherit its colour, so tokenised pages lost their hierarchy. Pages built on `--ct-*` tokens now opt out with `data-ct-tokens` (PageHeader, pharmacy detail, Learning). Outlined primary buttons and error buttons got dark-mode colours that pass AA.
 - **Checks:** screenshots at 1440 and 390 of every tab, the expanded rows, dialogs, empty, error and dark states. The AA sweep passes on every tab in light and dark, and in the review dialog.
 - **Expo:** not started; left for a later pass at the owner's request.
+
+## Invoice detail (issuer and recipient)
+
+- Reference: Figma authority `m4xv…` section 15 "Invoices - Detail" (draft, sent, external bill-to, saving, saved, save failed, owner sent/paid/issue reported/marked paid, status and PDF failures, load error, loading).
+- **Two views instead of one disabled form.** The issuer (pharmacist or other staff) edits the invoice. The recipient (owner) gets a read-only invoice document: From and Bill to, dates and status, line items with their totals, *Pay to* with copy buttons for account name, BSB and account number, and the amount due. Figma showed owners a greyed-out form, which was hard to read; bank details are not masked, because the payer needs them.
+- **Order (owner's call):** Dates, Bill to, Line items, then From with Pay to, then Superannuation. A sticky bar keeps the total and Save in reach.
+- **Line items:** a table from 1400px, cards below that (no sideways scrolling on phones). There is no discount for workers: the field is hidden but kept in the data and the line-total maths, in case the marketplace needs it. The Hours readout was replaced by an editable **Quantity**. For professional services that's the paid hours, and start and end are for information only (an unpaid break can sit between them), so changing the times no longer overwrites the quantity.
+- **Status:** Draft / Sent / Paid pill, plus **Overdue** when a sent invoice is past its due date. Mark as paid is the main owner action; Mark as unpaid undoes it.
+- **Report an issue** now opens a dialog with an optional note (the existing endpoint already accepted `message`) and confirms who was notified. It used to fire on one click.
+- **States:** skeleton while loading; a load error with Try again (it used to show an empty form plus a toast); save, status and PDF failures as inline alerts in plain words (the typed changes are kept); spinners while saving.
+- AA sweep: worker view, owner view and report dialog all pass.
