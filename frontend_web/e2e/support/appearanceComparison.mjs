@@ -29,20 +29,29 @@ export function compareOutsideDateText(actualBuffer, expectedBuffer, boxes) {
 }
 export async function assertAppearanceOutsideDateText(page, testInfo, name, view) {
   const expectedBoxes = dateGeometry[view];
-  const boxes = await page.locator('input[type="date"]').evaluateAll(inputs => inputs.map(input => {
-    const { x, y, width, height } = input.getBoundingClientRect();
-    return { x, y, width, height };
-  }));
-  expect(boxes).toHaveLength(expectedBoxes.length);
-  for (let index = 0; index < boxes.length; index++) for (const key of ['x', 'y', 'width', 'height']) {
-    expect(boxes[index][key], `Date input ${index} ${key}`).toBeCloseTo(expectedBoxes[index][key], 1);
-  }
-  const actual = await page.screenshot({ animations: 'disabled', caret: 'hide' });
   const expected = await readFile(testInfo.snapshotPath(name));
-  const comparison = compareOutsideDateText(actual, expected, expectedBoxes);
-  if (comparison.pixels) {
-    await testInfo.attach('actual', { body: actual, contentType: 'image/png' });
-    await testInfo.attach('outside-date-text-diff', { body: comparison.diff, contentType: 'image/png' });
+  let actual, comparison;
+  try {
+    // Match toHaveScreenshot's bounded retry while workspace reconciliation
+    // settles. Every attempt still checks fixed geometry and all other pixels.
+    await expect(async () => {
+      const boxes = await page.locator('input[type="date"]').evaluateAll(inputs => inputs.map(input => {
+        const { x, y, width, height } = input.getBoundingClientRect();
+        return { x, y, width, height };
+      }));
+      expect(boxes).toHaveLength(expectedBoxes.length);
+      for (let index = 0; index < boxes.length; index++) for (const key of ['x', 'y', 'width', 'height']) {
+        expect(boxes[index][key], `Date input ${index} ${key}`).toBeCloseTo(expectedBoxes[index][key], 1);
+      }
+      actual = await page.screenshot({ animations: 'disabled', caret: 'hide' });
+      comparison = compareOutsideDateText(actual, expected, expectedBoxes);
+      expect(comparison.pixels, 'Appearance outside native date placeholder glyphs').toBe(0);
+    }).toPass({ timeout: 8_000, intervals: [100, 250, 500] });
+  } catch (error) {
+    if (actual && comparison) {
+      await testInfo.attach('actual', { body: actual, contentType: 'image/png' });
+      await testInfo.attach('outside-date-text-diff', { body: comparison.diff, contentType: 'image/png' });
+    }
+    throw error;
   }
-  expect(comparison.pixels, 'Appearance outside native date placeholder glyphs').toBe(0);
 }
