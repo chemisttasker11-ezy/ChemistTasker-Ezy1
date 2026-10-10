@@ -1,23 +1,37 @@
+import { finance, financeStatus, type FinanceCustomer, type FinanceExpense, type FinanceInvoice, type FinanceItem, type FinanceWorksheet } from '@chemisttasker/shared-core';
+import {
+  Alert, Box, Button, CircularProgress,
+  Divider,
+  ListItemIcon, ListItemText, Menu, MenuItem, Snackbar, Stack, Tab,
+  Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow,
+  Tabs,
+  TextField, Tooltip, Typography
+} from '@mui/material';
+import {
+  AlertTriangle, CheckCircle2, CircleDollarSign,
+  Copy, Download, FileText, History, Mail,
+  PiggyBank, Plus, RefreshCw, Send, Wallet, X
+} from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer,
-  IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Snackbar, Stack, Tab, Tabs, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, TextField, Tooltip, Typography } from '@mui/material';
-import { AlertTriangle, CheckCircle2, CircleDollarSign, Clock3, Copy, Download, FileText, History, Mail, MoreHorizontal,
-  Pencil, PiggyBank, Plus, RefreshCw, Send, Wallet, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { finance, financeStatus, type FinanceCustomer, type FinanceItem, type FinanceInvoice, type FinanceExpense, type FinanceWorksheet } from '@chemisttasker/shared-core';
-import { CustomerEditor, ItemEditor, ExpenseEditor, PaymentEditor } from './Editors';
-import InvoiceComposer from './InvoiceComposer';
-import { today, dollars, download, downloadCsv, errorMessage } from './helpers';
-import { FinanceStatusPill, InvoiceDocument, dueText } from './financeParts';
 import DashboardContentState from '../../components/dashboard/DashboardContentState';
-import { buildInvoiceStats, filterInvoicesByTimeframe, INVOICE_TIMEFRAME_OPTIONS, type InvoiceTimeframe } from '../dashboard/sidebar/Invoices/invoiceStats';
-import { formatDay } from '../dashboard/sidebar/Invoices/invoiceParts';
-import { Pill } from '../../components/ui/Pill';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import SectionCard from '../../components/ui/SectionCard';
-import PageHeader from '../../components/ui/PageHeader';
 import MetricStrip from '../../components/ui/MetricStrip';
+import PageHeader from '../../components/ui/PageHeader';
+import { Pill } from '../../components/ui/Pill';
+import SectionCard from '../../components/ui/SectionCard';
+import { formatDay } from '../dashboard/sidebar/Invoices/invoiceParts';
+import { buildInvoiceStats, filterInvoicesByTimeframe, INVOICE_TIMEFRAME_OPTIONS, type InvoiceTimeframe } from '../dashboard/sidebar/Invoices/invoiceStats';
+import { CustomerEditor, ExpenseEditor, ItemEditor, PaymentEditor } from './Editors';
+import { dollars, download, downloadCsv, errorMessage, today } from './helpers';
+import InvoiceComposer from './InvoiceComposer';
+
+import { receivedKey, receivedOrder, receivedTabs, statusKey, statusTabs, type ReceivedKey, type StatusKey } from './invoiceFilters';
+import InvoiceReviewDialog from './InvoiceReviewDialog';
+import InvoiceReviewDrawer, { type ReviewAction } from './InvoiceReviewDrawer';
+import { Empty, InvoiceRow, ReceivedInvoiceRow, rowTitle, rowMeta, amountSx } from './InvoiceRows';
+import { useFinanceData } from './useFinanceData';
 
 type Editor = { kind: 'customer'; value?: FinanceCustomer } | { kind: 'item'; value?: FinanceItem }
   | { kind: 'invoice'; value?: FinanceInvoice; prefillShiftId?: number } | { kind: 'expense'; value?: FinanceExpense }
@@ -28,65 +42,13 @@ const ownerTools = ['received'] as const;
 const labels: Record<string, string> = { invoices: 'Invoices', received: 'Received invoices', customers: 'Customers', items: 'Saved items', expenses: 'Expenses', bas: 'GST worksheet' };
 const timeframeLabel = (value: InvoiceTimeframe) => ({ '30d': 'Last 30 days', '90d': 'Last 90 days', this_year: 'This year', all: 'All time' }[value]);
 
-// Worker list filters. "Sent" covers everything sent and still owed that is not overdue or sent back.
-type StatusKey = 'all' | 'saved' | 'sent' | 'revision' | 'overdue' | 'paid';
-const statusTabs: [StatusKey, string][] = [['all', 'All'], ['saved', 'Drafts'], ['sent', 'Sent'], ['revision', 'Changes requested'], ['overdue', 'Overdue'], ['paid', 'Paid']];
-function statusKey(invoice: FinanceInvoice): StatusKey | null {
-  const status = financeStatus(invoice);
-  if (status === 'Saved') return 'saved';
-  if (status === 'Overdue') return 'overdue';
-  if (status === 'Paid') return 'paid';
-  if (status === 'Revision requested') return 'revision';
-  if (['Sent', 'Part paid', 'Approved for payment'].includes(status)) return 'sent';
-  return null;
-}
-
-// Pharmacy side: what still needs the reader's attention comes first.
-type ReceivedKey = 'all' | 'review' | 'waiting' | 'approved' | 'paid';
-const receivedTabs: [ReceivedKey, string, string][] = [
-  ['all', 'All', ''],
-  ['review', 'To review', 'Check these and approve them or ask for changes'],
-  ['waiting', 'With contractor', 'Waiting for the contractor to send a corrected or newer version'],
-  ['approved', 'Approved', 'Approved for payment, not marked paid yet'],
-  ['paid', 'Paid', 'Payment recorded'],
-];
-function receivedKey(invoice: FinanceInvoice): Exclude<ReceivedKey, 'all'> {
-  if (invoice.status === 'paid') return 'paid';
-  // A newer version is saved but unsent: nothing to act on until the contractor sends it.
-  if (invoice.review_status === 'REVISION_REQUESTED' || invoice.is_current === false) return 'waiting';
-  if (invoice.review_status === 'APPROVED_FOR_PAYMENT') return 'approved';
-  return 'review';
-}
-const receivedOrder: Record<Exclude<ReceivedKey, 'all'>, number> = { review: 0, approved: 1, waiting: 2, paid: 3 };
-
-const rowTitle = { color: 'var(--ct-text-primary)', fontWeight: 600, fontSize: 15 } as const;
-const rowMeta = { color: 'var(--ct-text-secondary)', fontSize: 13.5, lineHeight: 1.5 } as const;
-const amountSx = { color: 'var(--ct-text-primary)', fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 19, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' } as const;
-
-function Empty({ title, detail, actionLabel, onAction }: { title: string; detail: string; actionLabel?: string; onAction?: () => void }) {
-  return <DashboardContentState kind="empty" title={title} description={detail} actionLabel={actionLabel} onAction={onAction} compact />;
-}
-
-/** A note under a row: why it needs attention. */
-function RowNote({ tone, children }: { tone: 'amber' | 'neutral'; children: ReactNode }) {
-  return <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ mt: 0.75, color: tone === 'amber' ? 'var(--ct-status-amber-fg)' : 'var(--ct-text-secondary)', '& svg': { flexShrink: 0, mt: '3px' } }}>
-    {tone === 'amber' ? <AlertTriangle size={14} aria-hidden="true" /> : <Clock3 size={14} aria-hidden="true" />}
-    <Typography sx={{ fontSize: 13.5, lineHeight: 1.45, color: 'inherit', overflowWrap: 'anywhere' }}>{children}</Typography>
-  </Stack>;
-}
-
 export default function FinanceWorkspace({ receivedMode = false }: { receivedMode?: boolean }) {
   const [params, setParams] = useSearchParams();
   const availableTools = receivedMode ? ownerTools : workerTools;
   const requested = params.get('tool');
   const tool = availableTools.find(value => value === requested) || (receivedMode ? 'received' : 'invoices');
-  const [customers, setCustomers] = useState<FinanceCustomer[]>([]);
-  const [items, setItems] = useState<FinanceItem[]>([]);
-  const [invoices, setInvoices] = useState<FinanceInvoice[]>([]);
-  const [receivedInvoices, setReceivedInvoices] = useState<FinanceInvoice[]>([]);
-  const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
-  const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
-  const [loadFailed, setLoadFailed] = useState(''); const [attempt, setAttempt] = useState(0);
+  const { customers, items, invoices, receivedInvoices, expenses, loading, loadFailed, reload, retry } = useFinanceData(receivedMode);
+  const [busy, setBusy] = useState(false);
   const running = useRef(false);
   const [invoiceStatus, setInvoiceStatus] = useState<StatusKey>('all');
   const [receivedFilter, setReceivedFilter] = useState<ReceivedKey>('all');
@@ -101,42 +63,24 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const [historyInvoice, setHistoryInvoice] = useState<FinanceInvoice | null>(null);
   const [historyDocument, setHistoryDocument] = useState<FinanceInvoice | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const [reviewAction, setReviewAction] = useState<{ invoice: FinanceInvoice; kind: 'approve' | 'revise' | 'paid'; note: string } | null>(null);
+  const [reviewAction, setReviewAction] = useState<ReviewAction | null>(null);
   const [worksheet, setWorksheet] = useState<FinanceWorksheet | null>(null);
   const [periodStart, setPeriodStart] = useState(`${Number(today().slice(0, 4)) - (Number(today().slice(5, 7)) < 7 ? 1 : 0)}-07-01`);
   const [periodEnd, setPeriodEnd] = useState(today()); const [basis, setBasis] = useState<'cash' | 'accrual'>('cash');
 
-  const load = async () => {
-    if (receivedMode) {
-      const next = await finance.receivedInvoices();
-      setReceivedInvoices(next);
-      // Keep an open review in step with the refreshed list.
-      setHistoryInvoice(current => current ? next.find(invoice => invoice.id === current.id) ?? null : null);
-      return;
-    }
-    const [nextCustomers, nextItems, nextInvoices, nextExpenses] = await Promise.all([finance.customers(), finance.items(), finance.invoices(), finance.expenses()]);
-    setCustomers(nextCustomers); setItems(nextItems); setInvoices(nextInvoices); setExpenses(nextExpenses); setWorksheet(null);
-  };
+  const load = async () => { await reload(); setWorksheet(null); };
   useEffect(() => {
-    let active = true;
-    setLoading(true); setLoadFailed('');
-    const request = receivedMode
-      ? finance.receivedInvoices().then(inv => { if (active) setReceivedInvoices(inv); })
-      : Promise.all([finance.customers(), finance.items(), finance.invoices(), finance.expenses()]).then(([c, i, inv, exp]) => {
-          if (active) { setCustomers(c); setItems(i); setInvoices(inv); setExpenses(exp); }
-        });
-    request.catch(failure => { if (active) setLoadFailed(errorMessage(failure)); }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [receivedMode, attempt]);
+    if (receivedMode) setHistoryInvoice(current => current ? receivedInvoices.find(invoice => invoice.id === current.id) ?? null : null);
+  }, [receivedMode, receivedInvoices]);
   const run = async (action: () => Promise<unknown>, success = '') => {
     if (running.current) return; running.current = true; setBusy(true); setError(''); setNotice('');
     try { await action(); if (success) setNotice(success); } catch (failure) { setError(errorMessage(failure)); } finally { running.current = false; setBusy(false); }
   };
-  const refreshAfterSave = async () => {
-    // A failed list refresh must not turn a successful create into a retryable form.
-    setNotice('Saved.');
-    try { await load(); } catch (failure) { setError(`Saved, but the list didn't refresh. Use Refresh. ${errorMessage(failure)}`); }
+  const refreshAfterMutation = async (success = 'Saved.') => {
+    setNotice(success);
+    try { await load(); } catch (failure) { setError(`The change was saved, but the list didn't refresh. Use Refresh. ${errorMessage(failure)}`); }
   };
+  const refreshAfterSave = () => refreshAfterMutation();
   const copy = (label: string, value: string) => {
     navigator.clipboard.writeText(value).then(() => setToast(`${label} copied`), () => setToast(`Couldn't copy the ${label.toLowerCase()}`));
   };
@@ -148,6 +92,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const linkNew = params.get('new');
   const linkKey = `${linkInvoice ?? ''}|${linkShift ?? ''}|${linkNew ?? ''}`;
   const linkRequest = useRef(0);
+  useEffect(() => () => { linkRequest.current += 1; }, []);
   const setLink = (link: { invoice?: string | number; shift?: string | number; new?: boolean } | null) => {
     const opening = Boolean(link);
     setParams(current => {
@@ -245,71 +190,6 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
     ? (toReview ? <Pill tone="amber" label={`${toReview} to review`} title="Invoices waiting for you to approve or ask for changes" /> : null)
     : <>{overdueCount ? <Pill tone="red" label={`${overdueCount} overdue`} title="Past their due date and not paid" /> : null}{needsChanges ? <Pill tone="amber" label={`${needsChanges} need changes`} title="The pharmacy asked for a corrected invoice" /> : null}</>;
 
-  const invoiceRow = (invoice: FinanceInvoice) => {
-    const isInvoice = invoice.kind === 'invoice';
-    const partPaid = Number(invoice.paid) > 0 && Number(invoice.balance) > 0;
-    const openRequest = invoice.review_requests?.find(request => !request.resolved_at);
-    return <Box component="li" key={invoice.id} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr auto', md: 'minmax(0, 1fr) 150px auto' }, columnGap: 2, rowGap: 1, alignItems: 'center', py: 2, borderTop: '1px solid var(--ct-border-color)', '&:first-of-type': { borderTop: 'none' } }}>
-      <Box sx={{ minWidth: 0, gridColumn: { xs: '1 / -1', md: 'auto' } }}>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Typography sx={rowTitle}>{invoice.payload.customer?.name || 'No customer'}</Typography>
-          <FinanceStatusPill invoice={invoice} />
-        </Stack>
-        <Typography sx={rowMeta}>
-          {[invoice.number, isInvoice ? `Issued ${formatDay(invoice.payload.invoice_date)}` : 'Super fund request', dueText(invoice), invoice.version > 1 ? `Revision ${invoice.version}` : '', invoice.delivery_status ? `Email ${invoice.delivery_status}` : ''].filter(Boolean).join(' · ')}
-        </Typography>
-        {financeStatus(invoice) === 'Revision requested' ? <RowNote tone="amber">{openRequest ? `${openRequest.requested_by_name} asked: ${openRequest.note}` : invoice.last_review_note || 'The pharmacy asked for changes.'}</RowNote> : null}
-      </Box>
-      <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-        <Typography sx={amountSx}>{dollars(invoice.calculation.payable)}</Typography>
-        {partPaid ? <Typography sx={{ ...rowMeta, fontSize: 12.5 }}>{dollars(invoice.balance)} still owed</Typography> : null}
-      </Box>
-      <Stack direction="row" spacing={0.75} justifyContent="flex-end">
-        <Button variant="outlined" disabled={busy} startIcon={isInvoice ? <Pencil size={15} /> : <Download size={15} />} onClick={() => { if (isInvoice) viewInvoice(invoice); else void run(async () => download(await finance.pdf(invoice.id), `${invoice.number}.pdf`)); }} sx={{ minHeight: 40, minWidth: 96 }}>
-          {isInvoice ? (financeStatus(invoice) === 'Revision requested' ? 'Fix' : 'Open') : 'PDF'}
-        </Button>
-        <Tooltip title="More actions">
-          <IconButton aria-label={`More actions for ${invoice.number}`} disabled={busy} onClick={event => setMenu({ anchor: event.currentTarget, invoice })} sx={{ width: 40, height: 40, border: '1px solid var(--ct-border-color)', borderRadius: '12px' }}>
-            <MoreHorizontal size={18} />
-          </IconButton>
-        </Tooltip>
-      </Stack>
-    </Box>;
-  };
-
-  const receivedRow = (invoice: FinanceInvoice) => {
-    const historicalOnly = invoice.is_current === false;
-    const key = receivedKey(invoice);
-    return <Box component="li" key={invoice.id} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr auto', md: 'minmax(0, 1fr) 150px auto' }, columnGap: 2, rowGap: 1, alignItems: 'center', py: 2, borderTop: '1px solid var(--ct-border-color)', '&:first-of-type': { borderTop: 'none' } }}>
-      <Box sx={{ minWidth: 0, gridColumn: { xs: '1 / -1', md: 'auto' } }}>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Typography sx={rowTitle}>{invoice.payload.issuer_name || 'Contractor'}</Typography>
-          <FinanceStatusPill invoice={invoice} />
-          {historicalOnly ? <Pill outlined label="Last sent version" title="A newer version is saved but not sent yet" /> : null}
-        </Stack>
-        <Typography sx={rowMeta}>{[invoice.number, invoice.payload.customer?.name, `Issued ${formatDay(invoice.payload.invoice_date)}`, dueText(invoice)].filter(Boolean).join(' · ')}</Typography>
-        {key === 'waiting' && invoice.last_review_note ? <RowNote tone="amber">You asked: {invoice.last_review_note}</RowNote> : null}
-        {historicalOnly ? <RowNote tone="neutral">The contractor saved a newer version but hasn't sent it. You're seeing the last one they sent.</RowNote> : null}
-      </Box>
-      <Typography sx={{ ...amountSx, textAlign: { xs: 'left', md: 'right' } }}>{dollars(invoice.calculation.payable)}</Typography>
-      <Stack direction="row" spacing={0.75} justifyContent="flex-end">
-        <Button variant={key === 'review' && !historicalOnly ? 'contained' : 'outlined'} disabled={busy} startIcon={<FileText size={15} />} onClick={() => openHistory(invoice)} aria-label={`Review ${invoice.number} from ${invoice.payload.issuer_name}`} sx={{ minHeight: 40, minWidth: 112 }}>
-          {key === 'review' && !historicalOnly ? 'Review' : 'View'}
-        </Button>
-        <Tooltip title="Download PDF">
-          <IconButton aria-label={`Download ${invoice.number} PDF`} disabled={busy} onClick={() => void run(async () => download(await finance.receivedPdf(invoice.id), `${invoice.number}-v${invoice.version}.pdf`))} sx={{ width: 40, height: 40, border: '1px solid var(--ct-border-color)', borderRadius: '12px' }}>
-            <Download size={17} />
-          </IconButton>
-        </Tooltip>
-      </Stack>
-    </Box>;
-  };
-
-  const shown = historyDocument || historyInvoice;
-  const reviewInvoice = historyInvoice;
-  const reviewKey = reviewInvoice ? receivedKey(reviewInvoice) : null;
-  const historicalReview = reviewInvoice?.is_current === false;
-
   return <Box data-ct-tokens="" sx={{ maxWidth: 1600, mx: 'auto' }}>
     <PageHeader
       title="Invoices"
@@ -332,7 +212,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
       {notice && <Alert severity="success" onClose={() => setNotice('')} role="status">{notice}</Alert>}
 
       {loading ? <DashboardContentState kind="loading" title={receivedMode ? 'Loading received invoices' : 'Loading your invoices'} /> : loadFailed ? (
-        <DashboardContentState kind="error" title={receivedMode ? "Received invoices didn't load" : "Your invoices didn't load"} description={`Nothing has changed. Check your connection and try again. (${loadFailed})`} actionLabel="Try again" onAction={() => setAttempt(n => n + 1)} />
+        <DashboardContentState kind="error" title={receivedMode ? "Received invoices didn't load" : "Your invoices didn't load"} description={`Nothing has changed. Check your connection and try again. (${loadFailed})`} actionLabel="Try again" onAction={retry} />
       ) : <>
         {tool === 'invoices' && <>
           {invoices.length ? <Stack spacing={1.25}>
@@ -364,7 +244,9 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
                 {filtersActive ? <Button onClick={resetFilters} startIcon={<X size={15} />} sx={{ justifySelf: 'start' }}>Clear filters</Button> : <span />}
               </Box>
               {visibleInvoices.length
-                ? <Box component="ul" aria-label="Invoices" aria-busy={busy} sx={{ listStyle: 'none', m: 0, p: 0 }}>{visibleInvoices.map(invoiceRow)}</Box>
+                ? <Box component="ul" aria-label="Invoices" aria-busy={busy} sx={{ listStyle: 'none', m: 0, p: 0 }}>{visibleInvoices.map(invoice => <InvoiceRow key={invoice.id} invoice={invoice} busy={busy} viewInvoice={viewInvoice}
+                    onPdf={value => void run(async () => download(await finance.pdf(value.id), `${value.number}.pdf`))}
+                    onMenu={(anchor, value) => setMenu({ anchor, invoice: value })} />)}</Box>
                 : <Empty title="No invoices match" detail="Change the status, customer, dates or search to see more." actionLabel="Clear filters" onAction={resetFilters} />}
             </> : <Empty title="No invoices yet" detail="Create one from a shift you worked, or start a blank invoice. Nothing is emailed until you choose to send it." actionLabel="New invoice" onAction={() => setLink({ new: true })} />}
           </SectionCard>
@@ -377,7 +259,8 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
             </Tabs>
             <TextField size="small" label="Search" placeholder="Contractor, number or reference" value={search} onChange={event => setSearch(event.target.value)} sx={{ mb: 1, maxWidth: { md: 420 } }} />
             {visibleReceived.length
-              ? <Box component="ul" aria-label="Received invoices" aria-busy={busy} sx={{ listStyle: 'none', m: 0, p: 0 }}>{visibleReceived.map(receivedRow)}</Box>
+              ? <Box component="ul" aria-label="Received invoices" aria-busy={busy} sx={{ listStyle: 'none', m: 0, p: 0 }}>{visibleReceived.map(invoice => <ReceivedInvoiceRow key={invoice.id} invoice={invoice} busy={busy} openHistory={openHistory}
+                  onPdf={value => void run(async () => download(await finance.receivedPdf(value.id), `${value.number}-v${value.version}.pdf`))} />)}</Box>
               : <Empty title="Nothing here" detail={search ? 'No invoices match your search.' : 'No invoices are in this group right now.'} actionLabel={search ? 'Clear search' : 'Show all'} onAction={() => { setSearch(''); setReceivedFilter('all'); }} />}
           </> : <Empty title="No invoices yet" detail="When a locum or contractor sends an invoice for a shift at your pharmacy, it appears here for you to check and approve." />}
         </SectionCard>}
@@ -395,14 +278,14 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
                 </Box>
                 <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
                   <Button variant="outlined" onClick={() => setEditor({ kind: 'customer', value: customer })}>Edit</Button>
-                  <Tooltip title={customer.abn ? 'Look up this ABN on the Australian Business Register' : 'Add an ABN first'}><span><Button disabled={!customer.abn || busy} onClick={() => void run(async () => { await finance.lookupAbn(customer.id); await load(); }, 'ABN details fetched. Check the business name matches; a lookup does not prove who owns the ABN.')}>Check ABN</Button></span></Tooltip>
+                  <Tooltip title={customer.abn ? 'Look up this ABN on the Australian Business Register' : 'Add an ABN first'}><span><Button disabled={!customer.abn || busy} onClick={() => void run(async () => { await finance.lookupAbn(customer.id); await refreshAfterMutation(); }, 'ABN details fetched. Check the business name matches; a lookup does not prove who owns the ABN.')}>Check ABN</Button></span></Tooltip>
                 </Stack>
               </Stack>
             </Box>)}</Box>
           </> : <Empty title="No customers yet" detail="Save each pharmacy or business you bill once: legal name, ABN, invoice email and payment terms." actionLabel="Add customer" onAction={() => setEditor({ kind: 'customer' })} />}
         </SectionCard>}
 
-        {tool === 'items' && <SectionCard dense title="Saved items" action={<Stack direction="row" spacing={1}>{!items.length && <Button disabled={busy} onClick={() => void run(async () => { await finance.seedItems(); await load(); }, 'Starter items added. Check the rates and GST before you use them.')}>Add starter items</Button>}<Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => setEditor({ kind: 'item' })}>Add item</Button></Stack>}>
+        {tool === 'items' && <SectionCard dense title="Saved items" action={<Stack direction="row" spacing={1}>{!items.length && <Button disabled={busy} onClick={() => void run(async () => { await finance.seedItems(); await refreshAfterMutation(); }, 'Starter items added. Check the rates and GST before you use them.')}>Add starter items</Button>}<Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => setEditor({ kind: 'item' })}>Add item</Button></Stack>}>
           {items.length ? <TableContainer><Table aria-label="Saved items"><TableHead><TableRow><TableCell>Item</TableCell><TableCell>Category</TableCell><TableCell align="right">Price</TableCell><TableCell>GST and super</TableCell><TableCell /></TableRow></TableHead>
             <TableBody>{items.filter(item => matches(item.code, item.name, item.category)).map(item => <TableRow key={item.id}>
               <TableCell><Typography sx={{ ...rowTitle, fontSize: 14 }}>{item.name}</Typography><Typography sx={{ ...rowMeta, fontSize: 12.5 }}>{item.code}{!item.active ? ' · Archived' : ''}</Typography></TableCell>
@@ -426,7 +309,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ flexShrink: 0 }}>
                 <Typography sx={{ ...amountSx, fontSize: 17, mr: 1 }}>{dollars(expense.amount)}</Typography>
                 <Button variant="outlined" onClick={() => setEditor({ kind: 'expense', value: expense })}>Edit</Button>
-                <Button component="label" disabled={busy}>Attach receipt<input type="file" hidden accept="application/pdf,image/png,image/jpeg" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void run(async () => { await finance.uploadReceipt(expense.id, file, file.name); await load(); }, 'Receipt attached.'); }} /></Button>
+                <Button component="label" disabled={busy}>Attach receipt<input type="file" hidden accept="application/pdf,image/png,image/jpeg" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void run(async () => { await finance.uploadReceipt(expense.id, file, file.name); await refreshAfterMutation(); }, 'Receipt attached.'); }} /></Button>
               </Stack>
             </Stack>
           </Box>)}</Box> : <Empty title="No expenses yet" detail="Record travel, accommodation, registration, training and other business costs, with their receipts." actionLabel="Add expense" onAction={() => setEditor({ kind: 'expense' })} />}
@@ -465,100 +348,36 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
         return [
           item(<History size={17} />, 'History', () => openHistory(invoice)),
           item(<Download size={17} />, 'Download PDF', () => { setMenu(null); void run(async () => download(await finance.pdf(invoice.id), `${invoice.number}.pdf`)); }),
-          item(<Mail size={17} />, 'Email to customer', () => ask({ title: `Email ${invoice.number} to ${invoice.payload.customer?.name || 'the customer'}?`, body: `The saved PDF (revision ${invoice.version}) goes to ${invoice.payload.customer?.email || 'the customer, but no invoice email is saved for them'}. If you change it later, you can send the new revision.`, confirmLabel: 'Send email', busyLabel: 'Sending…', action: async () => { const result = await finance.send(invoice.id, invoice.version); setNotice(result.detail); await load(); } })),
-          item(<Copy size={17} />, 'Duplicate', () => { const key = crypto.randomUUID(); ask({ title: `Duplicate ${invoice.number}?`, body: 'Creates a new draft with the same customer and lines. Shift links, payments and email history are not copied.', confirmLabel: 'Duplicate', busyLabel: 'Duplicating…', action: async () => { const result = await finance.duplicate(invoice.id, key); await load(); setLink({ invoice: result.id }); } }); }, !isInvoice),
+          item(<Mail size={17} />, 'Email to customer', () => ask({ title: `Email ${invoice.number} to ${invoice.payload.customer?.name || 'the customer'}?`, body: `The saved PDF (revision ${invoice.version}) goes to ${invoice.payload.customer?.email || 'the customer, but no invoice email is saved for them'}. If you change it later, you can send the new revision.`, confirmLabel: 'Send email', busyLabel: 'Sending…', action: async () => { const result = await finance.send(invoice.id, invoice.version); await refreshAfterMutation(result.detail); } })),
+          item(<Copy size={17} />, 'Duplicate', () => { const key = crypto.randomUUID(); ask({ title: `Duplicate ${invoice.number}?`, body: 'Creates a new draft with the same customer and lines. Shift links, payments and email history are not copied.', confirmLabel: 'Duplicate', busyLabel: 'Duplicating…', action: async () => { const result = await finance.duplicate(invoice.id, key); await refreshAfterMutation(); setLink({ invoice: result.id }); } }); }, !isInvoice),
           <Divider key="divider" />,
-          item(<CheckCircle2 size={17} />, 'Mark as paid', () => ask({ title: `Mark ${invoice.number} as paid?`, body: 'Use this when the full amount has arrived. You can still edit the invoice later if something needs correcting.', confirmLabel: 'Mark as paid', busyLabel: 'Saving…', action: async () => { await finance.markPaid(invoice.id, invoice.version); await load(); } }), invoice.status === 'paid'),
+          item(<CheckCircle2 size={17} />, 'Mark as paid', () => ask({ title: `Mark ${invoice.number} as paid?`, body: 'Use this when the full amount has arrived. You can still edit the invoice later if something needs correcting.', confirmLabel: 'Mark as paid', busyLabel: 'Saving…', action: async () => { await finance.markPaid(invoice.id, invoice.version); await refreshAfterMutation(); } }), invoice.status === 'paid'),
           item(<CircleDollarSign size={17} />, 'Record a payment', () => { setEditor({ kind: 'payment', value: invoice }); setMenu(null); }, Number(invoice.balance || '0') <= 0, Number(invoice.balance || '0') <= 0 ? 'Nothing owed' : 'Optional, for part payments'),
-          item(<PiggyBank size={17} />, 'Create super request', () => ask({ title: 'Create a separate super request?', body: 'Creates a linked request for the super amount, paid to your fund. Your service payment stays separate.', confirmLabel: 'Create request', busyLabel: 'Creating…', action: async () => { await finance.superDocument(invoice.id, invoice.version); await load(); } }), !isInvoice || invoice.payload.super_mode !== 'separate' || Boolean(invoice.super_document_id), invoice.super_document_id ? 'Already created' : invoice.payload.super_mode !== 'separate' ? 'Set super to "separate" first' : undefined),
+          item(<PiggyBank size={17} />, 'Create super request', () => ask({ title: 'Create a separate super request?', body: 'Creates a linked request for the super amount, paid to your fund. Your service payment stays separate.', confirmLabel: 'Create request', busyLabel: 'Creating…', action: async () => { await finance.superDocument(invoice.id, invoice.version); await refreshAfterMutation(); } }), !isInvoice || invoice.payload.super_mode !== 'separate' || Boolean(invoice.super_document_id), invoice.super_document_id ? 'Already created' : invoice.payload.super_mode !== 'separate' ? 'Set super to "separate" first' : undefined),
         ];
       })()}
     </Menu>
 
-    <Drawer anchor="right" open={Boolean(historyInvoice)} onClose={closeHistory} PaperProps={{ 'data-ct-tokens': '', sx: { width: { xs: '100%', sm: 680 }, bgcolor: 'var(--ct-page-bg)', backgroundImage: 'none' } } as object} aria-labelledby="finance-review-title">
-      {reviewInvoice && shown && <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
-        <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 2, borderBottom: '1px solid var(--ct-border-color)', bgcolor: 'var(--ct-surface-bg)' }}>
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography id="finance-review-title" component="h2" sx={{ color: 'var(--ct-text-primary)', fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 24 }}>{reviewInvoice.number}</Typography>
-              <FinanceStatusPill invoice={reviewInvoice} />
-            </Stack>
-            <Typography sx={rowMeta}>{receivedMode ? `From ${reviewInvoice.payload.issuer_name}` : `To ${reviewInvoice.payload.customer?.name || 'customer'}`} · {dollars(reviewInvoice.calculation.payable)} · {dueText(reviewInvoice)}</Typography>
-          </Box>
-          <IconButton aria-label="Close" onClick={closeHistory} disabled={busy} sx={{ width: 44, height: 44 }}><X size={20} /></IconButton>
-        </Stack>
-        <Stack spacing={2} sx={{ px: { xs: 2, sm: 3 }, py: 2.5, flex: 1 }}>
-          {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
-          {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
-          {historicalReview && <Alert severity="info">The contractor saved a newer version but hasn't sent it yet. This is the last one they sent, so it can't be approved or changed here.</Alert>}
-          {receivedMode && reviewKey === 'waiting' && reviewInvoice.last_review_note ? <Alert severity="warning">You asked for changes: {reviewInvoice.last_review_note}</Alert> : null}
-          {!receivedMode && reviewInvoice.has_unsent_revision && <Alert severity="info">You have a newer saved version that hasn't been sent. The pharmacy only sees sent versions.</Alert>}
-          {historyDocument && <Alert severity="info" action={<Button color="inherit" onClick={() => setHistoryDocument(null)}>Show current</Button>}>You're looking at revision {historyDocument.version}.</Alert>}
-          <InvoiceDocument invoice={shown} onCopy={copy} />
-          <SectionCard dense title="History">
-            {reviewInvoice.revisions?.length ? <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
-              {reviewInvoice.revisions.map(revision => <Stack component="li" key={revision.version} direction="row" alignItems="center" spacing={1} sx={{ py: 1.25, borderTop: '1px solid var(--ct-border-color)', '&:first-of-type': { borderTop: 'none' } }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ ...rowTitle, fontSize: 14 }}>Revision {revision.version}{historyDocument?.version === revision.version ? ' · showing' : ''}</Typography>
-                  <Typography sx={{ ...rowMeta, fontSize: 12.5 }}>{[revision.invoice_status.replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase()), new Date(revision.created_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }), dollars(revision.calculation.payable)].join(' · ')}</Typography>
-                </Box>
-                <Button disabled={busy} onClick={() => openRevision(reviewInvoice, revision.version)}>View</Button>
-                <Tooltip title="Download this revision"><IconButton aria-label={`Download revision ${revision.version} PDF`} disabled={busy} onClick={() => downloadRevision(reviewInvoice, revision.version)} sx={{ width: 40, height: 40 }}><Download size={17} /></IconButton></Tooltip>
-              </Stack>)}
-            </Box> : <Typography sx={rowMeta}>No earlier revisions.</Typography>}
-          </SectionCard>
-        </Stack>
-        <Stack direction={{ xs: 'column-reverse', sm: 'row' }} spacing={1} justifyContent="flex-end" sx={{ position: 'sticky', bottom: 0, px: { xs: 2, sm: 3 }, py: 1.75, borderTop: '1px solid var(--ct-border-color)', bgcolor: 'var(--ct-surface-bg)' }}>
-          {receivedMode ? <>
-            <Button variant="outlined" disabled={busy || historicalReview || reviewInvoice.status === 'paid'} onClick={() => setReviewAction({ invoice: reviewInvoice, kind: 'paid', note: '' })} sx={{ minHeight: 44 }}>Mark as paid</Button>
-            <Button variant="outlined" color="warning" disabled={busy || historicalReview} onClick={() => setReviewAction({ invoice: reviewInvoice, kind: 'revise', note: '' })} sx={{ minHeight: 44 }}>Ask for changes</Button>
-            <Tooltip title={reviewInvoice.status === 'paid' ? 'Already paid' : reviewKey === 'approved' ? 'Already approved' : ''}><span style={{ display: 'flex' }}>
-              <Button fullWidth variant="contained" startIcon={<CheckCircle2 size={16} />} disabled={busy || historicalReview || reviewKey === 'approved' || reviewInvoice.status === 'paid'} onClick={() => setReviewAction({ invoice: reviewInvoice, kind: 'approve', note: '' })} sx={{ minHeight: 44 }}>Approve for payment</Button>
-            </span></Tooltip>
-          </> : <>
-            <Button variant="outlined" startIcon={<Download size={15} />} disabled={busy} onClick={() => void run(async () => download(await finance.pdf(reviewInvoice.id), `${reviewInvoice.number}.pdf`))} sx={{ minHeight: 44 }}>Download PDF</Button>
-            {reviewInvoice.kind === 'invoice' && <Button variant="contained" startIcon={<Pencil size={15} />} onClick={() => { const value = reviewInvoice; closeHistory(); viewInvoice(value); }} sx={{ minHeight: 44 }}>Open invoice</Button>}
-          </>}
-        </Stack>
-      </Box>}
-    </Drawer>
+    <InvoiceReviewDrawer reviewInvoice={historyInvoice} historyDocument={historyDocument} receivedMode={receivedMode} busy={busy} error={error} notice={notice}
+      onClose={closeHistory} clearError={() => setError('')} clearNotice={() => setNotice('')} clearDocument={() => setHistoryDocument(null)}
+      copy={copy} openRevision={openRevision} downloadRevision={downloadRevision} onReview={setReviewAction}
+      onPdf={value => void run(async () => download(await finance.pdf(value.id), `${value.number}.pdf`))}
+      onOpenInvoice={value => { closeHistory(); viewInvoice(value); }} />
 
     {editor?.kind === 'customer' && <CustomerEditor initial={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
     {editor?.kind === 'item' && <ItemEditor initial={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
     {editor?.kind === 'expense' && <ExpenseEditor initial={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
     {editor?.kind === 'payment' && <PaymentEditor invoice={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
 
-    <Dialog open={Boolean(reviewAction)} onClose={() => { if (!busy) setReviewAction(null); }} maxWidth="sm" fullWidth aria-labelledby="finance-review-action-title">
-      {reviewAction && (() => {
-        const { invoice, kind } = reviewAction; const who = invoice.payload.issuer_name || 'the contractor';
-        const copyFor = {
-          approve: { title: `Approve ${invoice.number} for payment?`, body: `This records that the invoice is correct. Pay ${dollars(invoice.calculation.payable)} to the account on the invoice, then mark it paid.`, label: 'Approve for payment', busyLabel: 'Approving…', done: 'Invoice approved for payment.' },
-          revise: { title: `Ask ${who} for changes?`, body: `Say what needs fixing. ${who} gets your note and sends a corrected version; this one stays in the history.`, label: 'Send request', busyLabel: 'Sending…', done: `Change request sent to ${who}.` },
-          paid: { title: `Mark ${invoice.number} as paid?`, body: 'Do this once the money has left your account.', label: 'Mark as paid', busyLabel: 'Saving…', done: 'Invoice marked as paid.' },
-        }[kind];
-        return <>
-          <DialogTitle id="finance-review-action-title" sx={{ fontWeight: 600 }}>{copyFor.title}</DialogTitle>
-          <DialogContent>
-            <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 15, lineHeight: 1.55, mb: 2 }}>{copyFor.body}</Typography>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            <TextField autoFocus fullWidth multiline minRows={3} required={kind === 'revise'} disabled={busy}
-              label={kind === 'revise' ? 'What needs changing?' : 'Note (optional)'}
-              placeholder={kind === 'revise' ? 'For example: the 9 October shift finished at 4pm, so 7.5 hours.' : undefined}
-              helperText={kind === 'revise' ? 'Required. Hours, finish time, rate, items or GST.' : undefined}
-              value={reviewAction.note} onChange={event => setReviewAction(current => current ? { ...current, note: event.target.value } : null)} />
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2.5 }}>
-            <Button disabled={busy} onClick={() => setReviewAction(null)}>Cancel</Button>
-            <Button variant="contained" color={kind === 'revise' ? 'warning' : 'primary'} disabled={busy || (kind === 'revise' && !reviewAction.note.trim())} startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={() => void run(async () => {
-              if (kind === 'revise') await finance.requestRevision(invoice.id, invoice.version, reviewAction.note.trim());
-              else if (kind === 'paid') await finance.markReceivedPaid(invoice.id, invoice.version, reviewAction.note.trim());
-              else await finance.approveForPayment(invoice.id, invoice.version, reviewAction.note.trim());
-              setReviewAction(null); await load();
-            }, copyFor.done)}>{busy ? copyFor.busyLabel : copyFor.label}</Button>
-          </DialogActions>
-        </>;
-      })()}
-    </Dialog>
+    <InvoiceReviewDialog action={reviewAction} busy={busy} error={error} onClose={() => { if (!busy) setReviewAction(null); }}
+      onNote={note => setReviewAction(current => current ? { ...current, note } : null)}
+      onConfirm={(action, success) => void run(async () => {
+        const { invoice, kind, note } = action;
+        if (kind === 'revise') await finance.requestRevision(invoice.id, invoice.version, note.trim());
+        else if (kind === 'paid') await finance.markReceivedPaid(invoice.id, invoice.version, note.trim());
+        else await finance.approveForPayment(invoice.id, invoice.version, note.trim());
+        setReviewAction(null); await refreshAfterMutation(success);
+      }, success)} />
 
     <ConfirmDialog open={Boolean(confirmation)} title={confirmation?.title ?? ''} destructive={false} busy={busy}
       body={<>{error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}{confirmation?.body}</>}

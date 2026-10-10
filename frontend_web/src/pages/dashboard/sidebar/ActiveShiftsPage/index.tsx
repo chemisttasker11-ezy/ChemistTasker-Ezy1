@@ -119,6 +119,8 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const [slotSeenReady, setSlotSeenReady] = useState(false);
     const latestSlotSignaturesRef = React.useRef<Record<string, string>>({});
     const reviewLoadingId: number | null = null;
+    const candidateReviewRequest = React.useRef(0);
+    React.useEffect(() => () => { candidateReviewRequest.current += 1; }, []);
 
     // Dialogs
     const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<DeleteConfirmDialogState>({
@@ -332,6 +334,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
 
     // Handle reveal interest
     const handleRevealInterest = useCallback(async (shift: Shift, interest: ShiftInterest) => {
+        const request = ++candidateReviewRequest.current;
         const levelKey = selectedLevelByShift[shift.id] ?? PUBLIC_LEVEL_KEY;
 
         resetWorkerRatings();
@@ -361,7 +364,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             }
         } else {
             // Already revealed, use existing user data
-            revealedUser = interest.user || (interest as any).user_detail;
+            revealedUser = interest.userDetail || (interest as any).user_detail || interest.user;
         }
 
 
@@ -371,7 +374,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             ? revealedUser
             : (typeof interest.user === 'object' && interest.user)
                 ? interest.user
-                : (interest as any).user_detail;
+                : interest.userDetail || (interest as any).user_detail;
 
         const interestAny = interest as any;
 
@@ -413,6 +416,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         }
 
         // Open dialog (no counter offer, just showing interest)
+        if (request !== candidateReviewRequest.current) return;
         setReviewOfferDialog({
             open: true,
             shiftId: shift.id,
@@ -425,6 +429,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     // Handle review offer dialog
     const handleReviewOffer = useCallback(
         async (shift: Shift, offer: any, tabData: any, slotId: number | null) => {
+            const request = ++candidateReviewRequest.current;
             resetWorkerRatings();
 
             // Find the interest for this offer
@@ -508,6 +513,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             const mappedSlots = mapOfferSlotsWithShift(offer, shift, resolvedSlotId);
 
             // Open dialog
+            if (request !== candidateReviewRequest.current) return;
             setReviewOfferDialog({
                 open: true,
                 shiftId: shift.id,
@@ -529,6 +535,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     // Handle review candidate (community level)
     const handleReviewCandidate = useCallback(
         async (shift: Shift, member: ShiftMemberStatus, offer: any | null, slotId: number | null) => {
+            const request = ++candidateReviewRequest.current;
             resetWorkerRatings();
             const levelKey = selectedLevelByShift[shift.id] ?? getCurrentLevelKey(shift);
             const currentTabData = tabData[getTabKey(shift.id, levelKey)] || {};
@@ -616,6 +623,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 ? { ...awaitingPaymentCounterOffer, _mappedSlots: mapOfferSlotsWithShift(awaitingPaymentCounterOffer, shift, resolvedSlotId) }
                 : null;
 
+            if (request !== candidateReviewRequest.current) return;
             setReviewOfferDialog({
                 open: true,
                 shiftId: shift.id,
@@ -1108,7 +1116,11 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     workerCommentsPage={workerCommentsPage}
                     workerCommentsPageCount={workerCommentsPageCount}
                     counterActionLoading={counterActionLoading}
-                    onClose={() => setReviewOfferDialog({ open: false, shiftId: null, offer: null, candidate: null, slotId: null })}
+                    onClose={() => {
+                        candidateReviewRequest.current += 1;
+                        resetWorkerRatings();
+                        setReviewOfferDialog({ open: false, shiftId: null, offer: null, candidate: null, slotId: null });
+                    }}
                     onAccept={(offer) => handleAcceptOffer(offer, reviewOfferDialog.shiftId, reviewOfferDialog.slotId)}
                     onReject={(offer) => handleRejectOffer(offer, reviewOfferDialog.shiftId)}
                     onAssign={(userId, slotId) => handleAssignCandidate(userId, reviewOfferDialog.shiftId, slotId)}

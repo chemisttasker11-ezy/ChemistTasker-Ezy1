@@ -146,7 +146,7 @@ test('public shift filters occupy natural page height without a nested desktop s
 });
 
 test('filter controls use legible icons, real checkbox states and responsive time labels', () => {
-  const filters = read('migrated/pages/dashboard/sidebar/ShiftsBoard/components/FiltersSidebar.tsx');
+  const filters = read('shared-ui/shifts/FiltersSidebar.tsx');
   assert.match(filters, /aria-pressed=\{active\}/);
   assert.match(filters, /flexDirection: 'column'/);
   assert.match(filters, /minWidth: 0, minHeight: 68/);

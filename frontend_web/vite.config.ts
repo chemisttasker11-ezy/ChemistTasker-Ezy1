@@ -12,6 +12,8 @@ export default defineConfig(({ command }) => {
   return {
     base: '/',
     plugins: [react()],
+    // Shared web UI lives alongside Next. Use this app's React/MUI contexts in Vite too.
+    resolve: { dedupe: ['react', 'react-dom', '@mui/material', '@mui/system', '@mui/private-theming', '@mui/icons-material', '@emotion/react', '@emotion/styled'] },
     // shared-core is rebuilt and repacked locally during consolidation work.
     // Serving it through Vite's normal module pipeline prevents an older
     // optimized bundle from surviving with a stale named-export surface.

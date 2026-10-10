@@ -1,19 +1,18 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Box, IconButton, Menu, MenuItem, Typography } from '@mui/material';
+import { Box,IconButton,Menu,MenuItem,Typography } from '@mui/material';
 import { MoreHorizontal } from 'lucide-react';
-import { getCurrentUser } from '@chemisttasker/shared-core';
+import { useCallback,useState } from 'react';
 
-import { fetchHubGroup, fetchHubGroupMembers } from '../../../../api/hub';
-import type {
-  HubChemistTaskerHub,
-  HubGroup,
-  HubGroupMemberOption,
-  HubPharmacy,
-  HubScopeSelection,
-} from '../../../../types/hub';
+import { fetchHubGroup,fetchHubGroupMembers } from '../../../../api/hub';
 import { Pill } from '../../../../components/ui/Pill';
+import type {
+HubChemistTaskerHub,
+HubGroup,
+HubGroupMemberOption,
+HubPharmacy,
+HubScopeSelection,
+} from '../../../../types/hub';
 import { ScopeFeed } from './HubFeed';
-import HubSpace, { type HubPerson } from './HubSpace';
+import HubSpace,{ type HubPerson } from './HubSpace';
 import { getMemberDisplayName } from './hubUtils';
 
 /** Group members with the admin flag the group API already returns. */
@@ -172,24 +171,7 @@ const AUDIENCE_ABOUT: Record<string, string> = {
 };
 
 export function ChemistTaskerHubContent({ hub, scope, targetPostId, onTargetPostHandled }: ChemistTaskerHubContentProps) {
-  const [opening, setOpening] = useState(true);
-  useEffect(() => {
-    let active = true;
-    setOpening(true);
-    getCurrentUser()
-      .then((user: { public_community_enabled?: boolean }) => {
-        if (!active) return;
-        if (user.public_community_enabled && ['public', 'pharmacist', 'intern', 'staff', 'explorer', 'owner'].includes(hub.key)) {
-          window.location.assign(targetPostId ? `/hubs/posts/${targetPostId}` : `/hubs/${hub.key}`);
-        } else {
-          setOpening(false);
-        }
-      })
-      .catch(() => { if (active) setOpening(false); });
-    return () => { active = false; };
-  }, [hub.key, targetPostId]);
-  if (opening) return <Box role="status" sx={{ p: 3, color: 'var(--ct-text-secondary)' }}>Opening your community…</Box>;
-
+  // Dashboard communities use the existing scoped hub API and stay in the Vite workspace.
   const isEveryone = hub.audienceType === 'PUBLIC' || hub.audienceType === 'ALL';
   return (
     <HubSpace

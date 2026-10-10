@@ -70,13 +70,13 @@ export function markInterestRevealedInState(
     if (!current) return tabData;
 
     const updatedInterestsAll = (current.interestsAll || []).map((i: any) =>
-        i.id === interestId ? { ...i, revealed: true, user: userDetail, user_detail: userDetail } : i
+        i.id === interestId ? { ...i, revealed: true, user: userDetail, userDetail } : i
     );
 
     const updatedInterestsBySlot: Record<number, any[]> = {};
     Object.entries(current.interestsBySlot || {}).forEach(([sid, list]) => {
         updatedInterestsBySlot[Number(sid)] = (list as any[]).map(i =>
-            i.id === interestId ? { ...i, revealed: true, user: userDetail, user_detail: userDetail } : i
+            i.id === interestId ? { ...i, revealed: true, user: userDetail, userDetail } : i
         );
     });
 

@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { preview } from 'vite';
 
 const testRoot = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(testRoot, '..');
+const projectRoot = process.env.PLAYWRIGHT_APP_ROOT ? resolve(process.env.PLAYWRIGHT_APP_ROOT) : resolve(testRoot, '..');
 const port = Number(process.env.PLAYWRIGHT_PORT || 4173);
 const viteBin = resolve(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js');
 const playwrightCli = resolve(testRoot, 'node_modules', '@playwright', 'test', 'cli.js');

@@ -20,12 +20,4 @@ export const EMPTY_TRAVEL_LOCATION: TravelLocation = {
 export const GOOGLE_LIBRARIES = ['places'] as Array<'places'>;
 export const COUNTER_OFFER_TRAVEL_AUTOCOMPLETE_ID = 'counter-offer-travel-autocomplete';
 
-export const FILTER_SECTIONS = {
-  roles: 'Job Role',
-  dateRange: 'Date Range',
-  perks: 'Perks & Benefits',
-  locations: 'Locations',
-  timeOfDay: 'Time of Day',
-  minRate: 'Min Rate',
-  employment: 'Employment Type',
-};
+export { FILTER_SECTIONS } from '../../../../../landing_next/shared-ui/shifts/model';
