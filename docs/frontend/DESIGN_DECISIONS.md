@@ -396,3 +396,44 @@ server changed. Figma: *Chat / Conversation*, *Message Hover Actions*, *Error (S
   notified of each message (`backend/chat/signals.py`), so no API change.
 - **Backend follow-ups (not done, need API fields):** reply-to/quote threads, *Seen* receipts (only my own last-read
   time is sent), online presence, a wider reaction set.
+
+## Pharmacy Hub, Vite (2026-10-10, groups-style redesign)
+
+Owner brief: a Facebook / LinkedIn groups layout; About must not take the top of the page; inherit the chat work;
+members on demand with admins shown; member counts per hub; names only. The Figma hub frames repeat the old stacked
+layout (cover → About → members → large composer), so they were not followed.
+
+- **One shell for every space** (`HubSpace`): pharmacy, organisation, group, organisation group and ChemistTasker hub.
+  Cover band (brand gradient when there is no photo or it fails; it used to show a broken image with "Pharmacy
+  cover"), kind tile, *Pharmacy hub* eyebrow, the name once (it was printed twice), *Private to your pharmacy team*,
+  and the member count as a link. Tabs: *Discussion · About*. Settings for managers in the header.
+- **About is out of the way:** its own tab (full text, who can see it, members); on wide screens a 4-line About
+  summary sits in a right rail beside the feed with *More about this hub* and *See N members*.
+- **Members on demand (owner decision):** no member list on the page. The count in the header, the rail and About
+  open a members dialog (full screen on phones) with search, **Admins** first with an *Admin* pill, then members;
+  each shows role in the backend's words, contract and pharmacy, never an email. Group admins come from the group
+  API's existing `is_admin`. **Open:** pharmacy and organisation directories (`/hub/members/`) carry no admin flag;
+  showing their admins needs one read-only field there (owner to approve before any backend change).
+- **Member counts in the hub menu (owner decision):** groups and organisation home from the context data; the
+  pharmacy home from the members the space loads (no extra request). ChemistTasker hubs show their audience in words
+  (*Everyone*, *Owners*) instead of codes (*ALL*). Menu headings in sentence case; one violet selected style (was four
+  colours: primary, grey, info, warning).
+- **Composer collapsed** like a group: avatar + *Write something to {space}…* with *Photo or file*, *Tag people*,
+  *Poll*; expands in place (was always open: 4-line box, tag list, dropdown and helper, ~430px before the first post).
+  Tagging is behind *Tag people*. From chat: emoji picker, paste or drop images, thumbnails with remove, and a failed
+  post keeps the text with a clear message.
+- **Posts:** pinned posts first; *Pinned* and *Announcement* pills (they were invisible); name · role in sentence
+  case (was "Name | PHARMACIST"); relative time (*3h*, *Yesterday*) with the full date on hover; links and @mentions
+  rendered; tagged people as "with Priya and Tom" (was chips with roles in capitals); reaction summary in the
+  colour-emoji font (*You and 3 others*); labelled reaction picker (*Like, Celebrate, Support, Insightful, Love*) with
+  *Remove my reaction*; delete asks in a dialog (was `window.confirm`).
+- **Comments** as chat-style bubbles with name · role, time, *React*, *Reply* and a reaction count; Enter to send.
+  **Fixed:** a post with unloaded comments said "View 1 more comment" and "Be the first to comment" together; failed
+  comments, reactions and comment loads now say so (they failed silently).
+- **Phone:** a single *Hubs and groups* button replaces "HUB VIEW · {name}" (the name repeated the header below).
+- **States:** skeleton posts, load error with *Try again*, empty with *Write a post*, members loading/error/empty.
+- **Shared code:** chat's formatting moved to `components/social/socialFormat.tsx` (times, links/mentions, emoji font,
+  initials, role and contract labels) and is used by chat and the Hub.
+- **Fixed (code):** the two group views called a React hook after an early return.
+- Checked: 1440 and 390 (home, composer, About, members, group members with admins, phone menu); AA sweep 0
+  failures; five hub route checks and the visual-states audit pass.

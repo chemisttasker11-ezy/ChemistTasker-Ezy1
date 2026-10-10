@@ -1,3 +1,5 @@
+import { roleLabel } from '../../../../components/social/socialFormat';
+
 const HUB_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
@@ -31,13 +33,14 @@ export const formatMemberLabel = (
 ) => {
   const displayName = name?.trim() || fallback;
   const parts = [displayName];
-  if (role?.trim()) {
-    parts.push(role.trim());
+  const roleText = roleLabel(role);
+  if (roleText) {
+    parts.push(roleText);
   }
-  if (jobTitle?.trim()) {
+  if (jobTitle?.trim() && jobTitle.trim().toLowerCase() !== roleText.toLowerCase()) {
     parts.push(jobTitle.trim());
   }
-  return parts.join(' | ');
+  return parts.join(' · ');
 };
 
 export const isEmailLike = (value?: string | null) =>
@@ -121,5 +124,6 @@ export const formatHubAuthorLabel = (
   fallback = 'Member',
 ) => {
   const name = getHubAuthorName(user, fallback);
-  return role?.trim() ? `${name} | ${role.trim()}` : name;
+  const roleText = roleLabel(role);
+  return roleText ? `${name} · ${roleText}` : name;
 };

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Typography } from '@mui/material';
 import TuneIcon from '@mui/icons-material/Tune';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
@@ -50,6 +50,9 @@ type SelectedView =
   | { type: 'platformHome'; id: number | string };
 
 export default function HubPage() {
+  const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
+  const rememberCount = useCallback((key: string) => (count: number) =>
+    setMemberCounts((prev) => (prev[key] === count ? prev : { ...prev, [key]: count })), []);
   const theme = useTheme();
   const { user } = useAuth();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -502,6 +505,7 @@ export default function HubPage() {
         onRequestCreateOrganizationGroup={openOrganizationGroupModal}
         organizations={organizations}
         activeOrganizationId={selectedOrganization?.id ?? null}
+        memberCounts={memberCounts}
       />
 
       <Box
@@ -520,33 +524,15 @@ export default function HubPage() {
         }}
       >
         {isMobile && (
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            spacing={1.5}
-            sx={{
-              px: 1,
-              py: 0.5,
-            }}
+          <Button
+            variant="outlined"
+            startIcon={<TuneIcon />}
+            onClick={() => setIsMobileSidebarOpen(true)}
+            aria-label={`Hubs and groups. Showing ${selectedViewLabel}`}
+            sx={{ alignSelf: 'flex-start', minHeight: 44 }}
           >
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="overline" color="text.secondary">
-                Hub View
-              </Typography>
-              <Typography variant="body1" fontWeight={700} noWrap>
-                {selectedViewLabel}
-              </Typography>
-            </Box>
-            <Button
-              variant="outlined"
-              startIcon={<TuneIcon />}
-              onClick={() => setIsMobileSidebarOpen(true)}
-              sx={{ flexShrink: 0, borderRadius: 999, textTransform: 'none' }}
-            >
-              Hub Menu
-            </Button>
-          </Stack>
+            Hubs and groups
+          </Button>
         )}
 
         {selectedView.type === 'home' && currentPharmacyDetails ? (
@@ -556,6 +542,7 @@ export default function HubPage() {
             canCreatePost={canPharmacyPost}
             scope={{ type: 'pharmacy', id: currentPharmacyDetails.id }}
             membersLoader={pharmacyMembersLoader}
+            onMemberCount={rememberCount(`pharmacy:${currentPharmacyDetails.id}`)}
             targetPostId={resolvedTargetPostId}
             onTargetPostHandled={clearDeepLinkParams}
           />
@@ -566,6 +553,7 @@ export default function HubPage() {
             canCreatePost={currentOrganizationDetails.canCreatePost}
             scope={{ type: 'organization', id: currentOrganizationDetails.id }}
             membersLoader={organizationMembersLoader}
+            onMemberCount={rememberCount(`org:${currentOrganizationDetails.id}`)}
             targetPostId={resolvedTargetPostId}
             onTargetPostHandled={clearDeepLinkParams}
           />

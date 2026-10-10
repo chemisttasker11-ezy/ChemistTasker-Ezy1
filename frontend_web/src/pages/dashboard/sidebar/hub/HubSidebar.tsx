@@ -54,7 +54,12 @@ interface InternalSidebarProps {
   onRequestCreateCommunityGroup: () => void;
   onRequestCreateOrganizationGroup: () => void;
   activeOrganizationId: number | null;
+  /** Member counts reported by loaded spaces, keyed "pharmacy:<id>" / "org:<id>". */
+  memberCounts?: Record<string, number>;
 }
+
+const membersText = (count?: number | null) => (count == null ? undefined : `${count} ${count === 1 ? 'member' : 'members'}`);
+const AUDIENCE_TEXT: Record<string, string> = { ALL: 'Everyone', PUBLIC: 'Everyone', OWNER: 'Owners', PHARMACIST: 'Pharmacists', INTERN: 'Interns', STAFF: 'Pharmacy staff', OTHER_STAFF: 'Pharmacy staff', EXPLORER: 'Explorers' };
 
 export function InternalSidebar({
   isOpen,
@@ -75,6 +80,7 @@ export function InternalSidebar({
   onRequestCreateCommunityGroup,
   onRequestCreateOrganizationGroup,
   activeOrganizationId,
+  memberCounts = {},
 }: InternalSidebarProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -183,11 +189,7 @@ export function InternalSidebar({
               borderRadius: 1,
               mb: 1,
               justifyContent: showExpandedContent ? 'flex-start' : 'center',
-              '&.Mui-selected': {
-                bgcolor: 'primary.light',
-                color: 'primary.dark',
-                '&:hover': { bgcolor: 'primary.light' },
-              },
+              '&.Mui-selected': { bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-accent-strong)', fontWeight: 600, '&:hover': { bgcolor: 'var(--ct-tone-violet-bg)' }, '& .MuiListItemText-secondary': { color: 'var(--ct-tone-violet-fg)' } },
             }}
           >
             <ListItemIcon sx={{ minWidth: showExpandedContent ? 36 : 'auto', color: 'inherit' }}>
@@ -195,8 +197,10 @@ export function InternalSidebar({
             </ListItemIcon>
             {showExpandedContent ? (
               <ListItemText
-                primary="Pharmacy Home"
-                primaryTypographyProps={{ fontWeight: 'medium' }}
+                primary="Pharmacy home"
+                secondary={membersText(selectedPharmacyId != null ? memberCounts[`pharmacy:${selectedPharmacyId}`] : null)}
+                primaryTypographyProps={{ fontWeight: 600 }}
+                secondaryTypographyProps={{ variant: 'caption' }}
               />
             ) : null}
           </ListItemButton>
@@ -206,7 +210,7 @@ export function InternalSidebar({
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
             {showExpandedContent ? (
               <Typography variant="overline" color="text.secondary" sx={{ pl: 1 }}>
-                Community Groups
+                Community groups
               </Typography>
             ) : null}
             <Tooltip
@@ -245,12 +249,7 @@ export function InternalSidebar({
                   borderRadius: 1,
                   mb: 0.5,
                   justifyContent: showExpandedContent ? 'flex-start' : 'center',
-                  '&.Mui-selected': {
-                    bgcolor: 'grey.200',
-                    fontWeight: 'medium',
-                    color: 'grey.900',
-                    '&:hover': { bgcolor: 'grey.200' },
-                  },
+                  '&.Mui-selected': { bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-accent-strong)', fontWeight: 600, '&:hover': { bgcolor: 'var(--ct-tone-violet-bg)' }, '& .MuiListItemText-secondary': { color: 'var(--ct-tone-violet-fg)' } },
                 }}
               >
                 <ListItemIcon sx={{ minWidth: showExpandedContent ? 36 : 'auto', color: 'grey.400' }}>
@@ -259,7 +258,9 @@ export function InternalSidebar({
                 {showExpandedContent ? (
                   <ListItemText
                     primary={group.name}
+                    secondary={membersText(group.memberCount)}
                     primaryTypographyProps={{ variant: 'body2', noWrap: true }}
+                    secondaryTypographyProps={{ variant: 'caption' }}
                   />
                 ) : null}
               </ListItemButton>
@@ -276,11 +277,7 @@ export function InternalSidebar({
                 borderRadius: 1,
                 mb: 1,
                 justifyContent: showExpandedContent ? 'flex-start' : 'center',
-                '&.Mui-selected': {
-                  bgcolor: 'info.light',
-                  color: 'info.dark',
-                  '&:hover': { bgcolor: 'info.light' },
-                },
+                '&.Mui-selected': { bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-accent-strong)', fontWeight: 600, '&:hover': { bgcolor: 'var(--ct-tone-violet-bg)' }, '& .MuiListItemText-secondary': { color: 'var(--ct-tone-violet-fg)' } },
               }}
             >
               <ListItemIcon sx={{ minWidth: showExpandedContent ? 36 : 'auto', color: 'inherit' }}>
@@ -288,8 +285,10 @@ export function InternalSidebar({
               </ListItemIcon>
               {showExpandedContent ? (
                 <ListItemText
-                  primary="Organization Home"
-                  primaryTypographyProps={{ fontWeight: 'medium' }}
+                  primary="Organisation home"
+                  secondary={membersText(memberCounts[`org:${primaryOrganizationId}`] ?? (organizations.find((o) => o.id === primaryOrganizationId) as any)?.memberCount)}
+                  primaryTypographyProps={{ fontWeight: 600 }}
+                  secondaryTypographyProps={{ variant: 'caption' }}
                 />
               ) : null}
             </ListItemButton>
@@ -298,7 +297,7 @@ export function InternalSidebar({
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, mt: 2 }}>
             {showExpandedContent ? (
               <Typography variant="overline" color="text.secondary" sx={{ pl: 1 }}>
-                Organization Hub
+                Organisation groups
               </Typography>
             ) : null}
             <Tooltip
@@ -337,12 +336,7 @@ export function InternalSidebar({
                   borderRadius: 1,
                   mb: 0.5,
                   justifyContent: showExpandedContent ? 'flex-start' : 'center',
-                  '&.Mui-selected': {
-                    bgcolor: 'grey.200',
-                    fontWeight: 'medium',
-                    color: 'grey.900',
-                    '&:hover': { bgcolor: 'grey.200' },
-                  },
+                  '&.Mui-selected': { bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-accent-strong)', fontWeight: 600, '&:hover': { bgcolor: 'var(--ct-tone-violet-bg)' }, '& .MuiListItemText-secondary': { color: 'var(--ct-tone-violet-fg)' } },
                 }}
               >
                 <ListItemIcon sx={{ minWidth: showExpandedContent ? 36 : 'auto', color: 'grey.400' }}>
@@ -351,7 +345,9 @@ export function InternalSidebar({
                 {showExpandedContent ? (
                   <ListItemText
                     primary={group.name}
+                    secondary={membersText(group.memberCount)}
                     primaryTypographyProps={{ variant: 'body2', noWrap: true }}
+                    secondaryTypographyProps={{ variant: 'caption' }}
                   />
                 ) : null}
               </ListItemButton>
@@ -364,7 +360,7 @@ export function InternalSidebar({
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                 {showExpandedContent ? (
                   <Typography variant="overline" color="text.secondary" sx={{ pl: 1 }}>
-                    ChemistTasker Hub
+                    ChemistTasker hubs
                   </Typography>
                 ) : null}
               </Box>
@@ -380,11 +376,7 @@ export function InternalSidebar({
                       borderRadius: 1,
                       mb: 0.5,
                       justifyContent: showExpandedContent ? 'flex-start' : 'center',
-                      '&.Mui-selected': {
-                        bgcolor: 'warning.light',
-                        color: 'warning.dark',
-                        '&:hover': { bgcolor: 'warning.light' },
-                      },
+                      '&.Mui-selected': { bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-accent-strong)', fontWeight: 600, '&:hover': { bgcolor: 'var(--ct-tone-violet-bg)' }, '& .MuiListItemText-secondary': { color: 'var(--ct-tone-violet-fg)' } },
                     }}
                   >
                     <ListItemIcon sx={{ minWidth: showExpandedContent ? 36 : 'auto', color: 'inherit' }}>
@@ -393,7 +385,7 @@ export function InternalSidebar({
                     {showExpandedContent ? (
                       <ListItemText
                         primary={hub.label}
-                        secondary={hub.audienceType.replace(/_/g, ' ')}
+                        secondary={AUDIENCE_TEXT[hub.audienceType] ?? hub.audienceType.replace(/_/g, ' ').toLowerCase()}
                         primaryTypographyProps={{ variant: 'body2', noWrap: true }}
                         secondaryTypographyProps={{ variant: 'caption', noWrap: true }}
                       />

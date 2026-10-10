@@ -16,13 +16,13 @@ import {
   Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import AttachFileIcon from '@mui/icons-material/AttachFile';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import CancelIcon from '@mui/icons-material/Cancel';
-import GroupIcon from '@mui/icons-material/Group';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import SendIcon from '@mui/icons-material/Send';
 
+import { Avatar, ButtonBase, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Popover, Skeleton, Tooltip } from '@mui/material';
+import { BarChart3, ImagePlus, MessagesSquare, Smile, Tag, X } from 'lucide-react';
+import DashboardContentState from '../../../../components/dashboard/DashboardContentState';
+import { COMPOSER_EMOJI, EMOJI_FONT, initialsOf } from '../../../../components/social/socialFormat';
 import {
   createHubPoll,
   createHubPost,
@@ -58,6 +58,8 @@ interface ScopeFeedProps {
   membersLoader?: () => Promise<HubGroupMemberOption[]>;
   emptyTitle: string;
   emptyDescription: string;
+  /** Name of the space, used in "Write something to …". */
+  audienceName?: string;
   targetPostId?: number | null;
   onTargetPostHandled?: () => void;
 }
@@ -72,11 +74,20 @@ export function ScopeFeed({
   membersLoader,
   emptyTitle,
   emptyDescription,
+  audienceName,
   targetPostId,
   onTargetPostHandled,
 }: ScopeFeedProps) {
-  const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
+  const { user } = useAuth();
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [showTags, setShowTags] = useState(false);
+  const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<HubPost | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const meName = `${(user as any)?.first_name || ''} ${(user as any)?.last_name || ''}`.trim() || (user as any)?.username || '';
   const [posts, setPosts] = useState<HubPost[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [postsError, setPostsError] = useState<string | null>(null);
@@ -112,7 +123,9 @@ export function ScopeFeed({
       sortAt: new Date(item.createdAt).getTime() || 0,
       item,
     }));
-    return [...postItems, ...pollItems].sort((a, b) => b.sortAt - a.sortAt);
+    // Pinned posts lead, like a group's featured posts; everything else is newest first.
+    const pinnedFirst = (entry: FeedItem) => (entry.kind === 'post' && entry.item.isPinned ? 1 : 0);
+    return [...postItems, ...pollItems].sort((a, b) => pinnedFirst(b) - pinnedFirst(a) || b.sortAt - a.sortAt);
   }, [polls, posts]);
   useEffect(() => {
     setTaggedMembers([]);
@@ -136,7 +149,7 @@ export function ScopeFeed({
       } catch (err) {
         console.error('Failed to fetch posts:', err);
         if (isMounted) {
-          setPostsError('Failed to load posts. Please try again.');
+          setPostsError("We couldn't load the posts.");
         }
       } finally {
         if (isMounted) {
@@ -148,7 +161,7 @@ export function ScopeFeed({
     return () => {
       isMounted = false;
     };
-  }, [stableScope]);
+  }, [stableScope, loadAttempt]);
 
   useEffect(() => {
     if (!targetPostId || loadingPosts || feedItems.length === 0) {
@@ -178,7 +191,7 @@ export function ScopeFeed({
       } catch (err) {
         console.error('Failed to fetch polls:', err);
         if (isMounted) {
-          setPollsError('Failed to load polls. Please try again.');
+          setPollsError("Polls didn't load. Posts are still shown.");
         }
       } finally {
         if (isMounted) {
@@ -215,9 +228,11 @@ export function ScopeFeed({
       setPostContent('');
       setAttachments([]);
       setTaggedMembers([]);
+      setShowTags(false);
+      setComposerOpen(false);
     } catch (err) {
       console.error('Failed to create post:', err);
-      setComposerError(getErrorMessage(err, 'Failed to create the post. Please try again.'));
+      setComposerError(`${getErrorMessage(err, "Your post wasn't published.")} Your text is still here, so you can try again.`);
     } finally {
       composerGuard.finish();
     }
@@ -228,7 +243,44 @@ export function ScopeFeed({
     if (!files) {
       return;
     }
-    setAttachments((prev) => [...prev, ...Array.from(files)]);
+    addFiles(Array.from(files));
+    event.target.value = '';
+  };
+
+  const addFiles = (files: File[]) => {
+    if (!files.length) return;
+    setAttachments((prev) => [...prev, ...files.filter((f) => !prev.some((p) => p.name === f.name && p.size === f.size))]);
+    setComposerOpen(true);
+    setComposerError(null);
+  };
+
+  const attachmentPreviews = useMemo(
+    () => attachments.map((file) => ({ file, url: file.type.startsWith('image/') ? URL.createObjectURL(file) : null })),
+    [attachments],
+  );
+  useEffect(() => () => attachmentPreviews.forEach((p) => p.url && URL.revokeObjectURL(p.url)), [attachmentPreviews]);
+
+  const insertEmoji = (emoji: string) => {
+    const input = composerInputRef.current;
+    const start = input?.selectionStart ?? postContent.length;
+    const end = input?.selectionEnd ?? postContent.length;
+    setPostContent(`${postContent.slice(0, start)}${emoji}${postContent.slice(end)}`);
+    setEmojiAnchor(null);
+    window.setTimeout(() => {
+      if (input) { input.focus(); const caret = start + emoji.length; input.setSelectionRange(caret, caret); }
+    }, 0);
+  };
+
+  const openComposer = (withTags = false) => {
+    setComposerOpen(true);
+    if (withTags) setShowTags(true);
+    window.setTimeout(() => composerInputRef.current?.focus(), 0);
+  };
+
+  const cancelComposer = () => {
+    setComposerOpen(false);
+    setShowTags(false);
+    setComposerError(null);
   };
 
   const removeAttachment = (fileToRemove: File) => {
@@ -332,15 +384,21 @@ export function ScopeFeed({
     }
   };
 
-  const handleDeletePost = async (post: HubPost) => {
-    const confirmed = window.confirm('Delete this post? This action cannot be undone.');
-    if (!confirmed) return;
+  const handleDeletePost = (post: HubPost) => setDeleteTarget(post);
+
+  const confirmDeletePost = async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
     try {
-      await deleteHubPost(post.id);
-      setPosts((prev) => prev.filter((item) => item.id !== post.id));
+      await deleteHubPost(deleteTarget.id);
+      setPosts((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+      setDeleteTarget(null);
     } catch (err) {
       console.error('Failed to delete post:', err);
-      setPostsError('Failed to delete post. Please try again.');
+      setComposerError("We couldn't delete that post. Try again.");
+      setDeleteTarget(null);
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -357,173 +415,192 @@ export function ScopeFeed({
       <Stack spacing={3}>
       {canCreatePost && (
         <Card
+          variant="outlined"
+          onDragOver={(e) => { if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setDragActive(true); } }}
+          onDragLeave={(e) => { if (e.currentTarget === e.target) setDragActive(false); }}
+          onDrop={(e) => { e.preventDefault(); setDragActive(false); addFiles(Array.from(e.dataTransfer?.files || [])); }}
           sx={{
-            borderRadius: 2,
-            border: '1px solid',
-            borderColor: isDarkMode ? alpha(theme.palette.common.white, 0.12) : 'grey.200',
-            boxShadow: 1,
-            bgcolor: isDarkMode ? alpha(theme.palette.background.paper, 0.96) : 'background.paper',
+            position: 'relative',
+            borderRadius: 'var(--ct-card-radius)',
+            borderColor: dragActive ? 'var(--ct-accent-strong)' : 'var(--ct-border-color)',
+            borderStyle: dragActive ? 'dashed' : 'solid',
+            bgcolor: 'var(--ct-surface-bg)',
+            boxShadow: 'none',
+            p: { xs: 1.75, md: 2 },
           }}
         >
-          <Box
-            sx={{
-              borderBottom: '1px solid',
-              borderColor: isDarkMode ? alpha(theme.palette.common.white, 0.12) : 'grey.200',
-              p: 2,
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
-              Share an update with your team
-            </Typography>
-          </Box>
-          <Box sx={{ p: 2 }}>
-            {composerError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {composerError}
-              </Alert>
-            )}
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              placeholder="Announce new roster updates, reminders, or shout-outs..."
-              value={postContent}
-              onChange={(e) => {
-                setPostContent(e.target.value);
-                if (composerError) {
-                  setComposerError(null);
-                }
-              }}
-              disabled={composerGuard.submitting}
-              variant="outlined"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 1,
-                  alignItems: 'flex-start',
-                  bgcolor: isDarkMode ? alpha(theme.palette.common.white, 0.06) : 'grey.50',
-                  color: 'text.primary',
-                  '& textarea::placeholder': {
-                    color: isDarkMode
-                      ? alpha(theme.palette.text.primary, 0.58)
-                      : undefined,
-                    opacity: 1,
-                  },
-                  '& fieldset': {
-                    borderColor: isDarkMode
-                      ? alpha(theme.palette.common.white, 0.18)
-                      : 'grey.300',
-                  },
-                  '&:hover fieldset': { borderColor: 'primary.main' },
-                  '&.Mui-focused fieldset': { borderColor: 'primary.main' },
-                },
-              }}
-            />
-          </Box>
-          {attachments.length > 0 && (
-            <Stack direction="row" spacing={1} sx={{ p: 2, pt: 0, flexWrap: 'wrap', gap: 1 }}>
-              {attachments.map((file, index) => (
-                  <Chip
-                    key={index}
-                    icon={<InsertDriveFileIcon />}
-                    label={file.name}
-                    onDelete={composerGuard.submitting ? undefined : () => removeAttachment(file)}
-                    deleteIcon={composerGuard.submitting ? undefined : <CancelIcon />}
-                  />
-                ))}
-              </Stack>
-            )}
-          <input
-            type="file"
-              multiple
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              disabled={composerGuard.submitting}
-              style={{ display: 'none' }}
-            />
-            {composerGuard.submitting ? (
-              <SubmissionStatusNotice message="Posting your update. Please wait and keep this window open." />
-            ) : null}
-            {membersLoader && (
-              <Box sx={{ px: 2, pb: 2 }}>
-                <TagMembersSelector
-                  loadMembers={membersLoader}
-                  value={taggedMembers}
-                  onChange={setTaggedMembers}
+          <Stack direction="row" spacing={1.5} alignItems={composerOpen ? 'flex-start' : 'center'}>
+            <Avatar sx={{ width: 44, height: 44, fontSize: 15, fontWeight: 600, bgcolor: 'var(--ct-tone-violet-bg)', color: 'var(--ct-tone-violet-fg)' }}>
+              {initialsOf((user as any)?.first_name, (user as any)?.last_name, meName || 'Me')}
+            </Avatar>
+            {!composerOpen ? (
+              <ButtonBase
+                onClick={() => openComposer()}
+                aria-label={`Write a post to ${audienceName || 'this hub'}`}
+                sx={{
+                  flex: 1, justifyContent: 'flex-start', minHeight: 48, px: 2, borderRadius: '999px', textAlign: 'left',
+                  bgcolor: 'var(--ct-subtle-bg)', border: '1px solid var(--ct-border-color)', color: 'var(--ct-text-secondary)', fontSize: 15,
+                  '&:hover': { borderColor: 'var(--ct-accent-strong)' },
+                  '&.Mui-focusVisible': { outline: '2px solid var(--ct-accent-strong)', outlineOffset: 2 },
+                }}
+              >
+                Write something to {audienceName || 'the team'}…
+              </ButtonBase>
+            ) : (
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'var(--ct-text-primary)', mb: 0.75 }}>
+                  {meName || 'You'}
+                  <Box component="span" sx={{ fontWeight: 400, color: 'var(--ct-text-secondary)' }}> · posting to {audienceName || 'this hub'}</Box>
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  maxRows={14}
+                  placeholder="Share an update, a reminder or a shout-out…"
+                  value={postContent}
+                  inputRef={composerInputRef}
+                  inputProps={{ 'aria-label': 'Post text', maxLength: 10000 }}
+                  onPaste={(e) => {
+                    const files = Array.from(e.clipboardData?.files || []);
+                    if (files.length) { e.preventDefault(); addFiles(files); }
+                  }}
+                  onChange={(e) => {
+                    setPostContent(e.target.value);
+                    if (composerError) setComposerError(null);
+                  }}
                   disabled={composerGuard.submitting}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: '14px', bgcolor: 'var(--ct-surface-bg)', fontSize: 15 } }}
                 />
               </Box>
             )}
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 1,
-              borderTop: '1px solid',
-              borderColor: isDarkMode ? alpha(theme.palette.common.white, 0.12) : 'grey.200',
-              bgcolor: isDarkMode ? alpha(theme.palette.common.white, 0.04) : 'grey.50',
-              p: 1.5,
-            }}
+          </Stack>
+
+          {composerOpen && composerError && (
+            <Alert severity="error" sx={{ mt: 1.5 }} onClose={() => setComposerError(null)}>{composerError}</Alert>
+          )}
+
+          {composerOpen && attachmentPreviews.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5, pl: { sm: 7 } }} aria-label="Attachments to post">
+              {attachmentPreviews.map(({ file, url }) => (
+                <Box key={`${file.name}-${file.size}`} sx={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 1, height: 72, maxWidth: 260, pr: url ? 0 : 1.25, pl: url ? 0 : 1, borderRadius: '12px', border: '1px solid var(--ct-border-color)', bgcolor: 'var(--ct-subtle-bg)', overflow: 'hidden' }}>
+                  {url ? (
+                    <img src={url} alt={file.name} style={{ width: 72, height: 72, objectFit: 'cover', display: 'block' }} />
+                  ) : (
+                    <>
+                      <InsertDriveFileIcon sx={{ color: 'var(--ct-accent-strong)' }} />
+                      <Typography variant="body2" noWrap sx={{ fontWeight: 600, color: 'var(--ct-text-primary)', maxWidth: 170 }}>{file.name}</Typography>
+                    </>
+                  )}
+                  <IconButton
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => removeAttachment(file)}
+                    disabled={composerGuard.submitting}
+                    sx={{ position: url ? 'absolute' : 'static', top: 2, right: 2, width: 26, height: 26, bgcolor: 'rgba(6,18,58,0.72)', color: '#fff', '&:hover': { bgcolor: 'rgba(6,18,58,0.9)' } }}
+                  >
+                    <X size={14} />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          {composerOpen && showTags && membersLoader && (
+            <Box sx={{ mt: 1.5, pl: { sm: 7 } }}>
+              <TagMembersSelector loadMembers={membersLoader} value={taggedMembers} onChange={setTaggedMembers} disabled={composerGuard.submitting} />
+            </Box>
+          )}
+
+          <input type="file" multiple ref={fileInputRef} onChange={handleFileSelect} disabled={composerGuard.submitting} style={{ display: 'none' }} />
+          {composerGuard.submitting ? <SubmissionStatusNotice message="Posting your update. Keep this window open." /> : null}
+
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            flexWrap="wrap"
+            useFlexGap
+            spacing={1}
+            sx={{ mt: 1.5, pt: 1.25, borderTop: '1px solid var(--ct-border-color)' }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                startIcon={<AttachFileIcon sx={{ fontSize: 16 }} />}
-                disabled={composerGuard.submitting}
-                sx={{
-                  textTransform: 'none',
-                  color: isDarkMode ? 'grey.200' : 'text.secondary',
-                  '&:hover': { color: 'primary.main' },
-                }}
-              >
-                Add attachments
+            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+              <Button onClick={() => fileInputRef.current?.click()} startIcon={<ImagePlus size={18} />} disabled={composerGuard.submitting} sx={{ minHeight: 40, color: 'var(--ct-text-secondary)' }}>
+                Photo or file
               </Button>
+              {membersLoader && (
+                <Button
+                  onClick={() => (composerOpen ? setShowTags((v) => !v) : openComposer(true))}
+                  startIcon={<Tag size={17} />}
+                  disabled={composerGuard.submitting}
+                  aria-pressed={showTags}
+                  sx={{ minHeight: 40, color: showTags ? 'var(--ct-accent-strong)' : 'var(--ct-text-secondary)' }}
+                >
+                  Tag people{taggedMembers.length ? ` (${taggedMembers.length})` : ''}
+                </Button>
+              )}
+              <Button onClick={() => openPollModal()} startIcon={<BarChart3 size={17} />} disabled={composerGuard.submitting} sx={{ minHeight: 40, color: 'var(--ct-text-secondary)' }}>
+                Poll
+              </Button>
+              {composerOpen && (
+                <Tooltip title="Emoji">
+                  <IconButton aria-label="Insert emoji" onClick={(e) => setEmojiAnchor(e.currentTarget)} sx={{ width: 40, height: 40, color: 'var(--ct-text-secondary)' }}>
+                    <Smile size={18} />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Stack>
+            {composerOpen && (
+              <Stack direction="row" spacing={1}>
+                <Button onClick={cancelComposer} disabled={composerGuard.submitting} sx={{ minHeight: 40 }}>Cancel</Button>
+                <Button
+                  onClick={handleCreatePost}
+                  disabled={composerGuard.submitting || (!postContent.trim() && attachments.length === 0)}
+                  variant="contained"
+                  startIcon={composerGuard.submitting ? <CircularProgress size={16} color="inherit" /> : <SendIcon sx={{ fontSize: 16 }} />}
+                  sx={{ minHeight: 40 }}
+                >
+                  Post
+                </Button>
+              </Stack>
+            )}
+          </Stack>
+          <Popover
+            open={Boolean(emojiAnchor)}
+            anchorEl={emojiAnchor}
+            onClose={() => setEmojiAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            slotProps={{ paper: { sx: { borderRadius: '16px', p: 1, mt: 0.5 } } }}
+          >
+            <Box role="group" aria-label="Emoji" sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, 40px)', gap: 0.25 }}>
+              {COMPOSER_EMOJI.map((emoji) => (
+                <IconButton key={emoji} aria-label={`Insert ${emoji}`} onClick={() => insertEmoji(emoji)} sx={{ width: 40, height: 40, fontSize: 22, fontFamily: EMOJI_FONT }}>
+                  {emoji}
+                </IconButton>
+              ))}
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Button
-                onClick={() => openPollModal()}
-                variant="outlined"
-                startIcon={<BarChartIcon sx={{ fontSize: 16 }} />}
-                disabled={composerGuard.submitting}
-                sx={{
-                  textTransform: 'none',
-                  borderColor: isDarkMode ? alpha(theme.palette.common.white, 0.18) : 'grey.300',
-                  color: 'text.primary',
-                  '&:hover': {
-                    bgcolor: isDarkMode ? alpha(theme.palette.common.white, 0.06) : 'grey.50',
-                  },
-                }}
-              >
-                Start Poll
-              </Button>
-              <Button
-                onClick={handleCreatePost}
-                disabled={composerGuard.submitting}
-                variant="contained"
-                startIcon={composerGuard.submitting ? <CircularProgress size={16} color="inherit" /> : <SendIcon sx={{ fontSize: 16 }} />}
-                sx={{ textTransform: 'none', bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
-              >
-                {composerGuard.submitting ? 'Posting...' : 'Post to Hub'}
-              </Button>
-            </Box>
-          </Box>
+          </Popover>
         </Card>
       )}
 
-      {postsError ? (
-        <Alert severity="error">{postsError}</Alert>
-      ) : null}
-      {pollsError ? (
-        <Alert severity="error">{pollsError}</Alert>
-      ) : null}
+      {pollsError && !postsError ? <Alert severity="warning">{pollsError}</Alert> : null}
 
-      {(loadingPosts || pollsLoading) && feedItems.length === 0 ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
-          <CircularProgress />
-        </Box>
+      {postsError && feedItems.length === 0 ? (
+        <DashboardContentState kind="error" title={postsError} description="Check your connection and try again." actionLabel="Try again" onAction={() => setLoadAttempt((n) => n + 1)} />
+      ) : (loadingPosts || pollsLoading) && feedItems.length === 0 ? (
+        <Stack spacing={2} aria-busy="true" aria-label="Loading posts">
+          {[0, 1].map((i) => (
+            <Card key={i} variant="outlined" sx={{ borderRadius: 'var(--ct-card-radius)', borderColor: 'var(--ct-border-color)', boxShadow: 'none', p: 2.25 }}>
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Skeleton variant="circular" width={44} height={44} />
+                <Box sx={{ flex: 1 }}><Skeleton width="40%" /><Skeleton width="20%" /></Box>
+              </Stack>
+              <Skeleton sx={{ mt: 2 }} /><Skeleton width="85%" /><Skeleton width="60%" />
+            </Card>
+          ))}
+        </Stack>
       ) : feedItems.length > 0 ? (
         <Stack spacing={2}>
+          {postsError ? <Alert severity="error">{postsError}</Alert> : null}
           {feedItems.map((entry) =>
             entry.kind === 'post' ? (
               <Box key={`post-${entry.item.id}`} id={`hub-post-${entry.item.id}`}>
@@ -548,15 +625,14 @@ export function ScopeFeed({
           )}
         </Stack>
       ) : (
-        <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: 'grey.200', bgcolor: 'white', p: 3, textAlign: 'center', boxShadow: 1 }}>
-          <GroupIcon sx={{ fontSize: 40, margin: '0 auto', marginBottom: 1.5, color: 'grey.400' }} />
-          <Typography variant="h6" sx={{ fontWeight: 'semibold', color: 'text.primary' }}>
-            {emptyTitle}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {emptyDescription}
-          </Typography>
-        </Card>
+        <DashboardContentState
+          kind="empty"
+          icon={<MessagesSquare size={26} />}
+          title={emptyTitle}
+          description={emptyDescription}
+          actionLabel={canCreatePost ? 'Write a post' : undefined}
+          onAction={canCreatePost ? () => openComposer() : undefined}
+        />
       )}
       </Stack>
       {isPollModalOpen && (
@@ -568,6 +644,16 @@ export function ScopeFeed({
           editingPoll={editingPoll}
         />
       )}
+      <Dialog open={Boolean(deleteTarget)} onClose={deleteBusy ? undefined : () => setDeleteTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete this post?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">It's removed for everyone, with its comments and reactions. You can't undo this.</Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => void confirmDeletePost()} disabled={deleteBusy} startIcon={deleteBusy ? <CircularProgress size={16} color="inherit" /> : undefined}>Delete post</Button>
+        </DialogActions>
+      </Dialog>
       {editingPost && (
         <EditPostDialog
           open={Boolean(editingPost)}
