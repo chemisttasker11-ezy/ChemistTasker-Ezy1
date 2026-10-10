@@ -116,6 +116,16 @@ export const isEmojiOnly = (body?: string | null) => Boolean(body && body.trim()
 
 const TOKEN = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])|(@[\p{L}\p{N}._-]+(?:\s[\p{Lu}][\p{L}'-]+)?)/gu;
 
+/** Only plain web links become anchors; anything else stays text. */
+export const safeWebHref = (raw: string): string | null => {
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+  } catch {
+    return null;
+  }
+};
+
 /** Message text with clickable links and highlighted @mentions. */
 export const renderRichText = (body: string, tone: 'me' | 'them'): ReactNode => {
   const parts: ReactNode[] = [];
@@ -123,11 +133,14 @@ export const renderRichText = (body: string, tone: 'me' | 'them'): ReactNode => 
   for (const match of body.matchAll(TOKEN)) {
     const start = match.index ?? 0;
     if (start > last) parts.push(body.slice(last, start));
-    if (match[1]) {
+    const href = match[1] ? safeWebHref(match[1]) : null;
+    if (match[1] && !href) {
+      parts.push(match[1]);
+    } else if (href) {
       parts.push(
         <a
           key={start}
-          href={match[1]}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
           style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2, overflowWrap: 'anywhere' }}

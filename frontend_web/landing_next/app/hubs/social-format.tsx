@@ -17,11 +17,16 @@ export const fullDate=(iso:string)=>new Date(iso).toLocaleString('en-AU',{weekda
 export const initials=(name:string)=>name.split(/\s+/).filter(Boolean).slice(0,2).map(n=>n[0]).join('').toUpperCase()||'?';
 
 const TOKEN=/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])|(@[\p{L}\p{N}._-]+)/gu;
+/** Only plain web links become anchors; anything else stays text. */
+export function safeWebHref(raw:string):string|null{
+ try{const url=new URL(raw);return url.protocol==='https:'||url.protocol==='http:'?url.href:null;}catch{return null;}
+}
 /** Text with clickable links and highlighted @mentions (no HTML is executed). */
 export function richText(body:string):ReactNode{
  const parts:ReactNode[]=[];let last=0;
  for(const m of body.matchAll(TOKEN)){const start=m.index??0;if(start>last)parts.push(body.slice(last,start));
-  parts.push(m[1]?<a key={start} href={m[1]} target="_blank" rel="noopener noreferrer nofollow">{m[1]}</a>:<strong key={start} className="ct-mention">{m[2]}</strong>);
+  const href=m[1]?safeWebHref(m[1]):null;
+  parts.push(m[1]&&!href?m[1]:href?<a key={start} href={href} target="_blank" rel="noopener noreferrer nofollow">{m[1]}</a>:<strong key={start} className="ct-mention">{m[2]}</strong>);
   last=start+m[0].length;}
  if(last<body.length)parts.push(body.slice(last));
  return parts.map((p,i)=><Fragment key={i}>{p}</Fragment>);
