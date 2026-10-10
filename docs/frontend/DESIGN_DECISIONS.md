@@ -311,3 +311,28 @@ All five use `DashboardOverviewTemplate`, now built from the shared components:
 - Checked: 1440 and 390 (plans with pending activation, setup, manage, error); AA sweep 0 failures.
 - **Finding (not changed):** the top bar reads *Owner Dashboard* on billing because billing is a view of the overview
   route, not a menu item.
+
+## Talent board (2026-10-10)
+
+- **Prior work checked first.** The redesigned filter sidebars from the UI01/UI02 integration branch (PR #155/#156)
+  are already on this branch for both the talent and shift boards. The Next public site (`landing_next/migrated`)
+  adds a public presentation on top: live result count, a labelled *Filters (N)* button, a drawer footer button and
+  `PublicTalentCard`. Taken into the dashboard: the count line, the labelled filters button and the drawer footer.
+  Kept: the dashboard `TalentCardV2` (it matches the Figma *Talent Board / Default* frame), the sidebar search
+  (Figma puts search in the sidebar).
+- `PageHeader` *Find talent* with a live count (*2 profiles match your filters*, `aria-live`); the hand-made h5 at
+  weight 700 removed, and the page's own tinted, padded wrapper removed so it lines up with every other page.
+- The unlabelled floating "+" (Figma) becomes a header action *Publish your availability* / *Update my pitch*:
+  discoverable and named for screen readers. Mobile: *Filters (N)* button instead of an icon-only button; the drawer
+  has a display-face title and a sticky *Show N profiles* footer.
+- Card: the engagement pill sat in a fixed 320px box, squeezing the headline and pitch to one or two words per line
+  at 1440; it now sizes to its content.
+- States: error *We couldn't load talent profiles* with *Try again* (showed the raw "Request failed with status
+  500"; the count line no longer says "0 profiles" on error); a failed refresh keeps results with a warning and *Try
+  again* (was a line of red text); the staff verification note is an info alert with *Verify profile*. Filter chips
+  in sentence case (*Open to travel*, *Students & interns*, *Available … to …*); the red *Clear All* chip is a text
+  button; pagination is labelled.
+- Checked: 1440 and 390 (owner filled, mobile filter drawer, pharmacist with verification note, error); AA sweep 0
+  failures; talent route checks and the visual-states audit passing.
+- **For the job (shift) boards, later:** the Next copy of `ShiftsBoard` also has public-presentation changes in
+  `index.tsx` and `ShiftList.tsx` to review when the worker shift boards are revised.

@@ -185,7 +185,7 @@ export default function TalentCard({
                   </Typography>
                 ) : null}
               </Box>
-              <Box sx={{ width: { xs: "100%", sm: 320 }, display: "flex", justifyContent: { xs: "flex-start", sm: "flex-end" } }}>
+              <Box sx={{ width: { xs: "100%", sm: "auto" }, maxWidth: { sm: 260 }, flexShrink: 0, display: "flex", justifyContent: { xs: "flex-start", sm: "flex-end" } }}>
                 <Chip
                   size="small"
                   label={`Engagement: ${candidate.workTypes.length ? candidate.workTypes.join(", ") : "-"}`}
