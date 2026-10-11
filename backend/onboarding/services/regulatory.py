@@ -17,14 +17,20 @@ def required_documents_for_role(instance):
             ('ahpra_proof', 'ahpra_proof_verified', 'ahpra_proof_verification_note'),
             ('hours_proof', 'hours_proof_verified', 'hours_proof_verification_note'),
         ],
-        # Qualification documents depend on claimed competencies; entry-level
-        # assistants do not automatically require a Certificate II or above.
-        'TECHNICIAN': [],
-        'ASSISTANT': [],
+        # Level 3/4 dispensary and Levels 2/3/4 assistants can submit
+        # qualifications, RPL or workplace competency evidence in this field.
+        'TECHNICIAN': [
+            ('certificate', 'certificate_verified', 'certificate_verification_note'),
+        ],
+        'ASSISTANT': [
+            ('certificate', 'certificate_verified', 'certificate_verification_note'),
+        ] if instance.classification_level in ('LEVEL_2', 'LEVEL_3', 'LEVEL_4') else [],
         'STUDENT': [
             ('university_id', 'university_id_verified', 'university_id_verification_note'),
         ],
     }
+    if role == 'INTERN' and instance.intern_half != 'SECOND_HALF':
+        return [('ahpra_proof', 'ahpra_proof_verified', 'ahpra_proof_verification_note')]
     return mapping.get(role, [])
 
 
@@ -42,12 +48,32 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
     def _fname(f):
         return getattr(f, 'name', None) if f else None
 
+    original_role = str(instance.role_type or '').upper()
+    original_class = instance.classification_level
+    original_year = instance.student_year
+    original_half = instance.intern_half
+
     # role classification inputs
     for f in ['role_type','classification_level','student_year','intern_half']:
         if f in vdata:
             if getattr(instance, f) != vdata[f]:
                 setattr(instance, f, vdata[f])
                 update_fields.append(f)
+
+    role_or_class_changed = (
+        original_role != str(instance.role_type or '').upper()
+        or original_class != instance.classification_level
+        or original_year != instance.student_year
+        or original_half != instance.intern_half
+    )
+    if role_or_class_changed:
+        # Previously verified documents must not silently authorise a new
+        # professional role or award classification.
+        instance.verified = False
+        update_fields.append('verified')
+        for flag in ('ahpra_proof_verified', 'hours_proof_verified', 'certificate_verified', 'university_id_verified'):
+            setattr(instance, flag, False)
+            update_fields.append(flag)
 
     # Handle each file: replace/clear safely; reset its verified flag on change
     def handle_file(field):
