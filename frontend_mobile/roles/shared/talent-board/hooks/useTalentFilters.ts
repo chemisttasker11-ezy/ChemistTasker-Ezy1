@@ -1,3 +1,5 @@
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { skillId } from '@chemisttasker/shared-core';
 import { useMemo } from 'react';
 import { Candidate } from '../types';
 import { TalentFilterState } from '../components/FiltersSidebar';
@@ -31,7 +33,7 @@ export const useTalentFilters = (candidates: Candidate[], filters: TalentFilterS
     const map: Record<string, string[]> = {};
     candidates.forEach((c) => {
       if (!map[c.role]) map[c.role] = [];
-      const roleSkills = [...(c.clinicalServices ?? []), ...(c.expandedScope ?? []), ...(c.skills ?? [])];
+      const roleSkills = [...(c.clinicalServices ?? []), ...(c.expandedScope ?? []), ...(c.skills ?? [])].map(value => skillId(skillsRegistry as any, value)).filter((value): value is string => Boolean(value));
       map[c.role].push(...roleSkills);
     });
     Object.keys(map).forEach((role) => {
@@ -42,7 +44,7 @@ export const useTalentFilters = (candidates: Candidate[], filters: TalentFilterS
 
   const softwareOptions = useMemo(() => {
     const unique = new Set<string>();
-    candidates.forEach((c) => c.dispenseSoftware.forEach((s: string) => unique.add(s)));
+    candidates.forEach((c) => c.dispenseSoftware.forEach((s: string) => { const code = skillId(skillsRegistry as any, s); if (code) unique.add(code); }));
     return Array.from(unique).sort();
   }, [candidates]);
 
@@ -60,8 +62,8 @@ export const useTalentFilters = (candidates: Candidate[], filters: TalentFilterS
       }
       if (filters.states.length > 0 && !filters.states.includes(c.state)) return false;
       if (filters.skills.length > 0) {
-        const allSkills = Array.from(new Set([...(c.skills ?? []), ...(c.dispenseSoftware ?? [])]));
-        const hasAllSkills = filters.skills.every((skill: string) => allSkills.includes(skill));
+        const allSkills = Array.from(new Set([...(c.skills ?? []), ...(c.dispenseSoftware ?? [])].map(value => skillId(skillsRegistry as any, value)).filter(Boolean)));
+        const hasAllSkills = filters.skills.every((skill: string) => { const code = skillId(skillsRegistry as any, skill); return code !== null && allSkills.includes(code); });
         if (!hasAllSkills) return false;
       }
       if (filters.willingToTravel && !c.willingToTravel) return false;
