@@ -102,7 +102,6 @@
       "code": "PRESCRIPTION_DISPENSING",
       "label": "Prescription dispensing",
       "group": "Dispensing & Medicines",
-      "icon": "💊",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -111,13 +110,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": "Pharmacy technicians may assist with dispensing only under pharmacist supervision."
+      "note": "Pharmacy technicians may assist with dispensing only under pharmacist supervision.",
+      "icon_web": "PillBottle",
+      "icon_mobile": "pill",
+      "icon_meaning": "Prescription medication container"
     },
     {
       "code": "DISPENSING_DATA_ENTRY",
       "label": "Dispensing data entry and labelling",
       "group": "Dispensing & Medicines",
-      "icon": "⌨️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -126,13 +127,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": "Assistant conditional on dispensary training and pharmacist supervision."
+      "note": "Assistant conditional on dispensary training and pharmacist supervision.",
+      "icon_web": "ClipboardPenLine",
+      "icon_mobile": "clipboard-edit-outline",
+      "icon_meaning": "Prescription details and printed label"
     },
     {
       "code": "CLINICAL_CHECKING",
       "label": "Clinical prescription checking",
       "group": "Dispensing & Medicines",
-      "icon": "🔍",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "none",
@@ -141,13 +144,15 @@
         "STUDENT": "none"
       },
       "certificate": "",
-      "note": "Independent final clinical judgement by registered pharmacist only."
+      "note": "Independent final clinical judgement by registered pharmacist only.",
+      "icon_web": "ClipboardCheck",
+      "icon_mobile": "clipboard-check-outline",
+      "icon_meaning": "Clinical verification checklist"
     },
     {
       "code": "ESCRIPT_PROCESSING",
       "label": "Electronic prescription workflows",
       "group": "Dispensing & Medicines",
-      "icon": "📲",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -156,13 +161,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "QrCode",
+      "icon_mobile": "qrcode-scan",
+      "icon_meaning": "Electronic prescription QR token"
     },
     {
       "code": "PBS_CLAIMS",
       "label": "PBS claim preparation",
       "group": "Dispensing & Medicines",
-      "icon": "🧾",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -171,13 +178,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "ReceiptText",
+      "icon_mobile": "receipt-text-outline",
+      "icon_meaning": "Claim transaction receipt"
     },
     {
       "code": "PATIENT_COUNSELLING",
       "label": "Patient medication counselling",
       "group": "Dispensing & Medicines",
-      "icon": "🗣️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -186,13 +195,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": "Intern and student only under pharmacist supervision."
+      "note": "Intern and student only under pharmacist supervision.",
+      "icon_web": "MessagesSquare",
+      "icon_mobile": "forum-outline",
+      "icon_meaning": "Two-way patient consultation"
     },
     {
       "code": "OTC_S2_ADVICE",
       "label": "Pharmacy medicines (S2) assistance",
       "group": "Dispensing & Medicines",
-      "icon": "🩹",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -201,13 +212,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": "Non-pharmacists assist under appropriate training and supervision."
+      "note": "Non-pharmacists assist under appropriate training and supervision.",
+      "icon_web": "Pill",
+      "icon_mobile": "pill",
+      "icon_meaning": "Pharmacy-only medicine"
     },
     {
       "code": "S3_CONSULT_SUPPORT",
       "label": "Pharmacist-only (S3) consultation support",
       "group": "Dispensing & Medicines",
-      "icon": "🧑‍⚕️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -216,13 +229,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": "Support and referral do not grant independent supply authority."
+      "note": "Support and referral do not grant independent supply authority.",
+      "icon_web": "MessageCircleQuestion",
+      "icon_mobile": "comment-question-outline",
+      "icon_meaning": "Pharmacist consultation referral"
     },
     {
       "code": "S8_PROCEDURES",
       "label": "Controlled-drug procedures",
       "group": "Dispensing & Medicines",
-      "icon": "🔐",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -231,13 +246,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": "Legal permissions and pharmacist oversight still apply."
+      "note": "Legal permissions and pharmacist oversight still apply.",
+      "icon_web": "LockKeyhole",
+      "icon_mobile": "lock-check-outline",
+      "icon_meaning": "Secure controlled-drug procedures"
     },
     {
       "code": "S8_RECORDS",
       "label": "Controlled-drug record administration",
       "group": "Dispensing & Medicines",
-      "icon": "📚",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -246,13 +263,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "BookLock",
+      "icon_mobile": "book-lock-outline",
+      "icon_meaning": "Restricted register and records"
     },
     {
       "code": "WEBSTER_PACKING_DAA",
       "label": "Dose administration aid (DAA/Webster) packing",
       "group": "Dispensing & Medicines",
-      "icon": "📦",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -261,13 +280,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "BLISTER_PACK",
+      "icon_mobile": "BLISTER_PACK",
+      "icon_meaning": "Weekly tablet blister grid, not a parcel"
     },
     {
       "code": "DAA_FINAL_CHECK",
       "label": "DAA final clinical check",
       "group": "Dispensing & Medicines",
-      "icon": "✅",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "none",
@@ -276,13 +297,15 @@
         "STUDENT": "none"
       },
       "certificate": "",
-      "note": "Pharmacist only."
+      "note": "Pharmacist only.",
+      "icon_web": "BLISTER_CHECK",
+      "icon_mobile": "BLISTER_CHECK",
+      "icon_meaning": "Tablet blister grid plus checking tick"
     },
     {
       "code": "COMPOUNDING",
       "label": "Extemporaneous compounding",
       "group": "Dispensing & Medicines",
-      "icon": "⚗️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -291,13 +314,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "COMPOUNDING_TRAINING",
-      "note": "ChemistTasker platform evidence policy; not a universal statutory certificate."
+      "note": "ChemistTasker platform evidence policy; not a universal statutory certificate.",
+      "icon_web": "FlaskConical",
+      "icon_mobile": "flask-outline",
+      "icon_meaning": "Compounding vessel"
     },
     {
       "code": "ADVANCED_COMPOUNDING",
       "label": "Advanced / sterile compounding",
       "group": "Dispensing & Medicines",
-      "icon": "🧪",
       "eligibility": {
         "PHARMACIST": "conditional",
         "INTERN": "supervised",
@@ -306,13 +331,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "ADVANCED_COMPOUNDING_TRAINING",
-      "note": "Specialist training and additional safeguards apply."
+      "note": "Specialist training and additional safeguards apply.",
+      "icon_web": "TestTubeDiagonal",
+      "icon_mobile": "test-tube",
+      "icon_meaning": "Specialist laboratory compounding"
     },
     {
       "code": "STAGED_SUPPLY",
       "label": "Staged supply workflow",
       "group": "Dispensing & Medicines",
-      "icon": "🗓️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -321,13 +348,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": "Clinical supply decisions remain pharmacist-only."
+      "note": "Clinical supply decisions remain pharmacist-only.",
+      "icon_web": "CalendarClock",
+      "icon_mobile": "calendar-clock",
+      "icon_meaning": "Dated staged pickups"
     },
     {
       "code": "PHARMACOTHERAPY_METHADONE_SUBOXONE",
       "label": "Opioid dependence pharmacotherapy support",
       "group": "Dispensing & Medicines",
-      "icon": "🧫",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -336,13 +365,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": "Technical support is not independent dosing."
+      "note": "Technical support is not independent dosing.",
+      "icon_web": "PillBottle",
+      "icon_mobile": "pill-multiple",
+      "icon_meaning": "Medication-assisted therapy"
     },
     {
       "code": "MEDICATION_RECONCILIATION",
       "label": "Medication reconciliation",
       "group": "Dispensing & Medicines",
-      "icon": "📋",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -351,13 +382,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": "Supervised learner assistance is not independent clinical reconciliation."
+      "note": "Supervised learner assistance is not independent clinical reconciliation.",
+      "icon_web": "ClipboardList",
+      "icon_mobile": "clipboard-list-outline",
+      "icon_meaning": "Comparative medicine list"
     },
     {
       "code": "DISPENSARY_WORKFLOW",
       "label": "Dispensary workflow coordination",
       "group": "Dispensing & Medicines",
-      "icon": "🔄",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -366,13 +399,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Workflow",
+      "icon_mobile": "source-branch",
+      "icon_meaning": "Multi-step dispensary workflow"
     },
     {
       "code": "ROBOT_DISPENSING",
       "label": "Dispensing robot operation (ROWA / Alpaca)",
       "group": "Dispensing & Medicines",
-      "icon": "🤖",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -381,13 +416,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Bot",
+      "icon_mobile": "robot-outline",
+      "icon_meaning": "Automated dispensing hardware"
     },
     {
       "code": "MEDICINE_DELIVERIES",
       "label": "Medicine deliveries and handover",
       "group": "Dispensing & Medicines",
-      "icon": "🚚",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -396,13 +433,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": "Follow privacy and medicine handling policies."
+      "note": "Follow privacy and medicine handling policies.",
+      "icon_web": "Truck",
+      "icon_mobile": "truck-delivery-outline",
+      "icon_meaning": "Medicine transport"
     },
     {
       "code": "CANNABIS",
       "label": "Medicinal cannabis handling / dispensing workflow",
       "group": "Dispensing & Medicines",
-      "icon": "🌿",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -411,13 +450,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": "Clinical decisions remain pharmacist-only."
+      "note": "Clinical decisions remain pharmacist-only.",
+      "icon_web": "Leaf",
+      "icon_mobile": "cannabis",
+      "icon_meaning": "Recognisable medicinal cannabis plant"
     },
     {
       "code": "MEDICATION_ADHERENCE",
       "label": "Medication adherence support",
       "group": "Dispensing & Medicines",
-      "icon": "💡",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -426,13 +467,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "CalendarCheck",
+      "icon_mobile": "calendar-check-outline",
+      "icon_meaning": "Scheduled doses and adherence"
     },
     {
       "code": "VACCINATION",
       "label": "Vaccination",
       "group": "Clinical Services",
-      "icon": "💉",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "conditional",
@@ -441,13 +484,15 @@
         "STUDENT": "none"
       },
       "certificate": "VACCINATION_TRAINING",
-      "note": "Intern conditional on jurisdictional authorisation, training and supervision."
+      "note": "Intern conditional on jurisdictional authorisation, training and supervision.",
+      "icon_web": "Syringe",
+      "icon_mobile": "needle",
+      "icon_meaning": "Injection needle and syringe"
     },
     {
       "code": "ANAPHYLAXIS_MANAGEMENT",
       "label": "Anaphylaxis response training",
       "group": "Clinical Services",
-      "icon": "🚨",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -456,13 +501,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "ANAPHYLAXIS_TRAINING",
-      "note": ""
+      "note": "",
+      "icon_web": "Siren",
+      "icon_mobile": "alert-circle-outline",
+      "icon_meaning": "Emergency reaction response"
     },
     {
       "code": "FIRST_AID",
       "label": "First Aid / CPR",
       "group": "Clinical Services",
-      "icon": "❤️‍🩹",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -471,13 +518,15 @@
         "STUDENT": "experience"
       },
       "certificate": "FIRST_AID_CPR",
-      "note": ""
+      "note": "",
+      "icon_web": "BriefcaseMedical",
+      "icon_mobile": "medical-bag",
+      "icon_meaning": "First-aid kit"
     },
     {
       "code": "HMR_ACCREDITED_MRN",
       "label": "Medication Management Reviews (HMR / RMMR)",
       "group": "Clinical Services",
-      "icon": "🏠",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "none",
@@ -486,13 +535,15 @@
         "STUDENT": "none"
       },
       "certificate": "MMR_CREDENTIAL",
-      "note": "Credentialed pharmacist only."
+      "note": "Credentialed pharmacist only.",
+      "icon_web": "HousePlus",
+      "icon_mobile": "home-plus-outline",
+      "icon_meaning": "Home medicines review"
     },
     {
       "code": "ACOP",
       "label": "Aged Care On-site Pharmacist services",
       "group": "Clinical Services",
-      "icon": "🏥",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "none",
@@ -501,13 +552,15 @@
         "STUDENT": "none"
       },
       "certificate": "ACOP_CREDENTIAL",
-      "note": "Accredited training and program rules apply."
+      "note": "Accredited training and program rules apply.",
+      "icon_web": "Hospital",
+      "icon_mobile": "hospital-building",
+      "icon_meaning": "Residential aged care clinical service"
     },
     {
       "code": "MEDSCHECK",
       "label": "MedsCheck / Diabetes MedsCheck",
       "group": "Clinical Services",
-      "icon": "🧾",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -516,13 +569,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": "Supervised trainee involvement only."
+      "note": "Supervised trainee involvement only.",
+      "icon_web": "ClipboardCheck",
+      "icon_mobile": "clipboard-pulse-outline",
+      "icon_meaning": "Structured medication review"
     },
     {
       "code": "NDSS",
       "label": "NDSS diabetes support",
       "group": "Clinical Services",
-      "icon": "🩸",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -531,13 +586,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": "Administrative support is not an independent clinical consultation."
+      "note": "Administrative support is not an independent clinical consultation.",
+      "icon_web": "Droplet",
+      "icon_mobile": "water-outline",
+      "icon_meaning": "Diabetes blood glucose testing"
     },
     {
       "code": "UTI_PRESCRIBER",
       "label": "Uncomplicated UTI pharmacist prescribing",
       "group": "Clinical Services",
-      "icon": "🧬",
       "eligibility": {
         "PHARMACIST": "conditional",
         "INTERN": "none",
@@ -546,13 +603,15 @@
         "STUDENT": "none"
       },
       "certificate": "UTI_PRESCRIBING_TRAINING",
-      "note": "Jurisdiction-specific authorisation."
+      "note": "Jurisdiction-specific authorisation.",
+      "icon_web": "Microscope",
+      "icon_mobile": "bacteria-outline",
+      "icon_meaning": "Urinary tract infection assessment"
     },
     {
       "code": "ORAL_CONTRACEPTIVE_RESUPPLY",
       "label": "Oral contraceptive resupply service",
       "group": "Clinical Services",
-      "icon": "💊",
       "eligibility": {
         "PHARMACIST": "conditional",
         "INTERN": "none",
@@ -561,13 +620,15 @@
         "STUDENT": "none"
       },
       "certificate": "CONTRACEPTIVE_RESUPPLY_TRAINING",
-      "note": "Jurisdiction-specific authorisation."
+      "note": "Jurisdiction-specific authorisation.",
+      "icon_web": "Pill",
+      "icon_mobile": "pill-multiple",
+      "icon_meaning": "Oral contraceptive tablets"
     },
     {
       "code": "TRAVEL_HEALTH_YELLOW_FEVER",
       "label": "Travel health / Yellow Fever services",
       "group": "Clinical Services",
-      "icon": "🌍",
       "eligibility": {
         "PHARMACIST": "conditional",
         "INTERN": "none",
@@ -576,13 +637,15 @@
         "STUDENT": "none"
       },
       "certificate": "YELLOW_FEVER_TRAINING",
-      "note": "Clinic and state authorisations may apply."
+      "note": "Clinic and state authorisations may apply.",
+      "icon_web": "Plane",
+      "icon_mobile": "airplane",
+      "icon_meaning": "Travel immunisation"
     },
     {
       "code": "MINOR_SKIN",
       "label": "Minor skin conditions pharmacist service",
       "group": "Clinical Services",
-      "icon": "🧴",
       "eligibility": {
         "PHARMACIST": "conditional",
         "INTERN": "none",
@@ -591,13 +654,15 @@
         "STUDENT": "none"
       },
       "certificate": "PRESCRIBING_SCOPE_TRAINING",
-      "note": "Subject to local authorised scope."
+      "note": "Subject to local authorised scope.",
+      "icon_web": "Hand",
+      "icon_mobile": "hand-heart-outline",
+      "icon_meaning": "Minor skin examination"
     },
     {
       "code": "DIABETES_SCREENING",
       "label": "Diabetes screening support",
       "group": "Clinical Services",
-      "icon": "📈",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -606,13 +671,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Droplets",
+      "icon_mobile": "water-check-outline",
+      "icon_meaning": "Blood glucose testing"
     },
     {
       "code": "BLOOD_PRESSURE_CHECK",
       "label": "Blood-pressure measurement",
       "group": "Clinical Services",
-      "icon": "🩺",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -621,13 +688,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": "Interpretation and clinical advice require appropriate qualifications."
+      "note": "Interpretation and clinical advice require appropriate qualifications.",
+      "icon_web": "HeartPulse",
+      "icon_mobile": "heart-pulse",
+      "icon_meaning": "Blood pressure and pulse"
     },
     {
       "code": "COLD_CHAIN",
       "label": "Cold-chain and vaccine stock handling",
       "group": "Clinical Services",
-      "icon": "❄️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -636,13 +705,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Snowflake",
+      "icon_mobile": "snowflake-thermometer",
+      "icon_meaning": "Temperature-controlled storage"
     },
     {
       "code": "VACCINE_ADMIN_SUPPORT",
       "label": "Vaccination service administrative support",
       "group": "Clinical Services",
-      "icon": "📅",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -651,13 +722,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": "Does not authorise administering injections."
+      "note": "Does not authorise administering injections.",
+      "icon_web": "CalendarPlus",
+      "icon_mobile": "calendar-plus",
+      "icon_meaning": "Vaccine appointment administration"
     },
     {
       "code": "POS_CUSTOMER",
       "label": "Point-of-sale (POS) operation",
       "group": "Operations & Retail",
-      "icon": "🛒",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -666,13 +739,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "ScanBarcode",
+      "icon_mobile": "barcode-scan",
+      "icon_meaning": "Scanning products at pharmacy register"
     },
     {
       "code": "CUSTOMER_SERVICE",
       "label": "Customer service",
       "group": "Operations & Retail",
-      "icon": "🤝",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -681,13 +756,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Headset",
+      "icon_mobile": "headset",
+      "icon_meaning": "Customer support"
     },
     {
       "code": "CASH_HANDLING",
       "label": "Cash handling and payment terminals",
       "group": "Operations & Retail",
-      "icon": "💳",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -696,13 +773,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "CreditCard",
+      "icon_mobile": "credit-card-check-outline",
+      "icon_meaning": "Payment terminal"
     },
     {
       "code": "OTC_PRODUCTS",
       "label": "General OTC product knowledge",
       "group": "Operations & Retail",
-      "icon": "🧴",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -711,13 +790,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "BriefcaseMedical",
+      "icon_mobile": "medical-bag",
+      "icon_meaning": "Over-the-counter medication range"
     },
     {
       "code": "VITAMINS_SUPPLEMENTS",
       "label": "Vitamins and supplement product knowledge",
       "group": "Operations & Retail",
-      "icon": "🍊",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -726,13 +807,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Pill",
+      "icon_mobile": "pill-multiple",
+      "icon_meaning": "Vitamins in tablet form"
     },
     {
       "code": "SKINCARE_BEAUTY",
       "label": "Skincare and beauty merchandising",
       "group": "Operations & Retail",
-      "icon": "🧼",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -741,13 +824,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "SprayCan",
+      "icon_mobile": "lotion-outline",
+      "icon_meaning": "Skincare bottle"
     },
     {
       "code": "MERCHANDISING",
       "label": "Merchandising and planograms",
       "group": "Operations & Retail",
-      "icon": "🧩",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -756,13 +841,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "LayoutGrid",
+      "icon_mobile": "view-dashboard-outline",
+      "icon_meaning": "Pharmacy shelf planogram"
     },
     {
       "code": "STOCK_RECEIVING",
       "label": "Stock receiving",
       "group": "Operations & Retail",
-      "icon": "📥",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -771,13 +858,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "PackageOpen",
+      "icon_mobile": "package-down",
+      "icon_meaning": "Incoming stock shipment"
     },
     {
       "code": "STOCK_ORDERING",
       "label": "Stock ordering and wholesaler portals",
       "group": "Operations & Retail",
-      "icon": "📦",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -786,13 +875,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "ShoppingCart",
+      "icon_mobile": "cart-plus",
+      "icon_meaning": "Wholesaler purchase order"
     },
     {
       "code": "INVENTORY_CONTROL",
       "label": "Inventory and stock reconciliation",
       "group": "Operations & Retail",
-      "icon": "📊",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -801,13 +892,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Boxes",
+      "icon_mobile": "clipboard-list-outline",
+      "icon_meaning": "Stock inventory"
     },
     {
       "code": "STOCK_EXPIRY",
       "label": "Expiry-date and stock rotation checks",
       "group": "Operations & Retail",
-      "icon": "⏳",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -816,13 +909,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Hourglass",
+      "icon_mobile": "timer-sand",
+      "icon_meaning": "Expiry-time tracking"
     },
     {
       "code": "CLICK_COLLECT",
       "label": "Click-and-collect fulfilment",
       "group": "Operations & Retail",
-      "icon": "🛍️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -831,13 +926,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "ShoppingBag",
+      "icon_mobile": "shopping-outline",
+      "icon_meaning": "Prepared store pickup"
     },
     {
       "code": "RETURNS",
       "label": "Returns and stock credits",
       "group": "Operations & Retail",
-      "icon": "↩️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -846,13 +943,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "PackageX",
+      "icon_mobile": "package-up",
+      "icon_meaning": "Returning inventory shipment"
     },
     {
       "code": "PHONE_ENQUIRIES",
       "label": "Telephone and customer enquiries",
       "group": "Operations & Retail",
-      "icon": "📞",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -861,13 +960,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "PhoneCall",
+      "icon_mobile": "phone-in-talk-outline",
+      "icon_meaning": "Telephone contact"
     },
     {
       "code": "APPOINTMENT_BOOKINGS",
       "label": "Service appointment bookings",
       "group": "Operations & Retail",
-      "icon": "📆",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -876,13 +977,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "CalendarPlus",
+      "icon_mobile": "calendar-plus",
+      "icon_meaning": "Booking a clinical appointment"
     },
     {
       "code": "NDSS_ADMIN",
       "label": "NDSS ordering and administration",
       "group": "Operations & Retail",
-      "icon": "🗂️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -891,13 +994,15 @@
         "STUDENT": "supervised"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "ClipboardList",
+      "icon_mobile": "clipboard-text-outline",
+      "icon_meaning": "NDSS order form"
     },
     {
       "code": "PHARMACY_ADMIN",
       "label": "Pharmacy administration",
       "group": "Operations & Retail",
-      "icon": "🗃️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -906,13 +1011,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Files",
+      "icon_mobile": "file-document-outline",
+      "icon_meaning": "Administrative records"
     },
     {
       "code": "STAFF_SUPERVISION",
       "label": "Staff training and supervision",
       "group": "Operations & Retail",
-      "icon": "👥",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -921,13 +1028,15 @@
         "STUDENT": "none"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "UsersRound",
+      "icon_mobile": "account-group-outline",
+      "icon_meaning": "Team training and supervision"
     },
     {
       "code": "WORKPLACE_SAFETY",
       "label": "Work health and safety procedures",
       "group": "Operations & Retail",
-      "icon": "🦺",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -936,13 +1045,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "ShieldCheck",
+      "icon_mobile": "shield-check-outline",
+      "icon_meaning": "Workplace safety compliance"
     },
     {
       "code": "FRONT_SHOP_MANAGEMENT",
       "label": "Front-of-shop management",
       "group": "Operations & Retail",
-      "icon": "🏬",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -951,13 +1062,15 @@
         "STUDENT": "none"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Store",
+      "icon_mobile": "storefront-outline",
+      "icon_meaning": "Retail pharmacy storefront"
     },
     {
       "code": "PHARMACY_IN_CHARGE",
       "label": "Pharmacist in charge duties",
       "group": "Operations & Retail",
-      "icon": "🛡️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "none",
@@ -966,13 +1079,15 @@
         "STUDENT": "none"
       },
       "certificate": "",
-      "note": "Appropriate general registration and appointment required."
+      "note": "Appropriate general registration and appointment required.",
+      "icon_web": "ShieldUser",
+      "icon_mobile": "shield-account-outline",
+      "icon_meaning": "Accountable supervising pharmacist"
     },
     {
       "code": "FRED",
       "label": "FRED / FRED NXT",
       "group": "Software & Digital",
-      "icon": "💻",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -981,13 +1096,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing workstation / FRED"
     },
     {
       "code": "MINFOS",
       "label": "Minfos",
       "group": "Software & Digital",
-      "icon": "🖥️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -996,13 +1113,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "MonitorCog",
+      "icon_mobile": "monitor-dashboard",
+      "icon_meaning": "Minfos dispensing application"
     },
     {
       "code": "Z_DISPENSE",
       "label": "Z Dispense",
       "group": "Software & Digital",
-      "icon": "⌨️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -1011,13 +1130,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Keyboard",
+      "icon_mobile": "keyboard-outline",
+      "icon_meaning": "Z Dispense data entry"
     },
     {
       "code": "CORUM_LOTS",
       "label": "Corum LOTS",
       "group": "Software & Digital",
-      "icon": "💽",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -1026,13 +1147,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Database",
+      "icon_mobile": "database-outline",
+      "icon_meaning": "Corum LOTS pharmacy database"
     },
     {
       "code": "DISPENSE_WORKS",
       "label": "Dispense Works",
       "group": "Software & Digital",
-      "icon": "🧑‍💻",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -1041,13 +1164,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "AppWindow",
+      "icon_mobile": "application-outline",
+      "icon_meaning": "Dispense Works application"
     },
     {
       "code": "RXONE",
       "label": "RxOne",
       "group": "Software & Digital",
-      "icon": "🖱️",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -1056,13 +1181,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "MousePointerClick",
+      "icon_mobile": "cursor-default-click-outline",
+      "icon_meaning": "RxOne software interaction"
     },
     {
       "code": "AQUARIUS",
       "label": "Aquarius",
       "group": "Software & Digital",
-      "icon": "🌊",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -1071,13 +1198,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "MonitorSmartphone",
+      "icon_mobile": "monitor-cellphone",
+      "icon_meaning": "Aquarius software workstation"
     },
     {
       "code": "POSWORKS",
       "label": "PosWorks",
       "group": "Software & Digital",
-      "icon": "🧮",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -1086,13 +1215,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "ScanBarcode",
+      "icon_mobile": "barcode-scan",
+      "icon_meaning": "PosWorks retail checkout"
     },
     {
       "code": "MYSCRIPT",
       "label": "MyScript",
       "group": "Software & Digital",
-      "icon": "📱",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "supervised",
@@ -1101,13 +1232,15 @@
         "STUDENT": "familiarity"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "Smartphone",
+      "icon_mobile": "cellphone",
+      "icon_meaning": "MyScript mobile prescription application"
     },
     {
       "code": "EXCEL",
       "label": "Microsoft Excel",
       "group": "Software & Digital",
-      "icon": "📊",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -1116,13 +1249,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "FileSpreadsheet",
+      "icon_mobile": "file-excel-outline",
+      "icon_meaning": "Excel worksheet"
     },
     {
       "code": "WORD",
       "label": "Microsoft Word",
       "group": "Software & Digital",
-      "icon": "📝",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -1131,13 +1266,15 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": ""
+      "note": "",
+      "icon_web": "FileText",
+      "icon_mobile": "file-word-outline",
+      "icon_meaning": "Word document"
     },
     {
       "code": "OTHER",
       "label": "Other pharmacy software",
       "group": "Software & Digital",
-      "icon": "🧰",
       "eligibility": {
         "PHARMACIST": "experience",
         "INTERN": "experience",
@@ -1146,12 +1283,25 @@
         "STUDENT": "experience"
       },
       "certificate": "",
-      "note": "Optional free-text software name."
+      "note": "Optional free-text software name.",
+      "icon_web": "MonitorCog",
+      "icon_mobile": "application-cog-outline",
+      "icon_meaning": "Other pharmacy software application"
     }
   ],
   "primary_sources": [
     "https://awards.fairwork.gov.au/MA000012.html",
     "https://www.pharmacyboard.gov.au/Registration/Internships",
     "https://www.pharmacycouncil.org.au/education-provider/accreditation/pharmacist-education-programs/accredited-pharmacist-education-programs/"
-  ]
+  ],
+  "icon_standard": {
+    "web": "lucide-react",
+    "mobile": "MaterialCommunityIcons via @expo/vector-icons",
+    "special": "Custom matching seven-day four-dose blister tray for Webster/DAA",
+    "source_urls": [
+      "https://lucide.dev/icons",
+      "https://pictogrammers.com/library/mdi/",
+      "https://mui.com/material-ui/icons/"
+    ]
+  }
 }
