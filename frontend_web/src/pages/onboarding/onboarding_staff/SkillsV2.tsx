@@ -116,7 +116,10 @@ export default function SkillsV2() {
 
   const hasExisting = (code: string) => Boolean(existingCerts[code]?.path);
   const hasPending = (code: string) => Boolean(pendingFiles[code]);
-  const requiresCert = (code: string) => Boolean((skillIndex.get(code) as any)?.certificate);
+  const requiresCert = (code: string) => {
+    const item = skillIndex.get(code) as any;
+    return Boolean(item?.certificate && currentRole && !['familiarity','none'].includes(item.eligibility[currentRole]));
+  };
   const previewPendingUrl = (code: string) => {
     const f = pendingFiles[code];
     return f ? URL.createObjectURL(f) : '';
@@ -261,7 +264,7 @@ export default function SkillsV2() {
                         control={<Checkbox checked={checked} onChange={toggleSkill(item.code)} />}
                         label={
                           <Box>
-                            <Typography variant="body1" sx={{display:'flex',alignItems:'center',gap:1}}><span role="img" aria-label={item.label}>{(item as any).icon}</span>{item.label}</Typography>
+                            <Typography variant="body1" sx={{display:"flex",alignItems:"center",gap:1}}><span role="img" aria-label={item.label}>{(item as any).icon}</span>{item.label}</Typography>
                             {currentRole && claimModeLabel((item as any).eligibility[currentRole]) && <Typography variant="caption" sx={{display:'block',color:'secondary.main',fontWeight:700}}>{claimModeLabel((item as any).eligibility[currentRole])}</Typography>}
                             {item.description && (
                               <Typography variant="body2" color="text.secondary">
