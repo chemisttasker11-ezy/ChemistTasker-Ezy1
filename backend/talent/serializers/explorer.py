@@ -4,6 +4,7 @@ from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, Pharmaci
 from talent.models import ExplorerPost, ExplorerPostReaction
 import uuid
 import json
+from onboarding.services.skill_identity import normalize_skills
 
 
 class ExplorerPostReadSerializer(serializers.ModelSerializer):
@@ -96,14 +97,14 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
     def get_skills(self, obj):
         # Always prefer onboarding skills for Pharmacist/Other Staff.
         if obj.role_category in ("PHARMACIST", "OTHER_STAFF"):
-            return self._get_onboarding_skills(obj)
+            return normalize_skills(self._get_onboarding_skills(obj))
         # Explorers do not expose skills on TalentBoard.
         if obj.role_category == "EXPLORER":
             return []
-        return list(obj.skills or []) if obj.skills else self._get_onboarding_skills(obj)
+        return normalize_skills(list(obj.skills or []) if obj.skills else self._get_onboarding_skills(obj))
 
     def get_software(self, obj):
-        return list(obj.software or []) if obj.software else []
+        return normalize_skills(list(obj.software or [])) if obj.software else []
 
     def get_travel_states(self, obj):
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
@@ -217,6 +218,14 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
                 attrs["software"] = json.loads(software)
             except Exception:
                 raise serializers.ValidationError({"software": "Invalid JSON list."})
+        # Explorer interests stay separate; professional skills are canonical IDs only.
+        for field in ("skills", "software"):
+            if field in attrs:
+                role = attrs.get("role_category", getattr(self.instance, "role_category", None))
+                if role == "EXPLORER":
+                    attrs[field] = []  # Never expose Explorer interests as professional capabilities.
+                else:
+                    attrs[field] = normalize_skills(attrs[field], strict=True)
         availability_days = attrs.get("availability_days")
         if isinstance(availability_days, str):
             try:
