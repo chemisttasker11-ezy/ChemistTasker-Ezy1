@@ -8,24 +8,20 @@ import { getOnboardingDetail, updateOnboardingForm, roleSkillGroups, workerSkill
 import { pickSingleDocument, roleKey, toRNFile } from './shared';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
 
-type SkillItem = {
-  code: string;
-  label: string;
-  description?: string;
-  requires_certificate?: boolean;
-};
+type CertRow = { skill_code: string; path?: string; url?: string | null; uploaded_at?: string | null };
+type ApiData = { skills?: string[]; skill_certificates?: CertRow[]; role_type?: string | null };
 
 const registry = require('@chemisttasker/shared-core/skills_registry.json') as any;
 
 export default function PharmacistSkillsScreen() {
   const currentRole = workerSkillRole('pharmacist');
   const groups = useMemo(() => roleSkillGroups(registry,currentRole),[]);
-  const legacy = useMemo(() => legacySkillCodes(registry,currentRole,selected),[selected]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const legacy = useMemo(() => legacySkillCodes(registry,currentRole,selected),[selected]);
   const [existingCerts, setExistingCerts] = useState<Record<string, CertRow>>({});
   const [pendingFiles, setPendingFiles] = useState<Record<string, any>>({});
   const unsaved = useUnsavedChangesGuard(
