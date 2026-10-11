@@ -129,6 +129,8 @@ class ShiftSerializer(serializers.ModelSerializer):
         role = attrs.get('role_needed') or getattr(self.instance, 'role_needed', None)
         for field in ('must_have', 'nice_to_have'):
             if field in attrs:
+                if role == 'EXPLORER' and attrs[field]:
+                    raise serializers.ValidationError({field: 'Explorer shifts cannot require professional pharmacy skills.'})
                 attrs[field] = normalize_skills(attrs[field], strict=True, allowed_role=role if role != 'EXPLORER' else None)
         if 'must_have' in attrs or 'nice_to_have' in attrs:
             required = attrs.get('must_have', getattr(self.instance, 'must_have', []) or [])
