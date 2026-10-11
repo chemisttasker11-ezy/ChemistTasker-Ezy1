@@ -1,7 +1,8 @@
 services:
   landing:
     build:
-      context: ./frontend_web/landing_next
+      context: .
+      dockerfile: frontend_web/landing_next/Dockerfile
       args:
         NEXT_PUBLIC_SITE_URL: "https://chemisttasker.com.au"
     container_name: chemisttasker_public_prod

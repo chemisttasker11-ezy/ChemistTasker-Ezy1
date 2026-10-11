@@ -171,7 +171,8 @@ services:
 
   landing:
     build:
-      context: ./frontend_web/landing_next
+      context: .
+      dockerfile: frontend_web/landing_next/Dockerfile
       args:
         REQUIRE_WEB_INTEGRATIONS: "1"
         NEXT_PUBLIC_SITE_URL: "${STAGING_PUBLIC_URL:-https://preview.invalid}"
