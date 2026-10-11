@@ -4,6 +4,8 @@
 // the public site passes its skill icons through renderSkillIcon.
 import React from 'react';
 import { Box, Collapse, IconButton, InputAdornment, Stack, TextField } from '@mui/material';
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { skillLabel } from '@chemisttasker/shared-core';
 import {
   CommuteOutlined as CommuteIcon,
   ExpandLess as ExpandLessIcon,
@@ -117,7 +119,7 @@ export default function TalentFiltersSidebar({
                   <Box sx={{ pb: 0.75 }}>
                     <FilterChips>
                       {roleSkillOptions[role].map((skill) => (
-                        <FilterChip key={skill} selected={filters.skills.includes(skill)} onClick={() => toggleSkill(skill)} icon={renderSkillIcon?.(skill)}>{skill}</FilterChip>
+                        <FilterChip key={skill} selected={filters.skills.includes(skill)} onClick={() => toggleSkill(skill)} icon={renderSkillIcon?.(skill)}>{skillLabel(skillsRegistry as any, skill)}</FilterChip>
                       ))}
                     </FilterChips>
                   </Box>
