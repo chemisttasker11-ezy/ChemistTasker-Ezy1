@@ -15,18 +15,18 @@ describe('canonical skills across talent and shift modules', () => {
   });
 
   it('resolves display names and previous codes to one identity', () => {
-    expect(skillId(registry, 'Dose administration aid (DAA/Webster) packing')).toBe('WEBSTER_PACKING_DAA');
-    expect(skillId(registry, 'DAA')).toBe('WEBSTER_PACKING_DAA');
-    expect(skillId(registry, 'vacciNATOR')).toBe('VACCINATION');
-    expect(skillId(registry, 'CRED_PHARM')).toBe('HMR_ACCREDITED_MRN');
-    expect(skillLabel(registry, 'VACCINATION')).toBe('Vaccination');
-    expect(findSkill(registry, 'Webster packing')?.code).toBe('WEBSTER_PACKING_DAA');
-    expect(skillId(registry, 'pack something unrelated')).toBeNull();
+    expect(skillId(registry as any, 'Dose administration aid (DAA/Webster) packing')).toBe('WEBSTER_PACKING_DAA');
+    expect(skillId(registry as any, 'DAA')).toBe('WEBSTER_PACKING_DAA');
+    expect(skillId(registry as any, 'vacciNATOR')).toBe('VACCINATION');
+    expect(skillId(registry as any, 'CRED_PHARM')).toBe('HMR_ACCREDITED_MRN');
+    expect(skillLabel(registry as any, 'VACCINATION')).toBe('Vaccination');
+    expect(findSkill(registry as any, 'Webster packing')?.code).toBe('WEBSTER_PACKING_DAA');
+    expect(skillId(registry as any, 'pack something unrelated')).toBeNull();
   });
 
   it('does not award matching for an unknown mandatory claim', () => {
     const match = matchSkillRequirements(
-      registry,
+      registry as any,
       ['WEBSTER_PACKING_DAA', 'not a verified skill'],
       ['FRED'],
       ['DAA', 'FRED']
@@ -40,16 +40,16 @@ describe('canonical skills across talent and shift modules', () => {
   it('has the same skill code across Pharmacist, Intern and Technician', () => {
     const roles = ['PHARMACIST', 'INTERN', 'TECHNICIAN'] as const;
     for (const role of roles) {
-      const codes = roleSkillGroups(registry, role).flatMap(group => group.items.map(skill => skill.code));
+      const codes = roleSkillGroups(registry as any, role).flatMap(group => group.items.map(skill => skill.code));
       expect(codes).toContain('WEBSTER_PACKING_DAA');
     }
-    expect(roleSkillGroups(registry, 'TECHNICIAN').flatMap(group => group.items.map(skill => skill.code))).not.toContain('DAA_FINAL_CHECK');
-    expect(roleSkillGroups(registry, null)).toEqual([]);
+    expect(roleSkillGroups(registry as any, 'TECHNICIAN').flatMap(group => group.items.map(skill => skill.code))).not.toContain('DAA_FINAL_CHECK');
+    expect(roleSkillGroups(registry as any, null)).toEqual([]);
   });
 
   it('does not equate different dispensing and final-check tasks', () => {
-    expect(skillMatches(registry, 'DAA_FINAL_CHECK', ['WEBSTER_PACKING_DAA'])).toBe(false);
-    expect(skillMatches(registry, 'DAA', ['WEBSTER_PACKING_DAA'])).toBe(true);
-    expect(normalizeSkillIds(registry, ['DAA','WEBSTER_PACKING_DAA','FRED'])).toEqual(['WEBSTER_PACKING_DAA','FRED']);
+    expect(skillMatches(registry as any, 'DAA_FINAL_CHECK', ['WEBSTER_PACKING_DAA'])).toBe(false);
+    expect(skillMatches(registry as any, 'DAA', ['WEBSTER_PACKING_DAA'])).toBe(true);
+    expect(normalizeSkillIds(registry as any, ['DAA','WEBSTER_PACKING_DAA','FRED'])).toEqual(['WEBSTER_PACKING_DAA','FRED']);
   });
 });
