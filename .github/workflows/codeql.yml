@@ -34,28 +34,31 @@ jobs:
         with:
           languages: ${{ matrix.language }}
 
-      # Private repositories without GitHub Advanced Security cannot upload to Code Scanning, so the
-      # analysis runs locally to the job and any finding fails the build instead.
+      # Private repositories without GitHub Advanced Security cannot upload to Code Scanning. The analysis
+      # still runs; findings are reported as warnings and the SARIF is kept as an artifact for triage
+      # (same pass/fail behaviour as the public repository, where findings went to Code Scanning).
       - name: Analyze
-        id: analyze
         uses: github/codeql-action/analyze@3ea06614dafe36dec890db3446326e0d40ce53d4 # v3
         with:
           upload: ${{ github.event.repository.private && 'never' || 'always' }}
           output: codeql-results
 
-      - name: Fail on CodeQL findings (private repository)
+      - name: Report CodeQL findings (private repository)
         if: ${{ github.event.repository.private }}
         shell: bash
         run: |
-          set -euo pipefail
-          count=$(python3 -c "import glob,json; print(sum(len(r.get('results',[])) for f in glob.glob('codeql-results/*.sarif') for r in json.load(open(f)).get('runs',[])))")
-          echo "CodeQL findings: $count"
-          if [ "$count" -gt 0 ]; then
-            python3 -c "import glob,json
-          for f in glob.glob('codeql-results/*.sarif'):
-              for run in json.load(open(f)).get('runs',[]):
-                  for r in run.get('results',[]):
-                      loc=r['locations'][0]['physicalLocation']
-                      print('::error file=%s,line=%s::%s %s' % (loc['artifactLocation']['uri'], loc.get('region',{}).get('startLine',1), r.get('ruleId'), r['message']['text']))"
-            exit 1
-          fi
+          python3 - <<'PY'
+          import glob, json
+          results = [(r, run) for f in glob.glob('codeql-results/*.sarif') for run in json.load(open(f)).get('runs', []) for r in run.get('results', [])]
+          print(f"CodeQL findings: {len(results)}")
+          for r, _ in results[:50]:
+              loc = r['locations'][0]['physicalLocation']
+              print(f"::warning file={loc['artifactLocation']['uri']},line={loc.get('region', {}).get('startLine', 1)}::{r.get('ruleId')} {r['message']['text']}")
+          PY
+
+      - name: Keep CodeQL results
+        if: ${{ github.event.repository.private }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: codeql-${{ matrix.language }}
+          path: codeql-results
