@@ -31,6 +31,14 @@ def _load_skills_catalog():
 
 def _required_cert_skill_codes(role_key: str) -> set[str]:
     catalog = _load_skills_catalog()
+    if "skills" not in catalog:
+        role = catalog.get(role_key, {})
+        return {
+            item.get("code")
+            for group in ("clinical_services", "dispense_software", "expanded_scope")
+            for item in role.get(group, [])
+            if item.get("requires_certificate") and item.get("code")
+        }
     return {skill["code"] for skill in catalog.get("skills", []) if skill.get("certificate")}
 
 
@@ -42,6 +50,9 @@ def _role_for_skills(instance, role_key: str):
 
 def _canonical_skills(instance, requested: list[str], role_key: str) -> list[str]:
     catalog = _load_skills_catalog()
+    if "skills" not in catalog:
+        # Preserve existing tab-test fixtures and older deployed catalog format.
+        return requested
     skills = {item["code"]: item for item in catalog.get("skills", [])}
     alias = catalog.get("legacy_aliases", {})
     allowed = {"PHARMACIST", "INTERN", "TECHNICIAN", "ASSISTANT", "STUDENT"}
@@ -171,6 +182,13 @@ def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: 
 
     uploaded_codes = {code for code, file_obj in uploads.items() if code in skills and file_obj}
     required_codes = _required_cert_skill_codes(role_key)
+    if "skills" in _load_skills_catalog():
+        role = _role_for_skills(instance, role_key)
+        item_lookup = {item["code"]: item for item in _load_skills_catalog().get("skills", [])}
+        required_codes = {
+            code for code in required_codes
+            if item_lookup.get(code, {}).get("eligibility", {}).get(role) not in ("familiarity", "none")
+        }
     missing = [
         code for code in skills
         if code in required_codes and code not in cert_map and code not in uploaded_codes
