@@ -15,13 +15,6 @@ import skillsRegistry from '../../../../../shared-core/skills_registry.json';
 import { roleSkillGroups, workerSkillRole, claimModeLabel, legacySkillCodes } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
 
-type SkillItem = {
-  code: string;
-  label: string;
-  description?: string;
-  requires_certificate?: boolean;
-};
-
 
 // ---- Legacy-style Years of Experience (string values; keep exactly as backend expects) ----
 const YEARS_EXPERIENCE_CHOICES: Array<{ value: string; label: string }> = [
