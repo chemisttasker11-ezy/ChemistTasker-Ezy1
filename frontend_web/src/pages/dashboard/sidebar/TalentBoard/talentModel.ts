@@ -1,5 +1,6 @@
 import { ENGAGEMENT_LABELS } from "./constants";
-import skillsCatalog from "../../../../../../shared-core/skills_catalog.json";
+import skillsRegistry from "../../../../../../shared-core/skills_registry.json";
+import { skillId, skillLabel } from "@chemisttasker/shared-core";
 
 const titleCase = (value: string) =>
   value
@@ -74,44 +75,13 @@ const mapAvailabilityToPitchSlots = (entries: any[]) =>
 const allWorkTypes = Object.values(ENGAGEMENT_LABELS);
 
 
-type SkillItem = {
-  code: string;
-  label: string;
-  description?: string;
-  requires_certificate?: boolean;
-};
+const codeToLabel = new Map(skillsRegistry.skills.map(skill => [skill.code, skill.label]));
+const codeToCategory = new Map(skillsRegistry.skills.map(skill => [
+  skill.code,
+  skill.group === "Clinical Services" ? "clinical_services" :
+  skill.group === "Software & Digital" ? "dispense_software" : "expanded_scope"
+] as const));
+const resolveTalentSkillCode = (value: string) => skillId(skillsRegistry as any, value);
+const resolveTalentSkillLabel = (value: string) => skillLabel(skillsRegistry as any, value);
 
-type RoleCatalog = {
-  clinical_services: SkillItem[];
-  dispense_software: SkillItem[];
-  expanded_scope: SkillItem[];
-};
-
-type SkillsCatalog = {
-  pharmacist: RoleCatalog;
-  otherstaff: RoleCatalog;
-};
-
-const catalog = skillsCatalog as SkillsCatalog;
-
-const buildSkillMaps = () => {
-  const codeToLabel = new Map<string, string>();
-  const codeToCategory = new Map<string, "clinical_services" | "dispense_software" | "expanded_scope">();
-  (["pharmacist", "otherstaff"] as const).forEach((roleKey) => {
-    const role = catalog[roleKey];
-    if (!role) return;
-    (["clinical_services", "dispense_software", "expanded_scope"] as const).forEach((category) => {
-      role[category]?.forEach((item) => {
-        if (!item?.code) return;
-        if (!codeToLabel.has(item.code)) codeToLabel.set(item.code, item.label || item.code);
-        if (!codeToCategory.has(item.code)) codeToCategory.set(item.code, category);
-      });
-    });
-  });
-  return { codeToLabel, codeToCategory };
-};
-
-const { codeToLabel, codeToCategory } = buildSkillMaps();
-
-
-export { formatRoleLabel, formatWorkType, mapRoleToShiftRole, mapAvailabilityToPitchSlots, allWorkTypes, codeToLabel, codeToCategory, isIsoDate, todayIso };
+export { formatRoleLabel, formatWorkType, mapRoleToShiftRole, mapAvailabilityToPitchSlots, allWorkTypes, codeToLabel, codeToCategory, resolveTalentSkillCode, resolveTalentSkillLabel, isIsoDate, todayIso };
