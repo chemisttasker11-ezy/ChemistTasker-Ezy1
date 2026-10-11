@@ -97,7 +97,12 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
     def get_skills(self, obj):
         # Always prefer onboarding skills for Pharmacist/Other Staff.
         if obj.role_category in ("PHARMACIST", "OTHER_STAFF"):
-            return normalize_skills(self._get_onboarding_skills(obj))
+            user = obj.author_user or getattr(obj.explorer_profile, 'user', None)
+            role = obj.role_category
+            if role == 'OTHER_STAFF':
+                profile = OtherStaffOnboarding.objects.filter(user=user).first() if user else None
+                role = getattr(profile, 'role_type', None) or 'UNKNOWN'
+            return normalize_skills(self._get_onboarding_skills(obj), allowed_role=role, matchable_only=True)
         # Explorers do not expose skills on TalentBoard.
         if obj.role_category == "EXPLORER":
             return []
@@ -106,7 +111,8 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
     def get_software(self, obj):
         if obj.role_category == 'EXPLORER':
             return []
-        return normalize_skills(list(obj.software or [])) if obj.software else []
+        # Software belongs to the same current role-compatible onboarding claims.
+        return normalize_skills(self.get_skills(obj), matchable_only=True, software_only=True)
 
     def get_travel_states(self, obj):
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
@@ -220,14 +226,29 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
                 attrs["software"] = json.loads(software)
             except Exception:
                 raise serializers.ValidationError({"software": "Invalid JSON list."})
-        # Explorer interests stay separate; professional skills are canonical IDs only.
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        role = attrs.get('role_category', getattr(self.instance, 'role_category', None))
+        if user and user.is_authenticated and role is None:
+            role = user.role
+            attrs['role_category'] = role
+        if user and user.is_authenticated and role != user.role:
+            raise serializers.ValidationError({'role_category': 'Use your current account role for your talent post.'})
+        skill_role = role
+        if role == 'OTHER_STAFF':
+            profile = OtherStaffOnboarding.objects.filter(user=user).first() if user else None
+            skill_role = getattr(profile, 'role_type', None) or 'UNKNOWN'
+        # Explorer interests stay separate; professional claims respect the current role.
         for field in ("skills", "software"):
             if field in attrs:
-                role = attrs.get("role_category", getattr(self.instance, "role_category", None))
                 if role == "EXPLORER":
                     attrs[field] = []  # Never expose Explorer interests as professional capabilities.
                 else:
-                    attrs[field] = normalize_skills(attrs[field], strict=True)
+                    try:
+                        attrs[field] = normalize_skills(attrs[field], strict=True, allowed_role=skill_role,
+                                                       matchable_only=True, software_only=field == 'software')
+                    except serializers.ValidationError as error:
+                        raise serializers.ValidationError({field: error.detail})
         availability_days = attrs.get("availability_days")
         if isinstance(availability_days, str):
             try:

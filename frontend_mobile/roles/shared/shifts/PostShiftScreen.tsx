@@ -1,3 +1,5 @@
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { normalizeSavedSkillCodes } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, TouchableOpacity } from 'react-native';
 import {
@@ -354,8 +356,8 @@ export default function PostShiftScreen() {
             setDescription(data.description ?? '');
             setHideName(Boolean(data.post_anonymously ?? data.postAnonymously));
             setSingleUserOnly(Boolean(data.single_user_only ?? data.singleUserOnly));
-            setMustHave(Array.isArray(data.must_have ?? data.mustHave) ? (data.must_have ?? data.mustHave) : []);
-            setNiceToHave(Array.isArray(data.nice_to_have ?? data.niceToHave) ? (data.nice_to_have ?? data.niceToHave) : []);
+            setMustHave(normalizeSavedSkillCodes(skillsRegistry as any, Array.isArray(data.must_have ?? data.mustHave) ? (data.must_have ?? data.mustHave) : []));
+            setNiceToHave(normalizeSavedSkillCodes(skillsRegistry as any, Array.isArray(data.nice_to_have ?? data.niceToHave) ? (data.nice_to_have ?? data.niceToHave) : []));
             const escalations =
                 typeof (data.escalation_dates ?? data.escalationDates) === 'object' && (data.escalation_dates ?? data.escalationDates)
                     ? (data.escalation_dates ?? data.escalationDates)

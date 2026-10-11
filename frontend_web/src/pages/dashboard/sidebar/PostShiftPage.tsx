@@ -1,3 +1,5 @@
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { normalizeSavedSkillCodes } from '@chemisttasker/shared-core';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Container,
@@ -242,8 +244,8 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
           setRoleNeeded(detail.roleNeeded ?? '');
           setDescription(detail.description ?? '');
           setWorkloadTags(detail.workloadTags ?? []);
-          setMustHave(detail.mustHave ?? []);
-          setNiceToHave(detail.niceToHave ?? []);
+          setMustHave(normalizeSavedSkillCodes(skillsRegistry as any, detail.mustHave ?? []));
+          setNiceToHave(normalizeSavedSkillCodes(skillsRegistry as any, detail.niceToHave ?? []));
           setVisibility(detail.visibility ?? 'FULL_PART_TIME');
           const incomingRateType = detail.rateType ?? '';
           setRateType(incomingRateType || 'FLEXIBLE');

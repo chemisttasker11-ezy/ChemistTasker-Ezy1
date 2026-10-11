@@ -127,15 +127,20 @@ class ShiftSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         role = attrs.get('role_needed') or getattr(self.instance, 'role_needed', None)
-        for field in ('must_have', 'nice_to_have'):
-            if field in attrs:
-                if role == 'EXPLORER' and attrs[field]:
+        # Revalidate the complete requirement set when the vacancy role changes.
+        # PATCH must not keep pharmacist-only requirements on a technician shift.
+        if any(field in attrs for field in ('role_needed', 'must_have', 'nice_to_have')):
+            requirements = {}
+            for field in ('must_have', 'nice_to_have'):
+                values = attrs.get(field, getattr(self.instance, field, []) or [])
+                if role == 'EXPLORER' and values:
                     raise serializers.ValidationError({field: 'Explorer shifts cannot require professional pharmacy skills.'})
-                attrs[field] = normalize_skills(attrs[field], strict=True, allowed_role=role if role != 'EXPLORER' else None)
-        if 'must_have' in attrs or 'nice_to_have' in attrs:
-            required = attrs.get('must_have', getattr(self.instance, 'must_have', []) or [])
-            preferred = attrs.get('nice_to_have', getattr(self.instance, 'nice_to_have', []) or [])
-            if set(required).intersection(preferred):
+                try:
+                    requirements[field] = normalize_skills(values, strict=True, allowed_role=role, matchable_only=True)
+                except serializers.ValidationError as error:
+                    raise serializers.ValidationError({field: error.detail})
+            attrs.update(requirements)
+            if set(requirements['must_have']).intersection(requirements['nice_to_have']):
                 raise serializers.ValidationError({'nice_to_have': 'A skill cannot be both required and preferred.'})
         employment_type = attrs.get('employment_type') or getattr(self.instance, 'employment_type', None)
         min_hour = attrs.get('min_hourly_rate') if 'min_hourly_rate' in attrs else getattr(self.instance, 'min_hourly_rate', None)

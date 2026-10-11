@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import skillsRegistry from '../../../../../shared-core/skills_registry.json';
-import { roleSkillGroups, claimModeLabel } from '@chemisttasker/shared-core';
+import { roleSkillGroups, claimModeLabel, skillLabel } from '@chemisttasker/shared-core';
 import { SkillGlyph } from '../../../components/SkillGlyph';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
@@ -38,13 +38,24 @@ export default function PostShiftSkillsStep({
   const categories = roleSkillGroups(skillsRegistry as any, roleNeeded as any).map(group => ({
     key: group.key, title: group.label, items: group.items
   }));
+  const available = new Set(categories.flatMap(category => category.items.map(skill => skill.code)));
+  const previous = Array.from(new Set([...mustHave, ...niceToHave])).filter(code => !available.has(code));
 
   return (
     <Stack spacing={3}>
       <Alert severity="info" sx={{ borderRadius: 2 }}>
         Select which skills are <strong>Required</strong> (must have to apply) or{' '}
-        <strong>Favorable</strong> (nice to have, but not mandatory).
+        <strong>Preferred</strong> (nice to have, but not mandatory).
       </Alert>
+      {previous.length > 0 && <Alert severity="warning">
+        Review requirements unavailable for this role before saving.
+        <Stack direction="row" useFlexGap flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
+          {previous.map(code => <Chip key={code} label={skillLabel(skillsRegistry as any, code)} onDelete={() => {
+            setMustHave(values => values.filter(value => value !== code));
+            setNiceToHave(values => values.filter(value => value !== code));
+          }} />)}
+        </Stack>
+      </Alert>}
 
       <Box sx={{ width: '100%' }}>
         {categories.map((category, index) => {
@@ -179,8 +190,13 @@ export default function PostShiftSkillsStep({
                             color={value ? 'text.primary' : 'text.secondary'}
                             sx={{ overflowWrap: 'anywhere' }}
                           >
-                            <SkillGlyph name={skill.icon_web} title={skill.label} /> {skill.label}
+                            <SkillGlyph name={skill.icon_web} title={skill.label} decorative /> {skill.label}
                           </Typography>
+                          {claimModeLabel(skill.eligibility[roleNeeded as keyof typeof skill.eligibility]) && (
+                            <Typography variant="caption" color="text.secondary">
+                              {claimModeLabel(skill.eligibility[roleNeeded as keyof typeof skill.eligibility])}
+                            </Typography>
+                          )}
                           {skill.definition && (
                             <Typography
                               variant="body2"
@@ -199,6 +215,7 @@ export default function PostShiftSkillsStep({
                           size="small"
                           value={value}
                           exclusive
+                          aria-label={`${skill.label} requirement`}
                           onChange={(_, nextValue) => {
                             setMustHave((previous) =>
                               previous.filter((code) => code !== skill.code),
@@ -260,7 +277,7 @@ export default function PostShiftSkillsStep({
                             Required
                           </ToggleButton>
                           <ToggleButton value="favorable">
-                            Favorable
+                            Preferred
                           </ToggleButton>
                         </ToggleButtonGroup>
                       </Box>

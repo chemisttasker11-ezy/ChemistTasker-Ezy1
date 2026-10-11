@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "authority": "Each code denotes one defined capability; labels and icons are presentation only. Claim mode and verified credentials must be considered before a capability qualifies a candidate for a shift. Unknown and retired codes never match.",
+  "version": 4,
+  "authority": "Each code denotes one defined capability; labels and icons are presentation only. Claim mode and verified credentials must be considered before a capability qualifies a candidate for a shift. Unknown codes never match.",
   "roles": [
     "PHARMACIST",
     "INTERN",
@@ -387,9 +387,9 @@
       },
       "certificate": "ADVANCED_COMPOUNDING_TRAINING",
       "note": "Specialist training and additional safeguards apply.",
-      "icon_web": "TestTubeDiagonal",
-      "icon_mobile": "test-tube",
-      "icon_meaning": "Specialist laboratory compounding",
+      "icon_web": "FlaskRound",
+      "icon_mobile": "flask-round-bottom-outline",
+      "icon_meaning": "Specialist preparation; sterile capability remains explicit in the label",
       "definition": "Support or undertake specialised or sterile compounding with validated procedures, environmental controls and appropriate qualifications.",
       "aliases": [],
       "matchable": true
@@ -683,7 +683,7 @@
       },
       "certificate": "",
       "note": "Supervised trainee involvement only.",
-      "icon_web": "ClipboardCheck",
+      "icon_web": "ClipboardPlus",
       "icon_mobile": "clipboard-pulse-outline",
       "icon_meaning": "Structured medication review",
       "definition": "Perform or assist an eligible pharmacist-led MedsCheck or Diabetes MedsCheck service within professional scope and program requirements.",
@@ -723,9 +723,9 @@
       },
       "certificate": "UTI_PRESCRIBING_TRAINING",
       "note": "Jurisdiction-specific authorisation.",
-      "icon_web": "Microscope",
-      "icon_mobile": "bacteria-outline",
-      "icon_meaning": "Urinary tract infection assessment",
+      "icon_web": "Stethoscope",
+      "icon_mobile": "stethoscope",
+      "icon_meaning": "Clinical consultation; does not imply laboratory testing",
       "definition": "Assess and manage eligible uncomplicated urinary tract infections under the pharmacist's locally authorised prescribing or treatment scope.",
       "aliases": [
         "UTI treatment service"
@@ -907,30 +907,10 @@
       },
       "certificate": "",
       "note": "",
-      "icon_web": "Headset",
-      "icon_mobile": "headset",
-      "icon_meaning": "Customer support",
+      "icon_web": "MessagesSquare",
+      "icon_mobile": "forum-outline",
+      "icon_meaning": "Customer communication and assistance",
       "definition": "Provide respectful pharmacy customer assistance, respond to routine enquiries and refer professional questions appropriately.",
-      "aliases": [],
-      "matchable": true
-    },
-    {
-      "code": "CASH_HANDLING",
-      "label": "Cash handling and payment terminals",
-      "group": "Operations & Retail",
-      "eligibility": {
-        "PHARMACIST": "experience",
-        "INTERN": "experience",
-        "TECHNICIAN": "experience",
-        "ASSISTANT": "experience",
-        "STUDENT": "experience"
-      },
-      "certificate": "",
-      "note": "",
-      "icon_web": "CreditCard",
-      "icon_mobile": "credit-card-check-outline",
-      "icon_meaning": "Payment terminal",
-      "definition": "Accurately process cash, EFTPOS transactions, refunds and till reconciliation.",
       "aliases": [],
       "matchable": true
     },
@@ -947,9 +927,9 @@
       },
       "certificate": "",
       "note": "",
-      "icon_web": "BriefcaseMedical",
-      "icon_mobile": "medical-bag",
-      "icon_meaning": "Over-the-counter medication range",
+      "icon_web": "Pill",
+      "icon_mobile": "pill",
+      "icon_meaning": "Non-prescription product knowledge",
       "definition": "Identify general over-the-counter product categories and know when to refer medicine-related decisions to the pharmacist.",
       "aliases": [],
       "matchable": true
@@ -1068,7 +1048,7 @@
       "certificate": "",
       "note": "",
       "icon_web": "Boxes",
-      "icon_mobile": "clipboard-list-outline",
+      "icon_mobile": "package-variant-closed",
       "icon_meaning": "Stock inventory",
       "definition": "Record, reconcile and audit pharmacy inventory and stock movements.",
       "aliases": [],
@@ -1131,26 +1111,6 @@
       "icon_mobile": "package-up",
       "icon_meaning": "Returning inventory shipment",
       "definition": "Process supplier returns, claims and credits for approved pharmacy stock.",
-      "aliases": [],
-      "matchable": true
-    },
-    {
-      "code": "PHONE_ENQUIRIES",
-      "label": "Telephone and customer enquiries",
-      "group": "Operations & Retail",
-      "eligibility": {
-        "PHARMACIST": "experience",
-        "INTERN": "experience",
-        "TECHNICIAN": "experience",
-        "ASSISTANT": "experience",
-        "STUDENT": "experience"
-      },
-      "certificate": "",
-      "note": "",
-      "icon_web": "PhoneCall",
-      "icon_mobile": "phone-in-talk-outline",
-      "icon_meaning": "Telephone contact",
-      "definition": "Handle routine telephone calls, capture messages and refer clinical or sensitive requests.",
       "aliases": [],
       "matchable": true
     },
@@ -1309,7 +1269,7 @@
       "note": "",
       "icon_web": "Monitor",
       "icon_mobile": "monitor",
-      "icon_meaning": "Dispensing workstation / FRED",
+      "icon_meaning": "Pharmacy software; the visible product name identifies the system",
       "definition": "Use the FRED or FRED NXT pharmacy dispensing system for tasks permitted by the worker's role.",
       "aliases": [
         "Fred NXT",
@@ -1330,9 +1290,9 @@
       },
       "certificate": "",
       "note": "",
-      "icon_web": "MonitorCog",
-      "icon_mobile": "monitor-dashboard",
-      "icon_meaning": "Minfos dispensing application",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Pharmacy software; the visible product name identifies the system",
       "definition": "Use Minfos dispensing or pharmacy management software for assigned workflows.",
       "aliases": [],
       "matchable": true
@@ -1350,9 +1310,9 @@
       },
       "certificate": "",
       "note": "",
-      "icon_web": "Keyboard",
-      "icon_mobile": "keyboard-outline",
-      "icon_meaning": "Z Dispense data entry",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Pharmacy software; the visible product name identifies the system",
       "definition": "Use Z Dispense dispensing software for assigned pharmacy workflows.",
       "aliases": [],
       "matchable": true
@@ -1370,9 +1330,9 @@
       },
       "certificate": "",
       "note": "",
-      "icon_web": "Database",
-      "icon_mobile": "database-outline",
-      "icon_meaning": "Corum LOTS pharmacy database",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Pharmacy software; the visible product name identifies the system",
       "definition": "Use Corum LOTS software for permitted dispensing and inventory functions.",
       "aliases": [
         "Corum LOTS"
@@ -1392,9 +1352,9 @@
       },
       "certificate": "",
       "note": "",
-      "icon_web": "AppWindow",
-      "icon_mobile": "application-outline",
-      "icon_meaning": "Dispense Works application",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Pharmacy software; the visible product name identifies the system",
       "definition": "Use Dispense Works pharmacy software for assigned dispensing tasks.",
       "aliases": [],
       "matchable": true
@@ -1412,9 +1372,9 @@
       },
       "certificate": "",
       "note": "",
-      "icon_web": "MousePointerClick",
-      "icon_mobile": "cursor-default-click-outline",
-      "icon_meaning": "RxOne software interaction",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Pharmacy software; the visible product name identifies the system",
       "definition": "Use RxOne pharmacy dispensing software for permitted workflow steps.",
       "aliases": [],
       "matchable": true
@@ -1432,9 +1392,9 @@
       },
       "certificate": "",
       "note": "",
-      "icon_web": "MonitorSmartphone",
-      "icon_mobile": "monitor-cellphone",
-      "icon_meaning": "Aquarius software workstation",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Pharmacy software; the visible product name identifies the system",
       "definition": "Use Aquarius pharmacy software for authorised dispensing or pharmacy operations.",
       "aliases": [],
       "matchable": true
@@ -1472,10 +1432,10 @@
       },
       "certificate": "",
       "note": "",
-      "icon_web": "Smartphone",
-      "icon_mobile": "cellphone",
-      "icon_meaning": "MyScript mobile prescription application",
-      "definition": "Use MyScript digital prescription or medication workflow features appropriate to the worker's permissions.",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Pharmacy dispensing software; the product name identifies the system",
+      "definition": "Use the Australian myScript pharmacy dispensing system for assigned tasks within the worker's role and permissions.",
       "aliases": [],
       "matchable": true
     },
@@ -1498,46 +1458,6 @@
       "definition": "Use Microsoft Excel to enter, analyse or organise pharmacy-related spreadsheet information.",
       "aliases": [],
       "matchable": true
-    },
-    {
-      "code": "WORD",
-      "label": "Microsoft Word",
-      "group": "Software & Digital",
-      "eligibility": {
-        "PHARMACIST": "experience",
-        "INTERN": "experience",
-        "TECHNICIAN": "experience",
-        "ASSISTANT": "experience",
-        "STUDENT": "experience"
-      },
-      "certificate": "",
-      "note": "",
-      "icon_web": "FileText",
-      "icon_mobile": "file-word-outline",
-      "icon_meaning": "Word document",
-      "definition": "Use Microsoft Word to create, edit and format pharmacy documents.",
-      "aliases": [],
-      "matchable": true
-    },
-    {
-      "code": "OTHER",
-      "label": "Other pharmacy software",
-      "group": "Software & Digital",
-      "eligibility": {
-        "PHARMACIST": "experience",
-        "INTERN": "experience",
-        "TECHNICIAN": "experience",
-        "ASSISTANT": "experience",
-        "STUDENT": "experience"
-      },
-      "certificate": "",
-      "note": "Optional free-text software name.",
-      "icon_web": "MonitorCog",
-      "icon_mobile": "application-cog-outline",
-      "icon_meaning": "Other pharmacy software application",
-      "definition": "Operate an additional pharmacy software product, recorded with its specific product name and version rather than treated as equivalent to a named system.",
-      "aliases": [],
-      "matchable": true
     }
   ],
   "primary_sources": [
@@ -1548,7 +1468,7 @@
   "icon_standard": {
     "web": "lucide-react",
     "mobile": "MaterialCommunityIcons via @expo/vector-icons",
-    "special": "Custom matching seven-day four-dose blister tray for Webster/DAA",
+    "special": "Seven-day, four-dose monochrome blister tray; final-check overlay denotes the task, not verified status",
     "source_urls": [
       "https://lucide.dev/icons",
       "https://pictogrammers.com/library/mdi/",
@@ -1563,5 +1483,16 @@
     "explorer": "Explorer interests are not professional skills; do not match them to skilled pharmacy shifts.",
     "unknown": "Legacy unknown claims can be shown for audit but never counted as a match.",
     "certificate": "A self-selected skill or uploaded file is not automatically a verified qualification."
-  }
+  },
+  "recruitment_review_sources": [
+    "https://au.seek.com/career-advice/role/pharmacy-assistant",
+    "https://au.seek.com/career-advice/role/pharmacist/resume-templates",
+    "https://au.indeed.com/q-pharmacy-assistant-jobs.html",
+    "https://www.ravensrecruitment.com.au/pharmacists/how-to-prepare-for-your-first-locum-pharmacist-shift-a-complete-guide-for-australian-pharmacists",
+    "https://www.webstercare.com.au/webster-pak-medication-packs/",
+    "https://lucide.dev/guide/react/",
+    "https://github.com/lucide-icons/lucide/blob/main/docs/how-to/accessibility.md",
+    "https://www.health.vic.gov.au/drugs-and-poisons/setting-up-and-accessing-safescript",
+    "https://www.posworks.com.au/pharmacy/dispense-works/"
+  ]
 }

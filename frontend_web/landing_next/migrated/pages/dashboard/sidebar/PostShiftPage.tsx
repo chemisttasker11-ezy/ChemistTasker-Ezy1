@@ -1,3 +1,4 @@
+import { normalizeSavedSkillCodes } from '@chemisttasker/shared-core';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
@@ -72,7 +73,7 @@ import {
 } from '@chemisttasker/shared-core';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 import SkillIcon from '@/public/skill-icon';
-import { roleSkillGroups } from '@chemisttasker/shared-core';
+import { roleSkillGroups, claimModeLabel, skillLabel } from '@chemisttasker/shared-core';
 import { useColorMode } from '../../../theme/sleekTheme';
 import apiClient from '../../../utils/apiClient';
 
@@ -494,8 +495,8 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
           setRoleNeeded(detail.roleNeeded ?? '');
           setDescription(detail.description ?? '');
           setWorkloadTags(detail.workloadTags ?? []);
-          setMustHave(detail.mustHave ?? []);
-          setNiceToHave(detail.niceToHave ?? []);
+          setMustHave(normalizeSavedSkillCodes(skillsRegistry as any, detail.mustHave ?? []));
+          setNiceToHave(normalizeSavedSkillCodes(skillsRegistry as any, detail.niceToHave ?? []));
           setVisibility(detail.visibility ?? 'FULL_PART_TIME');
           const incomingRateType = detail.rateType ?? '';
           setRateType(incomingRateType || 'FLEXIBLE');
@@ -1730,14 +1731,25 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
       );
       case 'skills': {
         const categories = roleSkillGroups(skillsRegistry as any, roleNeeded as any).map(group => ({key:group.key,title:group.label,items:group.items}));
+        const available = new Set(categories.flatMap(category => category.items.map(skill => skill.code)));
+        const previous = Array.from(new Set([...mustHave, ...niceToHave])).filter(code => !available.has(code));
         
 
 
         return (
           <Stack spacing={3}>
             <Alert severity="info" sx={{ borderRadius: 2 }}>
-              Select which skills are <strong>Required</strong> (must have to apply) or <strong>Favorable</strong> (nice to have, but not mandatory).
+              Select which skills are <strong>Required</strong> (must have to apply) or <strong>Preferred</strong> (nice to have, but not mandatory).
             </Alert>
+            {previous.length > 0 && <Alert severity="warning">
+              Review requirements unavailable for this role before saving.
+              <Stack direction="row" useFlexGap flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
+                {previous.map(code => <Chip key={code} label={skillLabel(skillsRegistry as any, code)} onDelete={() => {
+                  setMustHave(values => values.filter(value => value !== code));
+                  setNiceToHave(values => values.filter(value => value !== code));
+                }} />)}
+              </Stack>
+            </Alert>}
             
             <Box sx={{ width: '100%' }}>
               {categories.map((category, index) => {
@@ -1827,7 +1839,8 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                                 >
                                   <SkillIcon skill={s.code} /> {s.label}
                                 </Typography>
-                                {s.definition && (
+                                {claimModeLabel(s.eligibility[roleNeeded]) && <Typography variant="caption" color="text.secondary">{claimModeLabel(s.eligibility[roleNeeded])}</Typography>}
+                                  {s.definition && (
                                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>
                                     {s.definition}
                                   </Typography>
@@ -1838,6 +1851,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                                 size="small"
                                 value={value}
                                 exclusive
+                                  aria-label={`${s.label} requirement`}
                                 onChange={(_, newVal) => {
                                   setMustHave(prev => prev.filter(x => x !== s.code));
                                   setNiceToHave(prev => prev.filter(x => x !== s.code));
@@ -1877,7 +1891,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                                 }}
                               >
                                 <ToggleButton value="required">Required</ToggleButton>
-                                <ToggleButton value="favorable">Favorable</ToggleButton>
+                                <ToggleButton value="favorable">Preferred</ToggleButton>
                               </ToggleButtonGroup>
                             </Box>
                           );

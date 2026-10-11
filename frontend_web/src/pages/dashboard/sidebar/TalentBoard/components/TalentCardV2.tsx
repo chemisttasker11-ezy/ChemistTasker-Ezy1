@@ -284,7 +284,7 @@ export default function TalentCard({
                 Clinical Services:
               </Typography>
               {candidate.clinicalServices.length > 0 ? (
-                candidate.clinicalServices.map((skill) => <Chip key={skill} size="small" icon={<SkillGlyph name={skillsRegistry.skills.find(s => s.code === skill)?.icon_web || "CircleHelp"} title={skill} />} label={skillLabel(skillsRegistry as any, skill)} />)
+                candidate.clinicalServices.map((skill) => <Chip key={skill} size="small" icon={<SkillGlyph name={skillsRegistry.skills.find(s => s.code === skill)?.icon_web || "CircleHelp"} title={skill} size={16} decorative />} label={skillLabel(skillsRegistry as any, skill)} />)
               ) : (
                 <Typography variant="caption" color="text.secondary">
                   --
@@ -294,10 +294,10 @@ export default function TalentCard({
 
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
               <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Dispense Software:
+                Software:
               </Typography>
               {candidate.dispenseSoftware.length > 0 ? (
-                candidate.dispenseSoftware.map((skill) => <Chip key={skill} size="small" icon={<SkillGlyph name={skillsRegistry.skills.find(s => s.code === skill)?.icon_web || "CircleHelp"} title={skill} />} label={skillLabel(skillsRegistry as any, skill)} />)
+                candidate.dispenseSoftware.map((skill) => <Chip key={skill} size="small" icon={<SkillGlyph name={skillsRegistry.skills.find(s => s.code === skill)?.icon_web || "CircleHelp"} title={skill} size={16} decorative />} label={skillLabel(skillsRegistry as any, skill)} />)
               ) : (
                 <Typography variant="caption" color="text.secondary">
                   --
@@ -307,10 +307,10 @@ export default function TalentCard({
 
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
               <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Expanded Scope:
+                Other pharmacy skills:
               </Typography>
               {candidate.expandedScope.length > 0 ? (
-                candidate.expandedScope.map((skill) => <Chip key={skill} size="small" icon={<SkillGlyph name={skillsRegistry.skills.find(s => s.code === skill)?.icon_web || "CircleHelp"} title={skill} />} label={skillLabel(skillsRegistry as any, skill)} />)
+                candidate.expandedScope.map((skill) => <Chip key={skill} size="small" icon={<SkillGlyph name={skillsRegistry.skills.find(s => s.code === skill)?.icon_web || "CircleHelp"} title={skill} size={16} decorative />} label={skillLabel(skillsRegistry as any, skill)} />)
               ) : (
                 <Typography variant="caption" color="text.secondary">
                   --

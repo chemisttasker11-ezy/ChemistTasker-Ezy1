@@ -1,8 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { TouchableOpacity, View } from 'react-native';
-import { List, Surface, Text } from 'react-native-paper';
+import { Chip, List, Surface, Text } from 'react-native-paper';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
-import { roleSkillGroups } from '@chemisttasker/shared-core';
+import { roleSkillGroups, claimModeLabel, skillLabel } from '@chemisttasker/shared-core';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { DoseBlisterIcon } from '../../../components/DoseBlisterIcon';
 import { PRIMARY } from './PostShiftScreen.helpers';
@@ -28,15 +28,24 @@ export default function PostShiftSkillsStep({
   const categories = roleSkillGroups(skillsRegistry as any, roleNeeded as any).map(group => ({
     key: group.key, title: group.label, items: group.items
   }));
+  const available = new Set(categories.flatMap(category => category.items.map(skill => skill.code)));
+  const previous = Array.from(new Set([...mustHave, ...niceToHave])).filter(code => !available.has(code));
 
   return (
     <Surface style={styles.card} elevation={1}>
       <Text style={styles.label}>Skills</Text>
       <View style={styles.infoAlert}>
         <Text style={styles.infoAlertText}>
-          Select which skills are Required (must have to apply) or Favorable (nice to have, but not mandatory).
+          Select only essential skills as Required. Choose Preferred for skills that can be learned on the job.
         </Text>
       </View>
+      {previous.length > 0 ? <View style={{ gap: 8 }}>
+        <Text>Review requirements unavailable for this role before saving.</Text>
+        {previous.map(code => <Chip key={code} onClose={() => {
+          setMustHave(values => values.filter(value => value !== code));
+          setNiceToHave(values => values.filter(value => value !== code));
+        }}>{skillLabel(skillsRegistry as any, code)}</Chip>)}
+      </View> : null}
 
       <List.AccordionGroup>
         {categories.map((category) => {
@@ -90,10 +99,14 @@ export default function PostShiftSkillsStep({
                             {skill.definition}
                           </Text>
                         ) : null}
+                        {claimModeLabel(skill.eligibility[roleNeeded]) ? <Text style={styles.skillDescription}>{claimModeLabel(skill.eligibility[roleNeeded])}</Text> : null}
                       </View>
 
                       <View style={styles.toggleGroup}>
                         <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel={`${skill.label}: required`}
+                          accessibilityState={{ selected: isRequired }}
                           style={[
                             styles.toggleBtn,
                             styles.toggleBtnLeft,
@@ -120,6 +133,9 @@ export default function PostShiftSkillsStep({
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel={`${skill.label}: preferred`}
+                          accessibilityState={{ selected: isFavorable }}
                           style={[
                             styles.toggleBtn,
                             styles.toggleBtnRight,
@@ -142,7 +158,7 @@ export default function PostShiftSkillsStep({
                               isFavorable && styles.toggleBtnTextActive,
                             ]}
                           >
-                            Favorable
+                            Preferred
                           </Text>
                         </TouchableOpacity>
                       </View>

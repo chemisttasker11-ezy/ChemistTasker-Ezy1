@@ -2,7 +2,7 @@
 
 ## One skill, one immutable code
 
-The authoritative schema lives in `shared-core/skills_registry.json`. Each of the 70 entries provides a permanent `code`, a human-readable `label`, a functional `definition`, a `group`, explicit known `aliases`, role `eligibility`, any related `certificate`, and the icon bindings for web/mobile. **A label, translated text, synonym or icon must never be the database identifier.**
+The authoritative schema lives in `shared-core/skills_registry.json` (version 4). Each of the 66 entries provides a permanent `code`, a human-readable `label`, a functional `definition`, a `group`, explicit known `aliases`, role `eligibility`, any related `certificate`, and the icon bindings for web/mobile. **A label, translated text, synonym or icon must never be the database identifier.**
 
 The same skill ID is passed through:
 1. Pharmacist or Other Staff onboarding `skills` JSON array.
@@ -45,6 +45,10 @@ A matched identifier proves **only that the code is the same**, not a legal righ
 - `PI_INSURANCE` and `PDL` legacy records are evidence rather than clinical skills.
 - No professional skills for the Explorer persona: its shadowing/placement/interests flow is separate.
 - Backend stores skill codes. Web/mobile render labels, definitions, icons and claim conditions.
+- The unused cash-handling, telephone-enquiries, Word and generic Other-software definitions were removed during the recruitment review. They are unknown IDs and cannot satisfy a requirement. There is no retirement banner or legacy-selection notice for these unused options.
+- Existing certificate aliases are re-keyed alongside their associated skill; retaining a vaccination claim must not delete a proof uploaded under `VACCINATOR`.
+- A vacancy-role change revalidates both saved requirement lists, including lists omitted from a partial update.
+- Talent posts use the account role and staff subtype; the software field contains named software capabilities from current onboarding.
 - API field names and routes are unchanged, preserving existing clients.
 
 ## Contract tests and deployments

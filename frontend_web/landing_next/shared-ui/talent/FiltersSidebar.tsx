@@ -134,7 +134,7 @@ export default function TalentFiltersSidebar({
         <FilterSection idPrefix="talent-filter" title="Dispensing software">
           <FilterChips>
             {softwareOptions.map((skill) => (
-              <FilterChip key={skill} selected={filters.skills.includes(skill)} onClick={() => toggleSkill(skill)} icon={renderSkillIcon?.(skill)}>{skill}</FilterChip>
+              <FilterChip key={skill} selected={filters.skills.includes(skill)} onClick={() => toggleSkill(skill)} icon={renderSkillIcon?.(skill)}>{skillLabel(skillsRegistry as any, skill)}</FilterChip>
             ))}
           </FilterChips>
         </FilterSection>

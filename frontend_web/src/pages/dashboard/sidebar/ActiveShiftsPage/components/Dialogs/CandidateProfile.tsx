@@ -2,17 +2,12 @@
 // experience, rates and skills. Never contact details (the reveal API no longer sends them).
 import { Avatar, Box, Stack, Typography } from '@mui/material';
 import { BadgeCheck, BriefcaseBusiness, MapPin, Wallet } from 'lucide-react';
-import skillsCatalog from '../../../../../../../../shared-core/skills_catalog.json';
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { findSkill } from '@chemisttasker/shared-core';
 import { InitialsAvatar } from '../../../../../../components/ui/InitialsAvatar';
 import { Pill } from '../../../../../../components/ui/Pill';
 
-type CatalogItem = { code: string; label: string };
-type Catalog = Record<string, Record<string, CatalogItem[]>>;
-const GROUPS: [key: string, title: string][] = [
-    ['dispense_software', 'Dispensing software'],
-    ['clinical_services', 'Clinical services'],
-    ['expanded_scope', 'Expanded scope'],
-];
+const GROUPS: [key: string, title: string][] = skillsRegistry.groups.map(group => [group, group]);
 const RATES: [key: string, label: string][] = [['weekday', 'Weekday'], ['saturday', 'Saturday'], ['sunday', 'Sunday'], ['publicHoliday', 'Public holiday']];
 
 const muted = { fontSize: 13.5, color: 'var(--ct-text-secondary)', lineHeight: 1.5 } as const;
@@ -20,13 +15,10 @@ const groupTitle = { fontSize: 13, fontWeight: 600, color: 'var(--ct-text-primar
 
 /** Catalogue labels for the candidate's skill codes, grouped like the Talent board; unknown codes go under "Other". */
 function groupSkills(codes: string[]) {
-    const catalog = skillsCatalog as unknown as Catalog;
-    const known = new Map<string, { group: string; label: string }>();
-    Object.values(catalog).forEach(role => GROUPS.forEach(([group]) => (role[group] || []).forEach(item => known.set(item.code, { group, label: item.label }))));
     const groups: Record<string, string[]> = {};
     codes.forEach(code => {
-        const hit = known.get(code);
-        const group = hit?.group ?? 'other';
+        const hit = findSkill(skillsRegistry as any, code);
+        const group = hit ? hit.group : 'other';
         (groups[group] ||= []).includes(hit?.label ?? code) || groups[group].push(hit?.label ?? code);
     });
     return groups;
@@ -63,7 +55,7 @@ export function CandidateProfile({ name, bio, profile }: { name: string; bio?: s
     const rates = RATES.map(([key, label]) => (p.ratePreference?.[key] ? `${label} $${p.ratePreference[key]}/h` : null)).filter(Boolean);
     const skills = groupSkills(Array.isArray(p.skills) ? p.skills : []);
     const known = GROUPS.some(([key]) => skills[key]?.length);
-    const skillGroups = [...GROUPS, ['other', known ? 'Other skills' : 'Skills'] as [string, string]].filter(([key]) => skills[key]?.length);
+    const skillGroups = [...GROUPS, ['other', known ? 'Previous selections' : 'Skills to review'] as [string, string]].filter(([key]) => skills[key]?.length);
 
     return (
         <Stack spacing={2}>
@@ -102,7 +94,7 @@ export function CandidateProfile({ name, bio, profile }: { name: string; bio?: s
                         <Box key={key}>
                             <Typography component="h4" sx={groupTitle}>{title}</Typography>
                             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                                {skills[key].map(label => <Pill key={label} tone={key === 'dispense_software' ? 'blue' : 'violet'} label={label} />)}
+                                {skills[key].map(label => <Pill key={label} tone={key === 'Software & Digital' ? 'blue' : 'violet'} label={label} />)}
                             </Stack>
                         </Box>
                     ))}

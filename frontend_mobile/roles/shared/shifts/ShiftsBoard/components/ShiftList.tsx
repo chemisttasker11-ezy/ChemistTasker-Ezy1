@@ -5,7 +5,9 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card, Text, Button, Chip, IconButton, Checkbox, ActivityIndicator, Icon } from 'react-native-paper';
 import { format } from 'date-fns';
-import { Shift } from '@chemisttasker/shared-core';
+import { Shift, skillLabel } from '@chemisttasker/shared-core';
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { SkillIcon } from '../../../../../components/SkillIcon';
 import { ShiftSlot } from '../types';
 import { formatDateLong, formatDateShort, formatTime } from '../utils/date';
 import { getRateSummary, getSlotRate } from '../utils/rates';
@@ -536,7 +538,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                                 <Text variant="labelSmall" style={styles.tagLabel}>Must have</Text>
                                                 <View style={styles.tagRow}>
                                                     {shift.mustHave.map((item, idx) => (
-                                                        <Chip key={`${item}-${idx}`} compact>{item}</Chip>
+                                                        <Chip key={`${item}-${idx}`} compact style={{ maxWidth: '100%' }} icon={() => <SkillIcon skill={item} />}>{skillLabel(skillsRegistry as any, item)}</Chip>
                                                     ))}
                                                 </View>
                                             </View>
@@ -547,7 +549,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                                 <Text variant="labelSmall" style={styles.tagLabel}>Nice to have</Text>
                                                 <View style={styles.tagRow}>
                                                     {shift.niceToHave.map((item, idx) => (
-                                                        <Chip key={`${item}-${idx}`} compact mode="outlined">{item}</Chip>
+                                                        <Chip key={`${item}-${idx}`} compact mode="outlined" style={{ maxWidth: '100%' }} icon={() => <SkillIcon skill={item} />}>{skillLabel(skillsRegistry as any, item)}</Chip>
                                                     ))}
                                                 </View>
                                             </View>

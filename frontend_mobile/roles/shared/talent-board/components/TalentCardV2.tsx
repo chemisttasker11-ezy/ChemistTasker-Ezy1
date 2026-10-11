@@ -1,9 +1,10 @@
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
-import { skillLabel } from '@chemisttasker/shared-core';
+import { findSkill, skillLabel } from '@chemisttasker/shared-core';
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Card, Chip, IconButton, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { DoseBlisterIcon } from '../../../../components/DoseBlisterIcon';
 import { Candidate } from '../types';
 
 const formatAuSlotDate = (date: string) => {
@@ -152,9 +153,24 @@ export default function TalentCardV2({
 
           {!candidate.isExplorer ? (
             <View style={styles.skillsBlock}>
-              <Text style={styles.skillTitle}>Clinical Services: {candidate.clinicalServices.length ? candidate.clinicalServices.map(s => skillLabel(skillsRegistry as any, s)).join(', ') : '--'}</Text>
-              <Text style={styles.skillTitle}>Dispense Software: {candidate.dispenseSoftware.length ? candidate.dispenseSoftware.map(s => skillLabel(skillsRegistry as any, s)).join(', ') : '--'}</Text>
-              <Text style={styles.skillTitle}>Expanded Scope: {candidate.expandedScope.length ? candidate.expandedScope.map(s => skillLabel(skillsRegistry as any, s)).join(', ') : '--'}</Text>
+              {[
+                { title: 'Clinical services', skills: candidate.clinicalServices },
+                { title: 'Software', skills: candidate.dispenseSoftware },
+                { title: 'Other pharmacy skills', skills: candidate.expandedScope },
+              ].filter(group => group.skills.length > 0).map(group => <View key={group.title} style={{ gap: 6 }}>
+                <Text style={styles.skillTitle}>{group.title}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {group.skills.map(code => {
+                    const definition = findSkill(skillsRegistry as any, code);
+                    const name = definition?.icon_mobile;
+                    return <Chip key={code} icon={() => name === 'BLISTER_PACK' || name === 'BLISTER_CHECK'
+                      ? <DoseBlisterIcon checked={name === 'BLISTER_CHECK'} />
+                      : <MaterialCommunityIcons name={(name || 'help-circle-outline') as any} size={16} color="#2463A6" />}>
+                      {skillLabel(skillsRegistry as any, code)}
+                    </Chip>;
+                  })}
+                </View>
+              </View>)}
             </View>
           ) : null}
         </View>

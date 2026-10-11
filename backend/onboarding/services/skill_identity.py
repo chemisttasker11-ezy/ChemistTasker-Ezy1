@@ -37,7 +37,7 @@ def canonical_skill(value):
     return _identities().get(value.strip().casefold())
 
 
-def normalize_skills(values, *, strict=False, allowed_role=None):
+def normalize_skills(values, *, strict=False, allowed_role=None, matchable_only=False, software_only=False):
     if not isinstance(values, list) or not all(isinstance(v, str) for v in values):
         raise serializers.ValidationError("Skills must be a list of strings.")
     skills = {entry["code"]: entry for entry in registry()["skills"]}
@@ -48,8 +48,18 @@ def normalize_skills(values, *, strict=False, allowed_role=None):
             if strict:
                 raise serializers.ValidationError("Unknown skill: " + value)
             continue
+        if matchable_only and (skills[code].get('matchable') is False):
+            if strict:
+                raise serializers.ValidationError('This skill cannot be used for matching: ' + value)
+            continue
+        if software_only and skills[code]['group'] != 'Software & Digital':
+            if strict:
+                raise serializers.ValidationError('Select a named software product: ' + value)
+            continue
         if allowed_role and skills[code]["eligibility"].get(allowed_role, "none") == "none":
-            raise serializers.ValidationError("Skill is not available for role " + allowed_role + ": " + value)
+            if strict:
+                raise serializers.ValidationError("Skill is not available for role " + allowed_role + ": " + value)
+            continue
         if code not in result:
             result.append(code)
     return result
@@ -57,10 +67,10 @@ def normalize_skills(values, *, strict=False, allowed_role=None):
 
 def evaluate_match(required, preferred, claimed):
     """Identity only; licence, supervision and evidence must be checked separately."""
-    recognised = set(normalize_skills(claimed))
-    needed = normalize_skills(required)
-    helpful = normalize_skills(preferred)
-    unknown = [value for value in required if canonical_skill(value) is None]
+    recognised = set(normalize_skills(claimed, matchable_only=True))
+    needed = normalize_skills(required, matchable_only=True)
+    helpful = normalize_skills(preferred, matchable_only=True)
+    unknown = [value for value in required if not normalize_skills([value], matchable_only=True)]
     missing = [code for code in needed if code not in recognised]
     return {
         "matches_required": not missing and not unknown,

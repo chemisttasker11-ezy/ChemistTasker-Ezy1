@@ -65,7 +65,7 @@ export function roleSkillGroups(registry: SkillsRegistry, role: WorkerSkillRole 
 }
 
 export function canonicalSkillCode(registry: SkillsRegistry, code: string): string {
-  return registry.legacy_aliases[code] || code;
+  return skillId(registry, code) || code;
 }
 
 export function validRoleSkillCodes(registry: SkillsRegistry, role: WorkerSkillRole | null, raw: string[]): string[] {
@@ -82,7 +82,7 @@ export function legacySkillCodes(registry: SkillsRegistry, role: WorkerSkillRole
 export function claimModeLabel(mode: SkillClaimMode): string | null {
   switch (mode) {
     case 'supervised': return 'Under pharmacist supervision';
-    case 'conditional': return 'Training & supervision required';
+    case 'conditional': return 'Training & role conditions apply';
     case 'familiarity': return 'Familiarity only';
     default: return null;
   }
@@ -115,17 +115,35 @@ export function normalizeSkillIds(registry: SkillsRegistry, values: readonly str
   const codes = values.map(value => skillId(registry, value)).filter((value): value is string => Boolean(value));
   return Array.from(new Set(codes));
 }
+/** Normalise edit forms to known skill IDs; removed choices have no identity. */
+export function normalizeSavedSkillCodes(registry: SkillsRegistry, values: readonly string[]): string[] {
+  return normalizeSkillIds(registry, values);
+}
+export function isMatchableSkill(registry: SkillsRegistry, value: string): boolean {
+  const skill = findSkill(registry, value);
+  return Boolean(skill && skill.matchable !== false);
+}
+export function searchRoleSkillGroups(registry: SkillsRegistry, role: WorkerSkillRole | null, query: string): RoleSkillGroup[] {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return roleSkillGroups(registry, role).map(group => ({
+    ...group,
+    items: group.items.filter(skill => {
+      const text = [skill.label, skill.definition, ...skill.aliases].join(' ').toLowerCase();
+      return words.every(word => text.includes(word));
+    })
+  })).filter(group => group.items.length > 0);
+}
 export function skillMatches(registry: SkillsRegistry, requested: string, claimed: readonly string[]): boolean {
   const code = skillId(registry, requested);
-  return code !== null && normalizeSkillIds(registry, claimed).includes(code);
+  return isMatchableSkill(registry, requested) && code !== null && normalizeSkillIds(registry, claimed).includes(code);
 }
 /** This checks identity only. Mandatory licensing, certificates and supervision
  * are separate constraints that must be enforced before ranking or assignment. */
 export function matchSkillRequirements(registry: SkillsRegistry, required: readonly string[], preferred: readonly string[], claimed: readonly string[]) {
-  const actual = new Set(normalizeSkillIds(registry, claimed));
-  const requiredCodes = normalizeSkillIds(registry, required);
-  const preferredCodes = normalizeSkillIds(registry, preferred);
-  const unknownRequired = required.filter(item => !skillId(registry, item));
+  const actual = new Set(normalizeSkillIds(registry, claimed.filter(value => isMatchableSkill(registry, value))));
+  const requiredCodes = normalizeSkillIds(registry, required.filter(value => isMatchableSkill(registry, value)));
+  const preferredCodes = normalizeSkillIds(registry, preferred.filter(value => isMatchableSkill(registry, value)));
+  const unknownRequired = required.filter(item => !isMatchableSkill(registry, item));
   return {
     matchesRequired: unknownRequired.length === 0 && requiredCodes.every(code => actual.has(code)),
     matchedRequired: requiredCodes.filter(code => actual.has(code)),
