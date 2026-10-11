@@ -1,4 +1,7 @@
 import { useState } from "react";
+import skillsRegistry from "../../../../../../../shared-core/skills_registry.json";
+import { skillLabel } from "@chemisttasker/shared-core";
+import { SkillGlyph } from "../../../../../components/SkillGlyph";
 import {
   Box,
   Card,
@@ -281,7 +284,7 @@ export default function TalentCard({
                 Clinical Services:
               </Typography>
               {candidate.clinicalServices.length > 0 ? (
-                candidate.clinicalServices.map((skill) => <Chip key={skill} size="small" label={skill} />)
+                candidate.clinicalServices.map((skill) => <Chip key={skill} size="small" icon={<SkillGlyph name={skillsRegistry.skills.find(s => s.code === skill)?.icon_web || "CircleHelp"} title={skill} />} label={skillLabel(skillsRegistry as any, skill)} />)
               ) : (
                 <Typography variant="caption" color="text.secondary">
                   --
