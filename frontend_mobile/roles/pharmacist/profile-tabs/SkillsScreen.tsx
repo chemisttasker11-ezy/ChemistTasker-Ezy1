@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { DoseBlisterIcon } from '../../../components/DoseBlisterIcon';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Checkbox, Chip, HelperText, SegmentedButtons, Text } from 'react-native-paper';
@@ -146,7 +148,7 @@ export default function PharmacistSkillsScreen() {
               <View style={styles.rowTop}>
                 <Checkbox status={checked ? 'checked' : 'unchecked'} onPress={() => toggle(item.code)} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.itemLabel}>{item.icon}  {item.label}</Text>
+                  <Text style={styles.itemLabel}>{item.icon_mobile === 'BLISTER_PACK' || item.icon_mobile === 'BLISTER_CHECK' ? <DoseBlisterIcon checked={item.icon_mobile === 'BLISTER_CHECK'} /> : <MaterialCommunityIcons name={item.icon_mobile as any} size={21} color="#2463A6" />}  {item.label}</Text>
                   {currentRole && claimModeLabel(item.eligibility[currentRole]) ? <Text style={styles.itemDesc}>{claimModeLabel(item.eligibility[currentRole])}</Text> : null}
                   {item.description ? <Text style={styles.itemDesc}>{item.description}</Text> : null}
                 </View>
