@@ -1,3 +1,5 @@
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { skillLabel } from '@chemisttasker/shared-core';
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Card, Chip, IconButton, Text } from 'react-native-paper';
@@ -150,9 +152,9 @@ export default function TalentCardV2({
 
           {!candidate.isExplorer ? (
             <View style={styles.skillsBlock}>
-              <Text style={styles.skillTitle}>Clinical Services: {candidate.clinicalServices.length ? candidate.clinicalServices.join(', ') : '--'}</Text>
-              <Text style={styles.skillTitle}>Dispense Software: {candidate.dispenseSoftware.length ? candidate.dispenseSoftware.join(', ') : '--'}</Text>
-              <Text style={styles.skillTitle}>Expanded Scope: {candidate.expandedScope.length ? candidate.expandedScope.join(', ') : '--'}</Text>
+              <Text style={styles.skillTitle}>Clinical Services: {candidate.clinicalServices.length ? candidate.clinicalServices.map(s => skillLabel(skillsRegistry as any, s)).join(', ') : '--'}</Text>
+              <Text style={styles.skillTitle}>Dispense Software: {candidate.dispenseSoftware.length ? candidate.dispenseSoftware.map(s => skillLabel(skillsRegistry as any, s)).join(', ') : '--'}</Text>
+              <Text style={styles.skillTitle}>Expanded Scope: {candidate.expandedScope.length ? candidate.expandedScope.map(s => skillLabel(skillsRegistry as any, s)).join(', ') : '--'}</Text>
             </View>
           ) : null}
         </View>
