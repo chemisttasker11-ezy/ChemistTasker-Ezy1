@@ -12,6 +12,9 @@ export interface SkillDefinition {
   icon_web: string;
   icon_mobile: string;
   icon_meaning: string;
+  definition: string;
+  aliases: string[];
+  matchable?: boolean;
   eligibility: Record<WorkerSkillRole, SkillClaimMode>;
   certificate: string;
   note: string;
@@ -85,4 +88,48 @@ export function claimModeLabel(mode: SkillClaimMode): string | null {
 }
 export function skillCertificateLabel(registry: SkillsRegistry, skill: SkillDefinition): string | null {
   return registry.certificates.find(item => item.code === skill.certificate)?.label || null;
+}
+
+/** Immutable cross-platform matching identity. Never equate arbitrary text with a skill. */
+export function findSkill(registry: SkillsRegistry, codeOrLabel: string): SkillDefinition | null {
+  if (typeof codeOrLabel !== 'string') return null;
+  const query = codeOrLabel.trim().toLowerCase();
+  if (!query) return null;
+  const canonical = registry.legacy_aliases[codeOrLabel.trim().toUpperCase()];
+  const match = registry.skills.find(skill =>
+    skill.code.toLowerCase() === query ||
+    skill.code === canonical ||
+    skill.label.toLowerCase() === query ||
+    (skill.aliases || []).some(alias => alias.toLowerCase() === query)
+  );
+  return match || null;
+}
+export function skillId(registry: SkillsRegistry, codeOrLabel: string): string | null {
+  return findSkill(registry, codeOrLabel)?.code || null;
+}
+export function skillLabel(registry: SkillsRegistry, codeOrLabel: string): string {
+  return findSkill(registry, codeOrLabel)?.label || codeOrLabel;
+}
+export function normalizeSkillIds(registry: SkillsRegistry, values: readonly string[]): string[] {
+  const codes = values.map(value => skillId(registry, value)).filter((value): value is string => Boolean(value));
+  return Array.from(new Set(codes));
+}
+export function skillMatches(registry: SkillsRegistry, requested: string, claimed: readonly string[]): boolean {
+  const code = skillId(registry, requested);
+  return code !== null && normalizeSkillIds(registry, claimed).includes(code);
+}
+/** This checks identity only. Mandatory licensing, certificates and supervision
+ * are separate constraints that must be enforced before ranking or assignment. */
+export function matchSkillRequirements(registry: SkillsRegistry, required: readonly string[], preferred: readonly string[], claimed: readonly string[]) {
+  const actual = new Set(normalizeSkillIds(registry, claimed));
+  const requiredCodes = normalizeSkillIds(registry, required);
+  const preferredCodes = normalizeSkillIds(registry, preferred);
+  const unknownRequired = required.filter(item => !skillId(registry, item));
+  return {
+    matchesRequired: unknownRequired.length === 0 && requiredCodes.every(code => actual.has(code)),
+    matchedRequired: requiredCodes.filter(code => actual.has(code)),
+    missingRequired: requiredCodes.filter(code => !actual.has(code)),
+    unknownRequired,
+    matchedPreferred: preferredCodes.filter(code => actual.has(code))
+  };
 }
