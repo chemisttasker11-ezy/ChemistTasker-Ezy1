@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Checkbox, Chip, HelperText, SegmentedButtons, Text } from 'react-native-paper';
-import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
+import { getOnboardingDetail, updateOnboardingForm, roleSkillGroups, workerSkillRole, claimModeLabel, legacySkillCodes } from '@chemisttasker/shared-core';
 import { pickSingleDocument, roleKey, toRNFile } from './shared';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
 
@@ -13,36 +13,17 @@ type SkillItem = {
   requires_certificate?: boolean;
 };
 
-type RoleCatalog = {
-  clinical_services: SkillItem[];
-  dispense_software: SkillItem[];
-  expanded_scope: SkillItem[];
-};
-
-type SkillsCatalog = {
-  pharmacist: RoleCatalog;
-  otherstaff: RoleCatalog;
-};
-
-type CertRow = {
-  skill_code: string;
-  path?: string;
-  url?: string | null;
-};
-
-type ApiData = {
-  skills?: string[];
-  skill_certificates?: CertRow[];
-};
-
-const catalog = require('@chemisttasker/shared-core/skills_catalog.json') as SkillsCatalog;
+const registry = require('@chemisttasker/shared-core/skills_registry.json') as any;
 
 export default function PharmacistSkillsScreen() {
-  const roleCatalog = catalog.otherstaff;
+  const [subtype,setSubtype] = useState<string | null>(null);
+  const currentRole = workerSkillRole('otherstaff',subtype);
+  const groups = useMemo(() => roleSkillGroups(registry,currentRole),[currentRole]);
+  const legacy = useMemo(() => legacySkillCodes(registry,currentRole,selected),[currentRole,selected]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'dispense_software' | 'clinical_services' | 'expanded_scope'>('dispense_software');
+  const [tab, setTab] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [existingCerts, setExistingCerts] = useState<Record<string, CertRow>>({});
   const [pendingFiles, setPendingFiles] = useState<Record<string, any>>({});
@@ -51,15 +32,8 @@ export default function PharmacistSkillsScreen() {
     { enabled: !loading, onSave: () => save(), saving }
   );
 
-  const allItems = useMemo(
-    () => [...roleCatalog.dispense_software, ...roleCatalog.clinical_services, ...roleCatalog.expanded_scope],
-    [roleCatalog]
-  );
-  const skillIndex = useMemo(() => {
-    const m = new Map<string, SkillItem>();
-    allItems.forEach((it) => m.set(it.code, it));
-    return m;
-  }, [allItems]);
+  const allItems = useMemo(() => groups.flatMap(g => g.items),[groups]);
+  const skillIndex = useMemo(() => new Map(allItems.map((item: any) => [item.code,item])),[allItems]);
 
   useEffect(() => {
     let mounted = true;
@@ -68,6 +42,7 @@ export default function PharmacistSkillsScreen() {
         const res: ApiData = (await getOnboardingDetail(roleKey)) as any;
         if (!mounted) return;
         const skills = res?.skills || [];
+        setSubtype((res as any)?.role_type || null);
         setSelected(skills);
         const map: Record<string, CertRow> = {};
         (res?.skill_certificates || []).forEach((row) => { map[row.skill_code] = row; });
@@ -86,7 +61,7 @@ export default function PharmacistSkillsScreen() {
     };
   }, []);
 
-  const requiresCert = (code: string) => Boolean(skillIndex.get(code)?.requires_certificate);
+  const requiresCert = (code: string) => Boolean((skillIndex.get(code) as any)?.certificate);
   const hasExisting = (code: string) => Boolean(existingCerts[code]?.path || existingCerts[code]?.url);
   const hasPending = (code: string) => Boolean(pendingFiles[code]);
 
@@ -140,12 +115,8 @@ export default function PharmacistSkillsScreen() {
     }
   };
 
-  const currentItems =
-    tab === 'dispense_software'
-      ? roleCatalog.dispense_software
-      : tab === 'clinical_services'
-        ? roleCatalog.clinical_services
-        : roleCatalog.expanded_scope;
+  const activeTab = groups.some(g => g.key === tab) ? tab : groups[0]?.key;
+  const currentItems = groups.find(g => g.key === activeTab)?.items || [];
 
   if (loading) {
     return (
@@ -161,19 +132,11 @@ export default function PharmacistSkillsScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text variant="titleLarge" style={styles.title}>Skills</Text>
-        <Text variant="bodySmall" style={styles.help}>Only skills marked as certificate-required need uploads.</Text>
+        <Text variant="bodySmall" style={styles.help}>Skills describe experience, not professional authorisation. Supervised activities must be performed under pharmacist supervision.</Text>
 
-        <SegmentedButtons
-          value={tab}
-          onValueChange={(v) => setTab(v as any)}
-          buttons={[
-            { value: 'dispense_software', label: 'Dispense Software' },
-            { value: 'clinical_services', label: 'Clinical Services' },
-            { value: 'expanded_scope', label: 'Expanded Scope' },
-          ]}
-        />
+        <SegmentedButtons value={activeTab || ''} onValueChange={setTab} buttons={groups.map(group => ({value:group.key,label:group.label}))} />
 
-        {currentItems.map((item) => {
+        {currentItems.map((item: any) => {
           const checked = selected.includes(item.code);
           const required = requiresCert(item.code);
           const fileState = hasPending(item.code) ? 'Selected' : hasExisting(item.code) ? 'On file' : required && checked ? 'Required' : '';
@@ -182,7 +145,8 @@ export default function PharmacistSkillsScreen() {
               <View style={styles.rowTop}>
                 <Checkbox status={checked ? 'checked' : 'unchecked'} onPress={() => toggle(item.code)} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.itemLabel}>{item.label}</Text>
+                  <Text style={styles.itemLabel}>{item.icon}  {item.label}</Text>
+                  {currentRole && claimModeLabel(item.eligibility[currentRole]) ? <Text style={styles.itemDesc}>{claimModeLabel(item.eligibility[currentRole])}</Text> : null}
                   {item.description ? <Text style={styles.itemDesc}>{item.description}</Text> : null}
                 </View>
                 {fileState ? <Chip mode="outlined">{fileState}</Chip> : null}
@@ -196,6 +160,8 @@ export default function PharmacistSkillsScreen() {
           );
         })}
 
+        {legacy.length ? <Text style={styles.itemDesc}>Some previously selected skills are unavailable for this role; they remain visible in the saved profile until reviewed.</Text> : null}
+        {!currentRole ? <HelperText type="info">Select your staff role under Regulatory Docs first.</HelperText> : null}
         {error ? <HelperText type="error">{error}</HelperText> : null}
         <Button mode="contained" onPress={save} loading={saving} disabled={saving}>Save Skills</Button>
       </ScrollView>

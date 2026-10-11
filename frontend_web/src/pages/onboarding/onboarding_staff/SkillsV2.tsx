@@ -10,7 +10,8 @@ import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
 
 import { API_BASE_URL } from '../../../constants/api';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
-import skillsCatalog from '../../../../../shared-core/skills_catalog.json';
+import skillsRegistry from '../../../../../shared-core/skills_registry.json';
+import { roleSkillGroups, workerSkillRole, claimModeLabel, skillCertificateLabel, legacySkillCodes } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
 
 type SkillItem = {
@@ -20,18 +21,6 @@ type SkillItem = {
   requires_certificate?: boolean;
 };
 
-type RoleCatalog = {
-  clinical_services: SkillItem[];
-  dispense_software: SkillItem[];
-  expanded_scope: SkillItem[];
-};
-
-type SkillsCatalog = {
-  pharmacist: RoleCatalog;
-  otherstaff: RoleCatalog;
-};
-
-const catalog = skillsCatalog as SkillsCatalog;
 
 // ---- Legacy-style Years of Experience (string values; keep exactly as backend expects) ----
 const YEARS_EXPERIENCE_CHOICES: Array<{ value: string; label: string }> = [
@@ -58,7 +47,10 @@ type ApiData = {
 
 export default function SkillsV2() {
   const roleKey = 'otherstaff' as const;
-  const roleCatalog = catalog[roleKey];
+  const [staffSubtype, setStaffSubtype] = React.useState<string | null>(null);
+  const currentRole = workerSkillRole(roleKey, staffSubtype);
+  const tabs = React.useMemo(() => roleSkillGroups(skillsRegistry as any, currentRole).map(group => ({key: group.key, label: group.label, items: group.items})), [currentRole]);
+  const legacySkills = React.useMemo(() => legacySkillCodes(skillsRegistry as any, currentRole, selected), [currentRole, selected]);
 
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -75,18 +67,7 @@ export default function SkillsV2() {
     value: { existingCerts, pendingFiles, selected, yearsExperience },
   });
 
-  const tabs = [
-    { key: 'dispense_software', label: 'Dispense Software', items: roleCatalog.dispense_software },
-    { key: 'clinical_services', label: 'Clinical Services', items: roleCatalog.clinical_services },
-    { key: 'expanded_scope', label: 'Expanded Scope', items: roleCatalog.expanded_scope },
-  ] as const;
-
-  const skillIndex = React.useMemo(() => {
-    const map = new Map<string, SkillItem>();
-    [...roleCatalog.dispense_software, ...roleCatalog.clinical_services, ...roleCatalog.expanded_scope]
-      .forEach(item => map.set(item.code, item));
-    return map;
-  }, [roleCatalog]);
+  const skillIndex = React.useMemo(() => new Map(tabs.flatMap(group => group.items).map(item => [item.code, item])), [tabs]);
 
   const getFileUrl = (path?: string | null) =>
     path ? (path.startsWith('http') ? path : `${API_BASE_URL}${path}`) : '';
@@ -102,6 +83,7 @@ export default function SkillsV2() {
         if (!mounted) return;
         const d: ApiData = (res as any) || {};
         setYearsExperience(d.years_experience || '');
+        setStaffSubtype((d as any).role_type || null);
         setSelected(d.skills || []);
         const byCode: Record<string, CertRow> = {};
         (d.skill_certificates || []).forEach(row => { byCode[row.skill_code] = row; });
@@ -134,7 +116,7 @@ export default function SkillsV2() {
 
   const hasExisting = (code: string) => Boolean(existingCerts[code]?.path);
   const hasPending = (code: string) => Boolean(pendingFiles[code]);
-  const requiresCert = (code: string) => Boolean(skillIndex.get(code)?.requires_certificate);
+  const requiresCert = (code: string) => Boolean((skillIndex.get(code) as any)?.certificate);
   const previewPendingUrl = (code: string) => {
     const f = pendingFiles[code];
     return f ? URL.createObjectURL(f) : '';
@@ -232,12 +214,14 @@ export default function SkillsV2() {
         ))}
       </TextField>
 
+      {legacySkills.length > 0 && <Alert severity="warning" sx={{mb:2}}>Previous skills are retained for audit but some are not available for your current role. Save only after reviewing your selections.</Alert>}
+      {!currentRole && <Alert severity="warning" sx={{mb:2}}>Select your staff role in Regulatory Docs before claiming professional skills.</Alert>}
       {/* Guidance */}
       <Alert severity="info" sx={{ mb: 2 }}>
-        Only skills marked as requiring certificates need uploads. Other selections do not need a file.
+        Claim only skills you can perform within your role. Supervised and familiarity claims are labelled. Training documents are required only for marked activities.
       </Alert>
 
-      <Tabs value={tabIndex} onChange={(_, next) => setTabIndex(next)} sx={{ mb: 2 }}>
+      <Tabs value={Math.min(tabIndex, Math.max(tabs.length - 1, 0))} onChange={(_, next) => setTabIndex(next)} sx={{ mb: 2 }}>
         {tabs.map(tab => (
           <Tab key={tab.key} label={tab.label} />
         ))}
@@ -277,7 +261,8 @@ export default function SkillsV2() {
                         control={<Checkbox checked={checked} onChange={toggleSkill(item.code)} />}
                         label={
                           <Box>
-                            <Typography variant="body1">{item.label}</Typography>
+                            <Typography variant="body1" sx={{display:'flex',alignItems:'center',gap:1}}><span role="img" aria-label={item.label}>{(item as any).icon}</span>{item.label}</Typography>
+                            {currentRole && claimModeLabel((item as any).eligibility[currentRole]) && <Typography variant="caption" sx={{display:'block',color:'secondary.main',fontWeight:700}}>{claimModeLabel((item as any).eligibility[currentRole])}</Typography>}
                             {item.description && (
                               <Typography variant="body2" color="text.secondary">
                                 {item.description}

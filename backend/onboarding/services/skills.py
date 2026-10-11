@@ -20,7 +20,7 @@ def _load_skills_catalog():
         return _SKILLS_CATALOG_CACHE
     from django.conf import settings
     base_dir = settings.BASE_DIR.parent
-    catalog_path = base_dir / "shared-core" / "skills_catalog.json"
+    catalog_path = base_dir / "shared-core" / "skills_registry.json"
     try:
         with open(catalog_path, "r", encoding="utf-8") as f:
             _SKILLS_CATALOG_CACHE = json.load(f)
@@ -31,13 +31,46 @@ def _load_skills_catalog():
 
 def _required_cert_skill_codes(role_key: str) -> set[str]:
     catalog = _load_skills_catalog()
-    role = (catalog or {}).get(role_key, {})
-    required = set()
-    for group_key in ("clinical_services", "dispense_software", "expanded_scope"):
-        for item in role.get(group_key, []) or []:
-            if item.get("requires_certificate"):
-                required.add(item.get("code"))
-    return {c for c in required if c}
+    return {skill["code"] for skill in catalog.get("skills", []) if skill.get("certificate")}
+
+
+def _role_for_skills(instance, role_key: str):
+    if role_key == "pharmacist":
+        return "PHARMACIST"
+    return str(getattr(instance, "role_type", "") or "").upper()
+
+
+def _canonical_skills(instance, requested: list[str], role_key: str) -> list[str]:
+    catalog = _load_skills_catalog()
+    skills = {item["code"]: item for item in catalog.get("skills", [])}
+    alias = catalog.get("legacy_aliases", {})
+    allowed = {"PHARMACIST", "INTERN", "TECHNICIAN", "ASSISTANT", "STUDENT"}
+    role = _role_for_skills(instance, role_key)
+    if role not in allowed:
+        if requested:
+            raise serializers.ValidationError({"skills": "Select your valid professional role before claiming skills."})
+        return requested
+
+    result = []
+    # Previously saved codes remain readable, but do not grant new professional claims.
+    previous = set(instance.skills or [])
+    deprecated = set(catalog.get("legacy_evidence_only", []))
+    for raw in requested:
+        code = alias.get(raw, raw)
+        item = skills.get(code)
+        if raw in deprecated and raw in previous:
+            # Insurance documents were historically stored among skills.
+            result.append(raw)
+            continue
+        if not item or item.get("eligibility", {}).get(role) == "none":
+            # Prevent previously saved stale options from being used as new claims.
+            if raw in previous:
+                result.append(raw)
+                continue
+            raise serializers.ValidationError({"skills": f"Skill {raw} cannot be claimed for role {role}."})
+        if code not in result:
+            result.append(code)
+    return result
 
 
 def files_by_skill(request):
@@ -117,6 +150,8 @@ def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: 
             raise serializers.ValidationError({"skills": "Must be a JSON array or list."})
     else:
         skills = list(raw or [])
+
+    skills = _canonical_skills(instance, skills, role_key)
 
     yrs = initial_data.get("years_experience", vdata.get("years_experience", None)) if track_years_experience else None
     if yrs is not None:

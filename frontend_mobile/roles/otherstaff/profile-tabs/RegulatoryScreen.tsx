@@ -102,7 +102,7 @@ export default function OtherStaffRegulatoryScreen() {
     };
   }, []);
 
-  const showAssistantLevel = data.role_type === 'ASSISTANT';
+  const showAssistantLevel = data.role_type === 'ASSISTANT' || data.role_type === 'TECHNICIAN';
   const showStudentYear = data.role_type === 'STUDENT';
   const showInternHalf = data.role_type === 'INTERN';
 
@@ -184,7 +184,7 @@ export default function OtherStaffRegulatoryScreen() {
 
         {showAssistantLevel ? (
           <Menu visible={assistantMenu} onDismiss={() => setAssistantMenu(false)} anchor={<Button mode="outlined" onPress={() => setAssistantMenu(true)}>{assistantLabel}</Button>}>
-            {ASSISTANT_LEVEL_CHOICES.map((c) => <Menu.Item key={c.value} title={c.label} onPress={() => { setData((p: any) => ({ ...p, classification_level: c.value })); setAssistantMenu(false); }} />)}
+            {ASSISTANT_LEVEL_CHOICES.filter((c) => data.role_type !== 'TECHNICIAN' || ['LEVEL_3','LEVEL_4'].includes(c.value)).map((c) => <Menu.Item key={c.value} title={c.label} onPress={() => { setData((p: any) => ({ ...p, classification_level: c.value })); setAssistantMenu(false); }} />)}
           </Menu>
         ) : null}
         {showStudentYear ? (

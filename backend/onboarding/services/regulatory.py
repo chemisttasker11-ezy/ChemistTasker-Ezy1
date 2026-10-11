@@ -17,12 +17,10 @@ def required_documents_for_role(instance):
             ('ahpra_proof', 'ahpra_proof_verified', 'ahpra_proof_verification_note'),
             ('hours_proof', 'hours_proof_verified', 'hours_proof_verification_note'),
         ],
-        'TECHNICIAN': [
-            ('certificate', 'certificate_verified', 'certificate_verification_note'),
-        ],
-        'ASSISTANT': [
-            ('certificate', 'certificate_verified', 'certificate_verification_note'),
-        ],
+        # Qualification documents depend on claimed competencies; entry-level
+        # assistants do not automatically require a Certificate II or above.
+        'TECHNICIAN': [],
+        'ASSISTANT': [],
         'STUDENT': [
             ('university_id', 'university_id_verified', 'university_id_verification_note'),
         ],

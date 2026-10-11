@@ -182,7 +182,7 @@ export default function RegulatoryV2() {
       setData((prev) => ({ ...prev, [field]: file }));
     };
 
-  const showAssistantLevel = data.role_type === "ASSISTANT";
+  const showAssistantLevel = data.role_type === "ASSISTANT" || data.role_type === "TECHNICIAN";
   const showStudentYear = data.role_type === "STUDENT";
   const showInternHalf = data.role_type === "INTERN";
 
@@ -296,7 +296,7 @@ export default function RegulatoryV2() {
           <TextField
             select
             fullWidth
-            label="Assistant Classification Level"
+            label={data.role_type === "TECHNICIAN" ? "Dispensary Assistant Award Classification" : "Pharmacy Assistant Award Classification"}
             name="classification_level"
             value={data.classification_level || ""}
             onChange={onTextChange}
@@ -389,9 +389,8 @@ export default function RegulatoryV2() {
 
         {(data.role_type === "TECHNICIAN" || data.role_type === "ASSISTANT") && (
           <Stack spacing={1}>
-            <Typography fontWeight={600}>
-              {data.role_type === "TECHNICIAN" ? "Technician" : "Assistant"} Documents
-            </Typography>
+            <Typography fontWeight={600}>{data.role_type === "TECHNICIAN" ? "Dispensary Competency Evidence" : "Qualification Evidence (if relevant)"}</Typography>
+            <Alert severity="info" sx={{ mb: 1 }}>Upload evidence of completed qualifications, recognised prior learning or assessed workplace competencies where applicable. Entry-level Pharmacy Assistants do not need a mandatory certificate.</Alert>
 
             <Stack direction="row" alignItems="center" spacing={1}>
               <Button variant="outlined" component="label">
