@@ -1,3 +1,4 @@
+import { skillId } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Chip, IconButton, Text } from 'react-native-paper';
@@ -97,42 +98,10 @@ const mapAvailabilityToPitchSlots = (entries: any[]) =>
   ).filter((slot) => slot.date >= todayIso());
 const allWorkTypes = Object.values(ENGAGEMENT_LABELS);
 
-type SkillItem = {
-  code: string;
-  label: string;
-  description?: string;
-  requires_certificate?: boolean;
-};
-type RoleCatalog = {
-  clinical_services: SkillItem[];
-  dispense_software: SkillItem[];
-  expanded_scope: SkillItem[];
-};
-type SkillsCatalog = {
-  pharmacist: RoleCatalog;
-  otherstaff: RoleCatalog;
-};
-
-const catalog = require('@chemisttasker/shared-core/skills_catalog.json') as SkillsCatalog;
-
-const buildSkillMaps = () => {
-  const codeToLabel = new Map<string, string>();
-  const codeToCategory = new Map<string, 'clinical_services' | 'dispense_software' | 'expanded_scope'>();
-  (['pharmacist', 'otherstaff'] as const).forEach((roleKey) => {
-    const role = catalog[roleKey];
-    if (!role) return;
-    (['clinical_services', 'dispense_software', 'expanded_scope'] as const).forEach((category) => {
-      role[category]?.forEach((item) => {
-        if (!item?.code) return;
-        if (!codeToLabel.has(item.code)) codeToLabel.set(item.code, item.label || item.code);
-        if (!codeToCategory.has(item.code)) codeToCategory.set(item.code, category);
-      });
-    });
-  });
-  return { codeToLabel, codeToCategory };
-};
-
-const { codeToLabel, codeToCategory } = buildSkillMaps();
+const registry = require('@chemisttasker/shared-core/skills_registry.json') as any;
+const codeToCategory = new Map<string, 'clinical_services' | 'dispense_software' | 'expanded_scope'>(
+  registry.skills.map((skill: any) => [skill.code, skill.group === 'Clinical Services' ? 'clinical_services' : skill.group === 'Software & Digital' ? 'dispense_software' : 'expanded_scope'])
+);
 
 type TalentBoardProps = {
   publicMode?: boolean;
@@ -261,7 +230,8 @@ export default function TalentBoard({
         const expandedScope: string[] = [];
         const otherSkills: string[] = [];
         rawSkills.forEach((code) => {
-          const label = codeToLabel.get(code) ?? code;
+          const label = skillId(registry, code);
+          if (!label) return;
           const category = codeToCategory.get(code);
           if (category === 'clinical_services') clinicalServices.push(label);
           else if (category === 'dispense_software') dispenseSoftware.push(label);
