@@ -108,7 +108,7 @@
         "INTERN": "supervised",
         "TECHNICIAN": "supervised",
         "ASSISTANT": "none",
-        "STUDENT": "none"
+        "STUDENT": "supervised"
       },
       "certificate": "",
       "note": "Pharmacy technicians may assist with dispensing only under pharmacist supervision."

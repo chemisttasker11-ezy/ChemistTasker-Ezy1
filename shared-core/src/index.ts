@@ -68,3 +68,5 @@ export type { AsyncScope, AsyncScopeTicket } from "./utils/asyncScope";
 
 export type {CurrentUserApi, OnboardingApi} from './contracts/accounts';
 export type {InvoiceDetailApi, InvoiceLineItemApi} from './contracts/invoiceDetail';
+
+export * from './skills';
