@@ -13,7 +13,7 @@ class OnboardingSkillsCatalogPathTests(SimpleTestCase):
 
     def test_skills_catalog_is_resolved_from_project_root_not_module_depth(self):
         catalog._SKILLS_CATALOG_CACHE = None
-        expected = Path(settings.BASE_DIR).parent / "shared-core" / "skills_catalog.json"
+        expected = Path(settings.BASE_DIR).parent / "shared-core" / "skills_registry.json"
 
         opened = {}
 
