@@ -1,7 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import { List, Surface, Text } from 'react-native-paper';
-import skillsCatalog from '@chemisttasker/shared-core/skills_catalog.json';
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { roleSkillGroups } from '@chemisttasker/shared-core';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { DoseBlisterIcon } from '../../../components/DoseBlisterIcon';
 import { PRIMARY } from './PostShiftScreen.helpers';
 import { styles } from './PostShiftScreen.styles';
 
@@ -22,25 +25,9 @@ export default function PostShiftSkillsStep({
   niceToHave,
   setNiceToHave,
 }: Props) {
-  const roleKey = roleNeeded === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
-  const roleCatalog = (skillsCatalog as any)[roleKey] || {};
-  const categories = [
-    {
-      key: 'clinical_services',
-      title: 'Clinical Services',
-      items: roleCatalog.clinical_services || [],
-    },
-    {
-      key: 'dispense_software',
-      title: 'Dispense Software',
-      items: roleCatalog.dispense_software || [],
-    },
-    {
-      key: 'expanded_scope',
-      title: 'Expanded Scope',
-      items: roleCatalog.expanded_scope || [],
-    },
-  ].filter((category) => category.items.length > 0);
+  const categories = roleSkillGroups(skillsRegistry as any, roleNeeded as any).map(group => ({
+    key: group.key, title: group.label, items: group.items
+  }));
 
   return (
     <Surface style={styles.card} elevation={1}>
@@ -87,6 +74,7 @@ export default function PostShiftSkillsStep({
                       ]}
                     >
                       <View style={styles.skillTextContainer}>
+                        {skill.icon_mobile === 'BLISTER_PACK' || skill.icon_mobile === 'BLISTER_CHECK' ? <DoseBlisterIcon checked={skill.icon_mobile === 'BLISTER_CHECK'} /> : <MaterialCommunityIcons name={skill.icon_mobile as any} size={21} color="#2463A6" />}
                         <Text
                           style={[
                             styles.skillLabel,
