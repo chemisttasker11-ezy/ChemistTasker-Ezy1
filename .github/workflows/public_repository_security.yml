@@ -108,7 +108,8 @@ jobs:
           allow_suffixes = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf", ".ico"}
 
           objects = {}
-          output = subprocess.check_output(["git", "rev-list", "--objects", "--all"], text=True, errors="surrogateescape")
+          # Private repository: scan the history that ships with this commit, not every unpublished branch.
+          output = subprocess.check_output(["git", "rev-list", "--objects", "HEAD"], text=True, errors="surrogateescape")
           for line in output.splitlines():
               sha, sep, path = line.partition(" ")
               if sep and path and sha not in objects:

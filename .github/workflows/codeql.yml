@@ -9,6 +9,7 @@ on:
     - cron: "31 18 * * 1"
 
 permissions:
+  actions: read
   contents: read
   security-events: write
 
@@ -33,5 +34,28 @@ jobs:
         with:
           languages: ${{ matrix.language }}
 
+      # Private repositories without GitHub Advanced Security cannot upload to Code Scanning, so the
+      # analysis runs locally to the job and any finding fails the build instead.
       - name: Analyze
+        id: analyze
         uses: github/codeql-action/analyze@3ea06614dafe36dec890db3446326e0d40ce53d4 # v3
+        with:
+          upload: ${{ github.event.repository.private && 'never' || 'always' }}
+          output: codeql-results
+
+      - name: Fail on CodeQL findings (private repository)
+        if: ${{ github.event.repository.private }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=$(python3 -c "import glob,json; print(sum(len(r.get('results',[])) for f in glob.glob('codeql-results/*.sarif') for r in json.load(open(f)).get('runs',[])))")
+          echo "CodeQL findings: $count"
+          if [ "$count" -gt 0 ]; then
+            python3 -c "import glob,json
+          for f in glob.glob('codeql-results/*.sarif'):
+              for run in json.load(open(f)).get('runs',[]):
+                  for r in run.get('results',[]):
+                      loc=r['locations'][0]['physicalLocation']
+                      print('::error file=%s,line=%s::%s %s' % (loc['artifactLocation']['uri'], loc.get('region',{}).get('startLine',1), r.get('ruleId'), r['message']['text']))"
+            exit 1
+          fi
