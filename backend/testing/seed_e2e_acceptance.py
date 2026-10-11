@@ -7,7 +7,9 @@ if os.environ.get("DJANGO_SETTINGS_MODULE") != "core.e2e_acceptance_settings":
 django.setup()
 
 from django.contrib.auth import get_user_model
-from client_profile.models import OwnerOnboarding, PharmacistOnboarding, Pharmacy, Membership, PharmacyAdmin
+from onboarding.models import OwnerOnboarding, PharmacistOnboarding
+from organizations.models import Pharmacy, PharmacyAdmin
+from memberships.models import Membership
 
 User = get_user_model()
 if User.objects.exists():
