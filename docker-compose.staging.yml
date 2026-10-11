@@ -30,6 +30,11 @@ x-backend-environment: &backend-environment
   DJANGO_CACHE_URL: "redis://redis:6379/4"
   REDIS_KEY_PREFIX: "chemisttasker:staging"
   USE_REDIS_CHANNEL_LAYER: "True"
+  CELERY_TASK_DEFAULT_QUEUE: "default"
+  CELERY_WORKER_PREFETCH_MULTIPLIER: "1"
+  CELERY_RESULT_EXPIRES: "3600"
+  CELERY_TASK_IGNORE_RESULT: "True"
+  EMAIL_TASK_RATE_LIMIT: "30/m"
   PUBLIC_COMMUNITY_ENABLED: "True"
   EMAIL_HOST_USER: ""
   EMAIL_HOST_PASSWORD: ""
@@ -127,6 +132,12 @@ services:
     volumes:
       - staging_media_data:/app/media
       - staging_verification_data:/app/verification_outputs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A core inspect ping -d celery@$$(hostname)"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
 
   celery_beat:
     image: chemisttasker_backend_staging:latest
@@ -204,6 +215,7 @@ services:
         condition: service_started
     networks:
       - staging_network
+      - shared_backend_network
     volumes:
       - ./nginx/staging.conf:/etc/nginx/conf.d/default.conf:ro
       - staging_static_data:/app/staticfiles:ro
@@ -218,6 +230,7 @@ services:
     image: cloudflare/cloudflared:2026.9.1
     container_name: chemisttasker_cloudflared_staging
     restart: unless-stopped
+    profiles: ["preview"]
     command: ["tunnel", "--no-autoupdate", "--url", "http://gateway:8080"]
     depends_on:
       gateway:
@@ -236,3 +249,6 @@ networks:
   staging_network:
     name: chemisttasker_staging_network
     driver: bridge
+  shared_backend_network:
+    external: true
+    name: shared_backend_network

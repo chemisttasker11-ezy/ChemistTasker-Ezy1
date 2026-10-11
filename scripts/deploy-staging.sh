@@ -96,7 +96,7 @@ set +a
 : "${STAGING_RECAPTCHA_SECRET_KEY:?STAGING_RECAPTCHA_SECRET_KEY is required}"
 
 compose() {
-  docker compose -f docker-compose.staging.yml "$@"
+  docker compose --profile preview -f docker-compose.staging.yml "$@"
 }
 
 compose up -d --build
