@@ -297,7 +297,7 @@ export default function TalentCard({
                 Dispense Software:
               </Typography>
               {candidate.dispenseSoftware.length > 0 ? (
-                candidate.dispenseSoftware.map((skill) => <Chip key={skill} size="small" label={skill} />)
+                candidate.dispenseSoftware.map((skill) => <Chip key={skill} size="small" icon={<SkillGlyph name={skillsRegistry.skills.find(s => s.code === skill)?.icon_web || "CircleHelp"} title={skill} />} label={skillLabel(skillsRegistry as any, skill)} />)
               ) : (
                 <Typography variant="caption" color="text.secondary">
                   --
@@ -310,7 +310,7 @@ export default function TalentCard({
                 Expanded Scope:
               </Typography>
               {candidate.expandedScope.length > 0 ? (
-                candidate.expandedScope.map((skill) => <Chip key={skill} size="small" label={skill} />)
+                candidate.expandedScope.map((skill) => <Chip key={skill} size="small" icon={<SkillGlyph name={skillsRegistry.skills.find(s => s.code === skill)?.icon_web || "CircleHelp"} title={skill} />} label={skillLabel(skillsRegistry as any, skill)} />)
               ) : (
                 <Typography variant="caption" color="text.secondary">
                   --
