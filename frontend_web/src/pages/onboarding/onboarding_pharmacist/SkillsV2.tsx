@@ -12,15 +12,8 @@ import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
 import { API_BASE_URL } from '../../../constants/api';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import skillsRegistry from '../../../../../shared-core/skills_registry.json';
-import { roleSkillGroups, workerSkillRole, claimModeLabel, legacySkillCodes } from '@chemisttasker/shared-core';
+import { roleSkillGroups, workerSkillRole, claimModeLabel } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
-
-type SkillItem = {
-  code: string;
-  label: string;
-  description?: string;
-  requires_certificate?: boolean;
-};
 
 
 type CertRow = {
@@ -47,7 +40,6 @@ export default function SkillsV2() {
   const [tabIndex, setTabIndex] = React.useState(0);
 
   const [selected, setSelected] = React.useState<string[]>([]);
-  const legacySkills = React.useMemo(() => legacySkillCodes(skillsRegistry as any, currentRole, selected), [currentRole, selected]);
   const [existingCerts, setExistingCerts] = React.useState<Record<string, CertRow>>({});
   const [pendingFiles, setPendingFiles] = React.useState<Record<string, File | null>>({}); // newly chosen (not yet uploaded)
   const unsaved = useUnsavedChangesGuard({
