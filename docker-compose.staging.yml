@@ -14,6 +14,7 @@ x-backend-environment: &backend-environment
   JWT_COOKIE_SECURE: "True"
   JWT_COOKIE_PATH: "/"
   APP_ENV: "staging"
+  STAGING_TEST_DATA_ENABLED: "1"
   FRONTEND_BASE_URL: "${STAGING_PUBLIC_URL:-https://preview.invalid}"
   BACKEND_BASE_URL: "${STAGING_PUBLIC_URL:-https://preview.invalid}"
   USE_PROD_DB: "False"

@@ -128,6 +128,38 @@ if [[ "${STAGING_PUBLIC_URL:-}" != "$preview_url" || "${STAGING_ALLOWED_HOSTS:-}
   compose up -d --build landing web celery_worker celery_beat gateway
 fi
 
+# Keep credentials exclusively in the staging server's ignored env directory.
+TEST_USERS_FILE="env/staging.test-users.json"
+if [[ -L "$TEST_USERS_FILE" ]]; then
+  echo "Refusing symlinked staging credentials." >&2
+  exit 1
+fi
+if [[ ! -f "$TEST_USERS_FILE" ]]; then
+  umask 077
+  python3 - "$TEST_USERS_FILE" <<'PY'
+import json
+import os
+import secrets
+import sys
+
+personas = ("owner", "organization_admin", "pharmacist", "intern",
+            "technician", "assistant", "student", "explorer")
+accounts = {
+    key: {"email": key + "@staging.chemisttasker.test",
+          "password": secrets.token_urlsafe(30)}
+    for key in personas
+}
+with os.fdopen(os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as output:
+    json.dump(accounts, output, indent=2)
+    output.write("\n")
+PY
+fi
+chmod 600 "$TEST_USERS_FILE"
+# Wait for successful migrations before this step; never print credentials.
+compose exec -T web python manage.py shell -c \
+  'from users.staging_test_data import seed_from_stdin; seed_from_stdin()' \
+  < "$TEST_USERS_FILE"
+
 for _ in $(seq 1 60); do
   if curl -fsS --max-time 10 "$preview_url/" >/dev/null; then
     break
