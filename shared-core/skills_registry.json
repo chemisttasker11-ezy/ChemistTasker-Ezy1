@@ -1,0 +1,1157 @@
+{
+  "version": 2,
+  "authority": "Shared, canonical capability names and role eligibility. A checked skill never confers legal practice authority.",
+  "roles": [
+    "PHARMACIST",
+    "INTERN",
+    "TECHNICIAN",
+    "ASSISTANT",
+    "STUDENT"
+  ],
+  "groups": [
+    "Dispensing & Medicines",
+    "Clinical Services",
+    "Operations & Retail",
+    "Software & Digital"
+  ],
+  "levels": {
+    "experience": "May claim experience within lawful scope",
+    "supervised": "Under pharmacist supervision",
+    "conditional": "Training / role / supervision conditions apply",
+    "familiarity": "Familiarity or observation only",
+    "none": "Unavailable"
+  },
+  "legacy_aliases": {
+    "VACCINATOR": "VACCINATION",
+    "CRED_PHARM": "HMR_ACCREDITED_MRN"
+  },
+  "legacy_evidence_only": [
+    "PI_INSURANCE",
+    "PDL"
+  ],
+  "certificates": [
+    {
+      "code": "COMPOUNDING_TRAINING",
+      "label": "Compounding training / competency evidence",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": true
+    },
+    {
+      "code": "ADVANCED_COMPOUNDING_TRAINING",
+      "label": "Advanced or sterile compounding training",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "VACCINATION_TRAINING",
+      "label": "Vaccination training and applicable authorisation",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "ANAPHYLAXIS_TRAINING",
+      "label": "Anaphylaxis response training certificate",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "FIRST_AID_CPR",
+      "label": "First Aid / CPR certificate",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "MMR_CREDENTIAL",
+      "label": "Current Medication Management Review credential",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "ACOP_CREDENTIAL",
+      "label": "Aged Care On-site Pharmacist training and program credentials",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "UTI_PRESCRIBING_TRAINING",
+      "label": "Jurisdictional UTI prescribing service training",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "CONTRACEPTIVE_RESUPPLY_TRAINING",
+      "label": "Contraceptive resupply service training",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "YELLOW_FEVER_TRAINING",
+      "label": "Travel health / Yellow Fever training and authorisation",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "PRESCRIBING_SCOPE_TRAINING",
+      "label": "Relevant expanded-scope service training",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    }
+  ],
+  "skills": [
+    {
+      "code": "PRESCRIPTION_DISPENSING",
+      "label": "Prescription dispensing",
+      "group": "Dispensing & Medicines",
+      "icon": "💊",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": "Pharmacy technicians may assist with dispensing only under pharmacist supervision."
+    },
+    {
+      "code": "DISPENSING_DATA_ENTRY",
+      "label": "Dispensing data entry and labelling",
+      "group": "Dispensing & Medicines",
+      "icon": "⌨️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Assistant conditional on dispensary training and pharmacist supervision."
+    },
+    {
+      "code": "CLINICAL_CHECKING",
+      "label": "Clinical prescription checking",
+      "group": "Dispensing & Medicines",
+      "icon": "🔍",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": "Independent final clinical judgement by registered pharmacist only."
+    },
+    {
+      "code": "ESCRIPT_PROCESSING",
+      "label": "Electronic prescription workflows",
+      "group": "Dispensing & Medicines",
+      "icon": "📲",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "PBS_CLAIMS",
+      "label": "PBS claim preparation",
+      "group": "Dispensing & Medicines",
+      "icon": "🧾",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "PATIENT_COUNSELLING",
+      "label": "Patient medication counselling",
+      "group": "Dispensing & Medicines",
+      "icon": "🗣️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Intern and student only under pharmacist supervision."
+    },
+    {
+      "code": "OTC_S2_ADVICE",
+      "label": "Pharmacy medicines (S2) assistance",
+      "group": "Dispensing & Medicines",
+      "icon": "🩹",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Non-pharmacists assist under appropriate training and supervision."
+    },
+    {
+      "code": "S3_CONSULT_SUPPORT",
+      "label": "Pharmacist-only (S3) consultation support",
+      "group": "Dispensing & Medicines",
+      "icon": "🧑‍⚕️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "supervised",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Support and referral do not grant independent supply authority."
+    },
+    {
+      "code": "S8_PROCEDURES",
+      "label": "Controlled-drug procedures",
+      "group": "Dispensing & Medicines",
+      "icon": "🔐",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "Legal permissions and pharmacist oversight still apply."
+    },
+    {
+      "code": "S8_RECORDS",
+      "label": "Controlled-drug record administration",
+      "group": "Dispensing & Medicines",
+      "icon": "📚",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "WEBSTER_PACKING_DAA",
+      "label": "Dose administration aid (DAA/Webster) packing",
+      "group": "Dispensing & Medicines",
+      "icon": "📦",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "supervised",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "DAA_FINAL_CHECK",
+      "label": "DAA final clinical check",
+      "group": "Dispensing & Medicines",
+      "icon": "✅",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": "Pharmacist only."
+    },
+    {
+      "code": "COMPOUNDING",
+      "label": "Extemporaneous compounding",
+      "group": "Dispensing & Medicines",
+      "icon": "⚗️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "COMPOUNDING_TRAINING",
+      "note": "ChemistTasker platform evidence policy; not a universal statutory certificate."
+    },
+    {
+      "code": "ADVANCED_COMPOUNDING",
+      "label": "Advanced / sterile compounding",
+      "group": "Dispensing & Medicines",
+      "icon": "🧪",
+      "eligibility": {
+        "PHARMACIST": "conditional",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "none",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "ADVANCED_COMPOUNDING_TRAINING",
+      "note": "Specialist training and additional safeguards apply."
+    },
+    {
+      "code": "STAGED_SUPPLY",
+      "label": "Staged supply workflow",
+      "group": "Dispensing & Medicines",
+      "icon": "🗓️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "Clinical supply decisions remain pharmacist-only."
+    },
+    {
+      "code": "PHARMACOTHERAPY_METHADONE_SUBOXONE",
+      "label": "Opioid dependence pharmacotherapy support",
+      "group": "Dispensing & Medicines",
+      "icon": "🧫",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "none",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "Technical support is not independent dosing."
+    },
+    {
+      "code": "MEDICATION_RECONCILIATION",
+      "label": "Medication reconciliation",
+      "group": "Dispensing & Medicines",
+      "icon": "📋",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Supervised learner assistance is not independent clinical reconciliation."
+    },
+    {
+      "code": "DISPENSARY_WORKFLOW",
+      "label": "Dispensary workflow coordination",
+      "group": "Dispensing & Medicines",
+      "icon": "🔄",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "ROBOT_DISPENSING",
+      "label": "Dispensing robot operation (ROWA / Alpaca)",
+      "group": "Dispensing & Medicines",
+      "icon": "🤖",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "MEDICINE_DELIVERIES",
+      "label": "Medicine deliveries and handover",
+      "group": "Dispensing & Medicines",
+      "icon": "🚚",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Follow privacy and medicine handling policies."
+    },
+    {
+      "code": "CANNABIS",
+      "label": "Medicinal cannabis handling / dispensing workflow",
+      "group": "Dispensing & Medicines",
+      "icon": "🌿",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "none",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "Clinical decisions remain pharmacist-only."
+    },
+    {
+      "code": "MEDICATION_ADHERENCE",
+      "label": "Medication adherence support",
+      "group": "Dispensing & Medicines",
+      "icon": "💡",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "VACCINATION",
+      "label": "Vaccination",
+      "group": "Clinical Services",
+      "icon": "💉",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "conditional",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "VACCINATION_TRAINING",
+      "note": "Intern conditional on jurisdictional authorisation, training and supervision."
+    },
+    {
+      "code": "ANAPHYLAXIS_MANAGEMENT",
+      "label": "Anaphylaxis response training",
+      "group": "Clinical Services",
+      "icon": "🚨",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "conditional",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "ANAPHYLAXIS_TRAINING",
+      "note": ""
+    },
+    {
+      "code": "FIRST_AID",
+      "label": "First Aid / CPR",
+      "group": "Clinical Services",
+      "icon": "❤️‍🩹",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "FIRST_AID_CPR",
+      "note": ""
+    },
+    {
+      "code": "HMR_ACCREDITED_MRN",
+      "label": "Medication Management Reviews (HMR / RMMR)",
+      "group": "Clinical Services",
+      "icon": "🏠",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "MMR_CREDENTIAL",
+      "note": "Credentialed pharmacist only."
+    },
+    {
+      "code": "ACOP",
+      "label": "Aged Care On-site Pharmacist services",
+      "group": "Clinical Services",
+      "icon": "🏥",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "ACOP_CREDENTIAL",
+      "note": "Accredited training and program rules apply."
+    },
+    {
+      "code": "MEDSCHECK",
+      "label": "MedsCheck / Diabetes MedsCheck",
+      "group": "Clinical Services",
+      "icon": "🧾",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "Supervised trainee involvement only."
+    },
+    {
+      "code": "NDSS",
+      "label": "NDSS diabetes support",
+      "group": "Clinical Services",
+      "icon": "🩸",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "supervised",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Administrative support is not an independent clinical consultation."
+    },
+    {
+      "code": "UTI_PRESCRIBER",
+      "label": "Uncomplicated UTI pharmacist prescribing",
+      "group": "Clinical Services",
+      "icon": "🧬",
+      "eligibility": {
+        "PHARMACIST": "conditional",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "UTI_PRESCRIBING_TRAINING",
+      "note": "Jurisdiction-specific authorisation."
+    },
+    {
+      "code": "ORAL_CONTRACEPTIVE_RESUPPLY",
+      "label": "Oral contraceptive resupply service",
+      "group": "Clinical Services",
+      "icon": "💊",
+      "eligibility": {
+        "PHARMACIST": "conditional",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "CONTRACEPTIVE_RESUPPLY_TRAINING",
+      "note": "Jurisdiction-specific authorisation."
+    },
+    {
+      "code": "TRAVEL_HEALTH_YELLOW_FEVER",
+      "label": "Travel health / Yellow Fever services",
+      "group": "Clinical Services",
+      "icon": "🌍",
+      "eligibility": {
+        "PHARMACIST": "conditional",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "YELLOW_FEVER_TRAINING",
+      "note": "Clinic and state authorisations may apply."
+    },
+    {
+      "code": "MINOR_SKIN",
+      "label": "Minor skin conditions pharmacist service",
+      "group": "Clinical Services",
+      "icon": "🧴",
+      "eligibility": {
+        "PHARMACIST": "conditional",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "PRESCRIBING_SCOPE_TRAINING",
+      "note": "Subject to local authorised scope."
+    },
+    {
+      "code": "DIABETES_SCREENING",
+      "label": "Diabetes screening support",
+      "group": "Clinical Services",
+      "icon": "📈",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "BLOOD_PRESSURE_CHECK",
+      "label": "Blood-pressure measurement",
+      "group": "Clinical Services",
+      "icon": "🩺",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Interpretation and clinical advice require appropriate qualifications."
+    },
+    {
+      "code": "COLD_CHAIN",
+      "label": "Cold-chain and vaccine stock handling",
+      "group": "Clinical Services",
+      "icon": "❄️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "VACCINE_ADMIN_SUPPORT",
+      "label": "Vaccination service administrative support",
+      "group": "Clinical Services",
+      "icon": "📅",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Does not authorise administering injections."
+    },
+    {
+      "code": "POS_CUSTOMER",
+      "label": "Point-of-sale (POS) operation",
+      "group": "Operations & Retail",
+      "icon": "🛒",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "CUSTOMER_SERVICE",
+      "label": "Customer service",
+      "group": "Operations & Retail",
+      "icon": "🤝",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "CASH_HANDLING",
+      "label": "Cash handling and payment terminals",
+      "group": "Operations & Retail",
+      "icon": "💳",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "OTC_PRODUCTS",
+      "label": "General OTC product knowledge",
+      "group": "Operations & Retail",
+      "icon": "🧴",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "VITAMINS_SUPPLEMENTS",
+      "label": "Vitamins and supplement product knowledge",
+      "group": "Operations & Retail",
+      "icon": "🍊",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "SKINCARE_BEAUTY",
+      "label": "Skincare and beauty merchandising",
+      "group": "Operations & Retail",
+      "icon": "🧼",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "MERCHANDISING",
+      "label": "Merchandising and planograms",
+      "group": "Operations & Retail",
+      "icon": "🧩",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "STOCK_RECEIVING",
+      "label": "Stock receiving",
+      "group": "Operations & Retail",
+      "icon": "📥",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "STOCK_ORDERING",
+      "label": "Stock ordering and wholesaler portals",
+      "group": "Operations & Retail",
+      "icon": "📦",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "INVENTORY_CONTROL",
+      "label": "Inventory and stock reconciliation",
+      "group": "Operations & Retail",
+      "icon": "📊",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "STOCK_EXPIRY",
+      "label": "Expiry-date and stock rotation checks",
+      "group": "Operations & Retail",
+      "icon": "⏳",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "CLICK_COLLECT",
+      "label": "Click-and-collect fulfilment",
+      "group": "Operations & Retail",
+      "icon": "🛍️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "RETURNS",
+      "label": "Returns and stock credits",
+      "group": "Operations & Retail",
+      "icon": "↩️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "PHONE_ENQUIRIES",
+      "label": "Telephone and customer enquiries",
+      "group": "Operations & Retail",
+      "icon": "📞",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "APPOINTMENT_BOOKINGS",
+      "label": "Service appointment bookings",
+      "group": "Operations & Retail",
+      "icon": "📆",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "NDSS_ADMIN",
+      "label": "NDSS ordering and administration",
+      "group": "Operations & Retail",
+      "icon": "🗂️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "PHARMACY_ADMIN",
+      "label": "Pharmacy administration",
+      "group": "Operations & Retail",
+      "icon": "🗃️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "STAFF_SUPERVISION",
+      "label": "Staff training and supervision",
+      "group": "Operations & Retail",
+      "icon": "👥",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "conditional",
+        "ASSISTANT": "conditional",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "WORKPLACE_SAFETY",
+      "label": "Work health and safety procedures",
+      "group": "Operations & Retail",
+      "icon": "🦺",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "FRONT_SHOP_MANAGEMENT",
+      "label": "Front-of-shop management",
+      "group": "Operations & Retail",
+      "icon": "🏬",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "conditional",
+        "ASSISTANT": "conditional",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "PHARMACY_IN_CHARGE",
+      "label": "Pharmacist in charge duties",
+      "group": "Operations & Retail",
+      "icon": "🛡️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": "Appropriate general registration and appointment required."
+    },
+    {
+      "code": "FRED",
+      "label": "FRED / FRED NXT",
+      "group": "Software & Digital",
+      "icon": "💻",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "MINFOS",
+      "label": "Minfos",
+      "group": "Software & Digital",
+      "icon": "🖥️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "Z_DISPENSE",
+      "label": "Z Dispense",
+      "group": "Software & Digital",
+      "icon": "⌨️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "CORUM_LOTS",
+      "label": "Corum LOTS",
+      "group": "Software & Digital",
+      "icon": "💽",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "DISPENSE_WORKS",
+      "label": "Dispense Works",
+      "group": "Software & Digital",
+      "icon": "🧑‍💻",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "RXONE",
+      "label": "RxOne",
+      "group": "Software & Digital",
+      "icon": "🖱️",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "AQUARIUS",
+      "label": "Aquarius",
+      "group": "Software & Digital",
+      "icon": "🌊",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "POSWORKS",
+      "label": "PosWorks",
+      "group": "Software & Digital",
+      "icon": "🧮",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "MYSCRIPT",
+      "label": "MyScript",
+      "group": "Software & Digital",
+      "icon": "📱",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "EXCEL",
+      "label": "Microsoft Excel",
+      "group": "Software & Digital",
+      "icon": "📊",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "WORD",
+      "label": "Microsoft Word",
+      "group": "Software & Digital",
+      "icon": "📝",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": ""
+    },
+    {
+      "code": "OTHER",
+      "label": "Other pharmacy software",
+      "group": "Software & Digital",
+      "icon": "🧰",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": "Optional free-text software name."
+    }
+  ],
+  "primary_sources": [
+    "https://awards.fairwork.gov.au/MA000012.html",
+    "https://www.pharmacyboard.gov.au/Registration/Internships",
+    "https://www.pharmacycouncil.org.au/education-provider/accreditation/pharmacist-education-programs/accredited-pharmacist-education-programs/"
+  ]
+}
