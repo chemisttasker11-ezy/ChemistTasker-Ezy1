@@ -1,5 +1,6 @@
 // src/pages/onboardingV2/SkillsV2.tsx
 import * as React from 'react';
+import { SkillGlyph } from '../../../components/SkillGlyph';
 import {
   Box, Stack, Typography, Checkbox, FormControlLabel, Button, Link,
   Alert, Snackbar, Chip, Divider, CircularProgress, Tabs, Tab
@@ -221,7 +222,7 @@ export default function SkillsV2() {
                         control={<Checkbox checked={checked} onChange={toggleSkill(item.code)} />}
                         label={
                           <Box>
-                            <Typography variant="body1" sx={{display:"flex",alignItems:"center",gap:1}}><span role="img" aria-label={item.label}>{(item as any).icon}</span>{item.label}</Typography>
+                            <Typography variant="body1" sx={{display:"flex",alignItems:"center",gap:1}}><SkillGlyph name={(item as any).icon_web} title={item.label} />{item.label}</Typography>
                             {currentRole && claimModeLabel((item as any).eligibility[currentRole]) && <Typography variant="caption" sx={{display:'block',color:'secondary.main',fontWeight:700}}>{claimModeLabel((item as any).eligibility[currentRole])}</Typography>}
                             {item.description && (
                               <Typography variant="body2" color="text.secondary">
