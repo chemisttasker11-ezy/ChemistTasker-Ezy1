@@ -8,9 +8,8 @@ django.setup()
 
 from django.contrib.auth import get_user_model
 from onboarding.models import OwnerOnboarding, PharmacistOnboarding
-from pharmacies.models import Pharmacy
+from organizations.models import Pharmacy, PharmacyAdmin
 from memberships.models import Membership
-from organization.models import PharmacyAdmin
 
 User = get_user_model()
 if User.objects.exists():
