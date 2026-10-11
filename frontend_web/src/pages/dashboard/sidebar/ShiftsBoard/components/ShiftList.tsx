@@ -1,3 +1,6 @@
+import skillsRegistry from '../../../../../../../shared-core/skills_registry.json';
+import { skillLabel } from '@chemisttasker/shared-core';
+import { SkillGlyph } from '../../../../../components/SkillGlyph';
 import React from 'react';
 import {
   Box,
@@ -675,7 +678,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                           <Typography variant="caption" color="text.secondary">Must have</Typography>
                           <Stack direction="row" spacing={0.5} flexWrap="wrap">
                             {shift.mustHave.map((item, idx) => (
-                              <Chip key={idx} label={item} size="small" />
+                              <Chip key={idx} label={skillLabel(skillsRegistry as any, item)} icon={<SkillGlyph name={skillsRegistry.skills.find(skill => skill.code === item)?.icon_web || "CircleHelp"} title={item} />} size="small" />
                             ))}
                           </Stack>
                         </Stack>
@@ -685,7 +688,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                           <Typography variant="caption" color="text.secondary">Nice to have</Typography>
                           <Stack direction="row" spacing={0.5} flexWrap="wrap">
                             {shift.niceToHave.map((item, idx) => (
-                              <Chip key={idx} label={item} size="small" variant="outlined" />
+                              <Chip key={idx} label={skillLabel(skillsRegistry as any, item)} icon={<SkillGlyph name={skillsRegistry.skills.find(skill => skill.code === item)?.icon_web || "CircleHelp"} title={item} />} size="small" variant="outlined" />
                             ))}
                           </Stack>
                         </Stack>
