@@ -148,7 +148,12 @@ export default function PharmacistSkillsScreen() {
               <View style={styles.rowTop}>
                 <Checkbox status={checked ? 'checked' : 'unchecked'} onPress={() => toggle(item.code)} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.itemLabel}>{item.icon_mobile === 'BLISTER_PACK' || item.icon_mobile === 'BLISTER_CHECK' ? <DoseBlisterIcon checked={item.icon_mobile === 'BLISTER_CHECK'} /> : <MaterialCommunityIcons name={item.icon_mobile as any} size={21} color="#2463A6" />}  {item.label}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {item.icon_mobile === 'BLISTER_PACK' || item.icon_mobile === 'BLISTER_CHECK'
+                      ? <DoseBlisterIcon checked={item.icon_mobile === 'BLISTER_CHECK'} />
+                      : <MaterialCommunityIcons name={item.icon_mobile as any} size={21} color="#2463A6" />}
+                    <Text style={[styles.itemLabel, { flexShrink: 1 }]}>{item.label}</Text>
+                  </View>
                   {currentRole && claimModeLabel(item.eligibility[currentRole]) ? <Text style={styles.itemDesc}>{claimModeLabel(item.eligibility[currentRole])}</Text> : null}
                   {item.description ? <Text style={styles.itemDesc}>{item.description}</Text> : null}
                 </View>
