@@ -151,7 +151,7 @@ export default function PharmacistSkillsScreen() {
                     <Text style={[styles.itemLabel, { flexShrink: 1 }]}>{item.label}</Text>
                   </View>
                   {currentRole && claimModeLabel(item.eligibility[currentRole]) ? <Text style={styles.itemDesc}>{claimModeLabel(item.eligibility[currentRole])}</Text> : null}
-                  {item.description ? <Text style={styles.itemDesc}>{item.description}</Text> : null}
+                  {item.definition ? <Text style={styles.itemDesc}>{item.definition}</Text> : null}
                 </View>
                 {fileState ? <Chip mode="outlined">{fileState}</Chip> : null}
               </View>

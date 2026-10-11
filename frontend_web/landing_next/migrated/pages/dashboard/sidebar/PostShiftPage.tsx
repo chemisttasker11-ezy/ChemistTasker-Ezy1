@@ -1827,9 +1827,9 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                                 >
                                   <SkillIcon skill={s.code} /> {s.label}
                                 </Typography>
-                                {s.description && (
+                                {s.definition && (
                                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>
-                                    {s.description}
+                                    {s.definition}
                                   </Typography>
                                 )}
                               </Box>

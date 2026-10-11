@@ -181,7 +181,7 @@ export default function PostShiftSkillsStep({
                           >
                             <SkillGlyph name={skill.icon_web} title={skill.label} /> {skill.label}
                           </Typography>
-                          {skill.description && (
+                          {skill.definition && (
                             <Typography
                               variant="body2"
                               color="text.secondary"
@@ -190,7 +190,7 @@ export default function PostShiftSkillsStep({
                                 overflowWrap: 'anywhere',
                               }}
                             >
-                              {skill.description}
+                              {skill.definition}
                             </Typography>
                           )}
                         </Box>

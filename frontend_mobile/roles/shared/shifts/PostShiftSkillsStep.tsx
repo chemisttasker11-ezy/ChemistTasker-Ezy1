@@ -85,9 +85,9 @@ export default function PostShiftSkillsStep({
                         >
                           {skill.label}
                         </Text>
-                        {skill.description ? (
+                        {skill.definition ? (
                           <Text style={styles.skillDescription}>
-                            {skill.description}
+                            {skill.definition}
                           </Text>
                         ) : null}
                       </View>

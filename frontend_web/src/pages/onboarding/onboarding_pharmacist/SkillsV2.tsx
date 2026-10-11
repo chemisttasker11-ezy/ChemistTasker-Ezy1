@@ -216,9 +216,9 @@ export default function SkillsV2() {
                           <Box>
                             <Typography variant="body1" sx={{display:"flex",alignItems:"center",gap:1}}><SkillGlyph name={(item as any).icon_web} title={item.label} />{item.label}</Typography>
                             {currentRole && claimModeLabel((item as any).eligibility[currentRole]) && <Typography variant="caption" sx={{display:'block',color:'secondary.main',fontWeight:700}}>{claimModeLabel((item as any).eligibility[currentRole])}</Typography>}
-                            {item.description && (
+                            {item.definition && (
                               <Typography variant="body2" color="text.secondary">
-                                {item.description}
+                                {item.definition}
                               </Typography>
                             )}
                           </Box>
