@@ -12,7 +12,9 @@ import {
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import skillsCatalog from '../../../../../shared-core/skills_catalog.json';
+import skillsRegistry from '../../../../../shared-core/skills_registry.json';
+import { roleSkillGroups, claimModeLabel } from '@chemisttasker/shared-core';
+import { SkillGlyph } from '../../../components/SkillGlyph';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
@@ -33,26 +35,9 @@ export default function PostShiftSkillsStep({
   setNiceToHave,
   isDarkMode,
 }: Props) {
-  const roleKey = roleNeeded === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
-  const roleCatalog = (skillsCatalog as any)[roleKey] || {};
-
-  const categories = [
-    {
-      key: 'clinical_services',
-      title: 'Clinical Services',
-      items: roleCatalog.clinical_services || [],
-    },
-    {
-      key: 'dispense_software',
-      title: 'Dispense Software',
-      items: roleCatalog.dispense_software || [],
-    },
-    {
-      key: 'expanded_scope',
-      title: 'Expanded Scope',
-      items: roleCatalog.expanded_scope || [],
-    },
-  ].filter((category) => category.items.length > 0);
+  const categories = roleSkillGroups(skillsRegistry as any, roleNeeded as any).map(group => ({
+    key: group.key, title: group.label, items: group.items
+  }));
 
   return (
     <Stack spacing={3}>
@@ -194,7 +179,7 @@ export default function PostShiftSkillsStep({
                             color={value ? 'text.primary' : 'text.secondary'}
                             sx={{ overflowWrap: 'anywhere' }}
                           >
-                            {skill.label}
+                            <SkillGlyph name={skill.icon_web} title={skill.label} /> {skill.label}
                           </Typography>
                           {skill.description && (
                             <Typography
