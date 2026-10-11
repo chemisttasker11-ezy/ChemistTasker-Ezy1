@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "authority": "Shared, canonical capability names and role eligibility. A checked skill never confers legal practice authority.",
+  "version": 3,
+  "authority": "Each code denotes one defined capability; labels and icons are presentation only. Claim mode and verified credentials must be considered before a capability qualifies a candidate for a shift. Unknown and retired codes never match.",
   "roles": [
     "PHARMACIST",
     "INTERN",
@@ -23,7 +23,9 @@
   },
   "legacy_aliases": {
     "VACCINATOR": "VACCINATION",
-    "CRED_PHARM": "HMR_ACCREDITED_MRN"
+    "CRED_PHARM": "HMR_ACCREDITED_MRN",
+    "WEBSTER_PACKING": "WEBSTER_PACKING_DAA",
+    "DAA": "WEBSTER_PACKING_DAA"
   },
   "legacy_evidence_only": [
     "PI_INSURANCE",
@@ -113,7 +115,12 @@
       "note": "Pharmacy technicians may assist with dispensing only under pharmacist supervision.",
       "icon_web": "PillBottle",
       "icon_mobile": "pill",
-      "icon_meaning": "Prescription medication container"
+      "icon_meaning": "Prescription medication container",
+      "definition": "Participate in the prescription dispensing process, including medicine selection and supply steps appropriate to the worker's authorised role; the pharmacist retains professional checking responsibility.",
+      "aliases": [
+        "Dispensing prescriptions"
+      ],
+      "matchable": true
     },
     {
       "code": "DISPENSING_DATA_ENTRY",
@@ -130,7 +137,10 @@
       "note": "Assistant conditional on dispensary training and pharmacist supervision.",
       "icon_web": "ClipboardPenLine",
       "icon_mobile": "clipboard-edit-outline",
-      "icon_meaning": "Prescription details and printed label"
+      "icon_meaning": "Prescription details and printed label",
+      "definition": "Accurately enter prescription details, produce dispensing labels and refer clinical or legal concerns to the supervising pharmacist.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "CLINICAL_CHECKING",
@@ -147,7 +157,10 @@
       "note": "Independent final clinical judgement by registered pharmacist only.",
       "icon_web": "ClipboardCheck",
       "icon_mobile": "clipboard-check-outline",
-      "icon_meaning": "Clinical verification checklist"
+      "icon_meaning": "Clinical verification checklist",
+      "definition": "Perform the pharmacist's independent clinical assessment of prescription appropriateness, interactions, dose and patient suitability before supply.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "ESCRIPT_PROCESSING",
@@ -164,7 +177,13 @@
       "note": "",
       "icon_web": "QrCode",
       "icon_mobile": "qrcode-scan",
-      "icon_meaning": "Electronic prescription QR token"
+      "icon_meaning": "Electronic prescription QR token",
+      "definition": "Receive, retrieve and process Australian electronic prescription tokens and repeat workflows within authorised pharmacy duties.",
+      "aliases": [
+        "eScripts",
+        "Electronic prescriptions"
+      ],
+      "matchable": true
     },
     {
       "code": "PBS_CLAIMS",
@@ -181,7 +200,10 @@
       "note": "",
       "icon_web": "ReceiptText",
       "icon_mobile": "receipt-text-outline",
-      "icon_meaning": "Claim transaction receipt"
+      "icon_meaning": "Claim transaction receipt",
+      "definition": "Prepare, check or process PBS claim data and dispensing transactions within assigned responsibilities.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "PATIENT_COUNSELLING",
@@ -198,7 +220,10 @@
       "note": "Intern and student only under pharmacist supervision.",
       "icon_web": "MessagesSquare",
       "icon_mobile": "forum-outline",
-      "icon_meaning": "Two-way patient consultation"
+      "icon_meaning": "Two-way patient consultation",
+      "definition": "Explain medicine use, precautions and adherence to patients within the professional scope of the worker and required supervision.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "OTC_S2_ADVICE",
@@ -215,7 +240,10 @@
       "note": "Non-pharmacists assist under appropriate training and supervision.",
       "icon_web": "Pill",
       "icon_mobile": "pill",
-      "icon_meaning": "Pharmacy-only medicine"
+      "icon_meaning": "Pharmacy-only medicine",
+      "definition": "Assist customers with Pharmacy Medicine (Schedule 2) requests, recognising when pharmacist referral is necessary.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "S3_CONSULT_SUPPORT",
@@ -232,7 +260,10 @@
       "note": "Support and referral do not grant independent supply authority.",
       "icon_web": "MessageCircleQuestion",
       "icon_mobile": "comment-question-outline",
-      "icon_meaning": "Pharmacist consultation referral"
+      "icon_meaning": "Pharmacist consultation referral",
+      "definition": "Support pharmacist-only Schedule 3 consultations through intake, preparation and referral without independently making pharmacist-only supply decisions.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "S8_PROCEDURES",
@@ -249,7 +280,10 @@
       "note": "Legal permissions and pharmacist oversight still apply.",
       "icon_web": "LockKeyhole",
       "icon_mobile": "lock-check-outline",
-      "icon_meaning": "Secure controlled-drug procedures"
+      "icon_meaning": "Secure controlled-drug procedures",
+      "definition": "Carry out authorised handling, storage and accountability procedures for Schedule 8 medicines subject to state or territory rules.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "S8_RECORDS",
@@ -266,7 +300,10 @@
       "note": "",
       "icon_web": "BookLock",
       "icon_mobile": "book-lock-outline",
-      "icon_meaning": "Restricted register and records"
+      "icon_meaning": "Restricted register and records",
+      "definition": "Maintain or support accurate controlled-drug records and reconciliations within lawful workplace duties.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "WEBSTER_PACKING_DAA",
@@ -283,7 +320,16 @@
       "note": "",
       "icon_web": "BLISTER_PACK",
       "icon_mobile": "BLISTER_PACK",
-      "icon_meaning": "Weekly tablet blister grid, not a parcel"
+      "icon_meaning": "Weekly tablet blister grid, not a parcel",
+      "definition": "Assemble individually identified doses into a dose administration aid or Webster-style blister pack following an authorised packing record and local checking workflow.",
+      "aliases": [
+        "DAA packing",
+        "Webster packing",
+        "Dose administration aid packing",
+        "WEBSTER_PACKING",
+        "DAA"
+      ],
+      "matchable": true
     },
     {
       "code": "DAA_FINAL_CHECK",
@@ -300,7 +346,13 @@
       "note": "Pharmacist only.",
       "icon_web": "BLISTER_CHECK",
       "icon_mobile": "BLISTER_CHECK",
-      "icon_meaning": "Tablet blister grid plus checking tick"
+      "icon_meaning": "Tablet blister grid plus checking tick",
+      "definition": "Perform the pharmacist's final clinical and accuracy check of a completed dose administration aid prior to supply.",
+      "aliases": [
+        "DAA checking",
+        "Webster checking"
+      ],
+      "matchable": true
     },
     {
       "code": "COMPOUNDING",
@@ -317,7 +369,10 @@
       "note": "ChemistTasker platform evidence policy; not a universal statutory certificate.",
       "icon_web": "FlaskConical",
       "icon_mobile": "flask-outline",
-      "icon_meaning": "Compounding vessel"
+      "icon_meaning": "Compounding vessel",
+      "definition": "Prepare an extemporaneously compounded non-sterile medicine using a validated formula, equipment, hygiene practices and required supervision.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "ADVANCED_COMPOUNDING",
@@ -334,7 +389,10 @@
       "note": "Specialist training and additional safeguards apply.",
       "icon_web": "TestTubeDiagonal",
       "icon_mobile": "test-tube",
-      "icon_meaning": "Specialist laboratory compounding"
+      "icon_meaning": "Specialist laboratory compounding",
+      "definition": "Support or undertake specialised or sterile compounding with validated procedures, environmental controls and appropriate qualifications.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "STAGED_SUPPLY",
@@ -351,7 +409,10 @@
       "note": "Clinical supply decisions remain pharmacist-only.",
       "icon_web": "CalendarClock",
       "icon_mobile": "calendar-clock",
-      "icon_meaning": "Dated staged pickups"
+      "icon_meaning": "Dated staged pickups",
+      "definition": "Prepare, record and coordinate scheduled staged medicine supply under the agreed plan and pharmacist oversight.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "PHARMACOTHERAPY_METHADONE_SUBOXONE",
@@ -368,7 +429,13 @@
       "note": "Technical support is not independent dosing.",
       "icon_web": "PillBottle",
       "icon_mobile": "pill-multiple",
-      "icon_meaning": "Medication-assisted therapy"
+      "icon_meaning": "Medication-assisted therapy",
+      "definition": "Support authorised opioid-dependence pharmacotherapy dispensing and dose recording, with pharmacist-led clinical decisions.",
+      "aliases": [
+        "Methadone dispensing support",
+        "Suboxone program support"
+      ],
+      "matchable": true
     },
     {
       "code": "MEDICATION_RECONCILIATION",
@@ -385,7 +452,10 @@
       "note": "Supervised learner assistance is not independent clinical reconciliation.",
       "icon_web": "ClipboardList",
       "icon_mobile": "clipboard-list-outline",
-      "icon_meaning": "Comparative medicine list"
+      "icon_meaning": "Comparative medicine list",
+      "definition": "Collect and compare medication histories across sources, identify discrepancies and escalate issues to the responsible clinician.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "DISPENSARY_WORKFLOW",
@@ -402,7 +472,10 @@
       "note": "",
       "icon_web": "Workflow",
       "icon_mobile": "source-branch",
-      "icon_meaning": "Multi-step dispensary workflow"
+      "icon_meaning": "Multi-step dispensary workflow",
+      "definition": "Coordinate prescription queues, prioritisation, handovers and dispensary task allocation within the workplace scope.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "ROBOT_DISPENSING",
@@ -419,7 +492,13 @@
       "note": "",
       "icon_web": "Bot",
       "icon_mobile": "robot-outline",
-      "icon_meaning": "Automated dispensing hardware"
+      "icon_meaning": "Automated dispensing hardware",
+      "definition": "Operate and troubleshoot automated medicine storage or dispensing equipment under pharmacy safety procedures.",
+      "aliases": [
+        "Pharmacy dispensing robot",
+        "ROWA robot"
+      ],
+      "matchable": true
     },
     {
       "code": "MEDICINE_DELIVERIES",
@@ -436,7 +515,10 @@
       "note": "Follow privacy and medicine handling policies.",
       "icon_web": "Truck",
       "icon_mobile": "truck-delivery-outline",
-      "icon_meaning": "Medicine transport"
+      "icon_meaning": "Medicine transport",
+      "definition": "Prepare, track and hand over medicines for delivery while maintaining confidentiality and any storage or custody requirements.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "CANNABIS",
@@ -453,7 +535,10 @@
       "note": "Clinical decisions remain pharmacist-only.",
       "icon_web": "Leaf",
       "icon_mobile": "cannabis",
-      "icon_meaning": "Recognisable medicinal cannabis plant"
+      "icon_meaning": "Recognisable medicinal cannabis plant",
+      "definition": "Handle lawful medicinal cannabis prescribing, dispensing or stock workflows only within the worker's authorised responsibilities.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "MEDICATION_ADHERENCE",
@@ -470,7 +555,10 @@
       "note": "",
       "icon_web": "CalendarCheck",
       "icon_mobile": "calendar-check-outline",
-      "icon_meaning": "Scheduled doses and adherence"
+      "icon_meaning": "Scheduled doses and adherence",
+      "definition": "Help monitor and support scheduled medicine taking, adherence prompts and referral of adherence concerns.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "VACCINATION",
@@ -487,7 +575,13 @@
       "note": "Intern conditional on jurisdictional authorisation, training and supervision.",
       "icon_web": "Syringe",
       "icon_mobile": "needle",
-      "icon_meaning": "Injection needle and syringe"
+      "icon_meaning": "Injection needle and syringe",
+      "definition": "Administer a vaccine when legally authorised, appropriately trained and operating under relevant state or territory conditions.",
+      "aliases": [
+        "VACCINATOR",
+        "Vaccine administration"
+      ],
+      "matchable": true
     },
     {
       "code": "ANAPHYLAXIS_MANAGEMENT",
@@ -504,7 +598,10 @@
       "note": "",
       "icon_web": "Siren",
       "icon_mobile": "alert-circle-outline",
-      "icon_meaning": "Emergency reaction response"
+      "icon_meaning": "Emergency reaction response",
+      "definition": "Recognise and respond to suspected anaphylaxis according to current first-response training and emergency procedures.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "FIRST_AID",
@@ -521,7 +618,12 @@
       "note": "",
       "icon_web": "BriefcaseMedical",
       "icon_mobile": "medical-bag",
-      "icon_meaning": "First-aid kit"
+      "icon_meaning": "First-aid kit",
+      "definition": "Provide first aid and cardiopulmonary resuscitation in accordance with current training and workplace emergency protocols.",
+      "aliases": [
+        "First aid and CPR"
+      ],
+      "matchable": true
     },
     {
       "code": "HMR_ACCREDITED_MRN",
@@ -538,7 +640,15 @@
       "note": "Credentialed pharmacist only.",
       "icon_web": "HousePlus",
       "icon_mobile": "home-plus-outline",
-      "icon_meaning": "Home medicines review"
+      "icon_meaning": "Home medicines review",
+      "definition": "Conduct credentialed Home Medicines Reviews and Residential Medication Management Reviews under the applicable Australian program rules.",
+      "aliases": [
+        "CRED_PHARM",
+        "HMR",
+        "RMMR",
+        "Medication Management Review"
+      ],
+      "matchable": true
     },
     {
       "code": "ACOP",
@@ -555,7 +665,10 @@
       "note": "Accredited training and program rules apply.",
       "icon_web": "Hospital",
       "icon_mobile": "hospital-building",
-      "icon_meaning": "Residential aged care clinical service"
+      "icon_meaning": "Residential aged care clinical service",
+      "definition": "Deliver authorised clinical pharmacy services in a residential aged-care facility under the Aged Care On-site Pharmacist program.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "MEDSCHECK",
@@ -572,7 +685,10 @@
       "note": "Supervised trainee involvement only.",
       "icon_web": "ClipboardCheck",
       "icon_mobile": "clipboard-pulse-outline",
-      "icon_meaning": "Structured medication review"
+      "icon_meaning": "Structured medication review",
+      "definition": "Perform or assist an eligible pharmacist-led MedsCheck or Diabetes MedsCheck service within professional scope and program requirements.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "NDSS",
@@ -589,7 +705,10 @@
       "note": "Administrative support is not an independent clinical consultation.",
       "icon_web": "Droplet",
       "icon_mobile": "water-outline",
-      "icon_meaning": "Diabetes blood glucose testing"
+      "icon_meaning": "Diabetes blood glucose testing",
+      "definition": "Provide appropriate diabetes supply or support services associated with the National Diabetes Services Scheme, referring clinical questions when necessary.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "UTI_PRESCRIBER",
@@ -606,7 +725,12 @@
       "note": "Jurisdiction-specific authorisation.",
       "icon_web": "Microscope",
       "icon_mobile": "bacteria-outline",
-      "icon_meaning": "Urinary tract infection assessment"
+      "icon_meaning": "Urinary tract infection assessment",
+      "definition": "Assess and manage eligible uncomplicated urinary tract infections under the pharmacist's locally authorised prescribing or treatment scope.",
+      "aliases": [
+        "UTI treatment service"
+      ],
+      "matchable": true
     },
     {
       "code": "ORAL_CONTRACEPTIVE_RESUPPLY",
@@ -623,7 +747,12 @@
       "note": "Jurisdiction-specific authorisation.",
       "icon_web": "Pill",
       "icon_mobile": "pill-multiple",
-      "icon_meaning": "Oral contraceptive tablets"
+      "icon_meaning": "Oral contraceptive tablets",
+      "definition": "Assess eligibility and provide authorised oral contraceptive resupply under the relevant jurisdictional service protocol.",
+      "aliases": [
+        "Oral contraceptive continuation"
+      ],
+      "matchable": true
     },
     {
       "code": "TRAVEL_HEALTH_YELLOW_FEVER",
@@ -640,7 +769,10 @@
       "note": "Clinic and state authorisations may apply.",
       "icon_web": "Plane",
       "icon_mobile": "airplane",
-      "icon_meaning": "Travel immunisation"
+      "icon_meaning": "Travel immunisation",
+      "definition": "Provide travel health or Yellow Fever-related services under applicable practitioner, vaccine and approved-centre authorisations.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "MINOR_SKIN",
@@ -657,7 +789,10 @@
       "note": "Subject to local authorised scope.",
       "icon_web": "Hand",
       "icon_mobile": "hand-heart-outline",
-      "icon_meaning": "Minor skin examination"
+      "icon_meaning": "Minor skin examination",
+      "definition": "Assess and manage eligible minor skin conditions only under the locally authorised pharmacist service protocol.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "DIABETES_SCREENING",
@@ -674,7 +809,10 @@
       "note": "",
       "icon_web": "Droplets",
       "icon_mobile": "water-check-outline",
-      "icon_meaning": "Blood glucose testing"
+      "icon_meaning": "Blood glucose testing",
+      "definition": "Support or conduct diabetes-related measurement and screening procedures and refer clinical interpretation as required.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "BLOOD_PRESSURE_CHECK",
@@ -691,7 +829,10 @@
       "note": "Interpretation and clinical advice require appropriate qualifications.",
       "icon_web": "HeartPulse",
       "icon_mobile": "heart-pulse",
-      "icon_meaning": "Blood pressure and pulse"
+      "icon_meaning": "Blood pressure and pulse",
+      "definition": "Obtain an accurate blood-pressure reading using appropriate equipment and escalation thresholds.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "COLD_CHAIN",
@@ -708,7 +849,10 @@
       "note": "",
       "icon_web": "Snowflake",
       "icon_mobile": "snowflake-thermometer",
-      "icon_meaning": "Temperature-controlled storage"
+      "icon_meaning": "Temperature-controlled storage",
+      "definition": "Monitor, record and maintain temperature-sensitive vaccine or medicine storage throughout the cold chain.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "VACCINE_ADMIN_SUPPORT",
@@ -725,7 +869,10 @@
       "note": "Does not authorise administering injections.",
       "icon_web": "CalendarPlus",
       "icon_mobile": "calendar-plus",
-      "icon_meaning": "Vaccine appointment administration"
+      "icon_meaning": "Vaccine appointment administration",
+      "definition": "Arrange appointments, consent paperwork, stock and records for a pharmacist-led vaccination service without giving injections.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "POS_CUSTOMER",
@@ -742,7 +889,10 @@
       "note": "",
       "icon_web": "ScanBarcode",
       "icon_mobile": "barcode-scan",
-      "icon_meaning": "Scanning products at pharmacy register"
+      "icon_meaning": "Scanning products at pharmacy register",
+      "definition": "Operate a pharmacy point-of-sale terminal and accurately scan or process sales.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "CUSTOMER_SERVICE",
@@ -759,7 +909,10 @@
       "note": "",
       "icon_web": "Headset",
       "icon_mobile": "headset",
-      "icon_meaning": "Customer support"
+      "icon_meaning": "Customer support",
+      "definition": "Provide respectful pharmacy customer assistance, respond to routine enquiries and refer professional questions appropriately.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "CASH_HANDLING",
@@ -776,7 +929,10 @@
       "note": "",
       "icon_web": "CreditCard",
       "icon_mobile": "credit-card-check-outline",
-      "icon_meaning": "Payment terminal"
+      "icon_meaning": "Payment terminal",
+      "definition": "Accurately process cash, EFTPOS transactions, refunds and till reconciliation.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "OTC_PRODUCTS",
@@ -793,7 +949,10 @@
       "note": "",
       "icon_web": "BriefcaseMedical",
       "icon_mobile": "medical-bag",
-      "icon_meaning": "Over-the-counter medication range"
+      "icon_meaning": "Over-the-counter medication range",
+      "definition": "Identify general over-the-counter product categories and know when to refer medicine-related decisions to the pharmacist.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "VITAMINS_SUPPLEMENTS",
@@ -810,7 +969,10 @@
       "note": "",
       "icon_web": "Pill",
       "icon_mobile": "pill-multiple",
-      "icon_meaning": "Vitamins in tablet form"
+      "icon_meaning": "Vitamins in tablet form",
+      "definition": "Explain non-clinical features of vitamin and supplement ranges and refer therapeutic questions to the pharmacist.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "SKINCARE_BEAUTY",
@@ -827,7 +989,10 @@
       "note": "",
       "icon_web": "SprayCan",
       "icon_mobile": "lotion-outline",
-      "icon_meaning": "Skincare bottle"
+      "icon_meaning": "Skincare bottle",
+      "definition": "Assist customers with cosmetic skincare and beauty products and merchandise the range appropriately.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "MERCHANDISING",
@@ -844,7 +1009,10 @@
       "note": "",
       "icon_web": "LayoutGrid",
       "icon_mobile": "view-dashboard-outline",
-      "icon_meaning": "Pharmacy shelf planogram"
+      "icon_meaning": "Pharmacy shelf planogram",
+      "definition": "Present pharmacy products using approved shelf plans, displays and promotional signage.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "STOCK_RECEIVING",
@@ -861,7 +1029,10 @@
       "note": "",
       "icon_web": "PackageOpen",
       "icon_mobile": "package-down",
-      "icon_meaning": "Incoming stock shipment"
+      "icon_meaning": "Incoming stock shipment",
+      "definition": "Receive and check stock deliveries against invoices and purchase orders and record discrepancies.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "STOCK_ORDERING",
@@ -878,7 +1049,10 @@
       "note": "",
       "icon_web": "ShoppingCart",
       "icon_mobile": "cart-plus",
-      "icon_meaning": "Wholesaler purchase order"
+      "icon_meaning": "Wholesaler purchase order",
+      "definition": "Prepare and submit authorised pharmaceutical wholesaler or retail replenishment orders.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "INVENTORY_CONTROL",
@@ -895,7 +1069,10 @@
       "note": "",
       "icon_web": "Boxes",
       "icon_mobile": "clipboard-list-outline",
-      "icon_meaning": "Stock inventory"
+      "icon_meaning": "Stock inventory",
+      "definition": "Record, reconcile and audit pharmacy inventory and stock movements.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "STOCK_EXPIRY",
@@ -912,7 +1089,10 @@
       "note": "",
       "icon_web": "Hourglass",
       "icon_mobile": "timer-sand",
-      "icon_meaning": "Expiry-time tracking"
+      "icon_meaning": "Expiry-time tracking",
+      "definition": "Perform expiry-date checking, stock rotation and separation of expired or recalled products.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "CLICK_COLLECT",
@@ -929,7 +1109,10 @@
       "note": "",
       "icon_web": "ShoppingBag",
       "icon_mobile": "shopping-outline",
-      "icon_meaning": "Prepared store pickup"
+      "icon_meaning": "Prepared store pickup",
+      "definition": "Pick, verify and prepare eligible items for click-and-collect orders with appropriate pharmacy handling.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "RETURNS",
@@ -946,7 +1129,10 @@
       "note": "",
       "icon_web": "PackageX",
       "icon_mobile": "package-up",
-      "icon_meaning": "Returning inventory shipment"
+      "icon_meaning": "Returning inventory shipment",
+      "definition": "Process supplier returns, claims and credits for approved pharmacy stock.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "PHONE_ENQUIRIES",
@@ -963,7 +1149,10 @@
       "note": "",
       "icon_web": "PhoneCall",
       "icon_mobile": "phone-in-talk-outline",
-      "icon_meaning": "Telephone contact"
+      "icon_meaning": "Telephone contact",
+      "definition": "Handle routine telephone calls, capture messages and refer clinical or sensitive requests.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "APPOINTMENT_BOOKINGS",
@@ -980,7 +1169,10 @@
       "note": "",
       "icon_web": "CalendarPlus",
       "icon_mobile": "calendar-plus",
-      "icon_meaning": "Booking a clinical appointment"
+      "icon_meaning": "Booking a clinical appointment",
+      "definition": "Schedule pharmacy service appointments and manage booking changes accurately.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "NDSS_ADMIN",
@@ -997,7 +1189,10 @@
       "note": "",
       "icon_web": "ClipboardList",
       "icon_mobile": "clipboard-text-outline",
-      "icon_meaning": "NDSS order form"
+      "icon_meaning": "NDSS order form",
+      "definition": "Handle NDSS stock, registration-related administration or ordering workflows without independent clinical advice.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "PHARMACY_ADMIN",
@@ -1014,7 +1209,10 @@
       "note": "",
       "icon_web": "Files",
       "icon_mobile": "file-document-outline",
-      "icon_meaning": "Administrative records"
+      "icon_meaning": "Administrative records",
+      "definition": "Maintain routine pharmacy correspondence, forms, rosters and administrative records.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "STAFF_SUPERVISION",
@@ -1031,7 +1229,10 @@
       "note": "",
       "icon_web": "UsersRound",
       "icon_mobile": "account-group-outline",
-      "icon_meaning": "Team training and supervision"
+      "icon_meaning": "Team training and supervision",
+      "definition": "Coordinate training, performance feedback and supervised work allocation within delegated workplace responsibilities.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "WORKPLACE_SAFETY",
@@ -1048,7 +1249,10 @@
       "note": "",
       "icon_web": "ShieldCheck",
       "icon_mobile": "shield-check-outline",
-      "icon_meaning": "Workplace safety compliance"
+      "icon_meaning": "Workplace safety compliance",
+      "definition": "Follow and support workplace health and safety procedures including hazard reporting and incident escalation.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "FRONT_SHOP_MANAGEMENT",
@@ -1065,7 +1269,10 @@
       "note": "",
       "icon_web": "Store",
       "icon_mobile": "storefront-outline",
-      "icon_meaning": "Retail pharmacy storefront"
+      "icon_meaning": "Retail pharmacy storefront",
+      "definition": "Coordinate non-dispensary retail operations, stock presentation, customer service and frontline team activity.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "PHARMACY_IN_CHARGE",
@@ -1082,7 +1289,10 @@
       "note": "Appropriate general registration and appointment required.",
       "icon_web": "ShieldUser",
       "icon_mobile": "shield-account-outline",
-      "icon_meaning": "Accountable supervising pharmacist"
+      "icon_meaning": "Accountable supervising pharmacist",
+      "definition": "Accept the professional accountabilities of the registered pharmacist designated in charge of the pharmacy.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "FRED",
@@ -1099,7 +1309,13 @@
       "note": "",
       "icon_web": "Monitor",
       "icon_mobile": "monitor",
-      "icon_meaning": "Dispensing workstation / FRED"
+      "icon_meaning": "Dispensing workstation / FRED",
+      "definition": "Use the FRED or FRED NXT pharmacy dispensing system for tasks permitted by the worker's role.",
+      "aliases": [
+        "Fred NXT",
+        "FRED DISPENSE"
+      ],
+      "matchable": true
     },
     {
       "code": "MINFOS",
@@ -1116,7 +1332,10 @@
       "note": "",
       "icon_web": "MonitorCog",
       "icon_mobile": "monitor-dashboard",
-      "icon_meaning": "Minfos dispensing application"
+      "icon_meaning": "Minfos dispensing application",
+      "definition": "Use Minfos dispensing or pharmacy management software for assigned workflows.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "Z_DISPENSE",
@@ -1133,7 +1352,10 @@
       "note": "",
       "icon_web": "Keyboard",
       "icon_mobile": "keyboard-outline",
-      "icon_meaning": "Z Dispense data entry"
+      "icon_meaning": "Z Dispense data entry",
+      "definition": "Use Z Dispense dispensing software for assigned pharmacy workflows.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "CORUM_LOTS",
@@ -1150,7 +1372,12 @@
       "note": "",
       "icon_web": "Database",
       "icon_mobile": "database-outline",
-      "icon_meaning": "Corum LOTS pharmacy database"
+      "icon_meaning": "Corum LOTS pharmacy database",
+      "definition": "Use Corum LOTS software for permitted dispensing and inventory functions.",
+      "aliases": [
+        "Corum LOTS"
+      ],
+      "matchable": true
     },
     {
       "code": "DISPENSE_WORKS",
@@ -1167,7 +1394,10 @@
       "note": "",
       "icon_web": "AppWindow",
       "icon_mobile": "application-outline",
-      "icon_meaning": "Dispense Works application"
+      "icon_meaning": "Dispense Works application",
+      "definition": "Use Dispense Works pharmacy software for assigned dispensing tasks.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "RXONE",
@@ -1184,7 +1414,10 @@
       "note": "",
       "icon_web": "MousePointerClick",
       "icon_mobile": "cursor-default-click-outline",
-      "icon_meaning": "RxOne software interaction"
+      "icon_meaning": "RxOne software interaction",
+      "definition": "Use RxOne pharmacy dispensing software for permitted workflow steps.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "AQUARIUS",
@@ -1201,7 +1434,10 @@
       "note": "",
       "icon_web": "MonitorSmartphone",
       "icon_mobile": "monitor-cellphone",
-      "icon_meaning": "Aquarius software workstation"
+      "icon_meaning": "Aquarius software workstation",
+      "definition": "Use Aquarius pharmacy software for authorised dispensing or pharmacy operations.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "POSWORKS",
@@ -1218,7 +1454,10 @@
       "note": "",
       "icon_web": "ScanBarcode",
       "icon_mobile": "barcode-scan",
-      "icon_meaning": "PosWorks retail checkout"
+      "icon_meaning": "PosWorks retail checkout",
+      "definition": "Use PosWorks retail point-of-sale software for applicable pharmacy tasks.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "MYSCRIPT",
@@ -1235,7 +1474,10 @@
       "note": "",
       "icon_web": "Smartphone",
       "icon_mobile": "cellphone",
-      "icon_meaning": "MyScript mobile prescription application"
+      "icon_meaning": "MyScript mobile prescription application",
+      "definition": "Use MyScript digital prescription or medication workflow features appropriate to the worker's permissions.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "EXCEL",
@@ -1252,7 +1494,10 @@
       "note": "",
       "icon_web": "FileSpreadsheet",
       "icon_mobile": "file-excel-outline",
-      "icon_meaning": "Excel worksheet"
+      "icon_meaning": "Excel worksheet",
+      "definition": "Use Microsoft Excel to enter, analyse or organise pharmacy-related spreadsheet information.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "WORD",
@@ -1269,7 +1514,10 @@
       "note": "",
       "icon_web": "FileText",
       "icon_mobile": "file-word-outline",
-      "icon_meaning": "Word document"
+      "icon_meaning": "Word document",
+      "definition": "Use Microsoft Word to create, edit and format pharmacy documents.",
+      "aliases": [],
+      "matchable": true
     },
     {
       "code": "OTHER",
@@ -1286,7 +1534,10 @@
       "note": "Optional free-text software name.",
       "icon_web": "MonitorCog",
       "icon_mobile": "application-cog-outline",
-      "icon_meaning": "Other pharmacy software application"
+      "icon_meaning": "Other pharmacy software application",
+      "definition": "Operate an additional pharmacy software product, recorded with its specific product name and version rather than treated as equivalent to a named system.",
+      "aliases": [],
+      "matchable": true
     }
   ],
   "primary_sources": [
@@ -1303,5 +1554,14 @@
       "https://pictogrammers.com/library/mdi/",
       "https://mui.com/material-ui/icons/"
     ]
+  },
+  "contract": "chemisttasker.skills/v1",
+  "matching_rules": {
+    "canonical_id": "skills[].code",
+    "normalisation": "Canonical code, case-insensitive label or explicit alias only; never fuzzy-match free text for eligibility.",
+    "scope": "Only legal role-compatible claims; supervision and credential verification must be checked separately.",
+    "explorer": "Explorer interests are not professional skills; do not match them to skilled pharmacy shifts.",
+    "unknown": "Legacy unknown claims can be shown for audit but never counted as a match.",
+    "certificate": "A self-selected skill or uploaded file is not automatically a verified qualification."
   }
 }
