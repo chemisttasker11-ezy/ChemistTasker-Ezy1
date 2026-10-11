@@ -104,6 +104,8 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
         return normalize_skills(list(obj.skills or []) if obj.skills else self._get_onboarding_skills(obj))
 
     def get_software(self, obj):
+        if obj.role_category == 'EXPLORER':
+            return []
         return normalize_skills(list(obj.software or [])) if obj.software else []
 
     def get_travel_states(self, obj):
