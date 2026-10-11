@@ -15,7 +15,7 @@ import DashboardContentState from "../../../../components/dashboard/DashboardCon
 import FiltersSidebar, { TalentFilterState } from "./components/FiltersSidebar";
 const PostShiftPage = lazy(() => import("../PostShiftPage"));
 import { Candidate } from "./types";
-import { formatRoleLabel, formatWorkType, mapRoleToShiftRole, mapAvailabilityToPitchSlots, allWorkTypes, codeToLabel, codeToCategory, isIsoDate, todayIso } from "./talentModel";
+import { formatRoleLabel, formatWorkType, mapRoleToShiftRole, mapAvailabilityToPitchSlots, allWorkTypes, codeToCategory, resolveTalentSkillCode, resolveTalentSkillLabel, isIsoDate, todayIso } from "./talentModel";
 import { useAuth } from "../../../../contexts/AuthContext";
 import {
   canPublishTalent,
@@ -143,8 +143,10 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       const expandedScope: string[] = [];
       const otherSkills: string[] = [];
       rawSkills.forEach((code) => {
-        const label = codeToLabel.get(code) ?? code;
-        const category = codeToCategory.get(code);
+        const canonical = resolveTalentSkillCode(code);
+        if (!canonical) return;
+        const label = canonical;
+        const category = codeToCategory.get(canonical);
         if (category === "clinical_services") clinicalServices.push(label);
         else if (category === "dispense_software") dispenseSoftware.push(label);
         else if (category === "expanded_scope") expandedScope.push(label);
@@ -947,7 +949,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
                   <Chip key={r} label={r} onDelete={() => toggleFilter("roles", r)} />
                 ))}
                 {filters.skills.map((s: string) => (
-                  <Chip key={s} label={s} onDelete={() => toggleFilter("skills", s)} />
+                  <Chip key={s} label={resolveTalentSkillLabel(s)} onDelete={() => toggleFilter("skills", s)} />
                 ))}
                 <Button size="small" onClick={clearAllFilters} sx={{ ml: "auto", minHeight: 32 }}>
                   Clear all
