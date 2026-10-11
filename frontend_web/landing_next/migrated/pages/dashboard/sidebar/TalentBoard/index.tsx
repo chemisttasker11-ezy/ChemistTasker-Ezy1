@@ -32,7 +32,8 @@ import {
   updateExplorerPost,
 } from "@chemisttasker/shared-core";
 import { otherStaffRoleLabel } from "../../../../utils/roleLabels";
-import skillsCatalog from "@chemisttasker/shared-core/skills_catalog.json";
+import skillsRegistry from "@chemisttasker/shared-core/skills_registry.json";
+import { skillId, skillLabel } from "@chemisttasker/shared-core";
 
 const titleCase = (value: string) =>
   value
@@ -107,44 +108,12 @@ const mapAvailabilityToPitchSlots = (entries: any[]) =>
 const allWorkTypes = Object.values(ENGAGEMENT_LABELS);
 
 
-type SkillItem = {
-  code: string;
-  label: string;
-  description?: string;
-  requires_certificate?: boolean;
-};
-
-type RoleCatalog = {
-  clinical_services: SkillItem[];
-  dispense_software: SkillItem[];
-  expanded_scope: SkillItem[];
-};
-
-type SkillsCatalog = {
-  pharmacist: RoleCatalog;
-  otherstaff: RoleCatalog;
-};
-
-const catalog = skillsCatalog as SkillsCatalog;
-
-const buildSkillMaps = () => {
-  const codeToLabel = new Map<string, string>();
-  const codeToCategory = new Map<string, "clinical_services" | "dispense_software" | "expanded_scope">();
-  (["pharmacist", "otherstaff"] as const).forEach((roleKey) => {
-    const role = catalog[roleKey];
-    if (!role) return;
-    (["clinical_services", "dispense_software", "expanded_scope"] as const).forEach((category) => {
-      role[category]?.forEach((item) => {
-        if (!item?.code) return;
-        if (!codeToLabel.has(item.code)) codeToLabel.set(item.code, item.label || item.code);
-        if (!codeToCategory.has(item.code)) codeToCategory.set(item.code, category);
-      });
-    });
-  });
-  return { codeToLabel, codeToCategory };
-};
-
-const { codeToLabel, codeToCategory } = buildSkillMaps();
+const codeToCategory = new Map(skillsRegistry.skills.map(skill => [
+  skill.code,
+  skill.group === "Clinical Services" ? "clinical_services" :
+  skill.group === "Software & Digital" ? "dispense_software" : "expanded_scope"
+] as const));
+const canonicalTalentSkill = (value: string) => skillId(skillsRegistry as any, value);
 
 type TalentBoardProps = {
   publicMode?: boolean;
@@ -283,8 +252,9 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       const expandedScope: string[] = [];
       const otherSkills: string[] = [];
       rawSkills.forEach((code) => {
-        const label = codeToLabel.get(code) ?? code;
-        const category = codeToCategory.get(code);
+        const label = canonicalTalentSkill(code);
+        if (!label) return;
+        const category = codeToCategory.get(label);
         if (category === "clinical_services") clinicalServices.push(label);
         else if (category === "dispense_software") dispenseSoftware.push(label);
         else if (category === "expanded_scope") expandedScope.push(label);
@@ -1044,7 +1014,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
                   <Chip key={r} label={r} onDelete={() => toggleFilter("roles", r)} />
                 ))}
                 {filters.skills.map((s: string) => (
-                  <Chip key={s} icon={<SkillIcon skill={s}/>} label={s} onDelete={() => toggleFilter("skills", s)} />
+                  <Chip key={s} icon={<SkillIcon skill={s}/>} label={skillLabel(skillsRegistry as any, s)} onDelete={() => toggleFilter("skills", s)} />
                 ))}
                 <Chip
                   label="Clear All"
