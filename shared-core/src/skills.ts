@@ -48,7 +48,7 @@ export function workerSkillRole(persona: 'pharmacist' | 'otherstaff', subtype?: 
 }
 
 export function roleSkillGroups(registry: SkillsRegistry, role: WorkerSkillRole | null): RoleSkillGroup[] {
-  if (!role) return [];
+  if (!role || !['PHARMACIST', 'INTERN', 'TECHNICIAN', 'ASSISTANT', 'STUDENT'].includes(role)) return [];
   const groups = registry.groups.map(label => ({
     key: label,
     label,
@@ -69,7 +69,7 @@ export function canonicalSkillCode(registry: SkillsRegistry, code: string): stri
 }
 
 export function validRoleSkillCodes(registry: SkillsRegistry, role: WorkerSkillRole | null, raw: string[]): string[] {
-  if (!role) return [];
+  if (!role || !['PHARMACIST', 'INTERN', 'TECHNICIAN', 'ASSISTANT', 'STUDENT'].includes(role)) return [];
   const allowed = new Set(registry.skills.filter(s => s.eligibility[role] !== 'none').map(s => s.code));
   return Array.from(new Set(raw.map(code => canonicalSkillCode(registry, code)).filter(code => allowed.has(code))));
 }
