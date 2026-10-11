@@ -334,7 +334,7 @@ export default function TalentCard({
                 Dispense Software:
               </Typography>
               {candidate.dispenseSoftware.length > 0 ? (
-                candidate.dispenseSoftware.map((skill) => <Chip key={skill} icon={<SkillIcon skill={skill}/>} size="small" label={skill} />)
+                candidate.dispenseSoftware.map((skill) => <Chip key={skill} icon={<SkillIcon skill={skill}/>} size="small" label={skillLabel(skill)} />)
               ) : (
                 <Typography variant="caption" color="text.secondary">
                   --
