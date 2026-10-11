@@ -10,6 +10,8 @@
     "dev:5175": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5175",
     "dev:5176": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite --port 5176",
     "build": "vite build",
+    "test:e2e": "npm --prefix e2e run test:e2e",
+    "test:e2e:authenticated": "npm --prefix e2e run test:e2e:authenticated",
     "dev:dashboard": "node ../scripts/run-with-env.mjs ../env/web.dev.env vite",
     "dev:all": "node scripts/dev-all.mjs",
     "kiosk:dev": "node scripts/run-tauri.mjs dev",

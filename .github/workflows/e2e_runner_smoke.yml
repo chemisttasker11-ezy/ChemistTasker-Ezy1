@@ -1,0 +1,107 @@
+name: E2E Runner Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend_web/**'
+      - 'shared-core/**'
+      - 'backend/**'
+      - '.github/workflows/e2e_runner_smoke.yml'
+  pull_request:
+    paths:
+      - 'frontend_web/**'
+      - 'shared-core/**'
+      - 'backend/**'
+      - '.github/workflows/e2e_runner_smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-runner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authenticated-web:
+    # The frontend-only export deliberately has no backend; run this job in source.
+    if: github.repository == 'chemisttasker11-ezy/ChemistTasker-Ezy1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            frontend_web/package-lock.json
+            frontend_web/landing_next/package-lock.json
+            frontend_web/e2e/package-lock.json
+      - name: Install app and test dependencies
+        run: |
+          npm ci --prefix frontend_web
+          npm ci --prefix frontend_web/landing_next
+          npm ci --prefix frontend_web/e2e
+      - name: Install Chromium
+        working-directory: frontend_web/e2e
+        run: npm run e2e:install -- --with-deps
+      - name: Run Docker authenticated acceptance
+        working-directory: frontend_web/e2e
+        run: npm run test:e2e:authenticated
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: authenticated-web-proof
+          path: |
+            frontend_web/e2e/.e2e/authenticated-report
+            frontend_web/e2e/.e2e/logs
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+
+  login-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            frontend_web/package-lock.json
+            frontend_web/e2e/package-lock.json
+      - name: Install application dependencies
+        working-directory: frontend_web
+        run: npm ci
+      - name: Install test dependencies
+        working-directory: frontend_web/e2e
+        run: npm ci
+      - name: Install Chromium
+        working-directory: frontend_web/e2e
+        run: npm run e2e:install -- --with-deps
+      - name: Check runner types and test discovery
+        working-directory: frontend_web/e2e
+        run: |
+          npm run typecheck:e2e
+          npm run e2e:list
+      - name: Run login smoke test
+        working-directory: frontend_web/e2e
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: e2e-runner-proof
+          path: |
+            frontend_web/e2e/.e2e/report.json
+            frontend_web/e2e/.e2e/artifacts
+            frontend_web/e2e/.e2e/logs
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
