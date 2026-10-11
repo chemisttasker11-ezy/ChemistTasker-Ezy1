@@ -59,7 +59,10 @@ export default function PharmacistSkillsScreen() {
     };
   }, []);
 
-  const requiresCert = (code: string) => Boolean((skillIndex.get(code) as any)?.certificate);
+  const requiresCert = (code: string) => {
+    const item = skillIndex.get(code) as any;
+    return Boolean(item?.certificate && currentRole && !['familiarity','none'].includes(item.eligibility[currentRole]));
+  };
   const hasExisting = (code: string) => Boolean(existingCerts[code]?.path || existingCerts[code]?.url);
   const hasPending = (code: string) => Boolean(pendingFiles[code]);
 
