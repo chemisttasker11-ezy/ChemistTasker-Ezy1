@@ -12,6 +12,7 @@ export interface SkillDefinition {
   icon_web: string;
   icon_mobile: string;
   icon_meaning: string;
+  description?: string;
   definition: string;
   aliases: string[];
   matchable?: boolean;
