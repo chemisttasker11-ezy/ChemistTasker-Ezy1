@@ -9,7 +9,9 @@ export interface SkillDefinition {
   code: string;
   label: string;
   group: string;
-  icon: string;
+  icon_web: string;
+  icon_mobile: string;
+  icon_meaning: string;
   eligibility: Record<WorkerSkillRole, SkillClaimMode>;
   certificate: string;
   note: string;
