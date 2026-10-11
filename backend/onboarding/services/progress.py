@@ -119,7 +119,14 @@ def otherstaff_progress_percent(obj):
     # Regulatory docs gate: all required docs for the role must be verified
     req = required_documents_for_role(obj)
     role_selected = str(getattr(obj, 'role_type', '') or '').upper() in {'INTERN', 'TECHNICIAN', 'ASSISTANT', 'STUDENT'}
-    docs_ok = role_selected and all(getattr(obj, verified_flag, False) for _, verified_flag, _ in req)
+    role = str(getattr(obj, 'role_type', '') or '').upper()
+    classification_ok = (
+        (role == 'INTERN' and obj.intern_half in {'FIRST_HALF', 'SECOND_HALF'})
+        or (role == 'TECHNICIAN' and obj.classification_level in {'LEVEL_3', 'LEVEL_4'})
+        or (role == 'ASSISTANT' and obj.classification_level in {'LEVEL_1', 'LEVEL_2', 'LEVEL_3', 'LEVEL_4'})
+        or (role == 'STUDENT' and obj.student_year in {'YEAR_1', 'YEAR_2', 'YEAR_3', 'YEAR_4'})
+    )
+    docs_ok = role_selected and classification_ok and all(getattr(obj, verified_flag, False) for _, verified_flag, _ in req)
     checks.append(docs_ok)
 
     # Final verified flip (role-specific)
