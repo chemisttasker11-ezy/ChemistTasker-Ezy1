@@ -1,6 +1,7 @@
 """shifts: cohesive shifts serializers."""
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+from onboarding.services.skill_identity import normalize_skills
 from drf_spectacular.utils import extend_schema_field
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from shifts.models import Shift, ShiftDescriptionTemplate, ShiftOffer
@@ -125,6 +126,15 @@ class ShiftSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        role = attrs.get('role_needed') or getattr(self.instance, 'role_needed', None)
+        for field in ('must_have', 'nice_to_have'):
+            if field in attrs:
+                attrs[field] = normalize_skills(attrs[field], strict=True, allowed_role=role if role != 'EXPLORER' else None)
+        if 'must_have' in attrs or 'nice_to_have' in attrs:
+            required = attrs.get('must_have', getattr(self.instance, 'must_have', []) or [])
+            preferred = attrs.get('nice_to_have', getattr(self.instance, 'nice_to_have', []) or [])
+            if set(required).intersection(preferred):
+                raise serializers.ValidationError({'nice_to_have': 'A skill cannot be both required and preferred.'})
         employment_type = attrs.get('employment_type') or getattr(self.instance, 'employment_type', None)
         min_hour = attrs.get('min_hourly_rate') if 'min_hourly_rate' in attrs else getattr(self.instance, 'min_hourly_rate', None)
         max_hour = attrs.get('max_hourly_rate') if 'max_hourly_rate' in attrs else getattr(self.instance, 'max_hourly_rate', None)
