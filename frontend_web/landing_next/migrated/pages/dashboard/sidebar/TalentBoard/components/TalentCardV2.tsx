@@ -1,4 +1,4 @@
-import SkillIcon from '@/public/skill-icon';
+import SkillIcon, { skillLabel } from '@/public/skill-icon';
 import { useState } from "react";
 import {
   Box,
@@ -321,7 +321,7 @@ export default function TalentCard({
                 Clinical Services:
               </Typography>
               {candidate.clinicalServices.length > 0 ? (
-                candidate.clinicalServices.map((skill) => <Chip key={skill} icon={<SkillIcon skill={skill}/>} size="small" label={skill} />)
+                candidate.clinicalServices.map((skill) => <Chip key={skill} icon={<SkillIcon skill={skill}/>} size="small" label={skillLabel(skill)} />)
               ) : (
                 <Typography variant="caption" color="text.secondary">
                   --
