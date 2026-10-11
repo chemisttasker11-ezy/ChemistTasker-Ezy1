@@ -10,6 +10,7 @@ from django.utils.text import slugify
 from rest_framework import serializers
 
 from core.file_validation import DOCUMENT_UPLOAD_POLICY, validate_uploaded_file
+from onboarding.services.skill_identity import canonical_skill
 
 _SKILLS_CATALOG_CACHE = None
 
@@ -54,7 +55,6 @@ def _canonical_skills(instance, requested: list[str], role_key: str) -> list[str
         # Preserve existing tab-test fixtures and older deployed catalog format.
         return requested
     skills = {item["code"]: item for item in catalog.get("skills", [])}
-    alias = catalog.get("legacy_aliases", {})
     allowed = {"PHARMACIST", "INTERN", "TECHNICIAN", "ASSISTANT", "STUDENT"}
     role = _role_for_skills(instance, role_key)
     if role not in allowed:
@@ -67,7 +67,7 @@ def _canonical_skills(instance, requested: list[str], role_key: str) -> list[str
     previous = set(instance.skills or [])
     deprecated = set(catalog.get("legacy_evidence_only", []))
     for raw in requested:
-        code = alias.get(raw, raw)
+        code = canonical_skill(raw) or raw
         item = skills.get(code)
         if raw in deprecated and raw in previous:
             # Insurance documents were historically stored among skills.
@@ -163,6 +163,9 @@ def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: 
         skills = list(raw or [])
 
     skills = _canonical_skills(instance, skills, role_key)
+    # Upload paths must use the same canonical key as a selected skill.
+    # This also accepts historic code aliases without losing the attached proof.
+    uploads = {canonical_skill(code) or code: file_obj for code, file_obj in uploads.items()}
 
     yrs = initial_data.get("years_experience", vdata.get("years_experience", None)) if track_years_experience else None
     if yrs is not None:
