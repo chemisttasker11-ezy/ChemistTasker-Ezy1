@@ -7,7 +7,7 @@ COPY shared-core /workspace/shared-core
 
 COPY frontend_web/package.json ./package.json
 COPY frontend_web/package-lock.json ./package-lock.json
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 
 COPY frontend_web/ ./
 
