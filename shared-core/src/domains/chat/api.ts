@@ -60,7 +60,7 @@ export function deleteMessage(messageId: number | string) {
     return fetchApi(`/messages/${messageId}/`, { method: 'DELETE' });
 }
 export function reactToMessage(messageId: number | string, data: unknown) {
-    return fetchApi<ChatMessageApi>(`/messages/${messageId}/react/`, { method: 'POST', body: JSON.stringify(data) });
+    return fetchApi<void>(`/messages/${messageId}/react/`, { method: 'POST', body: JSON.stringify(data) });
 }
 export function toggleRoomPin(roomId: number | string, data: unknown) {
     return fetchApi<ChatRoomApi>(`/rooms/${roomId}/toggle-pin/`, { method: 'POST', body: JSON.stringify(data) });
@@ -160,8 +160,8 @@ export async function deleteMessageService(messageId: number | string) {
     await deleteMessage(messageId);
 }
 export async function reactToMessageService(messageId: number | string, reaction: string) {
-    const data = await reactToMessage(messageId, { reaction });
-    return mapChatMessage(data);
+    // The API returns an empty success response; WebSocket events update reactions.
+    await reactToMessage(messageId, { reaction });
 }
 export async function deleteRoomService(roomId: number | string) {
     await deleteRoomRequest(roomId);
