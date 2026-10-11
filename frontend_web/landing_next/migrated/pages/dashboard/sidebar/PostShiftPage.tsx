@@ -70,7 +70,9 @@ import {
   createOwnerShiftService,
   updateOwnerShiftService,
 } from '@chemisttasker/shared-core';
-import skillsCatalog from '@chemisttasker/shared-core/skills_catalog.json';
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import SkillIcon from '@/public/skill-icon';
+import { roleSkillGroups } from '@chemisttasker/shared-core';
 import { useColorMode } from '../../../theme/sleekTheme';
 import apiClient from '../../../utils/apiClient';
 
@@ -1727,14 +1729,9 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
         </Grid>
       );
       case 'skills': {
-        const roleKey = roleNeeded === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
-        const roleCatalog = (skillsCatalog as any)[roleKey] || {};
+        const categories = roleSkillGroups(skillsRegistry as any, roleNeeded as any).map(group => ({key:group.key,title:group.label,items:group.items}));
         
-        const categories = [
-          { key: 'clinical_services', title: 'Clinical Services', items: roleCatalog.clinical_services || [] },
-          { key: 'dispense_software', title: 'Dispense Software', items: roleCatalog.dispense_software || [] },
-          { key: 'expanded_scope', title: 'Expanded Scope', items: roleCatalog.expanded_scope || [] },
-        ].filter(cat => cat.items.length > 0);
+
 
         return (
           <Stack spacing={3}>
@@ -1828,7 +1825,7 @@ const PostShiftPage: React.FC<PostShiftPageProps> = ({ onCompleted }) => {
                                   color={value ? 'text.primary' : 'text.secondary'}
                                   sx={{ overflowWrap: 'anywhere' }}
                                 >
-                                  {s.label}
+                                  <SkillIcon skill={s.code} /> {s.label}
                                 </Typography>
                                 {s.description && (
                                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>
