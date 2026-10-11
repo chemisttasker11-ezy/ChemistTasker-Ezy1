@@ -349,7 +349,7 @@ class ProgressTests(RoleTabFixture):
         # the phone are verified.
         gates = {
             "pharmacist": {"ahpra_verified": True},
-            "otherstaff": {"gov_id_verified": True, "role_type": "ASSISTANT", "certificate_verified": True},
+            "otherstaff": {"gov_id_verified": True, "role_type": "ASSISTANT", "classification_level": "LEVEL_1"},
             "explorer": {"gov_id_verified": True},
         }
         for label, fields in gates.items():
