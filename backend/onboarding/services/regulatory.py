@@ -29,8 +29,6 @@ def required_documents_for_role(instance):
             ('university_id', 'university_id_verified', 'university_id_verification_note'),
         ],
     }
-    if role == 'INTERN' and instance.intern_half != 'SECOND_HALF':
-        return [('ahpra_proof', 'ahpra_proof_verified', 'ahpra_proof_verification_note')]
     return mapping.get(role, [])
 
 
