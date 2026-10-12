@@ -2,6 +2,8 @@
 
 Read this file first. It supersedes the status and next steps in the archived handovers. These documents are records of earlier work, not authorization to change another branch or resume the separate launch programme.
 
+**Publication:** application commit `2e67f18` was pushed successfully on 12 October 2026 to both `design/pr165-skills` and `feat/role-aware-skills-onboarding-2026-10` (draft PR165). The user explicitly requested immediate push after narrowing testing. Focused checks are recorded below; the full exact-commit release gate was not completed. It remains required before merge/release. No merge or deployment occurred. This documentation follow-up records that status without changing application code.
+
 ## Branch and scope
 
 All accumulated PR165 application changes are on local `design/pr165-skills`, based on `bbc4ee35f6b86074efe2151853217516b195d02c`. The existing draft PR165 uses remote `feat/role-aware-skills-onboarding-2026-10`. Publication targets both feature branches at the same final commit; never `origin/main`. No merge or deployment is authorized by this handover.
@@ -49,7 +51,7 @@ Focused validation completed before publication preparation: 45 shared-core test
 
 Synthetic browser checks used the actual production web form/card with mocked API dispatch. Deliberate clearing survived forward/back; chainless Public audience had no chain switch; Automatic/12 hours survived navigation; a 77.50 custom date retained pharmacy guide 65; a direct booking without `embedded` submitted only to its dedicated worker with no widening/broadcast; each successful submit called completion once. This proves those local fixture paths, not live end-to-end persistence or native device acceptance. Vite shared-package cache needed refreshing after rebuilding exports.
 
-The outgoing exact-commit regression gate is required before publication by workspace policy. Its final outcome belongs in the publication record, not an inference from focused tests. PR165 remains draft until hosted checks and staging acceptance are reviewed.
+Workspace policy normally requires the outgoing exact-commit regression gate before publication. The user's later explicit immediate-push instruction superseded that timing for this draft feature branch. The full gate is pending and must not be inferred from focused tests. PR165 remains draft until the gate, hosted checks and staging acceptance are reviewed.
 
 ## Remaining work for the next agent
 

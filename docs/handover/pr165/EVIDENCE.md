@@ -1,5 +1,7 @@
 # PR165 evidence and limits
 
+Application commit `2e67f18` was pushed to both PR165 feature branches after the user's explicit immediate-push instruction. The full outgoing gate was not completed; do not mark it passed. Hosted checks, exact-commit gate and staging acceptance remain release work. The following results are focused pre-publication evidence, not all-CI acceptance.
+
 ## Reproduced before the fixes
 
 The initial senior review executed source-derived probes with synthetic inputs and mocked managers/task dispatch. It confirmed: a dedicated booking could broadcast to another worker; `OTHER_STAFF` short-circuited Technician to Assistant; cleared saved selections reapplied after step remount; widening mode/interval reset; the success callback ran twice; an Other Staff account with an admin-created historical pharmacist row displayed the old profession. The candidate review source also dropped the native work profile. The source locations and original probes are described in the archived senior review; they are historical evidence, not current passing tests.
