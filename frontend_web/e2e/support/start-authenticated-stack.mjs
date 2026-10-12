@@ -82,6 +82,8 @@ try {
   const docker = spawn('docker', ['run', '--rm', '--name', `chemisttasker-e2e-${process.env.E2E_AUTH_RUN_ID}`,
     '--label', `chemisttasker.e2e.run=${process.env.E2E_AUTH_RUN_ID}`,
     '--publish', `127.0.0.1:${backendPort}:8000`,
+    // backend/Dockerfile.dev carries dependencies only; the source under test is mounted.
+    '--mount', `type=bind,source=${backend},target=/app,readonly`,
     '--mount', `type=bind,source=${testRoot},target=${containerRoot}`,
     '--workdir', '/app', '--entrypoint', 'sh',
     ...environmentKeys.flatMap(key => ['--env', key]),

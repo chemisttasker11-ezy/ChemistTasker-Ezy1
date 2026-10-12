@@ -96,3 +96,13 @@ Source changed: shared `buildShiftPostingPreview` and `SUPER_GUARANTEE_PERCENT` 
 | Architecture, shared-core boundary/package/transport, frontend static wiring, web UI boundaries | All pass |
 
 Not rerun: backend (no backend change), full browser runner (web Review mapping is unchanged code moved into shared-core), full native journeys (only the candidate review dialog was confirmed; the latest posting-preview edits postdate the APK build).
+
+## Hosted CI on PR #166 (first runs)
+
+The first hosted runs exposed three packaging defects from `53dc83f` that local runs could not see, because the local worktree already had `shared-core/dist` and a prebuilt backend image:
+
+- `frontend_web/package-lock.json` lacked the top-level `@emnapi/core`/`@emnapi/runtime` optional peer entries; npm 10 and current npm 11 reject it (`444a63e`). Local npm 11.6.2 tolerates the omission, so verify lock changes with `npx npm@10 ci`.
+- `frontend_web/.npmrc` `install-links=true` copied `file:../shared-core` before the root `preinstall` built `dist` (npm runs root lifecycle scripts after reifying dependencies), so fresh CI builds could not resolve `@chemisttasker/shared-core`. Vite now links shared-core again as on main; `landing_next` keeps its own `install-links` for shared-UI peers. Verified by fresh `npm ci` + `vite build` with no prebuilt `dist`.
+- The authenticated e2e stack dropped the read-only backend source mount; `backend/Dockerfile.dev` carries no source, so CI's container had no `/app/manage.py`. Mount restored; the dev image with the mount passes `manage.py check` and loads 67 registry skills.
+
+Kiosk Rust, PostgreSQL concurrency, serializers, CodeQL, lint, security and the backend contract jobs passed on hosted CI.
