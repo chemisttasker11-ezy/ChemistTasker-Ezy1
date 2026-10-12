@@ -195,7 +195,15 @@ class ShiftSerializer(serializers.ModelSerializer):
         return project_published_rates(data, user=user, pharmacy=instance.pharmacy)
 
     def get_published_rates_visible(self, obj) -> bool:
-        return published_rates_visible(getattr(self.context.get('request'), 'user', None), obj.pharmacy)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        # Serializer contexts are request-scoped. Repeated shifts at one pharmacy
+        # reuse the decision; request identity prevents reuse across HTTP calls.
+        cache = self.context.setdefault('_published_pay_visibility', {})
+        key = (id(request), getattr(user, 'pk', None), obj.pharmacy_id)
+        if key not in cache:
+            cache[key] = published_rates_visible(user, obj.pharmacy)
+        return cache[key]
 
     def get_role_label(self, obj):
         return obj.get_role_needed_display()

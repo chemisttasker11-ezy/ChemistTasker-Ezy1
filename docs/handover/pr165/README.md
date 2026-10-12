@@ -1,6 +1,6 @@
 > Current local follow-up: [review fixes and gate status](REVIEW_FIXES_2026-10-12.md). The publication status below is historical. New fixes are local only; do not claim remote CI, device or staging acceptance.
 
-# PR165 current handover â€” 12 October 2026
+# PR165 current handover — 12 October 2026
 
 Read this file first. It supersedes the status and next steps in the archived handovers. These documents are records of earlier work, not authorization to change another branch or resume the separate launch programme.
 
@@ -66,11 +66,11 @@ Workspace policy normally requires the outgoing exact-commit regression gate bef
 
 ## Reading order and archive
 
-- `README.md` â€” current facts, ownership and remaining work.
-- `EVIDENCE.md` â€” primary-source research, observed before/after behavior and local check scope.
-- `archive/HANDOVER_PR165_POSTSHIFT_before_senior_fixes.md` â€” original Claude form work and unfinished parity tasks.
-- `archive/CLAUDE_HANDOVER_PR165_FIXES_before_latest_fixes.txt` â€” earlier fixes/presets plus clearly historical separate-programme entries.
-- `archive/PR165_SKILLS_REVIEW_previous_branch.md` and `archive/DESIGN_DECISIONS_previous_branch.md` â€” previous checkout's recorded design work.
-- `archive/SENIOR_REVIEW_PR165_before_fixes.txt` â€” initial reproduced findings; its outstanding status is superseded above.
+- `README.md` — current facts, ownership and remaining work.
+- `EVIDENCE.md` — primary-source research, observed before/after behavior and local check scope.
+- `archive/HANDOVER_PR165_POSTSHIFT_before_senior_fixes.md` — original Claude form work and unfinished parity tasks.
+- `archive/CLAUDE_HANDOVER_PR165_FIXES_before_latest_fixes.txt` — earlier fixes/presets plus clearly historical separate-programme entries.
+- `archive/PR165_SKILLS_REVIEW_previous_branch.md` and `archive/DESIGN_DECISIONS_previous_branch.md` — previous checkout's recorded design work.
+- `archive/SENIOR_REVIEW_PR165_before_fixes.txt` — initial reproduced findings; its outstanding status is superseded above.
 
 No playground fixture, database backup, real credential or generated user belongs in a commit. Publishing the reviewed handover copies here is the user's explicit exception for handover documentation.

@@ -36,7 +36,7 @@ Four serializer baselines intentionally change: Shift and MyShift add `support_o
 ## Primary-source qualification evidence
 
 - [Guild certificate training](https://www.guild.org.au/guild-branches/act/training/certificate-training): Certificate III in Community Pharmacy (SIR30116), Certificate IV in Community Pharmacy (SIR40116), Certificate IV in Community Pharmacy Dispensary (SIR40216) and dispensary courses.
-- [National Training Register â€” SIRCDIS003](https://training.gov.au/Training/Details/SIRCDIS003): Assist in dispensing prescriptions is core in SIR40216, elective in SIR30116/SIR40116 and part of SIRSS00012. A general certificate title does not prove that unit/stream was completed.
+- [National Training Register — SIRCDIS003](https://training.gov.au/Training/Details/SIRCDIS003): Assist in dispensing prescriptions is core in SIR40216, elective in SIR30116/SIR40116 and part of SIRSS00012. A general certificate title does not prove that unit/stream was completed.
 - [National training package](https://training.gov.au/assets/SIR/SIR_R2.0.pdf): Community Pharmacy Dispensary skill set SIRSS00012 includes dispensing units.
 - [Guild Certificate III course flyer](https://www.guild.org.au/__data/assets/pdf_file/0034/94669/22_000086_CIII-CP.pdf): distinguishes streams, including dispensary.
 - [Pharmacy Industry Award, Schedule A](https://awards.fairwork.gov.au/MA000012.html): common Levels describe competencies/classification; they are distinct from the evidence of a particular dispensing qualification.

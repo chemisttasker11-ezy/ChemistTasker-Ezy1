@@ -91,6 +91,25 @@ class PublishedRateVisibilityTests(TestCase):
         self.assertTrue(self.data(worker)['published_rates_visible'])
         self.assertTrue(self.data(self.owner)['published_rates_visible'])
 
+    def test_feed_reuses_pay_visibility_per_pharmacy_and_never_across_requests(self):
+        worker, _ = self.member()
+        request = APIRequestFactory().get('/api/v1/community-shifts/')
+        request.user = worker
+        context = {'request': request}
+        serializers = [cls(context=context) for cls in (ShiftSerializer, MyShiftSerializer, OpenShiftSerializer)]
+        self.assertFalse(serializers[0].get_published_rates_visible(self.shift))
+        with self.assertNumQueries(0):
+            for index in range(50):
+                self.assertFalse(serializers[index % 3].get_published_rates_visible(self.shift))
+        # The same user gains manager scope on a subsequent request. A previous
+        # feed's cached decision must not override the new permission lookup.
+        PharmacyAdmin.objects.create(user=worker, pharmacy=self.pharmacy,
+            is_active=True, admin_level=PharmacyAdmin.AdminLevel.OWNER)
+        next_request = APIRequestFactory().get('/api/v1/community-shifts/')
+        next_request.user = worker
+        context['request'] = next_request
+        self.assertTrue(serializers[0].get_published_rates_visible(self.shift))
+
     def test_real_community_response_and_emails_hide_staff_rates(self):
         worker, _ = self.member()
         response = client_for(worker).get(f'/api/v1/community-shifts/{self.shift.id}/')

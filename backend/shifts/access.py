@@ -88,9 +88,9 @@ def _shift_roles_visible_to_user(user):
         profile = OtherStaffOnboarding.objects.filter(user=user).first()
         staff_role = _normalized_role_code(getattr(profile, 'role_type', None))
         # Pharmacy-assistant work is the broad Other Staff entry point and is
-        # visible to every Other Staff subtype. Specialist work stays exact:
-        # intern shifts only to interns, dispensary-technician shifts only to
-        # technicians, and student shifts only to students.
+        # visible to every Other Staff subtype. Intern and student vacancies stay
+        # role-specific; technician vacancies also accept interns/students and
+        # assistants with a dispensing claim, subject to assignment safeguards.
         if staff_role == "INTERN":
             return ["ASSISTANT", "INTERN", "TECHNICIAN"]
         if staff_role == "TECHNICIAN":

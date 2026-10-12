@@ -494,31 +494,17 @@ def assigned_profile(*, request, shift, candidate, slot_id, slot):
         slot=slot,
     )
 
-    # Retrieve profile data without sending an email or consuming reveal quota
-    try:
-        po = PharmacistOnboarding.objects.get(user=candidate)
-        profile_data = {
-            'phone_number': candidate.mobile_number,
-            'short_bio': po.short_bio,
-            'resume': request.build_absolute_uri(po.resume.url) if po.resume else None,
-            'rate_preference': po.rate_preference or None,
-        }
-    except PharmacistOnboarding.DoesNotExist:
-        try:
-            os = OtherStaffOnboarding.objects.get(user=candidate)
-            profile_data = {
-                'phone_number': candidate.mobile_number,
-                'short_bio': os.short_bio,
-                'resume': request.build_absolute_uri(os.resume.url) if os.resume else None,
-            }
-        except OtherStaffOnboarding.DoesNotExist:
-            # Handle cases where user might not have a full onboarding profile yet
-            profile_data = {
-                'phone_number': None,
-                'short_bio': None,
-                'resume': None,
-                'rate_preference': None,
-            }
+    # Contact access is unchanged; bio/CV must come from the current worker role,
+    # just like the public work-profile projection. Historical rows remain stored.
+    profile = current_worker_profile(candidate)
+    resume = getattr(profile, 'resume', None)
+    profile_data = {
+        'phone_number': candidate.mobile_number if profile else None,
+        'short_bio': getattr(profile, 'short_bio', None),
+        'resume': request.build_absolute_uri(resume.url) if resume else None,
+    }
+    if profile is None or hasattr(profile, 'rate_preference'):
+        profile_data['rate_preference'] = getattr(profile, 'rate_preference', None) or None
 
     return {
         'id': candidate.id,

@@ -12,7 +12,7 @@ from django.test import TestCase
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from memberships.models import Membership
-from onboarding.models import PharmacistOnboarding
+from onboarding.models import PharmacistOnboarding, OtherStaffOnboarding
 from organizations.models import PharmacyAdmin
 from shifts.models import Shift, ShiftProfileAccessAudit, ShiftSlot, ShiftSlotAssignment
 
@@ -229,6 +229,29 @@ class AssignedProfileTests(ShiftListingFixture):
                 self.assertTrue(ShiftProfileAccessAudit.objects.filter(
                     shift=shift, target_user=staff, action=ShiftProfileAccessAudit.Action.VIEW_ASSIGNED_PROFILE,
                 ).exists())
+
+    def test_booked_profile_contact_and_cv_follow_the_current_worker_role(self):
+        staff = self.users['staff']
+        old = PharmacistOnboarding.objects.get(user=staff)
+        old.short_bio = 'Historical pharmacist biography'
+        old.resume = 'profiles/historical-pharmacist.pdf'
+        old.save()
+        staff.role = 'OTHER_STAFF'
+        staff.save(update_fields=['role'])
+        OtherStaffOnboarding.objects.create(user=staff, role_type='STUDENT',
+            short_bio='Current student biography', resume='profiles/current-student.pdf',
+            skills=['PRESCRIPTION_DISPENSING', 'CORUM_LOTS'])
+        shift = self.shifts['confirmed']
+        response = client_for(self.owner).post(
+            f'{API}shifts/confirmed/{shift.id}/view_assigned_profile/',
+            {'user_id': staff.id}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['role_label'], 'Pharmacy Student')
+        self.assertEqual(response.data['short_bio'], 'Current student biography')
+        from urllib.parse import urlsplit
+        self.assertTrue(urlsplit(response.data['resume']).path.endswith('/profiles/current-student.pdf'))
+        self.assertEqual(response.data['email'], staff.email)
+        self.assertNotIn('Historical pharmacist', str(response.data))
 
     def test_assigned_profile_refusals(self):
         shift = self.shifts["confirmed"]

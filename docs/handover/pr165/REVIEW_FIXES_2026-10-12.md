@@ -1,4 +1,4 @@
-# PR165 review fixes â€” local only, 12 October 2026
+# PR165 review fixes — local only, 12 October 2026
 
 Latest direction: work locally. No follow-up fixes have been pushed. PR165 remains draft; do not call it mergeable until the pending gates below are completed. Baseline is the local reviewed merge `4fcdf69` of remote main into design/pr165-skills (published PR head was `e449427`).
 
@@ -49,3 +49,5 @@ Update: live Vite browser import confirms automaticShiftEscalationDates and buil
 - Real authenticated Next/Vite/Django acceptance: 2/2 passed: owner cookie refresh, CSRF, scope and logout; delegated manager pharmacy isolation and unauthorized route recovery.
 - Live development browser import confirms automaticShiftEscalationDates and buildShiftPostingPayload are functions in canonical compiled output.
 - Emulator installation authorized and in progress. Android CLI/Temurin archives had verified SHA256 hashes. Native device and staging acceptance are still outstanding; no push performed.
+
+Native setup update: official API 35 x86_64 emulator is installed, hardware acceleration is usable, and adb reports boot completed. SDK/JDK paths are under workspace-level playground/native-tools, not source control. Isolated Android prebuild uses synthetic Firebase configuration, localreview package ID and disabled production updates. Debug APK compilation is waiting on NDK installation; the legacy Java download stalled, so the same Google archive is being installed with repository-checksum verification. No device-level app acceptance has passed yet.
