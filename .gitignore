@@ -109,6 +109,10 @@ verification_outputs/
 ocr_verification
 **/jobs/
 
+# DSH local workspace (teaching, plans, notes) and the local issue tracker
+.dsh/
+.scratch/
+
 # ─── Azure Safe Deploy Additions (DO NOT REMOVE) ───────────────────
 # Prevent accidental GLIBC issues from local builds
 .python_packages/
