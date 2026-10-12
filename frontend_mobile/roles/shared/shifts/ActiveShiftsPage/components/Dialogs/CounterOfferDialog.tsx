@@ -3,6 +3,8 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Portal, Dialog, Button, Text, Surface, Divider, ActivityIndicator, Chip } from 'react-native-paper';
 import { customTheme } from '../../theme';
 import { RatingComment, RatingSummary } from '../../types';
+import type { ShiftReviewCandidate } from '@chemisttasker/shared-core';
+import { CandidateWorkProfile } from '../../../../skills/CandidateWorkProfile';
 
 const STATE_CODES = new Set(['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT']);
 
@@ -28,7 +30,7 @@ const extractSuburb = (origin?: string | null) => {
 interface CounterOfferDialogProps {
     visible: boolean;
     offer: any | null;
-    candidate: any | null;
+    candidate: ShiftReviewCandidate | null;
     slotId: number | null;
     workerRatingSummary: RatingSummary | null;
     workerRatingComments: RatingComment[];
@@ -65,19 +67,17 @@ export default function CounterOfferDialog({
     if (!offer && !candidate) return null;
 
     const awaitingPayment = Boolean(
-        candidate?.awaitingPayment ?? candidate?.awaiting_payment
+        candidate?.awaitingPayment
     );
     const pendingConfirmation = !awaitingPayment && Boolean(
-        candidate?.pendingConfirmation ?? candidate?.pending_confirmation
+        candidate?.pendingConfirmation
     );
     const offerStatus = String(offer?.status ?? '').toUpperCase();
     const isActionableCounterOffer = Boolean(offer) && !pendingConfirmation && !awaitingPayment && offerStatus === 'PENDING';
     const counterOfferDetails =
         offer ||
         candidate?.pendingConfirmationCounterOffer ||
-        candidate?.pending_confirmation_counter_offer ||
         candidate?.awaitingPaymentCounterOffer ||
-        candidate?.awaiting_payment_counter_offer ||
         null;
     const rawOrigin =
         (counterOfferDetails as any)?.travel_origin ??
@@ -108,7 +108,7 @@ export default function CounterOfferDialog({
                             <Surface style={styles.section} elevation={1}>
                                 <Text style={styles.sectionTitle}>Candidate</Text>
                                 <Text style={styles.candidateName}>
-                                    {candidate.name || candidate.first_name || candidate.firstName || 'Candidate'}
+                                    {candidate.name || 'Candidate'}
                                 </Text>
                                 {candidate.shortBio && (
                                     <Text style={styles.detail}>{candidate.shortBio}</Text>
@@ -116,6 +116,7 @@ export default function CounterOfferDialog({
                                 {candidate.email && (
                                     <Text style={styles.detail}>{candidate.email}</Text>
                                 )}
+                                <CandidateWorkProfile profile={candidate.profile} />
                                 {pendingConfirmation && (
                                     <Chip style={styles.pendingChip}>Offer sent. Waiting for candidate confirmation.</Chip>
                                 )}
@@ -232,7 +233,7 @@ export default function CounterOfferDialog({
                             mode="contained"
                             loading={assignLoading}
                             disabled={assignLoading}
-                            onPress={() => onAssign(candidate.userId ?? candidate.id, slotId)}
+                            onPress={() => { if (candidate.userId != null) onAssign(candidate.userId, slotId); }}
                         >
                             {assignLabel || 'Assign Candidate'}
                         </Button>

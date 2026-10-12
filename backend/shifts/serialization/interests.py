@@ -1,7 +1,7 @@
 """shifts: cohesive interests serializers."""
 from rest_framework import serializers
 from shifts.models import ShiftInterest, ShiftOffer, ShiftRejection, ShiftSaved
-from users.presentation import _get_user_short_bio
+from onboarding.services.work_profile import current_profile_short_bio
 
 
 class ShiftInterestSerializer(serializers.ModelSerializer):
@@ -79,7 +79,7 @@ class ShiftInterestSerializer(serializers.ModelSerializer):
         is_public = obj.shift.visibility == 'PLATFORM'
         if is_public and not obj.revealed:
             return None
-        return _get_user_short_bio(obj.user)
+        return current_profile_short_bio(obj.user)
 
     def get_user_detail(self, obj):
         is_public = obj.shift.visibility == 'PLATFORM'
@@ -93,12 +93,16 @@ class ShiftInterestSerializer(serializers.ModelSerializer):
             from shifts.candidates import revealed_profile
             request = self.context.get('request')
             return revealed_profile(user, build_absolute_uri=request.build_absolute_uri if request else (lambda url: url))
+        # Pharmacy members and favourites: the same work profile (skills, software, role, experience) plus the email
+        # they already share with the pharmacy.
+        from shifts.candidates import work_profile
+        request = self.context.get('request')
         return {
             'id': user.id,
             'first_name': user.first_name,
             'last_name': user.last_name,
+            **work_profile(user, build_absolute_uri=request.build_absolute_uri if request else (lambda url: url)),
             'email': user.email,
-            'short_bio': _get_user_short_bio(user),
         }
 
     def get_slot_time(self, obj):

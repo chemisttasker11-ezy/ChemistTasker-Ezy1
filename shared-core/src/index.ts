@@ -70,3 +70,10 @@ export type {CurrentUserApi, OnboardingApi} from './contracts/accounts';
 export type {InvoiceDetailApi, InvoiceLineItemApi} from './contracts/invoiceDetail';
 
 export * from './skills';
+export * from './pharmacyProfile';
+export * from './domains/shifts/skillPresets';
+export * from './domains/shifts/visibility';
+export * from './domains/shifts/workProfile';
+export * from './domains/shifts/draftSlots';
+export * from './domains/talent/presentation';
+export * from './domains/onboarding/qualifications';

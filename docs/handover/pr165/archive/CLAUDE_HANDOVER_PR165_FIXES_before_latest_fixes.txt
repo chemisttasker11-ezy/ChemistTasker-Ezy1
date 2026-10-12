@@ -1,0 +1,108 @@
+CLAUDE HANDOVER — PR 165 follow-up fixes
+Prepared: 2026-10-12T13:12:56 Brisbane local time
+Checkout: C:\Users\semse\Downloads\chemisttasker-Frontend-main\pr165-skills-design
+Branch: design/pr165-skills
+HEAD: bbc4ee35f6b86074efe2151853217516b195d02c
+
+STATUS
+The additional Claude work and these fixes remain local and uncommitted. No push, merge, deployment or live database migration was performed by Codex. New source files were marked intent-to-add so git diff includes them. Existing staged work was preserved. Nothing in playground should be committed.
+
+USER REQUIREMENTS
+Do not run the full testing package/regression matrix. Keep checks focused.
+Apply anti-spaghetti/domain ownership rules. Avoid duplicated business logic.
+In BOTH Next and Vite, pharmacy workload/services/staffing/script volumes appear ONLY in expanded full details, under the title "Pharmacy services". Do not restore the pharmacy row in collapsed cards.
+Collapsed and expanded requirement headings are exactly Required, Preferred, Software. They share one heading component: Inter, 13px, weight 800, with the same theme-aware color per heading.
+Do not add a retired-skills notification/banner to onboarding. Keep the unused choices removed.
+
+IMPLEMENTED
+1. Registered Clock3/Coffee in the explicit icon map; web typecheck is clean.
+2. Kept the condensed 67-entry catalogue. Removed 14 non-equivalent legacy-code mappings and partial-task synonyms that granted broader skills. First aid/CPR retains its original scope. Anaphylaxis-only proof cannot satisfy FIRST_AID; blood-pressure-only claims cannot satisfy combined HEALTH_CHECKS. Genuine equivalent aliases such as VACCINATOR, DAA and WinIFRED remain.
+3. Backend partial shift updates reject unknown required codes instead of silently discarding them. All three edit forms preserve unknown requirements until the poster explicitly removes or replaces them. Onboarding still removes unused choices without a retirement banner.
+4. Workload tags use registry codes across Vite, Next and Expo. Existing Sole Pharmacist/High Script Load/Webster Packs values normalize without data loss. The first two are legacy-only options displayed in an edit only while selected, not offered for new posts. Mobile cards show readable labels.
+5. Pharmacy services and weekday/weekend script-volume fields are loaded, submitted, cleared and reset in Vite and Expo. Native discard/save snapshots include the new fields. Creating a pharmacy clears the previous pharmacy's software and context.
+6. All three shift-posting forms load/save support_on_shift. Counts must be whole numbers in range. New and existing workload selections round-trip. Native expanded cards show pharmacy context.
+7. Dark-mode surfaces and labels use theme tokens. Software claim modes are visible again; duplicate staff-role warning removed.
+8. One shared grouping function partitions Required/Preferred/Software on web and native. One shared policy handles software defaults on all clients, and one shared staffing-input function handles web/native count edits.
+9. Next and Vite render shared requirement headings and show "Pharmacy services" only inside expanded details.
+
+DOMAIN OWNERS
+backend/organizations/pharmacy_profile.py: pharmacy software/services/script-band validation.
+backend/shifts/context.py: workload/support validation.
+backend/core/serializer_values.py: domain-neutral JSON-list parsing only.
+shared-core/src/domains/organizations/pharmacyProfile.ts: pharmacy vocabulary, bands and software configuration.
+shared-core/src/domains/shifts/context.ts: workload, staffing, retained requirements, requirement grouping and software defaults.
+shared-core/src/pharmacyProfile.ts: compatibility exports only; no business logic.
+Django models remain in backend/organizations/models.py and backend/shifts/models.py. They intentionally retain client_profile labels/table identity. Migration 0073 is additive, not a model relocation. Do not relabel models or move their implementations into the kernel.
+
+VALIDATION
+27 focused shared-core tests passed: skills.test.ts, domains/shifts/context.test.ts and domains/shifts/skillPresets.test.ts.
+43 focused backend tests passed: skill identity/review regressions, pharmacy/shift context contracts, backend ownership boundaries and organization/shift model ownership.
+Shared-core compilation passed. Vite, Next and Expo TypeScript checks passed.
+Architecture boundary audit passed. Final git diff --check passed.
+Browser check used the actual shared components in a synthetic local fixture, light desktop and dark phone (390px). Confirmed pharmacy absent from summary and present in full details; no Must have/Nice to have wording; headings matched font/weight/colors; no horizontal overflow. This was not an authenticated full-app end-to-end or live-database test.
+No full regression gate, production build matrix, deployment or live database migration was run.
+
+LOCAL RECOVERY/EVIDENCE — ALL IGNORED
+Original Claude snapshot: playground/before-review-fixes-20261012-124155/
+Complete current diff against HEAD: playground/review-fixes-final.patch
+Visual fixtures/screenshots: playground/review-fixes-visual/
+Focused backend runner: playground/run-focused-review-tests.ps1
+
+CONTINUATION
+Review git diff HEAD; it includes Claude's earlier changes plus these corrections. Do not overwrite/reset that work or commit playground artifacts.
+Confirm the running app uses THIS checkout and a rebuilt shared-core package if hot reload still shows an older layout.
+The existing additive 0073 migration remains. Check live local schema before exercising persistence; back up the database before applying any migration.
+Keep broad test/release gates out of this local follow-up unless the user changes their testing instruction. Remote PR 165 has not been updated by this fix turn.
+
+FOLLOW-UP — SAVE SELECTIONS FOR THIS ROLE
+Added a top-of-Skills-step control in Next and Vite: Save selections for this role, plus Use saved selections once a preset exists.
+This is a personal browser preference, scoped by signed-in user ID and professional role. It stores Required/Preferred skill IDs, including software, through the existing configured storage adapter. It does not create a shared pharmacy template, new backend model, endpoint or migration. Presets do not sync to another browser/device. The UI states the browser scope.
+
+Implementation owners:
+- shared-core/src/domains/shifts/skillPresets.ts: key namespaces, normalization, role validation, loading/saving and untouched-new-shift auto-apply policy. Uses existing skill eligibility rather than a copied role catalogue.
+- frontend_web/shared/ShiftSkillPresetControls.tsx: one shared control for Next/Vite, UI feedback and cancellation/scope checks for stale asynchronous results.
+- PostShiftSkillsStep.tsx and both PostShiftPage coordinators: thin context/selection wiring only.
+
+Behavior:
+Saved choices automatically seed a new shift only when current choices are empty or pharmacy-provided defaults and have not changed during loading. Existing shifts or manual choices require explicit Use saved selections. Users can edit the applied choices per shift. Saving again replaces the role's preset; an empty selection can deliberately clear previous choices. Accounts and roles are isolated. Unknown/ineligible/conflicting/malformed presets never weaken required criteria. Failed storage writes do not report success. Explorer does not show a professional skill-preset control.
+
+Latest validation:
+- 27 focused shared-core tests passed (7 new preset tests).
+- Shared-core compilation, Vite and Next typechecks passed.
+- Architecture boundary audit and git diff --check passed.
+- Interactive local browser fixture verified Save, reload persistence, automatic seeding, explicit reuse, role/account isolation and phone layout.
+- No full testing package or new database migration was run. Backend/native sources were unchanged for this follow-up; their earlier focused checks are recorded above.
+
+Local evidence: playground/skill-presets-review/ (ignored). Final patch snapshot has been refreshed to include this feature. Work remains local/uncommitted on design/pr165-skills. Keep the previous corrections and the final Pharmacy services expanded-only placement intact.
+
+LAUNCH JOURNEY PROGRAMME — 12 OCTOBER 2026
+The user now requests completion of all existing end-to-end journeys in milestones over 7-14 days. Programme artifacts and current shared handover live at C:/Users/semse/Downloads/chemisttasker-Frontend-main/chemisttasker-ezy-main/playground/launch-readiness-20261012/. Read PLAN.txt, ledger.json, scenarios.csv and CLAUDE_HANDOVER.txt. This PR165 patch remains separate, dirty and preserved; it is an integration dependency, not already deployed behavior. Do not overwrite it while working on main. The first new programme repair touches ordinary marketplace lifecycle on canonical main, independently of this branch. Hourly Codex heartbeat is active through 26 October; Claude CLI was signed out at setup. Development uses focused checks; outgoing work follows the current AGENTS.md release gate. No new model or migration was introduced by the first programme repair.
+
+LATEST GOAL BRANCH RULE
+The user requires all launch-goal application changes on feat/launch-journey-completion-20261012. This branch is active in ../chemisttasker-ezy-main; first marketplace repair is local commit 13ec2c1f6684051f7886b4af1e14367110050166. Main was not advanced. PR165 remains separate and preserved; reviewed integration goes into the launch-goal branch. See the programme ledger for current ownership.
+
+ONGOING ENTRYPOINT AND FAMILY REVIEW
+Read C:/Users/semse/Downloads/chemisttasker-Frontend-main/chemisttasker-ezy-main/playground/launch-readiness-20261012/PROGRESS.md first. User wants verified gaps repaired first, then each completed family reviewed separately. Decision dashboard is live at http://localhost:8893. Actual user responses are only in the programme decision-responses/decisions.json, with explicit-save history; synthetic dashboard-browser-test-responses are not user instructions. Seven focused dashboard checks and browser save/reload passed. Continue on feat/launch-journey-completion-20261012; next application work is fixed-time shift occurrence/history and deletion/cancellation reproduction. No new application commit during dashboard delivery.
+
+LATEST LAUNCH CHECKPOINT — 12 OCTOBER 2026
+Launch branch now contains 17d7ba7c15ef513f20c64c1cf7137559bd794293 (assigned shift occurrence classification/payload/shared bindings and scoped invoice preview) after f25394e (canonical fixture imports). Final 44 focused backend checks, 6 shared occurrence tests, client typechecks and architecture audit passed. See launch programme wp002-evidence.json and wp002-final-contracts-v2.log. No family is accepted, and real browser/PostgreSQL evidence remains pending. No push/live migration/deployment; main and this PR165 patch are preserved. Next source work is active vacancy and deletion/cancellation closure reproduction. User requested explicit Next marketplace/ethical/blog/public-hub journey labels and route mapping; keep that in the next dashboard presentation batch without replacing the whole-project goal. Read launch PROGRESS.md and the latest shared handover before taking a writer lease.
+
+LATEST CHECKPOINT — WP-003 / WP-004, SUPERSEDES PREVIOUS NEXT STEPS
+12 October 2026: local commit 04327a2dfdcbb81deac5311de1d318104a895da5 on feat/launch-journey-completion-20261012. Main unchanged; only pre-existing next-env.d.ts dirty. No push, deployment, live DB/schema/migration/URL change.
+Dated vacancy selection and payload/share-link rendering now share shifts.occurrences with a request clock/cache, canonical pharmacy timezone/bounds, exact assigned and payment-pending dates, withdrawn-slot scope and actual recurrence/date filters. Anonymous views advertise remaining unbooked/non-pending dates; existing community/authenticated booked-date visibility is retained. Sunday=0 recurrence remains unchanged. Distinct candidate counts prevent slot joins inflating interests.
+Hard deletion safety now lives in shifts.deletion; HTTP uses a locked service and collectors use the same validator through a shifts pre-delete signal. Booked/accepted/payment/invoice/published-roster history is retained; uncommitted deletion succeeds. Invoicing owns its provenance query. Vite/Expo display the refusal reason. This is NOT completion of cancellation or close-recruitment; do not replace the positive journey with a blocked button/refusal.
+Final evidence: wp003-wp004-final-contracts-v3.log, 80 focused checks passed (14 vacancy + 10 deletion methods, existing assigned/listing/ownership and roster editor HTTP cases). Vite/Expo typechecks and architecture/cached diff audit passed. After the backend test run only unused imports/local bindings were removed. wp003-wp004-evidence.json pins hashes; wp003-wp004-local.patch is immutable. Initial 13-method vacancy baseline had 10 assertion failures plus one empty-payload error; 8-method deletion baseline had 7 assertion/subtest failures, including 204 erasure and 500 invoice protection. Earlier combined final-named logs have a label typo/test transaction-savepoint error; use v3 only.
+Next bounded writer scope: reproduce partial/dated/stale community claims (currently rejects any assigned parent and creates template-date assignments), cancellation timing/overnight boundaries, then positive closure of remaining recruitment/selected commitments. Keep current fees unchanged until supported semantics are established; missing attendance does not authorize a no-show charge. PostgreSQL races/performance, real supported clients, DST folds, remaining filters, public privacy projection, account/pharmacy removal and expired-post management remain open. Parent deletion guard affects cascades too: verify cross-family retention/recovery before release. No ownership allowlists widened, no models moved, no compatibility-kernel behavior added.
+Dashboard now names marketplace, private ethical and Blog, learning & public hub explicitly and maps eight Next journey cards to existing scenario IDs. Seven isolated persistence/HTTP checks pass; separate read-only in-app browser verified public cards and PUB-05 navigation. User tab/responses were untouched. CLI browser launch failed; its empty named session was closed and in-app browser was used. QA tab closed; no new mobile viewport validation claimed. Registration/return handoff remains runtime acceptance work. WP-003/004 leases released; no other writer or Claude execution implied.
+Read PROGRESS.md first, then current ledger/actual decisions before taking the next scope. Whole goal remains active and no journey family is accepted.
+
+RUNNER STATE: get_goal returned usageLimited after the 04327a2 checkpoint. Goal unfinished; no family accepted. Resume from launch PROGRESS.md when available.
+
+
+### PAUSED at user request — 12 October 2026
+User said "wait for now". Goal and hourly automation are PAUSED. Do not continue source work until the user resumes.
+Local commit **66e8bc35ae019762ca0fbfb469f07c6e33347498** on required launch branch closes WP-005/006 focused contracts: exact-date partial/recurring staff claims, atomic selection/refusals/retries and canonical settlement snapshots; Vite/Expo carry dates and date-aware row keys through shared-core. Billing uses canonical pharmacy-local overnight bounds and Decimal cents with existing 20%/10% timing bands; cancellation receipts cannot finalize pending fulfillment offers or mark a parent shift paid.
+Final evidence: **73 backend tests passed**, **9 shared API tests passed**, shared build and Vite/Next/Expo typechecks passed; architecture/diff checks passed. wp005-wp006-evidence.json and immutable patch pin source/log hashes. Earlier shared-contracts.log has a mock assertion problem; v2 is passing authority. No models/migrations/live DB changes/push/deployment; only pre-existing next-env.d.ts remains dirty. Writer leases released.
+Anti-spaghetti: shifts owns claims, workforce owns deterministic roster locks/validation, engagement owns staff snapshots, billing owns cancellation quote/receipt effects and shared-core owns client payload mapping. No compatibility-kernel logic or widened ownership allowlist.
+Resume: finish explicit scenario gap-audit coverage tracking and dashboard metrics (currently inventory100%, partial contract count in ledger, accepted families0; exhaustive scan percentage not yet measured). Broaden public/ethical source review. Verified new PUB-04 issue: Learning requests topic=learning although published taxonomy/editorial validates career. Not repaired because user paused. Read current Next AGENTS and bundled Next guide before client edits. Public-hub read/editorial/community/media source was partially inspected, not a completed family audit.
+All actual user decisions remain separate; do not infer choices or modify/reload their tab. Real PostgreSQL/browser/native and positive cancellation/close-recruitment/no-show journeys remain open.

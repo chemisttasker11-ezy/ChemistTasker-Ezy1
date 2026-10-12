@@ -140,7 +140,7 @@ export default function PostShiftPayRateStep({
 
     return (
       <View style={styles.slotRatePreviewPanel}>
-        <Text style={styles.label}>Slot rate preview</Text>
+        <Text style={styles.label}>Rate for each date</Text>
         {expandedSlots.map((slot, index) => {
           const row = slotRateRows[index] ?? {
             rate: '',
@@ -216,7 +216,7 @@ export default function PostShiftPayRateStep({
 
   return (
     <Surface style={styles.card} elevation={1}>
-      <Text style={styles.label}>Pay Rate</Text>
+      <Text style={styles.label}>Pay</Text>
 
       {!isLocumLike ? (
         <>
@@ -241,7 +241,7 @@ export default function PostShiftPayRateStep({
             <>
               <TextInput
                 mode="outlined"
-                label="Min Hourly Rate ($/hr)"
+                label="From ($/hr)"
                 value={minHourly}
                 onChangeText={setMinHourly}
                 keyboardType="numeric"
@@ -249,7 +249,7 @@ export default function PostShiftPayRateStep({
               />
               <TextInput
                 mode="outlined"
-                label="Max Hourly Rate ($/hr)"
+                label="Up to ($/hr)"
                 value={maxHourly}
                 onChangeText={setMaxHourly}
                 keyboardType="numeric"
@@ -260,7 +260,7 @@ export default function PostShiftPayRateStep({
             <>
               <TextInput
                 mode="outlined"
-                label="Min Annual Package ($)"
+                label="From ($/year)"
                 value={minAnnual}
                 onChangeText={setMinAnnual}
                 keyboardType="numeric"
@@ -268,7 +268,7 @@ export default function PostShiftPayRateStep({
               />
               <TextInput
                 mode="outlined"
-                label="Max Annual Package ($)"
+                label="Up to ($/year)"
                 value={maxAnnual}
                 onChangeText={setMaxAnnual}
                 keyboardType="numeric"
@@ -300,10 +300,10 @@ export default function PostShiftPayRateStep({
                     textStyle={chipTextStyle(selected)}
                   >
                     {mode === 'FLEXIBLE'
-                      ? 'Flexible Rate'
+                      ? 'Open to offers'
                       : mode === 'FIXED'
-                        ? 'Fixed Rate'
-                        : 'Pharmacist Provided'}
+                        ? 'Fixed rate'
+                        : 'Pharmacist’s own rate'}
                   </Chip>
                 );
               },
@@ -323,7 +323,7 @@ export default function PostShiftPayRateStep({
                   style={chipStyle(selected)}
                   textStyle={chipTextStyle(selected)}
                 >
-                  {preference}
+                  {preference === 'ABN' ? 'Contractor (ABN)' : 'Employee (TFN)'}
                 </Chip>
               );
             })}
@@ -336,7 +336,7 @@ export default function PostShiftPayRateStep({
             <Checkbox
               status={locumSuperIncluded ? 'checked' : 'unchecked'}
             />
-            <Text style={styles.rowText}>+ superannuation </Text>
+            <Text style={styles.rowText}>Super paid on top</Text>
           </TouchableOpacity>
 
           {rateType !== 'PHARMACIST_PROVIDED' ? (
@@ -377,7 +377,7 @@ export default function PostShiftPayRateStep({
               />
               <TextInput
                 mode="outlined"
-                label="Public Holiday"
+                label="Public holiday"
                 value={ratePublicHoliday}
                 onChangeText={setRatePublicHoliday}
                 keyboardType="numeric"
@@ -385,7 +385,7 @@ export default function PostShiftPayRateStep({
               />
               <TextInput
                 mode="outlined"
-                label="Early Morning"
+                label="Early morning"
                 value={rateEarlyMorning}
                 onChangeText={setRateEarlyMorning}
                 keyboardType="numeric"
@@ -393,7 +393,7 @@ export default function PostShiftPayRateStep({
               />
               <TextInput
                 mode="outlined"
-                label="Late Night"
+                label="Late night"
                 value={rateLateNight}
                 onChangeText={setRateLateNight}
                 keyboardType="numeric"
@@ -406,7 +406,7 @@ export default function PostShiftPayRateStep({
                 disabled={savingPharmacyRates || !pharmacyId}
                 style={styles.defaultRatesButton}
               >
-                Update Pharmacy Default Rates
+                Save as this pharmacy's usual rates
               </Button>
             </>
           ) : null}
@@ -434,7 +434,7 @@ export default function PostShiftPayRateStep({
                   style={chipStyle(selected)}
                   textStyle={chipTextStyle(selected)}
                 >
-                  {preference}
+                  {preference === 'ABN' ? 'Contractor (ABN)' : 'Employee (TFN)'}
                 </Chip>
               );
             })}
@@ -447,12 +447,12 @@ export default function PostShiftPayRateStep({
             <Checkbox
               status={locumSuperIncluded ? 'checked' : 'unchecked'}
             />
-            <Text style={styles.rowText}>+ superannuation </Text>
+            <Text style={styles.rowText}>Super paid on top</Text>
           </TouchableOpacity>
 
           <TextInput
             mode="outlined"
-            label="Owner Bonus ($/hr, optional)"
+            label="Extra on top of the award ($/hr, optional)"
             value={ownerBonus}
             onChangeText={setOwnerBonus}
             keyboardType="numeric"

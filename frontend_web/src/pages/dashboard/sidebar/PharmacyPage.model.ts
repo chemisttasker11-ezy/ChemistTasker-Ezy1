@@ -34,6 +34,10 @@ export type PharmacyApi = {
   induction_guides?: string;
   employment_types?: string[];
   roles_needed?: string[];
+  software?: string[];
+  services?: string[];
+  script_volume_weekday?: string;
+  script_volume_weekend?: string;
   weekdays_start: string | null;
   weekdays_end: string | null;
   monday_start: string | null;
@@ -108,6 +112,10 @@ export const normalizePharmacy = (raw: any): Pharmacy => ({
   induction_guides: raw.induction_guides ?? raw.inductionGuides ?? undefined,
   employment_types: raw.employment_types ?? raw.employmentTypes ?? [],
   roles_needed: raw.roles_needed ?? raw.rolesNeeded ?? [],
+  software: raw.software ?? [],
+  services: raw.services ?? [],
+  script_volume_weekday: raw.script_volume_weekday ?? raw.scriptVolumeWeekday ?? '',
+  script_volume_weekend: raw.script_volume_weekend ?? raw.scriptVolumeWeekend ?? '',
   weekdays_start: raw.weekdays_start ?? raw.weekdaysStart ?? '',
   weekdays_end: raw.weekdays_end ?? raw.weekdaysEnd ?? '',
   monday_start: raw.monday_start ?? raw.mondayStart ?? raw.weekdays_start ?? raw.weekdaysStart ?? '',

@@ -27,6 +27,16 @@ def normalize_money_value(value, *, field_name, slot_index):
             'slots': [f"Slot #{slot_index} has an invalid {field_name}."]
         })
 
+def protect_direct_booking(values, *, instance=None):
+    """Direct offers stay private even when an old client submits general vacancy controls."""
+    target = values.get('dedicated_user', getattr(instance, 'dedicated_user_id', None))
+    if target:
+        values['visibility'] = 'LOCUM_CASUAL'
+        values['post_anonymously'] = False
+        for field in ('escalate_to_locum_casual', 'escalate_to_owner_chain', 'escalate_to_org_chain', 'escalate_to_platform'):
+            values[field] = None
+
+
 def normalize_slots_payload(slots_data):
     normalized = []
     for idx, raw_slot in enumerate(slots_data, start=1):
@@ -66,6 +76,7 @@ def post_shift(
     pharmacy's daily limit, offers a dedicated shift to its worker, optionally copies the rates to the pharmacy, and
     announces the shift after commit. `allowed_tiers` must contain the chosen visibility."""
     pharmacy    = validated_data['pharmacy']
+    protect_direct_booking(validated_data)
     rate_type   = validated_data.get('rate_type')
     employment_type = validated_data.get('employment_type')
 
@@ -152,6 +163,7 @@ def revise_shift(
             "slots": "Use the roster editor to update existing roster slots in place."
         })
     # Validate the new slots before changing anything, and apply the whole edit atomically.
+    protect_direct_booking(validated_data, instance=instance)
     slots_data = normalize_slots_payload(slots_payload) if slots_payload is not None else None
     with transaction.atomic():
         # If visibility is changing, recalc escalation_level

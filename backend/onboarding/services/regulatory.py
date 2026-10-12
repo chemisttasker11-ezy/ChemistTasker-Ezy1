@@ -50,9 +50,10 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
     original_class = instance.classification_level
     original_year = instance.student_year
     original_half = instance.intern_half
+    original_dispensing = instance.dispensary_qualification
 
     # role classification inputs
-    for f in ['role_type','classification_level','student_year','intern_half']:
+    for f in ['role_type','classification_level','student_year','intern_half','dispensary_qualification']:
         if f in vdata:
             if getattr(instance, f) != vdata[f]:
                 setattr(instance, f, vdata[f])
@@ -104,6 +105,10 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
         return changed
 
     changed_map = {f: handle_file(f) for f in file_fields}
+    if role_or_class_changed or original_dispensing != instance.dispensary_qualification or changed_map['certificate']:
+        instance.dispensary_qualification_verified = False
+        instance.dispensary_qualification_verification_note = ''
+        update_fields.extend(['dispensary_qualification_verified', 'dispensary_qualification_verification_note'])
 
     if submit:
         instance.verified = False

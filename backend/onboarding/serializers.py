@@ -517,6 +517,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
             # ---------- REGULATORY DOCS (role + files) ----------
             'role_type','classification_level','student_year','intern_half',
+            'dispensary_qualification', 'dispensary_qualification_verified', 'dispensary_qualification_verification_note',
             'ahpra_proof','hours_proof','certificate','university_id','cpr_certificate','s8_certificate',
             'ahpra_proof_verified','ahpra_proof_verification_note',
             'hours_proof_verified','hours_proof_verification_note',
@@ -585,6 +586,9 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             # regulatory files optional (tab decides requiredness)
             'role_type': {'required': False, 'allow_blank': True, 'allow_null': True},
             'classification_level': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'dispensary_qualification': {'required': False, 'allow_blank': True},
+            'dispensary_qualification_verified': {'read_only': True},
+            'dispensary_qualification_verification_note': {'read_only': True},
             'student_year': {'required': False, 'allow_blank': True, 'allow_null': True},
             'intern_half': {'required': False, 'allow_blank': True, 'allow_null': True},
 

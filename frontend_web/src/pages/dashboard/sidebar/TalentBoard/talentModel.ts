@@ -18,25 +18,6 @@ const formatWorkType = (workType?: string | null) => {
   return titleCase(workType);
 };
 
-const mapRoleToShiftRole = (value?: string | null) => {
-  if (!value) return "";
-  const normalized = value.trim().toUpperCase().replace(/\s+/g, "_");
-  if (["PHARMACIST", "INTERN", "STUDENT", "ASSISTANT", "TECHNICIAN", "EXPLORER"].includes(normalized)) {
-    return normalized;
-  }
-  if (normalized.includes("OTHER_STAFF")) return "ASSISTANT";
-  if (normalized.includes("COMMUNITY_PHARMACIST")) return "PHARMACIST";
-  if (normalized.includes("DISPENSARY_TECHNICIAN")) return "TECHNICIAN";
-  if (normalized.includes("PHARMACY_TECHNICIAN")) return "TECHNICIAN";
-  if (normalized.includes("PHARMACY_ASSISTANT")) return "ASSISTANT";
-  if (normalized.includes("PHARMACIST")) return "PHARMACIST";
-  if (normalized.includes("TECHNICIAN")) return "TECHNICIAN";
-  if (normalized.includes("ASSISTANT")) return "ASSISTANT";
-  if (normalized.includes("INTERN")) return "INTERN";
-  if (normalized.includes("STUDENT")) return "STUDENT";
-  return "";
-};
-
 const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
 const toIsoDate = (date: Date) =>
@@ -84,4 +65,4 @@ const codeToCategory = new Map(skillsRegistry.skills.map(skill => [
 const resolveTalentSkillCode = (value: string) => skillId(skillsRegistry as any, value);
 const resolveTalentSkillLabel = (value: string) => skillLabel(skillsRegistry as any, value);
 
-export { formatRoleLabel, formatWorkType, mapRoleToShiftRole, mapAvailabilityToPitchSlots, allWorkTypes, codeToLabel, codeToCategory, resolveTalentSkillCode, resolveTalentSkillLabel, isIsoDate, todayIso };
+export { formatRoleLabel, formatWorkType, mapAvailabilityToPitchSlots, allWorkTypes, codeToLabel, codeToCategory, resolveTalentSkillCode, resolveTalentSkillLabel, isIsoDate, todayIso };

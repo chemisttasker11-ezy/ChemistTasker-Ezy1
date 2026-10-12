@@ -1,10 +1,10 @@
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
-import { findSkill, skillLabel } from '@chemisttasker/shared-core';
+import { skillLabel } from '@chemisttasker/shared-core';
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Card, Chip, IconButton, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { DoseBlisterIcon } from '../../../../components/DoseBlisterIcon';
+import { SkillIcon } from '../../../../components/SkillIcon';
 import { Candidate } from '../types';
 
 const formatAuSlotDate = (date: string) => {
@@ -101,7 +101,7 @@ export default function TalentCardV2({
         <View>
           <Text variant="bodySmall" style={styles.subtle}>{candidate.headline}</Text>
         </View>
-        {candidate.pitch ? <Text style={styles.pitch}>"{candidate.pitch}"</Text> : null}
+        {candidate.pitch ? <Text style={styles.pitch}>“{candidate.pitch}”</Text> : null}
 
         <View style={styles.detailsCol}>
           <View style={styles.headerMetaRow}>
@@ -161,11 +161,7 @@ export default function TalentCardV2({
                 <Text style={styles.skillTitle}>{group.title}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {group.skills.map(code => {
-                    const definition = findSkill(skillsRegistry as any, code);
-                    const name = definition?.icon_mobile;
-                    return <Chip key={code} icon={() => name === 'BLISTER_PACK' || name === 'BLISTER_CHECK'
-                      ? <DoseBlisterIcon checked={name === 'BLISTER_CHECK'} />
-                      : <MaterialCommunityIcons name={(name || 'help-circle-outline') as any} size={16} color="#2463A6" />}>
+                    return <Chip key={code} icon={() => <SkillIcon skill={code} size={16} />}>
                       {skillLabel(skillsRegistry as any, code)}
                     </Chip>;
                   })}

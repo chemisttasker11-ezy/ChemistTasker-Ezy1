@@ -36,6 +36,10 @@ export type PharmacyApi = {
     induction_guides?: string;
     employment_types?: string[];
     roles_needed?: string[];
+    software?: string[];
+  services?: string[];
+  script_volume_weekday?: string;
+  script_volume_weekend?: string;
     weekdays_start: string | null;
     weekdays_end: string | null;
     monday_start: string | null;

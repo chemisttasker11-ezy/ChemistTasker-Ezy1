@@ -194,23 +194,8 @@ def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: 
             if code not in skills:
                 cert_map.pop(code, None)
 
-    uploaded_codes = {code for code, file_obj in uploads.items() if code in skills and file_obj}
-    required_codes = _required_cert_skill_codes(role_key)
-    if "skills" in _load_skills_catalog():
-        role = _role_for_skills(instance, role_key)
-        item_lookup = {item["code"]: item for item in _load_skills_catalog().get("skills", [])}
-        required_codes = {
-            code for code in required_codes
-            if item_lookup.get(code, {}).get("eligibility", {}).get(role) not in ("familiarity", "none")
-        }
-    missing = [
-        code for code in skills
-        if code in required_codes and code not in cert_map and code not in uploaded_codes
-    ]
-    if missing:
-        raise serializers.ValidationError(
-            {"skills": f"{missing_message}{', '.join(missing)}"}
-        )
+    # A role-eligible skill may be claimed without evidence. Certificate absence
+    # affects its verification signal, never whether the claim can be saved.
 
     newly_saved_paths = []
     old_paths_to_delete = []

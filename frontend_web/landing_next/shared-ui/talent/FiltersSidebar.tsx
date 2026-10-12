@@ -1,11 +1,12 @@
 'use client';
 
 // Talent filters, shared by the Vite dashboard and the Next public site. Each app owns its data and filtering;
-// the public site passes its skill icons through renderSkillIcon.
+// both show the shared skill symbols (renderSkillIcon can override them).
 import React from 'react';
 import { Box, Collapse, IconButton, InputAdornment, Stack, TextField } from '@mui/material';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
-import { skillLabel } from '@chemisttasker/shared-core';
+import { findSkill, skillLabel, softwareSubgroups } from '@chemisttasker/shared-core';
+import { SkillSymbol } from '../../../shared/SkillGlyph';
 import {
   CommuteOutlined as CommuteIcon,
   ExpandLess as ExpandLessIcon,
@@ -60,6 +61,7 @@ export default function TalentFiltersSidebar({
   onToggleRoleSkillExpand: (role: string) => void;
   renderSkillIcon?: (skill: string) => React.ReactNode;
 }) {
+  const icon = (skill: string) => renderSkillIcon ? renderSkillIcon(skill) : <SkillSymbol skill={skill} size={18} />;
   const active = filters.roles.length + filters.workTypes.length + filters.states.length + filters.skills.length
     + (filters.willingToTravel ? 1 : 0) + (filters.placementSeeker ? 1 : 0)
     + (filters.availabilityStart || filters.availabilityEnd ? 1 : 0);
@@ -119,7 +121,7 @@ export default function TalentFiltersSidebar({
                   <Box sx={{ pb: 0.75 }}>
                     <FilterChips>
                       {roleSkillOptions[role].map((skill) => (
-                        <FilterChip key={skill} selected={filters.skills.includes(skill)} onClick={() => toggleSkill(skill)} icon={renderSkillIcon?.(skill)}>{skillLabel(skillsRegistry as any, skill)}</FilterChip>
+                        <FilterChip key={skill} selected={filters.skills.includes(skill)} onClick={() => toggleSkill(skill)} icon={icon(skill)}>{skillLabel(skillsRegistry as any, skill)}</FilterChip>
                       ))}
                     </FilterChips>
                   </Box>
@@ -131,12 +133,23 @@ export default function TalentFiltersSidebar({
       </FilterSection>
 
       {softwareOptions.length > 0 && (
-        <FilterSection idPrefix="talent-filter" title="Dispensing software">
-          <FilterChips>
-            {softwareOptions.map((skill) => (
-              <FilterChip key={skill} selected={filters.skills.includes(skill)} onClick={() => toggleSkill(skill)} icon={renderSkillIcon?.(skill)}>{skillLabel(skillsRegistry as any, skill)}</FilterChip>
-            ))}
-          </FilterChips>
+        <FilterSection idPrefix="talent-filter" title="Software">
+          <Stack spacing={1}>
+            {softwareSubgroups(skillsRegistry as any).map((category) => {
+              const inCategory = softwareOptions.filter((skill) => (findSkill(skillsRegistry as any, skill) as any)?.subgroup === category);
+              if (!inCategory.length) return null;
+              return (
+                <Box key={category} role="group" aria-label={category}>
+                  <Box component="span" sx={{ display: 'block', px: 0.5, mb: 0.5, fontSize: 12, fontWeight: 600, color: c.muted }}>{category}</Box>
+                  <FilterChips>
+                    {inCategory.map((skill) => (
+                      <FilterChip key={skill} selected={filters.skills.includes(skill)} onClick={() => toggleSkill(skill)} icon={icon(skill)}>{skillLabel(skillsRegistry as any, skill)}</FilterChip>
+                    ))}
+                  </FilterChips>
+                </Box>
+              );
+            })}
+          </Stack>
         </FilterSection>
       )}
 

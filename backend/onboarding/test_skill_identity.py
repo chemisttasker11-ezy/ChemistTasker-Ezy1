@@ -10,8 +10,8 @@ from onboarding.services.skill_identity import (
 class SkillIdentityTests(SimpleTestCase):
     def test_registry_has_unique_nonempty_capability_definitions(self):
         skills = registry()["skills"]
-        self.assertEqual(len(skills), 66)
-        self.assertEqual(len({skill["code"] for skill in skills}), 66)
+        self.assertEqual(len(skills), 67)
+        self.assertEqual(len({skill["code"] for skill in skills}), 67)
         for skill in skills:
             self.assertGreater(len(skill["definition"]), 24)
             self.assertIn("PHARMACIST", skill["eligibility"])

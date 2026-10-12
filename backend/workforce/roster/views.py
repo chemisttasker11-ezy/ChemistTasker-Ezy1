@@ -187,12 +187,6 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
             for slot in shift_instance.slots.all():
                 slot_date = slot.date
                 desired_keys.add((slot.id, slot_date))
-                rate, rate_reason = get_locked_rate_for_slot(
-                    slot=slot,
-                    shift=shift_instance,
-                    user=newly_assigned_user,
-                    override_date=slot_date
-                )
                 try:
                     assignment_defaults = staff_assignment_defaults(
                         user=newly_assigned_user,
@@ -203,6 +197,13 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                     raise DRFValidationError(
                         getattr(exc, "message_dict", {"detail": exc.messages})
                     ) from exc
+                rate, rate_reason = get_locked_rate_for_slot(
+                    slot=slot,
+                    shift=shift_instance,
+                    user=newly_assigned_user,
+                    override_date=slot_date,
+                    staff_terms=assignment_defaults['engagement_terms_snapshot'],
+                )
                 ShiftSlotAssignment.objects.update_or_create(
                     slot=slot,
                     slot_date=slot_date,
@@ -494,7 +495,8 @@ class CreateShiftAndAssignView(APIView):
             slot=new_slot,
             shift=new_shift,
             user=candidate_user,
-            override_date=slot_date
+            override_date=slot_date,
+            staff_terms=assignment_defaults['engagement_terms_snapshot'],
         )
 
         assignment = ShiftSlotAssignment.objects.create(

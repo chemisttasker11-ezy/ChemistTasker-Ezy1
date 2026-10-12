@@ -1,5 +1,7 @@
+import { expandShiftDraftSlots, buildShiftDraftSlotPayload, reconcileShiftDraftRateRows } from '@chemisttasker/shared-core';
+import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults, type SupportEntry } from '@chemisttasker/shared-core';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
-import { normalizeSavedSkillCodes } from '@chemisttasker/shared-core';
+import { normalizeShiftRequirements, canNotifyShiftChainMembers, isPrivateShiftBooking, automaticShiftEscalationDates, type ShiftEscalationPlan } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, TouchableOpacity } from 'react-native';
 import {
@@ -43,6 +45,7 @@ import { styles } from './PostShiftScreen.styles';
 import PostShiftDetailsStep from './PostShiftDetailsStep';
 import PostShiftSkillsStep from './PostShiftSkillsStep';
 import PostShiftVisibilityStep from './PostShiftVisibilityStep';
+import PostShiftProgress from './PostShiftProgress';
 import PostShiftPayRateStep from './PostShiftPayRateStep';
 import PostShiftTimetableStep from './PostShiftTimetableStep';
 
@@ -59,6 +62,7 @@ export default function PostShiftScreen() {
     const [roleNeeded, setRoleNeeded] = useState<string>('PHARMACIST');
     const [employmentType, setEmploymentType] = useState<string>('LOCUM');
     const [workloadTags, setWorkloadTags] = useState<string[]>([]);
+    const [supportOnShift, setSupportOnShift] = useState<SupportEntry[]>([]);
     const [mustHave, setMustHave] = useState<string[]>([]);
     const [niceToHave, setNiceToHave] = useState<string[]>([]);
     const [singleUserOnly, setSingleUserOnly] = useState(false);
@@ -88,7 +92,6 @@ export default function PostShiftScreen() {
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
     const [pharmacyMenuVisible, setPharmacyMenuVisible] = useState(false);
-    const [audienceMenuVisible, setAudienceMenuVisible] = useState(false);
     const [activeStep, setActiveStep] = useState<StepKey>('details');
     const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<Date>(new Date());
 
@@ -121,18 +124,20 @@ export default function PostShiftScreen() {
     // Other
     const [savingPharmacyRates, setSavingPharmacyRates] = useState(false);
     const [dedicatedUserId, setDedicatedUserId] = useState<number | null>(null);
+    const isPrivateBooking = isPrivateShiftBooking(dedicatedUserId ?? params.dedicated_user);
+    const [escalationPlan, setEscalationPlan] = useState<ShiftEscalationPlan>({ mode: 'off', everyHours: 24 });
 
     const isLocumLike = useMemo(
         () => employmentType === 'LOCUM' || employmentType === 'CASUAL',
         [employmentType]
     );
     const canPostAnonymously = useMemo(
-        () => !isEmbedded && ['ORG_CHAIN', 'PLATFORM'].includes(initialAudience),
-        [initialAudience, isEmbedded]
+        () => !isPrivateBooking && ['ORG_CHAIN', 'PLATFORM'].includes(initialAudience),
+        [initialAudience, isPrivateBooking]
     );
     const hasOutsidePharmacyMemberAudience = useMemo(
-        () => !isEmbedded && (initialAudience !== 'FULL_PART_TIME' || Object.values(escalationDates).some(Boolean)),
-        [escalationDates, initialAudience, isEmbedded]
+        () => !isPrivateBooking && (initialAudience !== 'FULL_PART_TIME' || Object.values(escalationDates).some(Boolean)),
+        [escalationDates, initialAudience, isPrivateBooking]
     );
     const getEmploymentLabel = useCallback(
         (value: string) => {
@@ -156,6 +161,7 @@ export default function PostShiftScreen() {
         setRoleNeeded('PHARMACIST');
         setEmploymentType('LOCUM');
         setWorkloadTags([]);
+        setSupportOnShift([]);
         setMustHave([]);
         setNiceToHave([]);
         setHideName(false);
@@ -178,6 +184,7 @@ export default function PostShiftScreen() {
         setSlotRecurringDays([]);
         setSlotRecurringEnd(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
         setEscalationDates({});
+        setEscalationPlan({ mode: 'off', everyHours: 24 });
         setToast('');
         setError('');
         // Reset new fields
@@ -272,6 +279,28 @@ export default function PostShiftScreen() {
         setRateLateNight(normalize((selectedPharmacy as any).rate_late_night ?? (selectedPharmacy as any).rateLateNight));
     }, [selectedPharmacy, editingId]);
 
+    // New shifts start with the pharmacy's own software (one per category) as preferred experience, by registry ID.
+    const softwareDefaults = React.useRef<string[]>([]);
+    useEffect(() => {
+        if (editingId || !selectedPharmacy || !roleNeeded) return;
+        const next = pharmacySoftwareDefaults(skillsRegistry as any, roleNeeded as any, (selectedPharmacy as any).software || []);
+        const previous = softwareDefaults.current;
+        softwareDefaults.current = next;
+        setNiceToHave(current => mergeSoftwareDefaults(current, mustHave, previous, next));
+    }, [selectedPharmacy, roleNeeded, editingId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const showNotifyChainMembers = !isPrivateBooking && !editingId && canNotifyShiftChainMembers(allowedVis, initialAudience);
+    const escalationTierKey = allowedVis.join(',');
+    useEffect(() => {
+        if (escalationPlan.mode === 'auto' && !isPrivateBooking) {
+            const dates = automaticShiftEscalationDates(allowedVis, initialAudience, escalationPlan.everyHours);
+            setEscalationDates(Object.fromEntries(Object.entries(dates).map(([tier, value]) => [tier.toLowerCase(), value])) as VisibilityDates);
+        }
+    }, [escalationTierKey, initialAudience, escalationPlan.mode, escalationPlan.everyHours, isPrivateBooking]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (!showNotifyChainMembers) setNotifyChainMembers(false);
+    }, [showNotifyChainMembers]);
+
     // Ensure initial audience stays within allowed tiers
     useEffect(() => {
         if (allowedVis.length && !allowedVis.includes(initialAudience as VisibilityTier)) {
@@ -280,11 +309,11 @@ export default function PostShiftScreen() {
     }, [allowedVis, initialAudience]);
 
     useEffect(() => {
-        if (!allowedVis.length || !isEmbedded) return;
+        if (!allowedVis.length || !isPrivateBooking) return;
         if (allowedVis.includes('LOCUM_CASUAL')) {
             setInitialAudience('LOCUM_CASUAL');
         }
-    }, [allowedVis, isEmbedded]);
+    }, [allowedVis, isPrivateBooking]);
 
     useEffect(() => {
         if (!canPostAnonymously) setHideName(false);
@@ -352,12 +381,13 @@ export default function PostShiftScreen() {
             const vis = data.visibility ?? '';
             setInitialAudience(vis);
             loadedVisibilityRef.current = vis;
-            setWorkloadTags(Array.isArray(data.workload_tags ?? data.workloadTags) ? (data.workload_tags ?? data.workloadTags) : []);
+            setWorkloadTags(normalizeWorkloadTags(skillsRegistry as any, Array.isArray(data.workload_tags ?? data.workloadTags) ? (data.workload_tags ?? data.workloadTags) : []));
+            setSupportOnShift(data.support_on_shift ?? data.supportOnShift ?? []);
             setDescription(data.description ?? '');
             setHideName(Boolean(data.post_anonymously ?? data.postAnonymously));
             setSingleUserOnly(Boolean(data.single_user_only ?? data.singleUserOnly));
-            setMustHave(normalizeSavedSkillCodes(skillsRegistry as any, Array.isArray(data.must_have ?? data.mustHave) ? (data.must_have ?? data.mustHave) : []));
-            setNiceToHave(normalizeSavedSkillCodes(skillsRegistry as any, Array.isArray(data.nice_to_have ?? data.niceToHave) ? (data.nice_to_have ?? data.niceToHave) : []));
+            setMustHave(normalizeShiftRequirements(skillsRegistry as any, Array.isArray(data.must_have ?? data.mustHave) ? (data.must_have ?? data.mustHave) : []));
+            setNiceToHave(normalizeShiftRequirements(skillsRegistry as any, Array.isArray(data.nice_to_have ?? data.niceToHave) ? (data.nice_to_have ?? data.niceToHave) : []));
             const escalations =
                 typeof (data.escalation_dates ?? data.escalationDates) === 'object' && (data.escalation_dates ?? data.escalationDates)
                     ? (data.escalation_dates ?? data.escalationDates)
@@ -368,6 +398,8 @@ export default function PostShiftScreen() {
                         platform: data.escalate_to_platform ?? data.escalateToPlatform,
                     };
             setEscalationDates(escalations);
+            setEscalationPlan({ mode: Object.values(escalations).some(Boolean) ? 'custom' : 'off', everyHours: 24 });
+            setDedicatedUserId(typeof data.dedicatedUser === 'number' ? data.dedicatedUser : typeof data.dedicated_user === 'number' ? data.dedicated_user : null);
             setOwnerBonus(
                 data.owner_bonus != null
                     ? String(data.owner_bonus)
@@ -687,49 +719,13 @@ export default function PostShiftScreen() {
         [calendarMonthAnchor]
     );
 
-    const expandedSlots = useMemo(() => {
-        const occurrences: Array<{ date: string; startTime: string; endTime: string }> = [];
-        slots.forEach((slot) => {
-            const addOccurrence = (date: Date) => {
-                occurrences.push({
-                    date: date.toISOString().split('T')[0],
-                    startTime: (slot.startTime || '').slice(0, 5),
-                    endTime: (slot.endTime || '').slice(0, 5),
-                });
-            };
-
-            const baseDate = toIsoDate(slot.date);
-            if (!baseDate) return;
-
-            if (slot.isRecurring && slot.recurringEndDate && slot.recurringDays.length) {
-                const endBoundary = toIsoDate(slot.recurringEndDate);
-                if (!endBoundary) {
-                    addOccurrence(baseDate);
-                    return;
-                }
-                let cursor = new Date(baseDate);
-                while (cursor <= endBoundary) {
-                    if (slot.recurringDays.includes(cursor.getDay())) {
-                        addOccurrence(cursor);
-                    }
-                    cursor.setDate(cursor.getDate() + 1);
-                }
-            } else {
-                addOccurrence(baseDate);
-            }
-        });
-
-        return occurrences.sort((a, b) => {
-            const left = new Date(`${a.date}T${a.startTime}:00`).getTime();
-            const right = new Date(`${b.date}T${b.startTime}:00`).getTime();
-            return left - right;
-        });
-    }, [slots]);
+    const expandedSlots = useMemo(() => expandShiftDraftSlots(slots), [slots]);
+    const previousRateOccurrences = React.useRef<typeof expandedSlots>([]);
 
     useEffect(() => {
-        setSlotRateRows((prev) =>
-            expandedSlots.map((_, idx) => prev[idx] ?? { rate: '', status: 'idle' as const })
-        );
+        const previous = previousRateOccurrences.current;
+        setSlotRateRows(rows => reconcileShiftDraftRateRows(previous, expandedSlots, rows, () => ({ rate: '', status: 'idle' as const })));
+        previousRateOccurrences.current = expandedSlots;
     }, [expandedSlots]);
 
     useEffect(() => {
@@ -831,13 +827,13 @@ export default function PostShiftScreen() {
         );
 
         if (!filtered.length) {
-            setError('Those timetable entries already exist.');
+            setError('Those dates are already in your list.');
             return false;
         }
 
         setSlots((prev) => [...prev, ...filtered]);
         setError('');
-        setToast(`${filtered.length} timetable entr${filtered.length > 1 ? 'ies' : 'y'} added.`);
+        setToast(`${filtered.length} date${filtered.length > 1 ? 's' : ''} added.`);
 
         if (options?.clearAllSelected) {
             setSelectedDates([]);
@@ -864,19 +860,19 @@ export default function PostShiftScreen() {
 
     const addManualSlot = () => {
         if (!slotStart || !slotEnd) {
-            setError('Please select a start and end time.');
+            setError('Set a start and finish time.');
             return false;
         }
         if (new Date(`1970-01-01T${slotEnd}:00`).getTime() <= new Date(`1970-01-01T${slotStart}:00`).getTime()) {
-            setError('End time must be after start time.');
+            setError('The finish time must be after the start time.');
             return false;
         }
         if (!slotDate) {
-            setError('Select a date to add a manual schedule entry.');
+            setError('Pick a date first.');
             return false;
         }
         if (slotRecurring && (!slotRecurringEnd || slotRecurringDays.length === 0)) {
-            setError('Please complete the recurrence details.');
+            setError('Pick the weekdays and the date it repeats until.');
             return false;
         }
 
@@ -896,7 +892,7 @@ export default function PostShiftScreen() {
             ...(selectedDateTimes[date] || { startTime: slotStart, endTime: slotEnd }),
         };
         if (new Date(`1970-01-01T${entry.endTime}:00`).getTime() <= new Date(`1970-01-01T${entry.startTime}:00`).getTime()) {
-            setError('End time must be after start time.');
+            setError('The finish time must be after the start time.');
             return false;
         }
         return addSlotEntries([{
@@ -913,7 +909,7 @@ export default function PostShiftScreen() {
             return false;
         }
         if (new Date(`1970-01-01T${slotEnd}:00`).getTime() <= new Date(`1970-01-01T${slotStart}:00`).getTime()) {
-            setError('End time must be after start time.');
+            setError('The finish time must be after the start time.');
             return false;
         }
         return addSlotEntries(
@@ -964,7 +960,7 @@ export default function PostShiftScreen() {
             return;
         }
         if (isLocumLike && slots.length === 0) {
-            setError('Please add at least one timetable entry.');
+            setError('Add at least one date before you continue.');
             return;
         }
         if (!isLocumLike && ftptPayMode === 'HOURLY' && (!minHourly || !maxHourly)) {
@@ -977,44 +973,27 @@ export default function PostShiftScreen() {
         }
         setLoading(true);
         try {
-            const slotRateForEntry = (entry: SlotEntry) => {
-                const idx = expandedSlots.findIndex(
-                    (slot) => slot.date === entry.date && slot.startTime === entry.startTime && slot.endTime === entry.endTime
-                );
-                if (idx < 0) return null;
-                const raw = slotRateRows[idx]?.rate;
-                if (raw === undefined || raw === null || raw === '') return null;
-                const num = Number(raw);
-                return Number.isFinite(num) ? num : null;
-            };
-            const payload: any = {
+                    const payload: any = {
                 pharmacy: pharmacyId,
                 role_needed: roleNeeded,
                 employment_type: employmentType,
                 workload_tags: workloadTags,
+                support_on_shift: supportOnShift,
                 description,
                 must_have: mustHave,
                 nice_to_have: niceToHave,
                 post_anonymously: canPostAnonymously ? hideName : false,
                 single_user_only: singleUserOnly,
-                visibility: isEmbedded ? 'LOCUM_CASUAL' : initialAudience,
-                escalate_to_locum_casual: isEmbedded ? null : escalationDates.locum_casual,
-                escalate_to_owner_chain: isEmbedded ? null : escalationDates.owner_chain,
-                escalate_to_org_chain: isEmbedded ? null : escalationDates.org_chain,
-                escalate_to_platform: isEmbedded ? null : escalationDates.platform,
-                slots: slots.map((s) => ({
-                    date: s.date,
-                    start_time: s.startTime,
-                    end_time: s.endTime,
-                    is_recurring: s.isRecurring,
-                    recurring_days: s.isRecurring ? s.recurringDays : [],
-                    recurring_end_date: s.isRecurring && s.recurringEndDate ? s.recurringEndDate : undefined,
-                    rate: slotRateForEntry(s),
-                })),
+                visibility: isPrivateBooking ? 'LOCUM_CASUAL' : initialAudience,
+                escalate_to_locum_casual: isPrivateBooking ? null : escalationDates.locum_casual,
+                escalate_to_owner_chain: isPrivateBooking ? null : escalationDates.owner_chain,
+                escalate_to_org_chain: isPrivateBooking ? null : escalationDates.org_chain,
+                escalate_to_platform: isPrivateBooking ? null : escalationDates.platform,
+                slots: buildShiftDraftSlotPayload(slots, expandedSlots, slotRateRows),
                 // New fields
-                notify_pharmacy_staff: isEmbedded ? false : notifyPharmacyStaff,
-                notify_favorite_staff: isEmbedded ? false : notifyFavoriteStaff,
-                notify_chain_members: isEmbedded ? false : notifyChainMembers,
+                notify_pharmacy_staff: isPrivateBooking ? false : notifyPharmacyStaff,
+                notify_favorite_staff: isPrivateBooking ? false : notifyFavoriteStaff,
+                notify_chain_members: showNotifyChainMembers && notifyChainMembers,
                 payment_preference: isLocumLike ? paymentPreference : null,
                 super_percent: isLocumLike ? (locumSuperIncluded ? 11.5 : 0) : null,
             };
@@ -1098,11 +1077,14 @@ export default function PostShiftScreen() {
                         setDescription={setDescription}
                         workloadTags={workloadTags}
                         setWorkloadTags={setWorkloadTags}
+            supportOnShift={supportOnShift}
+            setSupportOnShift={setSupportOnShift}
                     />
                 );
             case 'skills':
                 return (
                     <PostShiftSkillsStep
+                        pharmacySoftware={pharmacySoftwareDefaults(skillsRegistry as any, roleNeeded as any, (selectedPharmacy as any)?.software || [])}
                         roleNeeded={roleNeeded}
                         mustHave={mustHave}
                         setMustHave={setMustHave}
@@ -1113,22 +1095,24 @@ export default function PostShiftScreen() {
             case 'visibility':
                 return (
                     <PostShiftVisibilityStep
-                        isEmbedded={isEmbedded}
+                        isEmbedded={isPrivateBooking}
+                        escalationPlan={escalationPlan}
+                        setEscalationPlan={setEscalationPlan}
                         canPostAnonymously={canPostAnonymously}
                         hideName={hideName}
                         setHideName={setHideName}
                         allowedVis={allowedVis}
                         initialAudience={initialAudience}
                         setInitialAudience={setInitialAudience}
-                        audienceMenuVisible={audienceMenuVisible}
-                        setAudienceMenuVisible={setAudienceMenuVisible}
                         notifyPharmacyStaff={notifyPharmacyStaff}
                         setNotifyPharmacyStaff={setNotifyPharmacyStaff}
                         notifyFavoriteStaff={notifyFavoriteStaff}
                         setNotifyFavoriteStaff={setNotifyFavoriteStaff}
                         notifyChainMembers={notifyChainMembers}
+                        showNotifyChainMembers={showNotifyChainMembers}
                         setNotifyChainMembers={setNotifyChainMembers}
                         escalationDates={escalationDates}
+                        setEscalationDates={setEscalationDates}
                         setEscalationPicker={setEscalationPicker}
                     />
                 );
@@ -1249,27 +1233,12 @@ export default function PostShiftScreen() {
                     </>
                 ) : null}
 
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={[styles.stepper, isEmbedded && styles.stepperEmbedded]}
-                >
-                    {stepOrder.map((step) => (
-                        <TouchableOpacity
-                            key={step}
-                            style={[styles.stepPill, isEmbedded && styles.stepPillEmbedded, activeStep === step && styles.stepPillActive]}
-                            onPress={() => setActiveStep(step)}
-                        >
-                            <Text style={[styles.stepPillText, activeStep === step && styles.stepPillTextActive]}>
-                                {step.replace('-', ' ')}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-
-                {error ? <HelperText type="error">{error}</HelperText> : null}
+                <PostShiftProgress steps={stepOrder} active={activeStep}
+                    onSelect={(step) => { if (editingId || stepOrder.indexOf(step) < stepOrder.indexOf(activeStep)) setActiveStep(step); }} />
 
                 {renderStep(activeStep)}
+
+                {error ? <HelperText type="error" accessibilityLiveRegion="polite" style={{ fontSize: 14, fontWeight: '600' }}>{error}</HelperText> : null}
 
                 <View style={styles.navRow}>
                     <Button mode="outlined" onPress={goBack} disabled={stepIndex === 0}>Back</Button>
@@ -1278,7 +1247,7 @@ export default function PostShiftScreen() {
                             mode="contained"
                             onPress={() => {
                                 if (activeStep === 'timetable' && slots.length === 0) {
-                                    setError('Please add at least one timetable entry.');
+                                    setError('Add at least one date before you continue.');
                                     return;
                                 }
                                 goNext();

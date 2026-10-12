@@ -69,6 +69,8 @@ class Shift(models.Model):
     )
 
     workload_tags = models.JSONField(default=list, blank=True)
+    # Who works alongside on the shift: [{"role": registry support role code, "count": n}].
+    support_on_shift = models.JSONField(default=list, blank=True)
     must_have = models.JSONField(default=list, blank=True)
     nice_to_have = models.JSONField(default=list, blank=True)
 

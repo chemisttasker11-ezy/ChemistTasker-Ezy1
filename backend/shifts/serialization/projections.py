@@ -4,9 +4,12 @@ from shifts.models import Shift
 from organizations.serializers import PharmacySerializer
 from .shifts import ShiftSerializer
 from .slots import ShiftSlotSerializer
+from shifts.rate_visibility import project_published_rates
 
 
 class MyShiftSerializer(serializers.ModelSerializer):
+    published_rates_visible = serializers.SerializerMethodField()
+    get_published_rates_visible = ShiftSerializer.get_published_rates_visible
     # reuse the full PharmacySerializer (with all the file‐fields)
     pharmacy_detail = PharmacySerializer(source='pharmacy', read_only=True)
     created_by_first_name = serializers.CharField(source='created_by.first_name', read_only=True)
@@ -37,11 +40,20 @@ class MyShiftSerializer(serializers.ModelSerializer):
             'rate_type',
             'fixed_rate',
             'workload_tags',
+            'support_on_shift',
             'slots',
             'line_items',
             'owner_adjusted_rate',
+            'published_rates_visible',
         ]
         read_only_fields = ['was_modified']  # ✅ this protects it
+
+    def to_representation(self, instance):
+        # Only the post's pay is redacted; the worker's own agreed line items stay intact.
+        return project_published_rates(
+            super().to_representation(instance),
+            user=getattr(self.context.get('request'), 'user', None), pharmacy=instance.pharmacy,
+        )
 
     @staticmethod
     def build_allowed_tiers(pharmacy):
@@ -133,6 +145,8 @@ class SharedShiftSerializer(serializers.ModelSerializer):
 
 
 class OpenShiftSerializer(serializers.ModelSerializer):
+    published_rates_visible = serializers.SerializerMethodField()
+    get_published_rates_visible = ShiftSerializer.get_published_rates_visible
     slots = ShiftSlotSerializer(many=True, read_only=True)
     pharmacy_name = serializers.CharField(source='pharmacy.name', read_only=True)
     visibility = serializers.CharField(read_only=True)
@@ -149,7 +163,14 @@ class OpenShiftSerializer(serializers.ModelSerializer):
             "allowed_escalation_levels",
             "description",
             "slots",
+            "published_rates_visible",
         ]
 
     def get_allowed_escalation_levels(self, obj):
         return ShiftSerializer.build_allowed_tiers(obj.pharmacy)
+
+    def to_representation(self, instance):
+        return project_published_rates(
+            super().to_representation(instance),
+            user=getattr(self.context.get('request'), 'user', None), pharmacy=instance.pharmacy,
+        )

@@ -595,3 +595,22 @@ layout (cover → About → members → large composer), so they were not follow
   one re-render each) and appeared stuck loading; it now fetches ratings for the visible page only, applied together.
 - Checked: Next and Vite boards at 1440 and 390, Vite light and dark; AA sweep 0 failures on all four boards; appearance
   baselines for shift filters regenerated (geometry updated); Next contract tests updated to the shared files.
+
+## Skill symbols and software marks (2026-10-12, PR 165)
+
+- **One family.** Every skill symbol is drawn on Lucide's 24px grid with thin navy lines (1.5px at chip size,
+  1.75px at 24-32px, 2px larger) over its own shapes filled in two brand tints: the group colour (violet
+  dispensing, cyan clinical, magenta retail and operations, blue software) and a second brand colour across the
+  lower-right half. Owner reference: the duotone spot icons on ourmedical.com.au (style only). No generic
+  backdrop dot; the colour sits inside the subject.
+- **Motion arcs** appear only on selected onboarding cards (opacity fade, calm under reduced motion).
+- **Custom glyphs** in the same grammar: blister pack (7 x 4, simplified to 4 x 3 under 20px), blister check,
+  robotic arm, mortar and pestle for compounding (owner request), POS terminal (POS is generic, so no vendor logo).
+- **Software** shows the vendor's own compact mark (StrongRoom "SR", Fred "F", Minfos, Z, RxOne mortar,
+  Dispense Works Rx, Webster W, Medi-Map, myPak, MPS) unaltered on a white tile beside the name; others keep
+  the software symbol. Sources in `skills_registry.json` > `software_logos`.
+- **Tokens:** `--ct-skill-ink` and `--ct-skill-{violet,cyan,magenta,blue}-{fill,arc}` in `sleekTheme.tsx`,
+  light and dark; components fall back to the light brand values where the tokens are absent (Next).
+- **Mobile** uses PNGs rendered from the web component at 20pt @3x (`frontend_web/scripts/render-mobile-skill-symbols.mjs`).
+- **Onboarding:** skill cards by group, then a separate "Software you have used" section of mark chips under
+  sub-headings (Dispensing systems, DAA packing, S8 registers, Aged care charts, Point of sale, Monitoring).

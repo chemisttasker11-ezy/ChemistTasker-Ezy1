@@ -17,6 +17,7 @@ def registry():
         return json.load(source)
 
 
+@lru_cache(maxsize=1)
 def _identities():
     data = registry()
     identities = {}

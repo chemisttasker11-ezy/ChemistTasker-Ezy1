@@ -1,7 +1,8 @@
+import { projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
 import SkillIcon from '@/public/skill-icon';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "@/public/navigation";
-import { Box, Button, Chip, Divider, Drawer, IconButton, InputAdornment, Paper, Stack, Pagination, TextField, Typography, Dialog } from "@mui/material";
+import { Box, Button, Chip, Divider, Drawer, IconButton, InputAdornment, Paper, Stack, Pagination, TextField, Typography } from "@mui/material";
 import {
   Add as AddIcon,
   Close as CloseIcon,
@@ -11,11 +12,11 @@ import {
 import { useTalentFeed } from "./hooks/useTalentFeed";
 import { useTalentFilters } from "./hooks/useTalentFilters";
 import PitchDialog, { PitchFormState } from "./components/PitchDialog";
+import { resolveUserHomePath } from "../../../../utils/dashboardPath";
 import AvailabilitySidebar from "./components/AvailabilitySidebar";
 import TalentCardV2 from "./components/TalentCardV2";
 import PublicTalentCard from "./components/PublicTalentCard";
 import FiltersSidebar, { TalentFilterState } from "./components/FiltersSidebar";
-import PostShiftPage from "../PostShiftPage";
 import { Candidate } from "./types";
 import { ENGAGEMENT_LABELS } from "./constants";
 import { useAuth } from "../../../../contexts/AuthContext";
@@ -51,24 +52,6 @@ const formatWorkType = (workType?: string | null) => {
   return titleCase(workType);
 };
 
-const mapRoleToShiftRole = (value?: string | null) => {
-  if (!value) return "";
-  const normalized = value.trim().toUpperCase().replace(/\s+/g, "_");
-  if (["PHARMACIST", "INTERN", "STUDENT", "ASSISTANT", "TECHNICIAN", "EXPLORER"].includes(normalized)) {
-    return normalized;
-  }
-  if (normalized.includes("OTHER_STAFF")) return "ASSISTANT";
-  if (normalized.includes("COMMUNITY_PHARMACIST")) return "PHARMACIST";
-  if (normalized.includes("DISPENSARY_TECHNICIAN")) return "TECHNICIAN";
-  if (normalized.includes("PHARMACY_TECHNICIAN")) return "TECHNICIAN";
-  if (normalized.includes("PHARMACY_ASSISTANT")) return "ASSISTANT";
-  if (normalized.includes("PHARMACIST")) return "PHARMACIST";
-  if (normalized.includes("TECHNICIAN")) return "TECHNICIAN";
-  if (normalized.includes("ASSISTANT")) return "ASSISTANT";
-  if (normalized.includes("INTERN")) return "INTERN";
-  if (normalized.includes("STUDENT")) return "STUDENT";
-  return "";
-};
 
 const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
@@ -108,12 +91,6 @@ const mapAvailabilityToPitchSlots = (entries: any[]) =>
 const allWorkTypes = Object.values(ENGAGEMENT_LABELS);
 
 
-const codeToCategory = new Map(skillsRegistry.skills.map(skill => [
-  skill.code,
-  skill.group === "Clinical Services" ? "clinical_services" :
-  skill.group === "Software & Digital" ? "dispense_software" : "expanded_scope"
-] as const));
-const canonicalTalentSkill = (value: string) => skillId(skillsRegistry as any, value);
 
 type TalentBoardProps = {
   publicMode?: boolean;
@@ -137,7 +114,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const loading = externalLoading ?? feed.loading;
   const error = externalError ?? feed.error;
   const reload = feed.reload;
-  const { user, isAdminUser } = useAuth();
+  const { user, isAdminUser, activePersona, activeAdminPharmacyId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -154,8 +131,6 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedCalendarCandidate, setSelectedCalendarCandidate] = useState<Candidate | null>(null);
-  const [isPostShiftModalOpen, setIsPostShiftModalOpen] = useState(false);
-  const [previousSearch, setPreviousSearch] = useState(location.search);
   const [expandedRoleSkills, setExpandedRoleSkills] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(1);
   const pageSize = 10;
@@ -247,20 +222,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       const showCalendar = !isFullTimeApplication && availableDates.length > 0;
 
       const rawSkills = Array.from(new Set([...(post.software ?? []), ...(post.skills ?? [])])).filter(Boolean) as string[];
-      const clinicalServices: string[] = [];
-      const dispenseSoftware: string[] = [];
-      const expandedScope: string[] = [];
-      const otherSkills: string[] = [];
-      rawSkills.forEach((code) => {
-        const label = canonicalTalentSkill(code);
-        if (!label) return;
-        const category = codeToCategory.get(label);
-        if (category === "clinical_services") clinicalServices.push(label);
-        else if (category === "dispense_software") dispenseSoftware.push(label);
-        else if (category === "expanded_scope") expandedScope.push(label);
-        else otherSkills.push(label);
-      });
-      const skills = Array.from(new Set([...clinicalServices, ...expandedScope, ...otherSkills])).filter(Boolean) as string[];
+      const { clinicalServices, dispenseSoftware, expandedScope, skills } = projectTalentSkills(skillsRegistry as any, rawSkills);
       const ratingFromPostAverageRaw =
         (post as any).ratingAverage ??
         (post as any).rating_average ??
@@ -450,33 +412,23 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       if (endTime) params.set("end_time", String(endTime).slice(0, 5));
     }
     params.set("dedicated_user", String(targetUserId));
-    const shiftRole =
-      mapRoleToShiftRole(candidate.rawRoleCategory) ||
-      mapRoleToShiftRole(candidate.explorerRoleType) ||
-      mapRoleToShiftRole(candidate.role);
+    const shiftRole = resolveTalentBookingRole(candidate.rawRoleCategory, candidate.explorerRoleType, candidate.role);
     if (shiftRole) {
       params.set("role", shiftRole);
       params.set("role_needed", shiftRole);
     }
-    params.set("embedded", "1");
-    setPreviousSearch(location.search);
-    navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
-    setSelectedCalendarCandidate(null);
-    setIsPostShiftModalOpen(true);
-  }, [canRequestBooking, location.pathname, location.search, navigate]);
+    // Post shift lives in the dashboard (Vite); Next only hands over the booking prefill.
+    const home = activePersona === "admin" && typeof activeAdminPharmacyId === "number"
+      ? `/dashboard/admin/${activeAdminPharmacyId}/overview`
+      : resolveUserHomePath(user as any);
+    const base = home.endsWith("/overview") ? home.slice(0, -"/overview".length) : "/dashboard/owner";
+    params.delete("embedded");
+    navigate(`${base}/post-shift?${params.toString()}`);
+  }, [canRequestBooking, location.search, navigate, user, activePersona, activeAdminPharmacyId]);
 
   const handleBookTalent = useCallback((candidate: Candidate) => {
     handleRequestBooking(candidate, candidate.isFullTimeApplication ? [] : candidate.availableDates || []);
   }, [handleRequestBooking]);
-
-  const handleClosePostShiftModal = useCallback(() => {
-    setIsPostShiftModalOpen(false);
-    navigate({ pathname: location.pathname, search: previousSearch }, { replace: true });
-  }, [location.pathname, navigate, previousSearch]);
-
-  const handlePostShiftCompleted = useCallback(() => {
-    handleClosePostShiftModal();
-  }, [handleClosePostShiftModal]);
 
   const handleToggleLike = useCallback(
     async (candidate: Candidate) => {
@@ -1103,27 +1055,6 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         />
       )}
 
-      <Dialog
-        open={isPostShiftModalOpen}
-        onClose={handleClosePostShiftModal}
-        fullWidth
-        maxWidth="lg"
-        PaperProps={{
-          sx: {
-            width: { xs: "100vw", sm: "96vw", lg: "92vw", xl: "1320px" },
-            maxWidth: "none",
-            maxHeight: { xs: "100dvh", sm: "94dvh" },
-            m: { xs: 0, sm: 2 },
-            borderRadius: { xs: 0, sm: 3 },
-            overflow: "hidden",
-            display: "flex",
-          },
-        }}
-      >
-        <Box sx={{ flex: 1, minHeight: 0, maxHeight: { xs: "100dvh", sm: "94dvh" }, overflow: "auto", bgcolor: "background.default" }}>
-          <PostShiftPage onCompleted={handlePostShiftCompleted} />
-        </Box>
-      </Dialog>
     </Box>
   );
 

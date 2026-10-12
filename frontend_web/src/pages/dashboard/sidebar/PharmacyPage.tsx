@@ -1,5 +1,7 @@
 /// <reference types="@types/google.maps" />
 
+import { PharmacyProfileFields } from '../../../../shared/PharmacyProfileFields';
+import PharmacySoftwareFields from './PharmacySoftwareFields';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "../../../components/ui/PageHeader";
 import {
@@ -300,6 +302,10 @@ export default function PharmacyPage({
   const [existingSumpDocs, setExistingSumpDocs] = useState<string | null>(null);
 
   const [employmentTypes, setEmploymentTypes] = useState<string[]>([]);
+  const [pharmacySoftware, setPharmacySoftware] = useState<string[]>([]);
+  const [pharmacyServices, setPharmacyServices] = useState<string[]>([]);
+  const [scriptWeekday, setScriptWeekday] = useState('');
+  const [scriptWeekend, setScriptWeekend] = useState('');
   const [rolesNeeded, setRolesNeeded] = useState<string[]>([]);
 
   const [weekdaysStart, setWeekdaysStart] = useState("");
@@ -524,9 +530,9 @@ export default function PharmacyPage({
             {abnGstRegistered == null ? "-" : abnGstRegistered ? "Yes" : "No"}
             {abnGstRegistered ? (
               <>
-                {" • "}
+                {" ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ "}
                 <strong>From:</strong> {formatDate(abnGstFrom)}
-                {abnGstTo ? <> {" • "} <strong>To:</strong> {formatDate(abnGstTo)}</> : null}
+                {abnGstTo ? <> {" ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ "} <strong>To:</strong> {formatDate(abnGstTo)}</> : null}
               </>
             ) : null}
           </li>
@@ -883,6 +889,12 @@ export default function PharmacyPage({
                   </Box>
                 ))}
               </FormGroup>
+            </Box>
+
+            <Box sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 3, border: `1px solid ${LIGHT_BORDER}`, bgcolor: LIGHT_SURFACE }}>
+              <PharmacySoftwareFields value={pharmacySoftware} onChange={setPharmacySoftware} />
+              <Box sx={{ mt: 3 }}><PharmacyProfileFields services={pharmacyServices} weekday={scriptWeekday} weekend={scriptWeekend}
+                onServicesChange={setPharmacyServices} onWeekdayChange={setScriptWeekday} onWeekendChange={setScriptWeekend} /></Box>
             </Box>
           </Stack>
         </Box>
@@ -1534,6 +1546,10 @@ export default function PharmacyPage({
       setExistingInductionGuides(pharmacy.induction_guides || null);
       setExistingSumpDocs(pharmacy.qld_sump_docs || null);
       setEmploymentTypes(pharmacy.employment_types || []);
+      setPharmacySoftware(pharmacy.software || []);
+      setPharmacyServices(pharmacy.services || []);
+      setScriptWeekday(pharmacy.script_volume_weekday || '');
+      setScriptWeekend(pharmacy.script_volume_weekend || '');
       setRolesNeeded(pharmacy.roles_needed || []);
       setWeekdaysStart(pharmacy.weekdays_start || pharmacy.monday_start || "");
       setWeekdaysEnd(pharmacy.weekdays_end || pharmacy.monday_end || "");
@@ -1589,6 +1605,10 @@ export default function PharmacyPage({
       setExistingInductionGuides(null);
       setExistingSumpDocs(null);
       setEmploymentTypes([]);
+      setPharmacySoftware([]);
+      setPharmacyServices([]);
+      setScriptWeekday('');
+      setScriptWeekend('');
       setRolesNeeded([]);
       setWeekdaysStart("");
       setWeekdaysEnd("");
@@ -1857,6 +1877,10 @@ export default function PharmacyPage({
     if (includeFiles && inductionGuidesFile) fd.append("induction_guides", inductionGuidesFile);
     if (includeFiles && sumpDocsFile) fd.append("qld_sump_docs", sumpDocsFile);
     fd.append("employment_types", JSON.stringify(employmentTypes));
+    fd.append("software", JSON.stringify(pharmacySoftware));
+    fd.append("services", JSON.stringify(pharmacyServices));
+    fd.append("script_volume_weekday", scriptWeekday);
+    fd.append("script_volume_weekend", scriptWeekend);
     fd.append("roles_needed", JSON.stringify(rolesNeeded));
     fd.append("weekdays_start", weekdaysStart);
     fd.append("weekdays_end", weekdaysEnd);

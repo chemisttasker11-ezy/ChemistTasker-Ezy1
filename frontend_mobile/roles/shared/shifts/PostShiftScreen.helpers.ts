@@ -1,6 +1,5 @@
 export const ROLE_OPTIONS = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 export const EMPLOYMENT_TYPES = ['LOCUM', 'PART_TIME', 'FULL_TIME'];
-export const WORKLOAD_TAGS = ['Sole Pharmacist', 'High Script Load', 'Webster Packs'];
 export const PRIMARY = '#7c3aed';
 export const PRIMARY_LIGHT = '#F3E8FF';
 export const PRIMARY_TEXT = '#2D1B69';

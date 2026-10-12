@@ -1,0 +1,95 @@
+PR165 SENIOR FULL-STACK REVIEW — 12 OCTOBER 2026
+
+Scope and verdict
+Reviewed accumulated work and Claude's latest uncommitted changes in pr165-skills-design, branch design/pr165-skills, HEAD bbc4ee35f6b86074efe2151853217516b195d02c. Compared against HEAD and the earlier review-fixes-final.patch text snapshot. Current accumulated diff: 181 files, 6,479 insertions and 9,857 deletions, including image assets and moved/deleted files.
+Verdict: useful convergence, but not ready for approval. There are reproducible correctness problems and incomplete Expo coverage. Passing architecture audits does not establish zero duplicated business logic.
+This was a review. No tracked application source was edited, no commit/push/merge occurred, and no live database migration or external message was performed. The probe scripts use synthetic data and mocked managers/task dispatch.
+
+Confirmed findings and recommended fix order
+
+1. P1 — Review rates do not match the stored recurring-slot rates (new Review regression over an existing payload limitation).
+frontend_web/shared/postShift/PostShiftForm.tsx:1117-1149 and 1191-1201.
+buildPayload stores one rate on the base recurring slot, selected by matching the entry's initial date. previewShift replaces the payload's slots with concrete occurrences and assigns each occurrence its separately calculated rate.
+Reproduction: a Monday/Saturday recurrence with $65 weekday and $80 Saturday shows [65,80] in Review but submits one recurring slot at 65.00. A direct call to the real active ShiftSerializer with a synthetic recurring slot returned both dates at 65. backend/shifts/serialization/shifts.py:406 copies slot.rate; web ShiftsBoard/utils/rates.ts:40 prefers that stored rate. This concerns the posted card/offer representation; payment locking uses a separate pricing path and was not proved wrong by this probe.
+Fix: choose a single explicit recurrence/rate contract. If rates can vary per occurrence, persist the concrete occurrences or introduce a domain-owned occurrence-rate representation. Build Review from that exact representation, including a start date that is not one of the recurrence weekdays. Do not fix the preview alone while submission continues discarding occurrence rates.
+
+2. P1 — Next talent booking no longer preserves private booking behavior (new handoff regression).
+frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:439-465.
+The old flow set embedded=1. The new flow deletes it and redirects to the normal dashboard form while retaining dedicated_user. The form uses isEmbedded, not dedicatedUserId, to suppress audience widening and notification flags (PostShiftForm.tsx:563, 1131-1135, 1167-1169). A dedicated booking therefore displays general vacancy audience controls, can be escalated, and can enable team/favourite notifications. The backend announcement functions do not independently guard dedicated_user.
+A mocked call to the real announce_posted_shift with dedicated_user_id=123 and team notifications enabled queued a different synthetic team member. No message was sent.
+Fix: represent private/direct booking explicitly and retain it across the handoff. Derive privacy rules from that domain state rather than presentation embedding, and enforce the direct-booking notification policy on the backend as well. If wider posting is intended, provide a separate explicit conversion from a direct booking to an open vacancy.
+
+3. P2 — Technician, intern and student booking roles can become Assistant (inherited mapping bug, still reachable through the new handoff).
+Same Next TalentBoard file:54-70 and 451-454.
+mapRoleToShiftRole('OTHER_STAFF') returns ASSISTANT before the actual staff subtype is consulted. Executed the function extracted from current source: OTHER_STAFF + TECHNICIAN + 'Dispensary Technician' produced ASSISTANT. This changes the vacancy role, eligibility, available requirements and pay path.
+Fix: resolve a concrete staff subtype before the generic account category, in one shared talent-to-shift role helper. Do not silently classify an unknown Other Staff subtype as Assistant.
+
+4. P2 — Expo discards candidate work profiles and never renders the skills/software in review (unfinished integration).
+frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:456-491 and components/Dialogs/CounterOfferDialog.tsx:106-125.
+The member path does not fall back to member.userDetail/user_detail; the constructed dialog candidate has no profile field. The dialog shows name, bio and email, with no skills/software section. Web now supports the member profile fallback and renders CandidateProfile, so the platforms behave differently. Revealed platform candidates also lack the native work-profile rendering even when the data is returned.
+Fix: retain the shared mapped profile in all native candidate entry paths and render it with native SkillIcon/software logos. Share a typed work-profile contract and grouping helper; do not copy the web component's normalization rules into another native implementation. Keep public/unrevealed profile data hidden.
+
+5. P2 — Deliberately cleared requirements can be replaced when the Skills step is revisited (inherited preset lifecycle issue).
+frontend_web/shared/ShiftSkillPresetControls.tsx:24-39; shared-core/src/domains/shifts/skillPresets.ts:51-52; PostShiftForm.tsx:1260 onward renders only the active step.
+On every mount, the control loads the saved preset and treats an empty Required list with a subset of pharmacy defaults as untouched. After a user clears the preset, goes Next, then Back, the control remounts; the empty selection again passes canAutoApplySkillPreset and is replaced. The async generation fence protects pending loads, but does not remember a previous deliberate edit across unmounts.
+Fix: the wizard owns a per-role 'initialized/edited' state for the lifetime of the draft. Auto-apply once for a genuinely untouched draft; subsequent revisits require Use saved selections. Empty is a meaningful user choice. This finding is from lifecycle/source tracing, not a DOM test.
+
+6. P2 — Automatic widening interval/mode is lost on step navigation (new web and native state bug).
+frontend_web/shared/postShift/PostShiftVisibilityStep.tsx:87-102; frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx:62-76.
+Mode and autoHours live inside the step. Choose Automatic / 12 hours, move on, then return: dates survive in the parent, but the step reinitializes as Custom with autoHours=24. Subsequent audience changes no longer recalculate as automatic, or switching back to Automatic overwrites the chosen interval with 24 hours.
+Fix: keep the mode and interval with the parent/domain draft, alongside its dates; derive dates from the full tier/interval state. Include allowed tiers in recalculation dependencies. This finding is from React lifecycle/source tracing, not a browser run.
+
+7. P2 — Work-profile role is chosen by old row existence instead of current account role (inherited precedence, extended to more surfaces).
+backend/shifts/candidates.py:143-167.
+work_profile always prefers a PharmacistOnboarding row; it never checks candidate.role. A synthetic OTHER_STAFF account retaining a historical pharmacist row returned role_label=Pharmacist, CLINICAL_CHECKING and pharmacist verification, without querying OtherStaffOnboarding. Normal role-specific onboarding endpoints are guarded; the trigger requires historical/mixed profile data, not an ordinary clean technician account.
+Fix: resolve the current account role first, then the current staff subtype, and select only that role's onboarding profile. Return an empty/unknown work profile for an inconsistent state. Reuse onboarding-owned role/profile resolution for talent and shift candidate projections.
+
+8. P2 — Completion callback can execute twice, including duplicate roster deletion (inherited handler bug carried into shared Form).
+frontend_web/shared/postShift/PostShiftForm.tsx:1235-1255.
+On success with onCompleted, the callback runs inside try and then again in finally. frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:582-595 uses it to delete pendingDeletionShiftId and reload assignments. Both invocations see the same closure before pending state clears, so the old shift deletion can be requested twice, generating a false failure after a successful replacement.
+Fix: invoke onCompleted exactly once after successful submission. A focused mocked callback-count test is sufficient; never exercise a real deletion for the review.
+Executed the current handleSubmit function extracted from source with a synthetic successful create and mocked callback: callbackCalls=2, expected=1. No roster deletion was executed.
+
+Architecture and integrity assessment
+
+Good convergence:
+- One authoritative skills_registry.json; obsolete skills_catalog.json and obsolete onboarding pages removed. Canonical IDs, exact aliases and role eligibility are shared; no fuzzy conversion of partial historical capabilities into broader claims.
+- Worker software remains in onboarding skills under canonical software IDs; it is not a second conflicting worker data model. Pharmacy software/services/script bands belong to the pharmacy domain, and shift workload/support belong to shifts.
+- Backend models physically remain in organizations/models.py and shifts/models.py. Existing client_profile app_label and the 0073 migration preserve historical Django model/table identity; this is not an out-of-domain model implementation. 0073 is additive, not a data deletion.
+- Neutral JSON list parsing lives in core/serializer_values.py; organizations/pharmacy_profile.py and shifts/context.py own their respective validation.
+- Shared TS policy lives under domains/organizations and domains/shifts. src/pharmacyProfile.ts is an export facade.
+- Next's duplicate post-shift wizard was deleted. Next hands booking prefills to Vite; it does not host a second wizard. Web shared/postShift houses the reusable form/steps and a thin Vite host supplies runtime context.
+- Required/Preferred/Software web card rendering uses shared ShiftRequirements; workload/services/staffing are only in expanded Pharmacy services. Native cards use the same core requirement grouping with native rendering.
+- New work_profile projections normalize claims, and the public/unrevealed serializer still returns no profile/bio. Revealed public profiles exclude contact/CV details.
+- Talent onboarding skills are cached/bulk-loaded per page; this is a partial query improvement, not a complete feed optimization.
+
+Not yet compliant with the user's no-duplication goal:
+- Vite and Next useTalentFilters.ts are byte-equivalent apart from line endings, and Expo repeats the same normalization/filtering policy. Date bounds, all-skill matching, software options, role/state options and travel filters belong in a shared talent domain helper.
+- Three TalentBoard/index.tsx implementations partition skills/software into the same groups. CandidateProfile adds another grouping implementation. Share typed domain projections; keep the React/MUI/native view differences local.
+- PostShiftForm is 1,493 lines and owns fetching, templates, rates, calendars, draft state, payloads and routing. Native PostShiftScreen repeats timetable expansion, rate-row handling and payload construction. A move into shared/ does not itself separate these concerns. Extract pure draft/payload/recurrence policy into the shifts domain and cohesive web hooks for form effects.
+- work_profile and other talent experience/travel projections still query per candidate/post. The new member_status profile projection adds per-member queries; reuse batch loaders where lists grow. This is performance debt, not proof of incorrect skill storage.
+- Several profile shapes are any/untyped, particularly the new candidate profile projection. Add a backend API contract plus mapped work-profile type to make missing native wiring visible to TypeScript.
+
+Coverage
+- Web/native onboarding and profile skills: canonical read/write paths and software picker wiring present; focused contract checks pass. No current-turn live-account save/reload proof.
+- Talent Next/Vite/Expo: canonical IDs and role eligibility render through registry/icons, with repeated client policy and the Next booking role bug above.
+- Pharmacy add/edit web/native: software, services, script bands wired into load, create/update, clear/reset and domain validation. No live DB mutation during this review.
+- Post shift: shared web form/preview/presets; native core helpers used, but native Review is absent, Pay layout is not aligned, travel/accommodation/urgent controls and payload fields are absent. Native saved browser presets are not provided; browser-local presets were an intentional scope choice and are not cloud-synced preferences.
+- Shift boards Next/Vite/native: shared requirement grouping; pharmacy context in expanded details. Preview/persisted recurring rates diverge as above.
+- Shift Centre: requirement summaries are still absent; candidate match indicators were not implemented. Treat these as explicitly unfinished coverage rather than claiming all dashboards show them.
+- Interested/revealed candidates: web receives/renders profiles; native remains incomplete. Actual skill-to-role matching is not a substitute for licence/authorization checks.
+
+Verification run on this working tree
+- Shared-core focused Vitest: 3 files, 30 tests passed (skills, shift context, role presets).
+- Backend focused runner: 43 tests passed (identity/regressions, pharmacy/shift context, model/ownership boundaries); no live DB migration.
+- Vite, Next and Expo tsc: exit 0.
+- Architecture boundary, shared-core boundary, package convergence, transport/strict-type and frontend static-wiring audits passed.
+- Executable synthetic probes: wrong booking role; real active-slot serializer recurring rates; stale profile precedence; mocked dedicated-booking notification dispatch; double completion callback.
+- Vite/Next filter hooks compared with git diff --no-index --ignore-space-at-eol: identical.
+- No full CI/regression package, production build, new browser screenshot review or live save/reload journey was run. Claude's stated scratchpad/pr165run/shots evidence was not found in this checkout or the checked neighbouring locations. Expo browser proof remains unverified; tsc does not prove Metro/native runtime behavior.
+- New probes/report/baseline are ignored playground material. Do not commit them.
+
+Handover to Claude
+Fix the occurrence-rate/preview contract and private booking handoff first, then concrete role resolution and native candidate profile wiring. Correct preset/escalation draft lifecycles and the double callback. Resolve current-profile precedence and share talent filtering/grouping rather than cloning another implementation. Complete the agreed native/Shift Centre coverage and update the architecture/design docs to describe actual parity.
+Add narrowly targeted regressions for these triggers, rerun the focused checks, and obtain web/native rendering and save/reload evidence. Keep full deployment gates for when changes are actually to leave this machine; do not push, merge or migrate as part of this review.
+Probe files: playground/senior-review-probes.cjs and playground/senior-review-profile-probe.py.

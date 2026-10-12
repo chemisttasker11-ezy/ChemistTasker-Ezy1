@@ -1,3 +1,4 @@
+import { otherStaffQualificationLevels, dispensaryQualifications } from '@chemisttasker/shared-core';
 import React, { useEffect, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,12 +16,7 @@ const ROLE_CHOICES = [
   { value: 'ASSISTANT', label: 'Pharmacy Assistant' },
   { value: 'STUDENT', label: 'Pharmacy Student' },
 ];
-const ASSISTANT_LEVEL_CHOICES = [
-  { value: 'LEVEL_1', label: 'Pharmacy Assistant - Level 1' },
-  { value: 'LEVEL_2', label: 'Pharmacy Assistant - Level 2' },
-  { value: 'LEVEL_3', label: 'Pharmacy Assistant - Level 3' },
-  { value: 'LEVEL_4', label: 'Pharmacy Assistant - Level 4' },
-];
+const ASSISTANT_LEVEL_CHOICES = otherStaffQualificationLevels;
 const STUDENT_YEAR_CHOICES = [
   { value: 'YEAR_1', label: 'Pharmacy Student - 1st Year' },
   { value: 'YEAR_2', label: 'Pharmacy Student - 2nd Year' },
@@ -42,11 +38,12 @@ export default function OtherStaffRegulatoryScreen() {
   const [error, setError] = useState('');
   const [roleMenu, setRoleMenu] = useState(false);
   const [assistantMenu, setAssistantMenu] = useState(false);
+  const [qualificationMenu, setQualificationMenu] = useState(false);
   const [studentMenu, setStudentMenu] = useState(false);
   const [internMenu, setInternMenu] = useState(false);
   const [data, setData] = useState<any>({
     role_type: '',
-    classification_level: '',
+    classification_level: '', dispensary_qualification: '',
     student_year: '',
     intern_half: '',
   });
@@ -65,6 +62,7 @@ export default function OtherStaffRegulatoryScreen() {
         setData({
           role_type: (res?.role_type as Role) || '',
           classification_level: res?.classification_level || '',
+          dispensary_qualification: res?.dispensary_qualification || '',
           student_year: res?.student_year || '',
           intern_half: res?.intern_half || '',
           ahpra_proof: res?.ahpra_proof || '',
@@ -78,6 +76,7 @@ export default function OtherStaffRegulatoryScreen() {
           data: {
             role_type: (res?.role_type as Role) || '',
             classification_level: res?.classification_level || '',
+          dispensary_qualification: res?.dispensary_qualification || '',
             student_year: res?.student_year || '',
             intern_half: res?.intern_half || '',
             ahpra_proof: res?.ahpra_proof || '',
@@ -120,7 +119,7 @@ export default function OtherStaffRegulatoryScreen() {
       form.append('tab', 'regulatory');
       if (submitForVerification) form.append('submitted_for_verification', 'true');
       if (data.role_type) form.append('role_type', data.role_type);
-      if (showAssistantLevel) form.append('classification_level', data.classification_level || '');
+      if (showAssistantLevel) { form.append('classification_level', data.classification_level || ''); form.append('dispensary_qualification', data.dispensary_qualification || ''); }
       if (showStudentYear) form.append('student_year', data.student_year || '');
       if (showInternHalf) form.append('intern_half', data.intern_half || '');
 
@@ -178,7 +177,7 @@ export default function OtherStaffRegulatoryScreen() {
 
         <Menu visible={roleMenu} onDismiss={() => setRoleMenu(false)} anchor={<Button mode="outlined" onPress={() => setRoleMenu(true)}>{roleLabel}</Button>}>
           {ROLE_CHOICES.map((c) => (
-            <Menu.Item key={c.value} title={c.label} onPress={() => { setData((p: any) => ({ ...p, role_type: c.value, classification_level: '', student_year: '', intern_half: '' })); setRoleMenu(false); }} />
+            <Menu.Item key={c.value} title={c.label} onPress={() => { setData((p: any) => ({ ...p, role_type: c.value, classification_level: '', dispensary_qualification: '', student_year: '', intern_half: '' })); setRoleMenu(false); }} />
           ))}
         </Menu>
 
@@ -187,6 +186,14 @@ export default function OtherStaffRegulatoryScreen() {
             {ASSISTANT_LEVEL_CHOICES.filter((c) => data.role_type !== 'TECHNICIAN' || ['LEVEL_3','LEVEL_4'].includes(c.value)).map((c) => <Menu.Item key={c.value} title={c.label} onPress={() => { setData((p: any) => ({ ...p, classification_level: c.value })); setAssistantMenu(false); }} />)}
           </Menu>
         ) : null}
+        {showAssistantLevel ? <View>
+          <Text>{ASSISTANT_LEVEL_CHOICES.find(item => item.value === data.classification_level)?.explainer}</Text>
+          <Menu visible={qualificationMenu} onDismiss={() => setQualificationMenu(false)} anchor={<Button mode="outlined" onPress={() => setQualificationMenu(true)}>{dispensaryQualifications.find(item => item.value === data.dispensary_qualification)?.label || 'Dispensary qualification (claimed)'}</Button>}>
+            <Menu.Item title="None claimed" onPress={() => { setData((p: any) => ({ ...p, dispensary_qualification: '' })); setQualificationMenu(false); }} />
+            {dispensaryQualifications.map(item => <Menu.Item key={item.value} title={item.label} onPress={() => { setData((p: any) => ({ ...p, dispensary_qualification: item.value })); setQualificationMenu(false); }} />)}
+          </Menu>
+          <Text>{dispensaryQualifications.find(item => item.value === data.dispensary_qualification)?.explainer || 'Optional. Claims and evidence verification are separate. Your award level is unchanged.'}</Text>
+        </View> : null}
         {showStudentYear ? (
           <Menu visible={studentMenu} onDismiss={() => setStudentMenu(false)} anchor={<Button mode="outlined" onPress={() => setStudentMenu(true)}>{studentLabel}</Button>}>
             {STUDENT_YEAR_CHOICES.map((c) => <Menu.Item key={c.value} title={c.label} onPress={() => { setData((p: any) => ({ ...p, student_year: c.value })); setStudentMenu(false); }} />)}

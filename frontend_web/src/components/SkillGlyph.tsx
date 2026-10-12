@@ -1,1 +1,1 @@
-export { SkillGlyph } from '../../shared/SkillGlyph';
+export { SkillGlyph, SkillSymbol } from '../../shared/SkillGlyph';

@@ -115,8 +115,8 @@ def staff_assignment_defaults(*, user, pharmacy, work_date):
             "saturday": str(engagement.rate_saturday),
             "sunday": str(engagement.rate_sunday),
             "public_holiday": str(engagement.rate_public_holiday),
-            "early_morning": str(engagement.rate_early_morning) if engagement.rate_early_morning is not None else None,
-            "late_night": str(engagement.rate_late_night) if engagement.rate_late_night is not None else None,
+            "early_morning": str(engagement.rate_early_morning) if engagement.early_morning_applicable and engagement.rate_early_morning is not None else None,
+            "late_night": str(engagement.rate_late_night) if engagement.late_night_applicable and engagement.rate_late_night is not None else None,
         },
     }
     return {

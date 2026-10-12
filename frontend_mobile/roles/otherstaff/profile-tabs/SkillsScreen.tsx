@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { DoseBlisterIcon } from '../../../components/DoseBlisterIcon';
+import { SkillIcon } from '../../../components/SkillIcon';
+import { SoftwarePicker, SOFTWARE_GROUP, roleSoftware } from '../../shared/skills/SoftwarePicker';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Checkbox, Chip, HelperText, Searchbar, Text } from 'react-native-paper';
@@ -17,7 +17,8 @@ export default function OtherStaffSkillsScreen() {
   const [subtype,setSubtype] = useState<string | null>(null);
   const currentRole = workerSkillRole('otherstaff',subtype);
   const [query, setQuery] = useState('');
-  const groups = useMemo(() => searchRoleSkillGroups(registry,currentRole,query),[currentRole,query]);
+  const groups = useMemo(() => searchRoleSkillGroups(registry,currentRole,query).filter(group => group.key !== SOFTWARE_GROUP),[currentRole,query]);
+  const software = useMemo(() => roleSoftware(currentRole, query), [currentRole, query]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -75,17 +76,8 @@ export default function OtherStaffSkillsScreen() {
     setPendingFiles((p) => ({ ...p, [code]: asset }));
   };
 
-  const validate = () => {
-    const missing = selected.filter((code) => requiresCert(code) && !hasExisting(code) && !hasPending(code));
-    return missing;
-  };
 
   const save = async () => {
-    const missing = validate();
-    if (missing.length) {
-      setError(`Please upload a certificate for: ${missing.map(code => skillLabel(registry, code)).join(', ')}`);
-      return;
-    }
     setSaving(true);
     setError('');
     try {
@@ -132,16 +124,16 @@ export default function OtherStaffSkillsScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text variant="titleLarge" style={styles.title}>Skills</Text>
-        <Text variant="bodySmall" style={styles.help}>Skills describe experience, not professional authorisation. Supervised activities must be performed under pharmacist supervision.</Text>
+        <Text variant="bodySmall" style={styles.help}>Tick what you have actually done on the job, then the software you have used. A tick is not a verified credential; certificates are checked separately.</Text>
 
         <Searchbar placeholder="Search skills or software" value={query} onChangeText={setQuery} accessibilityLabel="Search skills or software" />
-        <Text style={styles.help}>{selected.length} skills selected. There is no minimum.</Text>
+        <Text style={styles.help}>{selected.filter(code => (skillIndex.get(code) as any)?.group !== SOFTWARE_GROUP).length} skills selected. There is no minimum.</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
           {groups.map(group => <Chip key={group.key} selected={activeTab === group.key}
             accessibilityRole="tab" accessibilityState={{ selected: activeTab === group.key }}
             onPress={() => setTab(group.key)}>{group.label}</Chip>)}
         </ScrollView>
-        {currentRole && currentItems.length === 0 ? <Text accessibilityRole="alert">No skills found. Try another search.</Text> : null}
+        {currentRole && currentItems.length === 0 && software.length === 0 ? <Text accessibilityRole="alert">Nothing matches. Try a shorter word, such as Webster or Fred.</Text> : null}
 
         {currentItems.map((item: any) => {
           const checked = selected.includes(item.code);
@@ -153,9 +145,7 @@ export default function OtherStaffSkillsScreen() {
                 <Checkbox.Item label="" accessibilityLabel={`Select ${item.label}`} style={{ width: 48, paddingHorizontal: 0 }} position="leading" disabled={saving} status={checked ? 'checked' : 'unchecked'} onPress={() => toggle(item.code)} />
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    {item.icon_mobile === 'BLISTER_PACK' || item.icon_mobile === 'BLISTER_CHECK'
-                      ? <DoseBlisterIcon checked={item.icon_mobile === 'BLISTER_CHECK'} />
-                      : <MaterialCommunityIcons name={item.icon_mobile as any} size={21} color="#2463A6" />}
+                    <SkillIcon skill={item.code} size={28} />
                     <Text style={[styles.itemLabel, { flexShrink: 1 }]}>{item.label}</Text>
                   </View>
                   {currentRole && claimModeLabel(item.eligibility[currentRole]) ? <Text style={styles.itemDesc}>{claimModeLabel(item.eligibility[currentRole])}</Text> : null}
@@ -174,6 +164,8 @@ export default function OtherStaffSkillsScreen() {
 
 
         {!currentRole ? <HelperText type="info">Select your staff role under Regulatory Docs first.</HelperText> : null}
+        <SoftwarePicker role={currentRole} items={software} selected={selected} disabled={saving} onToggle={toggle} />
+
         {error ? <HelperText type="error">{error}</HelperText> : null}
         <Button mode="contained" onPress={save} loading={saving} disabled={saving || !currentRole}>Save Skills</Button>
       </ScrollView>

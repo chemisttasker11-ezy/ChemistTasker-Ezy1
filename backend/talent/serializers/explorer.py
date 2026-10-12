@@ -78,35 +78,55 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
             return getattr(obj.explorer_profile, "role_type", None)
         return obj.role_title or obj.role_category
 
-    def _get_onboarding_skills(self, obj):
+    def _onboarding(self, obj):
+        """(skill role, saved skills) for the post author, looked up once per author per request."""
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
-        if not user:
-            return []
-        try:
+        if not user or obj.role_category not in ("PHARMACIST", "OTHER_STAFF"):
+            return None, []
+        cache = self.__dict__.setdefault("_onboarding_cache", {})
+        key = (obj.role_category, user.pk)
+        if key not in cache and not self.__dict__.get("_onboarding_bulk_loaded"):
+            self._bulk_load_onboarding(cache)
+        if key not in cache:
             if obj.role_category == "PHARMACIST":
-                po = PharmacistOnboarding.objects.filter(user=user).first()
-                return list(po.skills or []) if po else []
-            if obj.role_category == "OTHER_STAFF":
-                so = OtherStaffOnboarding.objects.filter(user=user).first()
-                return list(so.skills or []) if so else []
-            # Explorers do not expose skills on TalentBoard.
-            return []
-        except Exception:
-            return []
+                profile = PharmacistOnboarding.objects.filter(user=user).only("skills").first()
+                cache[key] = ("PHARMACIST", list(getattr(profile, "skills", None) or []))
+            else:
+                profile = OtherStaffOnboarding.objects.filter(user=user).only("skills", "role_type").first()
+                cache[key] = (getattr(profile, "role_type", None) or "UNKNOWN", list(getattr(profile, "skills", None) or []))
+        return cache[key]
+
+    def _bulk_load_onboarding(self, cache):
+        """One query per onboarding model for every author on the page being serialised."""
+        self._onboarding_bulk_loaded = True
+        posts = getattr(self.parent, "instance", None) if self.parent is not None else None
+        if not isinstance(posts, (list, tuple)):
+            try:
+                posts = list(posts) if posts is not None else []
+            except TypeError:
+                posts = []
+        users = {}
+        for post in posts:
+            author = getattr(post, "author_user", None) or getattr(getattr(post, "explorer_profile", None), "user", None)
+            if author is not None and getattr(post, "role_category", None) in ("PHARMACIST", "OTHER_STAFF"):
+                users.setdefault(post.role_category, set()).add(author.pk)
+        for row in PharmacistOnboarding.objects.filter(user_id__in=users.get("PHARMACIST", ())).only("user_id", "skills"):
+            cache[("PHARMACIST", row.user_id)] = ("PHARMACIST", list(row.skills or []))
+        for row in OtherStaffOnboarding.objects.filter(user_id__in=users.get("OTHER_STAFF", ())).only("user_id", "skills", "role_type"):
+            cache[("OTHER_STAFF", row.user_id)] = (row.role_type or "UNKNOWN", list(row.skills or []))
+
+    def _get_onboarding_skills(self, obj):
+        return self._onboarding(obj)[1]
 
     def get_skills(self, obj):
-        # Always prefer onboarding skills for Pharmacist/Other Staff.
+        # Always prefer onboarding skills for Pharmacist/Other Staff, limited to the author's current role.
         if obj.role_category in ("PHARMACIST", "OTHER_STAFF"):
-            user = obj.author_user or getattr(obj.explorer_profile, 'user', None)
-            role = obj.role_category
-            if role == 'OTHER_STAFF':
-                profile = OtherStaffOnboarding.objects.filter(user=user).first() if user else None
-                role = getattr(profile, 'role_type', None) or 'UNKNOWN'
-            return normalize_skills(self._get_onboarding_skills(obj), allowed_role=role, matchable_only=True)
+            role, skills = self._onboarding(obj)
+            return normalize_skills(skills, allowed_role=role, matchable_only=True)
         # Explorers do not expose skills on TalentBoard.
         if obj.role_category == "EXPLORER":
             return []
-        return normalize_skills(list(obj.skills or []) if obj.skills else self._get_onboarding_skills(obj))
+        return normalize_skills(list(obj.skills or []))
 
     def get_software(self, obj):
         if obj.role_category == 'EXPLORER':

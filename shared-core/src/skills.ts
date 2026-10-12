@@ -9,6 +9,10 @@ export interface SkillDefinition {
   code: string;
   label: string;
   group: string;
+  /** Software only: Dispensing systems, DAA packing, S8 registers, Aged care charts, Point of sale, Monitoring. */
+  subgroup?: string;
+  /** Software only: key of the vendor's own compact mark (see registry software_logos). */
+  logo?: string;
   icon_web: string;
   icon_mobile: string;
   icon_meaning: string;
@@ -29,6 +33,7 @@ export interface SkillCertificateDefinition {
 export interface SkillsRegistry {
   version: number;
   groups: string[];
+  subgroups?: Record<string, string[]>;
   skills: SkillDefinition[];
   legacy_aliases: Record<string, string>;
   legacy_evidence_only: string[];
@@ -39,6 +44,36 @@ export interface RoleSkillGroup {
   label: string;
   items: SkillDefinition[];
 }
+/** Named software is stored with skills (same IDs) but presented separately from skill cards. */
+export const SOFTWARE_GROUP = 'Software & Digital';
+
+export function softwareSubgroups(registry: SkillsRegistry): string[] {
+  return registry.subgroups?.[SOFTWARE_GROUP] || [];
+}
+
+/** Software a role can claim, matched on name or alias like the skill search. */
+export function roleSoftware(registry: SkillsRegistry, role: WorkerSkillRole | null, query = ''): SkillDefinition[] {
+  if (!role || !['PHARMACIST', 'INTERN', 'TECHNICIAN', 'ASSISTANT', 'STUDENT'].includes(role)) return [];
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return registry.skills.filter(skill => skill.group === SOFTWARE_GROUP
+    && skill.eligibility[role] !== 'none'
+    && words.every(word => [skill.label, ...skill.aliases].join(' ').toLowerCase().includes(word)));
+}
+
+/** Split stored IDs into skills and named software (kept in registry order within software), so every surface shows software apart. */
+export function splitSkillsAndSoftware(registry: SkillsRegistry, values: readonly string[]): { skills: string[]; software: string[] } {
+  const skills: string[] = [];
+  const software: string[] = [];
+  for (const value of values) {
+    const code = skillId(registry, value) || value;
+    const target = findSkill(registry, value)?.group === SOFTWARE_GROUP ? software : skills;
+    if (!target.includes(code)) target.push(code);
+  }
+  const order = new Map(registry.skills.map((skill, index) => [skill.code, index]));
+  software.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+  return { skills, software };
+}
+
 const STAFF_ROLES: WorkerSkillRole[] = ['INTERN', 'TECHNICIAN', 'ASSISTANT', 'STUDENT'];
 
 export function workerSkillRole(persona: 'pharmacist' | 'otherstaff', subtype?: string | null): WorkerSkillRole | null {

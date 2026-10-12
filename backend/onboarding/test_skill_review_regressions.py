@@ -6,18 +6,60 @@ from django.test import SimpleTestCase
 from rest_framework.exceptions import ValidationError
 
 from onboarding.services.skill_identity import evaluate_match, normalize_skills, registry
-from onboarding.services.skills import apply_skills_tab, _canonical_skills
+from onboarding.services.skills import apply_skills_tab, _canonical_skills, _required_cert_skill_codes
 from shifts.serialization.shifts import ShiftSerializer
 from talent.serializers.explorer import ExplorerPostReadSerializer, ExplorerPostWriteSerializer
 
 
 class SkillReviewRegressions(SimpleTestCase):
+    def test_credentialed_skill_claim_can_be_saved_without_evidence(self):
+        profile = SimpleNamespace(user_id=1, skills=[], skill_certificates={}, save=Mock())
+        apply_skills_tab(profile, {}, initial_data={'skills': ['VACCINATION']}, uploads={},
+                         role_key='pharmacist', missing_message='Missing: ')
+        self.assertEqual(profile.skills, ['VACCINATION'])
+        self.assertEqual(profile.skill_certificates, {})
+        profile.save.assert_called_once()
+
     def test_removed_choices_never_match(self):
-        self.assertEqual(len(registry()['skills']), 66)
+        self.assertEqual(len(registry()['skills']), 67)
         for code in ('CASH_HANDLING', 'PHONE_ENQUIRIES', 'WORD', 'OTHER'):
             self.assertFalse(evaluate_match([code], [], [code])['matches_required'])
             with self.assertRaises(ValidationError):
                 normalize_skills([code], strict=True, matchable_only=True)
+
+    def test_narrow_claims_cannot_satisfy_broader_requirements(self):
+        for old, broader in (('S8_RECORDS', 'S8_PROCEDURES'), ('BLOOD_PRESSURE_CHECK', 'HEALTH_CHECKS'),
+                             ('ANAPHYLAXIS_MANAGEMENT', 'FIRST_AID'), ('CUSTOMER_SERVICE', 'POS_CUSTOMER')):
+            self.assertFalse(evaluate_match([broader], [], [old])['matches_required'])
+            with self.assertRaises(ValidationError):
+                normalize_skills([old], strict=True)
+        self.assertEqual(normalize_skills(['methadone', 'WinIFRED']), ['PHARMACOTHERAPY_METHADONE_SUBOXONE', 'FRED'])
+
+    def test_anaphylaxis_document_does_not_become_first_aid_proof(self):
+        profile = SimpleNamespace(user_id=1, skills=['ANAPHYLAXIS_MANAGEMENT'],
+                                  skill_certificates={'ANAPHYLAXIS_MANAGEMENT': {'path': 'anaphylaxis.pdf'}}, save=Mock())
+        with patch('onboarding.services.skills.default_storage.delete') as delete:
+            apply_skills_tab(profile, {}, initial_data={'skills': ['FIRST_AID']}, uploads={},
+                             role_key='pharmacist', missing_message='Missing: ', keep_history=True)
+        profile.save.assert_called_once()
+        self.assertEqual(profile.skills, ['FIRST_AID'])  # Explicit claim is allowed, but old proof is not broadened.
+        delete.assert_not_called()
+        self.assertNotIn('FIRST_AID', profile.skill_certificates)
+
+    def test_certificates_only_for_credentialed_services(self):
+        required = _required_cert_skill_codes('pharmacist')
+        self.assertIn('VACCINATION', required)
+        self.assertIn('ADVANCED_COMPOUNDING', required)
+        self.assertNotIn('COMPOUNDING', required)
+        self.assertFalse({s['code'] for s in registry()['skills'] if s['group'] == 'Software & Digital'} & required)
+
+    def test_partial_edit_does_not_drop_unknown_required_codes(self):
+        shift = SimpleNamespace(role_needed='PHARMACIST', must_have=['UNKNOWN_REQUIRED'], nice_to_have=[])
+        for attrs in ({'nice_to_have': ['FRED']}, {'role_needed': 'TECHNICIAN'}):
+            with self.assertRaises(ValidationError):
+                ShiftSerializer(instance=shift).validate(attrs)
+        self.assertEqual(shift.must_have, ['UNKNOWN_REQUIRED'])
+        self.assertFalse(evaluate_match(shift.must_have, [], [])['matches_required'])
 
     def test_removed_claim_is_rejected(self):
         profile = SimpleNamespace(skills=['OTHER'])
