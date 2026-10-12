@@ -60,6 +60,32 @@ Server-generated staging database/Django secrets and browser-integration values 
 
 Once the runner shows **Idle** in GitHub, every push to this repository's `main` branch redeploys the preview automatically.
 
+## Synthetic test users in staging
+
+The private staging PostgreSQL database is chemisttasker_staging and is not
+reachable directly from the contractor frontend. It stays inside the isolated
+staging Docker network. Never publish port 5432 or import customer data.
+
+Once Staging Preview deploys on the OVH self-hosted runner and migrations pass,
+the deployment provisions eight synthetic logins: Owner, Organisation Admin,
+Pharmacist, Intern, Technician, Assistant, Student and Explorer, with one fictional
+organisation, two fictional pharmacies and accepted staff memberships. The four
+Other Staff profiles use the corresponding role subtypes. The operation is
+idempotent and refuses collisions with non-demo accounts.
+
+Distinct, randomly generated credentials are stored only on the OVH server in
+/opt/apps/chemisttasker-staging/env/staging.test-users.json (permissions 0600).
+An authorised server operator should obtain the relevant credentials and
+provide them privately to the frontend developer. Never commit or print the
+passwords in CI, PR comments or documentation. Staging users bypass only email
+and mobile OTP setup via preseeded verification flags; no real licence or
+identity verification has been performed.
+
+After a successful deployment, the developer uses the normal staging HTTPS API
+via localhost:3000 (Next) and localhost:5173 (Vite). Database access is not
+required for frontend login. If deployment remains queued because the OVH
+self-hosted runner is offline, the accounts cannot yet be considered available.
+
 ## Review workflow
 
 1. Make proposed changes in this staging repository.
