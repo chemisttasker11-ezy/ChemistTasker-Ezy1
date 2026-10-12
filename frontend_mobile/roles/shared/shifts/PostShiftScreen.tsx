@@ -1,4 +1,4 @@
-import { buildShiftPostingPayload, validateShiftPostingDraft, shiftsDomain, type ShiftPostingDraft } from '@chemisttasker/shared-core';
+import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, type ShiftPostingDraft } from '@chemisttasker/shared-core';
 import NativeShiftBoardPreview from './NativeShiftBoardPreview';
 import { expandShiftDraftSlots, reconcileShiftDraftRateRows } from '@chemisttasker/shared-core';
 import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults, type SupportEntry } from '@chemisttasker/shared-core';
@@ -958,7 +958,7 @@ export default function PostShiftScreen() {
         );
     };
 
-    const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff: !isPrivateBooking, showNotifyFavoriteStaff: !isPrivateBooking, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, defaultSuperPercent: 11.5, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform } });
+    const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff: !isPrivateBooking, showNotifyFavoriteStaff: !isPrivateBooking, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform } });
 
     const handleSubmit = async () => {
         setError('');
@@ -1139,7 +1139,7 @@ export default function PostShiftScreen() {
                     />
                 );
             case 'review':
-                return <NativeShiftBoardPreview shift={shiftsDomain.mapShift({ ...buildShiftPostingPayload(postingDraft()), id: 0, pharmacy_detail: selectedPharmacy } as any)} />;
+                return <NativeShiftBoardPreview shift={buildShiftPostingPreview(postingDraft(), selectedPharmacy) as any} />;
             default: return null;
         }
     };

@@ -122,8 +122,6 @@ export const WEEK_DAYS = [
 
 export const DAY_LABELS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export const DEFAULT_SUPER_PERCENT = 11.5;
-
 export const toIsoDate = (value: string): Date | null => {
   if (!value) return null;
   const trimmed = value.trim();

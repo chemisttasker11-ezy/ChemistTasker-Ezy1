@@ -1,5 +1,5 @@
 import { useShiftDescriptionTemplate } from './useShiftDescriptionTemplate';
-import { buildShiftPostingPayload, validateShiftPostingDraft, type ShiftPostingDraft } from '@chemisttasker/shared-core';
+import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, type ShiftPostingDraft } from '@chemisttasker/shared-core';
 import { useShiftPricing } from './useShiftPricing';
 import { useShiftTimetable } from './useShiftTimetable';
 import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults, type SupportEntry } from '@chemisttasker/shared-core';
@@ -26,7 +26,6 @@ import {
   fetchActiveShiftDetailService,
   createOwnerShiftService,
   updateOwnerShiftService,
-  shiftsDomain,
 } from '@chemisttasker/shared-core';
 import PostShiftWizardShell, { type PostShiftWizardStep } from './PostShiftWizardShell';
 import PostShiftDetailsStep from './PostShiftDetailsStep';
@@ -41,7 +40,6 @@ import {
   getSlotRateValue,
   firstPresent,
   formatPostShiftError,
-  DEFAULT_SUPER_PERCENT,
   toInputDateTimeLocal,
   normalizePrefillRole,
   ORG_ROLE_VALUES,
@@ -441,23 +439,11 @@ const PostShiftForm: React.FC<PostShiftFormProps> = ({
     ...(renderPreview ? [{ key: 'review', label: 'Review', icon: ScanEye, tone: 'violet' as const }] : []),
   ], [isLocumLike, renderPreview]);
 
-  const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility, escalationDates, editingShiftId, postAnonymously, defaultSuperPercent: DEFAULT_SUPER_PERCENT });
+  const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility, escalationDates, editingShiftId, postAnonymously });
   const buildPayload = () => buildShiftPostingPayload(postingDraft());
 
   // shortcut: the preview leaves out server-computed fields (distance, ratings); fine for a pre-post check.
-  const previewShift = (): Shift => {
-    const payload = buildPayload();
-    return shiftsDomain.mapShift({
-      ...payload,
-      id: 0,
-      created_at: new Date().toISOString(),
-      pharmacy_detail: selectedPharmacy ?? null,
-      slots: expandedSlots.map((slot, index) => ({
-        id: index + 1, date: slot.date, start_time: slot.startTime, end_time: slot.endTime,
-        rate: slotRateRows[index]?.rate || null,
-      })),
-    } as any) as Shift;
-  };
+  const previewShift = (): Shift => buildShiftPostingPreview(postingDraft(), selectedPharmacy) as Shift;
 
   const handleSubmit = async () => {
     const validation = validateShiftPostingDraft(postingDraft());

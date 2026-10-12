@@ -1,4 +1,4 @@
-> Current local follow-up: [review fixes and gate status](REVIEW_FIXES_2026-10-12.md). The publication status below is historical. New fixes are local only; do not claim remote CI, device or staging acceptance.
+> Start with [current successor-PR handover](REVIEW_FIXES_2026-10-12.md), [reviewer cross-check](REVIEW_CROSSCHECK_2026-10-12.md) and [reusable test ledger](TEST_LEDGER_2026-10-12.md). The publication status below is historical. The user requested a new PR from review/pr165-consolidated-20261012 and has no intention to merge PR165. Do not repeat unchanged passing checks or claim unperformed hosted/native/staging acceptance.
 
 # PR165 current handover — 12 October 2026
 

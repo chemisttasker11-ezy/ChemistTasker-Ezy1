@@ -1,53 +1,42 @@
-# PR165 review fixes — local only, 12 October 2026
+# Current reviewer-fix handover
 
-Latest direction: work locally. No follow-up fixes have been pushed. PR165 remains draft; do not call it mergeable until the pending gates below are completed. Baseline is the local reviewed merge `4fcdf69` of remote main into design/pr165-skills (published PR head was `e449427`).
+Read [the reviewer cross-check](REVIEW_CROSSCHECK_2026-10-12.md) and [the reusable test ledger](TEST_LEDGER_2026-10-12.md) before doing more work. These supersede the earlier pending lists in the archived handovers. The user explicitly requested the current and previous handover copies accompany the code; synthetic users, credentials, launchers, SDKs and raw artifacts remain ignored.
 
-## Changes implemented
+## Branch and authority
 
-- Backend Docker contexts now include the canonical skills registry, packaged at `/opt/chemisttasker/skills_registry.json`. A single cached loader fails closed on missing/malformed data; validation no longer bypasses the catalog. Added packaged-path/malformed-resource tests.
-- Shared web UI is an explicit local package with host peer dependencies. Next imports its package exports; shared UI no longer imports a Next-host RoleTile. Copied local packages resolve peers inside each host. Next standalone Docker context/tracing includes shared code.
-- Vite dev aliases canonical compiled shared-core output; unified startup rebuilds core and forces dependency refresh, addressing the missing `automaticShiftEscalationDates` export.
-- Private-booking partial PATCH derives allowed tiers after applying the effective booking state. HTTP tests cover description, slots, retarget and unauthorized edits.
-- Pharmacy instant claims use the accepted membership role as employment approval. Claimed dispensing skills alone cannot assign an assistant to technician work without that approved role. Discovery/application still accept unverified role-eligible skill claims. Shared backend helper also covers staff engagement terms.
-- Staging fixture composition moved from users to testing to remove the inherited onboarding/users module cycle; dependency allowlists unchanged.
-- Payroll pharmacy overview reads the canonical `pharmacy_id` query key, fixing settings routing. Two GST separators restored to UTF-8 bullets.
-- Wiring job uses the ref checkout already fetched, avoiding an unauthenticated fetch.
-- Web posting form reduced from about 1,452 to about 740 lines. Timetable, pricing and template controllers own their work; one shared shifts-domain builder/validator constructs web/native posting payloads. Recurrence/rate-row identity remains in draftSlots. Native template and guide saves use shared domain APIs.
-- Native Details includes travel, accommodation and urgency; Timetable includes flexible timing. Native Review projects the same payload through the actual native board card. No duplicate native payload builder.
-- Shared-core artifact installation copies only the validated packed package, preserving locked host dependencies. CI package audit explicitly distinguishes copied local packages from mobile links. Generated `.ci-artifacts/` stays ignored.
-- Hermetic browser runner explicitly excludes the separately hosted real Next/Django login journey; full-stack acceptance continues to include it.
+The user requested a successor PR from `review/pr165-consolidated-20261012` containing all accumulated local PR165 work. PR165 itself is not to be updated or merged. No launch-branch commits are included. `13ec2c1` is not an ancestor; no launch-branch collision occurred locally. Origin main was rechecked at `0a010859377d595cf6f4672f0b3f9ea3ab201192`, already incorporated by `4fcdf69`.
 
-## Evidence already collected
+- `53dc83f`: packaging, private PATCH, staff scope, payroll routing, shared posting/controllers, native fields/review and CI/harness corrections.
+- `54dbc58`: current-role booked biography/CV, request-scoped feed permission cache, clean candidate reveal acceptance and reviewer cross-check.
+- The current worktree also factors review-card projection and the locum Super Guarantee default into shared-core; both web and Expo preview call the same shared mapper. The native Pharmacy GST separator is repaired. See the ledger's verification refresh for targeted checks against these latest edits.
 
-- Backend CI-label matrix: 946 tests, passed, 43 skips (SQLite-specific unavailable/concurrency cases are not acceptance successes).
-- Additional backend suites: public hub 17; editorial 20; worker finance 51; 16 attendance/roster unittest commands all passed. System check passed, no model migration changes detected.
-- Shared core: 27 files, 198 tests passed, including dedicated privacy, notification edit suppression, date-rate override, salary-contract and extras regressions.
-- Vite, Next and Expo typechecks passed before clean-install repetition; fresh Expo typecheck also passed.
-- Browser: 160 passed, 3 skipped; 24 appearance cases passed without baseline changes, including the eight reported pharmacy cases. One real-stack test failed because it was launched against the Vite-only preview. Dedicated authenticated rerun remains required.
-- Architecture, core boundary, package/transport strict typing, native tab route and static wiring audits passed. No ownership allowlist expansion.
-- Production backend and Next images built. Backend image imports/system check passed with packaged registry. Standalone Next `/login` and three static resources returned HTTP 200 (HTML alone is not hydrated login acceptance).
-- API URL/migration/Celery identity and schema are identical. The complete multi-persona API replay is identical with APP_ENV=test and identical feature flags. Initial differences were local environment loading, not code changes.
+No merge, deployment, live database migration or real outbound messaging occurred. The successor PR should remain draft until the outstanding acceptance checks below are completed. Publishing a review branch is not approval to release it.
 
-## Pending gates and environment notes
+## Completed fixes and structure
 
-1. Complete PostgreSQL migration/concurrency run, normalized API identity/replay, final exact-source backend gate including added resource tests.
-2. Windows live Vite process held a native dependency DLL during npm ci. That broke the first authenticated run. Stop/restart only this checkout's development stack, restore locked dependencies, reinstall fresh core artifact and rerun the isolated authenticated suite.
-3. Repeat clean Vite typecheck/build and hermetic browser suite. Next production build already exercises isolated npm ci and typecheck.
-4. Android production bundle export passed after applying the repository-required postinstall patches (the initial install incorrectly skipped scripts). Emulator was initially deferred, then the user authorized installing one; official Android tools/JDK installation is now in progress. Device-level acceptance remains unverified; iOS/staging unavailable under local-only direction.
-5. Record final wiring differences against main, update this ledger and local handovers; verify generated data remains ignored. No push under current instruction.
+The functional review defects are corrected: dedicated bookings stay private without embedding; concrete staff subtype resolves centrally; Expo carries/render skills and software; empty presets and widening mode survive navigation; success completion runs once; recurrence and custom date rates are preserved. Pharmacy context is expanded-only under Pharmacy services. Current account role selects onboarding even with historical rows; private booked bio/CV now use the same lookup.
 
-Logs, copied fixtures, generated artifacts and synthetic env files are under ignored `playground/`/`.e2e/`. Never force-add them. Earlier evidence is historical; do not claim current exact-commit or native/staging acceptance from it.
+Canonical skills data is packaged into backend images. One fail-closed registry loader owns normalization. Shared UI has its own package boundary; Next no longer relies on sibling-host dependency resolution. Vite starts from freshly built compiled core, resolving the missing export. Shared shifts draft construction/validation serves both web and native, with focused host controllers. Backend models remain in their owning domains; no ownership allowlist expansion was used.
 
-Update: live Vite browser import confirms automaticShiftEscalationDates and buildShiftPostingPayload are functions. Source alias was replaced by compiled output to preserve TypeScript type-only export erasure. PostgreSQL migration and 74 concurrency/HTTP tests passed. Final isolated login run and hermetic browser rerun remain in progress.
+Published-rate policy remains in the backend shifts domain; internal staff redaction and email rendering reuse it. Shared client projections consume the explicit visibility flag. Staff agreement snapshots use existing engagement/pricing services. Custom posted rates still override pharmacy guides. The feed permission cache reuses decisions within one request/pharmacy; it does not introduce another policy or a global permission cache.
 
-## Latest local gate update
+The claims-versus-verification, Other Staff eligibility, instant-staffing scope, private-booking and agreed-rate policies are listed verbatim in the cross-check. Do not change them while fixing acceptance tooling. In particular, unverified individual skill evidence must not become a new application gate.
 
-- Final browser regression run: 160 passed, 3 skipped; all 24 appearance baselines unchanged. Earlier kiosk failure was bootstrap timing; test now waits for pharmacy scope and verifies the selected tab before checking the device. Targeted revoke passed, then the full suite passed.
-- Backend: 946 passed, 43 skipped; PostgreSQL migrations and 74 concurrency/HTTP tests passed. Public hub/editorial/finance and all 16 additional attendance unittest commands passed. No existing database migrated.
-- Shared core: 198 tests passed. Vite/Next/Expo typechecks passed; backend/Next production images built and booted. Android bundle export passed with required postinstall patches applied.
-- API replay and URL/auth/permission/migration/task identity are identical to reviewed main-merge baseline, as is OpenAPI schema. Use APP_ENV=test to prevent local environment files affecting comparisons.
-- Real authenticated Next/Vite/Django acceptance: 2/2 passed: owner cookie refresh, CSRF, scope and logout; delegated manager pharmacy isolation and unauthorized route recovery.
-- Live development browser import confirms automaticShiftEscalationDates and buildShiftPostingPayload are functions in canonical compiled output.
-- Emulator installation authorized and in progress. Android CLI/Temurin archives had verified SHA256 hashes. Native device and staging acceptance are still outstanding; no push performed.
+## Current verification
 
-Native setup update: official API 35 x86_64 emulator is installed, hardware acceleration is usable, and adb reports boot completed. SDK/JDK paths are under workspace-level playground/native-tools, not source control. Isolated Android prebuild uses synthetic Firebase configuration, localreview package ID and disabled production updates. Debug APK compilation is waiting on NDK installation; the legacy Java download stalled, so the same Google archive is being installed with repository-checksum verification. No device-level app acceptance has passed yet.
+The exact application checkpoint `54dbc58` has 948 backend tests run (43 skipped), 198 shared-core tests passed, 160 browser cases passed (3 skipped), all 24 appearance baselines unchanged, all host typechecks passed and architecture/package/wiring checks passed. Additional backend suites and 16 attendance/roster commands passed. Next route tests pass after replacing obsolete inline-grouping expectations with the current shared component contract. Mobile lint and dependency checks pass; initial direct invocation lacked the required npm environment and is recorded separately.
+
+Fresh synthetic Student candidates saved dispensing/software claims via the normal onboarding API and reloaded them. Real owner browser review/reveal passed; the unrevealed counteroffer stayed anonymous and reveal returned no email/CV. Historical/invalid data remains a separate negative regression. Old seeded users are not a policy oracle.
+
+Production backend/Next images built and booted. Actual authenticated Next/Vite/Django tests passed owner cookie/CSRF/logout and delegated pharmacy isolation. Final API identity/schema/replay are identical to 4fcdf69. Final PostgreSQL migration rehearsal and 74 tests passed. Android export, debug APK build, emulator installation, owner login/dashboard, shift-center navigation and the candidate counter-offer review dialog passed. The dialog showed a synthetic Student's role, claimed dispensing skill, software, verification badges and proposed terms. Full native onboarding, talent, posting and roster journeys have not passed yet; the current posting-preview edits also postdate the APK build and need a rebuilt APK.
+
+See the ledger for precise tested checkpoints, commands, logs, earlier baseline comparison and reuse instructions. Do not rerun the complete package solely because a previous handover says it is pending.
+
+## Work still required
+
+1. Native Android journeys: onboarding, talent, post-shift preview and roster acceptance remain. The candidate counter-offer review is now visually verified. Rebuild/reinstall the APK before accepting the latest shared posting-preview change. The isolated copied app initially generated a wrong router entry because dependencies are junctioned; an ignored `index.js` wrapper corrects the manifest path. Earlier emulator System UI ANR and dev-server timeout/404 are environment/harness evidence, not acceptance successes. Keep any harness adjustments outside source.
+2. iOS native acceptance needs a Mac/iOS runner; none is available here.
+3. Kiosk Rust suite: Windows attempted `cargo test --locked --offline`; missing Perl, then Git's incomplete Perl modules prevented vendored OpenSSL configuration. No kiosk application files changed. Run the existing Linux CI job, or use a complete native Windows Perl/build toolchain; do not rerun unrelated passing web tests for this.
+4. Hosted successor-PR CI, including Linux/platform-specific runtime audit and wiring checkout evidence, then staging multi-persona acceptance. Local image boot is not staging approval. Do not describe every CI job as passed while these remain unresolved.
+
+The separate launch branch is excluded. The user has no intention to merge PR165; its historical handovers are reference records only.

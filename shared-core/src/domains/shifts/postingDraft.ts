@@ -1,5 +1,10 @@
 import { buildShiftDraftSlotPayload, type ShiftDraftSlot, type ShiftDraftOccurrence } from './draftSlots';
 import { isPrivateShiftBooking } from './visibility';
+import { mapShift } from './mappers';
+import type { ShiftApi } from '../../types';
+
+/** Australian Superannuation Guarantee rate from 1 July 2025; the locum "super on top" default. */
+export const SUPER_GUARANTEE_PERCENT = 12;
 
 /** Pure posting state shared by web and native; host presentation/state stays outside this domain. */
 export interface ShiftPostingDraft {
@@ -9,7 +14,7 @@ export interface ShiftPostingDraft {
   editingShiftId: string | number | null; flexibleTiming: boolean; singleUserOnly: boolean;
   postAnonymously: boolean; canPostAnonymously: boolean; hasTravel: boolean; hasAccommodation: boolean; isUrgent: boolean;
   slots: ShiftDraftSlot[]; expandedSlots: ShiftDraftOccurrence[]; slotRateRows: { rate: string }[];
-  rateType: string; ownerBonus: string; paymentPreference: string; locumSuperIncluded: boolean; defaultSuperPercent: number;
+  rateType: string; ownerBonus: string; paymentPreference: string; locumSuperIncluded: boolean;
   rateWeekday: string; rateSaturday: string; rateSunday: string; ratePublicHoliday: string; rateEarlyMorning: string; rateLateNight: string;
   ftptPayMode: 'HOURLY' | 'ANNUAL'; minHourly: string; maxHourly: string; minAnnual: string; maxAnnual: string; superPercent: string;
   showNotifyPharmacyStaff: boolean; showNotifyFavoriteStaff: boolean; showNotifyChainMembers: boolean;
@@ -44,7 +49,7 @@ export function buildShiftPostingPayload(draft: ShiftPostingDraft): Record<strin
     payload[`escalate_to_${tier.toLowerCase()}`] = privateBooking ? null : draft.escalationDates[tier] || null;
   }
   if (privateBooking) payload.dedicated_user = draft.dedicatedUserId;
-  if (locum) payload.super_percent = draft.locumSuperIncluded ? draft.defaultSuperPercent : 0;
+  if (locum) payload.super_percent = draft.locumSuperIncluded ? SUPER_GUARANTEE_PERCENT : 0;
   if (draft.roleNeeded === 'PHARMACIST') {
     for (const [field,value] of Object.entries({weekday:draft.rateWeekday,saturday:draft.rateSaturday,sunday:draft.rateSunday,public_holiday:draft.ratePublicHoliday,early_morning:draft.rateEarlyMorning,late_night:draft.rateLateNight})) payload[`rate_${field}`] = value || null;
   }
@@ -57,4 +62,14 @@ export function buildShiftPostingPayload(draft: ShiftPostingDraft): Record<strin
     ? {min_hourly_rate:draft.minHourly||null,max_hourly_rate:draft.maxHourly||null,min_annual_salary:null,max_annual_salary:null,super_percent:null}
     : {min_hourly_rate:null,max_hourly_rate:null,min_annual_salary:draft.minAnnual||null,max_annual_salary:draft.maxAnnual||null,super_percent:draft.superPercent||null});
   return payload;
+}
+
+/** Review card for an unsaved draft: the submitted payload, shown with one slot per concrete date as workers see it. */
+export function buildShiftPostingPreview(draft: ShiftPostingDraft, pharmacyDetail: unknown) {
+  return mapShift({
+    ...buildShiftPostingPayload(draft), id: 0, created_at: new Date().toISOString(), pharmacy_detail: pharmacyDetail ?? null,
+    slots: draft.expandedSlots.map((slot, index) => ({
+      id: index + 1, date: slot.date, start_time: slot.startTime, end_time: slot.endTime, rate: draft.slotRateRows[index]?.rate || null,
+    })),
+  } as unknown as ShiftApi);
 }

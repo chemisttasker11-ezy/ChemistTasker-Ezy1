@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildShiftPostingPayload, validateShiftPostingDraft, type ShiftPostingDraft } from './postingDraft';
+import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, SUPER_GUARANTEE_PERCENT, type ShiftPostingDraft } from './postingDraft';
 import { expandShiftDraftSlots } from './draftSlots';
 const draft = (): ShiftPostingDraft => ({
   pharmacyId:1, roleNeeded:'PHARMACIST', employmentType:'LOCUM', description:'Review draft',
@@ -9,7 +9,7 @@ const draft = (): ShiftPostingDraft => ({
   hasTravel:true, hasAccommodation:true, isUrgent:true,
   slots:[{date:'2026-10-19',startTime:'09:00',endTime:'17:00',isRecurring:false,recurringDays:[],recurringEndDate:''}],
   expandedSlots:[], slotRateRows:[{rate:'90'}], rateType:'FIXED', ownerBonus:'', paymentPreference:'ABN',
-  locumSuperIncluded:false, defaultSuperPercent:11.5, rateWeekday:'65', rateSaturday:'70', rateSunday:'80',
+  locumSuperIncluded:false, rateWeekday:'65', rateSaturday:'70', rateSunday:'80',
   ratePublicHoliday:'100', rateEarlyMorning:'', rateLateNight:'', ftptPayMode:'HOURLY',
   minHourly:'', maxHourly:'', minAnnual:'', maxAnnual:'', superPercent:'',
   showNotifyPharmacyStaff:true, showNotifyFavoriteStaff:true, showNotifyChainMembers:true,
@@ -31,5 +31,17 @@ describe('shared posting payload', () => {
   it('switches salary contracts without stale hourly or locum terms', () => {
     expect(buildShiftPostingPayload({...draft(),employmentType:'FULL_TIME',ftptPayMode:'ANNUAL',minAnnual:'80000',maxAnnual:'100000',superPercent:'12'})).toMatchObject({min_hourly_rate:null,max_hourly_rate:null,min_annual_salary:'80000',max_annual_salary:'100000',super_percent:'12',payment_preference:null});
     expect(validateShiftPostingDraft({...draft(),slots:[]})).toBe('Add at least one date before posting.');
+  });
+  it('adds super at the current guarantee rate when a locum post includes it', () => {
+    expect(SUPER_GUARANTEE_PERCENT).toBe(12);
+    expect(buildShiftPostingPayload({...draft(),locumSuperIncluded:true})).toHaveProperty('super_percent',12);
+  });
+  it('previews every concrete date of a weekly repeat, not only the recurrence base', () => {
+    const input={...draft(),slots:[{date:'2026-10-19',startTime:'09:00',endTime:'17:00',isRecurring:true,recurringDays:[1],recurringEndDate:'2026-11-02'}],slotRateRows:[]};
+    input.expandedSlots=expandShiftDraftSlots(input.slots);
+    expect(buildShiftPostingPayload(input).slots).toHaveLength(1);
+    const preview=buildShiftPostingPreview(input,{name:'Test Pharmacy'});
+    expect(preview.slots.map((slot:any)=>[slot.id,slot.date])).toEqual([[1,'2026-10-19'],[2,'2026-10-26'],[3,'2026-11-02']]);
+    expect(preview.pharmacyDetail).toEqual({name:'Test Pharmacy'});
   });
 });
