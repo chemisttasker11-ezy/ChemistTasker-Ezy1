@@ -36,13 +36,13 @@ jobs:
         run: |
           output="$(cd "$STAGING_DIR" && bash scripts/deploy-staging.sh)"
           printf '%s\n' "$output"
-          preview_url="$(printf '%s\n' "$output" | sed -n 's/^PREVIEW_URL=//p' | tail -n 1)"
-          test -n "$preview_url"
-          echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
+          staging_url="$(printf '%s\n' "$output" | sed -n 's/^STAGING_URL=//p' | tail -n 1)"
+          test -n "$staging_url"
+          echo "staging_url=$staging_url" >> "$GITHUB_OUTPUT"
           {
-            echo "## ChemistTasker staging preview"
+            echo "## ChemistTasker permanent staging"
             echo ""
-            echo "Preview: $preview_url"
+            echo "Staging: $staging_url"
             echo ""
             echo "This deployment runs on the OVH self-hosted runner and uses staging-only PostgreSQL, Redis, volumes and containers."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           cd "$STAGING_DIR"
-          bash scripts/smoke-staging.sh "${{ steps.deploy.outputs.preview_url }}"
+          bash scripts/smoke-staging.sh "${{ steps.deploy.outputs.staging_url }}"
 
       - name: Smoke-test summary
         shell: bash
