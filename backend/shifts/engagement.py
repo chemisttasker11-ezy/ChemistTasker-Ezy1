@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from memberships.models import Membership
+from shifts.access import staff_membership_can_claim_role
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 
 PHARMACY_STAFF_TYPES = {"FULL_TIME", "PART_TIME", "CASUAL"}
@@ -527,7 +528,7 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
     if staff_membership:
         membership_role = str(staff_membership.role or "").upper()
         shift_role = str(shift.role_needed or "").upper()
-        if membership_role != shift_role:
+        if not staff_membership_can_claim_role(staff_membership, shift_role):
             raise ValidationError({
                 "role": (
                     f"This worker is a {membership_role.replace('_', ' ').title()} member of the pharmacy "

@@ -164,6 +164,9 @@ def revise_shift(
         })
     # Validate the new slots before changing anything, and apply the whole edit atomically.
     protect_direct_booking(validated_data, instance=instance)
+    if 'visibility' in validated_data and allowed_tiers is None:
+        from shifts.escalation import allowed_tiers as pharmacy_allowed_tiers
+        allowed_tiers = pharmacy_allowed_tiers(instance.pharmacy)
     slots_data = normalize_slots_payload(slots_payload) if slots_payload is not None else None
     with transaction.atomic():
         # If visibility is changing, recalc escalation_level

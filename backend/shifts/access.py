@@ -39,6 +39,17 @@ def _normalized_role_code(value):
     return raw
 
 
+def staff_membership_can_claim_role(membership, role_needed):
+    """Instant staffing relies on the pharmacy-accepted employment role, not a new skill claim."""
+    role = _normalized_role_code(getattr(membership, 'role', None))
+    vacancy = _normalized_role_code(role_needed)
+    if vacancy == 'ASSISTANT':
+        return role in {'ASSISTANT', 'TECHNICIAN', 'INTERN', 'STUDENT'}
+    if vacancy == 'TECHNICIAN':
+        return role in {'TECHNICIAN', 'INTERN', 'STUDENT'}
+    return role == vacancy
+
+
 def _otherstaff_onboarding_role(user):
     onboarding = OtherStaffOnboarding.objects.filter(user=user).first()
     return _normalized_role_code(getattr(onboarding, "role_type", None))

@@ -1,6 +1,6 @@
 import registry from '@chemisttasker/shared-core/skills_registry.json';
 import { skillLabel as resolveSkillLabel } from '@chemisttasker/shared-core';
-import { SkillSymbol } from '../../shared/SkillGlyph';
+import { SkillSymbol } from '@chemisttasker/shared-ui/SkillGlyph';
 
 export function skillLabel(value: string): string { return resolveSkillLabel(registry as any, value); }
 export default function SkillIcon({ skill, size = 16, className }: { skill: string; size?: number; className?: string }) {

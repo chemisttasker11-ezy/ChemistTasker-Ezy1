@@ -8,6 +8,7 @@ import {
   Surface,
   Text,
   TextInput,
+  Switch,
 } from 'react-native-paper';
 import {
   formatAuDate,
@@ -27,6 +28,7 @@ type CalendarCell = {
 };
 
 type Props = {
+  flexibleTiming: boolean; setFlexibleTiming: Setter<boolean>;
   selectedDates: string[];
   setSelectedDates: Setter<string[]>;
   slotDate: string;
@@ -72,6 +74,7 @@ const chipTextStyle = (selected: boolean) =>
   selected ? styles.chipTextSelected : styles.chipText;
 
 export default function PostShiftTimetableStep({
+  flexibleTiming, setFlexibleTiming,
   selectedDates,
   setSelectedDates,
   slotDate,
@@ -108,6 +111,11 @@ export default function PostShiftTimetableStep({
   removeSlot,
 }: Props) {
   return (
+    <>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingVertical:8}}>
+        <Text>Start and finish times can move a little</Text>
+        <Switch accessibilityLabel="Start and finish times can move a little" value={flexibleTiming} onValueChange={setFlexibleTiming} />
+      </View>
     <Surface style={styles.card} elevation={1}>
       <View style={styles.slotHeader}>
         <Text style={styles.label}>Your dates</Text>
@@ -491,5 +499,6 @@ export default function PostShiftTimetableStep({
         )}
       </View>
     </Surface>
+    </>
   );
 }

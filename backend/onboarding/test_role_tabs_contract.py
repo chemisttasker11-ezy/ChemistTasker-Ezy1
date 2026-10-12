@@ -25,7 +25,7 @@ STORAGES = {
 }
 PDF = b"%PDF-1.7\nsynthetic-test-content"
 CATALOG = {
-    "pharmacist": {"clinical_services": [{"code": "VAX", "requires_certificate": True}, {"code": "SECOND", "requires_certificate": True}, {"code": "DAA"}]},
+    "pharmacist": {"clinical_services": [{"code": "VAX", "requires_certificate": True}, {"code": "SECOND", "requires_certificate": True}, {"code": "DAA"}, {"code":"OTHER"}]},
     "otherstaff": {"dispense_software": [{"code": "FRED", "requires_certificate": True}]},
 }
 ROLES = {
@@ -43,6 +43,17 @@ def pdf(name="doc.pdf"):
 @contextmanager
 def skills_catalog(catalog):
     """Serve `catalog` from the skills catalog loader wherever it lives."""
+    # Unit fixtures use synthetic codes, but still exercise the canonical eligibility shape.
+    if 'skills' not in catalog:
+        entries = {}
+        for role, groups in catalog.items():
+            for items in groups.values():
+                for item in items:
+                    entry = entries.setdefault(item['code'], {**item, 'eligibility': {}})
+                    entry['eligibility'].update({'PHARMACIST': 'independent', 'ASSISTANT': 'supervised'})
+                    if item.get('requires_certificate'):
+                        entry['certificate'] = 'Evidence'
+        catalog = {'skills': list(entries.values())}
     with ExitStack() as stack:
         for module_name in ("onboarding.serializers", "onboarding.services.skills"):
             try:

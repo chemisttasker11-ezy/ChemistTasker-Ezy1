@@ -4,17 +4,30 @@ The authoritative labels/aliases live in shared-core/skills_registry.json.
 No fuzzy matching: an arbitrary free-text claim must never satisfy a job requirement.
 """
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from rest_framework import serializers
 
 
 @lru_cache(maxsize=1)
 def registry():
-    file_path = Path(settings.BASE_DIR).parent / "shared-core" / "skills_registry.json"
-    with file_path.open(encoding="utf-8") as source:
-        return json.load(source)
+    file_path = Path(os.environ.get('SKILLS_REGISTRY_PATH') or (Path(settings.BASE_DIR).parent / 'shared-core' / 'skills_registry.json'))
+    try:
+        with file_path.open(encoding='utf-8') as source:
+            data = json.load(source)
+        if not isinstance(data, dict) or not isinstance(data.get('skills'), list) or not data['skills']:
+            raise ValueError('Expected a non-empty canonical skills registry')
+        for skill in data['skills']:
+            if not isinstance(skill, dict) or not isinstance(skill.get('code'), str) or not isinstance(skill.get('eligibility'), dict):
+                raise ValueError('Invalid canonical skill entry')
+        if not isinstance(data.get('other_staff_qualifications', {}).get('dispensary'), list):
+            raise ValueError('Missing dispensing qualification vocabulary')
+        return data
+    except (OSError, ValueError, TypeError) as exc:
+        raise ImproperlyConfigured(f'Canonical skills registry is missing or malformed: {file_path}') from exc
 
 
 @lru_cache(maxsize=1)

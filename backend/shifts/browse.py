@@ -23,6 +23,7 @@ from django.db.models import Count, F, Q
 from django.utils import timezone
 from shifts.pricing import get_locked_rate_for_slot
 from shifts.engagement import staff_assignment_defaults
+from shifts.access import staff_membership_can_claim_role
 from shifts.emails import build_roster_email_link, build_shift_email_context
 from django.conf import settings
 from core.task_queue import async_task
@@ -326,6 +327,13 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                     request, shift, "role_mismatch",
                     f"This shift requires a {shift.role_needed}, but your role is {effective_user_role}.",
                     "shift_claim_role_mismatch",
+                )
+
+            if not staff_membership_can_claim_role(membership, shift.role_needed):
+                return _claim_refused(
+                    request, shift, 'employment_role_mismatch',
+                    'Your pharmacy employment role does not cover this instant assignment. Express interest so the owner can review your claimed skills and supervision.',
+                    'shift_claim_employment_role_mismatch',
                 )
 
             # --- 5. Check if shift already taken ---

@@ -9,6 +9,7 @@ const STEP: Record<StepKey, { label: string; icon: string; tone: string }> = {
   skills: { label: 'Skills', icon: 'check-decagram-outline', tone: '#1F4FBF' },
   visibility: { label: 'Who sees it', icon: 'radar', tone: '#0B6577' },
   timetable: { label: 'Dates', icon: 'calendar-clock', tone: '#A1179A' },
+  review: { label: 'Review', icon: 'clipboard-check-outline', tone: '#4A1FA8' },
   payrate: { label: 'Pay', icon: 'wallet-outline', tone: '#1F4FBF' },
 };
 const BRAND = '#5222B8';

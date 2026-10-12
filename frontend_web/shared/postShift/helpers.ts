@@ -302,3 +302,23 @@ export const pharmacyHoursForDate = (
 };
 
 export const ORG_ROLE_VALUES = ORG_ROLES as readonly string[];
+
+export const formatPostShiftError = (err: any): string => {
+    const fallback = err?.message || 'An error occurred.';
+    const data = err?.response?.data;
+    if (!data) return fallback;
+    if (typeof data === 'string') return data;
+    if (Array.isArray(data)) return data.join('; ');
+    if (typeof data === 'object') {
+      const parts: string[] = [];
+      Object.entries(data).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          parts.push(`${key}: ${value.join(', ')}`);
+        } else if (typeof value === 'string') {
+          parts.push(`${key}: ${value}`);
+        }
+      });
+      return parts.length ? parts.join('; ') : fallback;
+    }
+    return fallback;
+  };

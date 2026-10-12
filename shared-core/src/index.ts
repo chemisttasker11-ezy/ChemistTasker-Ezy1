@@ -73,6 +73,8 @@ export * from './skills';
 export * from './pharmacyProfile';
 export * from './domains/shifts/skillPresets';
 export * from './domains/shifts/visibility';
+export * from './domains/shifts/postingDraft';
+export * from './domains/shifts/descriptionTemplates';
 export * from './domains/shifts/workProfile';
 export * from './domains/shifts/draftSlots';
 export * from './domains/talent/presentation';

@@ -1,8 +1,8 @@
 import { showPublishedShiftRates } from '@chemisttasker/shared-core';
 import React from 'react';
 import SkillIcon, { skillLabel } from '@/public/skill-icon';
-import { ShiftRequirementDetails, ShiftRequirementSummary } from '../../../../../../../shared/ShiftRequirements';
-import { PharmacyContextDetails } from '../../../../../../../shared/PharmacyContext';
+import { ShiftRequirementDetails, ShiftRequirementSummary } from '@chemisttasker/shared-ui/ShiftRequirements';
+import { PharmacyContextDetails } from '@chemisttasker/shared-ui/PharmacyContext';
 import {
   Box,
   Button,

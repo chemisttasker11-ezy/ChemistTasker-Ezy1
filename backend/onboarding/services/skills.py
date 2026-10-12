@@ -10,24 +10,10 @@ from django.utils.text import slugify
 from rest_framework import serializers
 
 from core.file_validation import DOCUMENT_UPLOAD_POLICY, validate_uploaded_file
-from onboarding.services.skill_identity import canonical_skill
-
-_SKILLS_CATALOG_CACHE = None
-
+from onboarding.services.skill_identity import canonical_skill, registry
 
 def _load_skills_catalog():
-    global _SKILLS_CATALOG_CACHE
-    if _SKILLS_CATALOG_CACHE is not None:
-        return _SKILLS_CATALOG_CACHE
-    from django.conf import settings
-    base_dir = settings.BASE_DIR.parent
-    catalog_path = base_dir / "shared-core" / "skills_registry.json"
-    try:
-        with open(catalog_path, "r", encoding="utf-8") as f:
-            _SKILLS_CATALOG_CACHE = json.load(f)
-    except Exception:
-        _SKILLS_CATALOG_CACHE = {}
-    return _SKILLS_CATALOG_CACHE
+    return registry()
 
 
 def _required_cert_skill_codes(role_key: str) -> set[str]:
@@ -51,9 +37,9 @@ def _role_for_skills(instance, role_key: str):
 
 def _canonical_skills(instance, requested: list[str], role_key: str) -> list[str]:
     catalog = _load_skills_catalog()
-    if "skills" not in catalog:
-        # Preserve existing tab-test fixtures and older deployed catalog format.
-        return requested
+    if not isinstance(catalog.get('skills'), list):
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured('Canonical skills registry is required for onboarding claims')
     skills = {item["code"]: item for item in catalog.get("skills", [])}
     allowed = {"PHARMACIST", "INTERN", "TECHNICIAN", "ASSISTANT", "STUDENT"}
     role = _role_for_skills(instance, role_key)

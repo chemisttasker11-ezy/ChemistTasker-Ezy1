@@ -6,7 +6,7 @@ import React from 'react';
 import { Box, Collapse, IconButton, InputAdornment, Stack, TextField } from '@mui/material';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 import { findSkill, skillLabel, softwareSubgroups } from '@chemisttasker/shared-core';
-import { SkillSymbol } from '../../../shared/SkillGlyph';
+import { SkillSymbol } from '@chemisttasker/shared-ui/SkillGlyph';
 import {
   CommuteOutlined as CommuteIcon,
   ExpandLess as ExpandLessIcon,

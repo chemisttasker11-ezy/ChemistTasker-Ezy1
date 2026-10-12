@@ -286,6 +286,26 @@ class AvailabilityMatchTests(ShiftPostingFixture):
 
 
 class PostingDefaultsTests(ShiftPostingFixture):
+    def test_dedicated_booking_partial_edits_keep_privacy_without_visibility_input(self):
+        worker = self.member('LOCUM')
+        response, _ = self.post_shift(dedicated_user=worker.id, visibility='LOCUM_CASUAL')
+        self.assertEqual(response.status_code, 201, response.data)
+        shift_id = response.data['id']
+        replacement = self.member('LOCUM')
+        for payload in (
+            {'description': 'Updated private booking'},
+            {'slots': [{'date': DAY.isoformat(), 'start_time':'09:00', 'end_time':'17:00', 'rate':'80.00'}]},
+            {'dedicated_user': replacement.id},
+        ):
+            with self.subTest(payload=list(payload)), queued_emails():
+                updated = client_for(self.owner).patch(f'{API}shifts/{shift_id}/', payload, format='json')
+                self.assertEqual(updated.status_code, 200, updated.data)
+                shift = Shift.objects.get(pk=shift_id)
+                self.assertEqual(shift.visibility, 'LOCUM_CASUAL')
+                self.assertIsNone(shift.escalate_to_platform)
+        unauthorized = client_for(worker).patch(f'{API}shifts/{shift_id}/', {'description':'Unauthorized'}, format='json')
+        self.assertIn(unauthorized.status_code, (403,404))
+
     def test_direct_booking_ignores_widening_and_broadcast_controls(self):
         worker = self.member('LOCUM')
         colleague = self.member('FULL_TIME')

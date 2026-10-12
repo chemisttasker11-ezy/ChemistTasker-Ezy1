@@ -1,4 +1,4 @@
-# ─── Python / Django ──────────────────────────────────────────────
+# â”€â”€â”€ Python / Django â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # virtualenvs
 venv/
 **/venv/
@@ -77,7 +77,7 @@ backend/hub-local.sqlite3
 backend/content-test.sqlite3
 
 
-# ─── Frontend (Vite / Node) ────────────────────────────────────────
+# â”€â”€â”€ Frontend (Vite / Node) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 node_modules/
 dist/
 dist-kiosk/
@@ -92,7 +92,7 @@ frontend_mobile/.env
 frontend_mobile/.env.local
 frontend_mobile/.env.production
 
-# ─── Miscellaneous ─────────────────────────────────────────────────
+# â”€â”€â”€ Miscellaneous â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # OS and editor
 .vscode/*
 !.vscode/settings.json
@@ -100,7 +100,7 @@ frontend_mobile/.env.production
 *.log
 *.tmp
 
-# Trash / docs folders you don’t want in Git
+# Trash / docs folders you donâ€™t want in Git
 trash/
 screenshots/
 frontend_web_old/
@@ -109,7 +109,7 @@ verification_outputs/
 ocr_verification
 **/jobs/
 
-# ─── Azure Safe Deploy Additions (DO NOT REMOVE) ───────────────────
+# â”€â”€â”€ Azure Safe Deploy Additions (DO NOT REMOVE) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Prevent accidental GLIBC issues from local builds
 .python_packages/
 **/.python_packages/
@@ -133,7 +133,7 @@ frontend_mobile/steps.txt
 frontend_web/src-tauri/target/
 
 
-# ─── Public repository secret hygiene ─────────────────────────────
+# â”€â”€â”€ Public repository secret hygiene â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Ignore every dotenv variant by default; only explicit examples/templates may be committed.
 .env.*
 !.env.example
@@ -195,3 +195,4 @@ GoogleService-Info.plist
 BACKEND_FRONTEND_FULL_COVERAGE_AUDIT.md
 END_TO_END_DOMAIN_LOGIC_AUDIT.md
 github_guidance.md
+.ci-artifacts/

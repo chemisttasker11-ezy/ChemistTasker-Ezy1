@@ -7,7 +7,7 @@ from django.test import SimpleTestCase, TestCase
 from memberships.models import Membership
 from organizations.models import Organization, Pharmacy
 from users.models import OrganizationMembership, User
-from users.staging_test_data import (
+from testing.staging_test_data import (
     PERSONAS, demo_email, require_staging_database,
     seed_demo_data, validate_credentials,
 )

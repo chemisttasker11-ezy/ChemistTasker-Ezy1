@@ -9,6 +9,8 @@ const baseURL = `http://127.0.0.1:${port}`;
 export default defineConfig({
   testDir: '.',
   testMatch: /.*\.spec\.mjs/,
+  // The real Next/Django login journey is run by its full-stack acceptance job.
+  testIgnore: process.env.PLAYWRIGHT_HERMETIC === '1' ? ['**/real-stack.spec.mjs'] : [],
   timeout: 30_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,

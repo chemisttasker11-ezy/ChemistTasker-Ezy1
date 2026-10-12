@@ -157,7 +157,7 @@ fi
 chmod 600 "$TEST_USERS_FILE"
 # Wait for successful migrations before this step; never print credentials.
 compose exec -T web python manage.py shell -c \
-  'from users.staging_test_data import seed_from_stdin; seed_from_stdin()' \
+  'from testing.staging_test_data import seed_from_stdin; seed_from_stdin()' \
   < "$TEST_USERS_FILE"
 
 for _ in $(seq 1 60); do

@@ -10,6 +10,7 @@ import {
   Surface,
   Text,
   TextInput,
+  Switch,
 } from 'react-native-paper';
 import {
   EMPLOYMENT_TYPES,
@@ -22,6 +23,9 @@ import { styles } from './PostShiftScreen.styles';
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
 type Props = {
+  hasTravel: boolean; setHasTravel: Setter<boolean>;
+  hasAccommodation: boolean; setHasAccommodation: Setter<boolean>;
+  isUrgent: boolean; setIsUrgent: Setter<boolean>;
   pharmacyMenuVisible: boolean;
   setPharmacyMenuVisible: Setter<boolean>;
   pharmacies: PharmacyOption[];
@@ -57,6 +61,7 @@ const chipTextStyle = (selected: boolean) =>
   selected ? styles.chipTextSelected : styles.chipText;
 
 export default function PostShiftDetailsStep({
+  hasTravel, setHasTravel, hasAccommodation, setHasAccommodation, isUrgent, setIsUrgent,
   pharmacyMenuVisible,
   setPharmacyMenuVisible,
   pharmacies,
@@ -161,6 +166,16 @@ export default function PostShiftDetailsStep({
       <Text style={styles.label}>On the day</Text>
       <ShiftContextFields workload={workloadTags} support={supportOnShift}
         onWorkloadChange={setWorkloadTags} onSupportChange={setSupportOnShift} />
+      <Text style={styles.label}>Extras</Text>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+        <Text>Travel provided</Text><Switch accessibilityLabel="Travel provided" value={hasTravel} onValueChange={setHasTravel} />
+      </View>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+        <Text>Accommodation provided</Text><Switch accessibilityLabel="Accommodation provided" value={hasAccommodation} onValueChange={setHasAccommodation} />
+      </View>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+        <Text>Urgent shift</Text><Switch accessibilityLabel="Urgent shift" value={isUrgent} onValueChange={setIsUrgent} />
+      </View>
     </Surface>
   );
 }

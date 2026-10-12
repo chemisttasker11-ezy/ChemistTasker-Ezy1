@@ -671,7 +671,8 @@ test('pharmacist membership accept uses the existing my-memberships action endpo
 
 
 test('workforce kiosk revoke uses the existing scoped manager kiosk contract', async ({ page }) => {
-  await installApiFixture(page, roleUsers.admin);
+  const manager = { ...roleUsers.admin, admin_assignments: roleUsers.admin.admin_assignments.map(assignment => ({ ...assignment, admin_level: 'MANAGER' })) };
+  await installApiFixture(page, manager);
 
   let revoked = false;
   let observed = null;
@@ -740,7 +741,11 @@ test('workforce kiosk revoke uses the existing scoped manager kiosk contract', a
   });
 
   await page.goto('/dashboard/workforce/settings?pharmacy_id=101');
-  await page.getByRole('tab', { name: 'Kiosk devices' }).click();
+  await page.waitForLoadState('networkidle');
+  const kioskTab = page.getByRole('tab', { name: 'Kiosk devices' });
+  await expect(kioskTab).toBeEnabled();
+  await kioskTab.click();
+  await expect(kioskTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByText('Smoke Kiosk')).toBeVisible();
 
   await page.getByRole('button', { name: 'Revoke' }).click();

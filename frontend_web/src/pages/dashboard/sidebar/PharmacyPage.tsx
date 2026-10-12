@@ -530,9 +530,9 @@ export default function PharmacyPage({
             {abnGstRegistered == null ? "-" : abnGstRegistered ? "Yes" : "No"}
             {abnGstRegistered ? (
               <>
-                {" ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ "}
+                {" • "}
                 <strong>From:</strong> {formatDate(abnGstFrom)}
-                {abnGstTo ? <> {" ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ "} <strong>To:</strong> {formatDate(abnGstTo)}</> : null}
+                {abnGstTo ? <> {" • "} <strong>To:</strong> {formatDate(abnGstTo)}</> : null}
               </>
             ) : null}
           </li>

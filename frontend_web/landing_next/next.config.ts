@@ -26,6 +26,8 @@ const viteDashboardPrefixes=[
 const config:NextConfig={
  poweredByHeader:false,
  output:'standalone',
+ outputFileTracingRoot:path.resolve(__dirname,'../..'),
+ transpilePackages:['@chemisttasker/shared-ui'],
  skipTrailingSlashRedirect:true,
  // Include the repository root so Turbopack can resolve the linked
  // file:../../shared-core package used by local installs.

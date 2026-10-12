@@ -6,6 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
+ENV SKILLS_REGISTRY_PATH=/opt/chemisttasker/skills_registry.json
+COPY shared-core/skills_registry.json /opt/chemisttasker/skills_registry.json
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -28,10 +30,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY backend/ .
 RUN sed -i 's/\r$//' /app/entrypoint.sh \
     && chmod +x /app/entrypoint.sh \
     && adduser --disabled-password --gecos "" appuser \

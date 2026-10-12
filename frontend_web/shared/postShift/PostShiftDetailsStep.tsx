@@ -3,7 +3,7 @@ import { ShiftContextFields } from '../PharmacyProfileFields';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { Box, Button, ButtonBase, MenuItem, Stack, Switch, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { BedDouble, Car, Siren } from 'lucide-react';
-import { RoleTile } from '../../landing_next/shared-ui/talent/RoleTile';
+import { RoleTile } from '../RoleTile';
 import type { PharmacyOption, ShiftDescriptionTemplate } from './helpers';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
