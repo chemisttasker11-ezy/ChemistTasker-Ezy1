@@ -1,3 +1,5 @@
+import { projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 ﻿import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Alert, Box, Button, Chip, Divider, Drawer, IconButton, Paper, Stack, Pagination, Typography, Dialog } from "@mui/material";
@@ -15,7 +17,7 @@ import DashboardContentState from "../../../../components/dashboard/DashboardCon
 import FiltersSidebar, { TalentFilterState } from "./components/FiltersSidebar";
 const PostShiftPage = lazy(() => import("../PostShiftPage"));
 import { Candidate } from "./types";
-import { formatRoleLabel, formatWorkType, mapRoleToShiftRole, mapAvailabilityToPitchSlots, allWorkTypes, codeToLabel, codeToCategory, isIsoDate, todayIso } from "./talentModel";
+import { formatRoleLabel, formatWorkType, mapAvailabilityToPitchSlots, allWorkTypes, resolveTalentSkillLabel, isIsoDate, todayIso } from "./talentModel";
 import { useAuth } from "../../../../contexts/AuthContext";
 import {
   canPublishTalent,
@@ -138,19 +140,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       const showCalendar = !isFullTimeApplication && availableDates.length > 0;
 
       const rawSkills = Array.from(new Set([...(post.software ?? []), ...(post.skills ?? [])])).filter(Boolean) as string[];
-      const clinicalServices: string[] = [];
-      const dispenseSoftware: string[] = [];
-      const expandedScope: string[] = [];
-      const otherSkills: string[] = [];
-      rawSkills.forEach((code) => {
-        const label = codeToLabel.get(code) ?? code;
-        const category = codeToCategory.get(code);
-        if (category === "clinical_services") clinicalServices.push(label);
-        else if (category === "dispense_software") dispenseSoftware.push(label);
-        else if (category === "expanded_scope") expandedScope.push(label);
-        else otherSkills.push(label);
-      });
-      const skills = Array.from(new Set([...clinicalServices, ...expandedScope, ...otherSkills])).filter(Boolean) as string[];
+      const { clinicalServices, dispenseSoftware, expandedScope, skills } = projectTalentSkills(skillsRegistry as any, rawSkills);
       const ratingFromPostAverageRaw =
         (post as any).ratingAverage ??
         (post as any).rating_average ??
@@ -364,10 +354,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       if (endTime) params.set("end_time", String(endTime).slice(0, 5));
     }
     params.set("dedicated_user", String(targetUserId));
-    const shiftRole =
-      mapRoleToShiftRole(candidate.rawRoleCategory) ||
-      mapRoleToShiftRole(candidate.explorerRoleType) ||
-      mapRoleToShiftRole(candidate.role);
+    const shiftRole = resolveTalentBookingRole(candidate.rawRoleCategory, candidate.explorerRoleType, candidate.role);
     if (shiftRole) {
       params.set("role", shiftRole);
       params.set("role_needed", shiftRole);
@@ -947,7 +934,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
                   <Chip key={r} label={r} onDelete={() => toggleFilter("roles", r)} />
                 ))}
                 {filters.skills.map((s: string) => (
-                  <Chip key={s} label={s} onDelete={() => toggleFilter("skills", s)} />
+                  <Chip key={s} label={resolveTalentSkillLabel(s)} onDelete={() => toggleFilter("skills", s)} />
                 ))}
                 <Button size="small" onClick={clearAllFilters} sx={{ ml: "auto", minHeight: 32 }}>
                   Clear all

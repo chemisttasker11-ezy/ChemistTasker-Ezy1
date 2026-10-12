@@ -4,6 +4,7 @@ from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, Pharmaci
 from talent.models import ExplorerPost, ExplorerPostReaction
 import uuid
 import json
+from onboarding.services.skill_identity import normalize_skills
 
 
 class ExplorerPostReadSerializer(serializers.ModelSerializer):
@@ -77,33 +78,61 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
             return getattr(obj.explorer_profile, "role_type", None)
         return obj.role_title or obj.role_category
 
-    def _get_onboarding_skills(self, obj):
+    def _onboarding(self, obj):
+        """(skill role, saved skills) for the post author, looked up once per author per request."""
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
-        if not user:
-            return []
-        try:
+        if not user or obj.role_category not in ("PHARMACIST", "OTHER_STAFF"):
+            return None, []
+        cache = self.__dict__.setdefault("_onboarding_cache", {})
+        key = (obj.role_category, user.pk)
+        if key not in cache and not self.__dict__.get("_onboarding_bulk_loaded"):
+            self._bulk_load_onboarding(cache)
+        if key not in cache:
             if obj.role_category == "PHARMACIST":
-                po = PharmacistOnboarding.objects.filter(user=user).first()
-                return list(po.skills or []) if po else []
-            if obj.role_category == "OTHER_STAFF":
-                so = OtherStaffOnboarding.objects.filter(user=user).first()
-                return list(so.skills or []) if so else []
-            # Explorers do not expose skills on TalentBoard.
-            return []
-        except Exception:
-            return []
+                profile = PharmacistOnboarding.objects.filter(user=user).only("skills").first()
+                cache[key] = ("PHARMACIST", list(getattr(profile, "skills", None) or []))
+            else:
+                profile = OtherStaffOnboarding.objects.filter(user=user).only("skills", "role_type").first()
+                cache[key] = (getattr(profile, "role_type", None) or "UNKNOWN", list(getattr(profile, "skills", None) or []))
+        return cache[key]
+
+    def _bulk_load_onboarding(self, cache):
+        """One query per onboarding model for every author on the page being serialised."""
+        self._onboarding_bulk_loaded = True
+        posts = getattr(self.parent, "instance", None) if self.parent is not None else None
+        if not isinstance(posts, (list, tuple)):
+            try:
+                posts = list(posts) if posts is not None else []
+            except TypeError:
+                posts = []
+        users = {}
+        for post in posts:
+            author = getattr(post, "author_user", None) or getattr(getattr(post, "explorer_profile", None), "user", None)
+            if author is not None and getattr(post, "role_category", None) in ("PHARMACIST", "OTHER_STAFF"):
+                users.setdefault(post.role_category, set()).add(author.pk)
+        for row in PharmacistOnboarding.objects.filter(user_id__in=users.get("PHARMACIST", ())).only("user_id", "skills"):
+            cache[("PHARMACIST", row.user_id)] = ("PHARMACIST", list(row.skills or []))
+        for row in OtherStaffOnboarding.objects.filter(user_id__in=users.get("OTHER_STAFF", ())).only("user_id", "skills", "role_type"):
+            cache[("OTHER_STAFF", row.user_id)] = (row.role_type or "UNKNOWN", list(row.skills or []))
+
+    def _get_onboarding_skills(self, obj):
+        return self._onboarding(obj)[1]
 
     def get_skills(self, obj):
-        # Always prefer onboarding skills for Pharmacist/Other Staff.
+        # Always prefer onboarding skills for Pharmacist/Other Staff, limited to the author's current role.
         if obj.role_category in ("PHARMACIST", "OTHER_STAFF"):
-            return self._get_onboarding_skills(obj)
+            role, skills = self._onboarding(obj)
+            return normalize_skills(skills, allowed_role=role, matchable_only=True)
         # Explorers do not expose skills on TalentBoard.
         if obj.role_category == "EXPLORER":
             return []
-        return list(obj.skills or []) if obj.skills else self._get_onboarding_skills(obj)
+        return normalize_skills(list(obj.skills or []))
 
     def get_software(self, obj):
-        return list(obj.software or []) if obj.software else []
+        if obj.role_category == 'EXPLORER':
+            return []
+        # Software belongs to the same current role-compatible onboarding claims.
+        return normalize_skills(self.get_skills(obj), matchable_only=True, software_only=True)
 
     def get_travel_states(self, obj):
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
@@ -217,6 +246,29 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
                 attrs["software"] = json.loads(software)
             except Exception:
                 raise serializers.ValidationError({"software": "Invalid JSON list."})
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        role = attrs.get('role_category', getattr(self.instance, 'role_category', None))
+        if user and user.is_authenticated and role is None:
+            role = user.role
+            attrs['role_category'] = role
+        if user and user.is_authenticated and role != user.role:
+            raise serializers.ValidationError({'role_category': 'Use your current account role for your talent post.'})
+        skill_role = role
+        if role == 'OTHER_STAFF':
+            profile = OtherStaffOnboarding.objects.filter(user=user).first() if user else None
+            skill_role = getattr(profile, 'role_type', None) or 'UNKNOWN'
+        # Explorer interests stay separate; professional claims respect the current role.
+        for field in ("skills", "software"):
+            if field in attrs:
+                if role == "EXPLORER":
+                    attrs[field] = []  # Never expose Explorer interests as professional capabilities.
+                else:
+                    try:
+                        attrs[field] = normalize_skills(attrs[field], strict=True, allowed_role=skill_role,
+                                                       matchable_only=True, software_only=field == 'software')
+                    except serializers.ValidationError as error:
+                        raise serializers.ValidationError({field: error.detail})
         availability_days = attrs.get("availability_days")
         if isinstance(availability_days, str):
             try:

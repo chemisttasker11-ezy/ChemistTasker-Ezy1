@@ -1,3 +1,5 @@
+import type { SupportEntry } from '@chemisttasker/shared-core';
+import { ShiftContextFields } from '../pharmacies/PharmacyProfileFields';
 import type { Dispatch, SetStateAction } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import {
@@ -8,11 +10,11 @@ import {
   Surface,
   Text,
   TextInput,
+  Switch,
 } from 'react-native-paper';
 import {
   EMPLOYMENT_TYPES,
   ROLE_OPTIONS,
-  WORKLOAD_TAGS,
   type PharmacyOption,
   type ShiftDescriptionTemplate,
 } from './PostShiftScreen.helpers';
@@ -21,6 +23,9 @@ import { styles } from './PostShiftScreen.styles';
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
 type Props = {
+  hasTravel: boolean; setHasTravel: Setter<boolean>;
+  hasAccommodation: boolean; setHasAccommodation: Setter<boolean>;
+  isUrgent: boolean; setIsUrgent: Setter<boolean>;
   pharmacyMenuVisible: boolean;
   setPharmacyMenuVisible: Setter<boolean>;
   pharmacies: PharmacyOption[];
@@ -40,6 +45,12 @@ type Props = {
   setDescription: Setter<string>;
   workloadTags: string[];
   setWorkloadTags: Setter<string[]>;
+  supportOnShift: SupportEntry[];
+  setSupportOnShift: Setter<SupportEntry[]>;
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  PHARMACIST: 'Pharmacist', INTERN: 'Intern pharmacist', TECHNICIAN: 'Dispensary technician', ASSISTANT: 'Assistant', STUDENT: 'Pharmacy student',
 };
 
 const chipStyle = (selected: boolean) => [
@@ -50,6 +61,7 @@ const chipTextStyle = (selected: boolean) =>
   selected ? styles.chipTextSelected : styles.chipText;
 
 export default function PostShiftDetailsStep({
+  hasTravel, setHasTravel, hasAccommodation, setHasAccommodation, isUrgent, setIsUrgent,
   pharmacyMenuVisible,
   setPharmacyMenuVisible,
   pharmacies,
@@ -69,106 +81,62 @@ export default function PostShiftDetailsStep({
   setDescription,
   workloadTags,
   setWorkloadTags,
+  supportOnShift,
+  setSupportOnShift,
 }: Props) {
+  const pharmacyName = pharmacies.find((pharmacy) => pharmacy.id === pharmacyId)?.name;
   return (
     <Surface style={styles.card} elevation={1}>
-      <Text style={styles.label}>Pharmacy</Text>
-      <Menu
-        visible={pharmacyMenuVisible}
-        onDismiss={() => setPharmacyMenuVisible(false)}
-        anchor={
-          <TouchableOpacity style={styles.selector} onPress={() => setPharmacyMenuVisible(true)}>
-            <Text style={styles.selectorText}>
-              {pharmacies.find((pharmacy) => pharmacy.id === pharmacyId)?.name || 'Select pharmacy'}
-            </Text>
-            <IconButton icon="chevron-down" size={18} />
-          </TouchableOpacity>
-        }
-      >
-        {pharmacies.map((pharmacy) => (
-          <Menu.Item
-            key={pharmacy.id}
-            onPress={() => {
-              setPharmacyId(pharmacy.id);
-              setPharmacyMenuVisible(false);
-            }}
-            title={pharmacy.name || `Pharmacy ${pharmacy.id}`}
-          />
-        ))}
-      </Menu>
-
-      <Text style={styles.label}>Role Needed</Text>
-      <View style={styles.pills}>
+      <Text style={styles.label}>Who do you need?</Text>
+      <View style={styles.pills} accessibilityRole="radiogroup">
         {ROLE_OPTIONS.map((role) => {
           const selected = roleNeeded === role;
           return (
-            <Chip
-              key={role}
-              selected={selected}
-              onPress={() => setRoleNeeded(role)}
-              style={chipStyle(selected)}
-              textStyle={chipTextStyle(selected)}
-            >
-              {role}
+            <Chip key={role} selected={selected} onPress={() => setRoleNeeded(role)} accessibilityRole="radio"
+              accessibilityState={{ checked: selected }} style={chipStyle(selected)} textStyle={chipTextStyle(selected)}>
+              {ROLE_LABELS[role] ?? role}
             </Chip>
           );
         })}
       </View>
 
-      <Text style={styles.label}>Employment Type</Text>
+      <Text style={styles.label}>Type of work</Text>
       <View style={styles.pills}>
         {EMPLOYMENT_TYPES.map((employment) => {
-          const selected =
-            employmentType === employment ||
-            (employment === 'LOCUM' && employmentType === 'CASUAL');
+          const selected = employmentType === employment || (employment === 'LOCUM' && employmentType === 'CASUAL');
           return (
-            <Chip
-              key={employment}
-              selected={selected}
-              onPress={() => setEmploymentType(employment)}
-              style={chipStyle(selected)}
-              textStyle={chipTextStyle(selected)}
-            >
+            <Chip key={employment} selected={selected} onPress={() => setEmploymentType(employment)}
+              style={chipStyle(selected)} textStyle={chipTextStyle(selected)}>
               {getEmploymentLabel(employment)}
             </Chip>
           );
         })}
       </View>
 
-      <Text style={styles.label}>Description</Text>
-      <Text style={styles.templateStatus}>
-        {descriptionTemplateLoading
-          ? 'Loading role description template...'
-          : descriptionTemplate?.description
-            ? 'Role description template available'
-            : 'No role description template saved yet'}
-      </Text>
-      <View style={styles.templateActions}>
-        <Button
-          mode="outlined"
-          compact
-          disabled={!descriptionTemplate?.description}
-          onPress={handleUseDescriptionTemplate}
-          style={styles.templateButton}
-        >
-          Use Template
-        </Button>
-        <Button
-          mode="contained"
-          compact
-          loading={descriptionTemplateSaving}
-          disabled={
-            descriptionTemplateSaving ||
-            !pharmacyId ||
-            !roleNeeded ||
-            !description.trim()
-          }
-          onPress={handleSaveDescriptionTemplate}
-          style={styles.templateButton}
-        >
-          Save as Template
-        </Button>
-      </View>
+      {pharmacies.length > 1 ? (
+        <>
+          <Text style={styles.label}>Pharmacy</Text>
+          <Menu
+            visible={pharmacyMenuVisible}
+            onDismiss={() => setPharmacyMenuVisible(false)}
+            anchor={
+              <TouchableOpacity style={styles.selector} onPress={() => setPharmacyMenuVisible(true)}>
+                <Text style={styles.selectorText}>{pharmacyName || 'Select pharmacy'}</Text>
+                <IconButton icon="chevron-down" size={18} />
+              </TouchableOpacity>
+            }
+          >
+            {pharmacies.map((pharmacy) => (
+              <Menu.Item key={pharmacy.id} title={pharmacy.name || `Pharmacy ${pharmacy.id}`}
+                onPress={() => { setPharmacyId(pharmacy.id); setPharmacyMenuVisible(false); }} />
+            ))}
+          </Menu>
+        </>
+      ) : (
+        <Text style={styles.templateStatus}>Pharmacy: {pharmacyName || 'Loading…'}</Text>
+      )}
+
+      <Text style={styles.label}>About the shift</Text>
       <TextInput
         mode="outlined"
         value={description}
@@ -176,31 +144,37 @@ export default function PostShiftDetailsStep({
         multiline
         numberOfLines={3}
         style={styles.input}
-        placeholder="Duties, expectations, notes"
+        label="Description"
+        placeholder="For example: busy community pharmacy, Webster packs on Tuesdays."
       />
+      <View style={styles.templateActions}>
+        {descriptionTemplate?.description ? (
+          <Button mode="text" compact onPress={handleUseDescriptionTemplate} style={styles.templateButton}>Use saved description</Button>
+        ) : null}
+        <Button
+          mode="text"
+          compact
+          loading={descriptionTemplateSaving}
+          disabled={descriptionTemplateLoading || descriptionTemplateSaving || !pharmacyId || !roleNeeded || !description.trim()}
+          onPress={handleSaveDescriptionTemplate}
+          style={styles.templateButton}
+        >
+          Save for future shifts
+        </Button>
+      </View>
 
-      <Text style={styles.label}>Workload Tags</Text>
-      <View style={styles.pills}>
-        {WORKLOAD_TAGS.map((tag) => {
-          const selected = workloadTags.includes(tag);
-          return (
-            <Chip
-              key={tag}
-              selected={selected}
-              onPress={() =>
-                setWorkloadTags((current) =>
-                  current.includes(tag)
-                    ? current.filter((value) => value !== tag)
-                    : [...current, tag],
-                )
-              }
-              style={chipStyle(selected)}
-              textStyle={chipTextStyle(selected)}
-            >
-              {tag}
-            </Chip>
-          );
-        })}
+      <Text style={styles.label}>On the day</Text>
+      <ShiftContextFields workload={workloadTags} support={supportOnShift}
+        onWorkloadChange={setWorkloadTags} onSupportChange={setSupportOnShift} />
+      <Text style={styles.label}>Extras</Text>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+        <Text>Travel provided</Text><Switch accessibilityLabel="Travel provided" value={hasTravel} onValueChange={setHasTravel} />
+      </View>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+        <Text>Accommodation provided</Text><Switch accessibilityLabel="Accommodation provided" value={hasAccommodation} onValueChange={setHasAccommodation} />
+      </View>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+        <Text>Urgent shift</Text><Switch accessibilityLabel="Urgent shift" value={isUrgent} onValueChange={setIsUrgent} />
       </View>
     </Surface>
   );

@@ -172,6 +172,13 @@ class Pharmacy(models.Model):
     # Employment & roles
     employment_types       = models.JSONField(default=list, blank=True)
     roles_needed           = models.JSONField(default=list, blank=True)
+    # Software the pharmacy runs (skill registry codes): one per category, e.g. its dispensing system and DAA software.
+    software               = models.JSONField(default=list, blank=True)
+    # Services the pharmacy offers (skill registry codes from pharmacy_profile.service_codes); context on its shifts.
+    services               = models.JSONField(default=list, blank=True)
+    # Typical scripts a day as registry band codes (pharmacy_profile.script_volume_bands); weekends often differ.
+    script_volume_weekday  = models.CharField(max_length=20, blank=True, default='')
+    script_volume_weekend  = models.CharField(max_length=20, blank=True, default='')
     use_chemisttasker_payroll = models.BooleanField(
         default=False,
         help_text=(

@@ -104,6 +104,16 @@ export function createSleekTheme(mode: Mode): Theme {
             "--ct-tone-cyan-fg": isLight ? "#007486" : "#7FDCE6",
             "--ct-tone-magenta-bg": isLight ? "#FCE6F8" : alpha("#D63BC4", 0.18),
             "--ct-tone-magenta-fg": isLight ? "#A3008F" : "#F09BE4",
+            // Skill symbols: navy linework over two brand tints (shared/SkillGlyph.tsx).
+            "--ct-skill-ink": isLight ? "#06214A" : "#E9EEF8",
+            "--ct-skill-violet-fill": isLight ? "#CBBBF6" : alpha("#8B6CF0", 0.45),
+            "--ct-skill-cyan-fill": isLight ? "#A3E9F0" : alpha("#22B8C9", 0.45),
+            "--ct-skill-magenta-fill": isLight ? "#F5BDEF" : alpha("#D63BC4", 0.45),
+            "--ct-skill-blue-fill": isLight ? "#A9D6F5" : alpha("#3F9BE8", 0.45),
+            "--ct-skill-violet-arc": isLight ? "#8B6CF0" : "#B9A5F5",
+            "--ct-skill-cyan-arc": isLight ? "#22B8C9" : "#5FD9E6",
+            "--ct-skill-magenta-arc": isLight ? "#D63BC4" : "#F09BE4",
+            "--ct-skill-blue-arc": isLight ? "#3F9BE8" : "#8CC6F5",
             // Status tones (booked / waiting / declined). Foregrounds keep >= 4.5:1 on their own tint.
             "--ct-status-green-bg": isLight ? "#E4F5EA" : alpha("#34C27A", 0.18),
             "--ct-status-green-fg": isLight ? "#17663A" : "#8EE0B3",

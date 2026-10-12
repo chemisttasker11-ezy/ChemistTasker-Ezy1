@@ -1,3 +1,5 @@
+import { PharmacyProfileFields } from './PharmacyProfileFields';
+import { PharmacySoftwareFields } from './PharmacySoftwareFields';
 // Pharmacy Form - Create/Edit Pharmacy
 // Full Parity with Web Dashboard
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -126,6 +128,8 @@ export default function PharmacyForm({
             public_holidays_closed: false,
         },
         rolesNeeded: [] as string[],
+        software: [] as string[],
+        pharmacyProfile: { services: [] as string[], weekday: '', weekend: '' },
     });
     const [loading, setLoading] = useState(mode === 'edit');
     const [saving, setSaving] = useState(false);
@@ -180,6 +184,8 @@ export default function PharmacyForm({
     // Lists logic
     const [employmentTypes, setEmploymentTypes] = useState<string[]>([]);
     const [rolesNeeded, setRolesNeeded] = useState<string[]>([]);
+    const [software, setSoftware] = useState<string[]>([]);
+    const [pharmacyProfile, setPharmacyProfile] = useState({ services: [] as string[], weekday: '', weekend: '' });
 
     // Files
     const [files, setFiles] = useState<{
@@ -217,6 +223,8 @@ export default function PharmacyForm({
         setForm(initial.form);
         setEmploymentTypes(initial.employmentTypes);
         setRolesNeeded(initial.rolesNeeded);
+        setSoftware(initial.software);
+        setPharmacyProfile(initial.pharmacyProfile);
         setExistingFiles(initial.existingFiles);
         setFiles({ approval: null, sops: null, induction: null, sump: null });
         unsaved.markClean({
@@ -224,10 +232,12 @@ export default function PharmacyForm({
             files: { approval: null, sops: null, induction: null, sump: null },
             form: initial.form,
             rolesNeeded: initial.rolesNeeded,
+            software: initial.software,
+            pharmacyProfile: initial.pharmacyProfile,
         });
     };
     const unsaved = useUnsavedChangesGuard(
-        { form, employmentTypes, rolesNeeded, files },
+        { form, employmentTypes, rolesNeeded, software, pharmacyProfile, files },
         { enabled: !loading, onDiscard: resetToSavedState, saving }
     );
 
@@ -319,17 +329,24 @@ export default function PharmacyForm({
                 applyAbnMeta(data);
                 setEmploymentTypes(nextEmploymentTypes);
                 setRolesNeeded(nextRolesNeeded);
+                setSoftware(data.software || []);
+                const nextProfile = { services: data.services || [], weekday: data.script_volume_weekday ?? data.scriptVolumeWeekday ?? '', weekend: data.script_volume_weekend ?? data.scriptVolumeWeekend ?? '' };
+                setPharmacyProfile(nextProfile);
                 setExistingFiles(nextExistingFiles);
                 initialStateRef.current = {
                     employmentTypes: nextEmploymentTypes,
                     existingFiles: nextExistingFiles,
                     form: nextForm,
                     rolesNeeded: nextRolesNeeded,
+                    software: data.software || [],
+                    pharmacyProfile: nextProfile,
                 };
                 unsaved.markClean({
                     form: nextForm,
                     employmentTypes: nextEmploymentTypes,
                     rolesNeeded: nextRolesNeeded,
+                    software: data.software || [],
+                    pharmacyProfile: nextProfile,
                     files: { approval: null, sops: null, induction: null, sump: null },
                 });
 
@@ -349,9 +366,11 @@ export default function PharmacyForm({
             existingFiles,
             form,
             rolesNeeded,
+            software,
+            pharmacyProfile,
         };
         applyAbnMeta(null);
-        unsaved.markClean({ form, employmentTypes, rolesNeeded, files });
+        unsaved.markClean({ form, employmentTypes, rolesNeeded, software, pharmacyProfile, files });
     }, []);
 
     const handlePickFile = async (key: keyof typeof files) => {
@@ -458,6 +477,10 @@ export default function PharmacyForm({
         });
         payload.employment_types = employmentTypes;
         payload.roles_needed = rolesNeeded;
+        payload.software = software;
+        payload.services = pharmacyProfile.services;
+        payload.script_volume_weekday = pharmacyProfile.weekday;
+        payload.script_volume_weekend = pharmacyProfile.weekend;
         if (submittedForVerification) {
             payload.submitted_for_verification = true;
         }
@@ -551,6 +574,10 @@ export default function PharmacyForm({
                 // Text fields
                 Object.entries(payload).forEach(([k, v]) => {
                     if (v === null || v === undefined) return;
+                    if (k === 'software' || k === 'services') {
+                        formData.append(k, JSON.stringify(v));
+                        return;
+                    }
                     if (Array.isArray(v)) {
                         v.forEach(item => formData.append(k, String(item)));
                         return;
@@ -587,6 +614,8 @@ export default function PharmacyForm({
                 form,
                 employmentTypes,
                 rolesNeeded,
+                software,
+                pharmacyProfile,
                 files: { approval: null, sops: null, induction: null, sump: null },
             });
             initialStateRef.current = {
@@ -594,6 +623,8 @@ export default function PharmacyForm({
                 existingFiles,
                 form,
                 rolesNeeded,
+                software,
+                pharmacyProfile,
             };
             if (afterSave) afterSave();
             else if (onSuccess) onSuccess();
@@ -1024,6 +1055,12 @@ export default function PharmacyForm({
                                             })}
                                         </View>
                                     </View>
+
+                                    <PharmacySoftwareFields value={software} onChange={setSoftware} />
+                                    <PharmacyProfileFields services={pharmacyProfile.services} weekday={pharmacyProfile.weekday} weekend={pharmacyProfile.weekend}
+                                      onServicesChange={services => setPharmacyProfile(current => ({ ...current, services }))}
+                                      onWeekdayChange={weekday => setPharmacyProfile(current => ({ ...current, weekday }))}
+                                      onWeekendChange={weekend => setPharmacyProfile(current => ({ ...current, weekend }))} />
                                 </>
                             )}
 

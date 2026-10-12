@@ -20,6 +20,24 @@ API = "/api/v1/"
 
 
 class ClaimEligibilityTests(TestCase):
+    def test_assistant_claim_does_not_replace_pharmacy_approved_technician_employment_role(self):
+        from onboarding.models import OtherStaffOnboarding
+        worker = make_user('OTHER_STAFF')
+        OtherStaffOnboarding.objects.create(user=worker,role_type='ASSISTANT',skills=['PRESCRIPTION_DISPENSING'],dispensary_qualification='LEVEL_3')
+        membership = Membership.objects.create(user=worker,pharmacy=self.pharmacy,role='ASSISTANT',employment_type='FULL_TIME',status=Membership.Status.ACCEPTED,is_active=True)
+        shift = Shift.objects.create(pharmacy=self.pharmacy,created_by=self.owner,role_needed='TECHNICIAN',employment_type='CASUAL',visibility='FULL_PART_TIME')
+        ShiftSlot.objects.create(shift=shift,date=date.today()+timedelta(days=7),start_time=time(9),end_time=time(17))
+        with mock.patch('shifts.browse.async_task'):
+            response = client_for(worker).post(f'{API}community-shifts/{shift.id}/claim-shift/',{},format='json')
+        self.assertEqual(response.status_code,403,response.data)
+        self.assertEqual(response.data['code'],'shift_claim_employment_role_mismatch')
+        self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift).exists())
+        # Owner approval of the employment role allows assignment without inventing a verified skill badge.
+        membership.role='TECHNICIAN';membership.save(update_fields=['role'])
+        with mock.patch('shifts.browse.async_task'):
+            accepted = client_for(worker).post(f'{API}community-shifts/{shift.id}/claim-shift/',{},format='json')
+        self.assertEqual(accepted.status_code,201,accepted.data)
+
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy()
 

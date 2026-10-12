@@ -127,8 +127,14 @@ test('public shift search and advanced filters update the server query contract'
 
 test('public shift cards group qualifications instead of repeating Required on every skill', () => {
   const cards = read('migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx');
-  assert.match(cards, /requiredLabels\.join\('  ·  '\)/);
-  assert.match(cards, /preferredLabels\.join\('  ·  '\)/);
+  const requirements = read('../shared/ShiftRequirements.tsx');
+  assert.match(cards, /from '@chemisttasker\/shared-ui\/ShiftRequirements'/);
+  assert.match(cards, /<ShiftRequirementSummary mustHave=\{shift\.mustHave\} niceToHave=\{shift\.niceToHave\}/);
+  assert.match(cards, /<ShiftRequirementDetails mustHave=\{shift\.mustHave\} niceToHave=\{shift\.niceToHave\}/);
+  assert.match(requirements, /shiftRequirementGroups\(reg, mustHave, niceToHave\)/);
+  assert.match(requirements, /row\('Required'/);
+  assert.match(requirements, /row\('Preferred'/);
+  assert.match(requirements, /row\('Software'/);
   assert.match(cards, /!publicPresentation && \(shift\.mustHave \|\| \[\]\)\.map/);
   assert.match(cards, /\{!publicPresentation && <Button\s+onClick=\{\(\) => toggleExpandedCard\(shift\.id\)\}/);
 });

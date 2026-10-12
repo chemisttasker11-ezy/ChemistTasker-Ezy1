@@ -52,6 +52,7 @@ export const mapShift = (api: ShiftApi) => {
         slotAssignments: ensureArray(api.slot_assignments).map(mapShiftAssignment),
         allowedEscalationLevels: ensureArray(api.allowed_escalation_levels ?? base.allowedEscalationLevels),
         workloadTags: ensureArray(api.workload_tags ?? base.workloadTags),
+        supportOnShift: ensureArray(api.support_on_shift ?? base.supportOnShift),
         mustHave: ensureArray(api.must_have ?? base.mustHave),
         niceToHave: ensureArray(api.nice_to_have ?? base.niceToHave),
         interestedMembers: ensureArray(api.interested_members).map(mapShiftMemberStatus),

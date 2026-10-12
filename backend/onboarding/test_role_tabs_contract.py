@@ -25,7 +25,7 @@ STORAGES = {
 }
 PDF = b"%PDF-1.7\nsynthetic-test-content"
 CATALOG = {
-    "pharmacist": {"clinical_services": [{"code": "VAX", "requires_certificate": True}, {"code": "SECOND", "requires_certificate": True}, {"code": "DAA"}]},
+    "pharmacist": {"clinical_services": [{"code": "VAX", "requires_certificate": True}, {"code": "SECOND", "requires_certificate": True}, {"code": "DAA"}, {"code":"OTHER"}]},
     "otherstaff": {"dispense_software": [{"code": "FRED", "requires_certificate": True}]},
 }
 ROLES = {
@@ -43,6 +43,17 @@ def pdf(name="doc.pdf"):
 @contextmanager
 def skills_catalog(catalog):
     """Serve `catalog` from the skills catalog loader wherever it lives."""
+    # Unit fixtures use synthetic codes, but still exercise the canonical eligibility shape.
+    if 'skills' not in catalog:
+        entries = {}
+        for role, groups in catalog.items():
+            for items in groups.values():
+                for item in items:
+                    entry = entries.setdefault(item['code'], {**item, 'eligibility': {}})
+                    entry['eligibility'].update({'PHARMACIST': 'independent', 'ASSISTANT': 'supervised'})
+                    if item.get('requires_certificate'):
+                        entry['certificate'] = 'Evidence'
+        catalog = {'skills': list(entries.values())}
     with ExitStack() as stack:
         for module_name in ("onboarding.serializers", "onboarding.services.skills"):
             try:
@@ -179,7 +190,7 @@ class BasicTabTests(RoleTabFixture):
 
 
 class SkillsTabTests(RoleTabFixture):
-    def test_certificates_are_required_saved_and_removed(self):
+    def test_claims_can_be_saved_without_certificates_and_evidence_can_be_added_removed(self):
         for label, code, message in (
             ("pharmacist", "VAX", "Certificate required for checked skill(s): VAX"),
             ("otherstaff", "FRED", "Certificate required for: FRED"),
@@ -187,7 +198,10 @@ class SkillsTabTests(RoleTabFixture):
             with self.subTest(role=label):
                 user, obj, url = self.onboarding(label)
                 response, _ = self.patch(user, url, {"tab": "skills", "skills": [code]})
-                self.assertEqual((response.status_code, str(response.data["skills"])), (400, message))
+                self.assertEqual(response.status_code, 200, response.data)
+                obj.refresh_from_db()
+                self.assertEqual(obj.skills, [code])
+                self.assertFalse(obj.skill_certificates)
                 response, _ = self.patch(user, url, {"tab": "skills", "skills": "not json"}, multipart=True)
                 self.assertEqual((response.status_code, str(response.data["skills"])),
                                  (400, "Must be a JSON array or list."))
@@ -225,13 +239,13 @@ class SkillsTabTests(RoleTabFixture):
             url,
             {
                 "tab": "skills",
-                "skills": '["VAX", "SECOND"]',
+                "skills": '["VAX", null]',
                 "skill_files[VAX]": pdf("replacement.pdf"),
             },
             multipart=True,
         )
         self.assertEqual(response.status_code, 400, response.data)
-        self.assertIn("SECOND", str(response.data["skills"]))
+        self.assertIn("Skills must be a list of strings", str(response.data["skills"]))
 
         obj.refresh_from_db()
         self.assertEqual(obj.skill_certificates["VAX"]["path"], old_path)
@@ -349,7 +363,7 @@ class ProgressTests(RoleTabFixture):
         # the phone are verified.
         gates = {
             "pharmacist": {"ahpra_verified": True},
-            "otherstaff": {"gov_id_verified": True, "role_type": "ASSISTANT", "certificate_verified": True},
+            "otherstaff": {"gov_id_verified": True, "role_type": "ASSISTANT", "classification_level": "LEVEL_1"},
             "explorer": {"gov_id_verified": True},
         }
         for label, fields in gates.items():

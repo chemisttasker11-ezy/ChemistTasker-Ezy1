@@ -6,6 +6,7 @@ from rest_framework import permissions, status
 from rest_framework.exceptions import APIException
 
 from onboarding.models import OtherStaffOnboarding
+from onboarding.qualifications import has_claimed_dispensing_competency
 
 
 class Http400(APIException):
@@ -36,6 +37,17 @@ def _normalized_role_code(value):
     if raw in {"PHARMACIST", "EXPLORER"}:
         return raw
     return raw
+
+
+def staff_membership_can_claim_role(membership, role_needed):
+    """Instant staffing relies on the pharmacy-accepted employment role, not a new skill claim."""
+    role = _normalized_role_code(getattr(membership, 'role', None))
+    vacancy = _normalized_role_code(role_needed)
+    if vacancy == 'ASSISTANT':
+        return role in {'ASSISTANT', 'TECHNICIAN', 'INTERN', 'STUDENT'}
+    if vacancy == 'TECHNICIAN':
+        return role in {'TECHNICIAN', 'INTERN', 'STUDENT'}
+    return role == vacancy
 
 
 def _otherstaff_onboarding_role(user):
@@ -73,17 +85,20 @@ def _shift_roles_visible_to_user(user):
     if top_role == "EXPLORER":
         return ["EXPLORER"]
     if top_role == "OTHER_STAFF":
-        staff_role = _otherstaff_onboarding_role(user)
+        profile = OtherStaffOnboarding.objects.filter(user=user).first()
+        staff_role = _normalized_role_code(getattr(profile, 'role_type', None))
         # Pharmacy-assistant work is the broad Other Staff entry point and is
-        # visible to every Other Staff subtype. Specialist work stays exact:
-        # intern shifts only to interns, dispensary-technician shifts only to
-        # technicians, and student shifts only to students.
+        # visible to every Other Staff subtype. Intern and student vacancies stay
+        # role-specific; technician vacancies also accept interns/students and
+        # assistants with a dispensing claim, subject to assignment safeguards.
         if staff_role == "INTERN":
-            return ["ASSISTANT", "INTERN"]
+            return ["ASSISTANT", "INTERN", "TECHNICIAN"]
         if staff_role == "TECHNICIAN":
             return ["ASSISTANT", "TECHNICIAN"]
         if staff_role == "STUDENT":
-            return ["ASSISTANT", "STUDENT"]
+            return ["ASSISTANT", "STUDENT", "TECHNICIAN"]
+        if staff_role == "ASSISTANT" and has_claimed_dispensing_competency(profile):
+            return ["ASSISTANT", "TECHNICIAN"]
         return ["ASSISTANT"]
     return ["PHARMACIST", "TECHNICIAN", "ASSISTANT", "EXPLORER", "INTERN", "STUDENT"]
 

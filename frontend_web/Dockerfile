@@ -1,11 +1,15 @@
 FROM node:22-alpine AS build
 
-WORKDIR /app
+WORKDIR /workspace/frontend_web
 
-COPY shared-core /shared-core
+COPY scripts/prepare-shared-core.mjs /workspace/scripts/prepare-shared-core.mjs
+COPY shared-core /workspace/shared-core
 
-COPY frontend_web/package*.json ./
-RUN npm install
+COPY frontend_web/package.json ./package.json
+COPY frontend_web/package-lock.json ./package-lock.json
+# @chemisttasker/shared-ui is the local file:./shared package.
+COPY frontend_web/shared ./shared
+RUN npm ci --no-audit --no-fund
 
 COPY frontend_web/ ./
 
@@ -25,5 +29,5 @@ RUN if [ "$REQUIRE_WEB_INTEGRATIONS" = "1" ]; then \
 
 FROM nginx:1.27-alpine
 
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /workspace/frontend_web/dist /usr/share/nginx/html
 COPY frontend_web/nginx-spa.conf /etc/nginx/conf.d/default.conf

@@ -5,6 +5,7 @@ from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin, P
 from users.serializers import UserProfileSerializer
 from django.db import transaction
 from organizations.access import user_can_manage_pharmacy
+from organizations.chains import active_owner_chains_for_pharmacy
 from core.task_queue import async_task
 from core.serializer_lifecycle import RemoveOldFilesMixin
 from core.serializer_mixins import UploadValidationMixin
@@ -61,6 +62,11 @@ def anonymize_pharmacy_detail(detail: dict | None) -> dict | None:
         masked['state'] = state
     if postcode is not None:
         masked['postcode'] = postcode
+    # Script volume is general context; services and software are kept back because a distinctive mix could
+    # identify a small-suburb pharmacy.
+    for key in ('script_volume_weekday', 'script_volume_weekend'):
+        if detail.get(key):
+            masked[key] = detail[key]
 
     return masked
 
@@ -165,6 +171,10 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             # arrays:
             "employment_types",
             "roles_needed",
+            "software",
+            "services",
+            "script_volume_weekday",
+            "script_volume_weekend",
             "use_chemisttasker_payroll",
             # rates & about:
             "default_rate_type",
@@ -244,6 +254,22 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             attrs["weekdays_end"] = None
         return attrs
 
+    def validate_services(self, value):
+        from organizations.pharmacy_profile import validate_services
+        return validate_services(value)
+
+    def validate_script_volume_weekday(self, value):
+        from organizations.pharmacy_profile import validate_script_band
+        return validate_script_band(value)
+
+    def validate_script_volume_weekend(self, value):
+        from organizations.pharmacy_profile import validate_script_band
+        return validate_script_band(value)
+
+    def validate_software(self, value):
+        from organizations.pharmacy_profile import validate_software
+        return validate_software(value)
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         if self.instance and "abn" in attrs:
@@ -279,9 +305,7 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_has_chain(self, obj) -> bool:
-        if not obj.owner:
-            return False
-        return Chain.objects.filter(owner=obj.owner, pharmacies=obj).exists()
+        return active_owner_chains_for_pharmacy(obj).exists()
 
 
     @extend_schema_field(OpenApiTypes.BOOL)

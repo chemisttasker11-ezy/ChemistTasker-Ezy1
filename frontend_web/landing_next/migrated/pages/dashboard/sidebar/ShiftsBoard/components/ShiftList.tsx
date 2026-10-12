@@ -1,5 +1,8 @@
+import { showPublishedShiftRates } from '@chemisttasker/shared-core';
 import React from 'react';
 import SkillIcon, { skillLabel } from '@/public/skill-icon';
+import { ShiftRequirementDetails, ShiftRequirementSummary } from '@chemisttasker/shared-ui/ShiftRequirements';
+import { PharmacyContextDetails } from '@chemisttasker/shared-ui/PharmacyContext';
 import {
   Box,
   Button,
@@ -224,7 +227,8 @@ const ShiftList: React.FC<ShiftListProps> = ({
       const selection = disableSlotActions ? new Set<number>() : (selectedSlotIds[shift.id] ?? new Set<number>());
       const isRejectedShift = isShiftRejected;
       const isFullOrPartTime = ['FULL_TIME', 'PART_TIME'].includes(shift.employmentType ?? '');
-      const isPharmacistProvided = shift.rateType === 'PHARMACIST_PROVIDED';
+      const showPublishedRates = showPublishedShiftRates(shift);
+const isPharmacistProvided = showPublishedRates && shift.rateType === 'PHARMACIST_PROVIDED';
       const offerStatusBySlot = ((shift as any).__offerStatusBySlot ?? {}) as Record<number, string>;
       const shiftOfferStatus = String((shift as any).__shiftOfferStatus ?? '').toUpperCase();
       const isOffersMode = applyLabel === 'Confirm';
@@ -266,9 +270,9 @@ const ShiftList: React.FC<ShiftListProps> = ({
       // Counter offer is allowed when either time is flexible or rate is negotiable.
       // Rate negotiation is only enabled in the modal when rate is flexible; time negotiation follows flexible_timing even for FT/PT.
       const showCounter = !hideCounterOffer && (getShiftFlexibleTime(shift) || getShiftNegotiable(shift)) && !isRejectedShift;
-      const showNegotiable = getShiftNegotiable(shift) && !isRejectedShift;
+      const showNegotiable = showPublishedRates && getShiftNegotiable(shift) && !isRejectedShift;
       const superValue = Number(shift.superPercent);
-      const showSuperChip = !isFullOrPartTime && Number.isFinite(superValue) && superValue > 0;
+      const showSuperChip = showPublishedRates && !isFullOrPartTime && Number.isFinite(superValue) && superValue > 0;
       const paymentType =
         shift.paymentPreference ||
         (shift.employmentType === 'LOCUM'
@@ -296,8 +300,6 @@ const ShiftList: React.FC<ShiftListProps> = ({
       const ratingSummary = pharmacyId != null ? pharmacyRatings[pharmacyId] : undefined;
       const isAnonymous = Boolean((shift as any).post_anonymously ?? shift.postAnonymously);
       const mapAddress = isAnonymous ? '' : buildMapAddress(shift);
-      const requiredLabels = Array.from(new Set((shift.mustHave || []).map(skill => skillLabel(skill))));
-      const preferredLabels = Array.from(new Set((shift.niceToHave || []).map(skill => skillLabel(skill))));
 
       return (
         <Paper
@@ -372,7 +374,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                           {shift.hasAccommodation && <Chip icon={<HotelIcon />} label={publicPresentation ? 'Accommodation' : 'Accomm.'} size="small" />}
                         </Stack>
                       )}
-                      {paymentType && !publicPresentation && (
+                      {showPublishedRates && paymentType && !publicPresentation && (
                         <Chip label={`Payment: ${paymentType}`} size="small" variant="outlined" />
                       )}
                       {isRejectedShift && <Chip label="Rejected" size="small" color="error" />}
@@ -437,23 +439,12 @@ const ShiftList: React.FC<ShiftListProps> = ({
                     <Typography variant="body2" sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>{getShiftCity(shift)} ({getShiftState(shift)})</Typography>
                   </Stack>
                 </Stack>
-                {publicPresentation && (requiredLabels.length > 0 || preferredLabels.length > 0) && (
-                  <Stack spacing={0.75} sx={{ mt: 1.6, pt: 1.5, borderTop: '1px solid #E9EFF6' }}>
-                    {requiredLabels.length > 0 && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} alignItems={{ sm: 'baseline' }}>
-                      <Typography component="span" sx={{ color: '#5222B8', fontWeight: 850, fontSize: 13, minWidth: 76 }}>Required</Typography>
-                      <Typography component="span" sx={{ color: '#344563', fontSize: 13.5, lineHeight: 1.6, overflowWrap: 'anywhere' }}>{requiredLabels.join('  ·  ')}</Typography>
-                    </Stack>}
-                    {preferredLabels.length > 0 && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} alignItems={{ sm: 'baseline' }}>
-                      <Typography component="span" sx={{ color: '#52617C', fontWeight: 800, fontSize: 13, minWidth: 76 }}>Preferred</Typography>
-                      <Typography component="span" sx={{ color: '#445474', fontSize: 13.5, lineHeight: 1.6, overflowWrap: 'anywhere' }}>{preferredLabels.join('  ·  ')}</Typography>
-                    </Stack>}
-                  </Stack>
-                )}
+                {publicPresentation && <ShiftRequirementSummary mustHave={shift.mustHave} niceToHave={shift.niceToHave} />}
               </Box>
 
               <Box sx={{ minWidth: { xs: 0, md: 175 }, maxWidth: { xs: '100%', md: 190 }, flexShrink: 0, textAlign: { xs: 'left', md: 'right' }, borderTop: { xs: publicPresentation ? '1px solid #E4E9F2' : 'none', md: 'none' }, pt: { xs: publicPresentation ? 2 : 0, md: 0 } }}>
                 <Stack spacing={1} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
-                  <Stack direction="row" spacing={0.5} alignItems="center">
+                  {showPublishedRates ? <Stack direction="row" spacing={0.5} alignItems="center">
                     <AttachMoneyIcon fontSize="small" color="success" />
                     <Typography variant="h6" sx={publicPresentation ? { color: '#06123A', fontSize: 24, fontWeight: 800 } : undefined}>
                       {rateSummary.display}
@@ -461,8 +452,8 @@ const ShiftList: React.FC<ShiftListProps> = ({
                         {rateSummary.unitLabel}
                       </Typography>
                     </Typography>
-                  </Stack>
-                  {isFullOrPartTime && shift.superPercent && (
+                  </Stack> : <Typography variant="body2" color="text.secondary">Your pharmacy staff agreement applies</Typography>}
+                  {showPublishedRates && isFullOrPartTime && shift.superPercent && (
                     <Chip label={`+ Superannuation (${shift.superPercent}%)`} size="small" />
                   )}
                   {showSuperChip && (
@@ -475,7 +466,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                   {showNegotiable && (
                     <Chip icon={<PaidIcon />} label="Negotiable" size="small" color="info" />
                   )}
-                  {publicPresentation && paymentType && <Typography sx={{ color: '#52617C', fontSize: 12.5, fontWeight: 750 }}>Payment: {paymentType}</Typography>}
+                  {showPublishedRates && publicPresentation && paymentType && <Typography sx={{ color: '#52617C', fontSize: 12.5, fontWeight: 750 }}>Payment: {paymentType}</Typography>}
                   {isPharmacistProvided && (
                     <Typography variant="caption" color="text.secondary">
                       Rate set by pharmacist, update your profile rates to improve matches.
@@ -570,7 +561,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                 {isFullOrPartTime ? 'This is a non-slot based role.' : 'Slots will be announced.'}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
-                                Rate: {rateSummary.display} {rateSummary.unitLabel === '/hr' ? '/hr' : rateSummary.unitLabel}
+                                {showPublishedRates ? `Rate: ${rateSummary.display} ${rateSummary.unitLabel}` : 'Your pharmacy staff agreement applies'}
                               </Typography>
                             </Stack>
                           </Paper>
@@ -644,7 +635,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                       <Chip label="Waiting for owner payment" color="warning" size="small" />
                                     ) : (
                                       <Chip
-                                        label={isSlotApplied ? 'Applied' : `$${getSlotRate(slot, shift, userRatePreference)}/hr`}
+                                        label={isSlotApplied ? 'Applied' : showPublishedRates ? `$${getSlotRate(slot, shift, userRatePreference)}/hr` : 'Staff agreement'}
                                         color={isSlotApplied ? 'info' : 'success'}
                                         size="small"
                                       />
@@ -732,36 +723,8 @@ const ShiftList: React.FC<ShiftListProps> = ({
                       <Typography variant="body2" color="text.secondary">
                         {shift.description || 'No description provided.'}
                       </Typography>
-                      {(shift.mustHave && shift.mustHave.length > 0) && (
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" color="text.secondary">Must have</Typography>
-                          <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                            {shift.mustHave.map((item, idx) => (
-                              <Chip key={idx} label={skillLabel(item)} size="small" />
-                            ))}
-                          </Stack>
-                        </Stack>
-                      )}
-                      {(shift.niceToHave && shift.niceToHave.length > 0) && (
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" color="text.secondary">Nice to have</Typography>
-                          <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                            {shift.niceToHave.map((item, idx) => (
-                              <Chip key={idx} label={skillLabel(item)} size="small" variant="outlined" />
-                            ))}
-                          </Stack>
-                        </Stack>
-                      )}
-                      {(shift.workloadTags && shift.workloadTags.length > 0) && (
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" color="text.secondary">Workload</Typography>
-                          <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                            {shift.workloadTags.map((tag, idx) => (
-                              <Chip key={idx} label={tag} size="small" color="default" />
-                            ))}
-                          </Stack>
-                        </Stack>
-                      )}
+                      <ShiftRequirementDetails mustHave={shift.mustHave} niceToHave={shift.niceToHave} />
+                      <PharmacyContextDetails pharmacy={shift.pharmacyDetail as any} workload={shift.workloadTags} support={shift.supportOnShift} />
                       {shift.createdAt && (
                         <Typography variant="caption" color="text.secondary">
                           Posted {dayjs(shift.createdAt).format('D MMM YYYY')}

@@ -15,6 +15,8 @@ const runs = resolve(process.cwd(), '.e2e/authenticated');
 mkdirSync(runs, { recursive: true });
 const testRoot = mkdtempSync(resolve(runs, 'run-'));
 const web = resolve(testRoot, 'frontend_web');
+// Preserve the canonical workspace dependency path used by Vite's dev aliases.
+symlinkSync(resolve(source, 'shared-core'), resolve(testRoot, 'shared-core'), process.platform === 'win32' ? 'junction' : 'dir');
 const excluded = new Set(['node_modules', '.next', '.e2e', '.git', 'e2e', 'src-tauri', 'dist', 'dist-kiosk', 'test-results', 'playwright-report']);
 mkdirSync(web, { recursive: true });
 const copyable = file => !excluded.has(basename(file)) && !basename(file).startsWith('.env') && !file.endsWith('.tsbuildinfo');
@@ -26,11 +28,11 @@ for (const relative of ['node_modules', 'landing_next/node_modules']) {
   symlinkSync(resolve(sourceWeb, relative), resolve(web, relative), process.platform === 'win32' ? 'junction' : 'dir');
 }
 const nextConfig = resolve(web, 'landing_next/next.config.ts');
-writeFileSync(nextConfig, readFileSync(nextConfig, 'utf8').replace("root:path.resolve(__dirname,'../..')", `root:${JSON.stringify(dirname(source))}`));
+writeFileSync(nextConfig, readFileSync(nextConfig, 'utf8').replaceAll("path.resolve(__dirname,'../..')", JSON.stringify(source)));
 const viteConfig = resolve(web, 'vite.config.ts');
 writeFileSync(viteConfig, readFileSync(viteConfig, 'utf8')
   .replace("base: '/',", `base: '/', cacheDir:${JSON.stringify(resolve(testRoot, 'vite-cache'))},`)
-  .replace('server: {', `server: { fs: { allow: ${JSON.stringify([source, testRoot])} },`));
+  .replace("allow: [resolve(import.meta.dirname, '..')]", `allow: ${JSON.stringify([source, testRoot])}`));
 const containerRoot = `/.e2e/authenticated/${basename(testRoot)}`;
 const env = {
   ...process.env, APP_ENV: 'test', DJANGO_ENV_FILE: '', DEBUG: 'True',
@@ -80,6 +82,7 @@ try {
   const docker = spawn('docker', ['run', '--rm', '--name', `chemisttasker-e2e-${process.env.E2E_AUTH_RUN_ID}`,
     '--label', `chemisttasker.e2e.run=${process.env.E2E_AUTH_RUN_ID}`,
     '--publish', `127.0.0.1:${backendPort}:8000`,
+    // backend/Dockerfile.dev carries dependencies only; the source under test is mounted.
     '--mount', `type=bind,source=${backend},target=/app,readonly`,
     '--mount', `type=bind,source=${testRoot},target=${containerRoot}`,
     '--workdir', '/app', '--entrypoint', 'sh',
@@ -98,5 +101,5 @@ try {
   }
   if (stopping) throw new Error('Disposable Docker backend failed');
   start(process.execPath, [resolve(web, 'node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', vitePort, '--strictPort'], web);
-  start(process.execPath, [resolve(web, 'landing_next/node_modules/next/dist/bin/next'), 'dev', '--hostname', '127.0.0.1', '--port', nextPort], resolve(web, 'landing_next'));
+  start(process.execPath, [resolve(web, 'landing_next/node_modules/next/dist/bin/next'), 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', nextPort], resolve(web, 'landing_next'));
 } catch (error) { console.error(error.message); stop(1); }

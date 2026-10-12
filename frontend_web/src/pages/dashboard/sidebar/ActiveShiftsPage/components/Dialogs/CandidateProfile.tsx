@@ -1,35 +1,22 @@
 // A candidate's work profile as a manager sees it after reveal: photo, role, verification, bio, location,
 // experience, rates and skills. Never contact details (the reveal API no longer sends them).
-import { Avatar, Box, Stack, Typography } from '@mui/material';
+import { Avatar, Box, Chip, Stack, Typography } from '@mui/material';
 import { BadgeCheck, BriefcaseBusiness, MapPin, Wallet } from 'lucide-react';
-import skillsCatalog from '../../../../../../../../shared-core/skills_catalog.json';
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { findSkill, groupWorkProfileSkills, workProfileSkillVerification, dispensaryQualifications, type ShiftWorkProfile } from '@chemisttasker/shared-core';
+import { SkillSymbol } from '../../../../../../components/SkillGlyph';
 import { InitialsAvatar } from '../../../../../../components/ui/InitialsAvatar';
 import { Pill } from '../../../../../../components/ui/Pill';
 
-type CatalogItem = { code: string; label: string };
-type Catalog = Record<string, Record<string, CatalogItem[]>>;
-const GROUPS: [key: string, title: string][] = [
-    ['dispense_software', 'Dispensing software'],
-    ['clinical_services', 'Clinical services'],
-    ['expanded_scope', 'Expanded scope'],
-];
-const RATES: [key: string, label: string][] = [['weekday', 'Weekday'], ['saturday', 'Saturday'], ['sunday', 'Sunday'], ['publicHoliday', 'Public holiday']];
+const GROUPS: [key: string, title: string][] = skillsRegistry.groups.map(group => [group, group === 'Software & Digital' ? 'Software' : group]);
+const RATES: [key: keyof NonNullable<ShiftWorkProfile['ratePreference']>, label: string][] = [['weekday', 'Weekday'], ['saturday', 'Saturday'], ['sunday', 'Sunday'], ['publicHoliday', 'Public holiday']];
 
 const muted = { fontSize: 13.5, color: 'var(--ct-text-secondary)', lineHeight: 1.5 } as const;
 const groupTitle = { fontSize: 13, fontWeight: 600, color: 'var(--ct-text-primary)', mb: 0.75 } as const;
 
-/** Catalogue labels for the candidate's skill codes, grouped like the Talent board; unknown codes go under "Other". */
+/** The candidate's skill IDs, grouped like the Talent board; unknown codes go under "Other". */
 function groupSkills(codes: string[]) {
-    const catalog = skillsCatalog as unknown as Catalog;
-    const known = new Map<string, { group: string; label: string }>();
-    Object.values(catalog).forEach(role => GROUPS.forEach(([group]) => (role[group] || []).forEach(item => known.set(item.code, { group, label: item.label }))));
-    const groups: Record<string, string[]> = {};
-    codes.forEach(code => {
-        const hit = known.get(code);
-        const group = hit?.group ?? 'other';
-        (groups[group] ||= []).includes(hit?.label ?? code) || groups[group].push(hit?.label ?? code);
-    });
-    return groups;
+    return groupWorkProfileSkills(skillsRegistry as any, codes);
 }
 
 const yearsSince = (iso?: string | null) => {
@@ -47,8 +34,8 @@ function Fact({ icon, children }: { icon: React.ReactNode; children: React.React
     );
 }
 
-export function CandidateProfile({ name, bio, profile }: { name: string; bio?: string; profile?: any }) {
-    const p = profile || {};
+export function CandidateProfile({ name, bio, profile }: { name: string; bio?: string; profile?: ShiftWorkProfile | null }) {
+    const p: Partial<ShiftWorkProfile> = profile || {};
     const role = [p.roleLabel, p.classification].filter(Boolean).join(' · ');
     const checks = [
         p.ahpraVerified && (p.roleLabel === 'Pharmacist' ? 'AHPRA verified' : 'Registration verified'),
@@ -62,8 +49,9 @@ export function CandidateProfile({ name, bio, profile }: { name: string; bio?: s
     const experience = p.yearsExperience ? `${p.yearsExperience} years experience` : yearsSince(p.registeredSince);
     const rates = RATES.map(([key, label]) => (p.ratePreference?.[key] ? `${label} $${p.ratePreference[key]}/h` : null)).filter(Boolean);
     const skills = groupSkills(Array.isArray(p.skills) ? p.skills : []);
+    const qualification = dispensaryQualifications.find(item => item.value === p.dispensaryQualification);
     const known = GROUPS.some(([key]) => skills[key]?.length);
-    const skillGroups = [...GROUPS, ['other', known ? 'Other skills' : 'Skills'] as [string, string]].filter(([key]) => skills[key]?.length);
+    const skillGroups = [...GROUPS, ['other', known ? 'Previous selections' : 'Skills to review'] as [string, string]].filter(([key]) => skills[key]?.length);
 
     return (
         <Stack spacing={2}>
@@ -96,13 +84,16 @@ export function CandidateProfile({ name, bio, profile }: { name: string; bio?: s
                 </Stack>
             )}
 
+            {qualification && <Typography sx={muted}>{qualification.label} · {p.dispensaryQualificationVerified ? 'Verified' : 'Claimed · not verified'}</Typography>}
             {skillGroups.length > 0 && (
                 <Stack spacing={1.5}>
                     {skillGroups.map(([key, title]) => (
                         <Box key={key}>
                             <Typography component="h4" sx={groupTitle}>{title}</Typography>
                             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                                {skills[key].map(label => <Pill key={label} tone={key === 'dispense_software' ? 'blue' : 'violet'} label={label} />)}
+                                {skills[key].map(code => key === 'other'
+                                    ? <Pill key={code} tone="neutral" label={code} />
+                                    : <Chip key={code} size="small" icon={<SkillSymbol skill={code} size={16} />} label={[findSkill(skillsRegistry as any, code)?.label || code, workProfileSkillVerification(skillsRegistry as any, p, code)].filter(Boolean).join(' · ')} />)}
                             </Stack>
                         </Box>
                     ))}

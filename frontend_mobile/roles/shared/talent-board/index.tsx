@@ -1,3 +1,5 @@
+import { projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
+import { skillId } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Chip, IconButton, Text } from 'react-native-paper';
@@ -42,24 +44,6 @@ const formatWorkType = (workType?: string | null) => {
   return titleCase(workType);
 };
 
-const mapRoleToShiftRole = (value?: string | null) => {
-  if (!value) return '';
-  const normalized = value.trim().toUpperCase().replace(/\s+/g, '_');
-  if (['PHARMACIST', 'INTERN', 'STUDENT', 'ASSISTANT', 'TECHNICIAN', 'EXPLORER'].includes(normalized)) {
-    return normalized;
-  }
-  if (normalized.includes('OTHER_STAFF')) return 'ASSISTANT';
-  if (normalized.includes('COMMUNITY_PHARMACIST')) return 'PHARMACIST';
-  if (normalized.includes('DISPENSARY_TECHNICIAN')) return 'TECHNICIAN';
-  if (normalized.includes('PHARMACY_TECHNICIAN')) return 'TECHNICIAN';
-  if (normalized.includes('PHARMACY_ASSISTANT')) return 'ASSISTANT';
-  if (normalized.includes('PHARMACIST')) return 'PHARMACIST';
-  if (normalized.includes('TECHNICIAN')) return 'TECHNICIAN';
-  if (normalized.includes('ASSISTANT')) return 'ASSISTANT';
-  if (normalized.includes('INTERN')) return 'INTERN';
-  if (normalized.includes('STUDENT')) return 'STUDENT';
-  return '';
-};
 
 const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
@@ -97,42 +81,7 @@ const mapAvailabilityToPitchSlots = (entries: any[]) =>
   ).filter((slot) => slot.date >= todayIso());
 const allWorkTypes = Object.values(ENGAGEMENT_LABELS);
 
-type SkillItem = {
-  code: string;
-  label: string;
-  description?: string;
-  requires_certificate?: boolean;
-};
-type RoleCatalog = {
-  clinical_services: SkillItem[];
-  dispense_software: SkillItem[];
-  expanded_scope: SkillItem[];
-};
-type SkillsCatalog = {
-  pharmacist: RoleCatalog;
-  otherstaff: RoleCatalog;
-};
-
-const catalog = require('@chemisttasker/shared-core/skills_catalog.json') as SkillsCatalog;
-
-const buildSkillMaps = () => {
-  const codeToLabel = new Map<string, string>();
-  const codeToCategory = new Map<string, 'clinical_services' | 'dispense_software' | 'expanded_scope'>();
-  (['pharmacist', 'otherstaff'] as const).forEach((roleKey) => {
-    const role = catalog[roleKey];
-    if (!role) return;
-    (['clinical_services', 'dispense_software', 'expanded_scope'] as const).forEach((category) => {
-      role[category]?.forEach((item) => {
-        if (!item?.code) return;
-        if (!codeToLabel.has(item.code)) codeToLabel.set(item.code, item.label || item.code);
-        if (!codeToCategory.has(item.code)) codeToCategory.set(item.code, category);
-      });
-    });
-  });
-  return { codeToLabel, codeToCategory };
-};
-
-const { codeToLabel, codeToCategory } = buildSkillMaps();
+const registry = require('@chemisttasker/shared-core/skills_registry.json') as any;
 
 type TalentBoardProps = {
   publicMode?: boolean;
@@ -256,19 +205,7 @@ export default function TalentBoard({
         const futureAvailableSlots = availableSlots.filter((entry: any) => entry.date >= todayIso());
         const availableDates = futureAvailableSlots.map((slot: any) => slot.date);
         const rawSkills = Array.from(new Set([...(post.software ?? []), ...(post.skills ?? [])])).filter(Boolean) as string[];
-        const clinicalServices: string[] = [];
-        const dispenseSoftware: string[] = [];
-        const expandedScope: string[] = [];
-        const otherSkills: string[] = [];
-        rawSkills.forEach((code) => {
-          const label = codeToLabel.get(code) ?? code;
-          const category = codeToCategory.get(code);
-          if (category === 'clinical_services') clinicalServices.push(label);
-          else if (category === 'dispense_software') dispenseSoftware.push(label);
-          else if (category === 'expanded_scope') expandedScope.push(label);
-          else otherSkills.push(label);
-        });
-        const skills = Array.from(new Set([...clinicalServices, ...expandedScope, ...otherSkills])).filter(Boolean) as string[];
+        const { clinicalServices, dispenseSoftware, expandedScope, skills } = projectTalentSkills(registry, rawSkills);
         const rating = post.authorUserId != null ? ratingSummary[post.authorUserId] : undefined;
         const ratingAverage = rating?.average ?? Number(post.ratingAverage ?? post.rating_average ?? post.rating?.average ?? 0);
         const ratingCount = rating?.count ?? Number(post.ratingCount ?? post.rating_count ?? post.rating?.count ?? 0);
@@ -385,10 +322,7 @@ export default function TalentBoard({
     if (!canRequestBooking) return;
     const targetUserId = candidate.authorUserId ?? candidate.explorerUserId ?? null;
     const uniqueDates = Array.from(new Set(dates)).sort();
-    const shiftRole =
-      mapRoleToShiftRole(candidate.rawRoleCategory) ||
-      mapRoleToShiftRole(candidate.explorerRoleType) ||
-      mapRoleToShiftRole(candidate.role);
+    const shiftRole = resolveTalentBookingRole(candidate.rawRoleCategory, candidate.explorerRoleType, candidate.role);
     const firstSlot = (candidate.availableSlots || []).find((slot: any) => uniqueDates.includes(slot.date));
     const startTime = firstSlot?.startTime || (firstSlot as any)?.start_time || null;
     const endTime = firstSlot?.endTime || (firstSlot as any)?.end_time || null;

@@ -195,3 +195,4 @@ GoogleService-Info.plist
 BACKEND_FRONTEND_FULL_COVERAGE_AUDIT.md
 END_TO_END_DOMAIN_LOGIC_AUDIT.md
 github_guidance.md
+.ci-artifacts/

@@ -10,34 +10,68 @@ from django.utils.text import slugify
 from rest_framework import serializers
 
 from core.file_validation import DOCUMENT_UPLOAD_POLICY, validate_uploaded_file
-
-_SKILLS_CATALOG_CACHE = None
-
+from onboarding.services.skill_identity import canonical_skill, registry
 
 def _load_skills_catalog():
-    global _SKILLS_CATALOG_CACHE
-    if _SKILLS_CATALOG_CACHE is not None:
-        return _SKILLS_CATALOG_CACHE
-    from django.conf import settings
-    base_dir = settings.BASE_DIR.parent
-    catalog_path = base_dir / "shared-core" / "skills_catalog.json"
-    try:
-        with open(catalog_path, "r", encoding="utf-8") as f:
-            _SKILLS_CATALOG_CACHE = json.load(f)
-    except Exception:
-        _SKILLS_CATALOG_CACHE = {}
-    return _SKILLS_CATALOG_CACHE
+    return registry()
 
 
 def _required_cert_skill_codes(role_key: str) -> set[str]:
     catalog = _load_skills_catalog()
-    role = (catalog or {}).get(role_key, {})
-    required = set()
-    for group_key in ("clinical_services", "dispense_software", "expanded_scope"):
-        for item in role.get(group_key, []) or []:
-            if item.get("requires_certificate"):
-                required.add(item.get("code"))
-    return {c for c in required if c}
+    if "skills" not in catalog:
+        role = catalog.get(role_key, {})
+        return {
+            item.get("code")
+            for group in ("clinical_services", "dispense_software", "expanded_scope")
+            for item in role.get(group, [])
+            if item.get("requires_certificate") and item.get("code")
+        }
+    return {skill["code"] for skill in catalog.get("skills", []) if skill.get("certificate")}
+
+
+def _role_for_skills(instance, role_key: str):
+    if role_key == "pharmacist":
+        return "PHARMACIST"
+    return str(getattr(instance, "role_type", "") or "").upper()
+
+
+def _canonical_skills(instance, requested: list[str], role_key: str) -> list[str]:
+    catalog = _load_skills_catalog()
+    if not isinstance(catalog.get('skills'), list):
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured('Canonical skills registry is required for onboarding claims')
+    skills = {item["code"]: item for item in catalog.get("skills", [])}
+    allowed = {"PHARMACIST", "INTERN", "TECHNICIAN", "ASSISTANT", "STUDENT"}
+    role = _role_for_skills(instance, role_key)
+    if role not in allowed:
+        if requested:
+            raise serializers.ValidationError({"skills": "Select your valid professional role before claiming skills."})
+        return requested
+
+    result = []
+    # Previously saved codes remain readable, but do not grant new professional claims.
+    previous = set(instance.skills or [])
+    previous_codes = {canonical_skill(value) or value for value in previous}
+    deprecated = set(catalog.get("legacy_evidence_only", []))
+    for raw in requested:
+        code = canonical_skill(raw) or raw
+        item = skills.get(code)
+        if raw in deprecated and raw in previous:
+            # Insurance documents were historically stored among skills.
+            result.append(raw)
+            continue
+        if not item:
+            raise serializers.ValidationError({'skills': f'Unknown skill: {raw}.'})
+        if not item or item.get("eligibility", {}).get(role, 'none') == "none":
+            # Prevent previously saved stale options from being used as new claims.
+            if code in previous_codes:
+                if code not in result:
+                    result.append(code)
+                continue
+            raise serializers.ValidationError({"skills": f"Skill {raw} cannot be claimed for role {role}."})
+        if code not in result:
+            result.append(code)
+    return result
 
 
 def files_by_skill(request):
@@ -116,14 +150,26 @@ def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: 
         except Exception:
             raise serializers.ValidationError({"skills": "Must be a JSON array or list."})
     else:
-        skills = list(raw or [])
+        skills = raw if raw is not None else []
+
+    if not isinstance(skills, list) or not all(isinstance(value, str) for value in skills):
+        raise serializers.ValidationError({'skills': 'Skills must be a list of strings.'})
+
+    skills = _canonical_skills(instance, skills, role_key)
+    # Upload paths must use the same canonical key as a selected skill.
+    # This also accepts historic code aliases without losing the attached proof.
+    uploads = {canonical_skill(code) or code: file_obj for code, file_obj in uploads.items()}
 
     yrs = initial_data.get("years_experience", vdata.get("years_experience", None)) if track_years_experience else None
     if yrs is not None:
         instance.years_experience = (yrs or "").strip()
 
     original_cert_map = dict(instance.skill_certificates or {})
-    cert_map = dict(original_cert_map)
+    # Re-key historic proof alongside its historic claim. Prefer a canonical
+    # entry if both canonical and alias paths exist; do not delete retained proof.
+    cert_map = {}
+    for code, meta in sorted(original_cert_map.items(), key=lambda entry: canonical_skill(entry[0]) == entry[0]):
+        cert_map[canonical_skill(code) or code] = meta
     user_id = instance.user_id
 
     # Work out which persisted certificates remain logically available without
@@ -134,16 +180,8 @@ def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: 
             if code not in skills:
                 cert_map.pop(code, None)
 
-    uploaded_codes = {code for code, file_obj in uploads.items() if code in skills and file_obj}
-    required_codes = _required_cert_skill_codes(role_key)
-    missing = [
-        code for code in skills
-        if code in required_codes and code not in cert_map and code not in uploaded_codes
-    ]
-    if missing:
-        raise serializers.ValidationError(
-            {"skills": f"{missing_message}{', '.join(missing)}"}
-        )
+    # A role-eligible skill may be claimed without evidence. Certificate absence
+    # affects its verification signal, never whether the claim can be saved.
 
     newly_saved_paths = []
     old_paths_to_delete = []
@@ -164,7 +202,7 @@ def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: 
 
         if not keep_history:
             for code, meta in original_cert_map.items():
-                if code not in skills:
+                if (canonical_skill(code) or code) not in skills:
                     old_path = (meta or {}).get("path")
                     if old_path:
                         old_paths_to_delete.append(old_path)

@@ -13,6 +13,7 @@ from core.task_queue import async_task
 from memberships.models import Membership
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Chain
+from organizations.chains import active_owner_chains_for_pharmacy
 from organizations.serializers import user_can_view_full_pharmacy
 from shifts.emails import build_shift_email_context
 from shifts.pricing import expand_shift_slots
@@ -124,6 +125,8 @@ def _get_location_line_for_email(shift, user):
     return ", ".join(part for part in parts if part) or None
 
 def _build_shift_email_slot_meta(shift, slot_entries, *, user=None):
+    from shifts.rate_visibility import published_rates_visible
+    show_rates = published_rates_visible(user, shift.pharmacy)
     first_slot = slot_entries[0] if slot_entries else {}
     slot_date = first_slot.get('date') if isinstance(first_slot, dict) else None
     slot_start = first_slot.get('start_time') if isinstance(first_slot, dict) else None
@@ -141,7 +144,7 @@ def _build_shift_email_slot_meta(shift, slot_entries, *, user=None):
         start_text = _format_slot_time(slot.get('start_time'))
         end_text = _format_slot_time(slot.get('end_time'))
         if date_text and start_text and end_text:
-            rate_value = slot.get("rate")
+            rate_value = slot.get("rate") if show_rates else None
             rate_text = f"{_format_money(rate_value)}/hr" if rate_value not in (None, "") else None
             slot_cards.append({
                 "date": date_text,
@@ -201,7 +204,7 @@ def _build_shift_email_slot_meta(shift, slot_entries, *, user=None):
         "slots_display_details": slots_display_details,
         "slots_extra_count": slots_extra_count,
         "location_line": location_line,
-        "rate_summary": rate_summary,
+        "rate_summary": rate_summary if show_rates else None,
     }
 
 def _availability_matches_slot(availability, slot_date, slot_start, slot_end):
@@ -345,6 +348,8 @@ def announce_posted_shift(
     notify_favorite_staff=False,
     notify_chain_members=False,
 ):
+    if getattr(shift, 'dedicated_user_id', None):
+        return  # Direct offers notify their recipient through offer_dedicated_shift.
     visibility_rules = {
         'FULL_PART_TIME': {'notify_pharmacy_staff'},
         'LOCUM_CASUAL': {'notify_pharmacy_staff', 'notify_favorite_staff'},
@@ -394,11 +399,7 @@ def announce_posted_shift(
             # Every pharmacy of the owner's active chains that include this pharmacy. The chains are selected
             # first: reading pharmacies__id in the same query would reuse the filter's join and only return this
             # pharmacy.
-            chain_ids = Chain.objects.filter(
-                owner_id=shift.pharmacy.owner_id,
-                pharmacies=shift.pharmacy,
-                is_active=True,
-            ).values_list('id', flat=True)
+            chain_ids = active_owner_chains_for_pharmacy(shift.pharmacy).values_list('id', flat=True)
             chain_pharmacy_ids = list(
                 Chain.pharmacies.through.objects.filter(chain_id__in=chain_ids)
                 .values_list('pharmacy_id', flat=True)
@@ -457,6 +458,8 @@ def announce_posted_shift(
         )
 
 def announce_availability_matches(shift):
+    if getattr(shift, 'dedicated_user_id', None):
+        return
     if shift.visibility != "PLATFORM":
         return
     slot_entries = expand_shift_slots(shift)

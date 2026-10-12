@@ -8,6 +8,7 @@ from django.utils import timezone
 # Historical migrations serialise this field by its client_profile.fields path, so it stays defined there.
 from client_profile.fields import EncryptedTextField
 from core.uploads import unique_upload_path as _unique_upload_path
+from onboarding.qualifications import DISPENSARY_QUALIFICATION_CHOICES
 
 
 # `client_profile.models.common` re-exports this under the same name.
@@ -420,6 +421,9 @@ class OtherStaffOnboarding(models.Model):
     intern_half = models.CharField(max_length=20, choices=INTERN_HALF_CHOICES, blank=True, null=True)
 
     # --- Role-specific docs (kept) ---
+    dispensary_qualification = models.CharField(max_length=32, blank=True, default='', choices=DISPENSARY_QUALIFICATION_CHOICES)
+    dispensary_qualification_verified = models.BooleanField(default=False, help_text='Confirm the certificate/transcript establishes dispensing competencies (SIRCDIS003 or an assessed equivalent), not merely a general pharmacy qualification.')
+    dispensary_qualification_verification_note = models.TextField(blank=True, default='')
     ahpra_proof = models.FileField(upload_to=otherstaff_role_doc_upload_path, blank=True, null=True)
     hours_proof = models.FileField(upload_to=otherstaff_role_doc_upload_path, blank=True, null=True)
     certificate = models.FileField(upload_to=otherstaff_role_doc_upload_path, blank=True, null=True)

@@ -346,7 +346,39 @@ def _price_shift_segments(slot_date, start_time, end_time, shift, rate_preferenc
         'description': _build_average_explanation(all_segments, rounded_total_hours, average_rate),
     }
 
-def get_locked_rate_for_slot(slot, shift, user, override_date=None):
+def _price_staff_agreement(slot, shift, slot_date, terms):
+    if terms.get('settlement_channel') == 'TIMESHEET_ONLY':
+        return DECIMAL_ZERO, {'source': 'StaffEmployment', 'settlement_channel': 'TIMESHEET_ONLY',
+                              'description': 'Pay is handled through the pharmacy staff agreement outside ChemistTasker.'}
+    rates = terms.get('rates') or {}
+    if not rates:
+        raise ValidationError('The staff employment snapshot has no agreed rates.')
+    hours = DECIMAL_ZERO
+    total = DECIMAL_ZERO
+    segments = []
+    for window in _split_shift_across_days(slot_date, slot.start_time, slot.end_time):
+        for segment in _split_day_window_into_segments(window):
+            day_type = get_day_type(segment['date'], shift.pharmacy.state)
+            bucket = segment['time_bucket']
+            value = rates.get(bucket) if bucket != 'daytime' else None
+            value = rates.get(day_type) if value in (None, '') else value
+            if value in (None, ''):
+                raise ValidationError(f'The staff agreement has no {day_type} rate.')
+            rate = Decimal(str(value))
+            hours += segment['hours']
+            total += rate * segment['hours']
+            segments.append({'date': str(segment['date']), 'day_type': day_type, 'time_bucket': bucket,
+                             'hours': str(segment['hours']), 'rate': str(rate)})
+    if hours <= 0:
+        raise ValidationError('Shift duration must be greater than zero.')
+    return (total / hours).quantize(Decimal('0.01')), {
+        'source': 'StaffEmployment', 'calculation_method': 'weighted_segment_average',
+        'employment_engagement_public_id': terms.get('employment_engagement_public_id'),
+        'segments': segments, 'total_hours': str(hours), 'total_pay': str(total.quantize(Decimal('0.01'))),
+    }
+
+
+def get_locked_rate_for_slot(slot, shift, user, override_date=None, *, staff_terms=None):
     """
     Calculates the effective hourly rate for a concrete slot.
 
@@ -357,6 +389,15 @@ def get_locked_rate_for_slot(slot, shift, user, override_date=None):
     - compute the weighted average hourly rate for the full slot
     """
     slot_date = override_date or slot.date
+    if staff_terms is not None:
+        return _price_staff_agreement(slot, shift, slot_date, staff_terms)
+    # Pharmacy profile rates seed a new posting. An owner-entered posted rate
+    # remains authoritative when claimed/booked; later profile edits must not
+    # silently reprice the advertised shift. Worker-provided pricing stays separate.
+    if shift.role_needed == 'PHARMACIST' and getattr(shift, 'rate_type', None) != 'PHARMACIST_PROVIDED' and getattr(slot, 'rate', None) is not None:
+        posted = Decimal(str(slot.rate)).quantize(Decimal('0.01'))
+        if posted > 0:
+            return posted, {'source': 'PostedShift', 'calculation_method': 'posted_slot_rate', 'date': slot_date.isoformat(), 'description': f'Owner-posted rate ${posted}/hr for this date.'}
     rate_preference = _extract_rate_preference(user) if shift.role_needed == 'PHARMACIST' else {}
     try:
         return _price_shift_segments(

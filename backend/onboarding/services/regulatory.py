@@ -17,12 +17,14 @@ def required_documents_for_role(instance):
             ('ahpra_proof', 'ahpra_proof_verified', 'ahpra_proof_verification_note'),
             ('hours_proof', 'hours_proof_verified', 'hours_proof_verification_note'),
         ],
+        # Level 3/4 dispensary and Levels 2/3/4 assistants can submit
+        # qualifications, RPL or workplace competency evidence in this field.
         'TECHNICIAN': [
             ('certificate', 'certificate_verified', 'certificate_verification_note'),
         ],
         'ASSISTANT': [
             ('certificate', 'certificate_verified', 'certificate_verification_note'),
-        ],
+        ] if instance.classification_level in ('LEVEL_2', 'LEVEL_3', 'LEVEL_4') else [],
         'STUDENT': [
             ('university_id', 'university_id_verified', 'university_id_verification_note'),
         ],
@@ -44,12 +46,33 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
     def _fname(f):
         return getattr(f, 'name', None) if f else None
 
+    original_role = str(instance.role_type or '').upper()
+    original_class = instance.classification_level
+    original_year = instance.student_year
+    original_half = instance.intern_half
+    original_dispensing = instance.dispensary_qualification
+
     # role classification inputs
-    for f in ['role_type','classification_level','student_year','intern_half']:
+    for f in ['role_type','classification_level','student_year','intern_half','dispensary_qualification']:
         if f in vdata:
             if getattr(instance, f) != vdata[f]:
                 setattr(instance, f, vdata[f])
                 update_fields.append(f)
+
+    role_or_class_changed = (
+        original_role != str(instance.role_type or '').upper()
+        or original_class != instance.classification_level
+        or original_year != instance.student_year
+        or original_half != instance.intern_half
+    )
+    if role_or_class_changed:
+        # Previously verified documents must not silently authorise a new
+        # professional role or award classification.
+        instance.verified = False
+        update_fields.append('verified')
+        for flag in ('ahpra_proof_verified', 'hours_proof_verified', 'certificate_verified', 'university_id_verified'):
+            setattr(instance, flag, False)
+            update_fields.append(flag)
 
     # Handle each file: replace/clear safely; reset its verified flag on change
     def handle_file(field):
@@ -82,6 +105,10 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
         return changed
 
     changed_map = {f: handle_file(f) for f in file_fields}
+    if role_or_class_changed or original_dispensing != instance.dispensary_qualification or changed_map['certificate']:
+        instance.dispensary_qualification_verified = False
+        instance.dispensary_qualification_verification_note = ''
+        update_fields.extend(['dispensary_qualification_verified', 'dispensary_qualification_verification_note'])
 
     if submit:
         instance.verified = False

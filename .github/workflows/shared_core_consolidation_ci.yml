@@ -89,7 +89,7 @@ jobs:
         env:
           CT_SHARED_CORE_SKIP_PREPARE: "1"
       - name: Use freshly packed shared core
-        run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
+        run: node ../scripts/install-shared-core-artifact.mjs ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz .
         working-directory: frontend_web
       - name: Typecheck Vite application
         run: npx tsc -p tsconfig.app.json --noEmit
@@ -139,7 +139,7 @@ jobs:
         env:
           CT_SHARED_CORE_SKIP_PREPARE: "1"
       - name: Use freshly packed shared core
-        run: npm install --no-save --package-lock=false --ignore-scripts ../../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
+        run: node ../../scripts/install-shared-core-artifact.mjs ../../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz .
         working-directory: frontend_web/landing_next
       - run: npm run typecheck
         working-directory: frontend_web/landing_next
@@ -178,7 +178,7 @@ jobs:
         env:
           CT_SHARED_CORE_SKIP_PREPARE: "1"
       - name: Use freshly packed shared core
-        run: npm install --no-save --package-lock=false --ignore-scripts ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz
+        run: node ../scripts/install-shared-core-artifact.mjs ../.ci-artifacts/chemisttasker-shared-core-1.1.1.tgz .
         working-directory: frontend_mobile
       - run: npm run lint
         working-directory: frontend_mobile

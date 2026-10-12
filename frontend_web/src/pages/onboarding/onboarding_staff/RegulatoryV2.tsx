@@ -1,3 +1,4 @@
+import { otherStaffQualificationLevels, dispensaryQualifications } from '@chemisttasker/shared-core';
 // frontend_web/src/pages/onboarding_staff/RegulatoryV2.tsx
 import React, { useEffect, useState } from "react";
 import {
@@ -38,6 +39,7 @@ type Role =
 type FormDataShape = {
   role_type: Role;
   classification_level?: string | null;
+  dispensary_qualification?: string;
   student_year?: string | null;
   intern_half?: string | null;
 
@@ -66,12 +68,7 @@ const ROLE_CHOICES = [
   { value: "STUDENT", label: "Pharmacy Student" },
 ];
 
-const ASSISTANT_LEVEL_CHOICES = [
-  { value: "LEVEL_1", label: "Pharmacy Assistant - Level 1" },
-  { value: "LEVEL_2", label: "Pharmacy Assistant - Level 2" },
-  { value: "LEVEL_3", label: "Pharmacy Assistant - Level 3" },
-  { value: "LEVEL_4", label: "Pharmacy Assistant - Level 4" },
-];
+const ASSISTANT_LEVEL_CHOICES = otherStaffQualificationLevels;
 
 const STUDENT_YEAR_CHOICES = [
   { value: "YEAR_1", label: "Pharmacy Student - 1st Year" },
@@ -99,6 +96,7 @@ export default function RegulatoryV2() {
   const [data, setData] = useState<FormDataShape>({
     role_type: "",
     classification_level: "",
+    dispensary_qualification: "",
     student_year: "",
     intern_half: "",
     ahpra_proof: null,
@@ -127,6 +125,7 @@ export default function RegulatoryV2() {
         const nextData: FormDataShape = {
           role_type: (d.role_type as Role) || "",
           classification_level: d.classification_level || "",
+          dispensary_qualification: d.dispensary_qualification || "",
           student_year: d.student_year || "",
           intern_half: d.intern_half || "",
           ahpra_proof: null,
@@ -166,6 +165,7 @@ export default function RegulatoryV2() {
       ...prev,
       role_type: value,
       classification_level: "",
+    dispensary_qualification: "",
       student_year: "",
       intern_half: "",
     }));
@@ -182,7 +182,7 @@ export default function RegulatoryV2() {
       setData((prev) => ({ ...prev, [field]: file }));
     };
 
-  const showAssistantLevel = data.role_type === "ASSISTANT";
+  const showAssistantLevel = data.role_type === "ASSISTANT" || data.role_type === "TECHNICIAN";
   const showStudentYear = data.role_type === "STUDENT";
   const showInternHalf = data.role_type === "INTERN";
 
@@ -200,7 +200,7 @@ export default function RegulatoryV2() {
 
       // role + sub-roles
       if (data.role_type) form.append("role_type", data.role_type);
-      if (showAssistantLevel) form.append("classification_level", data.classification_level || "");
+      if (showAssistantLevel) { form.append("classification_level", data.classification_level || ""); form.append("dispensary_qualification", data.dispensary_qualification || ""); }
       if (showStudentYear) form.append("student_year", data.student_year || "");
       if (showInternHalf) form.append("intern_half", data.intern_half || "");
 
@@ -296,10 +296,11 @@ export default function RegulatoryV2() {
           <TextField
             select
             fullWidth
-            label="Assistant Classification Level"
+            label={data.role_type === "TECHNICIAN" ? "Dispensary Assistant Award Classification" : "Pharmacy Assistant Award Classification"}
             name="classification_level"
             value={data.classification_level || ""}
             onChange={onTextChange}
+            helperText={ASSISTANT_LEVEL_CHOICES.find(level => level.value === data.classification_level)?.explainer}
             required
           >
             {ASSISTANT_LEVEL_CHOICES.map((opt) => (
@@ -310,6 +311,12 @@ export default function RegulatoryV2() {
           </TextField>
         )}
 
+        {showAssistantLevel && <TextField select fullWidth label="Dispensary qualification (claimed)" name="dispensary_qualification"
+          value={data.dispensary_qualification || ''} onChange={onTextChange}
+          helperText={dispensaryQualifications.find(item => item.value === data.dispensary_qualification)?.explainer || 'Optional. Claim your dispensing training; evidence and admin verification can be completed later. This does not change your award level.'}>
+          <MenuItem value="">None claimed</MenuItem>
+          {dispensaryQualifications.map(item => <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>)}
+        </TextField>}
         {showStudentYear && (
           <TextField
             select
@@ -389,9 +396,8 @@ export default function RegulatoryV2() {
 
         {(data.role_type === "TECHNICIAN" || data.role_type === "ASSISTANT") && (
           <Stack spacing={1}>
-            <Typography fontWeight={600}>
-              {data.role_type === "TECHNICIAN" ? "Technician" : "Assistant"} Documents
-            </Typography>
+            <Typography fontWeight={600}>{data.role_type === "TECHNICIAN" ? "Dispensary Competency Evidence" : "Qualification Evidence (if relevant)"}</Typography>
+            <Alert severity="info" sx={{ mb: 1 }}>Upload evidence of completed qualifications, recognised prior learning or assessed workplace competencies where applicable. Entry-level Pharmacy Assistants do not need a mandatory certificate.</Alert>
 
             <Stack direction="row" alignItems="center" spacing={1}>
               <Button variant="outlined" component="label">

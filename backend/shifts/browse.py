@@ -16,12 +16,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import NotFound, PermissionDenied as DRFPermissionDenied, ValidationError
 from rest_framework.decorators import action
-from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied, ValidationError as DjangoValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, F, Q
 from django.utils import timezone
 from shifts.pricing import get_locked_rate_for_slot
+from shifts.engagement import staff_assignment_defaults
+from shifts.access import staff_membership_can_claim_role
 from shifts.emails import build_roster_email_link, build_shift_email_context
 from django.conf import settings
 from core.task_queue import async_task
@@ -62,6 +64,8 @@ class CommunityShiftViewSet(BaseShiftViewSet):
 
         qs = super().get_queryset().exclude(
             slots__unpublished_at__isnull=False
+        ).filter(
+            Q(dedicated_user__isnull=True) | Q(dedicated_user=user)
         ).filter(
             Q(visibility__in=COMMUNITY_LEVELS) |
             Q(visibility=PUBLIC_LEVEL, post_anonymously=False)
@@ -325,6 +329,13 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                     "shift_claim_role_mismatch",
                 )
 
+            if not staff_membership_can_claim_role(membership, shift.role_needed):
+                return _claim_refused(
+                    request, shift, 'employment_role_mismatch',
+                    'Your pharmacy employment role does not cover this instant assignment. Express interest so the owner can review your claimed skills and supervision.',
+                    'shift_claim_employment_role_mismatch',
+                )
+
             # --- 5. Check if shift already taken ---
             any_assigned = ShiftSlotAssignment.objects.filter(shift=shift).exists()
             if any_assigned:
@@ -352,7 +363,14 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 if taken:
                     continue
 
-                rate, reason = get_locked_rate_for_slot(shift=shift, slot=slot, user=user, override_date=slot.date)
+                try:
+                    defaults = staff_assignment_defaults(user=user, pharmacy=shift.pharmacy, work_date=slot.date)
+                    rate, reason = get_locked_rate_for_slot(
+                        shift=shift, slot=slot, user=user, override_date=slot.date,
+                        staff_terms=defaults['engagement_terms_snapshot'],
+                    )
+                except DjangoValidationError as exc:
+                    raise ValidationError(getattr(exc, 'message_dict', {'detail': exc.messages})) from exc
 
                 assignment = ShiftSlotAssignment.objects.create(
                     shift=shift,
@@ -361,7 +379,8 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                     user=user,
                     unit_rate=rate,
                     rate_reason=reason,
-                    is_rostered=True
+                    is_rostered=True,
+                    **defaults,
                 )
                 assignment_ids.append(assignment.id)
 
@@ -410,7 +429,7 @@ class PublicShiftViewSet(BaseShiftViewSet):
         qs = super().get_queryset().exclude(
             slots__unpublished_at__isnull=False
         ).filter(
-            visibility=PUBLIC_LEVEL
+            visibility=PUBLIC_LEVEL, dedicated_user__isnull=True
         ).annotate(
             slot_count=Count('slots', distinct=True)
         ).filter(

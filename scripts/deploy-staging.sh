@@ -10,6 +10,13 @@ RUNTIME_FILE="env/staging.runtime.env"
 INTEGRATIONS_FILE="env/staging.integrations.env"
 PRODUCTION_ENV_DIR="${PRODUCTION_ENV_DIR:-/opt/apps/chemisttasker/env}"
 
+# Permanent staging is the safe default. Temporary Cloudflare tunnels are opt-in.
+STAGING_PREVIEW_MODE="${STAGING_PREVIEW_MODE:-0}"
+case "$STAGING_PREVIEW_MODE" in
+  0|1) ;;
+  *) echo "STAGING_PREVIEW_MODE must be 0 (permanent) or 1 (temporary tunnel)" >&2; exit 2 ;;
+esac
+
 read_dotenv_value() {
   local file="$1"
   local key="$2"
@@ -48,8 +55,8 @@ fi
 if [[ ! -f "$RUNTIME_FILE" ]]; then
   umask 077
   {
-    printf 'STAGING_PUBLIC_URL=%q\n' "https://preview.invalid"
-    printf 'STAGING_ALLOWED_HOSTS=%q\n' "localhost,127.0.0.1,web"
+    printf 'STAGING_PUBLIC_URL=%q\n' "https://staging.chemisttasker.com.au"
+    printf 'STAGING_ALLOWED_HOSTS=%q\n' "staging.chemisttasker.com.au"
   } > "$RUNTIME_FILE"
 fi
 
@@ -91,41 +98,90 @@ source "$RUNTIME_FILE"
 source "$INTEGRATIONS_FILE"
 set +a
 
+if [[ "$STAGING_PREVIEW_MODE" == "0" ]]; then
+  # Upgrade only the obsolete auto-generated tunnel/placeholder configuration.
+  # Never replace an existing permanent or custom staging hostname.
+  case "${STAGING_PUBLIC_URL:-}" in
+    https://preview.invalid|https://*.trycloudflare.com)
+      STAGING_PUBLIC_URL="https://staging.chemisttasker.com.au"
+      STAGING_ALLOWED_HOSTS="staging.chemisttasker.com.au"
+      umask 077
+      {
+        printf 'STAGING_PUBLIC_URL=%q\n' "$STAGING_PUBLIC_URL"
+        printf 'STAGING_ALLOWED_HOSTS=%q\n' "$STAGING_ALLOWED_HOSTS"
+      } > "$RUNTIME_FILE"
+      export STAGING_PUBLIC_URL STAGING_ALLOWED_HOSTS
+      ;;
+  esac
+
+  if [[ "${STAGING_PUBLIC_URL:-}" != https://* ]]; then
+    echo "Permanent staging requires an HTTPS STAGING_PUBLIC_URL." >&2
+    exit 1
+  fi
+  staging_host="${STAGING_PUBLIC_URL#https://}"
+  case ",${STAGING_ALLOWED_HOSTS:-}," in
+    *,"$staging_host",*) ;;
+    *) echo "STAGING_ALLOWED_HOSTS must include $staging_host." >&2; exit 1 ;;
+  esac
+fi
+
 : "${STAGING_WEB_MAPS_API_KEY:?STAGING_WEB_MAPS_API_KEY is required}"
 : "${STAGING_RECAPTCHA_SITE_KEY:?STAGING_RECAPTCHA_SITE_KEY is required}"
 : "${STAGING_RECAPTCHA_SECRET_KEY:?STAGING_RECAPTCHA_SECRET_KEY is required}"
 
 compose() {
-  docker compose -f docker-compose.staging.yml "$@"
+  if [[ "$STAGING_PREVIEW_MODE" == "1" ]]; then
+    docker compose --profile preview -f docker-compose.staging.yml "$@"
+  else
+    docker compose -f docker-compose.staging.yml "$@"
+  fi
 }
+
+# A permanent deployment must not keep a previously started quick tunnel alive.
+if [[ "$STAGING_PREVIEW_MODE" == "0" ]]; then
+  docker compose --profile preview -f docker-compose.staging.yml stop cloudflared >/dev/null 2>&1 || true
+fi
 
 compose up -d --build
 
-preview_url=""
+target_url="$STAGING_PUBLIC_URL"
+if [[ "$STAGING_PREVIEW_MODE" == "1" ]]; then
+  preview_url=""
+  for _ in $(seq 1 60); do
+    preview_url="$(compose logs --no-color cloudflared 2>&1 | grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' | tail -n 1 || true)"
+    if [[ -n "$preview_url" ]]; then
+      break
+    fi
+    sleep 2
+  done
+
+  if [[ -z "$preview_url" ]]; then
+    echo "Could not discover the Cloudflare staging URL from cloudflared logs." >&2
+    compose ps
+    exit 1
+  fi
+
+  preview_host="${preview_url#https://}"
+  export STAGING_PUBLIC_URL="$preview_url"
+  export STAGING_ALLOWED_HOSTS="$preview_host"
+  # Only the explicitly requested preview deploy uses a temporary hostname.
+  # The permanent env/staging.runtime.env file is never overwritten by preview.
+  compose up -d --build web landing celery_worker celery_beat gateway
+  target_url="$preview_url"
+fi
+
+ready=0
 for _ in $(seq 1 60); do
-  preview_url="$(compose logs --no-color cloudflared 2>&1 | grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' | tail -n 1 || true)"
-  if [[ -n "$preview_url" ]]; then
+  if curl -fsS --max-time 10 "$target_url/" >/dev/null; then
+    ready=1
     break
   fi
   sleep 2
 done
-
-if [[ -z "$preview_url" ]]; then
-  echo "Could not discover the Cloudflare staging URL from cloudflared logs." >&2
+if [[ "$ready" != "1" ]]; then
+  echo "Staging health check failed at $target_url" >&2
   compose ps
   exit 1
-fi
-
-preview_host="${preview_url#https://}"
-if [[ "${STAGING_PUBLIC_URL:-}" != "$preview_url" || "${STAGING_ALLOWED_HOSTS:-}" != "$preview_host" ]]; then
-  umask 077
-  {
-    printf 'STAGING_PUBLIC_URL=%q\n' "$preview_url"
-    printf 'STAGING_ALLOWED_HOSTS=%q\n' "$preview_host"
-  } > "$RUNTIME_FILE"
-  export STAGING_PUBLIC_URL="$preview_url"
-  export STAGING_ALLOWED_HOSTS="$preview_host"
-  compose up -d --build landing web celery_worker celery_beat gateway
 fi
 
 # Keep credentials exclusively in the staging server's ignored env directory.
@@ -157,15 +213,11 @@ fi
 chmod 600 "$TEST_USERS_FILE"
 # Wait for successful migrations before this step; never print credentials.
 compose exec -T web python manage.py shell -c \
-  'from users.staging_test_data import seed_from_stdin; seed_from_stdin()' \
+  'from testing.staging_test_data import seed_from_stdin; seed_from_stdin()' \
   < "$TEST_USERS_FILE"
 
-for _ in $(seq 1 60); do
-  if curl -fsS --max-time 10 "$preview_url/" >/dev/null; then
-    break
-  fi
-  sleep 2
-done
-
-printf 'PREVIEW_URL=%s\n' "$preview_url"
+printf 'STAGING_URL=%s\n' "$target_url"
+if [[ "$STAGING_PREVIEW_MODE" == "1" ]]; then
+  printf 'PREVIEW_URL=%s\n' "$target_url"
+fi
 compose ps

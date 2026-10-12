@@ -4,6 +4,7 @@ from shifts.models import ShiftOffer, ShiftSlotAssignment
 from decimal import Decimal
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
+from shifts.engagement import KIND_STAFF_EMPLOYMENT, staff_assignment_defaults
 
 
 def _accepted_offer_rate_for_occurrence(offer, slot_id, slot_date):
@@ -42,18 +43,24 @@ def finalize_shift_offer(offer: ShiftOffer):
                 if ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot_date).exists():
                     continue
 
+                staff_defaults = {}
+                if offer.engagement_kind == KIND_STAFF_EMPLOYMENT:
+                    staff_defaults = staff_assignment_defaults(
+                        user=offer.user, pharmacy=shift.pharmacy, work_date=slot_date,
+                    )
                 rate, reason = get_locked_rate_for_slot(
                     shift=shift,
                     slot=slot,
                     user=offer.user,
                     override_date=slot_date,
+                    staff_terms=staff_defaults.get('engagement_terms_snapshot'),
                 )
                 accepted_terms_rate = _accepted_offer_rate_for_occurrence(
                     offer,
                     slot.id,
                     slot_date,
                 )
-                if accepted_terms_rate is not None:
+                if not staff_defaults and accepted_terms_rate is not None:
                     rate = accepted_terms_rate
                     reason = {
                         "type": "AcceptedTerms",
@@ -61,7 +68,7 @@ def finalize_shift_offer(offer: ShiftOffer):
                         "offer_id": offer.id,
                         "settlement_channel": offer.settlement_channel,
                     }
-                elif getattr(offer, "offered_rate", None) is not None:
+                elif not staff_defaults and getattr(offer, "offered_rate", None) is not None:
                     rate = Decimal(str(offer.offered_rate))
                     reason = {
                         "type": "Offer",
@@ -77,11 +84,11 @@ def finalize_shift_offer(offer: ShiftOffer):
                     unit_rate=rate,
                     rate_reason=reason,
                     is_rostered=True,
-                    payment_preference_snapshot=offer.payment_preference_snapshot,
-                    settlement_channel=offer.settlement_channel,
-                    engagement_kind=offer.engagement_kind,
-                    engagement_terms_snapshot=offer.engagement_terms_snapshot,
-                    engagement_terms_accepted_at=offer.engagement_terms_accepted_at,
+                    payment_preference_snapshot=staff_defaults.get('payment_preference_snapshot', offer.payment_preference_snapshot),
+                    settlement_channel=staff_defaults.get('settlement_channel', offer.settlement_channel),
+                    engagement_kind=staff_defaults.get('engagement_kind', offer.engagement_kind),
+                    engagement_terms_snapshot=staff_defaults.get('engagement_terms_snapshot', offer.engagement_terms_snapshot),
+                    engagement_terms_accepted_at=staff_defaults.get('engagement_terms_accepted_at', offer.engagement_terms_accepted_at),
                     payroll_activated_at=offer.payroll_activated_at,
                     source_offer=offer,
                 )

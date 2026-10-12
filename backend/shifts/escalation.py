@@ -10,7 +10,7 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from organizations.models import Chain
+from organizations.chains import active_owner_chains_for_pharmacy
 from shifts.access import ShiftActionRefused
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.models import Shift
@@ -36,8 +36,7 @@ def allowed_tiers(pharmacy):
     """
     tiers = ['FULL_PART_TIME', 'LOCUM_CASUAL']
 
-    owner = getattr(pharmacy, 'owner', None)
-    if owner and Chain.objects.filter(owner=owner, pharmacies=pharmacy).exists():
+    if active_owner_chains_for_pharmacy(pharmacy).exists():
         tiers.append('OWNER_CHAIN')
 
     if pharmacy.organization_id:

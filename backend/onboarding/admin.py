@@ -134,7 +134,7 @@ class PharmacistOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin
     fields = [
         'user',
         'government_id', 'ahpra_number', 'ahpra_first_registration_date', 'ahpra_years_since_first_registration', 'short_bio', 'resume',
-        'skills',  'payment_preference',
+        'skills', 'skill_certificates', 'payment_preference',
         'abn', 'gst_registered', 'super_fund_name', 'super_usi', 'super_member_number',
         # Referee 1
         'referee1_name', 'referee1_relation', 'referee1_email', 'referee1_confirmed',
@@ -182,9 +182,10 @@ class OtherStaffOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin
         'user__username', 'user__email', 'user__first_name', 'user__last_name', 'role_type'
     ]
     fields = [
-        'user', 'government_id', 'role_type', 'skills', 'years_experience',
+        'user', 'government_id', 'role_type', 'skills', 'skill_certificates', 'years_experience',
         'payment_preference', 'classification_level', 'student_year', 'intern_half',
         'ahpra_proof', 'hours_proof', 'certificate', 'university_id',
+        'dispensary_qualification', 'dispensary_qualification_verified', 'dispensary_qualification_verification_note',
         'cpr_certificate', 's8_certificate',
         'abn', 'gst_registered', 'tfn_number',
         'super_fund_name', 'super_usi', 'super_member_number',

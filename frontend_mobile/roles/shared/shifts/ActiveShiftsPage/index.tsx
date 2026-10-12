@@ -14,6 +14,7 @@ import {
     ShiftInterest,
     ShiftMemberStatus,
     EscalationLevelKey,
+    normalizeShiftWorkProfile,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 
@@ -288,6 +289,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
 
         const interestAny = interest as any;
         const candidate = {
+            profile: normalizeShiftWorkProfile(userObj),
             userId: interest.userId ?? userObj?.id ?? null,
             name:
                 (userObj?.firstName && userObj?.lastName)
@@ -376,6 +378,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             const candidate =
                 userObj || interest
                     ? {
+                        profile: normalizeShiftWorkProfile(userObj),
                         userId: userObj?.id ?? interestAny?.userId ?? interest?.userId ?? offer?.user?.id ?? null,
                         name:
                             userObj?.firstName && userObj?.lastName
@@ -458,6 +461,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 (typeof (interest as any)?.user === 'object' ? (interest as any).user : null) ||
                 (interest as any)?.user_detail ||
                 (interest as any)?.userDetail ||
+                member.userDetail ||
                 null;
 
             const pendingConfirmationCounterOffer =
@@ -470,6 +474,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 null;
 
             const candidate = {
+                profile: normalizeShiftWorkProfile(revealedUserObj),
                 userId: revealedUserObj?.id ?? (member as any).userId ?? (member as any).user?.id ?? null,
                 name:
                     revealedUserObj?.firstName && revealedUserObj?.lastName

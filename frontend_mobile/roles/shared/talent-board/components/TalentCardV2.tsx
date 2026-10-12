@@ -1,7 +1,10 @@
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { skillLabel } from '@chemisttasker/shared-core';
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Card, Chip, IconButton, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SkillIcon } from '../../../../components/SkillIcon';
 import { Candidate } from '../types';
 
 const formatAuSlotDate = (date: string) => {
@@ -98,7 +101,7 @@ export default function TalentCardV2({
         <View>
           <Text variant="bodySmall" style={styles.subtle}>{candidate.headline}</Text>
         </View>
-        {candidate.pitch ? <Text style={styles.pitch}>"{candidate.pitch}"</Text> : null}
+        {candidate.pitch ? <Text style={styles.pitch}>“{candidate.pitch}”</Text> : null}
 
         <View style={styles.detailsCol}>
           <View style={styles.headerMetaRow}>
@@ -150,9 +153,20 @@ export default function TalentCardV2({
 
           {!candidate.isExplorer ? (
             <View style={styles.skillsBlock}>
-              <Text style={styles.skillTitle}>Clinical Services: {candidate.clinicalServices.length ? candidate.clinicalServices.join(', ') : '--'}</Text>
-              <Text style={styles.skillTitle}>Dispense Software: {candidate.dispenseSoftware.length ? candidate.dispenseSoftware.join(', ') : '--'}</Text>
-              <Text style={styles.skillTitle}>Expanded Scope: {candidate.expandedScope.length ? candidate.expandedScope.join(', ') : '--'}</Text>
+              {[
+                { title: 'Clinical services', skills: candidate.clinicalServices },
+                { title: 'Software', skills: candidate.dispenseSoftware },
+                { title: 'Other pharmacy skills', skills: candidate.expandedScope },
+              ].filter(group => group.skills.length > 0).map(group => <View key={group.title} style={{ gap: 6 }}>
+                <Text style={styles.skillTitle}>{group.title}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {group.skills.map(code => {
+                    return <Chip key={code} icon={() => <SkillIcon skill={code} size={16} />}>
+                      {skillLabel(skillsRegistry as any, code)}
+                    </Chip>;
+                  })}
+                </View>
+              </View>)}
             </View>
           ) : null}
         </View>

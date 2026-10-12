@@ -40,11 +40,12 @@ for (const client of clients) {
   }
 
   const link = lock.packages?.['node_modules/@chemisttasker/shared-core'];
-  if (!link || link.link !== true || link.resolved !== client.resolved || 'integrity' in link) {
+  const copied = fs.existsSync(path.join(root, client.dir, '.npmrc')) && /^install-links=true$/m.test(fs.readFileSync(path.join(root, client.dir, '.npmrc'), 'utf8'));
+  if (!link || link.resolved !== (copied ? client.dependency : client.resolved) || 'integrity' in link || (copied ? link.link === true : link.link !== true)) {
     failures.push(`${client.dir}/package-lock.json must contain a local shared-core link without tarball integrity`);
   }
 
-  const sourceEntry = lock.packages?.[client.resolved];
+  const sourceEntry = copied ? link : lock.packages?.[client.resolved];
   if (!sourceEntry || sourceEntry.version !== core.version) {
     failures.push(`${client.dir}/package-lock.json must pin the linked shared-core source version ${core.version}`);
   }

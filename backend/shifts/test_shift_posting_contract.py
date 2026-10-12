@@ -80,6 +80,31 @@ class ShiftPostingFixture(TestCase):
 
 
 class PostedShiftAnnouncementTests(ShiftPostingFixture):
+    def test_platform_chain_flag_cannot_notify_an_unrelated_chain(self):
+        _, sibling = make_owner_with_pharmacy('Elsewhere')
+        sibling.owner = self.pharmacy.owner
+        sibling.save(update_fields=['owner'])
+        chain = Chain.objects.create(owner=self.pharmacy.owner, name='Other pharmacy chain', is_active=True)
+        chain.pharmacies.add(sibling)  # The posting pharmacy is not in it.
+        self.member('FULL_TIME')
+        self.member('LOCUM', pharmacy=sibling)
+        response, sent = self.post_shift(visibility='PLATFORM', notify_chain_members=True)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertNotIn('OWNER_CHAIN', response.data['allowed_escalation_levels'])
+        self.assertFalse(response.data['pharmacy_detail']['has_chain'])
+        self.assertEqual([e for e in sent if e['template'] == 'emails/shift_posted.html'], [])
+        self.assertFalse(Notification.objects.filter(title='New shift available').exists())
+
+    def test_inactive_chain_is_unavailable_for_metadata_escalation_and_outreach(self):
+        chain = Chain.objects.create(owner=self.pharmacy.owner, name='Inactive chain', is_active=False)
+        chain.pharmacies.add(self.pharmacy)
+        self.member('FULL_TIME')
+        response, sent = self.post_shift(visibility='PLATFORM', notify_chain_members=True)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertNotIn('OWNER_CHAIN', response.data['allowed_escalation_levels'])
+        self.assertFalse(response.data['pharmacy_detail']['has_chain'])
+        self.assertEqual([e for e in sent if e['template'] == 'emails/shift_posted.html'], [])
+
     def test_staff_and_favourites_are_emailed_when_the_owner_asks(self):
         staff = self.member("FULL_TIME")
         locum = self.member("LOCUM")
@@ -123,7 +148,7 @@ class PostedShiftAnnouncementTests(ShiftPostingFixture):
 
         cases = {
             "INTERN": {workers["INTERN"].email},
-            "TECHNICIAN": {workers["TECHNICIAN"].email},
+            "TECHNICIAN": {workers[role].email for role in ('TECHNICIAN', 'INTERN', 'STUDENT')},
             "STUDENT": {workers["STUDENT"].email},
             "ASSISTANT": {worker.email for worker in workers.values()},
         }
@@ -240,7 +265,7 @@ class AvailabilityMatchTests(ShiftPostingFixture):
 
         cases = {
             "INTERN": {intern.email},
-            "TECHNICIAN": {technician.email},
+            "TECHNICIAN": {technician.email, intern.email, student.email},
             "STUDENT": {student.email},
             "ASSISTANT": {intern.email, technician.email, assistant.email, student.email},
         }
@@ -261,6 +286,44 @@ class AvailabilityMatchTests(ShiftPostingFixture):
 
 
 class PostingDefaultsTests(ShiftPostingFixture):
+    def test_dedicated_booking_partial_edits_keep_privacy_without_visibility_input(self):
+        worker = self.member('LOCUM')
+        response, _ = self.post_shift(dedicated_user=worker.id, visibility='LOCUM_CASUAL')
+        self.assertEqual(response.status_code, 201, response.data)
+        shift_id = response.data['id']
+        replacement = self.member('LOCUM')
+        for payload in (
+            {'description': 'Updated private booking'},
+            {'slots': [{'date': DAY.isoformat(), 'start_time':'09:00', 'end_time':'17:00', 'rate':'80.00'}]},
+            {'dedicated_user': replacement.id},
+        ):
+            with self.subTest(payload=list(payload)), queued_emails():
+                updated = client_for(self.owner).patch(f'{API}shifts/{shift_id}/', payload, format='json')
+                self.assertEqual(updated.status_code, 200, updated.data)
+                shift = Shift.objects.get(pk=shift_id)
+                self.assertEqual(shift.visibility, 'LOCUM_CASUAL')
+                self.assertIsNone(shift.escalate_to_platform)
+        unauthorized = client_for(worker).patch(f'{API}shifts/{shift_id}/', {'description':'Unauthorized'}, format='json')
+        self.assertIn(unauthorized.status_code, (403,404))
+
+    def test_direct_booking_ignores_widening_and_broadcast_controls(self):
+        worker = self.member('LOCUM')
+        colleague = self.member('FULL_TIME')
+        response, sent = self.post_shift(
+            dedicated_user=worker.id, visibility='PLATFORM', notify_pharmacy_staff=True,
+            notify_favorite_staff=True, notify_chain_members=True,
+            escalate_to_platform=f'{DAY.isoformat()}T09:00:00+10:00',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        shift = Shift.objects.get(pk=response.data['id'])
+        self.assertEqual(shift.visibility, 'LOCUM_CASUAL')
+        self.assertIsNone(shift.escalate_to_platform)
+        self.assertEqual([e['to'] for e in sent if e['template'] == 'emails/shift_offer.html'], [(worker.email,)])
+        self.assertEqual([e for e in sent if e['template'] in ('emails/shift_posted.html', 'emails/shift_availability_match.html')], [])
+        self.assertFalse(Notification.objects.filter(user=colleague, title='New shift available').exists())
+        community = client_for(colleague).get(f'{API}community-shifts/{shift.id}/')
+        self.assertEqual(community.status_code, 404)
+
     def test_dedicated_shift_offers_each_slot_to_its_worker(self):
         worker = self.member("LOCUM")
         response, sent = self.post_shift(dedicated_user=worker.id)

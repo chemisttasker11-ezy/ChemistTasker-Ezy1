@@ -3,6 +3,9 @@ worker's profile (audited) and the member status list of a member-visibility shi
 
 Refusals raise `ShiftActionRefused`, whose response body and status are those the views used to build by hand.
 """
+from onboarding.services.skill_identity import normalize_skills
+from onboarding.services.work_profile import current_worker_profile
+from onboarding.qualifications import has_verified_dispensing_qualification
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -139,15 +142,18 @@ def reveal_candidate(*, request, shift, candidate, slot_id, slot):
 def work_profile(candidate, *, build_absolute_uri):
     """What a manager sees of a candidate's work profile: photo, bio, skills (catalogue codes), role, experience,
     location and verification. Never contact details or the CV; those are only for booked workers."""
-    po = PharmacistOnboarding.objects.filter(user=candidate).first()
-    os = None if po else OtherStaffOnboarding.objects.filter(user=candidate).first()
-    profile = po or os
+    profile = current_worker_profile(candidate)
+    po = profile if str(getattr(candidate, 'role', '')).upper() == 'PHARMACIST' else None
+    os = profile if str(getattr(candidate, 'role', '')).upper() == 'OTHER_STAFF' else None
     if not profile:
         return {'profile_photo': None, 'short_bio': None, 'skills': [], 'role_label': None, 'verified': False}
     data = {
         'profile_photo': build_absolute_uri(profile.profile_photo.url) if profile.profile_photo else None,
         'short_bio': profile.short_bio,
-        'skills': list(profile.skills or []),
+        'skill_role': 'PHARMACIST' if po else str(os.role_type or 'UNKNOWN').upper(),
+        # Canonical registry IDs the candidate's current role may claim (same rule as the Talent board).
+        'skills': normalize_skills(list(profile.skills or []), allowed_role='PHARMACIST' if po else str(os.role_type or 'UNKNOWN').upper(), matchable_only=True),
+        'verified_skills': normalize_skills([code for code, evidence in (getattr(profile, 'skill_certificates', None) or {}).items() if isinstance(evidence, dict) and evidence.get('path') and evidence.get('verified') is True], allowed_role='PHARMACIST' if po else str(os.role_type or 'UNKNOWN').upper(), matchable_only=True),
         'suburb': profile.suburb or None,
         'state': profile.state or None,
         'open_to_travel': bool(profile.open_to_travel),
@@ -173,6 +179,8 @@ def work_profile(candidate, *, build_absolute_uri):
                           else os.get_intern_half_display() if os.intern_half else None)
         data.update({
             'role_label': os.get_role_type_display() if os.role_type else None,
+            'dispensary_qualification': os.dispensary_qualification or None,
+            'dispensary_qualification_verified': has_verified_dispensing_qualification(os),
             'classification': classification,
             'ahpra_verified': bool(os.ahpra_proof_verified),
             'registered_since': None,
@@ -454,6 +462,9 @@ def member_status(*, shift, requested_visibility, slot_id, slot_date, request):
             'awaiting_payment': awaiting_payment,
             'awaiting_payment_offer_id': awaiting_payment_offer.id if awaiting_payment_offer else None,
             'awaiting_payment_counter_offer': awaiting_payment_counter_offer_data,
+            # Pharmacy members and favourites already work with the pharmacy: show their work profile (skills,
+            # software, role, experience) in the review without a reveal.
+            'user_detail': revealed_profile(user, build_absolute_uri=request.build_absolute_uri if request else (lambda url: url)),
         })
 
     return data
@@ -483,31 +494,17 @@ def assigned_profile(*, request, shift, candidate, slot_id, slot):
         slot=slot,
     )
 
-    # Retrieve profile data without sending an email or consuming reveal quota
-    try:
-        po = PharmacistOnboarding.objects.get(user=candidate)
-        profile_data = {
-            'phone_number': candidate.mobile_number,
-            'short_bio': po.short_bio,
-            'resume': request.build_absolute_uri(po.resume.url) if po.resume else None,
-            'rate_preference': po.rate_preference or None,
-        }
-    except PharmacistOnboarding.DoesNotExist:
-        try:
-            os = OtherStaffOnboarding.objects.get(user=candidate)
-            profile_data = {
-                'phone_number': candidate.mobile_number,
-                'short_bio': os.short_bio,
-                'resume': request.build_absolute_uri(os.resume.url) if os.resume else None,
-            }
-        except OtherStaffOnboarding.DoesNotExist:
-            # Handle cases where user might not have a full onboarding profile yet
-            profile_data = {
-                'phone_number': None,
-                'short_bio': None,
-                'resume': None,
-                'rate_preference': None,
-            }
+    # Contact access is unchanged; bio/CV must come from the current worker role,
+    # just like the public work-profile projection. Historical rows remain stored.
+    profile = current_worker_profile(candidate)
+    resume = getattr(profile, 'resume', None)
+    profile_data = {
+        'phone_number': candidate.mobile_number if profile else None,
+        'short_bio': getattr(profile, 'short_bio', None),
+        'resume': request.build_absolute_uri(resume.url) if resume else None,
+    }
+    if profile is None or hasattr(profile, 'rate_preference'):
+        profile_data['rate_preference'] = getattr(profile, 'rate_preference', None) or None
 
     return {
         'id': candidate.id,
