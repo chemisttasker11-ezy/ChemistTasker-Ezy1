@@ -7,13 +7,12 @@ import {
   Alert, Snackbar, Chip, Divider, CircularProgress, TextField, Tabs, Tab
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
+import { SkillEvidenceMark } from '@chemisttasker/shared-ui/VerificationBadges';
 
 import { API_BASE_URL } from '../../../constants/api';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import skillsRegistry from '../../../../../shared-core/skills_registry.json';
-import { searchRoleSkillGroups, normalizeSavedSkillCodes, skillId, workerSkillRole, claimModeLabel } from '@chemisttasker/shared-core';
+import { searchRoleSkillGroups, normalizeSavedSkillCodes, normalizeVerification, skillId, workerSkillRole, claimModeLabel, type EvidenceState } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
 
 
@@ -44,6 +43,7 @@ export default function SkillsV2() {
   const activeTabIndex = Math.min(tabIndex, Math.max(tabs.length - 1, 0));
 
   const [selected, setSelected] = React.useState<string[]>([]);
+  const [evidence, setEvidence] = React.useState<Record<string, EvidenceState>>({}); // check state per certificate skill
   const [existingCerts, setExistingCerts] = React.useState<Record<string, CertRow>>({});
   const [pendingFiles, setPendingFiles] = React.useState<Record<string, File | null>>({}); // newly chosen (not yet uploaded)
   const unsaved = useUnsavedChangesGuard({
@@ -71,6 +71,7 @@ export default function SkillsV2() {
         const byCode: Record<string, CertRow> = {};
         (d.skill_certificates || []).forEach(row => { byCode[skillId(skillsRegistry as any, row.skill_code) || row.skill_code] = row; });
         setExistingCerts(byCode);
+        setEvidence(normalizeVerification((d as any).verification)?.skillEvidence ?? {});
         unsaved.markClean({ existingCerts: byCode, pendingFiles: {}, selected: normalizeSavedSkillCodes(skillsRegistry as any, d.skills || []) });
       } catch (e: any) {
         setError(e.response?.data?.detail || e.message || 'Failed to load');
@@ -131,6 +132,7 @@ export default function SkillsV2() {
       const byCode: Record<string, CertRow> = {};
       (d.skill_certificates || []).forEach(row => { byCode[skillId(skillsRegistry as any, row.skill_code) || row.skill_code] = row; });
       setExistingCerts(byCode);
+      setEvidence(normalizeVerification((d as any).verification)?.skillEvidence ?? {});
 
       // Clear pending files that were just uploaded successfully
       setPendingFiles({});
@@ -152,16 +154,12 @@ export default function SkillsV2() {
   if (loading) return <Typography>Loading…</Typography>;
 
   return (
-    <Box sx={{ width: '100%', maxWidth: 960, px: { xs: 2, md: 3 }, pb: 3 }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-        Skills
-      </Typography>
-
+    <Box sx={{ width: '100%' }}>
       {error && <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>{error}</Alert>}
 
       {/* Legend / guidance */}
       <Alert severity="info" sx={{ mb: 2 }}>
-        Tick what you have actually done on the job, then the software you have used. Pharmacies use this to match you to shifts. A tick is not a verified credential; certificates are checked separately.
+        Tick what you have done on the job, then the software you use: pharmacies match shifts on these. A certificate is never required. Adding one earns a Verified mark on that skill once we have checked it.
       </Alert>
 
       <TextField fullWidth label="Search skills or software" placeholder="Try Webster, vaccination or FRED"
@@ -190,7 +188,6 @@ export default function SkillsV2() {
                 const checked = selected.includes(item.code);
                 const existingUrl = getFileUrl(existingCerts[item.code]?.url || existingCerts[item.code]?.path);
                 const pendingUrl = pendingUrls[item.code] || '';
-                const needsFile = checked && requiresCert(item.code) && !hasExisting(item.code) && !hasPending(item.code);
 
                 return (
                   <Box
@@ -219,19 +216,17 @@ export default function SkillsV2() {
                                 {item.definition}
                               </Typography>
                             )}
-                            {!checked && requiresCert(item.code) && <Typography variant="caption" color="text.secondary">Certificate needed for verification</Typography>}
+                            {!checked && requiresCert(item.code) && <Typography variant="caption" color="text.secondary">Certificate optional · earns a Verified mark</Typography>}
                           </Box>
                         }
                       />
 
                       {checked && requiresCert(item.code) ? (
                         hasPending(item.code) ? (
-                          <Chip icon={<UploadFileIcon />} label="File selected" size="small" />
-                        ) : hasExisting(item.code) ? (
-                          <Chip icon={<CheckCircleOutlineIcon />} variant="outlined" label="Document uploaded" size="small" />
-                        ) : needsFile ? (
-                          <Chip icon={<HourglassBottomIcon />} color="warning" variant="outlined" label="Not verified" size="small" />
-                        ) : null
+                          <Chip icon={<UploadFileIcon />} label="File selected · save to send it for checking" size="small" />
+                        ) : (
+                          <SkillEvidenceMark audience="worker" skill={item.label} state={evidence[item.code] ?? (hasExisting(item.code) ? 'pending' : 'not_supplied')} />
+                        )
                       ) : null}
                     </Stack>
 
@@ -243,7 +238,7 @@ export default function SkillsV2() {
                           component="label"
                           startIcon={<UploadFileIcon />}
                         >
-                          {hasPending(item.code) ? 'Change file' : 'Upload certificate'}
+                          {hasPending(item.code) ? 'Change file' : hasExisting(item.code) ? 'Replace certificate' : 'Add certificate (optional)'}
                           <input
                             hidden
                             type="file"

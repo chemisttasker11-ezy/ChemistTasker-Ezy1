@@ -694,6 +694,7 @@ export type ShiftUser = CamelCasedPropertiesDeep<ShiftUserApi>;
 
 export interface VerificationSummaryApi {
     verified: boolean;
+    missing?: ('email' | 'mobile' | 'ahpra' | 'gov_id' | 'referees' | 'role')[];
     badges: { code: 'AHPRA' | 'AHPRA_PROVISIONAL' | 'QUALIFICATION' | 'DISPENSING' | 'ENROLMENT' | 'ID' | 'REFERENCES' | 'ABN'; state: 'verified' | 'pending' | 'not_supplied' | 'failed' }[];
     skill_evidence: Record<string, 'verified' | 'pending' | 'not_supplied' | 'failed'>;
     overseas: boolean;

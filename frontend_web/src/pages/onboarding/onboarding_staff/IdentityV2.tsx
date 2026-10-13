@@ -126,9 +126,6 @@ export default function IdentityV2() {
 
 return (
   <Box sx={{ width: '100%' }}>
-    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-      Identity Document
-    </Typography>
 
     {error && (
       <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>

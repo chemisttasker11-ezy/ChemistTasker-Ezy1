@@ -5,7 +5,7 @@ const OTHER_STAFF_ROLE_LABELS: Record<string, string> = {
   STUDENT: "Pharmacy Student",
 };
 
-export function otherStaffRoleLabel(roleType?: string | null, fallback = "Other Staff") {
+export function otherStaffRoleLabel(roleType?: string | null, fallback = "Pharmacy team") {
   const normalized = String(roleType || "").trim().toUpperCase();
   return OTHER_STAFF_ROLE_LABELS[normalized] ?? fallback;
 }

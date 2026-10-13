@@ -151,6 +151,8 @@ def verification_summary(profile) -> dict:
     """What employers and the worker see: the Verified flag, every badge, certificate skills and the overseas label."""
     return {
         'verified': bool(profile.verified),
+        # What Verified still needs (email, mobile, ahpra, gov_id, referees, role); empty once verified.
+        'missing': [] if profile.verified else missing_requirements(profile),
         'badges': badges(profile),
         'skill_evidence': skill_evidence(profile),
         'overseas': _role(profile) == 'EXPLORER' and getattr(profile, 'role_type', '') == 'OVERSEAS',

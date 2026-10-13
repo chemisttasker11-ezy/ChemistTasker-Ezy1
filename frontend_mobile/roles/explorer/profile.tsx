@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { deleteAccount, updateOnboardingForm } from '@chemisttasker/shared-core';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ProfileVerificationCard } from '../shared/skills/ProfileVerificationCard';
 
 export default function ExplorerProfileScreen() {
   const router = useRouter();
@@ -34,9 +35,9 @@ export default function ExplorerProfileScreen() {
   const imageMediaTypes = (ImagePicker as any).MediaType?.Images ?? ImagePicker.MediaTypeOptions.Images;
   const menuItems = [
     { title: 'Basic Info', description: 'Personal and contact details', icon: 'account-edit-outline', route: '/explorer/profile-basic-info' },
-    { title: 'Identity', description: 'Government ID verification', icon: 'card-account-details-outline', route: '/explorer/profile-identity' },
-    { title: 'Interests', description: 'Choose your interests', icon: 'heart-outline', route: '/explorer/profile-interests' },
-    { title: 'Referees', description: 'References and requests', icon: 'account-group-outline', route: '/explorer/profile-referees' },
+    { title: 'Photo ID', description: 'Optional, unless you are overseas', icon: 'card-account-details-outline', route: '/explorer/profile-identity' },
+    { title: "What you're looking for", description: 'Placement, work experience or a first job', icon: 'heart-outline', route: '/explorer/profile-interests' },
+    { title: 'References', description: 'Optional · earns the References badge', icon: 'account-group-outline', route: '/explorer/profile-referees' },
     { title: 'Bio', description: 'Short bio and resume', icon: 'file-account-outline', route: '/explorer/profile-bio' },
   ];
 
@@ -194,6 +195,8 @@ export default function ExplorerProfileScreen() {
             </View>
           </LinearGradient>
         </Card>
+
+        <ProfileVerificationCard roleKey="explorer" role="EXPLORER" routes={{ mobile: '/mobile-verify', gov_id: '/explorer/profile-identity', referees: '/explorer/profile-referees' }} />
 
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (

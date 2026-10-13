@@ -363,9 +363,6 @@ export default function BasicInfoV2() {
 
 return (
   <Box sx={{ width: '100%' }}>
-    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-      Basic Information
-    </Typography>
 
     {error && (
       <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>

@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { deleteAccount, updateOnboardingForm } from '@chemisttasker/shared-core';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ProfileVerificationCard } from '../shared/skills/ProfileVerificationCard';
 
 export default function OtherStaffProfileScreen() {
   const router = useRouter();
@@ -38,11 +39,11 @@ export default function OtherStaffProfileScreen() {
     { title: 'My Roster', description: 'View assigned shifts and request cover', icon: 'calendar-week', route: '/my-roster' },
     { title: 'My Leave', description: 'Request full or partial-day leave', icon: 'calendar-clock', route: '/my-leave' },
     { title: 'Basic Info', description: 'Personal and contact details', icon: 'account-edit-outline', route: '/otherstaff/profile-basic-info' },
-    { title: 'Identity', description: 'Government ID verification', icon: 'card-account-details-outline', route: '/otherstaff/profile-identity' },
-    { title: 'Regulatory Docs', description: 'Role-specific compliance files', icon: 'file-certificate-outline', route: '/otherstaff/profile-regulatory' },
-    { title: 'Skills', description: 'Skills and certificates', icon: 'star-outline', route: '/otherstaff/profile-skills' },
+    { title: 'Photo ID', description: 'Optional · earns the Photo ID badge', icon: 'card-account-details-outline', route: '/otherstaff/profile-identity' },
+    { title: 'Role & qualifications', description: 'Your role, award level and optional certificates', icon: 'file-certificate-outline', route: '/otherstaff/profile-regulatory' },
+    { title: 'Skills & software', description: 'What you have done on the job', icon: 'star-outline', route: '/otherstaff/profile-skills' },
     { title: 'Payment', description: 'TFN/ABN and super details', icon: 'cash-multiple', route: '/otherstaff/profile-payment' },
-    { title: 'Referees', description: 'References and requests', icon: 'account-group-outline', route: '/otherstaff/profile-referees' },
+    { title: 'References', description: 'Optional · earns the References badge', icon: 'account-group-outline', route: '/otherstaff/profile-referees' },
     { title: 'Bio', description: 'Short bio and resume', icon: 'file-account-outline', route: '/otherstaff/profile-bio' },
   ];
 
@@ -196,10 +197,12 @@ export default function OtherStaffProfileScreen() {
               {user?.email || ''}
             </Text>
             <View style={styles.roleChip}>
-              <Text variant="labelSmall" style={styles.roleText}>OTHER STAFF</Text>
+              <Text variant="labelSmall" style={styles.roleText}>PHARMACY TEAM</Text>
             </View>
           </LinearGradient>
         </Card>
+
+        <ProfileVerificationCard roleKey="otherstaff" routes={{ mobile: '/mobile-verify', ahpra: '/otherstaff/profile-regulatory', role: '/otherstaff/profile-regulatory', gov_id: '/otherstaff/profile-identity', referees: '/otherstaff/profile-referees' }} />
 
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (

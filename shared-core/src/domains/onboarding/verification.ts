@@ -7,8 +7,12 @@ export type BadgeCode = 'AHPRA' | 'AHPRA_PROVISIONAL' | 'QUALIFICATION' | 'DISPE
 export type BadgeAudience = 'employer' | 'worker';
 export type BadgeTone = 'success' | 'info' | 'warning' | 'neutral';
 
+export type RequirementCode = 'email' | 'mobile' | 'ahpra' | 'gov_id' | 'referees' | 'role';
+
 export interface VerificationSummary {
   verified: boolean;
+  /** What the Verified profile still needs; empty once verified. */
+  missing: RequirementCode[];
   badges: { code: BadgeCode; state: EvidenceState }[];
   /** Claimed skills that carry a certificate in the registry; other skills never have a badge. */
   skillEvidence: Record<string, EvidenceState>;
@@ -60,6 +64,7 @@ export function normalizeVerification(value: unknown): VerificationSummary | nul
   const raw = value as Record<string, any>;
   return {
     verified: Boolean(raw.verified),
+    missing: Array.isArray(raw.missing) ? raw.missing : [],
     badges: Array.isArray(raw.badges) ? raw.badges : [],
     skillEvidence: raw.skillEvidence ?? raw.skill_evidence ?? {},
     overseas: Boolean(raw.overseas),
@@ -104,6 +109,16 @@ export function verificationRows(summary: VerificationSummary | null, audience: 
 /** Badge state of one claimed skill; null for skills that never carry a certificate. */
 export const skillEvidenceState = (summary: VerificationSummary | null, code: string): EvidenceState | null =>
   summary?.skillEvidence?.[code] ?? null;
+
+/** One line per requirement, for the worker's "To get verified" list. */
+export const REQUIREMENT_TEXT: Record<RequirementCode, { title: string; body: string }> = {
+  email: { title: 'Confirm your email', body: 'Enter the code we emailed you when you signed up.' },
+  mobile: { title: 'Verify your mobile number', body: 'We text you a code. Pharmacies only contact verified numbers.' },
+  ahpra: { title: 'AHPRA registration', body: 'Add your AHPRA number. Our team checks it on the public register, usually within one business day.' },
+  gov_id: { title: 'Photo ID', body: 'Upload photo ID. It is needed because you skipped the Australian mobile check.' },
+  referees: { title: 'Two references', body: 'Add two referees and ask them to confirm.' },
+  role: { title: 'Choose your role', body: 'Tell us whether you are an assistant, technician, intern or student.' },
+};
 
 export const verifiedProfileExplainer = (role?: string | null) =>
   /PHARMACIST|INTERN/.test(String(role || '').toUpperCase())

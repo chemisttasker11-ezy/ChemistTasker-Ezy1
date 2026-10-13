@@ -75,6 +75,20 @@ export function VerificationBadges({ summary, role, audience = 'employer', compa
   );
 }
 
+/** A document's state with its explanation written out (worker screens, where the reason is the point). */
+export function EvidenceStatus({ label, state, explainer }: { label: string; state: EvidenceState; explainer: string }) {
+  const look = TONES[STATE_TONE[state]];
+  return (
+    <View style={{ gap: 4 }} accessible accessibilityLabel={`${label}: ${evidenceStateLabel(state)}. ${explainer}`}>
+      <View style={[styles.pill, { alignSelf: 'flex-start', backgroundColor: look.bg, borderColor: look.border }]}>
+        <MaterialCommunityIcons name={STATE_ICON[state]} size={15} color={look.fg} />
+        <Text style={[styles.pillText, { color: look.fg }]}>{label} · {evidenceStateLabel(state)}</Text>
+      </View>
+      <Text style={{ fontSize: 12.5, lineHeight: 18, color: '#445474' }}>{explainer}</Text>
+    </View>
+  );
+}
+
 /** Small state icon inside a certificate skill's chip; skills without a certificate show none. */
 export function SkillEvidenceIcon({ state, audience = 'employer' }: { state: EvidenceState | null; audience?: BadgeAudience }) {
   if (!state) return null;
