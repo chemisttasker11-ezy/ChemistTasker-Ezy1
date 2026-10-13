@@ -62,7 +62,7 @@ export function ProfileVerificationCard({ roleKey, role, routes }: {
           <View style={{ gap: 4 }}>
             <View style={styles.badgesHeader}>
               <Text style={styles.badgesTitle}>Your badges</Text>
-              <BadgeGuideButton />
+              <BadgeGuideButton label="What pharmacies see" />
             </View>
             <VerificationBadges summary={summary} role={skillRole} audience="worker" />
           </View>

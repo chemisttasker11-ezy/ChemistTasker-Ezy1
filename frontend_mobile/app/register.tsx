@@ -255,7 +255,7 @@ export default function RegisterScreen() {
 
         <Divider style={styles.divider} />
 
-        <Text variant="titleSmall" style={styles.sectionTitle} accessibilityRole="header">I'm joining as</Text>
+        <Text variant="titleSmall" style={styles.sectionTitle} accessibilityRole="header">{"I'm joining as"}</Text>
         <View style={styles.roleList} accessibilityRole="radiogroup">
           {ROLE_OPTIONS.map((option) => {
             const isSelected = formData.role === option.value;

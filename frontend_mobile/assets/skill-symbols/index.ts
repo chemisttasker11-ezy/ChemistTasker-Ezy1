@@ -55,3 +55,18 @@ export const SKILL_SYMBOLS: Record<string, number> = {
   POSWORKS: require('./POSWORKS.png'),
   RTPM: require('./RTPM.png'),
 };
+
+// Verification badge subjects (BADGE_SUBJECTS in shared/SkillGlyph.tsx); the status medallion is drawn natively.
+export const BADGE_SYMBOLS: Record<string, number> = {
+  PROFILE: require('./BADGE_PROFILE.png'),
+  AHPRA: require('./BADGE_AHPRA.png'),
+  AHPRA_PROVISIONAL: require('./BADGE_AHPRA_PROVISIONAL.png'),
+  QUALIFICATION: require('./BADGE_QUALIFICATION.png'),
+  DISPENSING: require('./BADGE_DISPENSING.png'),
+  ENROLMENT: require('./BADGE_ENROLMENT.png'),
+  ID: require('./BADGE_ID.png'),
+  REFERENCES: require('./BADGE_REFERENCES.png'),
+  ABN: require('./BADGE_ABN.png'),
+  OVERSEAS: require('./BADGE_OVERSEAS.png'),
+  UNDER_18: require('./BADGE_UNDER_18.png'),
+};

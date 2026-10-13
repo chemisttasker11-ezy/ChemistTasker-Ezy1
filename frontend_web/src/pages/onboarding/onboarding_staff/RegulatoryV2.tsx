@@ -79,7 +79,7 @@ function EvidenceRow({ title, purpose, field, form, badge, onPick }: {
           <Typography sx={{ fontSize: 14.5, fontWeight: 600, color: "var(--ct-text-primary)" }}>{title}</Typography>
           <Typography sx={{ fontSize: 13, color: "var(--ct-text-secondary)", mt: 0.25, lineHeight: 1.45 }}>{purpose}</Typography>
         </Box>
-        {badge && !picked && <EvidencePill label={badge.label} state={badge.state} explainer={badge.explainer} />}
+        {badge && !picked && <EvidencePill code={badge.code} label={badge.label} state={badge.state} explainer={badge.explainer} />}
       </Stack>
       <Stack direction="row" spacing={1.5} alignItems="center" useFlexGap flexWrap="wrap" sx={{ mt: 1.25 }}>
         <Button variant="outlined" size="small" component="label" startIcon={<FileUp size={16} />}>
@@ -205,7 +205,7 @@ export default function RegulatoryV2() {
               inputProps={{ autoComplete: "off", spellCheck: false }} error={Boolean(fieldErrors.ahpra_number)}
               helperText={fieldErrors.ahpra_number || "Your provisional (intern) registration. Our team checks it on the AHPRA register; nothing else is needed from interns."} />
             {badge("AHPRA_PROVISIONAL") && data.ahpra_number && (
-              <Box><EvidencePill label="AHPRA provisional registration" state={badge("AHPRA_PROVISIONAL")!.state} explainer={badge("AHPRA_PROVISIONAL")!.explainer} /></Box>
+              <Box><EvidencePill code="AHPRA_PROVISIONAL" label="AHPRA provisional registration" state={badge("AHPRA_PROVISIONAL")!.state} explainer={badge("AHPRA_PROVISIONAL")!.explainer} /></Box>
             )}
           </Stack>
         )}

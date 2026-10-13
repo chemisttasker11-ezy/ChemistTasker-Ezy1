@@ -127,7 +127,7 @@ export default function OtherStaffRegulatoryScreen() {
       <View key={field} style={styles.evidence}>
         <Text style={styles.evidenceTitle}>{title}</Text>
         <Text style={styles.help}>{purpose}</Text>
-        {state && !files[field] ? <EvidenceStatus label={state.label} state={state.state} explainer={state.explainer} /> : null}
+        {state && !files[field] ? <EvidenceStatus code={code} label={state.label} state={state.state} explainer={state.explainer} /> : null}
         {files[field] ? <Text style={styles.help}>{files[field]?.name || 'File selected'} · save to send it for checking</Text> : null}
         <View style={styles.row}>
           <Button mode="outlined" icon="file-upload-outline" onPress={() => pick(field)}>{files[field] ? 'Change file' : data[field] ? 'Replace file' : 'Add file'}</Button>
@@ -180,7 +180,7 @@ export default function OtherStaffRegulatoryScreen() {
             <HelperText type={fieldErrors.ahpra_number ? 'error' : 'info'} visible>
               {fieldErrors.ahpra_number || 'Your provisional (intern) registration. Our team checks it on the AHPRA register; nothing else is needed from interns.'}
             </HelperText>
-            {badge('AHPRA_PROVISIONAL') && data.ahpra_number ? <EvidenceStatus label="AHPRA provisional registration" state={badge('AHPRA_PROVISIONAL')!.state} explainer={badge('AHPRA_PROVISIONAL')!.explainer} /> : null}
+            {badge('AHPRA_PROVISIONAL') && data.ahpra_number ? <EvidenceStatus code="AHPRA_PROVISIONAL" label="AHPRA provisional registration" state={badge('AHPRA_PROVISIONAL')!.state} explainer={badge('AHPRA_PROVISIONAL')!.explainer} /> : null}
           </View>
         ) : null}
 
