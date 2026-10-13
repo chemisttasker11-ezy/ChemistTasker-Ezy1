@@ -596,7 +596,10 @@ for _app in ("attendance", "chat", "dashboards", "invoicing", "memberships", "no
     LOGGING['loggers'][_app] = dict(LOGGING['loggers']['client_profile'])
 
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = env(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.smtp.EmailBackend',
+)
 EMAIL_HOST = 'smtp.zoho.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True

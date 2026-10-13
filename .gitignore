@@ -195,4 +195,8 @@ GoogleService-Info.plist
 BACKEND_FRONTEND_FULL_COVERAGE_AUDIT.md
 END_TO_END_DOMAIN_LOGIC_AUDIT.md
 github_guidance.md
+# Ignored by Mostafa
+.dsh/*
+AGENTS.md
+.dsh-code-index/
 .ci-artifacts/
