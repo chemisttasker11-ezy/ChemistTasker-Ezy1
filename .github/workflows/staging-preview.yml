@@ -1,4 +1,5 @@
-name: Staging Preview
+# Deploy to permanent staging via the OVH self-hosted runner.
+name: Staging deployment
 
 on:
   push:
@@ -10,8 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: chemisttasker-staging-preview
-  cancel-in-progress: true
+  group: chemisttasker-staging-deployment
+  cancel-in-progress: false
 
 env:
   STAGING_DIR: "/opt/apps/chemisttasker-staging"
@@ -19,9 +20,10 @@ env:
 jobs:
   deploy-staging:
     runs-on: [self-hosted, linux, x64, chemisttasker-staging]
+
     steps:
       - name: Checkout staging
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Sync isolated staging source
         shell: bash
@@ -34,19 +36,20 @@ jobs:
         id: deploy
         shell: bash
         run: |
-          output="$(cd "$STAGING_DIR" && bash scripts/deploy-staging.sh)"
-          printf '%s\n' "$output"
-          staging_url="$(printf '%s\n' "$output" | sed -n 's/^STAGING_URL=//p' | tail -n 1)"
-          test -n "$staging_url"
-          echo "staging_url=$staging_url" >> "$GITHUB_OUTPUT"
-          {
-            echo "## ChemistTasker permanent staging"
-            echo ""
-            echo "Staging: $staging_url"
-            echo ""
-            echo "This deployment runs on the OVH self-hosted runner and uses staging-only PostgreSQL, Redis, volumes and containers."
-          } >> "$GITHUB_STEP_SUMMARY"
+          cd "$STAGING_DIR"
+          bash scripts/deploy-staging.sh
 
+          staging_url="https://staging.chemisttasker.com.au"
+          echo "staging_url=$staging_url" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## ChemistTasker staging deployment"
+            echo ""
+            echo "Site: $staging_url"
+            echo ""
+            echo "Deployed on the OVH self-hosted runner."
+            echo "Uses staging-only PostgreSQL, Redis, volumes and containers."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Smoke-test deployed staging
         shell: bash
