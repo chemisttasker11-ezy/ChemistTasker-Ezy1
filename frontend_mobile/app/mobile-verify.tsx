@@ -54,13 +54,14 @@ export default function MobileVerifyScreen() {
         }
         setLoading(true);
         try {
-            await mobileRequestOtp({
+            const sent: any = await mobileRequestOtp({
                 first_name: firstName,
                 last_name: lastName,
                 username,
                 mobile_number: mobile,
             });
-            setStatus('We sent a code to your mobile.');
+            if (sent?.debug_otp) setOtp(sent.debug_otp);
+            setStatus(sent?.debug_otp ? `Test mode: no SMS sent. Your code is ${sent.debug_otp}.` : 'We sent a code to your mobile.');
         } catch (err: any) {
             setError(err?.message || 'Failed to send code.');
         } finally {
@@ -99,8 +100,9 @@ export default function MobileVerifyScreen() {
         setStatus('');
         setLoading(true);
         try {
-            await mobileResendOtp({});
-            setStatus('A new code has been sent to your mobile.');
+            const resent: any = await mobileResendOtp({});
+            if (resent?.debug_otp) setOtp(resent.debug_otp);
+            setStatus(resent?.debug_otp ? `Test mode: no SMS sent. Your code is ${resent.debug_otp}.` : 'A new code has been sent to your mobile.');
         } catch (err: any) {
             setError(err?.message || 'Could not resend code.');
         } finally {

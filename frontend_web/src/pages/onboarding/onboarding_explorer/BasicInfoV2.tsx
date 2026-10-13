@@ -307,13 +307,14 @@ export default function BasicInfoV2() {
   const sendMobileOtp = async () => {
     setOtpBusy(true); setOtpErr(''); setOtpMsg('');
     try {
-      await mobileRequestOtp({
+      const sent: any = await mobileRequestOtp({
         first_name: data.first_name,
         last_name: data.last_name,
         username: data.username,
         mobile_number: data.phone_number,
       } as any);
-      setOtpMsg('Code sent to your mobile.');
+      if (sent?.debug_otp) setOtp(sent.debug_otp);
+      setOtpMsg(sent?.debug_otp ? `Test mode: no SMS sent. Your code is ${sent.debug_otp}.` : 'Code sent to your mobile.');
     } catch (e: any) {
       setOtpErr(e?.response?.data?.error || e?.response?.data?.detail || e.message || 'Failed to send code.');
     } finally {
@@ -350,8 +351,9 @@ export default function BasicInfoV2() {
   const resendMobileOtp = async () => {
     setOtpBusy(true); setOtpErr(''); setOtpMsg('');
     try {
-      await mobileResendOtp({} as any);
-      setOtpMsg('New code sent.');
+      const resent: any = await mobileResendOtp({} as any);
+      if (resent?.debug_otp) setOtp(resent.debug_otp);
+      setOtpMsg(resent?.debug_otp ? `Test mode: no SMS sent. Your code is ${resent.debug_otp}.` : 'New code sent.');
     } catch (e: any) {
       setOtpErr(e?.response?.data?.error || e?.response?.data?.detail || e.message || 'Could not resend code.');
     } finally {

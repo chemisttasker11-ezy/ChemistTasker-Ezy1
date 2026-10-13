@@ -149,6 +149,7 @@ class EmailQueueFailureBoundaryTests(TestCase):
 
 @override_settings(
     DEBUG=False,
+    MOBILE_OTP_DISPLAY_IN_APP=False,
     MOBILEMESSAGE_SENDER="CT",
     MOBILEMESSAGE_USERNAME="u",
     MOBILEMESSAGE_PASSWORD="p",
