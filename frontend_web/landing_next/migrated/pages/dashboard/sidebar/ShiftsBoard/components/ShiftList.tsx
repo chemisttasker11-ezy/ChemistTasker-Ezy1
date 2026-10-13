@@ -38,6 +38,7 @@ import { Shift, ShiftCounterOfferPayload } from '@chemisttasker/shared-core';
 import { CounterOfferTrack, RatePreference, ShiftSlot, SlotFilterMode } from '../types';
 import { formatDateLong, formatDateShort, formatTime } from '../utils/date';
 import { getRateSummary, getSlotRate } from '../utils/rates';
+import { ReportButton } from '@chemisttasker/shared-ui/ReportButton';
 import {
   getEmploymentLabel,
   getUpcomingSlotsForDisplay,
@@ -481,6 +482,7 @@ const isPharmacistProvided = showPublishedRates && shift.rateType === 'PHARMACIS
                     >
                       {isApplied && !isOffersMode ? 'Applied' : (applyLabel ?? 'Apply Now')}
                     </Button>
+                    {(publicPresentation || shift.visibility === 'PLATFORM') && <Box sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}><ReportButton kind="jobs" id={shift.id} /></Box>}
                     {showCounter && onSubmitCounterOffer && (
                       <Button
                         variant="outlined"

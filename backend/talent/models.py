@@ -78,6 +78,9 @@ class ExplorerPost(models.Model):
     created_at  = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)
 
+    # Taken down by a moderator after a report (Moderation tab, Talent board area); hidden from every feed.
+    hidden_at = models.DateTimeField(blank=True, null=True)
+
     class Meta:
         indexes = [
             models.Index(fields=['-created_at']),
@@ -114,6 +117,8 @@ class ExplorerPost(models.Model):
         return max(dates)
 
     def is_talent_board_visible(self, today=None):
+        if self.hidden_at:
+            return False
         if self.post_kind == "FULL_TIME_APPLICATION":
             return True
         latest_date = self.latest_availability_date()

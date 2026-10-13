@@ -429,7 +429,7 @@ class PublicShiftViewSet(BaseShiftViewSet):
         qs = super().get_queryset().exclude(
             slots__unpublished_at__isnull=False
         ).filter(
-            visibility=PUBLIC_LEVEL, dedicated_user__isnull=True
+            visibility=PUBLIC_LEVEL, dedicated_user__isnull=True, public_hidden_at__isnull=True
         ).annotate(
             slot_count=Count('slots', distinct=True)
         ).filter(
@@ -539,6 +539,7 @@ class PublicJobBoardView(generics.ListAPIView):
         qs = Shift.objects.filter(
             visibility='PLATFORM',
             dedicated_user__isnull=True,
+            public_hidden_at__isnull=True,
         ).exclude(slots__unpublished_at__isnull=False)
 
         org_param = self.request.query_params.get("organization")

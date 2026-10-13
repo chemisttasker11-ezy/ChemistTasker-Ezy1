@@ -15,6 +15,7 @@ import { splitSkillsAndSoftware } from "@chemisttasker/shared-core";
 import SkillIcon, { skillLabel } from "@/public/skill-icon";
 import { RoleTile } from "../../../../../../shared-ui/talent/RoleTile";
 
+import { ReportButton } from '@chemisttasker/shared-ui/ReportButton';
 type PublicTalentCardProps = {
   candidate: Candidate;
   onViewCalendar: (candidate: Candidate) => void;
@@ -223,6 +224,7 @@ export default function PublicTalentCard({
               {candidate.refId}
             </Typography>
           )}
+          <Box sx={{ mt: 0.5, alignSelf: { md: "center" } }}><ReportButton kind="talent" id={candidate.id} /></Box>
         </Box>
       </Stack>
     </Paper>

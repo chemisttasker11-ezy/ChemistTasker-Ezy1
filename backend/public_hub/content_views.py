@@ -13,9 +13,9 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .editorial import audit, publish, validate_payload
-from .models import (ContentAdministrator, ContentAssignment, ContentAudit, ContentDocument,
+from .models import (BoardReport, ContentAdministrator, ContentAssignment, ContentAudit, ContentDocument,
                      ContentInvitation, ContentRevision, Report, Comment, CommunityReport)
-from .permissions import AREAS, ContentAccess, ContentAdmin, VerifiedMember, capabilities, can_publish
+from .permissions import AREAS, ASSIGNABLE_AREAS, BOARDS, ContentAccess, ContentAdmin, VerifiedMember, capabilities, can_publish
 from .views import DiscussionThrottle
 
 
@@ -53,7 +53,7 @@ class ContentMe(APIView):
     permission_classes = [VerifiedMember]
 
     def get(self, request):
-        return Response({'user_id': request.user.pk, 'name': request.user.get_full_name(), **capabilities(request.user), 'area_labels': AREAS})
+        return Response({'user_id': request.user.pk, 'name': request.user.get_full_name(), **capabilities(request.user), 'area_labels': ASSIGNABLE_AREAS})
 
 
 class Documents(ContentView):
@@ -156,7 +156,7 @@ class DocumentAction(ContentView):
 def assignment_input(value):
     if not isinstance(value, dict) or not value:
         raise ValidationError('Choose at least one publishing responsibility.')
-    if any(area not in AREAS or role not in {'writer', 'publisher'} for area, role in value.items()):
+    if any(area not in ASSIGNABLE_AREAS or role not in {'writer', 'publisher'} for area, role in value.items()):
         raise ValidationError('Invalid area or responsibility.')
     return value
 
@@ -299,6 +299,33 @@ class AuditLog(ContentView):
         return pager.get_paginated_response([{'id': row.pk, 'action': row.action, 'target': row.target, 'details': row.details, 'created_at': row.created_at} for row in rows])
 
 
+def board_reports(kinds):
+    """Open talent/job board reports for the boards this moderator covers, with enough text to judge them."""
+    from shifts.models import Shift
+    from talent.models import ExplorerPost
+    rows = []
+    for report in BoardReport.objects.filter(resolved=False, kind__in=kinds).order_by('created_at')[:100]:
+        if report.kind == 'talent':
+            post = ExplorerPost.objects.filter(pk=report.object_id).first()
+            body = f'{post.headline}\n{post.body}' if post else 'This post has been deleted.'
+        else:
+            shift = Shift.objects.filter(pk=report.object_id).select_related('pharmacy').first()
+            body = f'{shift.pharmacy.name if shift and shift.pharmacy else "Shift"} · {shift.get_role_needed_display() if shift else ""}\n{shift.description or "" if shift else ""}' if shift else 'This shift has been deleted.'
+        rows.append({'id': report.pk, 'type': report.kind, 'area': f'board:{report.kind}', 'reason': report.reason, 'body': body.strip()})
+    return rows
+
+
+def hide_board_item(kind, object_id):
+    """Take a reported item off its public board without deleting it (admin can restore it)."""
+    from django.utils import timezone
+    if kind == 'talent':
+        from talent.models import ExplorerPost
+        ExplorerPost.objects.filter(pk=object_id).update(hidden_at=timezone.now())
+    else:
+        from shifts.models import Shift
+        Shift.objects.filter(pk=object_id).update(public_hidden_at=timezone.now())
+
+
 class Moderation(ContentView):
     def get(self, request):
         from pharmacy_hub.models import PharmacyHubPost
@@ -313,6 +340,7 @@ class Moderation(ContentView):
             comment = post.comments.filter(pk=report.comment_id).first() if report.comment_id else None
             result.append({'id': report.pk, 'type': 'hub', 'area': f'hub:{post.platform_hub}',
                            'reason': report.reason, 'body': comment.body if comment else post.body})
+        result += board_reports([area.removeprefix('board:') for area in areas if area in BOARDS])
         return Response(result)
 
     @transaction.atomic
@@ -341,6 +369,13 @@ class Moderation(ContentView):
                     post.recompute_comment_count()
                 else:
                     post.soft_delete()
+        elif kind in ('talent', 'jobs'):
+            report = get_object_or_404(BoardReport.objects.select_for_update(), pk=pk, kind=kind)
+            area = f'board:{kind}'
+            if not can_publish(request.user, area):
+                raise PermissionDenied('Moderator access is required.')
+            if action == 'hide':
+                hide_board_item(kind, report.object_id)
         else:
             raise ValidationError('Unknown report type.')
         report.resolved = True

@@ -32,6 +32,7 @@ import { RoleTile } from "../../../../../../landing_next/shared-ui/talent/RoleTi
 import dayjs from "dayjs";
 import { Candidate } from "../types";
 
+import { ReportButton } from '@chemisttasker/shared-ui/ReportButton';
 const formatAuSlotDate = (date: string) => {
   const parsed = dayjs(date);
   return parsed.isValid() ? parsed.format("ddd, D MMM YYYY") : date;
@@ -328,7 +329,8 @@ export default function TalentCard({
 
       </CardContent>
 
-      <Box sx={{ position: "absolute", right: 16, bottom: 16 }}>
+      <Box sx={{ position: "absolute", right: 16, bottom: 16, display: "flex", alignItems: "center" }}>
+        <ReportButton kind="talent" id={candidate.id} />
         <IconButton
           onClick={() => onToggleLike(candidate)}
           color={candidate.isLikedByMe ? "error" : "default"}

@@ -8,6 +8,7 @@ import { SkillIcon } from '../../../../components/SkillIcon';
 import { SkillEvidenceIcon, VerificationBadges } from '../../skills/VerificationBadges';
 import { Candidate } from '../types';
 
+import { ReportButton } from '../../skills/ReportButton';
 const formatAuSlotDate = (date: string) => {
   const d = new Date(`${date}T00:00:00`);
   if (Number.isNaN(d.getTime())) return date;
@@ -190,7 +191,7 @@ export default function TalentCardV2({
       </Card.Content>
 
       <View style={styles.actions}>
-        <View />
+        <ReportButton kind="talent" id={candidate.id} />
         <View style={styles.likeWrap}>
           <IconButton
             icon={candidate.isLikedByMe ? 'heart' : 'heart-outline'}

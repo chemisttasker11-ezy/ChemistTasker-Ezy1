@@ -76,6 +76,7 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
       getPost: (id: number) => client.get<PublicHubPost>(PLATFORM_ENDPOINTS.publicHub.post(id), undefined, { auth: false }),
       listPostComments: (id: number, query?: ApiQuery) => client.get<ApiPage<PublicHubComment>>(PLATFORM_ENDPOINTS.publicHub.postComments(id), query, { auth: false }),
       reportPost: (id: number, body: { reason: string; comment_id?: number }) => client.post<DetailResponse>(PLATFORM_ENDPOINTS.publicHub.postReport(id), body),
+      reportBoardItem: (kind: 'talent' | 'jobs', id: number, reason: string) => client.post<DetailResponse>(PLATFORM_ENDPOINTS.publicHub.boardReport(kind, id), { reason }),
       listArticles: (query?: ApiQuery) => client.get<ApiPage<PublicArticle>>(PLATFORM_ENDPOINTS.publicHub.articles, query, { auth: false }),
       getArticle: (slug: string) => client.get<PublicArticleDetail>(PLATFORM_ENDPOINTS.publicHub.article(slug), undefined, { auth: false }),
       listArticleComments: (slug: string, query?: ApiQuery) => client.get<ApiPage<PublicArticleComment>>(PLATFORM_ENDPOINTS.publicHub.articleComments(slug), query, { auth: false }),
