@@ -79,6 +79,8 @@ docker exec chemisttasker_postgres_staging \
   /tmp/production-refresh.dump
 docker exec chemisttasker_postgres_staging rm /tmp/production-refresh.dump
 
+bash scripts/reconcile-staging-migration-history.sh
+
 set_runtime_value STAGING_RUN_MIGRATIONS 0
 
 docker exec chemisttasker_postgres_staging \

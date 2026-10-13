@@ -86,7 +86,9 @@ bash scripts/refresh-staging-db.sh \
 
 The refresh script creates a rollback dump of the current staging database,
 stops the application containers, restores the production data, and prints
-row counts for users, pharmacies and memberships. It sets
+row counts for users, pharmacies and memberships. It also removes the verified
+legacy `pharmacy_hub.0001_initial` history collision while the hub tables still
+have their legacy `client_profile_*` names. It sets
 `STAGING_RUN_MIGRATIONS=0` and leaves Celery stopped. Repair and rehearse the
 migration history before changing that value to `1`.
 
