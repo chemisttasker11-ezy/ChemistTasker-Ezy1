@@ -1,4 +1,6 @@
-name: Staging Preview
+# Cloudflare Quick Tunnel preview deployment was retired. This workflow now
+# deploys the permanent staging.chemisttasker.com.au environment.
+name: Staging deployment
 
 on:
   push:
@@ -10,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: chemisttasker-staging-preview
+  group: chemisttasker-staging-deployment
   cancel-in-progress: true
 
 env:
@@ -31,18 +33,14 @@ jobs:
           tar --exclude='.git' --exclude='./env' -czf - . | tar -xzf - -C "$STAGING_DIR"
 
       - name: Deploy isolated staging stack
-        id: deploy
         shell: bash
         run: |
-          output="$(cd "$STAGING_DIR" && bash scripts/deploy-staging.sh)"
-          printf '%s\n' "$output"
-          preview_url="$(printf '%s\n' "$output" | sed -n 's/^PREVIEW_URL=//p' | tail -n 1)"
-          test -n "$preview_url"
-          echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
+          cd "$STAGING_DIR"
+          bash scripts/deploy-staging.sh
           {
-            echo "## ChemistTasker staging preview"
+            echo "## ChemistTasker staging deployment"
             echo ""
-            echo "Preview: $preview_url"
+            echo "Site: https://staging.chemisttasker.com.au"
             echo ""
             echo "This deployment runs on the OVH self-hosted runner and uses staging-only PostgreSQL, Redis, volumes and containers."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -52,7 +50,7 @@ jobs:
         shell: bash
         run: |
           cd "$STAGING_DIR"
-          bash scripts/smoke-staging.sh "${{ steps.deploy.outputs.preview_url }}"
+          bash scripts/smoke-staging.sh "https://staging.chemisttasker.com.au"
 
       - name: Smoke-test summary
         shell: bash
