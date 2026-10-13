@@ -1,8 +1,6 @@
 import { useState } from "react";
-import skillsRegistry from "../../../../../../../shared-core/skills_registry.json";
-import { skillEvidenceState, skillLabel } from "@chemisttasker/shared-core";
-import { SkillEvidenceMark, VerificationBadges } from "@chemisttasker/shared-ui/VerificationBadges";
-import { SkillSymbol } from "../../../../../components/SkillGlyph";
+import { VerificationBadges } from "@chemisttasker/shared-ui/VerificationBadges";
+import { WorkerSkillRows } from "@chemisttasker/shared-ui/WorkerSkills";
 import {
   Box,
   Card,
@@ -285,46 +283,10 @@ export default function TalentCard({
         </Stack>
 
         {!candidate.isExplorer && (
-          <Stack spacing={1} sx={{ mt: 2 }}>
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Clinical Services:
-              </Typography>
-              {candidate.clinicalServices.length > 0 ? (
-                candidate.clinicalServices.map((skill) => <Chip key={skill} size="small" icon={<SkillSymbol skill={skill} size={16} />} label={<Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>{skillLabel(skillsRegistry as any, skill)}<SkillEvidenceMark iconOnly state={skillEvidenceState(candidate.verification ?? null, skill)} skill={skillLabel(skillsRegistry as any, skill)} /></Box>} />)
-              ) : (
-                <Typography variant="caption" color="text.secondary">
-                  --
-                </Typography>
-              )}
-            </Stack>
-
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Software:
-              </Typography>
-              {candidate.dispenseSoftware.length > 0 ? (
-                candidate.dispenseSoftware.map((skill) => <Chip key={skill} size="small" icon={<SkillSymbol skill={skill} size={16} />} label={skillLabel(skillsRegistry as any, skill)} />)
-              ) : (
-                <Typography variant="caption" color="text.secondary">
-                  --
-                </Typography>
-              )}
-            </Stack>
-
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Other pharmacy skills:
-              </Typography>
-              {candidate.expandedScope.length > 0 ? (
-                candidate.expandedScope.map((skill) => <Chip key={skill} size="small" icon={<SkillSymbol skill={skill} size={16} />} label={skillLabel(skillsRegistry as any, skill)} />)
-              ) : (
-                <Typography variant="caption" color="text.secondary">
-                  --
-                </Typography>
-              )}
-            </Stack>
-          </Stack>
+          <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
+            <WorkerSkillRows compact skills={[...candidate.clinicalServices, ...candidate.dispenseSoftware, ...candidate.expandedScope]}
+              verification={candidate.verification ?? null} />
+          </Box>
         )}
 
       </CardContent>

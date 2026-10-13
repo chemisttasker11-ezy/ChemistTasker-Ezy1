@@ -474,7 +474,7 @@ def member_status(*, shift, requested_visibility, slot_id, slot_date, request):
     return data
 
 
-def assigned_profile(*, request, shift, candidate, slot_id, slot):
+def assigned_profile(*, request, shift, candidate, slot_id, slot, contact=True):
     """A manager opening the profile of a worker assigned to the shift (or to the given slot). Audited; unlike a
     reveal it uses no quota and sends no e-mail. Returns the profile as the endpoint renders it."""
     # Verify the user is actually assigned to this shift/slot
@@ -510,7 +510,7 @@ def assigned_profile(*, request, shift, candidate, slot_id, slot):
     if profile is None or hasattr(profile, 'rate_preference'):
         profile_data['rate_preference'] = getattr(profile, 'rate_preference', None) or None
 
-    return {
+    result = {
         'id': candidate.id,
         'first_name': candidate.first_name,
         'last_name': candidate.last_name,
@@ -519,3 +519,7 @@ def assigned_profile(*, request, shift, candidate, slot_id, slot):
         'email': candidate.email,
         **profile_data
     }
+    if not contact:
+        for key in ('email', 'phone_number', 'resume'):
+            result.pop(key, None)
+    return result

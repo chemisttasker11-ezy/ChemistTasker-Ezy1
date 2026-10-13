@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Box, Button, Collapse, Pagination, Skeleton, Stack, Typography } from '@mui/material';
 import {
   Building2,
@@ -10,6 +10,7 @@ import {
   History,
   Lock,
   MapPin,
+  MessageCircle,
   Star,
   UserCheck,
   Users,
@@ -160,6 +161,9 @@ export default function OwnerAssignedShiftBoard({
   title,
 }: Props) {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Chat in the current workspace (/dashboard/owner, /dashboard/organization, /dashboard/admin/12).
+  const chatBase = `${/^\/dashboard\/(admin\/\d+|[a-z-]+)/.exec(location.pathname)?.[0] ?? '/dashboard/owner'}/chat`;
   const itemsPerPage = 6;
   const [page, setPage] = useState(1);
   const [expandedShiftIds, setExpandedShiftIds] = useState<Record<number, boolean>>({});
@@ -387,6 +391,11 @@ export default function OwnerAssignedShiftBoard({
                             <RowAction kind="primary" onClick={() => onViewAssigned(shift.id, slot?.id ?? null, userId as number)}>
                               View profile
                             </RowAction>
+                            {mode === 'confirmed' && (
+                              <RowAction kind="secondary" startIcon={<MessageCircle />} onClick={() => navigate(`${chatBase}?startDmWithUser=${userId}`)}>
+                                Message
+                              </RowAction>
+                            )}
                             {mode === 'history' && onRateAssigned && (
                               <RowAction kind="secondary" startIcon={<Star />} onClick={() => onRateAssigned(userId as number)}>
                                 Rate
