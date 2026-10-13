@@ -1,4 +1,5 @@
 import SkillIcon, { skillLabel } from '@/public/skill-icon';
+import { VerificationBadges } from '@chemisttasker/shared-ui/VerificationBadges';
 import { useState } from "react";
 import {
   Box,
@@ -180,6 +181,11 @@ export default function TalentCard({
                 <Typography variant="subtitle2" color="text.secondary">
                   {candidate.headline}
                 </Typography>
+                {candidate.verification && (
+                  <Box sx={{ mt: 1 }}>
+                    <VerificationBadges summary={candidate.verification} role={candidate.role} compact />
+                  </Box>
+                )}
                 {candidate.pitch ? (
                   <Typography variant="body2" sx={{ mt: 1, fontStyle: "italic" }} color="text.secondary">
                     "{candidate.pitch}"

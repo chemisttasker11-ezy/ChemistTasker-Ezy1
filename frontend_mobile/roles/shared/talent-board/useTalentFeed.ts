@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getExplorerPostFeed, loadAllTalentPages } from '@chemisttasker/shared-core';
+import { getExplorerPostFeed, loadAllTalentPages, normalizeVerification } from '@chemisttasker/shared-core';
 
 type ExplorerPost = Record<string, any>;
 
@@ -25,6 +25,7 @@ const mapPost = (post: any): ExplorerPost => ({
   explorerRoleType: post.explorer_role_type ?? post.explorerRoleType ?? null,
   explorerUserId: post.explorer_user_id ?? post.explorerUserId ?? null,
   explorerProfileId: post.explorer_profile ?? post.explorerProfile ?? null,
+  verification: normalizeVerification(post.verification),
 });
 
 export const useTalentFeed = (options?: { enabled?: boolean }) => {

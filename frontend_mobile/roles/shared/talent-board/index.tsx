@@ -23,6 +23,7 @@ import { ENGAGEMENT_LABELS } from './constants';
 import { Candidate } from './types';
 import { useTalentFeed } from './useTalentFeed';
 import { useTalentFilters } from './useTalentFilters';
+import { BadgeGuideButton } from '../skills/VerificationBadges';
 import AvailabilitySidebar from './components/AvailabilitySidebar';
 import FiltersSidebar, { TalentFilterState } from './components/FiltersSidebar';
 import PitchDialog, { PitchFormState } from './components/PitchDialog';
@@ -250,6 +251,7 @@ export default function TalentBoard({
           rawRoleCategory: post.roleCategory ?? null,
           explorerRoleType: post.explorerRoleType ?? null,
           explorerProfileId: post.explorerProfileId ?? null,
+          verification: post.verification ?? null,
         };
       }),
     [posts, ratingSummary]
@@ -639,6 +641,7 @@ export default function TalentBoard({
           <View style={{ flex: 1 }}>
             <Text variant="headlineSmall" style={styles.title}>Find Talent</Text>
             <Text style={styles.subtitle}>{loading ? 'Loading...' : `Showing ${processedCandidates.length} active candidates matching your criteria`}</Text>
+            <View style={{ alignSelf: 'flex-start', marginLeft: -8 }}><BadgeGuideButton /></View>
           </View>
           <IconButton icon="tune" onPress={() => setIsSidebarOpen(true)} />
         </View>

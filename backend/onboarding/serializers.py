@@ -27,6 +27,7 @@ from onboarding.services.progress import (
     pharmacist_progress_percent,
 )
 from onboarding.services.regulatory import apply_regulatory_tab
+from onboarding.verification.policy import verification_summary
 from onboarding.services.skills import (  # noqa: F401  (_load_skills_catalog, _required_cert_skill_codes: historical path)
     _load_skills_catalog,
     _required_cert_skill_codes,
@@ -204,6 +205,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # computed
     progress_percent = serializers.SerializerMethodField()
+    verification = serializers.SerializerMethodField()
     upload_validation_map = {
         "profile_photo": IMAGE_UPLOAD_POLICY,
         "government_id": DOCUMENT_UPLOAD_POLICY,
@@ -257,7 +259,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             # ---------- Profile preferences ----------
             'short_bio', 'resume',
 
-            'verified','progress_percent',
+            'verified','progress_percent','verification',
             'tab','submitted_for_verification',
         ]
         extra_kwargs = {
@@ -390,6 +392,9 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     def get_progress_percent(self, obj):
         return pharmacist_progress_percent(obj)
 
+    def get_verification(self, obj):
+        return verification_summary(obj)  # after progress_percent, which refreshes the Verified flag
+
     # -------- update --------
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
@@ -437,7 +442,6 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     def _skills_tab(self, instance, vdata: dict, submit: bool):
         return apply_skills_tab(
             instance, vdata, initial_data=self.initial_data, uploads=self._files_by_skill(), role_key="pharmacist",
-            missing_message="Certificate required for checked skill(s): ",
             keep_history=getattr(self, "KEEP_SKILL_HISTORY", False),
         )
 
@@ -490,6 +494,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # computed
     progress_percent = serializers.SerializerMethodField()
+    verification = serializers.SerializerMethodField()
     upload_validation_map = {
         "profile_photo": IMAGE_UPLOAD_POLICY,
         "government_id": DOCUMENT_UPLOAD_POLICY,
@@ -551,7 +556,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             # ---------- PROFILE ----------
             'short_bio','resume',
 
-            'verified','progress_percent',
+            'verified','progress_percent','verification',
             'tab','submitted_for_verification',
         ]
         extra_kwargs = {
@@ -685,6 +690,9 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     def get_progress_percent(self, obj):
         return otherstaff_progress_percent(obj)
 
+    def get_verification(self, obj):
+        return verification_summary(obj)  # after progress_percent, which refreshes the Verified flag
+
     # ---------------- update router ----------------
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
@@ -736,7 +744,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     def _skills_tab(self, instance, vdata: dict, submit: bool):
         return apply_skills_tab(
             instance, vdata, initial_data=self.initial_data, uploads=self._files_by_skill(), role_key="otherstaff",
-            missing_message="Certificate required for: ", track_years_experience=True,
+            track_years_experience=True,
             keep_history=getattr(self, "KEEP_SKILL_HISTORY", False),
         )
 
@@ -775,6 +783,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
 
     # computed
     progress_percent = serializers.SerializerMethodField()
+    verification = serializers.SerializerMethodField()
     upload_validation_map = {
         "profile_photo": IMAGE_UPLOAD_POLICY,
         "government_id": DOCUMENT_UPLOAD_POLICY,
@@ -807,7 +816,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             # ---------- PROFILE ----------
             'short_bio','resume',
 
-            'verified','progress_percent',
+            'verified','progress_percent','verification',
             'tab','submitted_for_verification',
         ]
         extra_kwargs = {
@@ -874,6 +883,9 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
     # ---------------- progress gate ----------------
     def get_progress_percent(self, obj):
         return explorer_progress_percent(obj)
+
+    def get_verification(self, obj):
+        return verification_summary(obj)  # after progress_percent, which refreshes the Verified flag
 
     # ---------------- update router ----------------
     def update(self, instance, validated_data):

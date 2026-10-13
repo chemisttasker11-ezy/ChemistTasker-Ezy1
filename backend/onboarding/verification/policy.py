@@ -141,6 +141,9 @@ def badges(profile) -> list[dict]:
                      'state': _flag_state(profile, getattr(profile, 'university_id', None), 'university_id_verified', 'university_id_verification_note')})
     rows.append({'code': 'ID', 'state': _flag_state(profile, getattr(profile, 'government_id', None), 'gov_id_verified', 'gov_id_verification_note')})
     rows.append({'code': 'REFERENCES', 'state': _referees_state(profile)})
+    if getattr(profile, 'abn_verified', False):
+        # The ABN is confirmed by its owner in the payment tab; there is no pending state worth showing.
+        rows.append({'code': 'ABN', 'state': VERIFIED})
     return rows
 
 

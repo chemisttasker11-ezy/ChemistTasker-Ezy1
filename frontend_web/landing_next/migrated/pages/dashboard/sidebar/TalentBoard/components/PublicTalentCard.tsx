@@ -10,6 +10,7 @@ import {
 } from "@mui/icons-material";
 import type { Candidate } from "../types";
 import skillsRegistry from "@chemisttasker/shared-core/skills_registry.json";
+import { VerificationBadges } from "@chemisttasker/shared-ui/VerificationBadges";
 import { splitSkillsAndSoftware } from "@chemisttasker/shared-core";
 import SkillIcon, { skillLabel } from "@/public/skill-icon";
 import { RoleTile } from "../../../../../../shared-ui/talent/RoleTile";
@@ -83,6 +84,11 @@ export default function PublicTalentCard({
                 <Typography sx={{ color: MUTED, fontSize: 14, lineHeight: 1.45, mt: 0.55, overflowWrap: "anywhere" }}>
                   {candidate.headline}
                 </Typography>
+              )}
+              {candidate.verification && (
+                <Box sx={{ mt: 1 }}>
+                  <VerificationBadges summary={candidate.verification} role={candidate.role} compact />
+                </Box>
               )}
             </Box>
             {hasRating && (

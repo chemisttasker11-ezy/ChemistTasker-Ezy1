@@ -1,4 +1,5 @@
-import { projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
+import { normalizeVerification, projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
+import { BadgeGuideLink } from '@chemisttasker/shared-ui/VerificationBadges';
 import SkillIcon from '@/public/skill-icon';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "@/public/navigation";
@@ -291,6 +292,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         rawRoleCategory: post.roleCategory ?? null,
         explorerRoleType: post.explorerRoleType ?? null,
         explorerProfileId: post.explorerProfileId ?? null,
+        verification: normalizeVerification((post as any).verification),
       };
     });
   }, [posts, ratingSummary]);
@@ -834,6 +836,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {loading ? "Loading..." : `Showing ${processedCandidates.length} active candidates matching your criteria`}
+              <Box component="span" sx={{ display: "inline-block", ml: 1 }}><BadgeGuideLink /></Box>
             </Typography>
           </Box>
           <IconButton
@@ -848,8 +851,9 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" alignItems={{ md: "flex-end" }}>
               <Box>
                 <Typography component="h2" sx={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: { xs: 26, md: 30 }, color: "#06123A", lineHeight: 1.2 }}>Browse pharmacy talent</Typography>
-                <Typography aria-live="polite" sx={{ mt: 0.5, fontSize: 14, color: "#445474" }}>
-                  {loading ? "Finding published profiles…" : processedCandidates.length === 1 ? "1 profile matches your search" : processedCandidates.length + " profiles match your search"}
+                <Typography sx={{ mt: 0.5, fontSize: 14, color: "#445474" }}>
+                  <Box component="span" aria-live="polite">{loading ? "Finding published profiles…" : processedCandidates.length === 1 ? "1 profile matches your search" : processedCandidates.length + " profiles match your search"}</Box>
+                  <Box component="span" sx={{ display: "inline-block", ml: 1 }}><BadgeGuideLink /></Box>
                 </Typography>
               </Box>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", md: "auto" }, minWidth: 0 }}>

@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest import mock
 
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from onboarding.verification.policy import badges, missing_requirements, refresh_verified, skill_evidence
 
@@ -70,3 +70,21 @@ class BadgeTests(SimpleTestCase):
         obj = profile("PHARMACIST", None, skills=["VACCINATION", "FIRST_AID", "PRESCRIPTION_DISPENSING"],
                       skill_certificates={"FIRST_AID": {"path": "x.pdf"}, "VACCINATION": {"path": "y.pdf", "verified": True}})
         self.assertEqual(skill_evidence(obj), {"VACCINATION": "verified", "FIRST_AID": "pending"})
+
+
+class SkillCertificateCheckTests(TestCase):
+    def test_result_is_recorded_only_for_the_file_that_was_checked(self):
+        from client_profile.characterization_support import make_user
+        from onboarding.models import PharmacistOnboarding
+        from onboarding.tasks import verify_skill_certificate_task
+
+        user = make_user("PHARMACIST")
+        obj = PharmacistOnboarding.objects.create(user=user, skills=["VACCINATION"],
+                                                  skill_certificates={"VACCINATION": {"path": "new.pdf"}})
+        with mock.patch("onboarding.tasks._document_name_check", return_value=(True, "")):
+            verify_skill_certificate_task.run("pharmacistonboarding", obj.pk, "VACCINATION", "old.pdf")
+            obj.refresh_from_db()
+            self.assertNotIn("verified", obj.skill_certificates["VACCINATION"])  # replaced since: ignored
+            verify_skill_certificate_task.run("pharmacistonboarding", obj.pk, "VACCINATION", "new.pdf")
+        obj.refresh_from_db()
+        self.assertEqual(skill_evidence(obj), {"VACCINATION": "verified"})

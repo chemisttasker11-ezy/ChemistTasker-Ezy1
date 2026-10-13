@@ -8,6 +8,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import urlencode
 
 import dateutil.parser
@@ -38,6 +39,66 @@ from onboarding.verification.support import fetch_instance_with_retries
 from users.normalization import sanitize_email_text as clean_email
 
 logger = logging.getLogger(__name__)
+
+
+def _document_name_check(file_obj, first_name, last_name):
+    """OCR the uploaded document and look for the person's name: (verified, note shown to the user on failure)."""
+    is_verified = False
+    failure_note = ""
+
+    if not file_obj:
+        failure_note = "No file uploaded for this verification."
+        logger.info(f"[verify_filefield_task] {failure_note} Setting as not verified.")
+    else:
+        local_path = get_local_file_or_download(file_obj)
+        if not local_path or not os.path.exists(local_path):
+            # the note is shown to the user: never a server path
+            failure_note = "Could not obtain the uploaded file for OCR."
+            logger.info(f"[verify_filefield_task] {failure_note}")
+        else:
+            converted_path = None
+            try:
+                ocr_path, converted_path = ocr_input_path_for_file(local_path)
+                logger.info("[verify_filefield_task] Sending the document to Azure OCR")
+                ocr_data = azure_ocr(ocr_path)
+                lines = ocr_data.get("lines", [])
+                text = " ".join(lines)
+                is_name_match = simple_name_match(text, first_name, last_name)
+
+                if is_name_match:
+                    is_verified = True
+                    logger.info("[verify_filefield_task] Name match result: %s", is_name_match)
+                else:
+                    failure_note = f"Name mismatch found in your uploaded document"
+                    logger.info(f"[verify_filefield_task] {failure_note}")
+
+            except Exception as exc:
+                # Keep traceback frames for operators without re-logging a possibly sensitive service exception value.
+                failure_note = "OCR processing failed."
+                logger.warning("[verify_filefield_task] OCR processing failed error_type=%s", type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
+            finally:
+                if converted_path and os.path.exists(converted_path):
+                    os.remove(converted_path)
+                if local_path and os.path.exists(local_path) and Path(local_path).parent == Path(tempfile.gettempdir()):
+                    os.remove(local_path)
+    return is_verified, failure_note
+
+
+@shared_task(name="onboarding.tasks.verify_skill_certificate_task", queue="ocr")
+def verify_skill_certificate_task(model_name, object_pk, skill_code, path):
+    """Name-match one skill certificate and record the result on that skill's entry, unless it was replaced since."""
+    Model = apps.get_model("client_profile", model_name)
+    obj = fetch_instance_with_retries(Model, object_pk)
+    is_verified, note = _document_name_check(SimpleNamespace(name=path), obj.user.first_name or "", obj.user.last_name or "")
+    with transaction.atomic():
+        row = Model.objects.select_for_update().get(pk=object_pk)
+        certificates = dict(row.skill_certificates or {})
+        meta = certificates.get(skill_code)
+        if not isinstance(meta, dict) or meta.get("path") != path:
+            return
+        certificates[skill_code] = {**meta, "verified": is_verified, "note": note[:255]}
+        row.skill_certificates = certificates
+        row.save(update_fields=["skill_certificates"])
 
 
 @shared_task(name="client_profile.tasks.verify_filefield_task", queue="ocr")
@@ -72,45 +133,7 @@ def verify_filefield_task(
     else:
         obj.save(update_fields=[verification_field])
 
-    file_obj = getattr(obj, file_field)
-    is_verified = False
-    failure_note = ""
-
-    if not file_obj:
-        failure_note = "No file uploaded for this verification."
-        logger.info(f"[verify_filefield_task] {failure_note} Setting as not verified.")
-    else:
-        local_path = get_local_file_or_download(file_obj)
-        if not local_path or not os.path.exists(local_path):
-            # the note is shown to the user: never a server path
-            failure_note = "Could not obtain the uploaded file for OCR."
-            logger.info(f"[verify_filefield_task] {failure_note}")
-        else:
-            converted_path = None
-            try:
-                ocr_path, converted_path = ocr_input_path_for_file(local_path)
-                logger.info("[verify_filefield_task] Sending the document to Azure OCR pk=%s field=%s", object_pk, file_field)
-                ocr_data = azure_ocr(ocr_path)
-                lines = ocr_data.get("lines", [])
-                text = " ".join(lines)
-                is_name_match = simple_name_match(text, first_name, last_name)
-
-                if is_name_match:
-                    is_verified = True
-                    logger.info("[verify_filefield_task] Name match result: %s pk=%s field=%s", is_name_match, object_pk, file_field)
-                else:
-                    failure_note = f"Name mismatch found in your uploaded document"
-                    logger.info(f"[verify_filefield_task] {failure_note}")
-
-            except Exception as exc:
-                # Keep traceback frames for operators without re-logging a possibly sensitive service exception value.
-                failure_note = "OCR processing failed."
-                logger.warning("[verify_filefield_task] OCR processing failed error_type=%s", type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
-            finally:
-                if converted_path and os.path.exists(converted_path):
-                    os.remove(converted_path)
-                if local_path and os.path.exists(local_path) and Path(local_path).parent == Path(tempfile.gettempdir()):
-                    os.remove(local_path)
+    is_verified, failure_note = _document_name_check(getattr(obj, file_field), first_name, last_name)
 
     setattr(obj, verification_field, is_verified)
     if note_field and hasattr(obj, note_field):

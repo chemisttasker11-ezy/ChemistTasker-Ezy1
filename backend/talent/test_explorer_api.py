@@ -11,7 +11,7 @@ from client_profile.characterization_support import (
 )
 
 URL = BASE + "explorer-posts/"
-PUBLIC_KEYS = ['ahpra_years_since_first_registration', 'author_user_id', 'availability_days', 'availability_mode', 'availability_notice', 'availability_summary', 'body', 'coverage_radius_km', 'created_at', 'explorer_name', 'explorer_profile', 'explorer_role_type', 'explorer_user_id', 'headline', 'id', 'is_anonymous', 'is_liked_by_me', 'like_count', 'location_postcode', 'location_state', 'location_suburb', 'open_to_travel', 'post_kind', 'rating_average', 'rating_count', 'reference_code', 'reply_count', 'role_category', 'role_title', 'skills', 'software', 'travel_states', 'updated_at', 'view_count', 'work_types', 'years_experience']
+PUBLIC_KEYS = ['ahpra_years_since_first_registration', 'author_user_id', 'availability_days', 'availability_mode', 'availability_notice', 'availability_summary', 'body', 'coverage_radius_km', 'created_at', 'explorer_name', 'explorer_profile', 'explorer_role_type', 'explorer_user_id', 'headline', 'id', 'is_anonymous', 'is_liked_by_me', 'like_count', 'location_postcode', 'location_state', 'location_suburb', 'open_to_travel', 'post_kind', 'rating_average', 'rating_count', 'reference_code', 'reply_count', 'role_category', 'role_title', 'skills', 'software', 'travel_states', 'updated_at', 'verification', 'view_count', 'work_types', 'years_experience']
 
 
 def post_for(user, headline="Available", **kw):

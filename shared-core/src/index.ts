@@ -79,3 +79,4 @@ export * from './domains/shifts/workProfile';
 export * from './domains/shifts/draftSlots';
 export * from './domains/talent/presentation';
 export * from './domains/onboarding/qualifications';
+export * from './domains/onboarding/verification';

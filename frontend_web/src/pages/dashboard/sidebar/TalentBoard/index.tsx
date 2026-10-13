@@ -1,10 +1,11 @@
-import { projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
+import { normalizeVerification, projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 ﻿import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Alert, Box, Button, Chip, Divider, Drawer, IconButton, Paper, Stack, Pagination, Typography, Dialog } from "@mui/material";
 import { Megaphone, SlidersHorizontal } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
+import { BadgeGuideLink } from "@chemisttasker/shared-ui/VerificationBadges";
 import {
   Close as CloseIcon,
 } from "@mui/icons-material";
@@ -209,6 +210,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         rawRoleCategory: post.roleCategory ?? null,
         explorerRoleType: post.explorerRoleType ?? null,
         explorerProfileId: post.explorerProfileId ?? null,
+        verification: normalizeVerification((post as any).verification),
       };
     });
   }, [posts, ratingSummary]);
@@ -820,13 +822,18 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         <PageHeader
           title="Find talent"
           subtitle={
-            <Box component="span" aria-live="polite">
-              {loading
-                ? "Finding published profiles…"
-                : error && pagedCandidates.length === 0
-                ? "Browse verified pharmacy professionals and request a booking."
-                : `${processedCandidates.length} ${processedCandidates.length === 1 ? "profile matches" : "profiles match"} your filters`}
-            </Box>
+            <>
+              <Box component="span" aria-live="polite">
+                {loading
+                  ? "Finding published profiles…"
+                  : error && pagedCandidates.length === 0
+                  ? "Browse verified pharmacy professionals and request a booking."
+                  : `${processedCandidates.length} ${processedCandidates.length === 1 ? "profile matches" : "profiles match"} your filters`}
+              </Box>
+              <Box component="span" sx={{ display: "inline-block", ml: 1 }}>
+                <BadgeGuideLink />
+              </Box>
+            </>
           }
           actions={
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">

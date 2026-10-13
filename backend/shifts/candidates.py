@@ -6,6 +6,7 @@ Refusals raise `ShiftActionRefused`, whose response body and status are those th
 from onboarding.services.skill_identity import normalize_skills
 from onboarding.services.work_profile import current_worker_profile
 from onboarding.qualifications import has_verified_dispensing_qualification
+from onboarding.verification.policy import VERIFIED, verification_summary
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -147,13 +148,16 @@ def work_profile(candidate, *, build_absolute_uri):
     os = profile if str(getattr(candidate, 'role', '')).upper() == 'OTHER_STAFF' else None
     if not profile:
         return {'profile_photo': None, 'short_bio': None, 'skills': [], 'role_label': None, 'verified': False}
+    summary = verification_summary(profile)
     data = {
         'profile_photo': build_absolute_uri(profile.profile_photo.url) if profile.profile_photo else None,
         'short_bio': profile.short_bio,
         'skill_role': 'PHARMACIST' if po else str(os.role_type or 'UNKNOWN').upper(),
         # Canonical registry IDs the candidate's current role may claim (same rule as the Talent board).
         'skills': normalize_skills(list(profile.skills or []), allowed_role='PHARMACIST' if po else str(os.role_type or 'UNKNOWN').upper(), matchable_only=True),
-        'verified_skills': normalize_skills([code for code, evidence in (getattr(profile, 'skill_certificates', None) or {}).items() if isinstance(evidence, dict) and evidence.get('path') and evidence.get('verified') is True], allowed_role='PHARMACIST' if po else str(os.role_type or 'UNKNOWN').upper(), matchable_only=True),
+        # verified_skills stays for app builds released before the badge summary.
+        'verified_skills': [code for code, state in summary['skill_evidence'].items() if state == VERIFIED],
+        'verification': summary,
         'suburb': profile.suburb or None,
         'state': profile.state or None,
         'open_to_travel': bool(profile.open_to_travel),

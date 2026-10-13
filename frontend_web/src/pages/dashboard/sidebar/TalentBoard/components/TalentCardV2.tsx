@@ -1,6 +1,7 @@
 import { useState } from "react";
 import skillsRegistry from "../../../../../../../shared-core/skills_registry.json";
-import { skillLabel } from "@chemisttasker/shared-core";
+import { skillEvidenceState, skillLabel } from "@chemisttasker/shared-core";
+import { SkillEvidenceMark, VerificationBadges } from "@chemisttasker/shared-ui/VerificationBadges";
 import { SkillSymbol } from "../../../../../components/SkillGlyph";
 import {
   Box,
@@ -127,6 +128,11 @@ export default function TalentCard({
                 <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 14, mt: 0.5 }}>
                   {candidate.headline}
                 </Typography>
+                {candidate.verification && (
+                  <Box sx={{ mt: 1 }}>
+                    <VerificationBadges summary={candidate.verification} role={candidate.role} compact />
+                  </Box>
+                )}
                 <Stack direction="row" spacing={0} useFlexGap flexWrap="wrap" gap={1.5} sx={{ mt: 1.25, color: "var(--ct-text-secondary)", "& svg": { fontSize: 18 } }}>
                   {(candidate.city || candidate.state) && (
                     <Stack direction="row" spacing={0.5} alignItems="center">
@@ -284,7 +290,7 @@ export default function TalentCard({
                 Clinical Services:
               </Typography>
               {candidate.clinicalServices.length > 0 ? (
-                candidate.clinicalServices.map((skill) => <Chip key={skill} size="small" icon={<SkillSymbol skill={skill} size={16} />} label={skillLabel(skillsRegistry as any, skill)} />)
+                candidate.clinicalServices.map((skill) => <Chip key={skill} size="small" icon={<SkillSymbol skill={skill} size={16} />} label={<Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>{skillLabel(skillsRegistry as any, skill)}<SkillEvidenceMark iconOnly state={skillEvidenceState(candidate.verification ?? null, skill)} skill={skillLabel(skillsRegistry as any, skill)} /></Box>} />)
               ) : (
                 <Typography variant="caption" color="text.secondary">
                   --

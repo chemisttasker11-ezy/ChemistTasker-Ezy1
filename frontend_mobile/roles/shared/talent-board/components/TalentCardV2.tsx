@@ -1,10 +1,11 @@
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
-import { skillLabel } from '@chemisttasker/shared-core';
+import { skillEvidenceState, skillLabel } from '@chemisttasker/shared-core';
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Card, Chip, IconButton, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SkillIcon } from '../../../../components/SkillIcon';
+import { SkillEvidenceIcon, VerificationBadges } from '../../skills/VerificationBadges';
 import { Candidate } from '../types';
 
 const formatAuSlotDate = (date: string) => {
@@ -98,8 +99,9 @@ export default function TalentCardV2({
           <Text style={styles.rating}>★ {candidate.ratingAverage.toFixed(1)} ({candidate.ratingCount})</Text>
         </View>
 
-        <View>
+        <View style={{ gap: 8 }}>
           <Text variant="bodySmall" style={styles.subtle}>{candidate.headline}</Text>
+          {candidate.verification ? <VerificationBadges summary={candidate.verification} role={candidate.role} compact /> : null}
         </View>
         {candidate.pitch ? <Text style={styles.pitch}>“{candidate.pitch}”</Text> : null}
 
@@ -162,7 +164,7 @@ export default function TalentCardV2({
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {group.skills.map(code => {
                     return <Chip key={code} icon={() => <SkillIcon skill={code} size={16} />}>
-                      {skillLabel(skillsRegistry as any, code)}
+                      {skillLabel(skillsRegistry as any, code)} <SkillEvidenceIcon state={skillEvidenceState(candidate.verification ?? null, code)} />
                     </Chip>;
                   })}
                 </View>
