@@ -5,9 +5,18 @@ from rest_framework import serializers
 from core.numbers import coerce_float_6 as q6
 from core.serializer_lifecycle import _update_locked_user_fields
 from onboarding.services.profile import apply_profile_photo
+from onboarding.verification.policy import ahpra_number_error
+
+
+def _check_ahpra_number(instance, vdata: dict):
+    if 'ahpra_number' in vdata:
+        problem = ahpra_number_error(instance, vdata['ahpra_number'])
+        if problem:
+            raise serializers.ValidationError({'ahpra_number': [problem]})
 
 
 def apply_pharmacist_basic_tab(instance, vdata: dict, submit: bool, *, initial_data):
+    _check_ahpra_number(instance, vdata)
     # nested user data
     user_data = vdata.pop('user', {})
 
@@ -28,7 +37,7 @@ def apply_pharmacist_basic_tab(instance, vdata: dict, submit: bool, *, initial_d
     'ahpra_number',
     'street_address', 'suburb', 'state', 'postcode', 'google_place_id',
     'open_to_travel', 'travel_states', 'coverage_radius_km',
-    'date_of_birth', 'gender', 'emergency_contact_number', 'emergency_contact_relation',
+    'date_of_birth', 'work_rights', 'gender', 'emergency_contact_number', 'emergency_contact_relation',
     ]
 
     # Detect changes that affect verification flags
@@ -76,9 +85,11 @@ def apply_pharmacist_basic_tab(instance, vdata: dict, submit: bool, *, initial_d
 
     # reset only relevant flags when inputs changed
     if ahpra_changed:
+        # Only an unchecked number can change (_check_ahpra_number); Verified relies on it, so it waits for the check.
         instance.ahpra_verified = False
         instance.ahpra_verification_note = ""
-        update_fields += ['ahpra_verified', 'ahpra_verification_note']
+        instance.verified = False
+        update_fields += ['ahpra_verified', 'ahpra_verification_note', 'verified']
 
     # if gov_id_changed:
     #     instance.gov_id_verified = False
@@ -143,7 +154,7 @@ def apply_otherstaff_basic_tab(instance, vdata: dict, submit: bool, *, initial_d
     # regular writes for basic fields (address + dob)
     direct_fields = [
         'street_address','suburb','state','postcode','google_place_id','open_to_travel','travel_states','coverage_radius_km','date_of_birth',
-        'gender','emergency_contact_number','emergency_contact_relation',
+        'gender','work_rights','emergency_contact_number','emergency_contact_relation',
         'role_type','classification_level','student_year','intern_half',  # allow role data in Basic if FE sends them early
     ]
     for f in direct_fields:
@@ -180,13 +191,24 @@ def apply_explorer_basic_tab(instance, vdata: dict, submit: bool, *, initial_dat
 
     # role + address
     direct_fields = [
-        'role_type','gender','emergency_contact_number','emergency_contact_relation',
+        'role_type','gender','work_rights','emergency_contact_number','emergency_contact_relation',
         'street_address','suburb','state','postcode','google_place_id','open_to_travel','travel_states','coverage_radius_km',
     ]
+    was_overseas = instance.role_type == 'OVERSEAS'
     for f in direct_fields:
         if f in vdata:
             setattr(instance, f, vdata[f])
             update_fields.append(f)
+
+    # Owner decision 2026-10-13: the mobile skip is for overseas newcomers only. Leaving Overseas cancels it; the
+    # person verifies their mobile and is not Verified until they do.
+    user = instance.user
+    if was_overseas and instance.role_type != 'OVERSEAS' and user.mobile_check_skipped:
+        user.mobile_check_skipped = False
+        user.save(update_fields=['mobile_check_skipped'])
+        if not user.is_mobile_verified:
+            instance.verified = False
+            update_fields.append('verified')
 
     # lat/lon rounding
     if 'latitude' in vdata:
@@ -206,6 +228,7 @@ def apply_explorer_basic_tab(instance, vdata: dict, submit: bool, *, initial_dat
 
 
 def apply_owner_basic_tab(instance, vdata: dict, submit: bool, *, initial_data):
+    _check_ahpra_number(instance, vdata)
     user_data = vdata.pop("user", {})
     update_fields: list[str] = []
 

@@ -98,10 +98,10 @@ class NewcomerTalentPostTests(TestCase):
 class NewcomerUpgradeTests(TestCase):
     URL = f"{BASE}users/me/account-type/"
 
-    def test_upgrade_carries_the_profile_and_post_and_applies_the_new_roles_checks(self):
+    def test_upgrade_carries_the_profile_removes_the_post_and_applies_the_new_roles_checks(self):
         user = make_user("EXPLORER", is_otp_verified=True, mobile_check_skipped=True)
         newcomer = ExplorerOnboarding.objects.create(user=user, role_type="OVERSEAS", verified=True, suburb="Parramatta",
-                                                     date_of_birth=date(1995, 5, 1), gov_id_verified=True,
+                                                     date_of_birth=date(1995, 5, 1), government_id="id/passport.pdf", gov_id_verified=True,
                                                      referee1_name="Dr Lee", referee1_confirmed=True)
         post = ExplorerPost.objects.create(explorer_profile=newcomer, author_user=user, headline="Hi", body="b", role_category="EXPLORER")
 
@@ -118,7 +118,7 @@ class NewcomerUpgradeTests(TestCase):
         self.assertEqual((profile.suburb, profile.date_of_birth, profile.gov_id_verified, profile.referee1_confirmed, profile.verified),
                          ("Parramatta", date(1995, 5, 1), True, True, False))
         self.assertEqual(missing_requirements(profile), ["mobile", "ahpra"])
-        post.refresh_from_db()
-        self.assertEqual((post.role_category, post.explorer_profile_id), ("PHARMACIST", None))
+        # Owner decision 2026-10-13: the New to pharmacy post comes off the board; they post again in the new role.
+        self.assertFalse(ExplorerPost.objects.filter(pk=post.pk).exists())
         # Once only: the account is no longer New to pharmacy.
         self.assertEqual(client_for(user).post(self.URL, {"role": "OTHER_STAFF", "staff_role": "ASSISTANT"}, format="json").status_code, 400)

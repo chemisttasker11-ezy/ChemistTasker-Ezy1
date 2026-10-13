@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from core.serializer_lifecycle import _delete_file_if_unreferenced
 from core.task_queue import async_task
+from onboarding.verification.policy import ahpra_number_error
 
 
 def apply_regulatory_tab(instance, vdata: dict, submit: bool):
@@ -27,6 +28,10 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
     original_half = instance.intern_half
     original_dispensing = instance.dispensary_qualification
     original_ahpra = (instance.ahpra_number or '').strip()
+    if 'ahpra_number' in vdata:
+        problem = ahpra_number_error(instance, vdata['ahpra_number'])
+        if problem:
+            raise serializers.ValidationError({'ahpra_number': [problem]})
 
     # role classification inputs
     for f in ['role_type','classification_level','student_year','intern_half','dispensary_qualification','ahpra_number']:
@@ -35,10 +40,12 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
                 setattr(instance, f, vdata[f])
                 update_fields.append(f)
     if original_ahpra != (instance.ahpra_number or '').strip():
-        # AHPRA is checked manually by admin, like pharmacists; a new number needs a new check.
+        # AHPRA is checked manually by admin, like pharmacists; a new number needs a new check, and Verified (which
+        # relies on it) waits for that check. Only an unchecked number can change (ahpra_number_error).
         instance.ahpra_verified = False
         instance.ahpra_verification_note = ''
-        update_fields.extend(['ahpra_verified', 'ahpra_verification_note'])
+        instance.verified = False
+        update_fields.extend(['ahpra_verified', 'ahpra_verification_note', 'verified'])
 
     role_or_class_changed = (
         original_role != str(instance.role_type or '').upper()
@@ -109,6 +116,15 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
             _delete_file_if_unreferenced(old_file, current_instance=instance)
         except Exception:
             pass
+
+    # Interns: the admin team checks the AHPRA number on the public register, as for pharmacists (who send theirs from
+    # the basic tab); the difference is the registration type, provisional.
+    if submit and str(instance.role_type or '').upper() == 'INTERN' and not instance.ahpra_verified:
+        from onboarding.emails import notify_superuser_on_onboarding
+        try:
+            notify_superuser_on_onboarding(instance)
+        except Exception:
+            pass  # never block the worker on email problems
 
     # schedule verification tasks for any provided file that changed or is not verified
     if submit:

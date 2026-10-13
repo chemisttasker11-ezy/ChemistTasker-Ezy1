@@ -1,9 +1,5 @@
-"""Onboarding completeness per role.
-
-Computing the pharmacist, other-staff and explorer progress also refreshes the Verified flag from the verification
-policy (onboarding/verification/policy.py). The calculation runs whenever the onboarding is rendered.
-"""
-from onboarding.verification.policy import refresh_verified
+"""Onboarding completeness per role. It only measures; the Verified flag is refreshed by the onboarding serializers
+before they render (RefreshVerifiedMixin, onboarding/verification/policy.py)."""
 
 
 def pharmacist_progress_percent(obj):
@@ -54,8 +50,6 @@ def pharmacist_progress_percent(obj):
     late_ok  = bool(rp.get('late_night_same_as_day'))   or _filled_str(rp.get('late_night'))
     checks.append(early_ok)
     checks.append(late_ok)
-
-    refresh_verified(obj)
 
     filled = sum(1 for x in checks if x)
     total = len(checks) or 1
@@ -109,8 +103,6 @@ def otherstaff_progress_percent(obj):
     )
     checks.append(classification_ok)
 
-    refresh_verified(obj)
-
     filled = sum(1 for x in checks if x)
     total = len(checks) or 1
     return int(100 * filled / total)
@@ -149,8 +141,6 @@ def explorer_progress_percent(obj):
     # Profile
     checks.append(bool(getattr(obj, 'resume', None)))
     checks.append(_filled_str(getattr(obj, 'short_bio', None)))
-
-    refresh_verified(obj)
 
     filled = sum(1 for x in checks if x)
     total = len(checks) or 1

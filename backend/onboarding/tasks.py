@@ -519,9 +519,13 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         logger.info(f"[FINAL EVALUATION] pk={object_pk} reached a final state. All pending reminders cancelled.")
 
     # Required checks come from the verification policy; optional evidence (ID, documents) never fails a profile.
-    from onboarding.verification.policy import requirements
-    required = requirements(obj) if model_name.lower() != 'owneronboarding' else (
-        {'ahpra': bool(obj.ahpra_verified)} if getattr(obj, 'role', None) == "PHARMACIST" else {})
+    # Extras covered by the tightening grace period do not count yet: the same decision as the onboarding screens.
+    from onboarding.verification.policy import evaluate, requirements
+    if model_name.lower() != 'owneronboarding':
+        grace = evaluate(obj)['grace']
+        required = {check: met for check, met in requirements(obj).items() if check not in grace}
+    else:
+        required = {'ahpra': bool(obj.ahpra_verified)} if getattr(obj, 'role', None) == "PHARMACIST" else {}
     required_checks = [check for check in ('ahpra', 'gov_id') if check in required]
 
     # Evaluate checks

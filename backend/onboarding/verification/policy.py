@@ -76,22 +76,52 @@ def _in_grace() -> bool:
     return bool(grace) and timezone.localdate() <= grace
 
 
-def refresh_verified(profile) -> bool:
-    """Save the Verified flag the policy gives this profile and return it.
+def evaluate(profile) -> dict:
+    """The one verification decision; the onboarding screens, final_evaluation and reevaluate_verification all use it.
 
-    Profiles are promoted automatically. The only automatic demotion is tightening: an already-verified profile that
-    lacks only the extra requirements loses Verified once the grace date has passed. Failed checks and admin decisions
-    keep their own paths (the tabs reset the flag when the evidence changes)."""
+    verified: whether the profile has public access now. Profiles are promoted automatically. The only automatic
+    demotion is tightening: an already-verified profile that lacks only the extra requirements keeps Verified until the
+    grace date and loses it afterwards. Base requirements never auto-demote (admin decisions stand); the tabs reset the
+    flag when the evidence itself changes.
+    missing: everything full verification needs and lacks. grace: the missing extras that do not count yet because the
+    profile was verified before the tightening; they are due by grace_until."""
     missing = missing_requirements(profile)
-    verified = bool(profile.verified)
-    if not missing and not verified:
+    was_verified = bool(profile.verified)
+    extras_only = bool(missing) and set(missing) <= set(EXTRA_REQUIREMENTS)
+    grace = missing if (was_verified and extras_only and _in_grace()) else []
+    if not missing:
         verified = True
-    elif missing and verified and set(missing) <= set(EXTRA_REQUIREMENTS) and not _in_grace():
-        verified = False
+    elif was_verified and extras_only:
+        verified = bool(grace)
+    else:
+        verified = was_verified
+    return {'verified': verified, 'missing': missing, 'grace': grace,
+            'grace_until': getattr(settings, 'VERIFICATION_GRACE_UNTIL', None) if grace else None}
+
+
+def refresh_verified(profile) -> bool:
+    """Save the Verified flag evaluate() gives this profile and return it."""
+    verified = evaluate(profile)['verified']
     if verified != bool(profile.verified):
         profile.verified = verified
         profile.save(update_fields=['verified'])
     return verified
+
+
+def ahpra_number_error(profile, new_number) -> str | None:
+    """Owner decision 2026-10-13: an AHPRA number belongs to one person for life (intern to pharmacist). Once checked it
+    cannot be changed here, and no other account can use it. None when the new number is fine."""
+    new = (new_number or '').strip()
+    if new == (getattr(profile, 'ahpra_number', None) or '').strip():
+        return None
+    if getattr(profile, 'ahpra_verified', False):
+        return "Your AHPRA number has been checked and stays with you for life, so it can't be changed. Contact support if it is wrong."
+    if new:
+        from onboarding.models import OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding
+        for model in (PharmacistOnboarding, OtherStaffOnboarding, OwnerOnboarding):
+            if model.objects.filter(ahpra_number__iexact=new).exclude(user_id=profile.user_id).exists():
+                return 'This AHPRA number is already used by another account. Contact support if it is yours.'
+    return None
 
 
 def _certificate_skill_codes(profile) -> list[str]:
@@ -149,12 +179,30 @@ def badges(profile) -> list[dict]:
 
 def verification_summary(profile) -> dict:
     """What employers and the worker see: the Verified flag, every badge, certificate skills and the overseas label."""
+    decision = evaluate(profile)
     return {
         'verified': bool(profile.verified),
         # What Verified still needs (email, mobile, ahpra, gov_id, referees, role); empty once verified.
-        'missing': [] if profile.verified else missing_requirements(profile),
+        'missing': [] if profile.verified else decision['missing'],
+        # Extras a verified profile must add by grace_until to keep Verified ("References needed by ...").
+        'outstanding': decision['grace'],
+        'grace_until': decision['grace_until'].isoformat() if decision['grace_until'] else None,
         'badges': badges(profile),
         'skill_evidence': skill_evidence(profile),
+        # Two separate facts: where the person trained (a label they chose) and which route verified them.
         'overseas': _role(profile) == 'EXPLORER' and getattr(profile, 'role_type', '') == 'OVERSEAS',
-        'under_18': _role(profile) == 'EXPLORER' and (profile.age() or 99) < 18,
+        'mobile_waived': mobile_waived(profile),
+        # Self-declared right to work in Australia ('' when not answered); "NONE" shows a label to employers.
+        'work_rights': getattr(profile, 'work_rights', '') or '',
+        'under_18': under_18(profile),
     }
+
+
+def under_18(profile, today=None) -> bool:
+    """From the date of birth on the person's current profile, whatever the role (it carries over on upgrade).
+    Under-18s show their first name only on the talent hub."""
+    born = getattr(profile, 'date_of_birth', None)
+    if not born:
+        return False
+    today = today or timezone.localdate()
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day)) < 18

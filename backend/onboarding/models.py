@@ -18,6 +18,14 @@ GENDER_CHOICES = [
     ("PREFER_NOT_TO_SAY", "Prefer not to say"),
 ]
 
+# Right to work in Australia, as the person tells us (not checked). "No work rights yet" shows as a label to employers;
+# an overseas person may already hold a visa with work rights while still abroad (owner decision 2026-10-13).
+WORK_RIGHTS_CHOICES = [
+    ("CITIZEN_OR_RESIDENT", "Australian or New Zealand citizen, or permanent resident"),
+    ("VISA", "Visa with work rights"),
+    ("NONE", "No work rights in Australia yet"),
+]
+
 
 def onboarding_upload_path(instance, filename, folder):
     user_id = getattr(instance, "user_id", None) or "new"
@@ -218,6 +226,7 @@ class PharmacistOnboarding(models.Model):
     ahpra_number = models.CharField(max_length=100, blank=True, null=True)
     # phone_number = models.CharField(max_length=20, blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
+    work_rights = models.CharField(max_length=24, choices=WORK_RIGHTS_CHOICES, blank=True, default="")
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True, null=True)
     emergency_contact_number = models.CharField(max_length=20, blank=True, null=True)
     emergency_contact_relation = models.CharField(max_length=100, blank=True, null=True)
@@ -373,6 +382,7 @@ class OtherStaffOnboarding(models.Model):
 
     # --- Basic (address + dob; phone comes from User.mobile_number in V2 serializers) ---
     date_of_birth = models.DateField(blank=True, null=True)
+    work_rights = models.CharField(max_length=24, choices=WORK_RIGHTS_CHOICES, blank=True, default="")
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True, null=True)
     emergency_contact_number = models.CharField(max_length=20, blank=True, null=True)
     emergency_contact_relation = models.CharField(max_length=100, blank=True, null=True)
@@ -527,6 +537,7 @@ class ExplorerOnboarding(models.Model):
     government_id = models.FileField(upload_to=explorer_gov_id_upload_path, blank=True, null=True)
     role_type = models.CharField(max_length=50, choices=ROLE_CHOICES, blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
+    work_rights = models.CharField(max_length=24, choices=WORK_RIGHTS_CHOICES, blank=True, default="")
     # Feed position of the newcomer's one talent post: a re-post within 7 days keeps it (no bumping by re-posting).
     last_talent_post_at = models.DateTimeField(blank=True, null=True)
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True, null=True)

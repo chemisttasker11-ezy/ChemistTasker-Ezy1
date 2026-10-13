@@ -5,7 +5,9 @@ from talent.models import ExplorerPost, ExplorerPostReaction
 import uuid
 import json
 from onboarding.services.skill_identity import normalize_skills
-from onboarding.verification.policy import verification_summary
+from drf_spectacular.utils import extend_schema_field
+from onboarding.verification.policy import under_18, verification_summary
+from onboarding.verification.schema import VerificationSummarySerializer
 
 
 class ExplorerPostReadSerializer(serializers.ModelSerializer):
@@ -72,9 +74,9 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
         if not user:
             return ""
-        age = obj.explorer_profile.age() if obj.explorer_profile else None
-        # Under-18 newcomers show their first name only.
-        return user.first_name if age is not None and age < 18 else user.get_full_name()
+        # Under-18s show their first name only; age comes from the author's current profile, not the post link.
+        profile = self._profile(obj)
+        return user.first_name if profile is not None and under_18(profile) else user.get_full_name()
 
     def get_explorer_user_id(self, obj):
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
@@ -150,6 +152,7 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
             return ExplorerOnboarding.objects.filter(user=user).first() if user else None
         return self._onboarding(obj)[2]
 
+    @extend_schema_field(VerificationSummarySerializer(allow_null=True))
     def get_verification(self, obj):
         """Badges for the author: verified flag, evidence states and the overseas label (labels live in shared-core)."""
         profile = self._profile(obj)
@@ -334,8 +337,7 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
             "software",
             "reference_code",
             "is_anonymous",
-            "explorer_profile",
-        ]
+        ]  # explorer_profile is set by the server at creation and never changed by the client
         changed = []
         for field in updatable_fields:
             if field in validated_data:

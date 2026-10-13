@@ -27,7 +27,9 @@ from onboarding.services.progress import (
     pharmacist_progress_percent,
 )
 from onboarding.services.regulatory import apply_regulatory_tab
-from onboarding.verification.policy import verification_summary
+from drf_spectacular.utils import extend_schema_field
+from onboarding.verification.policy import refresh_verified, verification_summary
+from onboarding.verification.schema import VerificationSummarySerializer
 from onboarding.services.skills import (  # noqa: F401  (_load_skills_catalog, _required_cert_skill_codes: historical path)
     _load_skills_catalog,
     _required_cert_skill_codes,
@@ -172,7 +174,15 @@ class RefereeResponseSerializer(serializers.ModelSerializer):
         ]
 
 
-class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerializer):
+class RefreshVerifiedMixin:
+    """Apply the verification policy once, before any field is read, so `verified` and `verification` agree."""
+
+    def to_representation(self, instance):
+        refresh_verified(instance)
+        return super().to_representation(instance)
+
+
+class PharmacistOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin, serializers.ModelSerializer):
     """
     V2 single-endpoint, tab-aware serializer.
     Implements ONLY the Basic tab (as requested).
@@ -217,7 +227,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         model = PharmacistOnboarding
         fields = [
             # ---------- BASIC ----------
-            'username','first_name','last_name','phone_number','date_of_birth','gender',
+            'username','first_name','last_name','phone_number','date_of_birth','work_rights','gender',
             'emergency_contact_number','emergency_contact_relation','profile_photo','profile_photo_url',
             'profile_photo','profile_photo_url',
             'ahpra_number',
@@ -392,8 +402,9 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     def get_progress_percent(self, obj):
         return pharmacist_progress_percent(obj)
 
+    @extend_schema_field(VerificationSummarySerializer)
     def get_verification(self, obj):
-        return verification_summary(obj)  # after progress_percent, which refreshes the Verified flag
+        return verification_summary(obj)
 
     # -------- update --------
     def update(self, instance, validated_data):
@@ -461,7 +472,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return apply_profile_tab(instance, vdata, submit)
 
 
-class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerializer):
+class OtherStaffOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin, serializers.ModelSerializer):
     """
     V2 single-endpoint, tab-aware serializer for OtherStaff.
     Mirrors the Pharmacist V2 procedure but without AHPRA and with a Regulatory tab.
@@ -512,7 +523,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         model = OtherStaffOnboarding
         fields = [
             # ---------- BASIC ----------
-            'username','first_name','last_name','phone_number','date_of_birth','gender',
+            'username','first_name','last_name','phone_number','date_of_birth','work_rights','gender',
             'emergency_contact_number','emergency_contact_relation','profile_photo','profile_photo_url',
             'street_address','suburb','state','postcode','google_place_id','latitude','longitude','open_to_travel','travel_states','coverage_radius_km',
 
@@ -690,8 +701,9 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     def get_progress_percent(self, obj):
         return otherstaff_progress_percent(obj)
 
+    @extend_schema_field(VerificationSummarySerializer)
     def get_verification(self, obj):
-        return verification_summary(obj)  # after progress_percent, which refreshes the Verified flag
+        return verification_summary(obj)
 
     # ---------------- update router ----------------
     def update(self, instance, validated_data):
@@ -760,7 +772,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return _build_absolute_media_url(self.context.get("request"), getattr(obj, "profile_photo", None))
 
 
-class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerializer):
+class ExplorerOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin, serializers.ModelSerializer):
     """
     V2 tab-aware serializer for Explorer.
     Tabs: basic, identity, interests, referees, profile.
@@ -797,7 +809,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             "id",
             # ---------- BASIC ----------
             'username','first_name','last_name','phone_number','profile_photo','profile_photo_url',
-            'role_type','gender','emergency_contact_number','emergency_contact_relation',
+            'role_type','work_rights','gender','emergency_contact_number','emergency_contact_relation',
             'street_address','suburb','state','postcode','google_place_id','latitude','longitude','open_to_travel','travel_states','coverage_radius_km',
 
             # ---------- IDENTITY ----------
@@ -884,8 +896,9 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
     def get_progress_percent(self, obj):
         return explorer_progress_percent(obj)
 
+    @extend_schema_field(VerificationSummarySerializer)
     def get_verification(self, obj):
-        return verification_summary(obj)  # after progress_percent, which refreshes the Verified flag
+        return verification_summary(obj)
 
     # ---------------- update router ----------------
     def update(self, instance, validated_data):

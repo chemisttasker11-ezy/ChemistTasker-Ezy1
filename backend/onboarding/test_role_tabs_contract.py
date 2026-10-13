@@ -160,8 +160,9 @@ class SubmissionTests(RoleTabFixture):
 
 class BasicTabTests(RoleTabFixture):
     def test_pharmacist_basic_fields_rounding_and_ahpra_reset(self):
-        user, obj, url = self.onboarding("pharmacist", ahpra_number="PHA1", ahpra_verified=True,
-                                         ahpra_verification_note="ok")
+        # A rejected number can be corrected (a checked one is locked: test_verification_transitions).
+        user, obj, url = self.onboarding("pharmacist", ahpra_number="PHA1", ahpra_verified=False,
+                                         ahpra_verification_note="Not found on the register")
         response, _ = self.patch(user, url, {
             "tab": "basic", "street_address": "1 Main St", "suburb": "Town", "state": "NSW", "postcode": "2000",
             "latitude": "-33.123456789", "longitude": "151.987654321", "ahpra_number": "PHA2",
