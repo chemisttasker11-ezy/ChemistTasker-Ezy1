@@ -53,3 +53,17 @@ Finish line: milestone commits on local main, then a pushed branch + draft PR (n
 ## Owner addition (2026-10-13, mid-build)
 Onboarding pages touched in milestones 3 and 6 are finished to the Post shift / Shift Centre standard
 (docs/frontend rules, page finishing standard): clear step purpose, one primary action, inline validation, all states.
+
+## Status at hand-off (2026-10-13)
+Done, committed on local main (365c69a..579e492): milestones 1-8. Backend tests for onboarding, talent, shifts,
+users, public_hub, core pass; shared-core 202 tests pass; Vite, Next and Expo typecheck clean.
+Not done:
+- Milestone 9, newcomer "Upgrade my account": extend users/api_account.ChooseAccountTypeView (today
+  PHARMACY_MANAGER only) to allow EXPLORER -> PHARMACIST / OTHER_STAFF once, inside the same transaction; copy
+  name/DOB/address/photo/bio/CV into the new onboarding, hide the talent post until the new role is verified, and
+  walk every role transition through the frontend persona routing (see PR152 lesson).
+- Milestone 10: browser check at 1440/390, impeccable detector on changed web UI, full regression gate.
+- Shortcuts: Report button shows on your own posts too; the grace-date downgrade only runs via
+  `manage.py reevaluate_verification` (schedule it when tightening).
+- Local DB: work ran against a copy (ctpg `ct_verification`); the dev DB was not migrated. New migrations:
+  client_profile 0075-0078, users 0004-0005, talent 0004-0005, pharmacy_hub 0004, public_hub 0005.
