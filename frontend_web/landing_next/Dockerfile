@@ -7,9 +7,15 @@ WORKDIR /workspace/frontend_web/landing_next
 # because npm records the local file dependency as ../../shared-core.
 COPY scripts/prepare-shared-core.mjs /workspace/scripts/prepare-shared-core.mjs
 COPY shared-core /workspace/shared-core
+# .npmrc install-links copies local packages (shared-core and ../shared UI)
+# before npm runs the root preinstall, so build shared-core first.
+RUN npm ci --prefix /workspace/shared-core --ignore-scripts --no-audit --no-fund \
+    && npm run build --prefix /workspace/shared-core
+COPY frontend_web/shared /workspace/frontend_web/shared
 COPY frontend_web/landing_next/package.json ./package.json
 COPY frontend_web/landing_next/package-lock.json ./package-lock.json
-RUN npm ci --no-audit --no-fund
+COPY frontend_web/landing_next/.npmrc ./.npmrc
+RUN CT_SHARED_CORE_SKIP_PREPARE=1 npm ci --no-audit --no-fund
 COPY frontend_web/landing_next/ ./
 ARG NEXT_PUBLIC_SITE_URL=https://chemisttasker.com.au
 ARG NEXT_PUBLIC_PLATFORM_URL=https://chemisttasker.com.au

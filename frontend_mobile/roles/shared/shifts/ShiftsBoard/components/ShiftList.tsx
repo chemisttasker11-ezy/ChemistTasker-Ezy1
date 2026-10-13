@@ -1,3 +1,5 @@
+import { showPublishedShiftRates } from '@chemisttasker/shared-core';
+import { PharmacyContextDetails } from '../../PharmacyContextDetails';
 // ShiftList - Mobile React Native version
 // Complete shift cards display with exact web logic
 
@@ -5,7 +7,9 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card, Text, Button, Chip, IconButton, Checkbox, ActivityIndicator, Icon } from 'react-native-paper';
 import { format } from 'date-fns';
-import { Shift } from '@chemisttasker/shared-core';
+import { shiftRequirementGroups, Shift, skillLabel } from '@chemisttasker/shared-core';
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { SkillIcon } from '../../../../../components/SkillIcon';
 import { ShiftSlot } from '../types';
 import { formatDateLong, formatDateShort, formatTime } from '../utils/date';
 import { getRateSummary, getSlotRate } from '../utils/rates';
@@ -140,7 +144,8 @@ const ShiftList: React.FC<ShiftListProps> = ({
                 const selection = disableSlotActions ? new Set<number>() : (selectedSlotIds[shift.id] ?? new Set<number>());
                 const isRejectedShift = isShiftRejected;
                 const isFullOrPartTime = ['FULL_TIME', 'PART_TIME'].includes(shift.employmentType ?? '');
-                const isPharmacistProvided = shift.rateType === 'PHARMACIST_PROVIDED';
+                const showPublishedRates = showPublishedShiftRates(shift);
+const isPharmacistProvided = showPublishedRates && shift.rateType === 'PHARMACIST_PROVIDED';
                 const offerStatusBySlot = ((shift as any).__offerStatusBySlot ?? {}) as Record<number, string>;
                 const shiftOfferStatus = String((shift as any).__shiftOfferStatus ?? '').toUpperCase();
                 const awaitingPaymentSlotIds = new Set(
@@ -177,9 +182,9 @@ const ShiftList: React.FC<ShiftListProps> = ({
                 })();
                 const shouldShowTimeRow = Boolean(showTimeText) || flexibleTime;
                 const showCounter = !hideCounterOffer && (getShiftFlexibleTime(shift) || getShiftNegotiable(shift)) && !isRejectedShift;
-                const showNegotiable = getShiftNegotiable(shift) && !isRejectedShift;
+                const showNegotiable = showPublishedRates && getShiftNegotiable(shift) && !isRejectedShift;
                 const superValue = Number(shift.superPercent);
-                const showSuperChip = !isFullOrPartTime && Number.isFinite(superValue) && superValue > 0;
+                const showSuperChip = showPublishedRates && !isFullOrPartTime && Number.isFinite(superValue) && superValue > 0;
                 const paymentType =
                     shift.paymentPreference ||
                     (shift.employmentType === 'LOCUM'
@@ -239,7 +244,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                         <Chip icon="briefcase-outline" compact>{getShiftRoleLabel(shift)}</Chip>
                                         {shift.hasTravel && <Chip icon="airplane" compact>Travel</Chip>}
                                         {shift.hasAccommodation && <Chip icon="bed" compact>Accomm.</Chip>}
-                                        {paymentType && <Chip mode="outlined" compact>Payment: {paymentType}</Chip>}
+                                        {showPublishedRates && paymentType && <Chip mode="outlined" compact>Payment: {paymentType}</Chip>}
                                         {isRejectedShift && (
                                             <Chip textStyle={{ color: '#d32f2f' }} compact>Rejected</Chip>
                                         )}
@@ -298,14 +303,14 @@ const ShiftList: React.FC<ShiftListProps> = ({
                             </View>
 
                             <View style={styles.rateSection}>
-                                <View style={styles.rateRow}>
+                                {showPublishedRates ? <View style={styles.rateRow}>
                                     <Icon source="currency-usd" size={16} color="#2e7d32" />
                                     <Text variant="headlineSmall" style={styles.rateText}>
                                         {rateSummary.display}
                                         <Text variant="bodySmall" style={styles.rateUnit}>{rateSummary.unitLabel}</Text>
                                     </Text>
-                                </View>
-                                {isFullOrPartTime && shift.superPercent && (
+                                </View> : <Text variant="bodySmall">Your pharmacy staff agreement applies</Text>}
+                                {showPublishedRates && isFullOrPartTime && shift.superPercent && (
                                     <Chip compact>+ Superannuation ({shift.superPercent}%)</Chip>
                                 )}
                                 {showSuperChip && <Chip compact style={styles.superChip}>+Super</Chip>}
@@ -398,7 +403,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                                         {isFullOrPartTime ? 'This is a non-slot based role.' : 'Slots will be announced.'}
                                                     </Text>
                                                     <Text variant="bodySmall" style={styles.slotSubtext}>
-                                                        Rate: {rateSummary.display} {rateSummary.unitLabel}
+                                                        {showPublishedRates ? `Rate: ${rateSummary.display} ${rateSummary.unitLabel}` : 'Your pharmacy staff agreement applies'}
                                                     </Text>
                                                 </Card.Content>
                                             </Card>
@@ -454,7 +459,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                                                         <Chip compact style={styles.appliedChip}>
                                                                             {isSlotApplied
                                                                                 ? 'Applied'
-                                                                                : `$${getSlotRate(slot, shift, userRatePreference)}/hr`}
+                                                                                : showPublishedRates ? `$${getSlotRate(slot, shift, userRatePreference)}/hr` : 'Staff agreement'}
                                                                         </Chip>
                                                                     )}
                                                                     {offerSlot && <Chip compact mode="outlined">Offer sent</Chip>}
@@ -531,54 +536,23 @@ const ShiftList: React.FC<ShiftListProps> = ({
                                             {shift.description || 'No description provided.'}
                                         </Text>
 
-                                        {shift.mustHave && shift.mustHave.length > 0 && (
-                                            <View style={styles.tagSection}>
-                                                <Text variant="labelSmall" style={styles.tagLabel}>Must have</Text>
-                                                <View style={styles.tagRow}>
-                                                    {shift.mustHave.map((item, idx) => (
-                                                        <Chip key={`${item}-${idx}`} compact>{item}</Chip>
-                                                    ))}
+                                        {(() => {
+                                            // Skills and named software shown apart, like onboarding and post shift.
+                                            const { requiredSkills, preferredSkills, software } = shiftRequirementGroups(skillsRegistry as any, shift.mustHave || [], shift.niceToHave || []);
+                                            const block = (title: string, chips: React.ReactNode[]) => chips.length > 0 && (
+                                                <View style={styles.tagSection} key={title}>
+                                                    <Text variant="labelSmall" style={styles.tagLabel}>{title}</Text>
+                                                    <View style={styles.tagRow}>{chips}</View>
                                                 </View>
-                                            </View>
-                                        )}
+                                            );
+                                            return <>
+                                                {block('Required', requiredSkills.map(code => <Chip key={code} compact style={{ maxWidth: '100%' }} icon={() => <SkillIcon skill={code} />}>{skillLabel(skillsRegistry as any, code)}</Chip>))}
+                                                {block('Preferred', preferredSkills.map(code => <Chip key={code} compact mode="outlined" style={{ maxWidth: '100%' }} icon={() => <SkillIcon skill={code} />}>{skillLabel(skillsRegistry as any, code)}</Chip>))}
+                                                {block('Software', software.map(item => <Chip key={item.code} compact mode={item.required ? 'flat' : 'outlined'} style={{ maxWidth: '100%' }} icon={() => <SkillIcon skill={item.code} />}>{`${skillLabel(skillsRegistry as any, item.code)} · ${item.required ? 'required' : 'preferred'}`}</Chip>))}
+                                            </>;
+                                        })()}
 
-                                        {shift.niceToHave && shift.niceToHave.length > 0 && (
-                                            <View style={styles.tagSection}>
-                                                <Text variant="labelSmall" style={styles.tagLabel}>Nice to have</Text>
-                                                <View style={styles.tagRow}>
-                                                    {shift.niceToHave.map((item, idx) => (
-                                                        <Chip key={`${item}-${idx}`} compact mode="outlined">{item}</Chip>
-                                                    ))}
-                                                </View>
-                                            </View>
-                                        )}
-
-                                        {shift.workloadTags && shift.workloadTags.length > 0 && (
-                                            <View style={styles.tagSection}>
-                                                <Text variant="labelSmall" style={styles.tagLabel}>Workload</Text>
-                                                <View style={styles.tagRow}>
-                                                    {shift.workloadTags.map((tag, idx) => (
-                                                        <Chip key={`${tag}-${idx}`} compact>{tag}</Chip>
-                                                    ))}
-                                                </View>
-                                            </View>
-                                        )}
-
-                                        {shift.createdAt && (
-                                            <Text variant="bodySmall" style={styles.postedDate}>
-                                                Posted {format(new Date(shift.createdAt), 'd MMM yyyy')}
-                                            </Text>
-                                        )}
-
-                                        <Card mode="outlined" style={styles.addressCard}>
-                                            <Card.Content>
-                                                <Text variant="labelSmall" style={styles.tagLabel}>Full Address</Text>
-                                                <View style={styles.addressRow}>
-                                                    <Icon source="map-marker" size={16} color="#6B7280" />
-                                                    <Text variant="bodySmall">{getShiftAddress(shift) || 'N/A'}</Text>
-                                                </View>
-                                            </Card.Content>
-                                        </Card>
+                                        <PharmacyContextDetails pharmacy={shift.pharmacyDetail} workload={shift.workloadTags} support={shift.supportOnShift} />
                                     </View>
                                 </View>
                             )}

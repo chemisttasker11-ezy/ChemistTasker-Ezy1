@@ -1,5 +1,4 @@
-# Cloudflare Quick Tunnel preview deployment was retired. This workflow now
-# deploys the permanent staging.chemisttasker.com.au environment.
+# Deploy to permanent staging via the OVH self-hosted runner.
 name: Staging deployment
 
 on:
@@ -13,7 +12,7 @@ permissions:
 
 concurrency:
   group: chemisttasker-staging-deployment
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   STAGING_DIR: "/opt/apps/chemisttasker-staging"
@@ -21,9 +20,10 @@ env:
 jobs:
   deploy-staging:
     runs-on: [self-hosted, linux, x64, chemisttasker-staging]
+
     steps:
       - name: Checkout staging
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Sync isolated staging source
         shell: bash
@@ -33,24 +33,29 @@ jobs:
           tar --exclude='.git' --exclude='./env' -czf - . | tar -xzf - -C "$STAGING_DIR"
 
       - name: Deploy isolated staging stack
+        id: deploy
         shell: bash
         run: |
           cd "$STAGING_DIR"
           bash scripts/deploy-staging.sh
+
+          staging_url="https://staging.chemisttasker.com.au"
+          echo "staging_url=$staging_url" >> "$GITHUB_OUTPUT"
+
           {
             echo "## ChemistTasker staging deployment"
             echo ""
-            echo "Site: https://staging.chemisttasker.com.au"
+            echo "Site: $staging_url"
             echo ""
-            echo "This deployment runs on the OVH self-hosted runner and uses staging-only PostgreSQL, Redis, volumes and containers."
+            echo "Deployed on the OVH self-hosted runner."
+            echo "Uses staging-only PostgreSQL, Redis, volumes and containers."
           } >> "$GITHUB_STEP_SUMMARY"
-
 
       - name: Smoke-test deployed staging
         shell: bash
         run: |
           cd "$STAGING_DIR"
-          bash scripts/smoke-staging.sh "https://staging.chemisttasker.com.au"
+          bash scripts/smoke-staging.sh "${{ steps.deploy.outputs.staging_url }}"
 
       - name: Smoke-test summary
         shell: bash

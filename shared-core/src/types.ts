@@ -692,6 +692,36 @@ export interface ShiftUserApi {
 
 export type ShiftUser = CamelCasedPropertiesDeep<ShiftUserApi>;
 
+export interface ShiftWorkProfileApi extends ShiftUserApi {
+    skill_role?: 'PHARMACIST' | 'INTERN' | 'TECHNICIAN' | 'ASSISTANT' | 'STUDENT';
+    verified_skills?: string[];
+    dispensary_qualification?: string | null;
+    dispensary_qualification_verified?: boolean;
+    profile_photo?: string | null;
+    skills?: string[];
+    role_label?: string | null;
+    classification?: string | null;
+    suburb?: string | null;
+    state?: string | null;
+    open_to_travel?: boolean;
+    travel_states?: string[];
+    coverage_radius_km?: number | null;
+    verified?: boolean;
+    gov_id_verified?: boolean;
+    abn_verified?: boolean;
+    ahpra_verified?: boolean;
+    registered_since?: string | null;
+    years_experience?: string | null;
+}
+export type ShiftWorkProfile = CamelCasedPropertiesDeep<ShiftWorkProfileApi>;
+export interface ShiftReviewCandidate {
+    userId?: number | null; name?: string; email?: string | null; shortBio?: string | null;
+    profile?: ShiftWorkProfile | null;
+    pendingConfirmation?: boolean; pendingOfferId?: number | null;
+    awaitingPayment?: boolean; awaitingPaymentOfferId?: number | null;
+    pendingConfirmationCounterOffer?: unknown; awaitingPaymentCounterOffer?: unknown;
+}
+
 export interface ShiftAssignmentApi {
     slot_id: number;
     user_id: number;
@@ -726,6 +756,7 @@ export interface ShiftPharmacyDetailApi {
 }
 
 export interface ShiftMemberStatusApi {
+    user_detail?: ShiftWorkProfileApi | null;
     user_id: number;
     name: string;
     employment_type: string;
@@ -745,7 +776,7 @@ export interface ShiftMemberStatusApi {
 }
 
 export interface ShiftInterestApi {
-    user_detail?: ShiftUserApi | null;
+    user_detail?: ShiftWorkProfileApi | null;
     slot_id?: number | null;
     id: number;
     shift: number;
@@ -788,6 +819,8 @@ export interface ShiftRatingCommentApi {
 }
 
 export interface ShiftApi {
+    published_rates_visible?: boolean;
+    dedicated_user?: number | null;
     id: number;
     role_needed: string;
     role_label?: string | null;
@@ -838,6 +871,8 @@ export interface ShiftApi {
     payment_preference?: string | null;
     payment_status?: string | null;
     workload_tags?: string[];
+    /** Who works alongside on the shift, by registry support role code. */
+    support_on_shift?: { role: string; count: number }[];
     must_have?: string[];
     nice_to_have?: string[];
     allowed_shift_types?: string[];
@@ -1174,6 +1209,11 @@ export type ChatParticipant = {
 export type PharmacySummary = {
     id: number;
     name: string;
+    /** Registry IDs: software (one per category) and services offered; script bands are registry codes. */
+    software?: string[];
+    services?: string[];
+    scriptVolumeWeekday?: string | null;
+    scriptVolumeWeekend?: string | null;
     email?: string | null;
     hasChain?: boolean;
     claimed?: boolean;

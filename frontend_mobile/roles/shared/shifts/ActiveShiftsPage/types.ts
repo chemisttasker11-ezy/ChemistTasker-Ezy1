@@ -1,7 +1,7 @@
 // ActiveShiftsPage Types
 // TypeScript type definitions for Active Shifts components
 
-import { ShiftMemberStatus } from '@chemisttasker/shared-core';
+import { ShiftMemberStatus, ShiftReviewCandidate } from '@chemisttasker/shared-core';
 
 export interface TabDataState {
     loading: boolean;
@@ -15,7 +15,7 @@ export type ReviewOfferDialogState = {
     open: boolean;
     shiftId: number | null;
     offer: any | null;
-    candidate: any | null;
+    candidate: ShiftReviewCandidate | null;
     slotId: number | null;
 };
 

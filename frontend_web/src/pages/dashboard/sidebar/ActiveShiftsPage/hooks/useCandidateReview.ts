@@ -262,6 +262,8 @@ export function useCandidateReview({ selectedLevelByShift, tabData, getTabKey, l
                 (typeof (interest as any)?.user === 'object' ? (interest as any).user : null) ||
                 (interest as any)?.user_detail ||
                 (interest as any)?.userDetail ||
+                (member as any).userDetail ||
+                (member as any).user_detail ||
                 null;
 
             const pendingConfirmationCounterOffer =

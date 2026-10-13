@@ -8,9 +8,20 @@ User = get_user_model()
 
 def refresh_assignment_rate(assignment):
     from shifts.pricing import get_locked_rate_for_slot
+    terms = assignment.engagement_terms_snapshot or {}
+    staff_terms = None
+    if assignment.engagement_kind == 'STAFF_EMPLOYMENT':
+        # Legacy incomplete snapshots retain their locked rate until terms are reviewed.
+        if not terms.get('rates') and terms.get('settlement_channel') != 'TIMESHEET_ONLY':
+            return
+        staff_terms = terms
+    elif assignment.source_offer_id:
+        # An accepted worker offer remains authoritative when roster dates are edited.
+        return
     assignment.unit_rate, assignment.rate_reason = get_locked_rate_for_slot(
         assignment.slot, assignment.shift, assignment.user,
         override_date=assignment.slot_date or assignment.slot.date,
+        staff_terms=staff_terms,
     )
     assignment.save(update_fields=["unit_rate", "rate_reason"])
 

@@ -1,0 +1,2019 @@
+{
+  "version": 5,
+  "authority": "Each code denotes one defined capability; labels and icons are presentation only. Claim mode and verified credentials must be considered before a capability qualifies a candidate for a shift. Unknown codes never match.",
+  "roles": [
+    "PHARMACIST",
+    "INTERN",
+    "TECHNICIAN",
+    "ASSISTANT",
+    "STUDENT"
+  ],
+  "groups": [
+    "Dispensing & Medicines",
+    "Clinical Services",
+    "Operations & Retail",
+    "Software & Digital"
+  ],
+  "levels": {
+    "experience": "May claim experience within lawful scope",
+    "supervised": "Under pharmacist supervision",
+    "conditional": "Training / role / supervision conditions apply",
+    "familiarity": "Familiarity or observation only",
+    "none": "Unavailable"
+  },
+  "legacy_aliases": {
+    "VACCINATOR": "VACCINATION",
+    "CRED_PHARM": "HMR_ACCREDITED_MRN",
+    "WEBSTER_PACKING": "WEBSTER_PACKING_DAA",
+    "DAA": "WEBSTER_PACKING_DAA"
+  },
+  "legacy_evidence_only": [
+    "PI_INSURANCE",
+    "PDL"
+  ],
+  "certificates": [
+    {
+      "code": "ADVANCED_COMPOUNDING_TRAINING",
+      "label": "Advanced or sterile compounding training",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "VACCINATION_TRAINING",
+      "label": "Vaccination training and applicable authorisation",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "FIRST_AID_CPR",
+      "label": "First aid, CPR and anaphylaxis certificate",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "MMR_CREDENTIAL",
+      "label": "Current Medication Management Review credential",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "ACOP_CREDENTIAL",
+      "label": "Aged Care On-site Pharmacist training and program credentials",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "UTI_PRESCRIBING_TRAINING",
+      "label": "Jurisdictional UTI prescribing service training",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "CONTRACEPTIVE_RESUPPLY_TRAINING",
+      "label": "Contraceptive resupply service training",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "YELLOW_FEVER_TRAINING",
+      "label": "Travel health / Yellow Fever training and authorisation",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    },
+    {
+      "code": "PRESCRIBING_SCOPE_TRAINING",
+      "label": "Relevant expanded-scope service training",
+      "trigger": "If corresponding skill is claimed",
+      "platform_policy": false
+    }
+  ],
+  "skills": [
+    {
+      "code": "PRESCRIPTION_DISPENSING",
+      "label": "Prescription dispensing",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Assistants require verified dispensary competencies. All non-pharmacist dispensing work is under direct pharmacist supervision and does not include the final clinical check.",
+      "icon_web": "PillBottle",
+      "icon_mobile": "pill",
+      "icon_meaning": "Prescription bottle",
+      "definition": "Pick, label and supply scripts; the pharmacist does the final check.",
+      "aliases": [
+        "Prescription dispensing",
+        "Dispensing"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "DISPENSING_DATA_ENTRY",
+      "label": "Script entry and labelling",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Assistant conditional on dispensary training and pharmacist supervision.",
+      "icon_web": "ClipboardPenLine",
+      "icon_mobile": "clipboard-edit-outline",
+      "icon_meaning": "Script being entered",
+      "definition": "Enter scripts into the dispensing system and print labels, flagging concerns to the pharmacist.",
+      "aliases": [
+        "Dispensing data entry and labelling"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "CLINICAL_CHECKING",
+      "label": "Clinical script checking",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": "Interns check under pharmacist supervision; the registered pharmacist keeps final responsibility.",
+      "icon_web": "ClipboardCheck",
+      "icon_mobile": "clipboard-check-outline",
+      "icon_meaning": "Checked script",
+      "definition": "Final clinical and legal check of each prescription before it is supplied.",
+      "aliases": [
+        "Clinical prescription checking"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "ESCRIPT_PROCESSING",
+      "label": "eScripts and tokens",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "QrCode",
+      "icon_mobile": "qrcode-scan",
+      "icon_meaning": "eScript token",
+      "definition": "Dispense electronic prescriptions from QR tokens and Active Script Lists.",
+      "aliases": [
+        "eScripts",
+        "Electronic prescriptions",
+        "Electronic prescription workflows",
+        "eRx",
+        "Active Script List",
+        "ASL"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "PBS_CLAIMS",
+      "label": "PBS claims",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "ReceiptText",
+      "icon_mobile": "receipt-text-outline",
+      "icon_meaning": "Claim receipt",
+      "definition": "Prepare and reconcile PBS claims and safety net records.",
+      "aliases": [
+        "PBS claim preparation"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "PATIENT_COUNSELLING",
+      "label": "Medication counselling",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Intern and student only under pharmacist supervision.",
+      "icon_web": "MessagesSquare",
+      "icon_mobile": "forum-outline",
+      "icon_meaning": "Two-way conversation",
+      "definition": "Explain to patients how to take their medicines safely.",
+      "aliases": [
+        "Patient medication counselling",
+        "Patient counselling"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "OTC_S2_ADVICE",
+      "label": "OTC and pharmacy medicine advice (S2/S3)",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Assistants need S2/S3 training and refer pharmacist-only (S3) requests.",
+      "icon_web": "Tablets",
+      "icon_mobile": "pill-multiple",
+      "icon_meaning": "Over-the-counter tablets",
+      "definition": "Recommend OTC and S2 medicines, and refer S3 requests to the pharmacist.",
+      "aliases": [
+        "OTC and S2 advice",
+        "Schedule 2 advice"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "S8_PROCEDURES",
+      "label": "S8 and controlled drugs",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "none",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "Legal permissions and pharmacist oversight still apply.",
+      "icon_web": "LockKeyhole",
+      "icon_mobile": "lock-check-outline",
+      "icon_meaning": "Locked S8 safe",
+      "definition": "Handle S8 safe access, register entries and balance checks.",
+      "aliases": [
+        "Controlled drug procedures"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "WEBSTER_PACKING_DAA",
+      "label": "Webster / DAA packing",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "supervised",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "BLISTER_PACK",
+      "icon_mobile": "BLISTER_PACK",
+      "icon_meaning": "Weekly blister pack",
+      "definition": "Pack dose administration aids such as Webster-paks.",
+      "aliases": [
+        "DAA packing",
+        "Webster packing",
+        "Dose administration aid packing",
+        "WEBSTER_PACKING",
+        "DAA",
+        "Dose administration aid (DAA/Webster) packing",
+        "Webster Packing / DAA"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "DAA_FINAL_CHECK",
+      "label": "Webster / DAA checking",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": "Interns check under pharmacist supervision; the registered pharmacist keeps final responsibility.",
+      "icon_web": "BLISTER_CHECK",
+      "icon_mobile": "BLISTER_CHECK",
+      "icon_meaning": "Blister pack with a check mark",
+      "definition": "Pharmacist final check of packed DAAs before release.",
+      "aliases": [
+        "DAA checking",
+        "Webster checking",
+        "DAA final clinical check",
+        "Webster checks"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "PHARMACOTHERAPY_METHADONE_SUBOXONE",
+      "label": "ODT dosing (methadone, buprenorphine)",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "none",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "Technical support is not independent dosing.",
+      "icon_web": "GlassWater",
+      "icon_mobile": "cup-water",
+      "icon_meaning": "Dosing cup",
+      "definition": "Supervised opioid dependence treatment dosing, records and balances.",
+      "aliases": [
+        "Methadone dispensing support",
+        "Suboxone program support",
+        "Opioid dependence pharmacotherapy support",
+        "ODT",
+        "Methadone",
+        "Suboxone",
+        "Buprenorphine",
+        "Opioid dependence treatment",
+        "Pharmacotherapy (Methadone/Suboxone)"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "STAGED_SUPPLY",
+      "label": "Staged supply",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "Clinical supply decisions remain pharmacist-only.",
+      "icon_web": "CalendarClock",
+      "icon_mobile": "calendar-clock",
+      "icon_meaning": "Scheduled pick-ups",
+      "definition": "Prepare daily or weekly staged pick-ups.",
+      "aliases": [
+        "Staged supply workflow"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "COMPOUNDING",
+      "label": "Compounding",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Non-sterile compounding is within normal pharmacy practice; no separate certificate is requested.",
+      "icon_web": "MORTAR_PESTLE",
+      "icon_mobile": "mortar-pestle",
+      "icon_meaning": "Mortar and pestle",
+      "definition": "Prepare non-sterile products from a formula.",
+      "aliases": [
+        "Extemporaneous compounding"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "ADVANCED_COMPOUNDING",
+      "label": "Sterile / advanced compounding",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "conditional",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "none",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "ADVANCED_COMPOUNDING_TRAINING",
+      "note": "Specialist training and additional safeguards apply.",
+      "icon_web": "TestTubeDiagonal",
+      "icon_mobile": "test-tube",
+      "icon_meaning": "Sterile preparation",
+      "definition": "Aseptic or complex compounding in a specialist facility.",
+      "aliases": [
+        "Advanced / sterile compounding"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "MEDICATION_RECONCILIATION",
+      "label": "Medication reconciliation",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "conditional",
+        "ASSISTANT": "none",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Hospital technicians take medication histories under credentialing; pharmacists reconcile.",
+      "icon_web": "ListChecks",
+      "icon_mobile": "format-list-checks",
+      "icon_meaning": "Lists compared and ticked",
+      "definition": "Compare medicine lists at admission, discharge or review.",
+      "aliases": [],
+      "matchable": true
+    },
+    {
+      "code": "CANNABIS",
+      "label": "Medicinal cannabis",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "none",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "Clinical decisions remain pharmacist-only.",
+      "icon_web": "CANNABIS_LEAF",
+      "icon_mobile": "cannabis",
+      "icon_meaning": "Palmate cannabis leaf",
+      "definition": "Dispense medicinal cannabis and counsel patients on its use.",
+      "aliases": [
+        "Medicinal cannabis handling / dispensing workflow",
+        "Cannabis dispensing"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "ROBOT_DISPENSING",
+      "label": "Dispensing robot (Rowa / Alpaca)",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "ROBOT_ARM",
+      "icon_mobile": "robot-industrial",
+      "icon_meaning": "Robotic picking arm",
+      "definition": "Load, run and troubleshoot a dispensing robot.",
+      "aliases": [
+        "Pharmacy dispensing robot",
+        "ROWA robot",
+        "Dispensing robot operation (ROWA / Alpaca)",
+        "Robot",
+        "Rowa"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "MEDICINE_DELIVERIES",
+      "label": "Medicine deliveries",
+      "group": "Dispensing & Medicines",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Follow privacy and medicine handling policies.",
+      "icon_web": "Truck",
+      "icon_mobile": "truck-delivery-outline",
+      "icon_meaning": "Delivery van",
+      "definition": "Deliver medicines to homes or aged care and confirm the handover.",
+      "aliases": [
+        "Medicine deliveries and handover"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "VACCINATION",
+      "label": "Vaccinations",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "conditional",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "VACCINATION_TRAINING",
+      "note": "Intern conditional on jurisdictional authorisation, training and supervision.",
+      "icon_web": "Syringe",
+      "icon_mobile": "needle",
+      "icon_meaning": "Syringe",
+      "definition": "Give vaccines as an accredited immuniser and report to the AIR.",
+      "aliases": [
+        "VACCINATOR",
+        "Vaccine administration",
+        "Immunisation"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "FIRST_AID",
+      "label": "First Aid / CPR",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "FIRST_AID_CPR",
+      "note": "",
+      "icon_web": "BriefcaseMedical",
+      "icon_mobile": "medical-bag",
+      "icon_meaning": "First aid kit",
+      "definition": "Provide first aid and cardiopulmonary resuscitation in accordance with current training and workplace emergency protocols.",
+      "aliases": [
+        "First aid and CPR"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "MEDSCHECK",
+      "label": "MedsCheck / Diabetes MedsCheck",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "Supervised trainee involvement only.",
+      "icon_web": "ClipboardPlus",
+      "icon_mobile": "clipboard-pulse-outline",
+      "icon_meaning": "Medicines review",
+      "definition": "Run MedsCheck and Diabetes MedsCheck consultations.",
+      "aliases": [],
+      "matchable": true
+    },
+    {
+      "code": "HMR_ACCREDITED_MRN",
+      "label": "HMR / RMMR reviews",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "MMR_CREDENTIAL",
+      "note": "Credentialed pharmacist only.",
+      "icon_web": "HousePlus",
+      "icon_mobile": "home-plus-outline",
+      "icon_meaning": "Home medicines review",
+      "definition": "Accredited Home and Residential Medication Management Reviews.",
+      "aliases": [
+        "CRED_PHARM",
+        "HMR",
+        "RMMR",
+        "Medication Management Review",
+        "Medication Management Reviews (HMR / RMMR)",
+        "Accredited pharmacist",
+        "Credentialed Pharmacist",
+        "HMR Accredited (MRN)"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "ACOP",
+      "label": "Aged care on-site pharmacist (ACOP)",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "ACOP_CREDENTIAL",
+      "note": "Accredited training and program rules apply.",
+      "icon_web": "HeartHandshake",
+      "icon_mobile": "home-heart",
+      "icon_meaning": "Aged care support",
+      "definition": "Work on-site in residential aged care under the ACOP program.",
+      "aliases": [
+        "Aged Care On-site Pharmacist services",
+        "Aged care pharmacist"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "HOSPITAL_PHARMACY",
+      "label": "Hospital pharmacy",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Hospital",
+      "icon_mobile": "hospital-building",
+      "icon_meaning": "Hospital building",
+      "definition": "Ward, clinical or dispensary work in a public or private hospital.",
+      "aliases": [
+        "Hospital pharmacist",
+        "Clinical pharmacy",
+        "Ward pharmacy"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "AGED_CARE_SUPPLY",
+      "label": "Aged care pharmacy supply",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Armchair",
+      "icon_mobile": "sofa-single-outline",
+      "icon_meaning": "Residential aged care",
+      "definition": "Supply aged care homes: medication charts, DAAs, imprest stock and visits.",
+      "aliases": [
+        "Aged care supply",
+        "RACF supply",
+        "Nursing home supply"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "HEALTH_CHECKS",
+      "label": "Health checks (BP, glucose, cholesterol)",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Assistants measure under pharmacy procedures; the pharmacist interprets and refers.",
+      "icon_web": "HeartPulse",
+      "icon_mobile": "heart-pulse",
+      "icon_meaning": "Heart rate",
+      "definition": "Measure blood pressure and screen glucose or cholesterol, referring when needed.",
+      "aliases": [
+        "Combined pharmacy health checks"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "NDSS",
+      "label": "NDSS access point",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "Diabetes advice stays with the pharmacist.",
+      "icon_web": "Droplet",
+      "icon_mobile": "water-outline",
+      "icon_meaning": "Blood glucose drop",
+      "definition": "Register NDSS members and supply subsidised diabetes products.",
+      "aliases": [
+        "NDSS access point",
+        "NDSS workflows"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "WOUND_CARE",
+      "label": "Wound care",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Bandage",
+      "icon_mobile": "bandage",
+      "icon_meaning": "Adhesive dressing",
+      "definition": "Assess minor wounds, choose dressings and refer when needed.",
+      "aliases": [
+        "Dressings"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "COLD_CHAIN",
+      "label": "Cold chain and vaccine fridge",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "ThermometerSnowflake",
+      "icon_mobile": "snowflake-thermometer",
+      "icon_meaning": "Cold storage thermometer",
+      "definition": "Monitor vaccine fridge temperatures and manage breaches.",
+      "aliases": [
+        "Cold-chain and vaccine stock handling"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "UTI_PRESCRIBER",
+      "label": "UTI prescribing",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "conditional",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "UTI_PRESCRIBING_TRAINING",
+      "note": "Jurisdiction-specific authorisation.",
+      "icon_web": "Stethoscope",
+      "icon_mobile": "stethoscope",
+      "icon_meaning": "Clinical consultation",
+      "definition": "Treat uncomplicated UTIs under a state pharmacist prescribing program.",
+      "aliases": [
+        "UTI treatment service",
+        "Uncomplicated UTI pharmacist prescribing",
+        "Uncomplicated UTI Prescriber"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "ORAL_CONTRACEPTIVE_RESUPPLY",
+      "label": "Contraceptive pill resupply",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "conditional",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "CONTRACEPTIVE_RESUPPLY_TRAINING",
+      "note": "Jurisdiction-specific authorisation.",
+      "icon_web": "Venus",
+      "icon_mobile": "gender-female",
+      "icon_meaning": "Women's health",
+      "definition": "Resupply oral contraceptives under a state pharmacist program.",
+      "aliases": [
+        "Oral contraceptive continuation",
+        "Oral contraceptive resupply service",
+        "Oral Contraceptive Resupply"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "MINOR_SKIN",
+      "label": "Skin condition prescribing",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "conditional",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "PRESCRIBING_SCOPE_TRAINING",
+      "note": "Subject to local authorised scope.",
+      "icon_web": "Hand",
+      "icon_mobile": "hand-back-left-outline",
+      "icon_meaning": "Skin check",
+      "definition": "Treat minor skin conditions such as dermatitis under state programs.",
+      "aliases": [
+        "Minor skin conditions pharmacist service"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "TRAVEL_HEALTH_YELLOW_FEVER",
+      "label": "Travel health / yellow fever",
+      "group": "Clinical Services",
+      "eligibility": {
+        "PHARMACIST": "conditional",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "YELLOW_FEVER_TRAINING",
+      "note": "Clinic and state authorisations may apply.",
+      "icon_web": "Plane",
+      "icon_mobile": "airplane",
+      "icon_meaning": "Travel",
+      "definition": "Travel vaccines and yellow fever services where authorised.",
+      "aliases": [
+        "Travel health / Yellow Fever services"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "POS_CUSTOMER",
+      "label": "Customer service and POS",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "POS_TERMINAL",
+      "icon_mobile": "point-of-sale",
+      "icon_meaning": "Point-of-sale terminal and card reader",
+      "definition": "Serve customers, run the register and hand out click-and-collect orders.",
+      "aliases": [
+        "Customer service and POS",
+        "Pharmacy point of sale"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "VITAMINS_SUPPLEMENTS",
+      "label": "Vitamins and supplements",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "VITAMIN_CAPSULE",
+      "icon_mobile": "pill",
+      "icon_meaning": "Supplement capsule lettered VIT",
+      "definition": "Advise on vitamins and complementary medicines.",
+      "aliases": [
+        "Vitamins and supplement product knowledge"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "SKINCARE_BEAUTY",
+      "label": "Skincare and beauty",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "SoapDispenserDroplet",
+      "icon_mobile": "lotion-outline",
+      "icon_meaning": "Pump bottle",
+      "definition": "Advise on skincare, cosmetics and fragrance.",
+      "aliases": [
+        "Skincare and beauty merchandising",
+        "Cosmetics",
+        "Beauty advisor"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "MERCHANDISING",
+      "label": "Merchandising and planograms",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "ShelvingUnit",
+      "icon_mobile": "bookshelf",
+      "icon_meaning": "Retail shelving",
+      "definition": "Set shelves to planogram, price stock and build promotions.",
+      "aliases": [],
+      "matchable": true
+    },
+    {
+      "code": "STOCK_ORDERING",
+      "label": "Stock ordering",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "ShoppingCart",
+      "icon_mobile": "cart-plus",
+      "icon_meaning": "Purchase order",
+      "definition": "Order from wholesalers such as API, Sigma and Symbion, and chase backorders.",
+      "aliases": [
+        "Stock ordering and wholesaler portals",
+        "Wholesaler ordering"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "INVENTORY_CONTROL",
+      "label": "Stock control",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "supervised"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "STOCK_CARTONS",
+      "icon_mobile": "package-variant-closed",
+      "icon_meaning": "Taped stock cartons",
+      "definition": "Receive deliveries, rotate expiry dates, process returns and do stocktakes.",
+      "aliases": [
+        "Stock control",
+        "Inventory management"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "APPOINTMENT_BOOKINGS",
+      "label": "Service and vaccination bookings",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "CalendarPlus",
+      "icon_mobile": "calendar-plus",
+      "icon_meaning": "Booking calendar",
+      "definition": "Book and manage vaccination and pharmacy service appointments.",
+      "aliases": [
+        "Service bookings",
+        "Vaccination bookings"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "PHARMACY_ADMIN",
+      "label": "Pharmacy administration",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Files",
+      "icon_mobile": "file-document-outline",
+      "icon_meaning": "Office files",
+      "definition": "Rosters, invoices, filing and other back-office work.",
+      "aliases": [],
+      "matchable": true
+    },
+    {
+      "code": "FRONT_SHOP_MANAGEMENT",
+      "label": "Front-of-shop management",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "conditional",
+        "ASSISTANT": "conditional",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Store",
+      "icon_mobile": "storefront-outline",
+      "icon_meaning": "Pharmacy shopfront",
+      "definition": "Run the retail floor: team, sales, displays and targets.",
+      "aliases": [],
+      "matchable": true
+    },
+    {
+      "code": "STAFF_SUPERVISION",
+      "label": "Staff training and supervision",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "conditional",
+        "ASSISTANT": "conditional",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "UsersRound",
+      "icon_mobile": "account-group-outline",
+      "icon_meaning": "Team",
+      "definition": "Train and supervise pharmacy staff.",
+      "aliases": [],
+      "matchable": true
+    },
+    {
+      "code": "PHARMACY_IN_CHARGE",
+      "label": "Sole pharmacist / pharmacist in charge",
+      "group": "Operations & Retail",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "none",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": "Appropriate general registration and appointment required.",
+      "icon_web": "ShieldUser",
+      "icon_mobile": "shield-account-outline",
+      "icon_meaning": "Responsible pharmacist",
+      "definition": "Run the pharmacy as the only pharmacist on shift.",
+      "aliases": [
+        "Pharmacist in charge duties",
+        "Sole pharmacist",
+        "PIC"
+      ],
+      "matchable": true
+    },
+    {
+      "code": "FRED",
+      "label": "Fred Dispense / Fred NXT",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "Fred Dispense Classic, Fred Dispense Plus or Fred NXT.",
+      "aliases": [
+        "Fred NXT",
+        "FRED DISPENSE",
+        "FRED / FRED NXT",
+        "WinIFRED",
+        "Fred Dispense Plus",
+        "Fred Dispense Classic"
+      ],
+      "matchable": true,
+      "subgroup": "Dispensing systems",
+      "logo": "fred"
+    },
+    {
+      "code": "MINFOS",
+      "label": "Minfos",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "Minfos dispensing and point-of-sale system.",
+      "aliases": [],
+      "matchable": true,
+      "subgroup": "Dispensing systems",
+      "logo": "minfos"
+    },
+    {
+      "code": "Z_DISPENSE",
+      "label": "Z Dispense",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "Z Software's Z Dispense dispensing system.",
+      "aliases": [
+        "Z Software"
+      ],
+      "matchable": true,
+      "subgroup": "Dispensing systems",
+      "logo": "zsoftware"
+    },
+    {
+      "code": "CORUM_LOTS",
+      "label": "LOTS (Corum)",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "Corum LOTS dispense, including LOTS Complete.",
+      "aliases": [
+        "Corum LOTS",
+        "LOTS Complete",
+        "LOTS"
+      ],
+      "matchable": true,
+      "subgroup": "Dispensing systems"
+    },
+    {
+      "code": "CORUM_CLEAR",
+      "label": "Corum Clear Dispense",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "Corum's Clear Dispense dispensing system.",
+      "aliases": [
+        "Clear Dispense"
+      ],
+      "matchable": true,
+      "subgroup": "Dispensing systems"
+    },
+    {
+      "code": "DISPENSE_WORKS",
+      "label": "Dispense Works",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "POSWorks' Dispense Works dispensing system.",
+      "aliases": [],
+      "matchable": true,
+      "subgroup": "Dispensing systems",
+      "logo": "dispenseworks"
+    },
+    {
+      "code": "RXONE",
+      "label": "RxOne",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "HealthSoft's RxOne, formerly PharmacyPro, dispensing system.",
+      "aliases": [
+        "PharmacyPro"
+      ],
+      "matchable": true,
+      "subgroup": "Dispensing systems",
+      "logo": "rxone"
+    },
+    {
+      "code": "AQUARIUS",
+      "label": "Aquarius (Simple Retail)",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "Simple Retail's Aquarius dispensing system.",
+      "aliases": [
+        "Simple Retail"
+      ],
+      "matchable": true,
+      "subgroup": "Dispensing systems"
+    },
+    {
+      "code": "MYSCRIPT",
+      "label": "myScript",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "myScript dispensing software (WA approved).",
+      "aliases": [],
+      "matchable": true,
+      "subgroup": "Dispensing systems"
+    },
+    {
+      "code": "MOUNTAINTOP",
+      "label": "Mountaintop Dispense",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "Mountaintop Systems' dispense and POS.",
+      "aliases": [
+        "Mountaintop POS"
+      ],
+      "matchable": true,
+      "subgroup": "Dispensing systems"
+    },
+    {
+      "code": "IPHARMACY",
+      "label": "iPharmacy (hospital)",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "MonitorCog",
+      "icon_mobile": "monitor-dashboard",
+      "icon_meaning": "Hospital pharmacy system",
+      "definition": "iPharmacy hospital pharmacy system.",
+      "aliases": [
+        "i.Pharmacy"
+      ],
+      "matchable": true,
+      "subgroup": "Dispensing systems"
+    },
+    {
+      "code": "COMPOUND_DIRECT",
+      "label": "Compound Direct",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "familiarity",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "Monitor",
+      "icon_mobile": "monitor",
+      "icon_meaning": "Dispensing system; the product name identifies it",
+      "definition": "Compound Direct compounding and dispense software.",
+      "aliases": [],
+      "matchable": true,
+      "subgroup": "Dispensing systems"
+    },
+    {
+      "code": "FREDPAK",
+      "label": "FredPak",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "BLISTER_PACK",
+      "icon_mobile": "BLISTER_PACK",
+      "icon_meaning": "DAA packing software",
+      "definition": "Fred's FredPak DAA packing module.",
+      "aliases": [
+        "Fred Pak"
+      ],
+      "matchable": true,
+      "subgroup": "DAA packing",
+      "logo": "fred"
+    },
+    {
+      "code": "Z_PAK",
+      "label": "Z Pak",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "BLISTER_PACK",
+      "icon_mobile": "BLISTER_PACK",
+      "icon_meaning": "DAA packing software",
+      "definition": "Z Software's Z Pak DAA packing module.",
+      "aliases": [
+        "ZPak"
+      ],
+      "matchable": true,
+      "subgroup": "DAA packing",
+      "logo": "zsoftware"
+    },
+    {
+      "code": "MINFOS_PACKING",
+      "label": "Minfos Packing",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "BLISTER_PACK",
+      "icon_mobile": "BLISTER_PACK",
+      "icon_meaning": "DAA packing software",
+      "definition": "Minfos Packing DAA module within Minfos.",
+      "aliases": [],
+      "matchable": true,
+      "subgroup": "DAA packing",
+      "logo": "minfos"
+    },
+    {
+      "code": "MYPAK",
+      "label": "myPak",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "BLISTER_PACK",
+      "icon_mobile": "BLISTER_PACK",
+      "icon_meaning": "DAA packing software",
+      "definition": "myPak Solutions' DAA packing software and robots.",
+      "aliases": [
+        "myPak Solutions",
+        "MedicoPak"
+      ],
+      "matchable": true,
+      "subgroup": "DAA packing",
+      "logo": "mypak"
+    },
+    {
+      "code": "MPS_CONNECT",
+      "label": "MPS Connect",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "BLISTER_PACK",
+      "icon_mobile": "BLISTER_PACK",
+      "icon_meaning": "DAA packing software",
+      "definition": "MPS Connect medication packing and management.",
+      "aliases": [
+        "MPS Pak",
+        "MPS"
+      ],
+      "matchable": true,
+      "subgroup": "DAA packing",
+      "logo": "mpsconnect"
+    },
+    {
+      "code": "WEBSTERCARE_SOFTWARE",
+      "label": "Webstercare (MedsPro / MedView / MedCare)",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "BLISTER_PACK",
+      "icon_mobile": "BLISTER_PACK",
+      "icon_meaning": "DAA packing software",
+      "definition": "Webstercare packing, chart and medication management software.",
+      "aliases": [
+        "MedView",
+        "MedCare",
+        "Webstercare",
+        "Webstercare MedView / MedCare",
+        "MedsPro"
+      ],
+      "matchable": true,
+      "subgroup": "DAA packing",
+      "logo": "webstercare"
+    },
+    {
+      "code": "STRONGROOM",
+      "label": "StrongRoom AI (StrongCare / StrongER)",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "supervised",
+        "ASSISTANT": "conditional",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "LockKeyhole",
+      "icon_mobile": "lock-check-outline",
+      "icon_meaning": "Electronic S8 register",
+      "definition": "StrongRoom AI's electronic drugs of dependence (S8) register.",
+      "aliases": [
+        "StrongRoom",
+        "StrongCare",
+        "StrongER",
+        "Electronic DD book",
+        "Electronic S8 register"
+      ],
+      "matchable": true,
+      "subgroup": "S8 registers",
+      "logo": "strongroom"
+    },
+    {
+      "code": "MEDI_MAP",
+      "label": "Medi-Map",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "TabletSmartphone",
+      "icon_mobile": "tablet-cellphone",
+      "icon_meaning": "Electronic medication chart",
+      "definition": "Medi-Map electronic medication charts for aged care.",
+      "aliases": [
+        "MediMap"
+      ],
+      "matchable": true,
+      "subgroup": "Aged care charts",
+      "logo": "medimap"
+    },
+    {
+      "code": "BESTMED",
+      "label": "BESTMED",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "familiarity"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "TabletSmartphone",
+      "icon_mobile": "tablet-cellphone",
+      "icon_meaning": "Electronic medication chart",
+      "definition": "BESTMED electronic medication charts for aged care.",
+      "aliases": [],
+      "matchable": true,
+      "subgroup": "Aged care charts"
+    },
+    {
+      "code": "POSWORKS",
+      "label": "PosWorks",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "experience",
+        "TECHNICIAN": "experience",
+        "ASSISTANT": "experience",
+        "STUDENT": "experience"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "POS_TERMINAL",
+      "icon_mobile": "point-of-sale",
+      "icon_meaning": "Point-of-sale terminal and card reader",
+      "definition": "PosWorks pharmacy point-of-sale system.",
+      "aliases": [],
+      "matchable": true,
+      "subgroup": "Point of sale"
+    },
+    {
+      "code": "RTPM",
+      "label": "Real-time prescription monitoring",
+      "group": "Software & Digital",
+      "eligibility": {
+        "PHARMACIST": "experience",
+        "INTERN": "supervised",
+        "TECHNICIAN": "none",
+        "ASSISTANT": "none",
+        "STUDENT": "none"
+      },
+      "certificate": "",
+      "note": "",
+      "icon_web": "ScanEye",
+      "icon_mobile": "eye-check-outline",
+      "icon_meaning": "Monitoring check",
+      "definition": "Check SafeScript, QScript or another state RTPM system before supplying monitored medicines.",
+      "aliases": [
+        "SafeScript",
+        "QScript",
+        "ScriptCheck"
+      ],
+      "matchable": true,
+      "subgroup": "Monitoring"
+    }
+  ],
+  "primary_sources": [
+    "https://awards.fairwork.gov.au/MA000012.html",
+    "https://www.pharmacyboard.gov.au/Registration/Internships",
+    "https://www.pharmacycouncil.org.au/education-provider/accreditation/pharmacist-education-programs/accredited-pharmacist-education-programs/"
+  ],
+  "icon_standard": {
+    "web": "lucide-react outline glyphs drawn in brand navy over a group accent shape (frontend_web/shared/SkillGlyph.tsx)",
+    "mobile": "MaterialCommunityIcons via @expo/vector-icons over the same accent shape (frontend_mobile/components/SkillIcon.tsx)",
+    "style": "Duotone spot symbols: navy linework, one flat accent shape tinted from the group's brand colour (violet dispensing, cyan clinical, magenta retail, blue software); two motion arcs only at onboarding size and on selection.",
+    "special": "Custom blister pack (seven days x four doses, 4 x 3 at badge size), blister check, robotic arm and mortar-and-pestle glyphs drawn on Lucide's grid and stroke; the check mark names the task, not a verified status.",
+    "source_urls": [
+      "https://lucide.dev/icons",
+      "https://pictogrammers.com/library/mdi/"
+    ]
+  },
+  "contract": "chemisttasker.skills/v1",
+  "matching_rules": {
+    "canonical_id": "skills[].code",
+    "normalisation": "Canonical code, case-insensitive label or explicit alias only; never fuzzy-match free text for eligibility.",
+    "scope": "Only legal role-compatible claims; supervision and credential verification must be checked separately.",
+    "explorer": "Explorer interests are not professional skills; do not match them to skilled pharmacy shifts.",
+    "unknown": "Legacy unknown claims can be shown for audit but never counted as a match.",
+    "certificate": "A self-selected skill or uploaded file is not automatically a verified qualification."
+  },
+  "recruitment_review_sources": [
+    "https://au.indeed.com/q-pharmacy-assistant-jobs.html",
+    "https://au.seek.com/career-advice/role/pharmacist/resume-templates",
+    "https://au.seek.com/career-advice/role/pharmacy-assistant",
+    "https://au.seek.com/locum-pharmacist-jobs",
+    "https://github.com/lucide-icons/lucide/blob/main/docs/how-to/accessibility.md",
+    "https://lucide.dev/guide/react/",
+    "https://pharmacysos.com.au/",
+    "https://www.digitalhealth.gov.au/sites/default/files/2022-07/ep-conformance-register-4.pdf",
+    "https://www.erx.com.au/pharmacists/pharmacy-software-partners/",
+    "https://www.facebook.com/locumco/",
+    "https://www.guild.org.au/guild-branches/sa/business-support-tools/odt-community-pharmacy-program",
+    "https://www.health.vic.gov.au/drugs-and-poisons/setting-up-and-accessing-safescript",
+    "https://www.health.wa.gov.au/~/media/Corp/Documents/Health-for/Medicines-and-Poisons/PDF/Electronic-prescribing-dispensing-software-vendors.PDF",
+    "https://www.posworks.com.au/pharmacy/dispense-works/",
+    "https://www.ravensrecruitment.com.au/job/locum-pharmacist-bbbh49833-1787809564",
+    "https://www.ravensrecruitment.com.au/pharmacists/how-to-prepare-for-your-first-locum-pharmacist-shift-a-complete-guide-for-australian-pharmacists",
+    "https://www.webstercare.com.au/webster-pak-medication-packs/"
+  ],
+  "subgroups": {
+    "Software & Digital": [
+      "Dispensing systems",
+      "DAA packing",
+      "S8 registers",
+      "Aged care charts",
+      "Point of sale",
+      "Monitoring"
+    ]
+  },
+  "software_logos": {
+    "policy": "Each vendor's own compact mark (app icon, favicon or the mark inside its official logo), unaltered apart from cropping to the mark and resizing, shown beside the product name to say a worker has used that software; no endorsement implied. Products without a confirmed official mark use the ChemistTasker software symbol.",
+    "on_dark": [],
+    "sources": {
+      "fred": "https://www.fred.com.au/wp-content/themes/fred/dist/images/logo.svg (the F of the wordmark, as in Fred_Teal_favicon.png)",
+      "minfos": "https://www.minfos.com.au/apple-touch-icon.png",
+      "zsoftware": "https://zsoftware.com.au/wp/wp-content/uploads/2026/08/Favicon-Apple.png",
+      "rxone": "https://irp.cdn-website.com/c00ce70c/dms3rep/multi/RxOne+Logo+Horizontal_RGB.svg (mortar mark)",
+      "dispenseworks": "https://www.posworks.com.au/wp-content/uploads/2022/10/dispense-works-1024x377.png (Rx mark)",
+      "webstercare": "https://www.webstercare.com.au/wp-content/uploads/2025/03/wplogo276x65.png (W mark)",
+      "medimap": "https://www.medi-map.com.au/img/logo/mm-logo-bg.png (logo mark)",
+      "mypak": "https://mypaksolutions.com.au/wp-content/uploads/2023/06/cropped-android-chrome-512x512-1-270x270.png",
+      "mpsconnect": "https://mpsconnect.com.au/wp-content/uploads/2021/09/cropped-MPS-Icon-270x270.png",
+      "strongroom": "https://strongroom.ai/wp-content/uploads/2023/03/cropped-srfave-270x270.png"
+    },
+    "retrieved": "2026-10-12"
+  },
+  "pharmacy_profile": {
+    "service_codes": [
+      "ESCRIPT_PROCESSING",
+      "WEBSTER_PACKING_DAA",
+      "STAGED_SUPPLY",
+      "PHARMACOTHERAPY_METHADONE_SUBOXONE",
+      "COMPOUNDING",
+      "ADVANCED_COMPOUNDING",
+      "CANNABIS",
+      "ROBOT_DISPENSING",
+      "MEDICINE_DELIVERIES",
+      "VACCINATION",
+      "MEDSCHECK",
+      "HMR_ACCREDITED_MRN",
+      "ACOP",
+      "AGED_CARE_SUPPLY",
+      "HOSPITAL_PHARMACY",
+      "HEALTH_CHECKS",
+      "NDSS",
+      "WOUND_CARE",
+      "UTI_PRESCRIBER",
+      "ORAL_CONTRACEPTIVE_RESUPPLY",
+      "MINOR_SKIN",
+      "TRAVEL_HEALTH_YELLOW_FEVER",
+      "SKINCARE_BEAUTY"
+    ],
+    "script_volume_bands": [
+      {
+        "code": "QUIET",
+        "label": "Quiet",
+        "range": "Under 100 scripts a day",
+        "level": 1,
+        "color": "#16A34A"
+      },
+      {
+        "code": "STEADY",
+        "label": "Steady",
+        "range": "100–150 scripts a day",
+        "level": 2,
+        "color": "#CA8A04"
+      },
+      {
+        "code": "BUSY",
+        "label": "Busy",
+        "range": "150–200 scripts a day",
+        "level": 3,
+        "color": "#EA580C"
+      },
+      {
+        "code": "HEAVY",
+        "label": "Heavy",
+        "range": "200+ scripts a day",
+        "level": 4,
+        "color": "#DC2626"
+      }
+    ],
+    "workload_tags": [
+      {
+        "code": "HIGH_DAA",
+        "label": "Heavy Webster / DAA checking",
+        "icon_web": "BLISTER_CHECK",
+        "icon_mobile": "pill-multiple",
+        "explainer": "A large share of the shift goes to checking packed DAAs.",
+        "aliases": [
+          "Webster Packs"
+        ]
+      },
+      {
+        "code": "ODT_PROGRAM",
+        "label": "Busy ODT dosing",
+        "icon_web": "GlassWater",
+        "icon_mobile": "cup-water",
+        "explainer": "Many opioid dependence treatment clients dosed on site."
+      },
+      {
+        "code": "VACCINATION_CLINIC",
+        "label": "Vaccination clinic on shift",
+        "icon_web": "Syringe",
+        "icon_mobile": "needle",
+        "explainer": "Booked vaccinations run alongside dispensing."
+      },
+      {
+        "code": "AGED_CARE_RUN",
+        "label": "Aged care supply day",
+        "icon_web": "Armchair",
+        "icon_mobile": "home-heart",
+        "explainer": "Charts, packs or imprest for aged care homes due this shift."
+      },
+      {
+        "code": "MEDICAL_CENTRE",
+        "label": "Medical centre script peaks",
+        "icon_web": "Stethoscope",
+        "icon_mobile": "stethoscope",
+        "explainer": "A nearby medical centre sends scripts in waves."
+      },
+      {
+        "code": "BUSY_COUNTER",
+        "label": "Busy front counter",
+        "icon_web": "Store",
+        "icon_mobile": "storefront-outline",
+        "explainer": "Frequent S2/S3 and OTC questions at the counter."
+      },
+      {
+        "code": "EXTENDED_HOURS",
+        "label": "Late or extended trading",
+        "icon_web": "Clock3",
+        "icon_mobile": "clock-outline",
+        "explainer": "Long or late hours with lighter staffing at the ends."
+      },
+      {
+        "code": "LIMITED_BREAK_COVER",
+        "label": "Limited break cover",
+        "icon_web": "Coffee",
+        "icon_mobile": "coffee-outline",
+        "explainer": "No second pharmacist to cover breaks."
+      },
+      {
+        "code": "SOLE_PHARMACIST",
+        "label": "Sole pharmacist",
+        "icon_web": "ShieldUser",
+        "icon_mobile": "account-alert-outline",
+        "explainer": "The shift lists only one pharmacist.",
+        "aliases": [
+          "Sole Pharmacist"
+        ],
+        "legacy": true
+      },
+      {
+        "code": "HIGH_SCRIPT_LOAD",
+        "label": "High script load",
+        "icon_web": "Files",
+        "icon_mobile": "file-multiple-outline",
+        "explainer": "The poster marked a high prescription workload.",
+        "aliases": [
+          "High Script Load"
+        ],
+        "legacy": true
+      }
+    ],
+    "legacy_workload_tags": {
+      "Sole Pharmacist": "SOLE_PHARMACIST",
+      "High Script Load": "HIGH_SCRIPT_LOAD"
+    },
+    "support_roles": [
+      {
+        "code": "PHARMACIST",
+        "label": "Other pharmacists",
+        "one": "pharmacist"
+      },
+      {
+        "code": "INTERN",
+        "label": "Intern pharmacists",
+        "one": "intern"
+      },
+      {
+        "code": "TECHNICIAN",
+        "label": "Dispensary technicians",
+        "one": "dispensary technician"
+      },
+      {
+        "code": "DISPENSARY_ASSISTANT",
+        "label": "Dispensary assistants",
+        "one": "dispensary assistant"
+      },
+      {
+        "code": "ASSISTANT",
+        "label": "Retail assistants",
+        "one": "retail assistant"
+      },
+      {
+        "code": "STUDENT",
+        "label": "Pharmacy students",
+        "one": "pharmacy student"
+      }
+    ],
+    "benchmark_note": "Cut-offs follow the Victorian Pharmacy Authority benchmark (about 150 prescriptions per full-time pharmacist on a typical day, pro rata at weekends) and the Pharmacy Board guide reported by the Guild (extra pharmacist or dispensary technician above 200 items a day).",
+    "benchmark_sources": [
+      "https://pharmacy.vic.gov.au/wordpress/wp-content/uploads/2024/09/VPA-Guidelines-effective-5-September-2024.pdf",
+      "https://www.accc.gov.au/system/files/Pharmacy-Guild-of-Australia-Public.pdf"
+    ],
+    "support_count_max": 20
+  },
+  "shift_posting": {
+    "popular_by_role": {
+      "PHARMACIST": [
+        "DAA_FINAL_CHECK",
+        "VACCINATION",
+        "PHARMACOTHERAPY_METHADONE_SUBOXONE",
+        "S8_PROCEDURES",
+        "ESCRIPT_PROCESSING",
+        "MEDSCHECK",
+        "COMPOUNDING",
+        "WOUND_CARE"
+      ],
+      "INTERN": [
+        "PRESCRIPTION_DISPENSING",
+        "PATIENT_COUNSELLING",
+        "VACCINATION",
+        "WEBSTER_PACKING_DAA",
+        "ESCRIPT_PROCESSING",
+        "S8_PROCEDURES",
+        "OTC_S2_ADVICE",
+        "MEDSCHECK"
+      ],
+      "TECHNICIAN": [
+        "PRESCRIPTION_DISPENSING",
+        "DISPENSING_DATA_ENTRY",
+        "WEBSTER_PACKING_DAA",
+        "PBS_CLAIMS",
+        "ESCRIPT_PROCESSING",
+        "STOCK_ORDERING",
+        "INVENTORY_CONTROL",
+        "COLD_CHAIN"
+      ],
+      "ASSISTANT": [
+        "POS_CUSTOMER",
+        "OTC_S2_ADVICE",
+        "INVENTORY_CONTROL",
+        "STOCK_ORDERING",
+        "DISPENSING_DATA_ENTRY",
+        "WEBSTER_PACKING_DAA",
+        "SKINCARE_BEAUTY",
+        "VITAMINS_SUPPLEMENTS"
+      ],
+      "STUDENT": [
+        "POS_CUSTOMER",
+        "OTC_S2_ADVICE",
+        "PRESCRIPTION_DISPENSING",
+        "WEBSTER_PACKING_DAA",
+        "DISPENSING_DATA_ENTRY",
+        "INVENTORY_CONTROL",
+        "PATIENT_COUNSELLING",
+        "VITAMINS_SUPPLEMENTS"
+      ]
+    },
+    "popular_software": [
+      "FRED",
+      "MINFOS",
+      "Z_DISPENSE",
+      "CORUM_LOTS"
+    ],
+    "sources": [
+      "https://www.ravensrecruitment.com.au/job/locum-pharmacist-bbbh49833-1787809564",
+      "https://www.facebook.com/locumco/",
+      "https://au.seek.com/locum-pharmacist-jobs",
+      "https://employmenthero.com/jobs/position/bendigo-united-friendly-societies-pharmacies-ltd-dispensary-technician-565wf",
+      "https://www.rosterelf.com/job-descriptions/pharmacy/pharmacy-assistant",
+      "https://www.rosterelf.com/job-descriptions/pharmacy/dispensary-technician"
+    ],
+    "note": "Short lists shown first on Post shift, from Australian locum, SEEK and Employment Hero ads and dispensary/assistant job descriptions; the full catalogue stays one tap away."
+  },
+  "other_staff_qualifications": {
+    "levels": [
+      {
+        "value": "LEVEL_1",
+        "label": "Level 1",
+        "explainer": "No completed Community Pharmacy qualification. This level does not establish dispensary competence."
+      },
+      {
+        "value": "LEVEL_2",
+        "label": "Level 2",
+        "explainer": "SIR20116 — Certificate II in Community Pharmacy. Dispensing competence must be evidenced separately."
+      },
+      {
+        "value": "LEVEL_3",
+        "label": "Level 3",
+        "explainer": "SIR30116 — Certificate III in Community Pharmacy. For dispensary work, evidence must include the dispensary stream / SIRCDIS003 Assist in dispensing prescriptions."
+      },
+      {
+        "value": "LEVEL_4",
+        "label": "Level 4",
+        "explainer": "SIR40116 — Certificate IV in Community Pharmacy, or SIR40216 — Certificate IV in Community Pharmacy Dispensary. General pharmacy training alone does not establish dispensing competence."
+      }
+    ],
+    "dispensary": [
+      {
+        "value": "LEVEL_3",
+        "label": "Level 3 — dispensary stream",
+        "explainer": "SIR30116 — Certificate III in Community Pharmacy, including SIRCDIS003 Assist in dispensing prescriptions. Upload the qualification and unit transcript together."
+      },
+      {
+        "value": "LEVEL_4",
+        "label": "Level 4 — dispensary qualification",
+        "explainer": "SIR40216 — Certificate IV in Community Pharmacy Dispensary, or SIR40116 — Certificate IV in Community Pharmacy including SIRCDIS003. Upload the qualification and unit transcript together."
+      },
+      {
+        "value": "SKILL_SET",
+        "label": "Community Pharmacy Dispensary skill set",
+        "explainer": "SIRSS00012 — Community Pharmacy Dispensary. Includes SIRCDIS003 Assist in dispensing prescriptions."
+      },
+      {
+        "value": "UNIT",
+        "label": "Dispensing unit / recognised equivalent",
+        "explainer": "SIRCDIS003 — Assist in dispensing prescriptions, or documented equivalent competencies/RPL assessed by the administrator. This is not an award level."
+      }
+    ]
+  }
+}

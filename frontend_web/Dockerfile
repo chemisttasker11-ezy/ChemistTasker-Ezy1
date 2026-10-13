@@ -7,6 +7,8 @@ COPY shared-core /workspace/shared-core
 
 COPY frontend_web/package.json ./package.json
 COPY frontend_web/package-lock.json ./package-lock.json
+# @chemisttasker/shared-ui is the local file:./shared package.
+COPY frontend_web/shared ./shared
 RUN npm ci --no-audit --no-fund
 
 COPY frontend_web/ ./

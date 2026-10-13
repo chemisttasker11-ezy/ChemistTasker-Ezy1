@@ -655,8 +655,11 @@ class MemberStatusTests(ShiftActionFixture):
             "user_id", "name", "employment_type", "role", "status", "is_member", "membership_id", "pharmacy_id",
             "pharmacy_name", "organization_id", "organization_name", "visibility_level", "pending_confirmation",
             "pending_offer_id", "pending_confirmation_counter_offer", "awaiting_payment", "awaiting_payment_offer_id",
-            "awaiting_payment_counter_offer",
+            "awaiting_payment_counter_offer", "user_detail",
         })
+        # Members and favourites carry their work profile for the review dialog, never a CV.
+        self.assertIn("skills", rows[silent.id]["user_detail"])
+        self.assertNotIn("resume", rows[silent.id]["user_detail"])
         pending = rows[offered.id]
         self.assertEqual((pending["pending_confirmation"], pending["pending_offer_id"]), (True, offer.id))
         synthetic = pending["pending_confirmation_counter_offer"]

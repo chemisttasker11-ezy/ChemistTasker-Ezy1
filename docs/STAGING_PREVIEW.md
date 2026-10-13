@@ -101,3 +101,48 @@ The optional self-hosted workflow deploys to
 `/opt/apps/chemisttasker-staging`. Configure its runner with the
 `chemisttasker-staging` label and Docker access. The workflow preserves the
 ignored `env/` directory between deployments.
+
+Once the runner shows **Idle** in GitHub, every push to this repository's
+`main` branch redeploys staging automatically.
+
+## Synthetic test users in staging
+
+The private staging PostgreSQL database is `chemisttasker_staging` and is not
+reachable directly from the contractor frontend. It stays inside the isolated
+staging Docker network. Never publish port 5432.
+
+After migrations pass, the deployment provisions eight synthetic logins:
+Owner, Organisation Admin, Pharmacist, Intern, Technician, Assistant, Student
+and Explorer. It also creates one fictional organisation, two fictional
+pharmacies and accepted staff memberships. The four Other Staff profiles use
+the corresponding role subtypes. The operation is idempotent and refuses
+collisions with non-demo accounts.
+
+Distinct, randomly generated credentials are stored only on the OVH server in
+`/opt/apps/chemisttasker-staging/env/staging.test-users.json` with permissions
+`0600`. An authorised server operator should obtain the relevant credentials
+and provide them privately to the frontend developer. Never commit or print
+the passwords in CI, pull request comments or documentation. Staging users
+bypass only email and mobile OTP setup through preseeded verification flags.
+No real licence or identity verification has been performed.
+
+After a successful deployment, the developer uses the normal staging HTTPS API
+from the local Next application on port 3000 or the local Vite application on
+port 5173. Database access is not required for frontend login. If deployment
+remains queued because the OVH self-hosted runner is offline, the accounts are
+not yet available.
+
+## Review workflow
+
+1. Make proposed changes in this staging repository.
+2. Commit them to this repository's `main` branch.
+3. Let the staging deployment workflow deploy them.
+4. Open the staging URL from the workflow summary and test it.
+5. Iterate here until approved.
+6. Only after approval, transfer the approved changes to the separate production repository.
+
+Temporary feature branches are still fine for large or risky work. There is no
+permanent `staging` branch because this repository is the staging repository.
+
+Prefer synthetic or sanitised data. If the reviewed production-data refresh
+procedure is used, apply the access restrictions and migration controls above.

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Checkbox, IconButton, Modal, Portal, Text, TextInput } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
+import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
+import { findSkill, skillLabel, softwareSubgroups } from '@chemisttasker/shared-core';
+import { SkillIcon } from '../../../../components/SkillIcon';
 
 export type TalentFilterState = {
   search: string;
@@ -104,7 +107,7 @@ export default function FiltersSidebar({
                       {roleSkillOptions[role].map((skill) => (
                         <Checkbox.Item
                           key={skill}
-                          label={skill}
+                          label={skillLabel(skillsRegistry as any, skill)}
                           status={filters.skills.includes(skill) ? 'checked' : 'unchecked'}
                           onPress={() => onChange({ ...filters, skills: toggleList(filters.skills, skill) })}
                           position="leading"
@@ -118,16 +121,28 @@ export default function FiltersSidebar({
             })}
           </FilterSection>
 
-          <FilterSection title="Software Proficiency">
-            {softwareOptions.map((skill) => (
-              <Checkbox.Item
-                key={skill}
-                label={skill}
-                status={filters.skills.includes(skill) ? 'checked' : 'unchecked'}
-                onPress={() => onChange({ ...filters, skills: toggleList(filters.skills, skill) })}
-                position="leading"
-              />
-            ))}
+          <FilterSection title="Software">
+            {softwareSubgroups(skillsRegistry as any).map((category) => {
+              const inCategory = softwareOptions.filter((skill) => (findSkill(skillsRegistry as any, skill) as any)?.subgroup === category);
+              if (!inCategory.length) return null;
+              return (
+                <View key={category}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 0.6, color: '#4B5563', marginTop: 6, marginLeft: 8 }}>{category.toUpperCase()}</Text>
+                  {inCategory.map((skill) => (
+                    <View key={skill} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ marginLeft: 8 }}><SkillIcon skill={skill} size={20} /></View>
+                      <Checkbox.Item
+                        label={skillLabel(skillsRegistry as any, skill)}
+                        status={filters.skills.includes(skill) ? 'checked' : 'unchecked'}
+                        onPress={() => onChange({ ...filters, skills: toggleList(filters.skills, skill) })}
+                        position="leading"
+                        style={{ flex: 1 }}
+                      />
+                    </View>
+                  ))}
+                </View>
+              );
+            })}
           </FilterSection>
 
           <FilterSection title="Engagement Type">

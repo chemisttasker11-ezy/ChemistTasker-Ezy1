@@ -8,6 +8,7 @@ import {
   Surface,
   Text,
   TextInput,
+  Switch,
 } from 'react-native-paper';
 import {
   formatAuDate,
@@ -27,6 +28,7 @@ type CalendarCell = {
 };
 
 type Props = {
+  flexibleTiming: boolean; setFlexibleTiming: Setter<boolean>;
   selectedDates: string[];
   setSelectedDates: Setter<string[]>;
   slotDate: string;
@@ -72,6 +74,7 @@ const chipTextStyle = (selected: boolean) =>
   selected ? styles.chipTextSelected : styles.chipText;
 
 export default function PostShiftTimetableStep({
+  flexibleTiming, setFlexibleTiming,
   selectedDates,
   setSelectedDates,
   slotDate,
@@ -108,9 +111,14 @@ export default function PostShiftTimetableStep({
   removeSlot,
 }: Props) {
   return (
+    <>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingVertical:8}}>
+        <Text>Start and finish times can move a little</Text>
+        <Switch accessibilityLabel="Start and finish times can move a little" value={flexibleTiming} onValueChange={setFlexibleTiming} />
+      </View>
     <Surface style={styles.card} elevation={1}>
       <View style={styles.slotHeader}>
-        <Text style={styles.label}>Timetable</Text>
+        <Text style={styles.label}>Your dates</Text>
         <Button
           mode="contained"
           onPress={addManualSlot}
@@ -118,7 +126,7 @@ export default function PostShiftTimetableStep({
           style={styles.primaryBtn}
           labelStyle={styles.primaryBtnText}
         >
-          Add slot
+          Add date
         </Button>
       </View>
 
@@ -263,7 +271,7 @@ export default function PostShiftTimetableStep({
           })}
         </View>
         <Text style={styles.hint}>
-          Blue: selected dates, purple border: dates already added to timetable.
+          Blue: picked, not yet added. Purple outline: already in your dates.
         </Text>
       </Surface>
 
@@ -272,7 +280,7 @@ export default function PostShiftTimetableStep({
           status={slotRecurring ? 'checked' : 'unchecked'}
           onPress={() => setSlotRecurring((value) => !value)}
         />
-        <Text style={styles.rowText}>Recurring</Text>
+        <Text style={styles.rowText}>Repeat every week</Text>
       </View>
 
       {slotRecurring ? (
@@ -292,7 +300,7 @@ export default function PostShiftTimetableStep({
           </View>
           <TextInput
             mode="outlined"
-            label="Recurring end date"
+            label="Repeat until"
             value={formatAuDate(slotRecurringEnd)}
             style={styles.input}
             placeholder="DD/MM/YYYY"
@@ -312,13 +320,13 @@ export default function PostShiftTimetableStep({
           status={singleUserOnly ? 'checked' : 'unchecked'}
           onPress={() => setSingleUserOnly((value) => !value)}
         />
-        <Text style={styles.rowText}>Single user only</Text>
+        <Text style={styles.rowText}>One person works every date</Text>
       </View>
 
       {selectedDates.length > 0 ? (
         <View style={styles.selectedDaysPanel}>
           <View style={styles.selectedDaysHeader}>
-            <Text style={styles.label}>Selected calendar days</Text>
+            <Text style={styles.label}>Dates picked on the calendar</Text>
             <View style={styles.selectedDaysActions}>
               <Button
                 mode="contained"
@@ -491,5 +499,6 @@ export default function PostShiftTimetableStep({
         )}
       </View>
     </Surface>
+    </>
   );
 }

@@ -16,6 +16,7 @@ x-backend-environment: &backend-environment
   APP_ENV: "staging"
   FRONTEND_BASE_URL: "${STAGING_PUBLIC_URL:-https://staging.chemisttasker.com.au}"
   BACKEND_BASE_URL: "${STAGING_PUBLIC_URL:-https://staging.chemisttasker.com.au}"
+  STAGING_TEST_DATA_ENABLED: "1"
   USE_PROD_DB: "False"
   LOCAL_DB_NAME: "chemisttasker_staging"
   LOCAL_DB_USER: "chemisttasker_staging"
@@ -93,8 +94,8 @@ services:
   web:
     image: chemisttasker_backend_staging:latest
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: chemisttasker_backend_staging
     restart: unless-stopped
     environment:

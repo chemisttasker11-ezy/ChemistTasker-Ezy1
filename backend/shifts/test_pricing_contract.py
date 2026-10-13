@@ -59,6 +59,15 @@ def fingerprint(results):
 
 
 class PricingEquivalenceTests(SimpleTestCase):
+    def test_custom_posted_pharmacist_rate_overrides_pharmacy_guide(self):
+        from shifts.pricing import get_locked_rate_for_slot
+        shift = SimpleNamespace(role_needed='PHARMACIST', rate_type='FIXED', pharmacy=SimpleNamespace(state='NSW', **PHARMACY_RATES))
+        slot = SimpleNamespace(date=date(2026,1,27), start_time=time(9), end_time=time(17), rate=Decimal('77.50'))
+        rate, reason = get_locked_rate_for_slot(slot, shift, SimpleNamespace(id=1))
+        self.assertEqual(rate, Decimal('77.50'))
+        self.assertEqual(reason['source'], 'PostedShift')
+        self.assertEqual(shift.pharmacy.rate_weekday, Decimal('60.00'))
+
     def test_matrix_fingerprint_is_unchanged(self):
         results = pricing_matrix()
         self.assertEqual(len(results), 3 * 10 * 5 * 4)

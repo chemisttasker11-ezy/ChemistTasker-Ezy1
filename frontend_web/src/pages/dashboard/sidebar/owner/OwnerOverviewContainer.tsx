@@ -141,7 +141,7 @@ export default function OwnerOverviewContainer() {
   );
 
   const rawViewParam = searchParams.get("view");
-  const rawPharmacyId = searchParams.get("pharmacyId");
+  const rawPharmacyId = searchParams.get("pharmacyId") ?? searchParams.get("pharmacy_id");
   const view: View =
     rawViewParam === "pharmacy" && rawPharmacyId
       ? "pharmacy"

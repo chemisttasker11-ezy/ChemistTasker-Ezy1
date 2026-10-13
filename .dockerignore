@@ -27,3 +27,9 @@ trash
 .venv
 chemisttasker-Frontend-main
 **/.next
+
+**/playground
+**/.e2e
+**/test-results
+**/playwright-report
+**/.env*

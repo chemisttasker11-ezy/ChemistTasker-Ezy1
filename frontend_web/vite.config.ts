@@ -13,7 +13,13 @@ export default defineConfig(({ command }) => {
     base: '/',
     plugins: [react()],
     // Shared web UI lives alongside Next. Use this app's React/MUI contexts in Vite too.
-    resolve: { dedupe: ['react', 'react-dom', '@mui/material', '@mui/system', '@mui/private-theming', '@mui/icons-material', '@emotion/react', '@emotion/styled'] },
+    resolve: {
+      dedupe: ['react', 'react-dom', '@mui/material', '@mui/system', '@mui/private-theming', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+      alias: isDev ? [
+        { find: /^@chemisttasker\/shared-core$/, replacement: resolve(import.meta.dirname, '../shared-core/dist/index.js') },
+        { find: '@chemisttasker/shared-core/skills_registry.json', replacement: resolve(import.meta.dirname, '../shared-core/skills_registry.json') },
+      ] : [],
+    },
     // shared-core is rebuilt and repacked locally during consolidation work.
     // Serving it through Vite's normal module pipeline prevents an older
     // optimized bundle from surviving with a stale named-export surface.
@@ -21,6 +27,7 @@ export default defineConfig(({ command }) => {
       exclude: ['@chemisttasker/shared-core'],
     },
     server: {
+      fs: { allow: [resolve(import.meta.dirname, '..')] },
       port: 5173,
       host: 'localhost',
       strictPort: true,

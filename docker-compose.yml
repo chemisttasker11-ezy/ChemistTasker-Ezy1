@@ -24,8 +24,8 @@ services:
       retries: 3
   web:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: chemisttasker_backend_prod
     restart: unless-stopped
     expose:
@@ -81,8 +81,8 @@ services:
 
   celery_worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: chemisttasker_celery_prod
     restart: unless-stopped
     env_file:
@@ -128,8 +128,8 @@ services:
 
   celery_beat:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: chemisttasker_celery_beat_prod
     restart: unless-stopped
     env_file:

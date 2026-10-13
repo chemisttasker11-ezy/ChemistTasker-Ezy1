@@ -1,4 +1,4 @@
-import {spawn} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {existsSync, readFileSync} from 'node:fs';
 import {resolve, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -20,8 +20,11 @@ Object.assign(env,{VITE_PUBLIC_SITE_ENABLED:'1',VITE_PUBLIC_SITE_URL:origin,VITE
  DASHBOARD_INTERNAL_URL:`http://127.0.0.1:${dashboardPort}`,
  DASHBOARD_PUBLIC_URL:dashboardOrigin,
  NEXT_TELEMETRY_DISABLED:'1'});
+// Build canonical exports before either dev server starts.
+const coreBuild=spawnSync(process.execPath,[resolve(root,'../shared-core/node_modules/typescript/bin/tsc')],{cwd:resolve(root,'../shared-core'),stdio:'inherit',windowsHide:true});
+if(coreBuild.status!==0)process.exit(coreBuild.status??1);
 const commands=[
- [root,'node_modules/vite/bin/vite.js',['--host','127.0.0.1','--port',dashboardPort]],
+ [root,'node_modules/vite/bin/vite.js',['--host','127.0.0.1','--port',dashboardPort,'--force']],
  [resolve(root,'landing_next'),'node_modules/next/dist/bin/next',['dev','--hostname','127.0.0.1','--port',port]],
 ];
 for(const [cwd,bin] of commands) if(!existsSync(resolve(cwd,bin))) {

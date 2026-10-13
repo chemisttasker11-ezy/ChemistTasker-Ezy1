@@ -1,6 +1,7 @@
 """shifts: cohesive shifts serializers."""
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+from onboarding.services.skill_identity import normalize_skills
 from drf_spectacular.utils import extend_schema_field
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from shifts.models import Shift, ShiftDescriptionTemplate, ShiftOffer
@@ -11,6 +12,7 @@ from django.utils import timezone
 from organizations.serializers import anonymize_pharmacy_detail, PharmacySerializer, user_can_view_full_pharmacy
 from shifts.posting import ensure_escalation_stamps, normalize_money_value, normalize_slots_payload, post_shift, revise_shift
 from shifts.travel import haversine_km
+from shifts.rate_visibility import project_published_rates, published_rates_visible
 from .slots import ShiftSlotSerializer
 
 User = get_user_model()
@@ -66,6 +68,7 @@ class ShiftSerializer(serializers.ModelSerializer):
     ui_address_line = serializers.SerializerMethodField()
     ui_distance_km = serializers.SerializerMethodField()
     ui_is_urgent = serializers.SerializerMethodField()
+    published_rates_visible = serializers.SerializerMethodField()
 
     # fixed_rate = serializers.DecimalField(max_digits=6, decimal_places=2)
     owner_adjusted_rate = serializers.DecimalField(max_digits=6,decimal_places=2,required=False,allow_null=True)
@@ -85,7 +88,7 @@ class ShiftSerializer(serializers.ModelSerializer):
             'must_have', 'nice_to_have', 'rate_type', 'fixed_rate', 'owner_adjusted_rate','slots','single_user_only',
             'post_anonymously',
             'escalate_to_locum_casual',
-            'interested_users_count', 'reveal_quota', 'reveal_count', 'workload_tags','slot_assignments',
+            'interested_users_count', 'reveal_quota', 'reveal_count', 'workload_tags','support_on_shift','slot_assignments',
             'pending_payment_slot_ids', 'payment_options',
             'allowed_escalation_levels','is_single_user', 'description',
             'flexible_timing',
@@ -97,6 +100,7 @@ class ShiftSerializer(serializers.ModelSerializer):
             'notify_pharmacy_staff', 'notify_favorite_staff', 'notify_chain_members',
             'apply_rates_to_pharmacy',
             'payment_status',
+            'published_rates_visible',
         ]
         read_only_fields = [
             'id', 'created_by', 'escalation_level',
@@ -123,8 +127,32 @@ class ShiftSerializer(serializers.ModelSerializer):
 
         return fields
 
+    def validate_workload_tags(self, value):
+        from shifts.context import validate_workload_tags
+        return validate_workload_tags(value)
+
+    def validate_support_on_shift(self, value):
+        from shifts.context import validate_support
+        return validate_support(value)
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        role = attrs.get('role_needed') or getattr(self.instance, 'role_needed', None)
+        # Revalidate the complete requirement set when the vacancy role changes.
+        # PATCH must not keep pharmacist-only requirements on a technician shift.
+        if any(field in attrs for field in ('role_needed', 'must_have', 'nice_to_have')):
+            requirements = {}
+            for field in ('must_have', 'nice_to_have'):
+                values = attrs.get(field, getattr(self.instance, field, []) or [])
+                if role == 'EXPLORER' and values:
+                    raise serializers.ValidationError({field: 'Explorer shifts cannot require professional pharmacy skills.'})
+                try:
+                    requirements[field] = normalize_skills(values, strict=True, allowed_role=role, matchable_only=True)
+                except serializers.ValidationError as error:
+                    raise serializers.ValidationError({field: error.detail})
+            attrs.update(requirements)
+            if set(requirements['must_have']).intersection(requirements['nice_to_have']):
+                raise serializers.ValidationError({'nice_to_have': 'A skill cannot be both required and preferred.'})
         employment_type = attrs.get('employment_type') or getattr(self.instance, 'employment_type', None)
         min_hour = attrs.get('min_hourly_rate') if 'min_hourly_rate' in attrs else getattr(self.instance, 'min_hourly_rate', None)
         max_hour = attrs.get('max_hourly_rate') if 'max_hourly_rate' in attrs else getattr(self.instance, 'max_hourly_rate', None)
@@ -164,7 +192,18 @@ class ShiftSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None) if request else None
         if instance.post_anonymously and not user_can_view_full_pharmacy(user, instance.pharmacy):
             data['pharmacy_detail'] = anonymize_pharmacy_detail(data.get('pharmacy_detail'))
-        return data
+        return project_published_rates(data, user=user, pharmacy=instance.pharmacy)
+
+    def get_published_rates_visible(self, obj) -> bool:
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        # Serializer contexts are request-scoped. Repeated shifts at one pharmacy
+        # reuse the decision; request identity prevents reuse across HTTP calls.
+        cache = self.context.setdefault('_published_pay_visibility', {})
+        key = (id(request), getattr(user, 'pk', None), obj.pharmacy_id)
+        if key not in cache:
+            cache[key] = published_rates_visible(user, obj.pharmacy)
+        return cache[key]
 
     def get_role_label(self, obj):
         return obj.get_role_needed_display()

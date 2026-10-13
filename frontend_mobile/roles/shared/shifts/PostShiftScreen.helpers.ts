@@ -1,11 +1,10 @@
 export const ROLE_OPTIONS = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 export const EMPLOYMENT_TYPES = ['LOCUM', 'PART_TIME', 'FULL_TIME'];
-export const WORKLOAD_TAGS = ['Sole Pharmacist', 'High Script Load', 'Webster Packs'];
 export const PRIMARY = '#7c3aed';
 export const PRIMARY_LIGHT = '#F3E8FF';
 export const PRIMARY_TEXT = '#2D1B69';
 
-export type StepKey = 'details' | 'skills' | 'visibility' | 'timetable' | 'payrate';
+export type StepKey = 'details' | 'skills' | 'visibility' | 'timetable' | 'payrate' | 'review';
 export type RateType = 'FLEXIBLE' | 'FIXED' | 'PHARMACIST_PROVIDED';
 export type VisibilityTier = 'FULL_PART_TIME' | 'LOCUM_CASUAL' | 'OWNER_CHAIN' | 'ORG_CHAIN' | 'PLATFORM';
 export type VisibilityDates = {

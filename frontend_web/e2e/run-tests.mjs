@@ -12,6 +12,7 @@ const playwrightCli = resolve(testRoot, 'node_modules', '@playwright', 'test', '
 const env = {
   ...process.env,
   PLAYWRIGHT_PORT: String(port),
+  PLAYWRIGHT_HERMETIC: '1',
   VITE_API_URL: 'http://127.0.0.1:8000',
   VITE_API_BASE_URL: 'http://127.0.0.1:8000',
   // Exercise the actual cross-origin Next/Vite URL builder, not same-origin fallback.

@@ -1,8 +1,10 @@
 // src/pages/onboardingV2/SkillsV2.tsx
 import * as React from 'react';
+import { SkillSymbol } from '../../../components/SkillGlyph';
+import SoftwarePicker, { SOFTWARE_GROUP, roleSoftware } from '../SoftwarePicker';
 import {
   Box, Stack, Typography, Checkbox, FormControlLabel, Button, Link,
-  Alert, Snackbar, Chip, Divider, CircularProgress, Tabs, Tab
+  Alert, Snackbar, Chip, Divider, CircularProgress, TextField, Tabs, Tab
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -10,28 +12,10 @@ import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
 
 import { API_BASE_URL } from '../../../constants/api';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
-import skillsCatalog from '../../../../../shared-core/skills_catalog.json';
+import skillsRegistry from '../../../../../shared-core/skills_registry.json';
+import { searchRoleSkillGroups, normalizeSavedSkillCodes, skillId, workerSkillRole, claimModeLabel } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
 
-type SkillItem = {
-  code: string;
-  label: string;
-  description?: string;
-  requires_certificate?: boolean;
-};
-
-type RoleCatalog = {
-  clinical_services: SkillItem[];
-  dispense_software: SkillItem[];
-  expanded_scope: SkillItem[];
-};
-
-type SkillsCatalog = {
-  pharmacist: RoleCatalog;
-  otherstaff: RoleCatalog;
-};
-
-const catalog = skillsCatalog as SkillsCatalog;
 
 type CertRow = {
   skill_code: string;
@@ -47,13 +31,17 @@ type ApiData = {
 
 export default function SkillsV2() {
   const roleKey = 'pharmacist' as const;
-  const roleCatalog = catalog[roleKey];
+  const currentRole = workerSkillRole(roleKey);
+  const [query, setQuery] = React.useState('');
+  const tabs = React.useMemo(() => searchRoleSkillGroups(skillsRegistry as any, currentRole, query).filter(group => group.key !== SOFTWARE_GROUP).map(group => ({key: group.key, label: group.label, items: group.items})), [currentRole, query]);
+  const software = React.useMemo(() => roleSoftware(currentRole, query), [currentRole, query]);
 
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [snack, setSnack] = React.useState('');
   const [error, setError] = React.useState('');
   const [tabIndex, setTabIndex] = React.useState(0);
+  const activeTabIndex = Math.min(tabIndex, Math.max(tabs.length - 1, 0));
 
   const [selected, setSelected] = React.useState<string[]>([]);
   const [existingCerts, setExistingCerts] = React.useState<Record<string, CertRow>>({});
@@ -63,18 +51,7 @@ export default function SkillsV2() {
     value: { existingCerts, pendingFiles, selected },
   });
 
-  const tabs = [
-    { key: 'dispense_software', label: 'Dispense Software', items: roleCatalog.dispense_software },
-    { key: 'clinical_services', label: 'Clinical Services', items: roleCatalog.clinical_services },
-    { key: 'expanded_scope', label: 'Expanded Scope', items: roleCatalog.expanded_scope },
-  ] as const;
-
-  const skillIndex = React.useMemo(() => {
-    const map = new Map<string, SkillItem>();
-    [...roleCatalog.dispense_software, ...roleCatalog.clinical_services, ...roleCatalog.expanded_scope]
-      .forEach(item => map.set(item.code, item));
-    return map;
-  }, [roleCatalog]);
+  const skillIndex = React.useMemo(() => new Map(skillsRegistry.skills.map(item => [item.code, item])), []);
 
   // Build absolute link if backend returned a relative media path
   const getFileUrl = (path?: string | null) =>
@@ -90,11 +67,11 @@ export default function SkillsV2() {
         const res = await getOnboardingDetail(roleKey);
         if (!mounted) return;
         const d: ApiData = (res as any) || {};
-        setSelected(d.skills || []);
+        setSelected(normalizeSavedSkillCodes(skillsRegistry as any, d.skills || []));
         const byCode: Record<string, CertRow> = {};
-        (d.skill_certificates || []).forEach(row => { byCode[row.skill_code] = row; });
+        (d.skill_certificates || []).forEach(row => { byCode[skillId(skillsRegistry as any, row.skill_code) || row.skill_code] = row; });
         setExistingCerts(byCode);
-        unsaved.markClean({ existingCerts: byCode, pendingFiles: {}, selected: d.skills || [] });
+        unsaved.markClean({ existingCerts: byCode, pendingFiles: {}, selected: normalizeSavedSkillCodes(skillsRegistry as any, d.skills || []) });
       } catch (e: any) {
         setError(e.response?.data?.detail || e.message || 'Failed to load');
       } finally {
@@ -118,18 +95,17 @@ export default function SkillsV2() {
 
   const hasExisting = (code: string) => Boolean(existingCerts[code]?.path);
   const hasPending = (code: string) => Boolean(pendingFiles[code]);
-  const requiresCert = (code: string) => Boolean(skillIndex.get(code)?.requires_certificate);
-
-  const previewPendingUrl = (code: string) => {
-    const f = pendingFiles[code];
-    return f ? URL.createObjectURL(f) : '';
+  const requiresCert = (code: string) => {
+    const item = skillIndex.get(code) as any;
+    return Boolean(item?.certificate && currentRole && !['familiarity','none'].includes(item.eligibility[currentRole]));
   };
 
-  const validateClientSide = (): string[] => {
-    // If a skill is checked, the user must either have an existing cert OR pick a new file now.
-    const missing = selected.filter(code => requiresCert(code) && !hasExisting(code) && !hasPending(code));
-    return missing;
-  };
+  const pendingUrls = React.useMemo(() => Object.fromEntries(
+    Object.entries(pendingFiles).filter((entry): entry is [string, File] => Boolean(entry[1]))
+      .map(([code, file]) => [code, URL.createObjectURL(file)])
+  ), [pendingFiles]);
+  React.useEffect(() => () => Object.values(pendingUrls).forEach(url => URL.revokeObjectURL(url)), [pendingUrls]);
+
 
   // ---------- save ----------
   const save = async () => {
@@ -137,13 +113,7 @@ export default function SkillsV2() {
     setSnack('');
     setError('');
     try {
-      // Client-side precheck (server enforces as well)
-      const missing = validateClientSide();
-      if (missing.length) {
-        setError(`Please upload a certificate for: ${missing.join(', ')}`);
-        setSaving(false);
-        return;
-      }
+      // Claims can be saved without evidence; verification is separate.
 
       const fd = new FormData();
       fd.append('tab', 'skills');
@@ -157,25 +127,21 @@ export default function SkillsV2() {
       const res = await updateOnboardingForm(roleKey, fd);
 
       const d: ApiData = (res as any) || {};
-      setSelected(d.skills || []);
+      setSelected(normalizeSavedSkillCodes(skillsRegistry as any, d.skills || []));
       const byCode: Record<string, CertRow> = {};
-      (d.skill_certificates || []).forEach(row => { byCode[row.skill_code] = row; });
+      (d.skill_certificates || []).forEach(row => { byCode[skillId(skillsRegistry as any, row.skill_code) || row.skill_code] = row; });
       setExistingCerts(byCode);
 
       // Clear pending files that were just uploaded successfully
-      setPendingFiles(prev => {
-        const next = { ...prev };
-        selected.forEach(code => { if (next[code]) delete next[code]; });
-        return next;
-      });
-      unsaved.markClean({ existingCerts: byCode, pendingFiles: {}, selected: d.skills || [] });
+      setPendingFiles({});
+      unsaved.markClean({ existingCerts: byCode, pendingFiles: {}, selected: normalizeSavedSkillCodes(skillsRegistry as any, d.skills || []) });
 
       setSnack('Skills saved.');
     } catch (e: any) {
       const resp = e.response?.data;
       setError(
         resp && typeof resp === 'object'
-          ? Object.entries(resp).map(([k, v]) => `${k}: ${(v as any[]).join(', ')}`).join('\n')
+          ? Object.entries(resp).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : String(v)}`).join('\n')
           : e.message
       );
     } finally {
@@ -195,18 +161,24 @@ export default function SkillsV2() {
 
       {/* Legend / guidance */}
       <Alert severity="info" sx={{ mb: 2 }}>
-        Only skills marked as requiring certificates need uploads. Other selections do not need a file.
+        Tick what you have actually done on the job, then the software you have used. Pharmacies use this to match you to shifts. A tick is not a verified credential; certificates are checked separately.
       </Alert>
 
-      <Tabs value={tabIndex} onChange={(_, next) => setTabIndex(next)} sx={{ mb: 2 }}>
-        {tabs.map(tab => (
-          <Tab key={tab.key} label={tab.label} />
+      <TextField fullWidth label="Search skills or software" placeholder="Try Webster, vaccination or FRED"
+        value={query} onChange={event => { setQuery(event.target.value); setTabIndex(0); }} sx={{ mb: 2 }} />
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {selected.filter(code => skillIndex.get(code)?.group !== SOFTWARE_GROUP).length} skills selected. There is no minimum.
+      </Typography>
+      {tabs.length === 0 && software.length === 0 && currentRole && <Typography role="status" sx={{ mb: 2 }}>Nothing matches “{query.trim()}”. Try a shorter word, such as Webster, vaccination or Fred.</Typography>}
+      {tabs.length > 0 && <Tabs variant="scrollable" scrollButtons="auto" aria-label="Skill categories" value={activeTabIndex} onChange={(_, next) => setTabIndex(next)} sx={{ mb: 2 }}>
+        {tabs.map((tab, idx) => (
+          <Tab key={tab.key} id={`skill-tab-${idx}`} aria-controls={`skill-panel-${idx}`} label={`${tab.label} (${tab.items.filter(item => selected.includes(item.code)).length})`} />
         ))}
-      </Tabs>
+      </Tabs>}
 
       {tabs.map((tab, idx) => (
-        <Box key={tab.key} role="tabpanel" hidden={tabIndex !== idx}>
-          {tabIndex === idx && (
+        <Box key={tab.key} role="tabpanel" id={`skill-panel-${idx}`} aria-labelledby={`skill-tab-${idx}`} hidden={activeTabIndex !== idx && !query.trim()}>
+          {(activeTabIndex === idx || query.trim()) && (
             <Box
               sx={{
                 display: 'grid',
@@ -217,7 +189,7 @@ export default function SkillsV2() {
               {tab.items.map(item => {
                 const checked = selected.includes(item.code);
                 const existingUrl = getFileUrl(existingCerts[item.code]?.url || existingCerts[item.code]?.path);
-                const pendingUrl = previewPendingUrl(item.code);
+                const pendingUrl = pendingUrls[item.code] || '';
                 const needsFile = checked && requiresCert(item.code) && !hasExisting(item.code) && !hasPending(item.code);
 
                 return (
@@ -225,7 +197,8 @@ export default function SkillsV2() {
                     key={item.code}
                     sx={{
                       border: '1px solid',
-                      borderColor: 'divider',
+                      borderColor: checked ? 'primary.main' : 'divider',
+                      bgcolor: theme => checked && theme.palette.mode === 'light' ? '#F8F5FE' : theme.palette.background.paper,
                       borderRadius: 1.5,
                       p: 1.25,
                       display: 'flex',
@@ -235,15 +208,18 @@ export default function SkillsV2() {
                   >
                     <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ flexWrap: 'wrap' }}>
                       <FormControlLabel
-                        control={<Checkbox checked={checked} onChange={toggleSkill(item.code)} />}
+                        sx={{ alignItems: 'flex-start', m: 0, width: '100%', '& .MuiCheckbox-root': { mt: -0.5 }, '& .MuiFormControlLabel-label': { minWidth: 0, flex: 1 } }}
+                        control={<Checkbox disabled={saving} checked={checked} onChange={toggleSkill(item.code)} />}
                         label={
                           <Box>
-                            <Typography variant="body1">{item.label}</Typography>
-                            {item.description && (
+                            <Typography variant="body1" sx={{display:'flex',alignItems:'center',gap:1.25,fontWeight:600}}><SkillSymbol skill={item.code} size={40} expressive selected={checked} />{item.label}</Typography>
+                            {currentRole && claimModeLabel((item as any).eligibility[currentRole]) && <Typography variant="caption" sx={{display:'block',color:'secondary.main',fontWeight:700}}>{claimModeLabel((item as any).eligibility[currentRole])}</Typography>}
+                            {item.definition && (
                               <Typography variant="body2" color="text.secondary">
-                                {item.description}
+                                {item.definition}
                               </Typography>
                             )}
+                            {!checked && requiresCert(item.code) && <Typography variant="caption" color="text.secondary">Certificate needed for verification</Typography>}
                           </Box>
                         }
                       />
@@ -252,9 +228,9 @@ export default function SkillsV2() {
                         hasPending(item.code) ? (
                           <Chip icon={<UploadFileIcon />} label="File selected" size="small" />
                         ) : hasExisting(item.code) ? (
-                          <Chip icon={<CheckCircleOutlineIcon />} color="success" variant="outlined" label="On file" size="small" />
+                          <Chip icon={<CheckCircleOutlineIcon />} variant="outlined" label="Document uploaded" size="small" />
                         ) : needsFile ? (
-                          <Chip icon={<HourglassBottomIcon />} color="warning" variant="outlined" label="Certificate required" size="small" />
+                          <Chip icon={<HourglassBottomIcon />} color="warning" variant="outlined" label="Not verified" size="small" />
                         ) : null
                       ) : null}
                     </Stack>
@@ -297,10 +273,13 @@ export default function SkillsV2() {
         </Box>
       ))}
 
+      <SoftwarePicker role={currentRole} items={software} selected={selected} disabled={saving}
+        onToggle={code => setSelected(prev => prev.includes(code) ? prev.filter(x => x !== code) : [...prev, code])} />
+
       <Divider sx={{ my: 2 }} />
 
       <Stack direction="row" spacing={1.5} sx={{ pt: .5 }}>
-        <Button variant="contained" onClick={save} disabled={saving}>
+        <Button variant="contained" onClick={save} disabled={saving || !currentRole}>
           {saving ? (<><CircularProgress size={18} sx={{ mr: 1 }} />Saving…</>) : 'Save Skills'}
         </Button>
       </Stack>

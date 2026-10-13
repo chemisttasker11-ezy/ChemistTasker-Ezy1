@@ -56,7 +56,7 @@ if (authenticated) {
   const image = process.env.E2E_BACKEND_IMAGE || 'chemisttasker-e2e-backend:local';
   env.E2E_BACKEND_IMAGE = image;
   if (!process.env.E2E_BACKEND_IMAGE) {
-    const built = spawnSync('docker', ['build', '--quiet', '-f', 'backend/Dockerfile.dev', '-t', image, 'backend'], { cwd: sourceRoot, stdio: 'inherit' });
+    const built = spawnSync('docker', ['build', '--quiet', '-f', 'backend/Dockerfile.dev', '-t', image, '.'], { cwd: sourceRoot, stdio: 'inherit' });
     if (built.status !== 0) process.exit(built.status ?? 1);
   } else if (spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) {
     console.error('The explicitly configured E2E_BACKEND_IMAGE is unavailable. Prepare it before running.');
