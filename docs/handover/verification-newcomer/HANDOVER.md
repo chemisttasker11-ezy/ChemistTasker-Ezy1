@@ -64,6 +64,24 @@ first: it is not a logic change by mistake.
   not dispatched anywhere today, see `core/test_task_contracts.py` note). Its tests now run under the tightened setting.
 - The public-shift refusal text changed to "Verify your profile (email and mobile, plus AHPRA ...)".
 
+## Staff Shift Centre redesign and membership roles (2026-10-14)
+
+- **D33 Membership roles** (owner): a pharmacy may give a pharmacist or Pharmacy team account an assistant, technician
+  or student role inside its own team; pharmacist and intern memberships need the matching registered profile.
+  One rule, `memberships/role_resolution.membership_role_refusal`, used by invites, applications, review and admin
+  assignment. Internal/community shifts use the membership role; the public profile keeps the profile role. (c447328)
+- **Staff Shift Centre (web, 7f3787e):** Public, Community, Confirmed and History share a "Shift Centre" header with
+  segmented section tabs (routes unchanged), segmented Browse/Saved/Interested/Rejected/Offers tabs, and Confirmed/History
+  rebuilt as owner-style booked-shift cards (`shiftCenter/WorkerBookedShifts.tsx`) with a pharmacy details dialog
+  (address, documents, reviews) and a clearer rating dialog. Checked headless (Playwright) at 1365 px and 390 px:
+  no page errors; tabs fit on phones; details and rating dialogs load.
+- **Staff Shift Centre (Expo):** Confirmed and History rebuilt on the same pattern (`roles/shared/shifts/WorkerBookedShifts.tsx`),
+  header subtitles match web. Typecheck and lint pass. **On-screen check skipped at the owner's request** (the Expo web
+  login reached the dashboard, then the dev server stalled); run it before release.
+- **Third review** (`playground/verification-third-review/REVIEW.txt`): read; its four findings (ownership drift
+  before the tab saves, admin corrections bypassing the registry, consumed referee links after upgrade, the threaded
+  test failing on SQLite) are the next work.
+
 ## Second senior review (2026-10-14, commit 3fffcd1) and what was done
 
 Reviewer file: `playground/verification-rereview/REVIEW.txt` (local only).
