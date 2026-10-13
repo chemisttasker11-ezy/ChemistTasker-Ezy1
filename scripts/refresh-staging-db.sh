@@ -70,7 +70,7 @@ chmod 600 "$rollback_path"
 docker exec chemisttasker_postgres_staging \
   psql --username=chemisttasker_staging --dbname=chemisttasker_staging \
   --set ON_ERROR_STOP=1 \
-  --command="DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION chemisttasker_staging;"
+  --command="DROP SCHEMA IF EXISTS public CASCADE;"
 
 docker cp "$backup_path" chemisttasker_postgres_staging:/tmp/production-refresh.dump
 docker exec chemisttasker_postgres_staging \
