@@ -8,7 +8,30 @@ The staging stack uses its own PostgreSQL database, Redis instance, media/static
 
 The public preview is provided by a Cloudflare Quick Tunnel, so the initial staging setup does not require a DNS change or a production Nginx change. The generated `trycloudflare.com` URL is HTTPS. If the tunnel container is recreated the URL can change; a permanent `staging.chemisttasker.com.au` hostname can be added later.
 
-Email, SMS, Stripe, OCR, ScrapingBee and Azure storage remain intentionally disconnected in staging by default so preview activity cannot trigger real messages, payments, paid lookups or production file writes.
+Email, SMS, Stripe, OCR, ScrapingBee and Azure storage stay disconnected unless the
+optional server-side files below exist, so preview activity cannot trigger real
+messages, payments, paid lookups or production file writes by accident.
+
+Mobile OTP has no test bypass: with MobileMessage credentials in
+`env/staging.api.env`, staging sends real SMS codes exactly like local; without
+them, requesting a mobile code returns 502. The seeded synthetic users are already
+mobile-verified, so they never need an SMS.
+
+To enable real email delivery with the same SMTP account as local, put
+`EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` and `DEFAULT_FROM_EMAIL` in the ignored
+server-side file `env/staging.email.env`. Alternatively, set
+`STAGING_EMAIL_ENV_FILE` to the path of the existing backend `.env` before running
+`scripts/deploy-staging.sh`. The deployment reads only those three mail settings;
+staging retains its own database and service configuration. The backend and email
+worker receive the same values. Keep this file on the staging server; the source
+sync preserves `env/` but never uploads local credentials from Git.
+
+For full integration testing, `env/staging.api.env` (or `STAGING_API_ENV_FILE`)
+can supply OCR, ScrapingBee, MobileMessage, Azure account credentials and Stripe
+test credentials from the backend `.env`. Stripe live keys are rejected by the
+deployment script. Azure storage stays disabled in staging so test uploads keep
+using staging's own volume. Browser Maps and reCAPTCHA keys, including the
+matching backend reCAPTCHA secret, remain in `env/staging.integrations.env`.
 
 ## Browser integrations
 

@@ -55,7 +55,7 @@ docker run --rm   -v "$ROOT_DIR:/src:ro"   -e CI=1   node:22-bookworm   bash -lc
   '
 
 echo "== Backend QA =="
-docker build -t "$backend_image" backend
+docker build -f backend/Dockerfile -t "$backend_image" .
 
 common_env=(
   -e WAIT_FOR_REDIS=0
