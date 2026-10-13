@@ -4,7 +4,7 @@ import ShiftList from './ShiftList';
 
 const ROLE_LABELS: Record<string, string> = {
   PHARMACIST: 'Pharmacist', INTERN: 'Intern Pharmacist', TECHNICIAN: 'Dispensary Technician',
-  ASSISTANT: 'Assistant', STUDENT: 'Pharmacy Student', EXPLORER: 'Explorer',
+  ASSISTANT: 'Assistant', STUDENT: 'Pharmacy Student', EXPLORER: 'New to pharmacy',
 };
 const noop = () => undefined;
 const none = new Set<number>();

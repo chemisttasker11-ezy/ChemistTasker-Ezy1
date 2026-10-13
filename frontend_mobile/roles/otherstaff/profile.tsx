@@ -191,7 +191,7 @@ export default function OtherStaffProfileScreen() {
               />
             </View>
             <Text variant="headlineSmall" style={styles.name}>
-              {user?.username || 'Other Staff'}
+              {user?.username || 'Pharmacy team member'}
             </Text>
             <Text variant="bodyMedium" style={styles.email}>
               {user?.email || ''}

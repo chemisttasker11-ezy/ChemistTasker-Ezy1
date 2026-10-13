@@ -4,7 +4,7 @@ const groups = [
  {title:'Connected pharmacy teams',items:['Coordinate rosters and team availability','Keep tasks and events in a shared calendar','Manage pharmacy memberships','Work across authorised pharmacy locations']},
  {title:'Community & knowledge',items:['Six public platform hubs','Comments, reactions and community polls','Blog articles and pharmacy news','Private pharmacy and organisation discussions']},
  {title:'Invoices & administration',items:['Prepare shift invoices','Keep invoice records together','Review work and payment status','Access administration tools according to your role']},
- {title:'One account, clear access',items:['Public pages and private dashboards','Owner, pharmacist, intern, Other Staff and Explorer communities','Separate editorial publishing responsibilities','Authorised organisation and internal staff spaces']},
+ {title:'One account, clear access',items:['Public pages and private dashboards','Owner, pharmacist, intern, pharmacy team and new-to-pharmacy communities','Separate editorial publishing responsibilities','Authorised organisation and internal staff spaces']},
 ];
 
 export default function FeatureCatalogue() {

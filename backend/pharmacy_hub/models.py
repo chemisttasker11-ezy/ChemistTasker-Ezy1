@@ -115,8 +115,8 @@ class PharmacyHubPost(models.Model):
         OWNER = "owner", "Owner Hub"
         PHARMACIST = "pharmacist", "Pharmacists Hub"
         INTERN = "intern", "Interns Hub"
-        STAFF = "staff", "Staff Hub"
-        EXPLORER = "explorer", "Explorer Hub"
+        STAFF = "staff", "Pharmacy Team Hub"
+        EXPLORER = "explorer", "New to Pharmacy Hub"
 
     pharmacy = models.ForeignKey(
         "client_profile.Pharmacy",
@@ -570,8 +570,8 @@ class PharmacyHubPoll(models.Model):
         OWNER = "owner", "Owner Hub"
         PHARMACIST = "pharmacist", "Pharmacists Hub"
         INTERN = "intern", "Interns Hub"
-        STAFF = "staff", "Staff Hub"
-        EXPLORER = "explorer", "Explorer Hub"
+        STAFF = "staff", "Pharmacy Team Hub"
+        EXPLORER = "explorer", "New to Pharmacy Hub"
 
     pharmacy = models.ForeignKey(
         "client_profile.Pharmacy",

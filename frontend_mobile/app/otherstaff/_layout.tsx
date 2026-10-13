@@ -66,7 +66,7 @@ function OtherStaffSidebar({
   return (
     <Portal>
       <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.sidebar}>
-        <Text variant="titleMedium" style={styles.sidebarTitle}>Other staff menu</Text>
+        <Text variant="titleMedium" style={styles.sidebarTitle}>Pharmacy team menu</Text>
         <Divider />
         {sidebarItems.map((item) => (
           <List.Item
@@ -262,7 +262,7 @@ export default function OtherStaffTabs() {
             fontWeight: '600',
           },
           headerShown: true,
-          headerTitle: tabTitles[route.name] || 'Other Staff',
+          headerTitle: tabTitles[route.name] || 'Pharmacy team',
           headerRightContainerStyle: { paddingRight: 10 },
           headerLeft: () => (
               <IconButton icon="menu" accessibilityLabel="Open other staff menu" onPress={() => setSidebarVisible(true)} />

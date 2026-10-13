@@ -15,7 +15,7 @@ export function dashboardTitleForRole(role?: string | null, otherStaffRoleType?:
   if (normalized === "OWNER") return "Owner Dashboard";
   if (normalized === "PHARMACIST") return "Pharmacist Dashboard";
   if (normalized === "OTHER_STAFF") return `${otherStaffRoleLabel(otherStaffRoleType)} Dashboard`;
-  if (normalized === "EXPLORER") return "Explorer Dashboard";
+  if (normalized === "EXPLORER") return "New to pharmacy dashboard";
   if (normalized.includes("ORG") || normalized === "ORGANIZATION") return "Organization Dashboard";
   return "Dashboard";
 }

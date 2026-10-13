@@ -185,13 +185,13 @@ export default function ExplorerProfileScreen() {
               />
             </View>
             <Text variant="headlineSmall" style={styles.name}>
-              {user?.username || 'Explorer'}
+              {user?.username || 'New to pharmacy'}
             </Text>
             <Text variant="bodyMedium" style={styles.email}>
               {user?.email || ''}
             </Text>
             <View style={styles.roleChip}>
-              <Text variant="labelSmall" style={styles.roleText}>EXPLORER</Text>
+              <Text variant="labelSmall" style={styles.roleText}>NEW TO PHARMACY</Text>
             </View>
           </LinearGradient>
         </Card>

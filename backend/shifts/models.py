@@ -14,7 +14,7 @@ class Shift(models.Model):
         ('STUDENT', 'Student'),
         ('ASSISTANT', 'Assistant'),
         ('TECHNICIAN', 'Technician'),
-        ('EXPLORER', 'Explorer'),
+        ('EXPLORER', 'New to pharmacy'),
     ]
     RATE_TYPE_CHOICES = [
         ('FIXED', 'Fixed'),

@@ -39,9 +39,9 @@ class User(AbstractUser):
     ROLE_CHOICES = (
         ('OWNER',       'Pharmacy Owner'),
         ('PHARMACIST',  'Pharmacist'),
-        ('OTHER_STAFF', 'Other Staff'),
+        ('OTHER_STAFF', 'Pharmacy team'),
         ('ORG_STAFF',   'Organization Staff'),
-        ('EXPLORER',    'Explorer'),
+        ('EXPLORER',    'New to pharmacy'),
         # Created only when an organisation onboards a pharmacy by email: the contact manages that pharmacy through a
         # pharmacy-admin MANAGER assignment and may later choose PHARMACIST or OTHER_STAFF once.
         ('PHARMACY_MANAGER', 'Pharmacy Manager'),

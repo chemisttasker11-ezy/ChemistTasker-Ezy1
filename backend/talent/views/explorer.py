@@ -101,7 +101,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         and stamp author_user.
         """
         if not (self.request.user.is_explorer() or self.request.user.is_pharmacist() or self.request.user.is_otherstaff()):
-            raise PermissionDenied("Only Explorer, Pharmacist, or Other Staff can create posts.")
+            raise PermissionDenied("Only pharmacists, the pharmacy team and people new to pharmacy can create posts.")
         self._require_public_staff_access()
         explorer_profile = serializer.validated_data.get("explorer_profile")
         if explorer_profile is not None and explorer_profile.user_id != self.request.user.id:

@@ -9,7 +9,7 @@ const titleCase = (value: string) =>
     .replace(/(^|\s)\S/g, (t) => t.toUpperCase());
 
 const formatRoleLabel = (role?: string | null) => {
-  if (!role) return "Explorer";
+  if (!role) return "New to pharmacy";
   return titleCase(role);
 };
 

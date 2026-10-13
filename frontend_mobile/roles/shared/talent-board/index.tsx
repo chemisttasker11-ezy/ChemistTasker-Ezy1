@@ -36,7 +36,7 @@ const titleCase = (value: string) =>
     .replace(/(^|\s)\S/g, (t) => t.toUpperCase());
 
 const formatRoleLabel = (role?: string | null) => {
-  if (!role) return 'Explorer';
+  if (!role) return 'New to pharmacy';
   return titleCase(role);
 };
 
@@ -381,7 +381,7 @@ export default function TalentBoard({
   const [pitchSaving, setPitchSaving] = useState(false);
   const [pitchError, setPitchError] = useState<string | null>(null);
   const [existingPostId, setExistingPostId] = useState<number | null>(null);
-  const [roleTitle, setRoleTitle] = useState<string>('Explorer');
+  const [roleTitle, setRoleTitle] = useState<string>('New to pharmacy');
   const [explorerProfileId, setExplorerProfileId] = useState<number | null>(null);
   const [pitchSkills, setPitchSkills] = useState<string[]>([]);
   const [pitchForm, setPitchForm] = useState<PitchFormState>({
@@ -426,7 +426,7 @@ export default function TalentBoard({
     });
     setExistingPostId(null);
     setExplorerProfileId(null);
-    setRoleTitle('Explorer');
+    setRoleTitle('New to pharmacy');
     setPitchSkills([]);
   }, []);
 
@@ -440,7 +440,7 @@ export default function TalentBoard({
       inheritedAvailabilitySlots = mapAvailabilityToPitchSlots(await fetchUserAvailabilityService().catch(() => []));
       if (isExplorer) {
         const onboarding: any = await getOnboarding('explorer');
-        setRoleTitle((onboarding?.role_type || 'Explorer').replace('_', ' '));
+        setRoleTitle((onboarding?.role_type || 'New to pharmacy').replace('_', ' '));
         setExplorerProfileId(onboarding?.id ?? null);
       } else if (isPharmacist) {
         const onboarding: any = await getOnboarding('pharmacist');
@@ -448,7 +448,7 @@ export default function TalentBoard({
         onboardingSkills = Array.isArray(onboarding?.skills) ? onboarding.skills : [];
       } else if (isOtherStaff) {
         const onboarding: any = await getOnboarding('other_staff');
-        setRoleTitle((onboarding?.role_type || 'Other Staff').replace('_', ' '));
+        setRoleTitle((onboarding?.role_type || 'Pharmacy team').replace('_', ' '));
         onboardingSkills = Array.isArray(onboarding?.skills) ? onboarding.skills : [];
         }
         const mine = posts.find((post) => post.authorUserId === user?.id);

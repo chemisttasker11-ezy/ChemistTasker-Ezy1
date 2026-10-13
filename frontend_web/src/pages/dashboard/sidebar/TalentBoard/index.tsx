@@ -419,7 +419,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const [pitchSaving, setPitchSaving] = useState(false);
   const [pitchError, setPitchError] = useState<string | null>(null);
   const [existingPostId, setExistingPostId] = useState<number | null>(null);
-  const [roleTitle, setRoleTitle] = useState<string>("Explorer");
+  const [roleTitle, setRoleTitle] = useState<string>("New to pharmacy");
   const [explorerProfileId, setExplorerProfileId] = useState<number | null>(null);
   const [pitchForm, setPitchForm] = useState<PitchFormState>({
     headline: "",
@@ -484,7 +484,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     });
     setExplorerProfileId(null);
     setExistingPostId(null);
-    setRoleTitle("Explorer");
+    setRoleTitle("New to pharmacy");
     setPitchSkills([]);
   }, []);
 
@@ -499,7 +499,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       if (isExplorer) {
         const onboarding: any = await getOnboarding("explorer");
         setRoleTitle(
-          (onboarding?.role_type || "Explorer")
+          (onboarding?.role_type || "New to pharmacy")
             .replace("_", " ")
             .toLowerCase()
             .replace(/(^|\s)\S/g, (t: string) => t.toUpperCase())

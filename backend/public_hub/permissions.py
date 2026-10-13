@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 
-HUBS = {'public': 'ChemistTasker Hub', 'pharmacist': 'Pharmacist Hub', 'intern': 'Intern Hub', 'staff': 'Other Staff Hub', 'explorer': 'Explorer Hub', 'owner': 'Owner Hub'}
+HUBS = {'public': 'ChemistTasker Hub', 'pharmacist': 'Pharmacist Hub', 'intern': 'Intern Hub', 'staff': 'Pharmacy Team Hub', 'explorer': 'New to Pharmacy Hub', 'owner': 'Owner Hub'}
 AREAS = {'blog': 'Blog', 'news': 'News', **{f'hub:{k}': v for k, v in HUBS.items()}}
 
 

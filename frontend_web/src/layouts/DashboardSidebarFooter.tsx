@@ -147,7 +147,7 @@ export default function DashboardSidebarFooter({ mini }: SidebarFooterProps) {
         kind: "ROLE",
         role: user.role,
         label: user.role === "OTHER_STAFF" ? otherStaffRoleLabel(otherStaffRoleType) :
-          user.role === "PHARMACIST" ? "Pharmacist" : user.role === "OWNER" ? "Owner" : "Explorer",
+          user.role === "PHARMACIST" ? "Pharmacist" : user.role === "OWNER" ? "Owner" : "New to pharmacy",
         helper: "Original dashboard",
       });
     }

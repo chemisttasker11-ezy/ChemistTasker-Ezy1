@@ -16,9 +16,9 @@ def explorer_post_upload_path(instance, filename):
 
 class ExplorerPost(models.Model):
     ROLE_CATEGORY_CHOICES = [
-        ("EXPLORER", "Explorer"),
+        ("EXPLORER", "New to pharmacy"),
         ("PHARMACIST", "Pharmacist"),
-        ("OTHER_STAFF", "Other Staff"),
+        ("OTHER_STAFF", "Pharmacy team"),
     ]
     WORK_TYPE_CHOICES = [
         ("FULL_TIME", "Full Time"),

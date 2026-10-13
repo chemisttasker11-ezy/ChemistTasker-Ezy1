@@ -390,10 +390,10 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
 
   if (assignments.length === 0 && !canSwitchToOrg && pendingAdminCount === 0) return null;
 
-  const roleLabel = normalizedRole === 'OTHER_STAFF' ? 'Other Staff' :
+  const roleLabel = normalizedRole === 'OTHER_STAFF' ? 'Pharmacy team' :
     normalizedRole === 'PHARMACIST' ? 'Pharmacist' :
     normalizedRole === 'OWNER' ? 'Owner' :
-    normalizedRole === 'EXPLORER' ? 'Explorer' : 'Organization';
+    normalizedRole === 'EXPLORER' ? 'New to pharmacy' : 'Organization';
   const activeAdmin = String(pathname || '').startsWith('/admin');
   const activeOrg = String(pathname || '').startsWith('/organization');
 

@@ -76,7 +76,7 @@ class ExplorerCreatePermissionTests(TestCase):
         owner, _ = make_owner_with_pharmacy()
         res = client_for(owner).post(URL, self.PAYLOAD, format="json")
         self.assertEqual(res.status_code, 403)
-        self.assertIn("Only Explorer, Pharmacist, or Other Staff", str(res.json()))
+        self.assertIn("Only pharmacists, the pharmacy team and people new to pharmacy", str(res.json()))
 
     def test_explorer_can_create_and_is_stamped_as_author_with_reference_code(self):
         user = make_user("EXPLORER")
