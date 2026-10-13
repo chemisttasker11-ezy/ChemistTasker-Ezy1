@@ -275,7 +275,7 @@ export default function PublicShiftsPage({
 
   const handleApplyAll = async (shift: Shift) => {
     if (!isVerified) {
-      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
+      const msg = 'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }
@@ -298,7 +298,7 @@ export default function PublicShiftsPage({
 
   const handleApplySlot = async (shift: Shift, slotId: number) => {
     if (!isVerified) {
-      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
+      const msg = 'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }
@@ -350,7 +350,7 @@ export default function PublicShiftsPage({
 
   const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload) => {
     if (!isVerified) {
-      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
+      const msg = 'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.';
       throw new Error(msg);
     }
     try {
@@ -498,7 +498,7 @@ export default function PublicShiftsPage({
 
   const handleApplySlots = async (shift: Shift, slotIds: number[]) => {
     if (!isVerified) {
-      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
+      const msg = 'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }

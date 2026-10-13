@@ -495,42 +495,11 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         _marker_delete(_final_evaluation_reminder_key(model_name, object_pk))
         logger.info(f"[FINAL EVALUATION] pk={object_pk} reached a final state. All pending reminders cancelled.")
 
-    # Build required checks
-    required_checks = []
-    model_name_lower = model_name.lower()
-
-    if model_name_lower == 'owneronboarding':
-        if getattr(obj, 'role', None) == "PHARMACIST":
-            required_checks.append('ahpra')
-
-    elif model_name_lower == 'pharmacistonboarding':
-        required_checks.extend(['gov_id', 'ahpra'])
-        if obj.payment_preference == "ABN":
-            if obj.abn:
-                required_checks.append('abn')
-        elif obj.payment_preference == "TFN":
-            if obj.tfn_number:
-                required_checks.append('tfn_number')
-
-    elif model_name_lower == 'otherstaffonboarding':
-        required_checks.append('gov_id')
-        if obj.payment_preference == 'ABN' and obj.abn:
-            required_checks.append('abn')
-        if obj.payment_preference == 'TFN' and obj.tfn_number:
-            required_checks.append('tfn_number')
-        if getattr(obj, 'role_type', None) == 'INTERN':
-            required_checks.extend(['ahpra_proof', 'hours_proof'])
-        if getattr(obj, 'role_type', None) in ['ASSISTANT', 'TECHNICIAN']:
-            required_checks.append('certificate')
-        if getattr(obj, 'role_type', None) == 'STUDENT':
-            required_checks.append('university_id')
-        if getattr(obj, 'cpr_certificate', None):
-            required_checks.append('cpr_certificate')
-        if getattr(obj, 's8_certificate', None):
-            required_checks.append('s8_certificate')
-
-    elif model_name_lower == 'exploreronboarding':
-        required_checks.append('gov_id')
+    # Required checks come from the verification policy; optional evidence (ID, documents) never fails a profile.
+    from onboarding.verification.policy import requirements
+    required = requirements(obj) if model_name.lower() != 'owneronboarding' else (
+        {'ahpra': bool(obj.ahpra_verified)} if getattr(obj, 'role', None) == "PHARMACIST" else {})
+    required_checks = [check for check in ('ahpra', 'gov_id') if check in required]
 
     # Evaluate checks
     has_failed_check, is_pending_check, failure_reasons = False, False, []
@@ -545,11 +514,13 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
                 failure_reasons.append(note)
             elif not is_verified and not note:
                 is_pending_check = True
+    # Email and mobile are confirmed interactively; until then the profile simply waits.
+    if any(not required.get(check, True) for check in ('email', 'mobile', 'role')):
+        is_pending_check = True
 
-    # Referee requirements
-    referees_needed = model_name_lower in ['pharmacistonboarding', 'otherstaffonboarding', 'exploreronboarding']
+    # Referee requirements (only when the owner has tightened the policy)
     is_pending_referee = False
-    if referees_needed:
+    if 'referees' in required:
         for idx in [1, 2]:
             if getattr(obj, f"referee{idx}_rejected", False):
                 has_failed_check = True

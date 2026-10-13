@@ -285,9 +285,20 @@ class RoleSpecificTabTests(RoleTabFixture):
 
     def test_other_staff_regulatory_documents(self):
         user, obj, url = self.onboarding("otherstaff", role_type="INTERN")
+        # Interns give only their AHPRA number (provisional registration); proof files and the half are optional.
         response, work = self.patch(user, url, {"tab": "regulatory", "submitted_for_verification": True})
-        self.assertEqual((response.status_code, set(response.data)), (400, {"ahpra_proof", "hours_proof"}))
+        self.assertEqual((response.status_code, set(response.data)), (400, {"ahpra_number"}))
         self.assertEqual(work["tasks"], [])
+        response, work = self.patch(user, url, {"tab": "regulatory", "ahpra_number": "0001234567",
+                                                "submitted_for_verification": True})
+        self.assertEqual(response.status_code, 200, response.data)
+        obj.refresh_from_db()
+        self.assertEqual((obj.ahpra_number, obj.ahpra_verified), ("0001234567", False))
+
+        # A Level 3 assistant claiming dispensing submits without a certificate: it is an optional badge.
+        response, work = self.patch(user, url, {"tab": "regulatory", "role_type": "ASSISTANT", "classification_level": "LEVEL_3",
+                                                "dispensary_qualification": "LEVEL_3", "submitted_for_verification": True})
+        self.assertEqual(response.status_code, 200, response.data)
 
         response, work = self.patch(user, url, {"tab": "regulatory", "role_type": "ASSISTANT",
                                                 "certificate": pdf("cert.pdf")}, multipart=True)
@@ -328,7 +339,7 @@ class RoleSpecificTabTests(RoleTabFixture):
             multipart=True,
         )
         self.assertEqual(response.status_code, 400, response.data)
-        self.assertIn("hours_proof", response.data)
+        self.assertIn("ahpra_number", response.data)
 
         obj.refresh_from_db()
         self.assertEqual(obj.ahpra_proof.name, old_path)

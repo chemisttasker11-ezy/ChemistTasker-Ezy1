@@ -3,7 +3,7 @@ import os
 import socket
 import ipaddress
 from environ import Env
-from datetime import timedelta
+from datetime import date, timedelta
 import dj_database_url
 import sys
 from celery.schedules import crontab
@@ -223,6 +223,14 @@ MARKETPLACE_NEW_COMMITMENTS_ENABLED = env.bool("MARKETPLACE_NEW_COMMITMENTS_ENAB
 MARKETPLACE_ESCALATION_ENABLED = env.bool("MARKETPLACE_ESCALATION_ENABLED", default=False)
 MARKETPLACE_CATALOGUE_LOOKUP_ENABLED = env.bool("MARKETPLACE_CATALOGUE_LOOKUP_ENABLED", default=False)
 MARKETPLACE_ALL_WRITES_ENABLED = env.bool("MARKETPLACE_ALL_WRITES_ENABLED", default=True)
+
+# Profile "Verified" = email + mobile (+ AHPRA for pharmacists and interns); see onboarding/verification/policy.py.
+# Tighten by listing gov_id and/or referees; profiles verified before then keep Verified until the grace date.
+VERIFICATION_EXTRA_REQUIREMENTS = [
+    item for item in _clean_env_list("VERIFICATION_EXTRA_REQUIREMENTS") if item in ("gov_id", "referees")
+]
+_verification_grace = env("VERIFICATION_GRACE_UNTIL", default="")
+VERIFICATION_GRACE_UNTIL = date.fromisoformat(_verification_grace) if _verification_grace else None
 
 ETHICAL_ACCESS_APPLICATIONS_ENABLED = env.bool("ETHICAL_ACCESS_APPLICATIONS_ENABLED", default=True)
 ETHICAL_PRIVATE_READ_ENABLED = env.bool("ETHICAL_PRIVATE_READ_ENABLED", default=False)

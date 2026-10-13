@@ -26,7 +26,7 @@ from onboarding.services.progress import (
     owner_progress_percent,
     pharmacist_progress_percent,
 )
-from onboarding.services.regulatory import apply_regulatory_tab, required_documents_for_role
+from onboarding.services.regulatory import apply_regulatory_tab
 from onboarding.services.skills import (  # noqa: F401  (_load_skills_catalog, _required_cert_skill_codes: historical path)
     _load_skills_catalog,
     _required_cert_skill_codes,
@@ -517,6 +517,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
             # ---------- REGULATORY DOCS (role + files) ----------
             'role_type','classification_level','student_year','intern_half',
+            'ahpra_number','ahpra_verified','ahpra_verification_note',
             'dispensary_qualification', 'dispensary_qualification_verified', 'dispensary_qualification_verification_note',
             'ahpra_proof','hours_proof','certificate','university_id','cpr_certificate','s8_certificate',
             'ahpra_proof_verified','ahpra_proof_verification_note',
@@ -591,6 +592,9 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             'dispensary_qualification_verification_note': {'read_only': True},
             'student_year': {'required': False, 'allow_blank': True, 'allow_null': True},
             'intern_half': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'ahpra_number': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'ahpra_verified': {'read_only': True},
+            'ahpra_verification_note': {'read_only': True},
 
             'ahpra_proof': {'required': False, 'allow_null': True},
             'hours_proof': {'required': False, 'allow_null': True},
@@ -676,10 +680,6 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     def _list_existing(self, user_id: int, code: str):
         return list_existing_skill_files(user_id, code)
-
-    # -------- utility: regulatory requirements by role --------
-    def _required_docs_for_role(self, instance):
-        return required_documents_for_role(instance)
 
     # -------- progress --------
     def get_progress_percent(self, obj):

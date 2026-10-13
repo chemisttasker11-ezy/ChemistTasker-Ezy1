@@ -184,6 +184,7 @@ class OtherStaffOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin
     fields = [
         'user', 'government_id', 'role_type', 'skills', 'skill_certificates', 'years_experience',
         'payment_preference', 'classification_level', 'student_year', 'intern_half',
+        'ahpra_number', 'ahpra_verified', 'ahpra_verification_note',
         'ahpra_proof', 'hours_proof', 'certificate', 'university_id',
         'dispensary_qualification', 'dispensary_qualification_verified', 'dispensary_qualification_verification_note',
         'cpr_certificate', 's8_certificate',

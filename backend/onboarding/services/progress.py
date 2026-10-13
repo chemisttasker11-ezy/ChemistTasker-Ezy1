@@ -1,10 +1,9 @@
-"""Onboarding completeness per role, and the verified gate.
+"""Onboarding completeness per role.
 
-CURRENT BEHAVIOUR kept from the serializers: computing the pharmacist, other-staff and explorer progress also saves
-verified=True once the role's gate passes (both referees confirmed, the role's key check verified and the phone
-verified). The calculation runs whenever the onboarding is rendered.
+Computing the pharmacist, other-staff and explorer progress also refreshes the Verified flag from the verification
+policy (onboarding/verification/policy.py). The calculation runs whenever the onboarding is rendered.
 """
-from onboarding.services.regulatory import required_documents_for_role
+from onboarding.verification.policy import refresh_verified
 
 
 def pharmacist_progress_percent(obj):
@@ -56,23 +55,7 @@ def pharmacist_progress_percent(obj):
     checks.append(early_ok)
     checks.append(late_ok)
 
-    # ---------- NEW: flip overall verified here, based on your gate ----------
-    phone_ok = bool(getattr(user, 'is_mobile_verified', False))
-    gate_ok = (
-        bool(getattr(obj, 'referee1_confirmed', False)) and
-        bool(getattr(obj, 'referee2_confirmed', False)) and
-        bool(getattr(obj, 'ahpra_verified', False)) and
-        phone_ok
-    )
-    if gate_ok and not bool(getattr(obj, 'verified', False)):
-        try:
-            obj.verified = True
-            obj.save(update_fields=['verified'])
-            # print("[VERIFY DEBUG] progress flip -> verified=True", {"pk": obj.pk}, flush=True)
-        except Exception as e:
-            # print("[VERIFY DEBUG] progress flip failed", {"pk": obj.pk, "err": str(e)}, flush=True)
-            pass
-    # ------------------------------------------------------------------------
+    refresh_verified(obj)
 
     filled = sum(1 for x in checks if x)
     total = len(checks) or 1
@@ -116,36 +99,17 @@ def otherstaff_progress_percent(obj):
     elif pref == 'TFN':
         checks.append(bool(getattr(obj, 'tfn_number', None)))
 
-    # Regulatory docs gate: all required docs for the role must be verified
-    req = required_documents_for_role(obj)
-    role_selected = str(getattr(obj, 'role_type', '') or '').upper() in {'INTERN', 'TECHNICIAN', 'ASSISTANT', 'STUDENT'}
+    # Role details: interns need their AHPRA number, the other roles their classification
     role = str(getattr(obj, 'role_type', '') or '').upper()
     classification_ok = (
-        (role == 'INTERN' and obj.intern_half in {'FIRST_HALF', 'SECOND_HALF'})
+        (role == 'INTERN' and _filled_str(getattr(obj, 'ahpra_number', None)))
         or (role == 'TECHNICIAN' and obj.classification_level in {'LEVEL_3', 'LEVEL_4'})
         or (role == 'ASSISTANT' and obj.classification_level in {'LEVEL_1', 'LEVEL_2', 'LEVEL_3', 'LEVEL_4'})
         or (role == 'STUDENT' and obj.student_year in {'YEAR_1', 'YEAR_2', 'YEAR_3', 'YEAR_4'})
     )
-    docs_ok = role_selected and classification_ok and all(getattr(obj, verified_flag, False) for _, verified_flag, _ in req)
-    checks.append(docs_ok)
+    checks.append(classification_ok)
 
-    # Final verified flip (role-specific)
-    phone_ok = bool(getattr(user, 'is_mobile_verified', False))
-    gate_ok = (
-        bool(getattr(obj, 'referee1_confirmed', False)) and
-        bool(getattr(obj, 'referee2_confirmed', False)) and
-        bool(getattr(obj, 'gov_id_verified', False))   and
-        docs_ok and
-        phone_ok
-    )
-    if gate_ok and not bool(getattr(obj, 'verified', False)):
-        try:
-            obj.verified = True
-            obj.save(update_fields=['verified'])
-            # print("[VERIFY DEBUG] otherstaff progress flip -> verified=True", {"pk": obj.pk}, flush=True)
-        except Exception as e:
-            # print("[VERIFY DEBUG] otherstaff progress flip failed", {"pk": obj.pk, "err": str(e)}, flush=True)
-            pass
+    refresh_verified(obj)
 
     filled = sum(1 for x in checks if x)
     total = len(checks) or 1
@@ -186,20 +150,7 @@ def explorer_progress_percent(obj):
     checks.append(bool(getattr(obj, 'resume', None)))
     checks.append(_filled_str(getattr(obj, 'short_bio', None)))
 
-    # Final flip
-    phone_ok = bool(getattr(user, 'is_mobile_verified', False))
-    gate_ok = (
-        bool(getattr(obj, 'referee1_confirmed', False)) and
-        bool(getattr(obj, 'referee2_confirmed', False)) and
-        bool(getattr(obj, 'gov_id_verified', False))    and
-        phone_ok
-    )
-    if gate_ok and not bool(getattr(obj, 'verified', False)):
-        try:
-            obj.verified = True
-            obj.save(update_fields=['verified'])
-        except Exception:
-            pass
+    refresh_verified(obj)
 
     filled = sum(1 for x in checks if x)
     total = len(checks) or 1

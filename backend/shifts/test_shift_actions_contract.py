@@ -154,7 +154,7 @@ class ExpressInterestTests(ShiftActionFixture):
             400, "Please complete your pharmacist onboarding before applying for public shifts."))
         response, _ = self.post(unverified, f"public-shifts/{shift.id}/express_interest/")
         self.assertEqual((response.status_code, response.data["detail"]), (
-            403, "Your onboarding must be verified by admin before applying for public shifts."))
+            403, "Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts."))
         response, sent = self.post(verified, f"public-shifts/{shift.id}/express_interest/")
         self.assertEqual(response.status_code, 201)
         [notice] = notifications_for(self.owner, "shift_interest")

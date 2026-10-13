@@ -419,6 +419,10 @@ class OtherStaffOnboarding(models.Model):
     classification_level = models.CharField(max_length=20, choices=ASSISTANT_LEVEL_CHOICES, blank=True, null=True)
     student_year = models.CharField(max_length=20, choices=STUDENT_YEAR_CHOICES, blank=True, null=True)
     intern_half = models.CharField(max_length=20, choices=INTERN_HALF_CHOICES, blank=True, null=True)
+    # Interns: provisional AHPRA registration, checked manually by admin like pharmacists.
+    ahpra_number = models.CharField(max_length=100, blank=True, null=True)
+    ahpra_verified = models.BooleanField(default=False, db_index=True)
+    ahpra_verification_note = models.TextField(blank=True, null=True)
 
     # --- Role-specific docs (kept) ---
     dispensary_qualification = models.CharField(max_length=32, blank=True, default='', choices=DISPENSARY_QUALIFICATION_CHOICES)
