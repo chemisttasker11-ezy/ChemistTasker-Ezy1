@@ -45,6 +45,17 @@ first: it is not a logic change by mistake.
 | D26 | **Interns are checked like pharmacists** (manual check on the public register; provisional registration). Submitting the Role step with an unchecked number emails the admin team, as the pharmacist basic step does. | `services/regulatory.py` |
 | open | **Under-18s: rules to be discussed** (regulations, our responsibilities). Unchanged for now: minimum age 15, first name only, Under 18 label. The review's "no contact before a match" rule is **not implemented** pending that discussion. | - |
 
+### Decisions after the second review (owner, 2026-10-14)
+
+| # | Decision | Enforced in |
+|---|---|---|
+| D27 | **A Pharmacy team role is fixed once chosen** (assistant / technician / intern / student). Basic takes no role fields; the Role step refuses a change ("Contact support"); the picker is locked on web and Expo. Supersedes D21's "check stays across role changes" (roles no longer change). | `services/regulatory.py`, `services/basic.py`, `RegulatoryV2.tsx`, Expo `RegulatoryScreen` |
+| D28 | **AHPRA ownership is a table** (`AhpraRegistration`, unique normalised number, one user). Every onboarding write passes one guard (`verification/ahpra_numbers.guard_ahpra_write`); unknown tabs are refused so nothing skips it. Migration 0080 registers existing numbers and **clears duplicates**: the account whose number was checked keeps it (else the lowest user id); others lose the number, its check and (workers) Verified, with a note to contact support. Owner: duplicates on local, staging and production are fake accounts. | `onboarding/verification/ahpra_numbers.py`, `serializers.py`, `client_profile/migrations/0080` |
+| D29 | **Submit never removes Verified.** Only evidence changes do: a changed AHPRA number, a changed photo ID when Verified relies on it (overseas mobile skip or a tightening), leaving Overseas. A verified mobile number is already locked. Rates, payment, profile, interests, skills and identity edits that Verified does not rely on keep access, including during a tightening grace period. | `policy.revoke_for_changed_evidence`; submit resets removed from basic, identity, payment, preferences, profile, regulatory (owner profile unchanged) |
+| D30 | **Referee links and reminders sent before an upgrade follow the person** to their new worker profile (answers and reminders kept). | `services/work_profile.referee_profile_target`, `views.py` (questionnaire + reject), `tasks.run_referee_reminder` |
+| D31 | **Worker skills show as two rows, Skills and Software** (the job board's split), on talent cards (symbol tiles) and profiles (name chips), web, Next and Expo. | `frontend_web/shared/WorkerSkills.tsx`, Expo `WorkerSkillRows.tsx` |
+| D32 | **One worker profile everywhere** (Review, Reveal, Confirmed, History; web and Expo). Contact details and the CV **only in Confirmed**: the History endpoint no longer sends them and Expo Review no longer shows the email. **Message** on Confirmed bookings opens a direct chat. | `shifts/candidates.assigned_profile(contact=)`, `WorkerProfileDialog` (web + Expo), `OwnerAssignedShiftBoard` |
+
 ### Behaviour changes a reviewer will notice (all intended)
 - A technician / Level 2-4 assistant can submit Role & qualifications without a certificate (D7).
 - Profiles become Verified without referees or ID (D1, D2). Interns no longer need hours proof (D8).
@@ -52,6 +63,31 @@ first: it is not a logic change by mistake.
 - The background `final_evaluation` uses the same policy (it disagreed with the progress calculator before; it is
   not dispatched anywhere today, see `core/test_task_contracts.py` note). Its tests now run under the tightened setting.
 - The public-shift refusal text changed to "Verify your profile (email and mobile, plus AHPRA ...)".
+
+## Second senior review (2026-10-14, commit 3fffcd1) and what was done
+
+Reviewer file: `playground/verification-rereview/REVIEW.txt` (local only).
+
+| # | Finding | Outcome |
+|---|---|---|
+| 1 (P1) | Unknown `tab` reached ModelSerializer.update and changed a checked AHPRA number | Fixed: unknown tabs refused (pharmacist, Pharmacy team, newcomer); the AHPRA guard runs first on every write (D28). Owner already normalised to Basic. |
+| 2 (P1) | Basic draft `role_type: INTERN` kept Verified | Fixed by D27: Basic takes no role fields; the Role step refuses a change |
+| 3 (P2) | Concurrent claims saved one number twice | Fixed by D28: unique registry row; threaded API test returns 200 + 400 and one owner |
+| 4 (P2) | Submit removed Verified during grace | Fixed by D29 (all tabs) |
+| 5 (P2) | Upgrade dropped work rights | Fixed: carried (an answer already on the target wins) |
+| 6 (P2) | Newcomer posts with blank/null category survived upgrade | Fixed: deleted by provenance (profile link, or authored with EXPLORER/blank/null category) |
+| 7 (P2) | Referee links updated the old newcomer row | Fixed by D30 |
+| 8 (P2) | Upgrade copy promised the post comes along | Fixed: shared `UPGRADE_COPY` says it is removed with its likes and views, before and in the confirmation |
+| 9 (P2) | General guide claimed every Verified profile has a mobile | Fixed: states the overseas exception and no guarantee; shared-core test |
+
+The reviewer's probes (`backend/onboarding/management/test_rereview.py`, ignored) still fail where the owner decided
+differently: the race probe patches the removed `basic.ahpra_number_error` (the tracked threaded test replaces it), and
+the Basic role probe expects the role to change (D27: it can no longer change, so the assistant correctly stays
+Verified).
+
+**Before staging/production:** migration 0080 on the local DB copy registered 3 numbers and cleared 279 duplicates;
+263 of 265 seed pharmacists lost their number and Verified (all `.test` accounts). Expect the same on staging and
+production seed data. Run it on a staging snapshot first and read the printed counts.
 
 ## Senior review (2026-10-13) and what was done
 
@@ -115,6 +151,9 @@ owner decided differently: lock instead of reset (1), check kept across role cha
 | 5829e17 | badge visual redesign (D20) |
 | ac77e03 | review fixes, backend (D21-D26; findings 1, 3-8, 10) |
 | 9b82a1c | review fixes, clients (work rights, overseas wording, locks, grace reminder, Next marks, date picker) |
+| 3fffcd1 | handover after the first review |
+| 2d5253b | one worker profile everywhere, contact only in Confirmed, Message, skills layout (D31, D32) |
+| a9bd85d | second review fixes (D27-D30; findings 1-9) |
 
 ## Migrations (all additive or label-only)
 - `client_profile` 0075 intern AHPRA fields; 0076 label-only; 0077 newcomer date_of_birth, last_talent_post_at, role_type choices (labels + OVERSEAS); 0078 `Shift.public_hidden_at`.
@@ -122,6 +161,8 @@ owner decided differently: lock instead of reset (1), check kept across role cha
 - `talent` 0004 label-only; 0005 `ExplorerPost.hidden_at`. `pharmacy_hub` 0004 label-only. `public_hub` 0005 BoardReport.
 - `client_profile` 0079 `work_rights` on pharmacist, Pharmacy team and newcomer profiles (additive, default '').
   Applied to the DB copy after a backup (`playground/backups/ct_verification_before_0079_20261014.dump`).
+- `client_profile` 0080 `AhpraRegistration` + data step (registers numbers, clears duplicates, prints counts; reverse is a
+  no-op for the cleared numbers). Applied to the DB copy after a backup (`playground/backups/ct_verification_before_0080_20261014.dump`).
 - Label-only migrations checked with `sqlmigrate`: no SQL. No data is rewritten. Existing ExplorerOnboarding codes kept
   (STUDENT/JUNIOR/CAREER_SWITCHER relabelled; OVERSEAS added).
 - Applied only to a **copy** of the dev DB (`ct_verification` in container `ctpg`). The dev DB `chemisttasker_preview`
