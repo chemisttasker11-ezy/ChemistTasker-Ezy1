@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Card, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { REQUIREMENT_TEXT, getOnboardingDetail, normalizeVerification, type RequirementCode, type VerificationSummary } from '@chemisttasker/shared-core';
+import { REQUIREMENT_TEXT, getOnboardingDetail, normalizeVerification, outstandingText, type RequirementCode, type VerificationSummary } from '@chemisttasker/shared-core';
 import { BadgeGuideButton, VerificationBadges } from './VerificationBadges';
 
 export function ProfileVerificationCard({ roleKey, role, routes }: {
@@ -34,6 +34,8 @@ export function ProfileVerificationCard({ roleKey, role, routes }: {
 
   if (failed && !summary) return null;
   const verified = Boolean(summary?.verified);
+  // Verified profiles list only what a tightening asks for by its grace date ("References needed by ...").
+  const due = (verified ? summary?.outstanding : summary?.missing) ?? [];
   return (
     <Card style={styles.card} accessibilityLabel={verified ? 'Your profile is verified' : 'To get verified'}>
       <Card.Content style={styles.content}>
@@ -42,9 +44,9 @@ export function ProfileVerificationCard({ roleKey, role, routes }: {
           <Text variant="titleMedium" style={styles.title}>{verified ? 'Your profile is verified' : 'To get verified'}</Text>
         </View>
         <Text style={styles.subtitle}>
-          {verified ? 'You can apply for public shifts and publish on the talent hub.' : 'Only these are required. Everything else earns badges and can be added any time.'}
+          {verified ? outstandingText(summary) ?? 'You can apply for public shifts and publish on the talent hub.' : 'Only these are required. Everything else earns badges and can be added any time.'}
         </Text>
-        {!verified && summary?.missing.map(code => {
+        {due.map(code => {
           const text = REQUIREMENT_TEXT[code];
           const route = routes[code];
           return (

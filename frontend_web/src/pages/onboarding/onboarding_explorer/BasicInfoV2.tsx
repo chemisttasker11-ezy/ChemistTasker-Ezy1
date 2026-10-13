@@ -21,16 +21,12 @@ import {
   mobileRequestOtp,
   mobileVerifyOtp,
   mobileResendOtp,
+  NEWCOMER_TYPES,
+  WORK_RIGHTS_OPTIONS,
 } from '@chemisttasker/shared-core';
 import { announceOnboardingSaved } from '../OnboardingShell';
 
-const EXPLORER_ROLE_CHOICES = [
-  { value: 'STUDENT',          label: 'Student' },
-  { value: 'JUNIOR',           label: 'Junior' },
-  { value: 'CAREER_SWITCHER',  label: 'Career switcher' },
-] as const;
-
-type ExplorerRole = typeof EXPLORER_ROLE_CHOICES[number]['value'];
+type ExplorerRole = typeof NEWCOMER_TYPES[number]['value'];
 
 type ApiData = {
   // user*
@@ -43,6 +39,7 @@ type ApiData = {
   phone_number?: string;
   government_id?: string | null;
   date_of_birth?: string | null;
+  work_rights?: string | null;
   gender?: string | null;
   emergency_contact_number?: string | null;
   emergency_contact_relation?: string | null;
@@ -219,8 +216,8 @@ export default function BasicInfoV2() {
       // phone/ahpra
       if (data.phone_number != null) fd.append('phone_number', String(data.phone_number));
 
-      // date of birth
-      if (data.date_of_birth != null) fd.append('date_of_birth', String(data.date_of_birth));
+      // the date of birth is set at sign-up (minimum age) and shown read-only
+      if (data.work_rights != null) fd.append('work_rights', String(data.work_rights));
       if (data.gender != null) fd.append('gender', String(data.gender));
       if (data.emergency_contact_number != null) fd.append('emergency_contact_number', String(data.emergency_contact_number));
       if (data.emergency_contact_relation != null) fd.append('emergency_contact_relation', String(data.emergency_contact_relation));
@@ -265,6 +262,8 @@ export default function BasicInfoV2() {
         profile_photo_url: nextPhoto,
         profilePhoto: nextPhoto,
         profilePhotoUrl: nextPhoto,
+        // Leaving Overseas cancels the mobile skip on the server; the route guard then asks for the mobile check.
+        mobile_check_skipped: Boolean(prev.mobile_check_skipped) && nextData.role_type === 'OVERSEAS',
       } : prev));
       window.dispatchEvent(new CustomEvent('ct-profile-updated', {
         detail: { ...nextData, profile_photo: nextPhoto, profile_photo_url: nextPhoto },
@@ -456,24 +455,37 @@ return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
       <TextField
         select
-        label="Role"
+        label="Which describes you?"
         value={(data.role_type as string) || ''}
         onChange={e => setField('role_type', e.target.value)}
-        sx={{ flex: '1 1 220px', minWidth: 200, maxWidth: 320 }}
+        helperText={data.role_type === 'OVERSEAS' && user?.mobile_check_skipped ? 'Changing this means verifying an Australian mobile.' : undefined}
+        sx={{ flex: '1 1 260px', minWidth: 220, maxWidth: 360 }}
       >
-        {EXPLORER_ROLE_CHOICES.map(opt => (
+        {NEWCOMER_TYPES.map(opt => (
           <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
         ))}
       </TextField>
 
       <TextField
-        label="Date of Birth"
+        label="Date of birth"
         type="date"
         value={data.date_of_birth || ''}
-        onChange={e => setField('date_of_birth', e.target.value)}
+        disabled
+        helperText="Set when you signed up"
         InputLabelProps={{ shrink: true }}
         sx={{ flex: '0 1 220px', minWidth: 200, maxWidth: 220 }}
       />
+      <TextField
+        select
+        label="Work rights in Australia"
+        value={data.work_rights || ''}
+        onChange={e => setField('work_rights', e.target.value)}
+        sx={{ flex: '1 1 260px', minWidth: 220, maxWidth: 360 }}
+      >
+        {WORK_RIGHTS_OPTIONS.map(opt => (
+          <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+        ))}
+      </TextField>
       <TextField
         select
         label="Gender"

@@ -68,5 +68,6 @@ export const BADGE_SYMBOLS: Record<string, number> = {
   REFERENCES: require('./BADGE_REFERENCES.png'),
   ABN: require('./BADGE_ABN.png'),
   OVERSEAS: require('./BADGE_OVERSEAS.png'),
+  NO_WORK_RIGHTS: require('./BADGE_NO_WORK_RIGHTS.png'),
   UNDER_18: require('./BADGE_UNDER_18.png'),
 };

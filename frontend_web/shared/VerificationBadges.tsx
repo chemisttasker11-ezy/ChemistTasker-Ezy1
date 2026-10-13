@@ -113,8 +113,8 @@ export function EvidencePill({ label, state, explainer, code, showState = true }
   );
 }
 
-export function VerifiedProfilePill({ verified, role }: { verified: boolean; role?: string | null }) {
-  const body = verified ? verifiedProfileExplainer(role) : 'Email or mobile not confirmed yet, so this profile cannot apply for public shifts.';
+export function VerifiedProfilePill({ verified, role, summary }: { verified: boolean; role?: string | null; summary?: VerificationSummary | null }) {
+  const body = verified ? verifiedProfileExplainer(role, summary) : 'Email or mobile not confirmed yet, so this profile cannot apply for public shifts.';
   const title = verified ? 'Verified profile' : 'Profile not verified';
   return (
     <Explained title={title} body={body}>
@@ -124,12 +124,14 @@ export function VerifiedProfilePill({ verified, role }: { verified: boolean; rol
   );
 }
 
-/** Labels say what the person told us (Overseas) or their date of birth implies (Under 18); they are not checks. */
-export function InfoLabel({ term }: { term: 'Overseas' | 'Under 18' }) {
+const LABEL_SUBJECT = { Overseas: 'OVERSEAS', 'No work rights yet': 'NO_WORK_RIGHTS', 'Under 18': 'UNDER_18' } as const;
+
+/** Labels say what the person told us (Overseas, work rights) or their date of birth implies (Under 18); they are not checks. */
+export function InfoLabel({ term }: { term: keyof typeof LABEL_SUBJECT }) {
   const body = VERIFICATION_GUIDE.items.find(item => item.term === term)?.text || '';
   return (
     <Explained title={term} body={body}>
-      <BadgePill glyph={<BadgeGlyph subject={term === 'Overseas' ? 'OVERSEAS' : 'UNDER_18'} />} label={term} accessibleName={`${term}. ${body}`} />
+      <BadgePill glyph={<BadgeGlyph subject={LABEL_SUBJECT[term]} />} label={term} accessibleName={`${term}. ${body}`} />
     </Explained>
   );
 }
@@ -150,7 +152,7 @@ export function VerificationBadges({ summary, role, audience = 'employer', compa
   const open = rows.filter(row => row.state !== 'verified');
   return (
     <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" aria-label="Verification badges" role="group">
-      <VerifiedProfilePill verified={summary.verified} role={role} />
+      <VerifiedProfilePill verified={summary.verified} role={role} summary={summary} />
       {(compact ? verified : rows).map(row => <EvidencePill key={row.code} code={row.code} label={row.label} state={row.state} explainer={row.explainer} />)}
       {compact && open.length > 0 && (
         <Explained title={`${open.length} not verified`} body={`${open.map(row => row.label).join(', ')}. Open the profile to see why, or check these yourself after you match.`}>
@@ -159,6 +161,7 @@ export function VerificationBadges({ summary, role, audience = 'employer', compa
         </Explained>
       )}
       {summary.overseas && <InfoLabel term="Overseas" />}
+      {summary.workRights === 'NONE' && <InfoLabel term="No work rights yet" />}
       {summary.under18 && <InfoLabel term="Under 18" />}
     </Stack>
   );
@@ -189,6 +192,7 @@ const GUIDE_SAMPLE: Record<string, { subject?: BadgeSubject; state?: EvidenceSta
   'Check pending': { subject: 'ID', state: 'pending' },
   'Not verified': { subject: 'ID', state: 'not_supplied' },
   Overseas: { subject: 'OVERSEAS' },
+  'No work rights yet': { subject: 'NO_WORK_RIGHTS' },
   'Under 18': { subject: 'UNDER_18' },
 };
 

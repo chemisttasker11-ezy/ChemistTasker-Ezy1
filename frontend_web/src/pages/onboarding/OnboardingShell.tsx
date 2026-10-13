@@ -8,6 +8,7 @@ import {
   REQUIREMENT_TEXT,
   getOnboardingDetail,
   normalizeVerification,
+  outstandingText,
   type RequirementCode,
   type VerificationSummary,
 } from "@chemisttasker/shared-core";
@@ -46,12 +47,14 @@ function VerificationPanel({ summary, role, progress, targets, onOpen }: {
   onOpen: (target: RequirementTarget) => void;
 }) {
   const verified = Boolean(summary?.verified);
+  // Verified profiles list only what a tightening asks for by its grace date ("References needed by ...").
+  const due = (verified ? summary?.outstanding : summary?.missing) ?? [];
   return (
     <SectionCard
       title={verified ? "Your profile is verified" : "To get verified"}
       icon={verified ? <BadgeCheck /> : <CircleDashed />}
       subtitle={verified
-        ? "You can apply for public shifts and publish on the talent hub."
+        ? outstandingText(summary) ?? "You can apply for public shifts and publish on the talent hub."
         : "Only these are required. Everything else earns badges and can be added any time."}
     >
       {!summary ? (
@@ -61,9 +64,9 @@ function VerificationPanel({ summary, role, progress, targets, onOpen }: {
         </Stack>
       ) : (
         <Stack spacing={2}>
-          {!verified && summary.missing.length > 0 && (
+          {due.length > 0 && (
             <Stack component="ul" spacing={1} sx={{ listStyle: "none", m: 0, p: 0 }}>
-              {summary.missing.map(code => {
+              {due.map(code => {
                 const text = REQUIREMENT_TEXT[code];
                 const target = targets[code];
                 return (

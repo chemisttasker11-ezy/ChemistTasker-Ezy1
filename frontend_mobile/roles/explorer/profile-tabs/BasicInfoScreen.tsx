@@ -2,18 +2,20 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, HelperText, Menu, Text, TextInput } from 'react-native-paper';
-import { getOnboarding, updateOnboarding } from '@chemisttasker/shared-core';
+import { NEWCOMER_TYPES, getOnboarding, updateOnboarding } from '@chemisttasker/shared-core';
 import GooglePlacesInput from '../../shared/pharmacies/GooglePlacesInput';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
 import { useAuth } from '../../../context/AuthContext';
+import { WorkRightsMenu } from '../../shared/forms/WorkRightsMenu';
 
-type ExplorerRole = 'STUDENT' | 'JUNIOR' | 'CAREER_SWITCHER' | '';
+type ExplorerRole = typeof NEWCOMER_TYPES[number]['value'] | '';
 type ApiData = {
   username?: string;
   first_name?: string;
   last_name?: string;
   phone_number?: string;
   date_of_birth?: string | null;
+  work_rights?: string | null;
   gender?: string | null;
   emergency_contact_number?: string | null;
   emergency_contact_relation?: string | null;
@@ -26,12 +28,6 @@ type ApiData = {
   longitude?: string | number | null;
   role_type?: ExplorerRole | string | null;
 };
-
-const EXPLORER_ROLE_CHOICES = [
-  { value: 'STUDENT', label: 'Student' },
-  { value: 'JUNIOR', label: 'Junior' },
-  { value: 'CAREER_SWITCHER', label: 'Career switcher' },
-] as const;
 
 const GENDER_OPTIONS = [
   { value: 'MALE', label: 'Male' },
@@ -51,7 +47,7 @@ export default function ExplorerBasicInfoScreen() {
   const [lockedNames, setLockedNames] = useState({ first: false, last: false });
   const saveRef = useRef<(() => Promise<void>) | null>(null);
   const unsaved = useUnsavedChangesGuard(form, { enabled: !loading, onSave: () => saveRef.current?.(), saving });
-  const { refreshUser } = useAuth();
+  const { refreshUser, user } = useAuth();
 
   useEffect(() => {
     let mounted = true;
@@ -79,7 +75,7 @@ export default function ExplorerBasicInfoScreen() {
   }, []);
 
   const setField = (k: keyof ApiData, v: any) => setForm((p) => ({ ...p, [k]: v }));
-  const roleLabel = EXPLORER_ROLE_CHOICES.find((r) => r.value === form.role_type)?.label || 'Select role';
+  const roleLabel = NEWCOMER_TYPES.find((r) => r.value === form.role_type)?.label || 'Which describes you?';
   const genderLabel = GENDER_OPTIONS.find((g) => g.value === form.gender)?.label || 'Select gender';
   const handlePlaceSelect = (place: {
     address: string;
@@ -115,7 +111,7 @@ export default function ExplorerBasicInfoScreen() {
       if (form.last_name != null) fd.append('last_name', String(form.last_name));
       if (form.role_type != null) fd.append('role_type', String(form.role_type));
       if (form.phone_number != null) fd.append('phone_number', String(form.phone_number));
-      if (form.date_of_birth != null) fd.append('date_of_birth', String(form.date_of_birth));
+      if (form.work_rights != null) fd.append('work_rights', String(form.work_rights));
       if (form.gender != null) fd.append('gender', String(form.gender));
       if (form.emergency_contact_number != null) fd.append('emergency_contact_number', String(form.emergency_contact_number));
       if (form.emergency_contact_relation != null) fd.append('emergency_contact_relation', String(form.emergency_contact_relation));
@@ -167,11 +163,13 @@ export default function ExplorerBasicInfoScreen() {
         <TextInput mode="outlined" label="Username" value={form.username || ''} onChangeText={(v) => setField('username', v)} />
         <TextInput mode="outlined" label="Phone Number" value={form.phone_number || ''} onChangeText={(v) => setField('phone_number', v)} />
         <Menu visible={roleMenuVisible} onDismiss={() => setRoleMenuVisible(false)} anchor={<Button mode="outlined" onPress={() => setRoleMenuVisible(true)}>{roleLabel}</Button>}>
-          {EXPLORER_ROLE_CHOICES.map((opt) => (
+          {NEWCOMER_TYPES.map((opt) => (
             <Menu.Item key={opt.value} title={opt.label} onPress={() => { setField('role_type', opt.value); setRoleMenuVisible(false); }} />
           ))}
         </Menu>
-        <TextInput mode="outlined" label="Date of Birth" value={form.date_of_birth || ''} onChangeText={(v) => setField('date_of_birth', v)} placeholder="YYYY-MM-DD" />
+        {form.role_type === 'OVERSEAS' && user?.mobile_check_skipped ? <HelperText type="info">Changing this means verifying an Australian mobile.</HelperText> : null}
+        <TextInput mode="outlined" label="Date of birth (set when you signed up)" value={form.date_of_birth || ''} editable={false} />
+        <WorkRightsMenu value={form.work_rights} onChange={(v) => setField('work_rights', v)} />
         <Menu
           visible={genderMenuVisible}
           onDismiss={() => setGenderMenuVisible(false)}

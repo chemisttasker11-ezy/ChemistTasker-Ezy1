@@ -16,11 +16,28 @@ export interface VerificationSummary {
   badges: { code: BadgeCode; state: EvidenceState }[];
   /** Claimed skills that carry a certificate in the registry; other skills never have a badge. */
   skillEvidence: Record<string, EvidenceState>;
+  /** Extra requirements a verified profile must add by graceUntil to stay verified (tightening). */
+  outstanding: RequirementCode[];
+  /** ISO date, or null when nothing is due. */
+  graceUntil: string | null;
   /** Told us they are overseas: a grey label, not a trust badge. */
   overseas: boolean;
-  /** Newcomer under 18: first name only on the talent hub; youth employment rules apply. */
+  /** Verified without an Australian mobile (overseas newcomer route). */
+  mobileWaived: boolean;
+  /** Right to work in Australia, as the person told us ('' when not answered). */
+  workRights: WorkRights | '';
+  /** Under 18: first name only on the talent hub; youth employment rules apply. */
   under18: boolean;
 }
+
+export type WorkRights = 'CITIZEN_OR_RESIDENT' | 'VISA' | 'NONE';
+
+/** The work-rights question every worker profile asks (labels match the backend choices). */
+export const WORK_RIGHTS_OPTIONS: { value: WorkRights; label: string }[] = [
+  { value: 'CITIZEN_OR_RESIDENT', label: 'Australian or New Zealand citizen, or permanent resident' },
+  { value: 'VISA', label: 'Visa with work rights' },
+  { value: 'NONE', label: 'No work rights in Australia yet' },
+];
 
 export interface VerificationRow {
   code: BadgeCode;
@@ -69,7 +86,11 @@ export function normalizeVerification(value: unknown): VerificationSummary | nul
     missing: Array.isArray(raw.missing) ? raw.missing : [],
     badges: Array.isArray(raw.badges) ? raw.badges : [],
     skillEvidence: raw.skillEvidence ?? raw.skill_evidence ?? {},
+    outstanding: Array.isArray(raw.outstanding) ? raw.outstanding : [],
+    graceUntil: raw.graceUntil ?? raw.grace_until ?? null,
     overseas: Boolean(raw.overseas),
+    mobileWaived: Boolean(raw.mobileWaived ?? raw.mobile_waived),
+    workRights: raw.workRights ?? raw.work_rights ?? '',
     under18: Boolean(raw.under18 ?? raw.under_18),
   };
 }
@@ -123,10 +144,22 @@ export const REQUIREMENT_TEXT: Record<RequirementCode, { title: string; body: st
   role: { title: 'Choose your role', body: 'Tell us whether you are an assistant, technician, intern or student.' },
 };
 
-export const verifiedProfileExplainer = (role?: string | null) =>
-  /PHARMACIST|INTERN/.test(String(role || '').toUpperCase())
-    ? 'Email, mobile and AHPRA registration confirmed.'
-    : 'Email and mobile confirmed.';
+/** What "Verified profile" means for this person. Overseas newcomers who skipped the Australian mobile check get no
+ * claim at all: ChemistTasker does not vouch for overseas profiles (owner decision 2026-10-13). */
+export const verifiedProfileExplainer = (role?: string | null, summary?: Pick<VerificationSummary, 'mobileWaived'> | null) =>
+  summary?.mobileWaived
+    ? 'Overseas profile without an Australian mobile. ChemistTasker does not vouch for overseas profiles: check their identity and work rights yourself.'
+    : /PHARMACIST|INTERN/.test(String(role || '').toUpperCase())
+      ? 'Email, mobile and AHPRA registration confirmed.'
+      : 'Email and mobile confirmed.';
+
+/** "References needed by 1 March 2027 to stay verified", for the worker during a tightening grace period. */
+export function outstandingText(summary: VerificationSummary | null): string | null {
+  if (!summary?.outstanding.length) return null;
+  const items = summary.outstanding.map(code => REQUIREMENT_TEXT[code]?.title ?? code).join(' and ');
+  const by = summary.graceUntil ? new Date(`${summary.graceUntil}T00:00:00`).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+  return `${items} needed${by ? ` by ${by}` : ''} to stay verified.`;
+}
 
 /** "What do badges mean?": the same guide on every employer screen that shows badges. */
 export const VERIFICATION_GUIDE = {
@@ -137,7 +170,8 @@ export const VERIFICATION_GUIDE = {
     { term: 'Verified', tone: 'success' as BadgeTone, text: 'We checked the evidence: a certificate or ID matched to their name, or registration on the AHPRA register.' },
     { term: 'Check pending', tone: 'info' as BadgeTone, text: 'Evidence was supplied and our check is still in progress.' },
     { term: 'Not verified', tone: 'neutral' as BadgeTone, text: 'Claimed without evidence, or the evidence did not pass. Before relying on it, check it yourself or ask them to complete verification after you match.' },
-    { term: 'Overseas', tone: 'neutral' as BadgeTone, text: 'Told us they are overseas. A label, not a check: their identity was confirmed with photo ID instead of an Australian mobile.' },
+    { term: 'Overseas', tone: 'neutral' as BadgeTone, text: 'Trained or based overseas, as they told us. A label, not a check: ChemistTasker does not vouch for overseas profiles.' },
+    { term: 'No work rights yet', tone: 'neutral' as BadgeTone, text: 'They told us they do not hold the right to work in Australia yet. Check their work rights before you hire.' },
     { term: 'Under 18', tone: 'neutral' as BadgeTone, text: 'From their date of birth. Only their first name is shown; youth employment rules in your state apply.' },
   ],
   footnote: 'Badges come only from ChemistTasker checks, never from employers or reviews.',

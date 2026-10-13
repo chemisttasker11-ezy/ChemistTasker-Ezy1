@@ -28,6 +28,7 @@ type FormState = {
   dispensary_qualification: string;
   student_year: string;
   ahpra_number: string;
+  ahpra_verified: boolean;
   files: Partial<Record<FileField, File | null>>;
   existing: Partial<Record<FileField, string>>;
 };
@@ -48,7 +49,7 @@ const STUDENT_YEAR_CHOICES = [
 
 const fileUrl = (path?: string) => (!path ? "" : path.startsWith("http") ? path : `${API_BASE_URL}${path}`);
 
-const EMPTY: FormState = { role_type: "", classification_level: "", dispensary_qualification: "", student_year: "", ahpra_number: "", files: {}, existing: {} };
+const EMPTY: FormState = { role_type: "", classification_level: "", dispensary_qualification: "", student_year: "", ahpra_number: "", ahpra_verified: false, files: {}, existing: {} };
 
 function fromServer(d: any): FormState {
   return {
@@ -57,6 +58,7 @@ function fromServer(d: any): FormState {
     dispensary_qualification: d.dispensary_qualification || "",
     student_year: d.student_year || "",
     ahpra_number: d.ahpra_number || "",
+    ahpra_verified: d.ahpra_verified === true,
     files: {},
     existing: { certificate: d.certificate || "", university_id: d.university_id || "", cpr_certificate: d.cpr_certificate || "", s8_certificate: d.s8_certificate || "" },
   };
@@ -201,9 +203,11 @@ export default function RegulatoryV2() {
 
         {role === "INTERN" && (
           <Stack spacing={1}>
-            <TextField fullWidth required label="AHPRA number" value={data.ahpra_number} onChange={event => set({ ahpra_number: event.target.value })}
+            <TextField fullWidth required label="AHPRA number" value={data.ahpra_number} onChange={event => set({ ahpra_number: event.target.value })} disabled={data.ahpra_verified}
               inputProps={{ autoComplete: "off", spellCheck: false }} error={Boolean(fieldErrors.ahpra_number)}
-              helperText={fieldErrors.ahpra_number || "Your provisional (intern) registration. Our team checks it on the AHPRA register; nothing else is needed from interns."} />
+              helperText={fieldErrors.ahpra_number || (data.ahpra_verified
+                ? "Checked by our team. Your AHPRA number stays with you for life, through to general registration; contact support to correct it."
+                : "Your provisional (intern) registration. Our team checks it on the AHPRA register; nothing else is needed from interns.")} />
             {badge("AHPRA_PROVISIONAL") && data.ahpra_number && (
               <Box><EvidencePill code="AHPRA_PROVISIONAL" label="AHPRA provisional registration" state={badge("AHPRA_PROVISIONAL")!.state} explainer={badge("AHPRA_PROVISIONAL")!.explainer} /></Box>
             )}

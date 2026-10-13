@@ -78,6 +78,7 @@ export default function OtherStaffRegulatoryScreen() {
   const role: Role = data.role_type;
   const isLevelled = role === 'ASSISTANT' || role === 'TECHNICIAN';
   const badge = (code: string) => badges.find(row => row.code === code);
+  const ahpraChecked = badge('AHPRA_PROVISIONAL')?.state === 'verified';
   const set = (patch: any) => setData((prev: any) => ({ ...prev, ...patch }));
 
   const pick = async (field: FileField) => {
@@ -176,9 +177,11 @@ export default function OtherStaffRegulatoryScreen() {
         {role === 'INTERN' ? (
           <View style={{ gap: 6 }}>
             <TextInput mode="outlined" label="AHPRA number" value={data.ahpra_number} onChangeText={value => set({ ahpra_number: value })}
-              autoCapitalize="characters" autoCorrect={false} error={Boolean(fieldErrors.ahpra_number)} />
+              autoCapitalize="characters" autoCorrect={false} error={Boolean(fieldErrors.ahpra_number)} editable={!ahpraChecked} />
             <HelperText type={fieldErrors.ahpra_number ? 'error' : 'info'} visible>
-              {fieldErrors.ahpra_number || 'Your provisional (intern) registration. Our team checks it on the AHPRA register; nothing else is needed from interns.'}
+              {fieldErrors.ahpra_number || (ahpraChecked
+                ? 'Checked by our team. Your AHPRA number stays with you for life, through to general registration; contact support to correct it.'
+                : 'Your provisional (intern) registration. Our team checks it on the AHPRA register; nothing else is needed from interns.')}
             </HelperText>
             {badge('AHPRA_PROVISIONAL') && data.ahpra_number ? <EvidenceStatus code="AHPRA_PROVISIONAL" label="AHPRA provisional registration" state={badge('AHPRA_PROVISIONAL')!.state} explainer={badge('AHPRA_PROVISIONAL')!.explainer} /> : null}
           </View>

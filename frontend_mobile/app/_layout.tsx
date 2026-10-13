@@ -10,6 +10,7 @@ import { WorkspaceProvider, useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../constants/theme';
 import OfflineBanner from '../components/OfflineBanner';
 import '../config/api'; // Configure shared-core on app load
+import { en, registerTranslation } from 'react-native-paper-dates';
 import { getOwnerSetupStatus, ownerSetupPaths } from '../utils/ownerSetup';
 import { initializeMobileSslPinning } from '../utils/sslPinning';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
@@ -23,6 +24,9 @@ import {
   readPersonaSelection,
   resolveInitialWorkspace,
 } from '../utils/mobilePersona';
+
+// Date pickers show real labels ("Save", "Type in date") instead of their translation keys.
+registerTranslation('en', en);
 
 function getCrashlytics() {
   try {

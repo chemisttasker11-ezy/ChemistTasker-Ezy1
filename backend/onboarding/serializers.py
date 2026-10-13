@@ -809,7 +809,7 @@ class ExplorerOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin
             "id",
             # ---------- BASIC ----------
             'username','first_name','last_name','phone_number','profile_photo','profile_photo_url',
-            'role_type','work_rights','gender','emergency_contact_number','emergency_contact_relation',
+            'role_type','date_of_birth','work_rights','gender','emergency_contact_number','emergency_contact_relation',
             'street_address','suburb','state','postcode','google_place_id','latitude','longitude','open_to_travel','travel_states','coverage_radius_km',
 
             # ---------- IDENTITY ----------
@@ -841,7 +841,8 @@ class ExplorerOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin
             'profile_photo': {'required': False, 'allow_null': True},
             'profile_photo_url': {'read_only': True},
 
-            # basic
+            # basic; the date of birth is set at sign-up, where the minimum age is checked
+            'date_of_birth': {'read_only': True},
             'role_type': {'required': False, 'allow_blank': True, 'allow_null': True},
             'gender': {'required': False, 'allow_blank': True, 'allow_null': True},
             'emergency_contact_number': {'required': False, 'allow_blank': True, 'allow_null': True},

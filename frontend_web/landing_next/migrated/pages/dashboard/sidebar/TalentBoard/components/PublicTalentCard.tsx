@@ -10,8 +10,8 @@ import {
 } from "@mui/icons-material";
 import type { Candidate } from "../types";
 import skillsRegistry from "@chemisttasker/shared-core/skills_registry.json";
-import { VerificationBadges } from "@chemisttasker/shared-ui/VerificationBadges";
-import { splitSkillsAndSoftware } from "@chemisttasker/shared-core";
+import { SkillEvidenceMark, VerificationBadges } from "@chemisttasker/shared-ui/VerificationBadges";
+import { skillEvidenceState, splitSkillsAndSoftware } from "@chemisttasker/shared-core";
 import SkillIcon, { skillLabel } from "@/public/skill-icon";
 import { RoleTile } from "../../../../../../shared-ui/talent/RoleTile";
 
@@ -149,7 +149,12 @@ export default function PublicTalentCard({
                 <Stack direction="row" useFlexGap flexWrap="wrap" gap={0.75} alignItems="center">
                   <Typography sx={{ fontSize: 12, color: MUTED, fontWeight: 800, minWidth: 65 }}>Skills</Typography>
                   {skills.map((skill) => (
-                    <Chip key={skill} size="small" icon={<SkillIcon skill={skill} size={16} />} label={skillLabel(skill)} variant="outlined" sx={{
+                    <Chip key={skill} size="small" icon={<SkillIcon skill={skill} size={16} />} variant="outlined"
+                      label={<Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+                        {skillLabel(skill)}
+                        {/* Certificate skills only: verified / pending / not verified, from the shared badge rules. */}
+                        <SkillEvidenceMark iconOnly state={skillEvidenceState(candidate.verification ?? null, skill)} skill={skillLabel(skill)} />
+                      </Box>} sx={{
                       maxWidth: "100%", height: "auto", minHeight: 28, bgcolor: "#FAFBFE",
                       borderColor: "#DCE3EF", borderRadius: "8px", color: "#344563",
                       "& .MuiChip-label": { whiteSpace: "normal", fontSize: 12, py: 0.45 },

@@ -1,6 +1,6 @@
 import { useId, type CSSProperties, type ReactNode } from 'react';
 import {
-  Award, Backpack, Earth, GraduationCap, IdCard,
+  Award, Backpack, BriefcaseBusiness, Earth, GraduationCap, IdCard,
   Armchair, Bandage, BriefcaseMedical, CalendarClock, CalendarPlus, CircleHelp, ClipboardCheck, Clock3, Coffee, ClipboardPenLine, ClipboardPlus, Droplet, Files, GlassWater, Hand, HeartHandshake, HeartPulse, Hospital, HousePlus, ListChecks, LockKeyhole, MessagesSquare, Monitor, MonitorCog, PillBottle, Plane, QrCode, ReceiptText, ScanEye, ShelvingUnit, ShieldUser, ShoppingCart, SoapDispenserDroplet, Stethoscope, Store, Syringe, TabletSmartphone, Tablets, TestTubeDiagonal, ThermometerSnowflake, Truck, UsersRound, Venus,
   type LucideIcon,
 } from 'lucide-react';
@@ -10,7 +10,7 @@ import { SoftwareMark, hasSoftwareMark } from './SoftwareLogo';
 
 const icons: Record<string, LucideIcon> = {
   // Verification badge subjects (shared/VerificationBadges.tsx).
-  Award, Backpack, Earth, GraduationCap, IdCard,
+  Award, Backpack, BriefcaseBusiness, Earth, GraduationCap, IdCard,
   Armchair, Bandage, BriefcaseMedical, CalendarClock, CalendarPlus, CircleHelp, ClipboardCheck, Clock3, Coffee, ClipboardPenLine, ClipboardPlus, Droplet, Files, GlassWater, Hand, HeartHandshake, HeartPulse, Hospital, HousePlus, ListChecks, LockKeyhole, MessagesSquare, Monitor, MonitorCog, PillBottle, Plane, QrCode, ReceiptText, ScanEye, ShelvingUnit, ShieldUser, ShoppingCart, SoapDispenserDroplet, Stethoscope, Store, Syringe, TabletSmartphone, Tablets, TestTubeDiagonal, ThermometerSnowflake, Truck, UsersRound, Venus,
 };
 
@@ -241,7 +241,7 @@ export function ScriptLoadSymbol({ level, color, size = 24, title }: { level: nu
   );
 }
 
-export type BadgeSubject = 'PROFILE' | 'AHPRA' | 'AHPRA_PROVISIONAL' | 'QUALIFICATION' | 'DISPENSING' | 'ENROLMENT' | 'ID' | 'REFERENCES' | 'ABN' | 'OVERSEAS' | 'UNDER_18';
+export type BadgeSubject = 'PROFILE' | 'AHPRA' | 'AHPRA_PROVISIONAL' | 'QUALIFICATION' | 'DISPENSING' | 'ENROLMENT' | 'ID' | 'REFERENCES' | 'ABN' | 'OVERSEAS' | 'NO_WORK_RIGHTS' | 'UNDER_18';
 
 /** Verification badge subjects (VerificationBadges.tsx); also rendered to PNG for Expo by scripts/render-mobile-skill-symbols.mjs. */
 export const BADGE_SUBJECTS: Record<BadgeSubject, { icon: string; tone: SkillTone; accent: SkillTone }> = {
@@ -255,5 +255,6 @@ export const BADGE_SUBJECTS: Record<BadgeSubject, { icon: string; tone: SkillTon
   REFERENCES: { icon: 'UsersRound', tone: 'cyan', accent: 'magenta' },
   ABN: { icon: 'ReceiptText', tone: 'blue', accent: 'cyan' },
   OVERSEAS: { icon: 'Earth', tone: 'blue', accent: 'cyan' },
+  NO_WORK_RIGHTS: { icon: 'BriefcaseBusiness', tone: 'blue', accent: 'magenta' },
   UNDER_18: { icon: 'Backpack', tone: 'magenta', accent: 'cyan' },
 };

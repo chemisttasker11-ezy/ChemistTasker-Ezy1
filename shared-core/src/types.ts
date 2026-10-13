@@ -697,7 +697,11 @@ export interface VerificationSummaryApi {
     missing?: ('email' | 'mobile' | 'ahpra' | 'gov_id' | 'referees' | 'role')[];
     badges: { code: 'AHPRA' | 'AHPRA_PROVISIONAL' | 'QUALIFICATION' | 'DISPENSING' | 'ENROLMENT' | 'ID' | 'REFERENCES' | 'ABN'; state: 'verified' | 'pending' | 'not_supplied' | 'failed' }[];
     skill_evidence: Record<string, 'verified' | 'pending' | 'not_supplied' | 'failed'>;
+    outstanding?: ('email' | 'mobile' | 'ahpra' | 'gov_id' | 'referees' | 'role')[];
+    grace_until?: string | null;
     overseas: boolean;
+    mobile_waived?: boolean;
+    work_rights?: '' | 'CITIZEN_OR_RESIDENT' | 'VISA' | 'NONE';
     under_18?: boolean;
 }
 

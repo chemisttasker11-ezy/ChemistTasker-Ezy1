@@ -60,7 +60,7 @@ export function VerificationBadges({ summary, role, audience = 'employer', compa
   const profileTitle = summary.verified ? 'Verified profile' : 'Profile not verified';
   const items: Item[] = [{
     key: 'profile', subject: 'PROFILE', state: summary.verified ? 'verified' : 'not_supplied', text: profileTitle, title: profileTitle,
-    body: summary.verified ? verifiedProfileExplainer(role) : 'Email or mobile not confirmed yet, so this profile cannot apply for public shifts.',
+    body: summary.verified ? verifiedProfileExplainer(role, summary) : 'Email or mobile not confirmed yet, so this profile cannot apply for public shifts.',
   }];
   for (const row of compact ? rows.filter(r => r.state === 'verified') : rows) {
     items.push({ key: row.code, subject: row.code, state: row.state, title: `${row.label}: ${row.stateLabel}`, body: row.explainer,
@@ -73,6 +73,10 @@ export function VerificationBadges({ summary, role, audience = 'employer', compa
   if (summary.overseas) {
     items.push({ key: 'overseas', subject: 'OVERSEAS', text: 'Overseas', title: 'Overseas',
       body: VERIFICATION_GUIDE.items.find(item => item.term === 'Overseas')?.text || '' });
+  }
+  if (summary.workRights === 'NONE') {
+    items.push({ key: 'work-rights', subject: 'NO_WORK_RIGHTS', text: 'No work rights yet', title: 'No work rights yet',
+      body: VERIFICATION_GUIDE.items.find(item => item.term === 'No work rights yet')?.text || '' });
   }
   if (summary.under18) {
     items.push({ key: 'under18', subject: 'UNDER_18', text: 'Under 18', title: 'Under 18',
@@ -128,6 +132,7 @@ const GUIDE_SAMPLE: Record<string, { subject: string; state?: EvidenceState }> =
   'Check pending': { subject: 'ID', state: 'pending' },
   'Not verified': { subject: 'ID', state: 'not_supplied' },
   Overseas: { subject: 'OVERSEAS' },
+  'No work rights yet': { subject: 'NO_WORK_RIGHTS' },
   'Under 18': { subject: 'UNDER_18' },
 };
 
