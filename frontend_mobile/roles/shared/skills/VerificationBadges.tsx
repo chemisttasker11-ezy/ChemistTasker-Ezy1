@@ -54,6 +54,10 @@ export function VerificationBadges({ summary, role, audience = 'employer', compa
     items.push({ key: 'overseas', tone: 'neutral', icon: 'earth', text: 'Overseas', title: 'Overseas',
       body: VERIFICATION_GUIDE.items.find(item => item.term === 'Overseas')?.text || '' });
   }
+  if (summary.under18) {
+    items.push({ key: 'under18', tone: 'neutral', icon: 'account-outline', text: 'Under 18', title: 'Under 18',
+      body: VERIFICATION_GUIDE.items.find(item => item.term === 'Under 18')?.text || '' });
+  }
   const selected = items.find(item => item.key === open);
   return (
     <View style={styles.wrap} accessibilityLabel="Verification badges">

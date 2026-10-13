@@ -6,8 +6,6 @@ import {
   Button,
   TextField,
   Typography,
-  ToggleButton,
-  ToggleButtonGroup,
   CircularProgress,
   Alert,
   Box,
@@ -18,12 +16,14 @@ import {
   FormControlLabel,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { SignupRolePicker, newcomerSignupProblem, type SignupRole } from "@chemisttasker/shared-ui/SignupRolePicker";
 import AuthLayout from "../layouts/AuthLayout"; // Import the new layout
 import PublicLogoTopBar from "../components/PublicLogoTopBar";
 import { API_BASE_URL, API_ENDPOINTS } from "../constants/api";
 import { setRobotsMeta } from "../utils/seo";
 
-type Role = "OWNER" | "PHARMACIST" | "OTHER_STAFF" | "EXPLORER";
+type Role = SignupRole;
+const ROLES: Role[] = ["OWNER", "PHARMACIST", "OTHER_STAFF", "EXPLORER"];
 
 export default function Register() {
   const navigate = useNavigate();
@@ -43,8 +43,10 @@ export default function Register() {
     email: string;
     password: string;
     confirmPassword: string;
-    role: Role;
-  }>({ email: "", password: "", confirmPassword: "", role: "OWNER", });
+    role: Role | null;
+  }>({ email: "", password: "", confirmPassword: "", role: ROLES.find(r => r === searchParams.get("role")?.toUpperCase()) ?? null });
+  const [newcomerType, setNewcomerType] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isDuplicateEmail, setIsDuplicateEmail] = useState(false);
@@ -71,6 +73,8 @@ export default function Register() {
       setError("Passwords do not match");
       return;
     }
+    // The role picker shows these problems next to its fields.
+    if (!formData.role || newcomerSignupProblem(formData.role, newcomerType, dateOfBirth)) return;
     setLoading(true);
     try {
       const payload = {
@@ -78,6 +82,7 @@ export default function Register() {
         password: formData.password,
         confirm_password: formData.confirmPassword,
         role: formData.role,
+        ...(formData.role === "EXPLORER" ? { newcomer_type: newcomerType, date_of_birth: dateOfBirth } : {}),
         accepted_terms: acceptedTerms,
         captcha_token: captchaValue,
         referral_code: referralCode || undefined,
@@ -160,13 +165,15 @@ export default function Register() {
         <TextField fullWidth margin="normal" label="Email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase() })} autoComplete="username" />
         <TextField fullWidth margin="normal" label="Password" type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} autoComplete="new-password" InputProps={{ endAdornment: ( <InputAdornment position="end"> <IconButton onClick={() => setShowPassword((show) => !show)} edge="end"> {showPassword ? <VisibilityOff /> : <Visibility />} </IconButton> </InputAdornment> ), }} />
         <TextField fullWidth margin="normal" label="Confirm Password" type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} autoComplete="new-password" InputProps={{ endAdornment: ( <InputAdornment position="end"> <IconButton onClick={() => setShowConfirmPassword((show) => !show)} edge="end"> {showConfirmPassword ? <VisibilityOff /> : <Visibility />} </IconButton> </InputAdornment> ), }} />
-        <Typography mt={2} mb={1}> Select Role: </Typography>
-        <ToggleButtonGroup fullWidth color="primary" exclusive value={formData.role} onChange={(_, newRole) => { if (newRole) { setFormData({ ...formData, role: newRole as Role }); } }} sx={{ mb: 2 }} >
-          <ToggleButton value="OWNER">Pharmacy Owner</ToggleButton>
-          <ToggleButton value="PHARMACIST">Pharmacist</ToggleButton>
-          <ToggleButton value="OTHER_STAFF">Other Staff</ToggleButton>
-          <ToggleButton value="EXPLORER">Explorer</ToggleButton>
-        </ToggleButtonGroup>
+        <SignupRolePicker
+          role={formData.role}
+          onRole={role => setFormData({ ...formData, role })}
+          newcomerType={newcomerType}
+          onNewcomerType={setNewcomerType}
+          dateOfBirth={dateOfBirth}
+          onDateOfBirth={setDateOfBirth}
+          showErrors={hasSubmitted}
+        />
         <FormControlLabel
           control={<Checkbox checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)} required />}
           label={

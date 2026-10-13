@@ -11,6 +11,7 @@ export {
   mobileRequestOtp,
   mobileVerifyOtp,
   mobileResendOtp,
+  skipMobileOverseas,
   getCurrentUser,
   passwordReset,
   passwordResetConfirm,

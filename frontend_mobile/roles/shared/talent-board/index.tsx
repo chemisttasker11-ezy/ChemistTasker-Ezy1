@@ -1,4 +1,4 @@
-import { projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
+import { projectTalentSkills, resolveTalentBookingRole, newcomerTypeLabel } from '@chemisttasker/shared-core';
 import { skillId } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -37,7 +37,10 @@ const titleCase = (value: string) =>
 
 const formatRoleLabel = (role?: string | null) => {
   if (!role) return 'New to pharmacy';
-  return titleCase(role);
+  const code = role.toUpperCase();
+  if (code === 'EXPLORER') return 'New to pharmacy';
+  if (code === 'OTHER_STAFF') return 'Pharmacy team';
+  return newcomerTypeLabel(role) ?? titleCase(role);
 };
 
 const formatWorkType = (workType?: string | null) => {

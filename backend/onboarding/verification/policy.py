@@ -156,4 +156,5 @@ def verification_summary(profile) -> dict:
         'badges': badges(profile),
         'skill_evidence': skill_evidence(profile),
         'overseas': _role(profile) == 'EXPLORER' and getattr(profile, 'role_type', '') == 'OVERSEAS',
+        'under_18': _role(profile) == 'EXPLORER' and (profile.age() or 99) < 18,
     }

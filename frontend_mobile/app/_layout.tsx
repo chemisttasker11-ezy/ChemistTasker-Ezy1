@@ -257,7 +257,7 @@ function AuthGate() {
 
     let active = true;
     const runGate = async () => {
-      if (user && !user.is_mobile_verified) {
+      if (user && !user.is_mobile_verified && !user.mobile_check_skipped) {
         if (top !== 'mobile-verify') {
           router.replace('/mobile-verify' as any);
         }

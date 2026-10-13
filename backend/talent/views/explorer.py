@@ -1,13 +1,15 @@
 """Talent/explorer posts API: feeds, public feed, create/update/delete, views and reactions."""
 from rest_framework import permissions, viewsets
 from rest_framework.pagination import PageNumberPagination
-from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
+from datetime import timedelta
+
+from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
 from talent.models import ExplorerPost, ExplorerPostReaction
 from ratings.models import Rating
 from django.db import models
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from django.db.models import Avg, Count, Q
@@ -34,6 +36,9 @@ class IsPostOwner(permissions.BasePermission):
         if getattr(obj, "author_user_id", None) == request.user.id:
             return True
         return getattr(obj.explorer_profile, "user_id", None) == request.user.id
+
+
+NEWCOMER_REPOST_WINDOW = timedelta(days=7)
 
 
 class TalentPostPagination(PageNumberPagination):
@@ -106,7 +111,25 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         explorer_profile = serializer.validated_data.get("explorer_profile")
         if explorer_profile is not None and explorer_profile.user_id != self.request.user.id:
             raise PermissionDenied("You can only post from your own explorer profile.")
+        if self.request.user.is_explorer():
+            self._create_newcomer_post(serializer)
+            return
         serializer.save(author_user=self.request.user)
+
+    @transaction.atomic
+    def _create_newcomer_post(self, serializer):
+        """New to pharmacy: one active post; a re-post within 7 days keeps the previous post's place in the feed."""
+        profile = ExplorerOnboarding.objects.select_for_update().get(user=self.request.user)
+        if ExplorerPost.objects.filter(Q(author_user=self.request.user) | Q(explorer_profile=profile)).exists():
+            raise ValidationError({"detail": "You already have a post on the talent hub. Edit it, or delete it to post again."})
+        previous = profile.last_talent_post_at
+        post = serializer.save(author_user=self.request.user, explorer_profile=profile)
+        if previous and timezone.now() - previous < NEWCOMER_REPOST_WINDOW:
+            ExplorerPost.objects.filter(pk=post.pk).update(created_at=previous)
+            post.created_at = previous
+        else:
+            profile.last_talent_post_at = post.created_at
+            profile.save(update_fields=["last_talent_post_at"])
 
     def perform_update(self, serializer):
         # Only owner can update (object-level)
@@ -118,6 +141,11 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
     def _require_public_staff_access(self):
         """An owner invitation grants internal membership, not public Talent access."""
         user = self.request.user
+        if user.role == "EXPLORER":
+            profile = ExplorerOnboarding.objects.filter(user=user).first()
+            if not user.is_active or not profile or not profile.verified:
+                raise PermissionDenied("Verify your profile (your mobile, or photo ID if you are overseas) before posting on the talent hub.")
+            return
         if user.role not in ("PHARMACIST", "OTHER_STAFF"):
             return
         profile = (PharmacistOnboarding if user.role == "PHARMACIST" else OtherStaffOnboarding).objects.filter(user=user).first()

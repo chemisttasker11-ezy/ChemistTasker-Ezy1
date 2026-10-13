@@ -498,11 +498,14 @@ class OtherStaffOnboarding(models.Model):
 
 
 class ExplorerOnboarding(models.Model):
+    # "New to pharmacy": which kind of newcomer, asked once at sign-up (codes kept from the Explorer profile).
     ROLE_CHOICES = [
-        ("STUDENT", "Student"),
-        ("JUNIOR", "Junior"),
-        ("CAREER_SWITCHER", "Career Switcher"),
+        ("OVERSEAS", "Overseas-qualified"),
+        ("JUNIOR", "School student or junior"),
+        ("STUDENT", "Looking for an internship or placement"),
+        ("CAREER_SWITCHER", "New to the field"),
     ]
+    MINIMUM_AGE = 15
   
     REFEREE_REL_CHOICES = [
     ('manager', 'Manager'),
@@ -523,6 +526,9 @@ class ExplorerOnboarding(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     government_id = models.FileField(upload_to=explorer_gov_id_upload_path, blank=True, null=True)
     role_type = models.CharField(max_length=50, choices=ROLE_CHOICES, blank=True, null=True)
+    date_of_birth = models.DateField(blank=True, null=True)
+    # Feed position of the newcomer's one talent post: a re-post within 7 days keeps it (no bumping by re-posting).
+    last_talent_post_at = models.DateTimeField(blank=True, null=True)
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True, null=True)
     emergency_contact_number = models.CharField(max_length=20, blank=True, null=True)
     emergency_contact_relation = models.CharField(max_length=100, blank=True, null=True)
@@ -576,6 +582,14 @@ class ExplorerOnboarding(models.Model):
     gov_id_verified = models.BooleanField(default=False, db_index=True)
     gov_id_verification_note = models.TextField(blank=True, null=True)
 
+
+    def age(self, today=None):
+        """Whole years from the date of birth given at sign-up; None when unknown."""
+        if not self.date_of_birth:
+            return None
+        today = today or timezone.localdate()
+        born = self.date_of_birth
+        return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
     def __str__(self):
         return f"{self.user.get_full_name()} - Explorer Onboarding"

@@ -698,6 +698,7 @@ export interface VerificationSummaryApi {
     badges: { code: 'AHPRA' | 'AHPRA_PROVISIONAL' | 'QUALIFICATION' | 'DISPENSING' | 'ENROLMENT' | 'ID' | 'REFERENCES' | 'ABN'; state: 'verified' | 'pending' | 'not_supplied' | 'failed' }[];
     skill_evidence: Record<string, 'verified' | 'pending' | 'not_supplied' | 'failed'>;
     overseas: boolean;
+    under_18?: boolean;
 }
 
 export interface ShiftWorkProfileApi extends ShiftUserApi {

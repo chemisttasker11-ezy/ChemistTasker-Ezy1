@@ -71,7 +71,7 @@ export default function Login() {
       if (userInfo?.id != null) localStorage.removeItem(`${PERSONA_KEY_PREFIX}:${userInfo.id}`);
       login(access, refresh || '', userInfo, rememberMe);
 
-      if (!userInfo?.is_mobile_verified) {
+      if (!userInfo?.is_mobile_verified && !userInfo?.mobile_check_skipped) {
         navigate('/mobile-verify');
         return;
       }

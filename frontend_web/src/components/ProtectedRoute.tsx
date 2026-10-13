@@ -20,7 +20,7 @@ const ROLES_REQUIRING_BASIC_ONBOARDING = new Set(["PHARMACIST", "OTHER_STAFF", "
 const MOBILE_VERIFY_PATH = "/mobile-verify";
 
 function needsMobileVerification(user: any) {
-  return !user?.is_mobile_verified;
+  return !user?.is_mobile_verified && !user?.mobile_check_skipped;
 }
 
 export default function ProtectedRoute({

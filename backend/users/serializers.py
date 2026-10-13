@@ -86,6 +86,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     referral_code = serializers.CharField(required=False, allow_blank=True, write_only=True)
     referral_shift_id = serializers.IntegerField(required=False, write_only=True)
     referral_event_id = serializers.IntegerField(required=False, write_only=True)
+    # New to pharmacy only: which kind of newcomer, and the date of birth (minimum age 15).
+    newcomer_type = serializers.CharField(required=False, write_only=True)
+    date_of_birth = serializers.DateField(required=False, write_only=True)
 
     class Meta:
         model = User
@@ -98,6 +101,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'referral_code',
             'referral_shift_id',
             'referral_event_id',
+            'newcomer_type',
+            'date_of_birth',
         ]
 
     def validate(self, attrs):
@@ -114,12 +119,28 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'password': list(exc.messages)
             })
+        if attrs.get('role') == 'EXPLORER':
+            from onboarding.models import ExplorerOnboarding  # onboarding builds on users: look it up at call time
+
+            errors = {}
+            if attrs.get('newcomer_type') not in dict(ExplorerOnboarding.ROLE_CHOICES):
+                errors['newcomer_type'] = 'Tell us which describes you best.'
+            born = attrs.get('date_of_birth')
+            if not born:
+                errors['date_of_birth'] = 'Enter your date of birth.'
+            elif ExplorerOnboarding(date_of_birth=born).age() < ExplorerOnboarding.MINIMUM_AGE:
+                errors['date_of_birth'] = f'You need to be at least {ExplorerOnboarding.MINIMUM_AGE} to join ChemistTasker.'
+            if errors:
+                raise serializers.ValidationError(errors)
+        else:
+            attrs.pop('newcomer_type', None)
+            attrs.pop('date_of_birth', None)
         return attrs
     
     def validate_role(self, value):
         # Organisation and pharmacy-manager accounts are created by invitations, never self-selected.
         if value not in User.SELF_REGISTRATION_ROLES:
-            raise serializers.ValidationError("Choose Pharmacy Owner, Pharmacist, Other Staff or Explorer.")
+            raise serializers.ValidationError("Choose Pharmacy Owner, Pharmacist, Pharmacy team or New to pharmacy.")
         return value
 
     def validate_accepted_terms(self, value):
@@ -140,6 +161,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         referral_code = validated_data.pop('referral_code', '')
         referral_shift_id = validated_data.pop('referral_shift_id', None)
         referral_event_id = validated_data.pop('referral_event_id', None)
+        newcomer_type = validated_data.pop('newcomer_type', None)
+        date_of_birth = validated_data.pop('date_of_birth', None)
         user = User.objects.create_user(
             email=validated_data['email'],
             password=validated_data['password'],
@@ -158,6 +181,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         user.save()
         user._plain_email_otp = otp
         # ---- END NEW BLOCK ----
+
+        if user.role == 'EXPLORER':
+            from onboarding.models import ExplorerOnboarding  # onboarding builds on users: look it up at call time
+
+            ExplorerOnboarding.objects.create(user=user, role_type=newcomer_type, date_of_birth=date_of_birth)
 
         if referral_code:
             shift = None
@@ -408,6 +436,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'admin_assignments': admin_payload,
             'is_pharmacy_admin': bool(admin_payload),
             'is_mobile_verified': bool(getattr(self.user, 'is_mobile_verified', False)),
+            'mobile_check_skipped': bool(getattr(self.user, 'mobile_check_skipped', False)),
             'billing_active': is_billing_active(),
             'in_free_trial': is_in_free_trial(self.user),
         }
@@ -479,6 +508,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                 'admin_assignments': admin_payload,
                 'is_pharmacy_admin': bool(admin_payload),
                 'is_mobile_verified': bool(getattr(user, 'is_mobile_verified', False)),
+                'mobile_check_skipped': bool(getattr(user, 'mobile_check_skipped', False)),
                 'billing_active': is_billing_active(),
                 'in_free_trial': is_in_free_trial(user),
             }

@@ -18,6 +18,8 @@ export interface VerificationSummary {
   skillEvidence: Record<string, EvidenceState>;
   /** Told us they are overseas: a grey label, not a trust badge. */
   overseas: boolean;
+  /** Newcomer under 18: first name only on the talent hub; youth employment rules apply. */
+  under18: boolean;
 }
 
 export interface VerificationRow {
@@ -68,6 +70,7 @@ export function normalizeVerification(value: unknown): VerificationSummary | nul
     badges: Array.isArray(raw.badges) ? raw.badges : [],
     skillEvidence: raw.skillEvidence ?? raw.skill_evidence ?? {},
     overseas: Boolean(raw.overseas),
+    under18: Boolean(raw.under18 ?? raw.under_18),
   };
 }
 
@@ -114,7 +117,7 @@ export const skillEvidenceState = (summary: VerificationSummary | null, code: st
 export const REQUIREMENT_TEXT: Record<RequirementCode, { title: string; body: string }> = {
   email: { title: 'Confirm your email', body: 'Enter the code we emailed you when you signed up.' },
   mobile: { title: 'Verify your mobile number', body: 'We text you a code. Pharmacies only contact verified numbers.' },
-  ahpra: { title: 'AHPRA registration', body: 'Add your AHPRA number. Our team checks it on the public register, usually within one business day.' },
+  ahpra: { title: 'AHPRA registration', body: 'Add your AHPRA number. Our team checks it on the public register.' },
   gov_id: { title: 'Photo ID', body: 'Upload photo ID. It is needed because you skipped the Australian mobile check.' },
   referees: { title: 'Two references', body: 'Add two referees and ask them to confirm.' },
   role: { title: 'Choose your role', body: 'Tell us whether you are an assistant, technician, intern or student.' },
@@ -135,6 +138,7 @@ export const VERIFICATION_GUIDE = {
     { term: 'Check pending', tone: 'info' as BadgeTone, text: 'Evidence was supplied and our check is still in progress.' },
     { term: 'Not verified', tone: 'neutral' as BadgeTone, text: 'Claimed without evidence, or the evidence did not pass. Before relying on it, check it yourself or ask them to complete verification after you match.' },
     { term: 'Overseas', tone: 'neutral' as BadgeTone, text: 'Told us they are overseas. A label, not a check: their identity was confirmed with photo ID instead of an Australian mobile.' },
+    { term: 'Under 18', tone: 'neutral' as BadgeTone, text: 'From their date of birth. Only their first name is shown; youth employment rules in your state apply.' },
   ],
   footnote: 'Badges come only from ChemistTasker checks, never from employers or reviews.',
 };

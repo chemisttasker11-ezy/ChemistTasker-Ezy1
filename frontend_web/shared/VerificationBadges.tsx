@@ -3,7 +3,7 @@
 // Verification badges for Vite and Next. States come from the backend; labels and explanations from shared-core.
 import { useState, type ReactElement, type ReactNode } from 'react';
 import { Box, ButtonBase, Popover, Stack, Tooltip, Typography } from '@mui/material';
-import { BadgeCheck, CircleAlert, CircleDashed, Clock3, Globe, Info } from 'lucide-react';
+import { BadgeCheck, CircleAlert, CircleDashed, Clock3, Globe, Info, UserRound } from 'lucide-react';
 import {
   VERIFICATION_GUIDE,
   evidenceExplainer,
@@ -92,11 +92,12 @@ export function VerifiedProfilePill({ verified, role }: { verified: boolean; rol
   );
 }
 
-export function OverseasLabel() {
-  const body = VERIFICATION_GUIDE.items.find(item => item.term === 'Overseas')?.text || '';
+/** Grey labels say what the person told us (Overseas) or their date of birth implies (Under 18); they are not checks. */
+export function InfoLabel({ term, icon }: { term: 'Overseas' | 'Under 18'; icon: ReactNode }) {
+  const body = VERIFICATION_GUIDE.items.find(item => item.term === term)?.text || '';
   return (
-    <Explained title="Overseas" body={body}>
-      <BadgePill tone="neutral" icon={<Globe aria-hidden />} label={`Overseas. ${body}`}>Overseas</BadgePill>
+    <Explained title={term} body={body}>
+      <BadgePill tone="neutral" icon={icon} label={`${term}. ${body}`}>{term}</BadgePill>
     </Explained>
   );
 }
@@ -126,7 +127,8 @@ export function VerificationBadges({ summary, role, audience = 'employer', compa
           </BadgePill>
         </Explained>
       )}
-      {summary.overseas && <OverseasLabel />}
+      {summary.overseas && <InfoLabel term="Overseas" icon={<Globe aria-hidden />} />}
+      {summary.under18 && <InfoLabel term="Under 18" icon={<UserRound aria-hidden />} />}
     </Stack>
   );
 }

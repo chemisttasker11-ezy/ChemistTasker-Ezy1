@@ -70,7 +70,11 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
 
     def get_explorer_name(self, obj):
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
-        return user.get_full_name() if user else ""
+        if not user:
+            return ""
+        age = obj.explorer_profile.age() if obj.explorer_profile else None
+        # Under-18 newcomers show their first name only.
+        return user.first_name if age is not None and age < 18 else user.get_full_name()
 
     def get_explorer_user_id(self, obj):
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)

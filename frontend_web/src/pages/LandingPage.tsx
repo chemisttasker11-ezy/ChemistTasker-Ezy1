@@ -89,7 +89,8 @@ function LandingPage() {
   const needsBasicOnboarding = Boolean(
     user &&
       ["PHARMACIST", "OTHER_STAFF", "EXPLORER"].includes(user.role) &&
-      !user.is_mobile_verified
+      !user.is_mobile_verified &&
+      !user.mobile_check_skipped
   );
   const dashboardHref =
     needsBasicOnboarding ? '/mobile-verify' : resolveDashboardPath(user?.role);

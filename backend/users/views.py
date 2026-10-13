@@ -58,6 +58,7 @@ from users.api_otp import (  # noqa: F401
     VerifyOTPView,
     ResendOTPView,
     RequestMobileOTPView,
+    SkipMobileOverseasView,
     VerifyMobileOTPView,
     ResendMobileOTPView,
 )

@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from client_profile.models import OtherStaffOnboarding
+from client_profile.models import ExplorerOnboarding, OtherStaffOnboarding
 from talent.models import ExplorerPost, ExplorerPostReaction
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_user,
@@ -80,6 +80,7 @@ class ExplorerCreatePermissionTests(TestCase):
 
     def test_explorer_can_create_and_is_stamped_as_author_with_reference_code(self):
         user = make_user("EXPLORER")
+        ExplorerOnboarding.objects.create(user=user, verified=True)
         res = client_for(user).post(URL, self.PAYLOAD, format="json")
         self.assertEqual(res.status_code, 201)
         post = ExplorerPost.objects.get()

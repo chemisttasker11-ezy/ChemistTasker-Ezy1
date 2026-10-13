@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from organizations.access import admin_assignments_for
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from core.task_queue import async_task
 from rest_framework.views import APIView
 from users.tasks import send_async_email
@@ -267,6 +267,7 @@ class VerifyOTPView(APIView):
                 # helpful flags for frontend:
                 "is_otp_verified": True,
                 "is_mobile_verified": bool(getattr(user, "is_mobile_verified", False)),
+                "mobile_check_skipped": bool(getattr(user, "mobile_check_skipped", False)),
             }
         }, status=200)
         _set_auth_cookies(response, access_token=str(refresh.access_token), refresh_token=str(refresh))
@@ -407,6 +408,30 @@ class RequestMobileOTPView(APIView):
             return _mobile_otp_delivery_failure_response()
 
         return Response({"detail": "OTP sent successfully"}, status=status.HTTP_200_OK)
+
+
+class SkipMobileOverseasView(APIView):
+    """New to pharmacy (overseas) only: skip the Australian mobile check. A verified photo ID then stands in for it
+    (onboarding/verification/policy.py), and the profile shows an Overseas label."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        from onboarding.models import ExplorerOnboarding  # onboarding builds on users: look it up at call time
+
+        if user.role != "EXPLORER" or not ExplorerOnboarding.objects.filter(user=user, role_type="OVERSEAS").exists():
+            return Response({"detail": "Only people joining from overseas can skip the mobile check."}, status=status.HTTP_403_FORBIDDEN)
+        # The legal name is still captured here: the photo ID check matches against it.
+        changed, identity_error = _capture_mobile_identity(user, request.data)
+        if identity_error is not None:
+            return identity_error
+        user.mobile_check_skipped = True
+        try:
+            user.save(update_fields=[*changed, "mobile_check_skipped"])
+        except IntegrityError:
+            return Response({"username": "That username is taken. Choose another."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "Mobile check skipped. Upload photo ID to verify your profile.",
+                         "user": _build_authenticated_user_payload(user)}, status=status.HTTP_200_OK)
 
 
 class VerifyMobileOTPView(APIView):

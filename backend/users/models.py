@@ -86,6 +86,8 @@ class User(AbstractUser):
     mobile_otp_failed_attempts = models.PositiveSmallIntegerField(default=0)
     mobile_otp_locked_until = models.DateTimeField(blank=True, null=True)
     is_mobile_verified = models.BooleanField(default=False)
+    # New to pharmacy (overseas) only: no Australian mobile, so a verified photo ID stands in for it.
+    mobile_check_skipped = models.BooleanField(default=False)
 
     deleted_at = models.DateTimeField(blank=True, null=True)
 

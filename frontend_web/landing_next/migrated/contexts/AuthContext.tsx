@@ -65,6 +65,7 @@ export type User = {
   memberships?: Array<OrgMembership | PharmacyMembership>;
   admin_assignments?: AdminAssignment[];
   is_mobile_verified?: boolean;
+  mobile_check_skipped?: boolean;
   billing_active?: boolean;
   in_free_trial?: boolean;
 };

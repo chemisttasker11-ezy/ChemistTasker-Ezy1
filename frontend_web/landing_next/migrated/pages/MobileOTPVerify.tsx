@@ -109,6 +109,24 @@ export default function MobileOTPVerify() {
     }
   };
 
+  const isNewcomer = String(user?.role || '').toUpperCase() === 'EXPLORER';
+  // Overseas newcomers without an Australian mobile: keep the legal name, skip the code, verify with photo ID instead.
+  const handleSkipOverseas = async () => {
+    setError('');
+    setStatus('');
+    setLoading(true);
+    try {
+      const resp = await apiClient.post('/users/mobile/skip-overseas/', { first_name: firstName, last_name: lastName, username });
+      setUser((prev) => (prev ? { ...prev, first_name: firstName, last_name: lastName, username, mobile_check_skipped: true } : resp.data?.user || prev));
+      setStatus('Done. Next, upload photo ID to verify your profile.');
+      setTimeout(() => window.location.assign('/dashboard/explorer/onboarding?step=identity'), 800);
+    } catch (err) {
+      setError(extractError(err, 'Could not skip the mobile check.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleResend = async () => {
     setError('');
     setStatus('');
@@ -226,6 +244,18 @@ export default function MobileOTPVerify() {
             {resendCooldown > 0 ? `Resend available in ${resendCooldown}s` : 'Resend code'}
           </Link>
         </Box>
+
+        {isNewcomer && (
+          <Box sx={{ mt: 3, p: 2, borderRadius: 3, border: '1px solid rgba(148,163,184,0.35)' }}>
+            <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Joining from overseas?</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              No Australian mobile yet? Fill in your legal name and username above, then skip this step. You will verify with photo ID instead, and your profile shows an Overseas label.
+            </Typography>
+            <Button fullWidth variant="outlined" onClick={handleSkipOverseas} disabled={loading || !firstName || !lastName || !username}>
+              Skip and verify with photo ID
+            </Button>
+          </Box>
+        )}
 
         <Typography variant="body2" mt={3} textAlign="center">
           Back to{' '}

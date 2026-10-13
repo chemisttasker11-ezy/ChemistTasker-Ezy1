@@ -142,6 +142,7 @@ def _build_authenticated_user_payload(user):
         "admin_assignments": admin_payload,
         "is_pharmacy_admin": bool(admin_payload),
         "is_mobile_verified": bool(getattr(user, "is_mobile_verified", False)),
+        "mobile_check_skipped": bool(getattr(user, "mobile_check_skipped", False)),
         "billing_active": is_billing_active(),
         "in_free_trial": is_in_free_trial(user),
     }
