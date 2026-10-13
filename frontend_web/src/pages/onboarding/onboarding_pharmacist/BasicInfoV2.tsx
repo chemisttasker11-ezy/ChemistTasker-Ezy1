@@ -17,6 +17,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import type { User } from '../../../contexts/AuthContext';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
 import { AHPRA_CONSENT_TEXT } from '../../../constants/ahpraConsent';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 
 type ApiData = {
@@ -231,6 +232,8 @@ export default function BasicInfoV2() {
       // government id file
 
       const res = await updateOnboardingForm(roleKey, fd as any);
+
+      announceOnboardingSaved(res);
       const nextData = (res as any) || {};
       setData(nextData);
       setLockedNames({

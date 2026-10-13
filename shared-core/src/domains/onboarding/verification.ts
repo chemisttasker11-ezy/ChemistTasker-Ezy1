@@ -80,13 +80,13 @@ export function normalizeVerification(value: unknown): VerificationSummary | nul
  */
 export function evidenceExplainer(state: EvidenceState, audience: BadgeAudience, evidence = 'certificate', options: { checked?: string; note?: string | null; references?: boolean } = {}): string {
   if (options.references) {
-    if (state === 'verified') return BADGES.REFERENCES.checked;
+    if (state === 'verified') return audience === 'worker' ? 'Both of your referees confirmed. Pharmacies see this badge.' : BADGES.REFERENCES.checked;
     if (state === 'pending') return audience === 'worker' ? 'Your referees have been asked. The badge appears when both confirm.' : 'Referees have been asked and have not all confirmed yet.';
     if (state === 'failed') return audience === 'worker' ? 'A referee declined. Add another referee to earn this badge.' : 'A referee declined. References are optional; ask for your own if you need them.';
     return audience === 'worker' ? 'Optional. Add two referees to earn this badge.' : 'No references provided. References are optional on ChemistTasker.';
   }
   if (audience === 'worker') {
-    if (state === 'verified') return 'Verified. Pharmacies see this badge on your profile.';
+    if (state === 'verified') return 'Checked. Pharmacies see this badge on your profile.';
     if (state === 'pending') return `We received your ${evidence} and are checking it. The badge appears once it passes.`;
     if (state === 'failed') return `${options.note || 'The check did not pass.'} Upload a clear copy that shows your full name.`;
     return `You can still apply without it. Upload your ${evidence} to earn the Verified badge; otherwise a pharmacy may check it or ask you to complete verification when you match.`;

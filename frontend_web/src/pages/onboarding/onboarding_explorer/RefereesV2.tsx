@@ -11,6 +11,7 @@ import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 dayjs.extend(utc);
 
@@ -112,6 +113,8 @@ export default function RefereesV2() {
       });
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
       const nextData = (res as any) || {};
       setData(nextData);
       unsaved.markClean(nextData);
@@ -144,6 +147,8 @@ export default function RefereesV2() {
       });
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
       const nextData = (res as any) || {};
       setData(nextData);
       unsaved.markClean(nextData);

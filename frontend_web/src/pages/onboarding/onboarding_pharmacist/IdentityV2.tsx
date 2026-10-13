@@ -1,12 +1,12 @@
 // src/pages/onboardingV2/IdentityV2.tsx
 import * as React from 'react';
-import { Box, Button, Link, TextField, Typography, MenuItem, Chip, Alert, Snackbar } from '@mui/material';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
+import { Box, Button, Link, TextField, Typography, MenuItem, Alert, Snackbar } from '@mui/material';
 import { API_BASE_URL } from '../../../constants/api';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
+import { evidenceExplainer, type EvidenceState } from '@chemisttasker/shared-core';
+import { EvidencePill } from '@chemisttasker/shared-ui/VerificationBadges';
 
 type ApiData = {
   government_id?: string | null;
@@ -96,6 +96,8 @@ export default function IdentityV2({ roleKey = 'pharmacist' }: { roleKey?: 'phar
       }
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
       const nextData = (res as any) || {};
       const nextMeta = (nextData.identity_meta as Record<string, string> | null) || {};
       setData(nextData);
@@ -118,11 +120,11 @@ export default function IdentityV2({ roleKey = 'pharmacist' }: { roleKey?: 'phar
 
   if (loading) return <Typography>Loading…</Typography>;
 
-  const VerifiedChip = ({ ok, label }: { ok?: boolean | null; label: string }) => {
-    if (ok === true)   return <Chip icon={<CheckCircleOutlineIcon />} color="success" label={label} variant="outlined" />;
-    if (ok === false)  return <Chip icon={<ErrorOutlineIcon />}   color="error"   label={label} variant="outlined" />;
-    return               <Chip icon={<HourglassBottomIcon />}      label={label}               variant="outlined" />;
-  };
+  // Optional evidence: an upload is "check pending" until the document check records a result.
+  const idState: EvidenceState = data.gov_id_verified ? 'verified'
+    : !data.government_id ? 'not_supplied'
+    : data.gov_id_verification_note ? 'failed' : 'pending';
+
 
 return (
   <Box sx={{ width: '100%' }}>
@@ -439,7 +441,7 @@ return (
       )}
     </Box>
     <Box sx={{ width: '100%', mb: 1 }}>
-      <VerifiedChip ok={data.gov_id_verified} label="Identity" />
+      <EvidencePill label="Photo ID" state={idState} explainer={evidenceExplainer(idState, 'worker', 'photo ID', { note: data.gov_id_verification_note })} />
     </Box>
 
     {typeof data.gov_id_verified === 'boolean' && (

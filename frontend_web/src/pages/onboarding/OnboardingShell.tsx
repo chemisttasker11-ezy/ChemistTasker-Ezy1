@@ -19,12 +19,21 @@ import AccountDeletionSection from "../../components/AccountDeletionSection";
 import { UnsavedChangesBoundary } from "../../hooks/useUnsavedChangesGuard";
 
 export type OnboardingStep = PostShiftWizardStep & {
+  /** Full name for the step heading; `label` stays short for the stepper. */
+  title?: string;
   /** One line under the step title: why this step matters. */
   purpose: string;
   render: () => React.ReactNode;
 };
 
 type RoleKey = "pharmacist" | "otherstaff" | "explorer";
+
+const SAVED_EVENT = "ct:onboarding-saved";
+
+/** Tabs call this with the save response (the full onboarding detail) so the verification panel updates at once. */
+export function announceOnboardingSaved(detail: unknown) {
+  window.dispatchEvent(new CustomEvent(SAVED_EVENT, { detail }));
+}
 
 /** Where each requirement is completed: a step of this onboarding, or the mobile check page. */
 type RequirementTarget = { step?: string; path?: string };
@@ -124,7 +133,21 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
   const [summary, setSummary] = React.useState<VerificationSummary | null>(null);
   const [progress, setProgress] = React.useState<number | null>(null);
 
-  // Re-read after every step change: a saved step can complete a requirement or earn a badge.
+  // A saved step can complete a requirement or earn a badge: take the save response as the new state.
+  React.useEffect(() => {
+    const onSaved = (event: Event) => {
+      const detail = (event as CustomEvent).detail as any;
+      if (!detail?.verification) return;
+      setSummary(normalizeVerification(detail.verification));
+      if (Number.isFinite(detail.progress_percent)) setProgress(detail.progress_percent);
+      onDetail?.(detail);
+    };
+    window.addEventListener(SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(SAVED_EVENT, onSaved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-read on every step change as well (and on first load).
   React.useEffect(() => {
     let live = true;
     getOnboardingDetail(roleKey)
@@ -160,15 +183,16 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
           <Box data-ct-tokens="">
             <PageHeader title={title} subtitle={subtitle} />
             <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1fr) 340px" }, alignItems: "start" }}>
-              {compact && panel}
+              {/* Phones: what is still required comes first; once verified, the step comes first. */}
+              {compact && !summary?.verified && panel}
               <Box component="section" aria-labelledby="onboarding-step-title" sx={{ minWidth: 0, p: { xs: 2, md: 3 }, borderRadius: "var(--ct-card-radius, 20px)", border: "1px solid var(--ct-border-color)", bgcolor: "var(--ct-surface-bg)" }}>
-                <StepProgress steps={steps} activeStep={index} compact={compact} onSelect={i => void go(i)} canSelect={() => true} label="Profile steps" />
+                <StepProgress steps={steps} activeStep={index} compact={compact} onSelect={i => void go(i)} canSelect={() => true} label="Profile steps" wrapLabels />
                 {!compact && (
                   <Typography id="onboarding-step-title" component="h2" sx={{ fontFamily: "var(--ct-font-display)", fontWeight: 500, fontSize: 22, color: "var(--ct-text-primary)" }}>
-                    {step.label}
+                    {step.title ?? step.label}
                   </Typography>
                 )}
-                {compact && <Box component="span" id="onboarding-step-title" sx={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>{step.label}</Box>}
+                {compact && <Box component="span" id="onboarding-step-title" sx={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>{step.title ?? step.label}</Box>}
                 <Typography sx={{ fontSize: 14, color: "var(--ct-text-secondary)", mt: 0.5, mb: 2.5, maxWidth: "70ch" }}>{step.purpose}</Typography>
                 {step.render()}
                 <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.5, sm: 3 }} justifyContent="space-between"
@@ -176,12 +200,12 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
                   <Button variant="text" onClick={() => void go(index - 1)} disabled={index === 0} sx={{ minWidth: 120 }}>Back</Button>
                   {index < steps.length - 1 && (
                     <Button variant="contained" endIcon={<ArrowRight size={16} />} onClick={() => void go(index + 1)} fullWidth={compact} sx={{ minWidth: 160 }}>
-                      Next: {steps[index + 1].label}
+                      Next: {steps[index + 1].title ?? steps[index + 1].label}
                     </Button>
                   )}
                 </Stack>
               </Box>
-              {!compact && <Box sx={{ position: "sticky", top: 88 }}>{panel}</Box>}
+              {(!compact || summary?.verified) && panel}
             </Box>
             {footer && <Box sx={{ mt: 3 }}>{footer}</Box>}
             <Box sx={{ mt: { xs: 8, md: 10 } }}>

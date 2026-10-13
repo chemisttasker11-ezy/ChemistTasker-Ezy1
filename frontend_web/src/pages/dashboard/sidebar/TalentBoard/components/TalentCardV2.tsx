@@ -329,7 +329,8 @@ export default function TalentCard({
 
       </CardContent>
 
-      <Box sx={{ position: "absolute", right: 16, bottom: 16, display: "flex", alignItems: "center" }}>
+      {/* Phones: under the card content (an absolute row would cover the booking button). */}
+      <Box sx={{ position: { xs: "static", md: "absolute" }, right: 16, bottom: 16, display: "flex", alignItems: "center", justifyContent: "flex-end", px: { xs: 2, md: 0 }, pb: { xs: 1.5, md: 0 } }}>
         <ReportButton kind="talent" id={candidate.id} />
         <IconButton
           onClick={() => onToggleLike(candidate)}

@@ -14,6 +14,7 @@ import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared
 import skillsRegistry from '../../../../../shared-core/skills_registry.json';
 import { searchRoleSkillGroups, normalizeSavedSkillCodes, normalizeVerification, skillId, workerSkillRole, claimModeLabel, type EvidenceState } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 
 type CertRow = {
@@ -126,6 +127,8 @@ export default function SkillsV2() {
       });
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
 
       const d: ApiData = (res as any) || {};
       setSelected(normalizeSavedSkillCodes(skillsRegistry as any, d.skills || []));

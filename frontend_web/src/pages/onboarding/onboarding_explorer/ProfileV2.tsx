@@ -17,6 +17,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import { API_BASE_URL } from '../../../constants/api';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 type ApiData = {
   short_bio?: string | null;
@@ -92,6 +93,7 @@ export default function ProfileV2() {
         fd.append('resume', resumePending);
       }
       const res = await updateOnboardingForm(roleKey, fd);
+      announceOnboardingSaved(res);
 
       const d: ApiData = (res as any) || {};
       setShortBio(d.short_bio || '');

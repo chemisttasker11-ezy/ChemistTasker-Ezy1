@@ -17,6 +17,7 @@ import {
 import { EvidencePill } from "@chemisttasker/shared-ui/VerificationBadges";
 import { API_BASE_URL } from "../../../constants/api";
 import { useUnsavedChangesGuard } from "../../../hooks/useUnsavedChangesGuard";
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 type Role = "INTERN" | "TECHNICIAN" | "ASSISTANT" | "STUDENT" | "";
 type FileField = "certificate" | "university_id" | "cpr_certificate" | "s8_certificate";
@@ -144,6 +145,7 @@ export default function RegulatoryV2() {
       if (role === "INTERN") form.append("ahpra_number", data.ahpra_number.trim());
       (Object.entries(data.files) as [FileField, File | null][]).forEach(([field, file]) => { if (file) form.append(field, file); });
       const response = await updateOnboardingForm(roleKey, form);
+      announceOnboardingSaved(response);
       accept(response || {});
       setSaved(true);
     } catch (err: any) {

@@ -439,7 +439,6 @@ const isPharmacistProvided = showPublishedRates && shift.rateType === 'PHARMACIS
                     >
                       {isApplied && !isOffersMode ? 'Applied' : (applyLabel ?? 'Apply Now')}
                     </Button>
-                    {shift.visibility === 'PLATFORM' && <Box sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}><ReportButton kind="jobs" id={shift.id} /></Box>}
                     {showCounter && onSubmitCounterOffer && (
                       <Button
                         variant="outlined"
@@ -480,6 +479,7 @@ const isPharmacistProvided = showPublishedRates && shift.rateType === 'PHARMACIS
                         {isRejectedShift ? 'Rejected' : 'Reject Entire Shift'}
                       </Button>
                     )}
+                    {shift.visibility === 'PLATFORM' && <Box sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}><ReportButton kind="jobs" id={shift.id} /></Box>}
                   </Stack>
                 </Stack>
               </Box>

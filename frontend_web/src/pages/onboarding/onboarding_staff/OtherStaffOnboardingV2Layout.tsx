@@ -13,13 +13,13 @@ import RegulatoryV2 from "./RegulatoryV2";
 
 // Keys stay as before: links into ?step= keep working.
 const STEPS: OnboardingStep[] = [
-  { key: "basic", label: "Basic info", icon: UserRound, tone: "violet", purpose: "Your name, contact details and where you can work. Pharmacies use your suburb to match nearby shifts.", render: () => <BasicInfoV2 /> },
-  { key: "regulatory docs", label: "Role & qualifications", icon: GraduationCap, tone: "blue", purpose: "Your role and award level. Interns add their AHPRA number; certificates are optional and earn a Qualification badge.", render: () => <RegulatoryV2 /> },
-  { key: "skills", label: "Skills & software", icon: ListChecks, tone: "cyan", purpose: "What you have done on the job. Certificates are optional and earn a Verified mark on that skill.", render: () => <SkillsV2 /> },
+  { key: "basic", label: "Basics", title: "Basic info", icon: UserRound, tone: "violet", purpose: "Your name, contact details and where you can work. Pharmacies use your suburb to match nearby shifts.", render: () => <BasicInfoV2 /> },
+  { key: "regulatory docs", label: "Role", title: "Role & qualifications", icon: GraduationCap, tone: "blue", purpose: "Your role and award level. Interns add their AHPRA number; certificates are optional and earn a Qualification badge.", render: () => <RegulatoryV2 /> },
+  { key: "skills", label: "Skills", title: "Skills & software", icon: ListChecks, tone: "cyan", purpose: "What you have done on the job. Certificates are optional and earn a Verified mark on that skill.", render: () => <SkillsV2 /> },
   { key: "identity", label: "Photo ID", icon: IdCard, tone: "magenta", purpose: "Optional. A checked photo ID earns the Photo ID badge pharmacies look for.", render: () => <IdentityV2 /> },
-  { key: "payment", label: "Payment", icon: Wallet, tone: "violet", purpose: "How you are paid: ABN or TFN, bank account and super.", render: () => <PaymentV2 /> },
+  { key: "payment", label: "Getting paid", title: "How you get paid", icon: Wallet, tone: "violet", purpose: "How pharmacies pay you for shifts: ABN or TFN, bank account and super. This is not a ChemistTasker fee.", render: () => <PaymentV2 /> },
   { key: "referees", label: "References", icon: Users, tone: "blue", purpose: "Optional. Two referees who confirm earn the References badge.", render: () => <RefereesV2 /> },
-  { key: "profile", label: "Profile & CV", icon: FileText, tone: "cyan", purpose: "Your photo, a short bio and your CV: what pharmacies read first.", render: () => <ProfileV2 /> },
+  { key: "profile", label: "Profile", title: "Profile & CV", icon: FileText, tone: "cyan", purpose: "Your photo, a short bio and your CV: what pharmacies read first.", render: () => <ProfileV2 /> },
 ];
 
 export default function OtherStaffOnboardingV2Layout() {

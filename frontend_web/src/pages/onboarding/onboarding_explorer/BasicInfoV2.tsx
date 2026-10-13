@@ -22,6 +22,7 @@ import {
   mobileVerifyOtp,
   mobileResendOtp,
 } from '@chemisttasker/shared-core';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 const EXPLORER_ROLE_CHOICES = [
   { value: 'STUDENT',          label: 'Student' },
@@ -240,6 +241,8 @@ export default function BasicInfoV2() {
       // government id file
 
       const res = await updateOnboarding(roleKey as any, fd as any);
+
+      announceOnboardingSaved(res);
       const nextData = res as any;
       setData(nextData);
       setLockedNames({

@@ -14,6 +14,7 @@ import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared
 import skillsRegistry from '../../../../../shared-core/skills_registry.json';
 import { searchRoleSkillGroups, normalizeSavedSkillCodes, normalizeVerification, skillId, workerSkillRole, claimModeLabel, type EvidenceState } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 
 // ---- Legacy-style Years of Experience (string values; keep exactly as backend expects) ----
@@ -145,6 +146,8 @@ export default function SkillsV2() {
       });
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
 
       const d: ApiData = (res as any) || {};
       setYearsExperience(d.years_experience || '');

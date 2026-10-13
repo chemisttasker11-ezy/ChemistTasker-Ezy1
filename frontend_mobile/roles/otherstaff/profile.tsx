@@ -42,7 +42,7 @@ export default function OtherStaffProfileScreen() {
     { title: 'Photo ID', description: 'Optional · earns the Photo ID badge', icon: 'card-account-details-outline', route: '/otherstaff/profile-identity' },
     { title: 'Role & qualifications', description: 'Your role, award level and optional certificates', icon: 'file-certificate-outline', route: '/otherstaff/profile-regulatory' },
     { title: 'Skills & software', description: 'What you have done on the job', icon: 'star-outline', route: '/otherstaff/profile-skills' },
-    { title: 'Payment', description: 'TFN/ABN and super details', icon: 'cash-multiple', route: '/otherstaff/profile-payment' },
+    { title: 'How you get paid', description: 'ABN or TFN, bank account and super', icon: 'cash-multiple', route: '/otherstaff/profile-payment' },
     { title: 'References', description: 'Optional · earns the References badge', icon: 'account-group-outline', route: '/otherstaff/profile-referees' },
     { title: 'Bio', description: 'Short bio and resume', icon: 'file-account-outline', route: '/otherstaff/profile-bio' },
   ];

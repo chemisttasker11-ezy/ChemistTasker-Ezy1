@@ -141,58 +141,44 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
         # Software belongs to the same current role-compatible onboarding claims.
         return normalize_skills(self.get_skills(obj), matchable_only=True, software_only=True)
 
+    def _profile(self, obj):
+        """The author's onboarding row (newcomer profile for New to pharmacy posts), loaded once per page."""
+        if obj.role_category == "EXPLORER":
+            if obj.explorer_profile is not None:
+                return obj.explorer_profile
+            user = obj.author_user
+            return ExplorerOnboarding.objects.filter(user=user).first() if user else None
+        return self._onboarding(obj)[2]
+
     def get_verification(self, obj):
         """Badges for the author: verified flag, evidence states and the overseas label (labels live in shared-core)."""
-        profile = obj.explorer_profile if obj.role_category == "EXPLORER" else self._onboarding(obj)[2]
+        profile = self._profile(obj)
         return verification_summary(profile) if profile else None
 
     def get_travel_states(self, obj):
-        user = obj.author_user or getattr(obj.explorer_profile, "user", None)
-        if not user:
-            return []
-        try:
-            if obj.role_category == "PHARMACIST":
-                po = PharmacistOnboarding.objects.filter(user=user).first()
-                return list(getattr(po, "travel_states", []) or []) if po else []
-            if obj.role_category == "OTHER_STAFF":
-                so = OtherStaffOnboarding.objects.filter(user=user).first()
-                return list(getattr(so, "travel_states", []) or []) if so else []
-            if obj.role_category == "EXPLORER":
-                eo = ExplorerOnboarding.objects.filter(user=user).first()
-                return list(getattr(eo, "travel_states", []) or []) if eo else []
-        except Exception:
-            return []
-        return []
+        profile = self._profile(obj) if obj.role_category in ("PHARMACIST", "OTHER_STAFF", "EXPLORER") else None
+        return list(getattr(profile, "travel_states", None) or [])
 
     def get_ahpra_years_since_first_registration(self, obj):
-        user = obj.author_user or getattr(obj.explorer_profile, "user", None)
-        if not user:
-            return None
-        if obj.role_category != "PHARMACIST":
-            return None
-        try:
-            po = PharmacistOnboarding.objects.filter(user=user).first()
-            return getattr(po, "ahpra_years_since_first_registration", None) if po else None
-        except Exception:
-            return None
+        profile = self._profile(obj) if obj.role_category == "PHARMACIST" else None
+        return getattr(profile, "ahpra_years_since_first_registration", None) if profile else None
 
     def get_years_experience(self, obj):
-        user = obj.author_user or getattr(obj.explorer_profile, "user", None)
-        if not user:
-            return None
-        if obj.role_category != "OTHER_STAFF":
-            return None
-        try:
-            so = OtherStaffOnboarding.objects.filter(user=user).first()
-            return getattr(so, "years_experience", None) if so else None
-        except Exception:
-            return None
+        profile = self._profile(obj) if obj.role_category == "OTHER_STAFF" else None
+        return getattr(profile, "years_experience", None) if profile else None
 
     def get_is_liked_by_me(self, obj):
         req = self.context.get("request")
         if not req or not req.user or not req.user.is_authenticated:
             return False
-        return ExplorerPostReaction.objects.filter(post=obj, user=req.user).exists()
+        liked = self.__dict__.get("_liked_post_ids")
+        if liked is None:
+            # One query for the whole page being serialised (a single post falls back to itself).
+            posts = getattr(self.parent, "instance", None) if self.parent is not None else None
+            ids = [post.pk for post in posts] if isinstance(posts, (list, tuple)) else [obj.pk]
+            liked = self._liked_post_ids = set(
+                ExplorerPostReaction.objects.filter(user=req.user, post_id__in=ids).values_list("post_id", flat=True))
+        return obj.pk in liked
 
 
 class PublicExplorerPostReadSerializer(ExplorerPostReadSerializer):

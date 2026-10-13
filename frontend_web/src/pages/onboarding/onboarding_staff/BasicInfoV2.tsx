@@ -17,6 +17,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import type { User } from '../../../contexts/AuthContext';
 import ProfilePhotoUploader from '../../../components/profilePhoto/ProfilePhotoUploader';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 
 type ApiData = {
@@ -225,6 +226,8 @@ export default function BasicInfoV2() {
       // government id file
 
       const res = await updateOnboardingForm(roleKey, fd as any);
+
+      announceOnboardingSaved(res);
       const nextData = res as any;
       setData(nextData);
       setLockedNames({

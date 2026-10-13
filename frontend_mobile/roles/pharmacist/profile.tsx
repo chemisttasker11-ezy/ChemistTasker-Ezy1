@@ -137,8 +137,8 @@ export default function PharmacistProfileScreen() {
       route: '/pharmacist/profile-skills',
     },
     {
-      title: 'Payment',
-      description: 'TFN/ABN preference and super details',
+      title: 'How you get paid',
+      description: 'ABN or TFN, bank account and super',
       icon: 'cash-multiple',
       route: '/pharmacist/profile-payment',
     },

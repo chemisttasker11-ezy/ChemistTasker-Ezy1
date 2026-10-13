@@ -23,6 +23,7 @@ export function dashboardTitleForRole(role?: string | null, otherStaffRoleType?:
 export function userRoleLabel(role?: string | null, otherStaffRoleType?: string | null) {
   const normalized = String(role || "").toUpperCase();
   if (normalized === "OTHER_STAFF") return otherStaffRoleLabel(otherStaffRoleType);
+  if (normalized === "EXPLORER") return "New to pharmacy";
   if (normalized.includes("ORG") || normalized === "ORGANIZATION") return "Organization";
   if (!normalized) return "Member";
   return normalized
