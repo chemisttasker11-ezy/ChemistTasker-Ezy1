@@ -98,6 +98,51 @@ source "$RUNTIME_FILE"
 source "$INTEGRATIONS_FILE"
 set +a
 
+# Read only mail credentials from the supplied backend dotenv file. Loading the
+# whole local environment would also replace staging database/service settings.
+# The default file is ignored and preserved by the staging source sync.
+email_env_file="${STAGING_EMAIL_ENV_FILE:-env/staging.email.env}"
+if [[ -n "${STAGING_EMAIL_ENV_FILE:-}" && ! -f "$email_env_file" ]]; then
+  echo "STAGING_EMAIL_ENV_FILE does not exist." >&2
+  exit 1
+fi
+if [[ -f "$email_env_file" ]]; then
+  for email_key in EMAIL_HOST_USER EMAIL_HOST_PASSWORD DEFAULT_FROM_EMAIL; do
+    email_value="$(read_dotenv_value "$email_env_file" "$email_key")"
+    if [[ -z "$email_value" ]]; then
+      echo "The staging email dotenv file must define $email_key." >&2
+      exit 1
+    fi
+    export "$email_key=$email_value"
+  done
+  unset email_value
+fi
+
+# External API settings are optional and never load database/runtime flags.
+api_env_file="${STAGING_API_ENV_FILE:-env/staging.api.env}"
+if [[ -n "${STAGING_API_ENV_FILE:-}" && ! -f "$api_env_file" ]]; then
+  echo "STAGING_API_ENV_FILE does not exist." >&2
+  exit 1
+fi
+if [[ -f "$api_env_file" ]]; then
+  for api_key in AZURE_ACCOUNT_NAME AZURE_ACCOUNT_KEY AZURE_CONTAINER \
+      AZURE_OCR_ENDPOINT AZURE_OCR_KEY SCRAPINGBEE_API_KEY \
+      MOBILEMESSAGE_USERNAME MOBILEMESSAGE_PASSWORD MOBILEMESSAGE_SENDER \
+      STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET; do
+    api_value="$(read_dotenv_value "$api_env_file" "$api_key")"
+    if [[ -n "$api_value" ]]; then
+      export "$api_key=$api_value"
+    fi
+  done
+  unset api_value
+fi
+if [[ -n "${STRIPE_SECRET_KEY:-}" ]]; then
+  case "$STRIPE_SECRET_KEY" in
+    sk_test_*|rk_test_*) ;;
+    *) echo "Staging requires a Stripe test-mode key." >&2; exit 1 ;;
+  esac
+fi
+
 if [[ "$STAGING_PREVIEW_MODE" == "0" ]]; then
   # Upgrade only the obsolete auto-generated tunnel/placeholder configuration.
   # Never replace an existing permanent or custom staging hostname.
