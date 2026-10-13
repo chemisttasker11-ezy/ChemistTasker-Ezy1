@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import AuthLayout from '../layouts/AuthLayout';
 import apiClient from '../utils/apiClient';
+import { mobileRequestOtp, mobileResendOtp } from '@chemisttasker/shared-core';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function MobileOTPVerify() {
@@ -60,13 +61,14 @@ export default function MobileOTPVerify() {
     setStatus('');
     setLoading(true);
     try {
-      await apiClient.post('/users/mobile/request-otp/', {
+      const sent: any = await mobileRequestOtp({
         first_name: firstName,
         last_name: lastName,
         username,
         mobile_number: mobile,
       });
-      setStatus('We sent a code to your mobile.');
+      if (sent?.debug_otp) setOtp(sent.debug_otp);
+      setStatus(sent?.debug_otp ? `Test mode: no SMS sent. Your code is ${sent.debug_otp}.` : 'We sent a code to your mobile.');
       setResendCooldown(30);
     } catch (err) {
       setError(extractError(err, 'Failed to send code.'));
@@ -114,8 +116,9 @@ export default function MobileOTPVerify() {
     setStatus('');
     setLoading(true);
     try {
-      await apiClient.post('/users/mobile/resend-otp/', {});
-      setStatus('A new code has been sent to your mobile.');
+      const resent: any = await mobileResendOtp({});
+      if (resent?.debug_otp) setOtp(resent.debug_otp);
+      setStatus(resent?.debug_otp ? `Test mode: no SMS sent. Your code is ${resent.debug_otp}.` : 'A new code has been sent to your mobile.');
       setResendCooldown(30);
     } catch (err) {
       setError(extractError(err, 'Could not resend code.'));
