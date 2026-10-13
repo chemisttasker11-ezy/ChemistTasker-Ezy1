@@ -93,3 +93,32 @@ class NewcomerTalentPostTests(TestCase):
         detail = client_for(viewer).get(f"{self.URL}{post_id}/").data
         self.assertEqual(detail["explorer_name"], "Sam")
         self.assertTrue(detail["verification"]["under_18"])
+
+
+class NewcomerUpgradeTests(TestCase):
+    URL = f"{BASE}users/me/account-type/"
+
+    def test_upgrade_carries_the_profile_and_post_and_applies_the_new_roles_checks(self):
+        user = make_user("EXPLORER", is_otp_verified=True, mobile_check_skipped=True)
+        newcomer = ExplorerOnboarding.objects.create(user=user, role_type="OVERSEAS", verified=True, suburb="Parramatta",
+                                                     date_of_birth=date(1995, 5, 1), gov_id_verified=True,
+                                                     referee1_name="Dr Lee", referee1_confirmed=True)
+        post = ExplorerPost.objects.create(explorer_profile=newcomer, author_user=user, headline="Hi", body="b", role_category="EXPLORER")
+
+        self.assertEqual(client_for(user).post(self.URL, {"role": "OTHER_STAFF", "staff_role": "OWNER"}, format="json").status_code, 400)
+        response = client_for(user).post(self.URL, {"role": "PHARMACIST"}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["onboarding_url"].endswith("/dashboard/pharmacist/onboarding"))
+
+        from onboarding.models import PharmacistOnboarding
+        from onboarding.verification.policy import missing_requirements
+        user.refresh_from_db()
+        profile = PharmacistOnboarding.objects.get(user=user)
+        self.assertEqual((user.role, user.mobile_check_skipped), ("PHARMACIST", False))
+        self.assertEqual((profile.suburb, profile.date_of_birth, profile.gov_id_verified, profile.referee1_confirmed, profile.verified),
+                         ("Parramatta", date(1995, 5, 1), True, True, False))
+        self.assertEqual(missing_requirements(profile), ["mobile", "ahpra"])
+        post.refresh_from_db()
+        self.assertEqual((post.role_category, post.explorer_profile_id), ("PHARMACIST", None))
+        # Once only: the account is no longer New to pharmacy.
+        self.assertEqual(client_for(user).post(self.URL, {"role": "OTHER_STAFF", "staff_role": "ASSISTANT"}, format="json").status_code, 400)

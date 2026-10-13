@@ -6,6 +6,7 @@ import IdentityV2 from "./IdentityV2";
 import InterestsV2 from "./InterestsV2";
 import RefereesV2 from "./RefereesV2";
 import ProfileV2 from "./ProfileV2";
+import UpgradeAccountCard from "./UpgradeAccountCard";
 
 // Keys stay as before: links into ?step= keep working.
 const STEPS: OnboardingStep[] = [
@@ -25,6 +26,7 @@ export default function ExplorerOnboardingV2Layout() {
       steps={STEPS}
       role="EXPLORER"
       targets={{ mobile: { path: "/mobile-verify" }, gov_id: { step: "identity" }, referees: { step: "referees" } }}
+      footer={<UpgradeAccountCard />}
     />
   );
 }

@@ -117,6 +117,16 @@ class ChooseAccountTypeView(APIView):
         from users.models import User
         from users.utils import get_frontend_onboarding_url
 
+        if request.user.role == "EXPLORER":
+            # New to pharmacy -> Pharmacist / Pharmacy team: a separate, newcomer-only conversion.
+            from onboarding.services.upgrade import upgrade_newcomer
+
+            user, staff_role = upgrade_newcomer(request.user.pk, request.data.get("role"), request.data.get("staff_role"))
+            return Response(
+                {"role": user.role, "staff_role": staff_role, "pharmacy_id": None, "onboarding_url": get_frontend_onboarding_url(user)},
+                status=status.HTTP_200_OK,
+            )
+
         role = str(request.data.get("role") or "").strip().upper()
         if role not in User.CHOOSABLE_ACCOUNT_TYPES:
             raise ValidationError({"role": "Choose PHARMACIST or OTHER_STAFF."})

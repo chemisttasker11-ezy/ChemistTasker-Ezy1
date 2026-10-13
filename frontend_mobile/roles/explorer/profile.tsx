@@ -21,6 +21,7 @@ import { deleteAccount, updateOnboardingForm } from '@chemisttasker/shared-core'
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ProfileVerificationCard } from '../shared/skills/ProfileVerificationCard';
+import { UpgradeAccountCard } from './UpgradeAccountCard';
 
 export default function ExplorerProfileScreen() {
   const router = useRouter();
@@ -214,6 +215,8 @@ export default function ExplorerProfileScreen() {
             </Card>
           ))}
         </View>
+
+        <UpgradeAccountCard />
 
         <View style={styles.section}>
           <Text variant="titleSmall" style={styles.sectionTitle}>

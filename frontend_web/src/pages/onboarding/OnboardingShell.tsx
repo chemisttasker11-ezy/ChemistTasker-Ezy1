@@ -102,7 +102,7 @@ function VerificationPanel({ summary, role, progress, targets, onOpen }: {
   );
 }
 
-export default function OnboardingShell({ roleKey, title, subtitle, steps, targets, role, onDetail }: {
+export default function OnboardingShell({ roleKey, title, subtitle, steps, targets, role, onDetail, footer }: {
   roleKey: RoleKey;
   title: string;
   subtitle: string;
@@ -111,6 +111,8 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
   /** Skill role for the verified-profile wording (PHARMACIST, INTERN, ...). */
   role?: string | null;
   onDetail?: (detail: any) => void;
+  /** Extra section under the steps (e.g. the newcomer's account upgrade). */
+  footer?: React.ReactNode;
 }) {
   const theme = useTheme();
   const compact = useMediaQuery(theme.breakpoints.down("md"));
@@ -181,6 +183,7 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
               </Box>
               {!compact && <Box sx={{ position: "sticky", top: 88 }}>{panel}</Box>}
             </Box>
+            {footer && <Box sx={{ mt: 3 }}>{footer}</Box>}
             <Box sx={{ mt: { xs: 8, md: 10 } }}>
               <AccountDeletionSection />
             </Box>
