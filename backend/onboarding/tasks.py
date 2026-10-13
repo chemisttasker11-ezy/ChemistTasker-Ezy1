@@ -23,6 +23,7 @@ from django.utils import timezone
 from core.integrations.abr import _parse_abn_html_fields, abn_lookup
 from core.task_queue import async_task
 from onboarding.emails import get_candidate_role, simple_name_match
+from onboarding.services.work_profile import referee_profile_target
 from onboarding.verification.ahpra import _update_ahpra_fields, ahpra_lookup, parse_ahpra_html
 from onboarding.verification.documents import azure_ocr, get_local_file_or_download, ocr_input_path_for_file
 from onboarding.verification.orchestration import mark_notification_sent, notification_already_sent
@@ -341,19 +342,22 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
     if not _marker_get(key):
         return
 
+    # The reminder's marker stays on the profile it was scheduled for; the referee and the new link follow the person.
+    scheduled_model, scheduled_pk = model_name, pk
+    model_name, pk = referee_profile_target(model_name, pk)
     Model = apps.get_model('client_profile', model_name)
     try:
         obj = Model.objects.get(pk=pk)
     except Model.DoesNotExist:
         # the profile was deleted after this ETA reminder was queued: nothing left to remind about
-        cancel_referee_reminder(model_name, pk, ref_idx)
+        cancel_referee_reminder(scheduled_model, scheduled_pk, ref_idx)
         logger.info("[referee-reminder] Profile gone; reminder dropped model=%s pk=%s ref_idx=%s", model_name, pk, ref_idx)
         return
 
     confirmed = bool(getattr(obj, f'referee{ref_idx}_confirmed', False))
     rejected = bool(getattr(obj, f'referee{ref_idx}_rejected', False))
     if confirmed or rejected:
-        cancel_referee_reminder(model_name, pk, ref_idx)
+        cancel_referee_reminder(scheduled_model, scheduled_pk, ref_idx)
         return
 
     # Build the single-ref reminder email
@@ -363,7 +367,7 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
     workplace = getattr(obj, f'referee{ref_idx}_workplace', '')
     email = clean_email(email_raw)
     if not email:
-        cancel_referee_reminder(model_name, pk, ref_idx)
+        cancel_referee_reminder(scheduled_model, scheduled_pk, ref_idx)
         return
 
     signer = TimestampSigner()
@@ -398,7 +402,7 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
 
     # Re-schedule this referee only
     _marker_delete(key)
-    schedule_referee_reminder(model_name, pk, ref_idx)
+    schedule_referee_reminder(scheduled_model, scheduled_pk, ref_idx)
 
 
 @shared_task(name="client_profile.tasks.run_all_verifications", queue="default")

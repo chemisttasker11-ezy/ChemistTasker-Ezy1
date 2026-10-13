@@ -35,11 +35,8 @@ def apply_rate_tab(instance, vdata: dict, submit: bool, *, initial_data):
     }
 
     instance.rate_preference = rp_norm
-    if submit:
-        instance.verified = False  # stays unverified until all tabs pass
-        instance.save(update_fields=["rate_preference", "verified"])
-    else:
-        instance.save(update_fields=["rate_preference"])
+    # Submit never removes Verified (owner decision 2026-10-14); rates are not verification evidence.
+    instance.save(update_fields=["rate_preference"])
 
     return instance
 
@@ -62,9 +59,5 @@ def apply_interests_tab(instance, vdata: dict, submit: bool, *, initial_data):
         vals = list(raw or [])
 
     instance.interests = vals
-    if submit:
-        instance.verified = False
-        instance.save(update_fields=['interests','verified'])
-    else:
-        instance.save(update_fields=['interests'])
+    instance.save(update_fields=['interests'])
     return instance

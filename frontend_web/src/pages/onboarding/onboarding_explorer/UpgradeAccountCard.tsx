@@ -1,10 +1,10 @@
-// New to pharmacy -> Pharmacist or Pharmacy team, once. Details, ID check, references and the talent post carry over;
+// New to pharmacy -> Pharmacist or Pharmacy team, once. Details, ID check, work rights and references carry over; the talent post is removed;
 // the new role's checks apply (AHPRA for pharmacists, the Australian mobile for everyone).
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Radio, RadioGroup, Stack, Typography } from "@mui/material";
 import { ArrowUpRight } from "lucide-react";
-import { chooseAccountType, getCurrentUser } from "@chemisttasker/shared-core";
+import { UPGRADE_COPY, chooseAccountType, getCurrentUser } from "@chemisttasker/shared-core";
 import SectionCard from "../../../components/ui/SectionCard";
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -53,8 +53,7 @@ export default function UpgradeAccountCard() {
     <SectionCard title="Ready for the next step?" icon={<ArrowUpRight />}
       subtitle="Registered with AHPRA, studying pharmacy or working in a pharmacy now? Move to a Pharmacist or Pharmacy team account.">
       <Typography sx={{ fontSize: 14, color: "var(--ct-text-secondary)", mb: 2, maxWidth: "70ch" }}>
-        Your details, photo ID check, references and talent post come with you. Your new role's checks then apply: your
-        Australian mobile, and AHPRA registration for pharmacists and interns. You can only do this once.
+        {UPGRADE_COPY.carried} {UPGRADE_COPY.postRemoved} {UPGRADE_COPY.once}
       </Typography>
       <Button variant="outlined" onClick={() => setOpen(true)}>Upgrade my account</Button>
       <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="xs" aria-labelledby="upgrade-title">
@@ -67,7 +66,7 @@ export default function UpgradeAccountCard() {
                 label={<Stack><Typography sx={{ fontWeight: 600, fontSize: 14.5 }}>{item.label}</Typography><Typography sx={{ fontSize: 13, color: "var(--ct-text-secondary)" }}>{item.body}</Typography></Stack>} />
             ))}
           </RadioGroup>
-          <Typography sx={{ fontSize: 13, color: "var(--ct-text-secondary)", mt: 1.5 }}>This can't be undone.</Typography>
+          <Alert severity="warning" sx={{ mt: 1.5 }}>{UPGRADE_COPY.postRemoved} {UPGRADE_COPY.once}</Alert>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>

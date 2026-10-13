@@ -5,7 +5,6 @@ from rest_framework import serializers
 
 from core.serializer_lifecycle import _delete_file_if_unreferenced
 from core.task_queue import async_task
-from onboarding.verification.policy import ahpra_number_error
 
 
 def apply_regulatory_tab(instance, vdata: dict, submit: bool):
@@ -27,11 +26,11 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
     original_year = instance.student_year
     original_half = instance.intern_half
     original_dispensing = instance.dispensary_qualification
-    original_ahpra = (instance.ahpra_number or '').strip()
-    if 'ahpra_number' in vdata:
-        problem = ahpra_number_error(instance, vdata['ahpra_number'])
-        if problem:
-            raise serializers.ValidationError({'ahpra_number': [problem]})
+    # Owner decision 2026-10-14: a Pharmacy team role is fixed once chosen (a pharmacy may still give the person a
+    # different role in its own team through the membership; that never reaches the public profile).
+    new_role = str(vdata.get('role_type') or '').upper()
+    if 'role_type' in vdata and original_role and new_role != original_role:
+        raise serializers.ValidationError({'role_type': ['Your role is set and cannot be changed. Contact support if it is wrong.']})
 
     # role classification inputs
     for f in ['role_type','classification_level','student_year','intern_half','dispensary_qualification','ahpra_number']:
@@ -39,13 +38,7 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
             if getattr(instance, f) != vdata[f]:
                 setattr(instance, f, vdata[f])
                 update_fields.append(f)
-    if original_ahpra != (instance.ahpra_number or '').strip():
-        # AHPRA is checked manually by admin, like pharmacists; a new number needs a new check, and Verified (which
-        # relies on it) waits for that check. Only an unchecked number can change (ahpra_number_error).
-        instance.ahpra_verified = False
-        instance.ahpra_verification_note = ''
-        instance.verified = False
-        update_fields.extend(['ahpra_verified', 'ahpra_verification_note', 'verified'])
+    # A changed AHPRA number resets its check (and Verified) in the serializer's guard (verification/ahpra_numbers.py).
 
     role_or_class_changed = (
         original_role != str(instance.role_type or '').upper()
@@ -54,10 +47,8 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
         or original_half != instance.intern_half
     )
     if role_or_class_changed:
-        # Previously verified documents must not silently authorise a new
-        # professional role or award classification.
-        instance.verified = False
-        update_fields.append('verified')
+        # Previously checked documents must not silently back a new award classification (their badges reset;
+        # Verified does not depend on them).
         for flag in ('ahpra_proof_verified', 'hours_proof_verified', 'certificate_verified', 'university_id_verified'):
             setattr(instance, flag, False)
             update_fields.append(flag)
@@ -99,9 +90,6 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
         update_fields.extend(['dispensary_qualification_verified', 'dispensary_qualification_verification_note'])
 
     if submit:
-        instance.verified = False
-        update_fields.append('verified')
-
         if str(instance.role_type or '').upper() == 'INTERN' and not (instance.ahpra_number or '').strip():
             raise serializers.ValidationError({'ahpra_number': ['Enter your AHPRA number (provisional registration).']})
 

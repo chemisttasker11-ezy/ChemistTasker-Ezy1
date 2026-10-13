@@ -1,10 +1,10 @@
-// New to pharmacy -> Pharmacist or Pharmacy team, once. Details, ID check, references and the talent post carry over;
+// New to pharmacy -> Pharmacist or Pharmacy team, once. Details, ID check, work rights and references carry over; the talent post is removed;
 // the new role's checks apply (AHPRA for pharmacists, the Australian mobile for everyone).
 import React, { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { Button, Card, Dialog, HelperText, Portal, RadioButton, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { chooseAccountType } from '@chemisttasker/shared-core';
+import { UPGRADE_COPY, chooseAccountType } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 
 const CHOICES = [
@@ -48,7 +48,7 @@ export function UpgradeAccountCard() {
         <Text variant="titleMedium" style={styles.title}>Ready for the next step?</Text>
         <Text style={styles.body}>
           Registered with AHPRA, studying pharmacy or working in a pharmacy now? Move to a Pharmacist or Pharmacy team account.
-          Your details, photo ID check, references and talent post come with you; your new role's checks then apply. You can only do this once.
+          {UPGRADE_COPY.carried} {UPGRADE_COPY.postRemoved} {UPGRADE_COPY.once}
         </Text>
         <Button mode="outlined" onPress={() => setOpen(true)}>Upgrade my account</Button>
       </Card.Content>
@@ -61,7 +61,7 @@ export function UpgradeAccountCard() {
                 <RadioButton.Item key={item.staffRole} value={item.staffRole} label={`${item.label}\n${item.body}`} position="leading" labelStyle={styles.option} />
               ))}
             </RadioButton.Group>
-            <Text style={styles.body}>This can't be undone.</Text>
+            <Text style={[styles.body, styles.warning]}>{UPGRADE_COPY.postRemoved} {UPGRADE_COPY.once}</Text>
             {error ? <HelperText type="error" visible>{error}</HelperText> : null}
           </Dialog.Content>
           <Dialog.Actions>
@@ -80,5 +80,6 @@ const styles = StyleSheet.create({
   card: { marginBottom: 16, borderRadius: 20, backgroundColor: '#FFFFFF' },
   title: { fontWeight: '600', color: '#06214A' },
   body: { fontSize: 13.5, lineHeight: 20, color: '#445474' },
+  warning: { color: '#8A4B00', marginTop: 8 },
   option: { fontSize: 14, textAlign: 'left' },
 });

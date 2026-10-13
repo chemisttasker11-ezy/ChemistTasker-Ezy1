@@ -614,6 +614,22 @@ class ExplorerOnboarding(models.Model):
 
 
 
+class AhpraRegistration(models.Model):
+    """Who holds an AHPRA number: one person per number, for life (owner decision 2026-10-13). The person may use it
+    on each of their own profiles. Kept by onboarding/verification/ahpra_numbers.py; the unique number makes concurrent
+    claims safe."""
+    number = models.CharField(max_length=100, unique=True)  # normalised: no spaces, upper case
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ahpra_registrations')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = "client_profile"
+
+    def __str__(self):
+        return f"{self.number} -> user {self.user_id}"
+
+
+
 class RefereeResponse(models.Model):
     # Link to the specific onboarding profile (works for all types)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)

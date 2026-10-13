@@ -1,5 +1,5 @@
-// A worker's skills, everywhere they are shown (talent cards, candidate review, booked-worker profile): the three
-// groups Clinical services / Software / Other pharmacy skills (projectTalentSkills), drawn like the job board's
+// A worker's skills, everywhere they are shown (talent cards, candidate review, booked-worker profile): two rows,
+// Skills and Software (owner decision 2026-10-14, the job board's split; projectTalentSkills), drawn like the job board's
 // requirements. Cards use `compact` (symbol tiles that explain themselves); profiles use name chips.
 // Certificate skills carry their check state (StatusMark); other skills never have one.
 import { Box, Chip, Stack, Typography } from '@mui/material';
@@ -11,9 +11,8 @@ import { SkillEvidenceMark, StatusMark } from './VerificationBadges';
 
 const reg = registry as any;
 export const WORKER_SKILL_GROUPS = [
-  { key: 'clinicalServices', title: 'Clinical services' },
+  { key: 'skills', title: 'Skills' },
   { key: 'dispenseSoftware', title: 'Software' },
-  { key: 'expandedScope', title: 'Other pharmacy skills' },
 ] as const;
 
 const heading = { fontFamily: 'Inter, sans-serif', color: 'text.primary', fontWeight: 800, fontSize: 13, lineHeight: 1.35 } as const;
@@ -32,7 +31,7 @@ export function WorkerSkillRows({ skills, verification = null, compact = false, 
       {rows.map(({ key, title }) => (
         <Stack key={key} direction={compact ? { xs: 'column', sm: 'row' } : 'column'} spacing={compact ? { xs: 0.5, sm: 1.25 } : 0.75}
           alignItems={compact ? { xs: 'flex-start', sm: 'center' } : 'stretch'}>
-          <Typography component="h4" sx={{ ...heading, minWidth: compact ? { sm: 136 } : undefined }}>{title}</Typography>
+          <Typography component="h4" sx={{ ...heading, minWidth: compact ? { sm: 76 } : undefined }}>{title}</Typography>
           <Stack direction="row" useFlexGap flexWrap="wrap" gap={compact ? 0.75 : 0.5}>
             {groups[key].map(code => {
               const label = findSkill(reg, code)?.label || code;

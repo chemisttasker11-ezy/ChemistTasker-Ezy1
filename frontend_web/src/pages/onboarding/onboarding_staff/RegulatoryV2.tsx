@@ -106,8 +106,11 @@ export default function RegulatoryV2() {
   const [data, setData] = useState<FormState>(EMPTY);
   const unsaved = useUnsavedChangesGuard({ disabled: loading || saving, value: data });
 
+  // Owner decision 2026-10-14: the role is fixed once chosen (the backend refuses a change).
+  const [savedRole, setSavedRole] = useState("");
   const accept = (d: any) => {
     const next = fromServer(d);
+    setSavedRole(next.role_type);
     setData(next);
     unsaved.markClean(next);
     setBadges(verificationRows(normalizeVerification(d.verification), "worker"));
@@ -173,7 +176,8 @@ export default function RegulatoryV2() {
 
       <Stack component="section" spacing={2} aria-labelledby="role-heading">
         <Typography id="role-heading" component="h3" sx={{ fontSize: 16, fontWeight: 600, color: "var(--ct-text-primary)" }}>Your role</Typography>
-        <TextField select fullWidth required label="Role" value={role} error={Boolean(fieldErrors.role_type)} helperText={fieldErrors.role_type}
+        <TextField select fullWidth required label="Role" value={role} error={Boolean(fieldErrors.role_type)} disabled={Boolean(savedRole)}
+          helperText={fieldErrors.role_type || (savedRole ? "Your role is set. Contact support if it is wrong." : "Choose carefully: your role can't be changed later.")}
           onChange={event => set({ role_type: event.target.value as Role, classification_level: "", dispensary_qualification: "", student_year: "" })}>
           {ROLE_CHOICES.map(option => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
         </TextField>

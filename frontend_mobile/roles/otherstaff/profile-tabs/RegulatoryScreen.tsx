@@ -57,8 +57,11 @@ export default function OtherStaffRegulatoryScreen() {
   const [badges, setBadges] = useState<VerificationRow[]>([]);
   const unsaved = useUnsavedChangesGuard({ data, files }, { enabled: !loading, onSave: () => save(), saving });
 
+  // Owner decision 2026-10-14: the role is fixed once chosen (the backend refuses a change).
+  const [savedRole, setSavedRole] = useState('');
   const accept = (res: any) => {
     const next = fromServer(res);
+    setSavedRole(next.role_type || '');
     setData(next);
     setFiles({});
     setBadges(verificationRows(normalizeVerification(res?.verification), 'worker'));
@@ -147,9 +150,10 @@ export default function OtherStaffRegulatoryScreen() {
 
         <Text style={styles.section}>Your role</Text>
         <Menu visible={menu === 'role'} onDismiss={() => setMenu(null)}
-          anchor={<Button mode="outlined" onPress={() => setMenu('role')} contentStyle={styles.select}>{ROLE_CHOICES.find(c => c.value === role)?.label || 'Choose your role'}</Button>}>
+          anchor={<Button mode="outlined" disabled={Boolean(savedRole)} onPress={() => setMenu('role')} contentStyle={styles.select}>{ROLE_CHOICES.find(c => c.value === role)?.label || 'Choose your role'}</Button>}>
           {ROLE_CHOICES.map(c => <Menu.Item key={c.value} title={c.label} onPress={() => { set({ role_type: c.value, classification_level: '', dispensary_qualification: '', student_year: '' }); setMenu(null); }} />)}
         </Menu>
+        <HelperText type="info" visible>{savedRole ? "Your role is set. Contact support if it is wrong." : "Choose carefully: your role can't be changed later."}</HelperText>
 
         {isLevelled ? (
           <>

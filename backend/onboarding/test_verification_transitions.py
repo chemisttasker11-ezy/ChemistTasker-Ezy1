@@ -6,19 +6,21 @@ from io import StringIO
 from unittest import mock
 
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
 from client_profile.characterization_support import BASE, client_for, make_user
-from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
+from onboarding.models import AhpraRegistration, ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding
 from onboarding.services.regulatory import apply_regulatory_tab
 from onboarding.services.upgrade import upgrade_newcomer
+from onboarding.verification.ahpra_numbers import guard_ahpra_number
 from onboarding.verification.policy import verification_summary
 from onboarding.verification.schema import VerificationSummarySerializer
 from talent.models import ExplorerPost
 
 STAFF_URL = BASE + 'otherstaff/onboarding/me/'
 NEWCOMER_URL = BASE + 'explorer/onboarding/me/'
+PHARMACIST_URL = BASE + 'pharmacist/onboarding/me/'
 
 
 def worker(**fields):
@@ -63,18 +65,70 @@ class AhpraNumberTests(TestCase):
         self.assertFalse(response.data['verified'])
 
     def test_a_number_cannot_be_used_by_two_accounts(self):
-        PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'), ahpra_number='PHA0000000009')
+        pharmacist = make_user('PHARMACIST', is_otp_verified=True)
+        PharmacistOnboarding.objects.create(user=pharmacist)
+        response = client_for(pharmacist).patch(PHARMACIST_URL, {'tab': 'basic', 'ahpra_number': 'PHA 0000000009'}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(AhpraRegistration.objects.get(number='PHA0000000009').user_id, pharmacist.pk)
         profile = worker(role_type='INTERN')
         response = client_for(profile.user).patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'pha0000000009'}, format='json')
         self.assertEqual(response.status_code, 400, response.data)
         self.assertIn('another account', str(response.data['ahpra_number']))
-
-    def test_the_check_stays_with_the_number_across_role_changes(self):
-        profile = worker(role_type='INTERN', ahpra_number='PHA0000000001', ahpra_verified=True, verified=True)
-        apply_regulatory_tab(profile, {'role_type': 'ASSISTANT', 'classification_level': 'LEVEL_1'}, False)
-        apply_regulatory_tab(profile, {'role_type': 'INTERN'}, False)
         profile.refresh_from_db()
-        self.assertTrue(profile.ahpra_verified)  # the same lifelong number, already checked
+        self.assertFalse(profile.ahpra_number)
+
+    def test_the_registry_row_decides_ownership(self):
+        # A concurrent claim that committed first owns the number: the unique row decides, not a scan of profiles.
+        AhpraRegistration.objects.create(number='PHA0000000010', user=make_user('PHARMACIST'))
+        profile = worker(role_type='INTERN')
+        response = client_for(profile.user).patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'PHA0000000010'}, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+
+    def test_one_person_keeps_their_number_across_their_profiles_and_frees_an_old_one(self):
+        profile = worker(role_type='INTERN')
+        client = client_for(profile.user)
+        for number in ('PHA0000000011', 'PHA0000000012'):
+            self.assertEqual(client.patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': number}, format='json').status_code, 200)
+        self.assertEqual(set(AhpraRegistration.objects.filter(user=profile.user).values_list('number', flat=True)), {'PHA0000000012'})
+        owner_profile = OwnerOnboarding.objects.create(user=profile.user)
+        self.assertTrue(guard_ahpra_number(owner_profile, 'PHA0000000012'))  # same person: allowed
+
+    def test_unknown_tabs_are_refused_and_cannot_change_a_checked_number(self):
+        intern = worker(role_type='INTERN', ahpra_number='PHA0000000001', ahpra_verified=True, verified=True)
+        pharmacist_user = make_user('PHARMACIST', is_otp_verified=True, is_mobile_verified=True)
+        pharmacist = PharmacistOnboarding.objects.create(user=pharmacist_user, ahpra_number='PHA0000000002', ahpra_verified=True, verified=True)
+        for user, url, row, number in ((intern.user, STAFF_URL, intern, 'PHA0000000001'), (pharmacist_user, PHARMACIST_URL, pharmacist, 'PHA0000000002')):
+            response = client_for(user).patch(url, {'tab': 'unrecognised', 'ahpra_number': 'PHA0000000099'}, format='json')
+            self.assertEqual(response.status_code, 400, response.data)
+            self.assertIn('tab', response.data)
+            row.refresh_from_db()
+            self.assertEqual((row.ahpra_number, row.ahpra_verified, row.verified), (number, True, True))
+        response = client_for(pharmacist_user).patch(PHARMACIST_URL, {'tab': 'basic', 'ahpra_number': 'PHA0000000099'}, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+
+    def test_a_pharmacy_team_role_is_fixed_once_chosen(self):
+        profile = worker(role_type='ASSISTANT', verified=True)
+        client = client_for(profile.user)
+        # Basic no longer takes role fields; the Role step refuses a change.
+        self.assertEqual(client.patch(STAFF_URL, {'tab': 'basic', 'role_type': 'INTERN', 'suburb': 'Town'}, format='json').status_code, 200)
+        response = client.patch(STAFF_URL, {'tab': 'regulatory', 'role_type': 'INTERN'}, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+        profile.refresh_from_db()
+        self.assertEqual((profile.role_type, profile.suburb, profile.verified), ('ASSISTANT', 'Town', True))
+        new = worker()  # choosing a role the first time is still allowed
+        self.assertEqual(client_for(new.user).patch(STAFF_URL, {'tab': 'regulatory', 'role_type': 'STUDENT'}, format='json').status_code, 200)
+
+    def test_existing_duplicates_are_cleaned_by_the_migration_rule(self):
+        from importlib import import_module
+        from django.apps import apps
+        claim = import_module('client_profile.migrations.0080_ahpra_registration').claim_existing_numbers
+        checked = PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'), ahpra_number='pha 77', ahpra_verified=True)
+        other = worker(role_type='INTERN', ahpra_number='PHA77', verified=True)
+        with mock.patch('builtins.print'):
+            claim(apps, None)
+        other.refresh_from_db()
+        self.assertEqual(AhpraRegistration.objects.get(number='PHA77').user_id, checked.user_id)
+        self.assertEqual((other.ahpra_number, other.ahpra_verified, other.verified), (None, False, False))
 
     def test_an_intern_submitting_an_unchecked_number_notifies_the_admin_team(self):
         profile = worker(role_type='INTERN', ahpra_number='PHA0000000001')
@@ -87,6 +141,29 @@ class AhpraNumberTests(TestCase):
 
 
 class VerificationStateTests(TestCase):
+    @override_settings(VERIFICATION_EXTRA_REQUIREMENTS=['referees'], VERIFICATION_GRACE_UNTIL=date(2099, 1, 1))
+    def test_submitting_ordinary_details_never_removes_verified(self):
+        profile = worker(role_type='ASSISTANT', verified=True)
+        client = client_for(profile.user)
+        for payload in ({'tab': 'basic', 'suburb': 'Town'}, {'tab': 'profile', 'short_bio': 'Hello'}, {'tab': 'skills', 'skills': []}):
+            client.patch(STAFF_URL, {**payload, 'submitted_for_verification': True}, format='json')
+            data = client.get(STAFF_URL).data
+            self.assertEqual((data['verified'], data['verification']['outstanding']), (True, ['referees']), payload)
+
+    def test_a_changed_photo_id_removes_verified_only_when_verified_relies_on_it(self):
+        from onboarding.services.identity import apply_identity_tab
+        user, overseas, post = newcomer(age=30)
+        type(user).objects.filter(pk=user.pk).update(is_mobile_verified=False, mobile_check_skipped=True)
+        ExplorerOnboarding.objects.filter(pk=overseas.pk).update(role_type='OVERSEAS', government_id='id/a.pdf', gov_id_verified=True)
+        overseas = ExplorerOnboarding.objects.select_related('user').get(pk=overseas.pk)
+        apply_identity_tab(overseas, {'government_id_type': 'OTHER_PASSPORT'}, False)
+        overseas.refresh_from_db()
+        self.assertFalse(overseas.verified)  # the overseas route relies on the photo ID
+        assistant = worker(role_type='ASSISTANT', verified=True, government_id='id/b.pdf', gov_id_verified=True)
+        apply_identity_tab(assistant, {'government_id_type': 'OTHER_PASSPORT'}, False)
+        assistant.refresh_from_db()
+        self.assertTrue(assistant.verified)  # here the photo ID is only a badge
+
     def test_one_response_reports_one_state(self):
         promoted = worker(role_type='ASSISTANT', verified=False)
         demoted = worker(role_type='ASSISTANT', verified=True)
@@ -150,6 +227,33 @@ class NewcomerTransitionTests(TestCase):
         self.assertFalse(ExplorerPost.objects.filter(pk=post.pk).exists())
         self.assertTrue(verification_summary(OtherStaffOnboarding.objects.get(user=user))['under_18'])
 
+    def test_upgrade_carries_the_work_rights_answer(self):
+        for answer in ('CITIZEN_OR_RESIDENT', 'VISA', 'NONE'):
+            for role, staff_role, model in (('PHARMACIST', None, PharmacistOnboarding), ('OTHER_STAFF', 'ASSISTANT', OtherStaffOnboarding)):
+                user, profile, post = newcomer(age=30, work_rights=answer)
+                upgrade_newcomer(user.pk, role, staff_role)
+                self.assertEqual(model.objects.get(user=user).work_rights, answer)
+
+    def test_upgrade_removes_legacy_newcomer_posts_without_a_role_category(self):
+        user, profile, post = newcomer(age=30)
+        ExplorerPost.objects.filter(pk=post.pk).update(role_category=None)
+        authored = ExplorerPost.objects.create(author_user=user, headline='Old', role_category='')
+        upgrade_newcomer(user.pk, 'PHARMACIST')
+        self.assertFalse(ExplorerPost.objects.filter(pk__in=[post.pk, authored.pk]).exists())
+
+    def test_referee_links_sent_before_upgrade_follow_the_person(self):
+        from django.core.signing import TimestampSigner
+        user, profile, post = newcomer(age=30, referee1_name='Dr Lee', referee1_email='lee@example.test',
+                                       referee1_relation='manager', referee1_workplace='Clinic')
+        token = TimestampSigner().sign(f'exploreronboarding:{profile.pk}:1')
+        upgrade_newcomer(user.pk, 'OTHER_STAFF', 'ASSISTANT')
+        with mock.patch('onboarding.views.async_task', create=True), mock.patch('core.task_queue.async_task'):
+            response = client_for(None).post(BASE + f'onboarding/referee-reject/{token}/', {}, format='json')
+        self.assertEqual(response.status_code, 200, getattr(response, 'data', None))
+        self.assertTrue(OtherStaffOnboarding.objects.get(user=user).referee1_rejected)
+        profile.refresh_from_db()
+        self.assertFalse(profile.referee1_rejected)
+
     def test_upgrade_carries_the_whole_identity_bundle(self):
         for kind in ('VISA', 'OTHER_PASSPORT'):
             user, profile, post = newcomer(age=30)
@@ -179,3 +283,37 @@ class NewcomerTransitionTests(TestCase):
         self.assertEqual(client.delete(BASE + f'explorer-posts/{post.pk}/').status_code, 204)
         response = client.post(BASE + 'explorer-posts/', {'headline': 'Again', 'role_category': 'EXPLORER'}, format='json')
         self.assertEqual(response.status_code, 201, response.data)
+
+
+class AhpraConcurrentClaimTests(TransactionTestCase):
+    """The reviewer's race (2026-10-14): two accounts claim one number at the same moment; exactly one may hold it."""
+
+    def test_concurrent_claims_leave_one_owner(self):
+        from queue import Queue
+        from threading import Barrier, Thread
+        from django.db import close_old_connections
+        profiles = [PharmacistOnboarding.objects.create(user=make_user('PHARMACIST', is_otp_verified=True, is_mobile_verified=True)) for _ in range(2)]
+        barrier, results = Barrier(2), Queue()
+        original = AhpraRegistration.objects.get_or_create
+
+        def together(*args, **kwargs):
+            barrier.wait(timeout=15)  # both requests reach the insert before either commits
+            return original(*args, **kwargs)
+
+        def claim(user):
+            close_old_connections()
+            try:
+                results.put(client_for(user).patch(PHARMACIST_URL, {'tab': 'basic', 'ahpra_number': 'PHA0000000099'}, format='json').status_code)
+            finally:
+                close_old_connections()
+
+        with mock.patch.object(AhpraRegistration.objects, 'get_or_create', side_effect=together):
+            threads = [Thread(target=claim, args=(profile.user,)) for profile in profiles]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=25)
+        statuses = sorted(results.get_nowait() for _ in threads)
+        self.assertEqual(statuses, [200, 400])
+        self.assertEqual(PharmacistOnboarding.objects.filter(ahpra_number='PHA0000000099').count(), 1)
+        self.assertEqual(AhpraRegistration.objects.filter(number='PHA0000000099').count(), 1)

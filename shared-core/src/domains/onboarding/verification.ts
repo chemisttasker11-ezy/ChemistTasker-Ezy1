@@ -166,7 +166,7 @@ export const VERIFICATION_GUIDE = {
   title: 'What do badges mean?',
   intro: 'Badges show what ChemistTasker has checked. Anything without a badge is the person’s own claim.',
   items: [
-    { term: 'Verified profile', tone: 'success' as BadgeTone, text: 'Email and mobile confirmed. Pharmacists and interns also have their AHPRA registration checked. Everyone who can apply for public shifts has this.' },
+    { term: 'Verified profile', tone: 'success' as BadgeTone, text: 'Email and Australian mobile confirmed; pharmacists and interns also have their AHPRA registration checked. One exception: a newcomer based overseas may verify with photo ID instead of a mobile. They carry the Overseas label, and ChemistTasker does not vouch for overseas profiles.' },
     { term: 'Verified', tone: 'success' as BadgeTone, text: 'We checked the evidence: a certificate or ID matched to their name, or registration on the AHPRA register.' },
     { term: 'Check pending', tone: 'info' as BadgeTone, text: 'Evidence was supplied and our check is still in progress.' },
     { term: 'Not verified', tone: 'neutral' as BadgeTone, text: 'Claimed without evidence, or the evidence did not pass. Before relying on it, check it yourself or ask them to complete verification after you match.' },

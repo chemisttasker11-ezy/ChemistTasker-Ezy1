@@ -108,20 +108,14 @@ def refresh_verified(profile) -> bool:
     return verified
 
 
-def ahpra_number_error(profile, new_number) -> str | None:
-    """Owner decision 2026-10-13: an AHPRA number belongs to one person for life (intern to pharmacist). Once checked it
-    cannot be changed here, and no other account can use it. None when the new number is fine."""
-    new = (new_number or '').strip()
-    if new == (getattr(profile, 'ahpra_number', None) or '').strip():
-        return None
-    if getattr(profile, 'ahpra_verified', False):
-        return "Your AHPRA number has been checked and stays with you for life, so it can't be changed. Contact support if it is wrong."
-    if new:
-        from onboarding.models import OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding
-        for model in (PharmacistOnboarding, OtherStaffOnboarding, OwnerOnboarding):
-            if model.objects.filter(ahpra_number__iexact=new).exclude(user_id=profile.user_id).exists():
-                return 'This AHPRA number is already used by another account. Contact support if it is yours.'
-    return None
+def revoke_for_changed_evidence(profile, requirement: str) -> bool:
+    """Owner decision 2026-10-14: Verified is removed only when evidence it relies on changes (AHPRA number, photo ID
+    for those who need it, mobile number), never by an ordinary save or Submit. Sets the flag (caller saves) and
+    returns True when `requirement` is one this profile's Verified needs."""
+    if requirement in requirements(profile) and profile.verified:
+        profile.verified = False
+        return True
+    return False
 
 
 def _certificate_skill_codes(profile) -> list[str]:

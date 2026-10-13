@@ -67,11 +67,6 @@ def apply_profile_tab(instance, vdata: dict, submit: bool):
             instance.resume = new_file
             update_fields.append('resume')
 
-    # Submit does not auto-verify anything here; keep profile unverified until all tabs pass
-    if submit:
-        instance.verified = False
-        update_fields.append('verified')
-
     if update_fields:
         instance.save(update_fields=list(set(update_fields)))
     return instance

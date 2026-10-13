@@ -128,16 +128,17 @@ class SubmissionTests(RoleTabFixture):
 
     def test_the_submit_flag_is_read_as_a_boolean(self):
         # Regression: the role serializers took the raw request value's truthiness, so the multipart string "false"
-        # turned a plain save into a submission (and un-verified the profile).
+        # turned a plain save into a submission. A submission is visible as the first-submission record (Basic).
         for label in ("pharmacist", "otherstaff", "explorer"):
             for flag, submitted in (("false", False), ("0", False), ("true", True), ("1", True)):
                 with self.subTest(role=label, flag=flag):
-                    user, obj, url = self.onboarding(label, verified=True)
-                    response, _ = self.patch(user, url, {"tab": "profile", "short_bio": "Hi",
+                    extra = {"ahpra_number": "PHA1"} if label == "pharmacist" else {}
+                    user, obj, url = self.onboarding(label, verified=True, **extra)
+                    response, _ = self.patch(user, url, {"tab": "basic", "suburb": "Town",
                                                          "submitted_for_verification": flag}, multipart=True)
                     self.assertEqual(response.status_code, 200, response.data)
                     obj.refresh_from_db()
-                    self.assertEqual(obj.verified, not submitted)
+                    self.assertEqual((obj.submitted_for_verification, obj.verified), (submitted, True))
 
     def test_owner_notifies_on_every_basic_save_and_resets_ahpra_on_change(self):
         user, obj, url = self.onboarding("owner", verified=True, ahpra_number="A1", ahpra_verified=True)
@@ -178,11 +179,13 @@ class BasicTabTests(RoleTabFixture):
 
     def test_other_staff_and_explorer_basic_fields(self):
         user, obj, url = self.onboarding("otherstaff")
+        role_before = obj.role_type
+        # Basic takes no role fields (owner decision 2026-10-14: the Role step owns them, and a role is fixed once chosen).
         response, _ = self.patch(user, url, {"tab": "basic", "role_type": "INTERN", "intern_half": "FIRST_HALF",
                                              "suburb": "Town", "submitted_for_verification": True})
         self.assertEqual(response.status_code, 200, response.data)
         obj.refresh_from_db()
-        self.assertEqual((obj.role_type, obj.intern_half, obj.suburb, obj.verified), ("INTERN", "FIRST_HALF", "Town", False))
+        self.assertEqual((obj.role_type, obj.intern_half, obj.suburb), (role_before, None, "Town"))
         user, obj, url = self.onboarding("explorer")
         response, _ = self.patch(user, url, {"tab": "basic", "role_type": "STUDENT", "suburb": "Town"})
         self.assertEqual(response.status_code, 200, response.data)
@@ -282,7 +285,7 @@ class RoleSpecificTabTests(RoleTabFixture):
         response, _ = self.patch(user, url, {"tab": "rate", "rate_preference": {"weekday": "70"},
                                              "submitted_for_verification": True})
         obj.refresh_from_db()
-        self.assertEqual((obj.rate_preference["weekday"], obj.verified), ("70", False))
+        self.assertEqual((obj.rate_preference["weekday"], obj.verified), ("70", True))  # owner decision 2026-10-14: Submit never removes Verified
 
     def test_other_staff_regulatory_documents(self):
         user, obj, url = self.onboarding("otherstaff", role_type="INTERN")
@@ -296,7 +299,12 @@ class RoleSpecificTabTests(RoleTabFixture):
         obj.refresh_from_db()
         self.assertEqual((obj.ahpra_number, obj.ahpra_verified), ("0001234567", False))
 
+        # The role is fixed once chosen (owner decision 2026-10-14).
+        response, work = self.patch(user, url, {"tab": "regulatory", "role_type": "ASSISTANT"})
+        self.assertEqual((response.status_code, set(response.data)), (400, {"role_type"}))
+
         # A Level 3 assistant claiming dispensing submits without a certificate: it is an optional badge.
+        user, obj, url = self.onboarding("otherstaff", role_type="ASSISTANT")
         response, work = self.patch(user, url, {"tab": "regulatory", "role_type": "ASSISTANT", "classification_level": "LEVEL_3",
                                                 "dispensary_qualification": "LEVEL_3", "submitted_for_verification": True})
         self.assertEqual(response.status_code, 200, response.data)
@@ -355,7 +363,7 @@ class RoleSpecificTabTests(RoleTabFixture):
         response, _ = self.patch(user, url, {"tab": "interests", "interests": '["PLACEMENT"]',
                                              "submitted_for_verification": "true"}, multipart=True)
         obj.refresh_from_db()
-        self.assertEqual((obj.interests, obj.verified), (["PLACEMENT"], False))
+        self.assertEqual((obj.interests, obj.verified), (["PLACEMENT"], True))  # owner decision 2026-10-14: Submit never removes Verified
         response, _ = self.patch(user, url, {"tab": "interests", "interests": "nope"}, multipart=True)
         self.assertEqual((response.status_code, str(response.data["interests"][0])), (400, "Value must be valid JSON."))
 

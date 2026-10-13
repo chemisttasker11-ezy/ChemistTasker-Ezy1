@@ -1,5 +1,5 @@
-// A worker's skills wherever they are shown (talent cards, candidate review, booked-worker profile): the three groups
-// Clinical services / Software / Other pharmacy skills (shared-core projectTalentSkills), each a labelled row of
+// A worker's skills wherever they are shown (talent cards, candidate review, booked-worker profile): two rows, Skills
+// and Software (owner decision 2026-10-14, the job board's split; shared-core projectTalentSkills), each a labelled row of
 // symbol + name chips, like the job board's details. Certificate skills carry their check state; others never do.
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -10,9 +10,8 @@ import { SkillIcon } from '../../../components/SkillIcon';
 import { SkillEvidenceIcon } from './VerificationBadges';
 
 const GROUPS = [
-  { key: 'clinicalServices', title: 'Clinical services' },
+  { key: 'skills', title: 'Skills' },
   { key: 'dispenseSoftware', title: 'Software' },
-  { key: 'expandedScope', title: 'Other pharmacy skills' },
 ] as const;
 
 export function WorkerSkillRows({ skills, verification = null }: { skills: readonly string[]; verification?: VerificationSummary | null }) {

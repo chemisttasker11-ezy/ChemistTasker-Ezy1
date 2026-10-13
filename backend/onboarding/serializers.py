@@ -28,6 +28,7 @@ from onboarding.services.progress import (
 )
 from onboarding.services.regulatory import apply_regulatory_tab
 from drf_spectacular.utils import extend_schema_field
+from onboarding.verification.ahpra_numbers import guard_ahpra_write
 from onboarding.verification.policy import refresh_verified, verification_summary
 from onboarding.verification.schema import VerificationSummarySerializer
 from onboarding.services.skills import (  # noqa: F401  (_load_skills_catalog, _required_cert_skill_codes: historical path)
@@ -121,6 +122,7 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
 
     def update(self, instance, validated_data):
         tab = (self.initial_data.get("tab") or "basic").strip().lower()
+        guard_ahpra_write(instance, validated_data)
         submit = bool(validated_data.pop("submitted_for_verification", False))
 
         if tab == "identity":
@@ -407,8 +409,13 @@ class PharmacistOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
         return verification_summary(obj)
 
     # -------- update --------
+    TABS = ('basic', 'payment', 'referees', 'skills', 'rate', 'profile', 'identity')
+
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
+        if tab not in self.TABS:
+            raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
+        guard_ahpra_write(instance, validated_data)
         submit = submit_requested(self.initial_data)
         record_first_submission(instance, tab=tab, submit=submit)
 
@@ -427,7 +434,7 @@ class PharmacistOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
         if tab == 'identity':
             return self._identity_tab(instance, validated_data, submit)
 
-        return super().update(instance, validated_data)
+        raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
 
     # ---------------- BASIC TAB ----------------
     def _basic_tab(self, instance, vdata: dict, submit: bool):
@@ -706,8 +713,13 @@ class OtherStaffOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
         return verification_summary(obj)
 
     # ---------------- update router ----------------
+    TABS = ('basic', 'identity', 'regulatory', 'payment', 'referees', 'skills', 'profile')
+
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
+        if tab not in self.TABS:
+            raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
+        guard_ahpra_write(instance, validated_data)
         submit = submit_requested(self.initial_data)
         record_first_submission(instance, tab=tab, submit=submit)
 
@@ -726,7 +738,7 @@ class OtherStaffOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
         if tab == 'profile':
             return self._profile_tab(instance, validated_data, submit)
 
-        return super().update(instance, validated_data)
+        raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
 
     # ---------------- BASIC TAB ----------------
     def _basic_tab(self, instance, vdata: dict, submit: bool):
@@ -902,8 +914,13 @@ class ExplorerOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin
         return verification_summary(obj)
 
     # ---------------- update router ----------------
+    TABS = ('basic', 'identity', 'interests', 'referees', 'profile')
+
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
+        if tab not in self.TABS:
+            raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
+        guard_ahpra_write(instance, validated_data)
         submit = submit_requested(self.initial_data)
         record_first_submission(instance, tab=tab, submit=submit)
 
@@ -918,7 +935,7 @@ class ExplorerOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin
         if tab == 'profile':
             return self._profile_tab(instance, validated_data, submit)
 
-        return super().update(instance, validated_data)
+        raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
 
     # ---------------- BASIC TAB ----------------
     def _basic_tab(self, instance, vdata: dict, submit: bool):

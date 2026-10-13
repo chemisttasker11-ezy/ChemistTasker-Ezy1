@@ -14,7 +14,7 @@ STAFF_ROLES = ('INTERN', 'TECHNICIAN', 'ASSISTANT', 'STUDENT')
 # Fields with the same meaning on the newcomer and worker profiles. Verification flags other than the ID check are
 # never copied: they belong to the new role.
 CARRIED_FIELDS = (
-    'date_of_birth', 'gender', 'emergency_contact_number', 'emergency_contact_relation',
+    'date_of_birth', 'work_rights', 'gender', 'emergency_contact_number', 'emergency_contact_relation',
     'street_address', 'suburb', 'state', 'postcode', 'google_place_id', 'latitude', 'longitude',
     'open_to_travel', 'travel_states', 'coverage_radius_km', 'profile_photo', 'short_bio', 'resume',
     *(f'referee{i}_{name}' for i in (1, 2) for name in ('name', 'relation', 'email', 'workplace', 'confirmed', 'rejected', 'last_sent')),
@@ -69,5 +69,8 @@ def upgrade_newcomer(user_id, role, staff_role=None):
 
         # Owner decision 2026-10-13: the New to pharmacy post comes off the board; they post again in their new role
         # once that profile is verified (the talent hub's normal publishing gate).
-        ExplorerPost.objects.filter(Q(author_user=user) | Q(explorer_profile__user=user), role_category='EXPLORER').delete()
+        # Newcomer posts by provenance: linked to the newcomer profile, or written by them as a newcomer (older rows may
+        # have no role category). Posts are only ever written in the account's current role, which was EXPLORER.
+        newcomer_posts = Q(explorer_profile__user=user) | Q(author_user=user, role_category__in=('EXPLORER', '')) | Q(author_user=user, role_category__isnull=True)
+        ExplorerPost.objects.filter(newcomer_posts).delete()
     return user, staff_role or 'PHARMACIST'
