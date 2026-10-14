@@ -118,7 +118,7 @@ jobs:
         working-directory: frontend_web/e2e
         env:
           CT_CAPTURE_SHIFT_BASELINE: '1'
-        run: npx playwright test frontend-appearance.spec.mjs --grep "shift-filters" --update-snapshots --workers=2
+        run: npm test -- frontend-appearance.spec.mjs --grep "shift-filters" --update-snapshots --workers=2
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
