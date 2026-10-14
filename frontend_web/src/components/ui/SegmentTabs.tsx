@@ -46,11 +46,18 @@ export default function SegmentTabs<T extends string>({
         borderRadius: "var(--ct-card-radius)",
         border: "1px solid var(--ct-border-color)",
         bgcolor: "var(--ct-surface-bg)",
-        "& .MuiTabs-flexContainer": {
+        "& .MuiTabs-list, & .MuiTabs-flexContainer": {
           gap: { xs: 0.75, sm: 1.25 },
           ...(mobileWrap ? { flexWrap: { xs: "wrap", sm: "nowrap" } } : {}),
         },
-        ...(mobileWrap ? { "& .MuiTab-root": { flexBasis: { xs: "29%", sm: 0 }, minWidth: { xs: 90, sm: 0 }, flexGrow: 1, maxWidth: "none" } } : {}),
+        ...(mobileWrap ? {
+          "& .MuiTab-root": {
+            flex: { xs: "1 1 30%", sm: "1 1 0" },
+            minWidth: { xs: 90, sm: 0 },
+            maxWidth: "none",
+            px: { xs: 1, sm: 2 },
+          },
+        } : {}),
       }}
     >
       {tabs.map((tab) => (
