@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { canSkipOverseasMobileCheck } from '@chemisttasker/shared-core';
+import { canSkipOverseasMobileCheck, skipMobileOverseas } from '@chemisttasker/shared-core';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   TextField,
@@ -38,7 +38,7 @@ export default function MobileOTPVerify() {
 
   const extractError = (err: unknown, fallback: string) => {
     const anyErr = err as any;
-    const data = anyErr?.response?.data;
+    const data = anyErr?.response?.data ?? anyErr?.payload;
     if (typeof data?.detail === 'string' && data.detail) return data.detail;
     if (typeof data?.error === 'string' && data.error) return data.error;
     if (data && typeof data === 'object') {
@@ -108,8 +108,9 @@ export default function MobileOTPVerify() {
     setStatus('');
     setLoading(true);
     try {
-      const resp = await apiClient.post('/users/mobile/skip-overseas/', { first_name: firstName, last_name: lastName, username });
-      setUser((prev) => (prev ? { ...prev, first_name: firstName, last_name: lastName, username, mobile_check_skipped: true } : resp.data?.user || prev));
+      // Same authenticated shared-core operation as Expo; the current user is present when this action is visible.
+      await skipMobileOverseas({ first_name: firstName, last_name: lastName, username });
+      setUser((prev) => (prev ? { ...prev, first_name: firstName, last_name: lastName, username, mobile_check_skipped: true } : prev));
       setStatus('Done. Next, upload photo ID to verify your profile.');
       setTimeout(() => window.location.assign('/dashboard/explorer/onboarding?step=identity'), 800);
     } catch (err) {

@@ -5,7 +5,6 @@ from organizations.access import admin_assignments_for
 from memberships.models import Membership
 from organizations.models import Pharmacy
 from django.conf import settings
-from onboarding.services.work_profile import newcomer_type
 from users.serializers import serialize_org_memberships
 
 
@@ -126,6 +125,9 @@ def _build_authenticated_user_payload(user):
     ]
 
     from billing.utils import is_billing_active, is_in_free_trial
+    # Onboarding models depend on the users app: resolve this helper at call time,
+    # so importing users.sessions cannot form a module-level app dependency cycle.
+    from onboarding.services.work_profile import newcomer_type
     from public_hub.permissions import capabilities, member_hubs
 
     return {
