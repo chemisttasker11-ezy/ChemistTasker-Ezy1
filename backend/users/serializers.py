@@ -437,6 +437,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'is_pharmacy_admin': bool(admin_payload),
             'is_mobile_verified': bool(getattr(self.user, 'is_mobile_verified', False)),
             'mobile_check_skipped': bool(getattr(self.user, 'mobile_check_skipped', False)),
+            'newcomer_type': (getattr(getattr(self.user, 'explorer_onboarding', None), 'role_type', None) if self.user.role == 'EXPLORER' else None),
             'billing_active': is_billing_active(),
             'in_free_trial': is_in_free_trial(self.user),
         }
@@ -509,6 +510,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                 'is_pharmacy_admin': bool(admin_payload),
                 'is_mobile_verified': bool(getattr(user, 'is_mobile_verified', False)),
                 'mobile_check_skipped': bool(getattr(user, 'mobile_check_skipped', False)),
+                'newcomer_type': (getattr(getattr(user, 'explorer_onboarding', None), 'role_type', None) if user.role == 'EXPLORER' else None),
                 'billing_active': is_billing_active(),
                 'in_free_trial': is_in_free_trial(user),
             }
