@@ -381,12 +381,12 @@ class RequestMobileOTPView(APIView):
             update_fields.extend(changed_identity_fields)
         user.save(update_fields=sorted(set(update_fields)))
 
-        if settings.DEBUG:
-            # Keep the explicit DEBUG response contract for local development, but
+        if settings.MOBILE_OTP_DISPLAY_IN_APP:
+            # Test environments show the code in the app instead of sending SMS;
             # never duplicate the OTP or mobile number into process logs/stdout.
             return Response(
                 {
-                    "detail": "OTP generated successfully (DEBUG mode).",
+                    "detail": "OTP generated successfully (test mode).",
                     "debug_otp": otp_code,
                 },
                 status=status.HTTP_200_OK,
@@ -532,12 +532,12 @@ class ResendMobileOTPView(APIView):
             "mobile_otp_locked_until",
         ])
 
-        if settings.DEBUG:
-            # The caller explicitly receives the development-only OTP below; do
-            # not persist that secret or the mobile number in logs/stdout.
+        if settings.MOBILE_OTP_DISPLAY_IN_APP:
+            # The caller explicitly receives the test-only OTP below; do not
+            # persist that secret or the mobile number in logs/stdout.
             return Response(
                 {
-                    "detail": "OTP regenerated successfully (DEBUG mode).",
+                    "detail": "OTP regenerated successfully (test mode).",
                     "debug_otp": otp_code,
                 },
                 status=status.HTTP_200_OK,

@@ -622,6 +622,11 @@ SCRAPINGBEE_API_KEY=env('SCRAPINGBEE_API_KEY')
 MOBILEMESSAGE_USERNAME = env('MOBILEMESSAGE_USERNAME')
 MOBILEMESSAGE_PASSWORD = env('MOBILEMESSAGE_PASSWORD')
 MOBILEMESSAGE_SENDER = env('MOBILEMESSAGE_SENDER')
+# Test environments only: return the mobile OTP in the API response for the app
+# to display instead of sending a paid SMS. Ignored outside local/test/staging.
+MOBILE_OTP_DISPLAY_IN_APP = env.bool("MOBILE_OTP_DISPLAY_IN_APP", default=DEBUG) and (
+    os.environ.get("APP_ENV", "local").lower() in {"local", "dev", "development", "test", "staging"}
+)
 
 MOBILE_LATEST_VERSION = env("MOBILE_LATEST_VERSION", default="1.0.11")
 MOBILE_MINIMUM_SUPPORTED_VERSION = env("MOBILE_MINIMUM_SUPPORTED_VERSION", default="1.0.10")

@@ -1,5 +1,12 @@
 name: chemisttasker_staging
 
+# Bounded json-file logs so staging cannot fill the disk shared with production.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 x-backend-environment: &backend-environment
   SECRET_KEY: "${STAGING_DJANGO_SECRET_KEY:?STAGING_DJANGO_SECRET_KEY is required}"
   ADMIN_URL: "admin/"
@@ -52,6 +59,7 @@ x-backend-environment: &backend-environment
   MOBILEMESSAGE_USERNAME: "${MOBILEMESSAGE_USERNAME:-}"
   MOBILEMESSAGE_PASSWORD: "${MOBILEMESSAGE_PASSWORD:-}"
   MOBILEMESSAGE_SENDER: "${MOBILEMESSAGE_SENDER:-ChemistTasker}"
+  MOBILE_OTP_DISPLAY_IN_APP: "${STAGING_MOBILE_OTP_DISPLAY_IN_APP:-True}"
   STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:-}"
   STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:-}"
   LOG_LEVEL: "INFO"
@@ -61,6 +69,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: chemisttasker_postgres_staging
+    logging: *default-logging
     restart: unless-stopped
     environment:
       POSTGRES_DB: "chemisttasker_staging"
@@ -79,6 +88,7 @@ services:
   redis:
     image: redis:8.8.2-alpine
     container_name: chemisttasker_redis_staging
+    logging: *default-logging
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
@@ -97,6 +107,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: chemisttasker_backend_staging
+    logging: *default-logging
     restart: unless-stopped
     environment:
       <<: *backend-environment
@@ -125,6 +136,7 @@ services:
     profiles: ["workers"]
     image: chemisttasker_backend_staging:latest
     container_name: chemisttasker_celery_staging
+    logging: *default-logging
     restart: unless-stopped
     environment:
       <<: *backend-environment
@@ -150,6 +162,7 @@ services:
     profiles: ["workers"]
     image: chemisttasker_backend_staging:latest
     container_name: chemisttasker_celery_beat_staging
+    logging: *default-logging
     restart: unless-stopped
     environment:
       <<: *backend-environment
@@ -173,9 +186,16 @@ services:
         VITE_Maps_API_KEY: "${VITE_Maps_API_KEY:?VITE_Maps_API_KEY is required}"
         VITE_RECAPTCHA_SITE_KEY: "${VITE_RECAPTCHA_SITE_KEY:?VITE_RECAPTCHA_SITE_KEY is required}"
     container_name: chemisttasker_frontend_staging
+    logging: *default-logging
     restart: unless-stopped
     networks:
       - staging_network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   landing:
     build:
@@ -188,6 +208,7 @@ services:
         NEXT_PUBLIC_Maps_API_KEY: "${VITE_Maps_API_KEY:?VITE_Maps_API_KEY is required}"
         NEXT_PUBLIC_RECAPTCHA_SITE_KEY: "${VITE_RECAPTCHA_SITE_KEY:?VITE_RECAPTCHA_SITE_KEY is required}"
     container_name: chemisttasker_public_staging
+    logging: *default-logging
     restart: unless-stopped
     environment:
       PLATFORM_API_URL: "http://web:8000/api/v1"
@@ -201,7 +222,7 @@ services:
       web:
         condition: service_healthy
       frontend:
-        condition: service_started
+        condition: service_healthy
     networks:
       - staging_network
     healthcheck:
@@ -211,6 +232,9 @@ services:
       retries: 3
       start_period: 30s
 
+  # Keep this definition stable: shared Nginx (production-owned) resolves the
+  # gateway address only when it loads, so recreating the container can break
+  # staging routing. deploy-staging.sh restarts it instead.
   gateway:
     image: nginx:1.27.5-alpine
     container_name: chemisttasker_gateway_staging

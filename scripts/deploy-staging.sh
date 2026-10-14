@@ -30,17 +30,83 @@ compose() {
 }
 
 compose config --quiet
-if [[ "${1:-}" == "--with-workers" ]]; then
-  compose --profile workers up -d --build --wait --wait-timeout 300
+
+# Celery worker and beat run by default; --without-workers is the explicit
+# opt-out. --with-workers is accepted for older runbooks.
+frontend_only=0
+case "${1:-}" in
+  ""|--with-workers) with_workers=1 ;;
+  --without-workers) with_workers=0 ;;
+  --frontend-only) frontend_only=1; with_workers=1 ;;
+  *) echo "Usage: $0 [--without-workers|--frontend-only]" >&2; exit 2 ;;
+esac
+
+# Build before replacing any running service. A frontend-only release leaves
+# the backend, workers, database and Redis exactly as they are.
+if [[ "$frontend_only" == "1" ]]; then
+  compose build frontend landing
 else
-  compose up -d --build --wait --wait-timeout 300
-  compose stop celery_worker celery_beat >/dev/null 2>&1 || true
+  compose build web frontend landing
+fi
+
+gateway_id="$(compose ps --all -q gateway)"
+gateway_networks=""
+if [[ -n "$gateway_id" ]]; then
+  gateway_networks="$(docker inspect -f '{{range $name, $network := .NetworkSettings.Networks}}{{$name}}={{$network.IPAddress}}/{{$network.GlobalIPv6Address}};{{end}}' "$gateway_id")"
+fi
+
+# Startup runs migrations, so keep a restorable copy of the current database.
+BACKUP_DIR="${STAGING_BACKUP_DIR:-/opt/backups/chemisttasker}"
+if docker ps --format '{{.Names}}' | grep -qx chemisttasker_postgres_staging; then
+  mkdir -p "$BACKUP_DIR"
+  backup="$BACKUP_DIR/staging-predeploy-$(date -u +%Y%m%dT%H%M%SZ).dump"
+  ( umask 077; docker exec chemisttasker_postgres_staging \
+      pg_dump -U chemisttasker_staging -d chemisttasker_staging -Fc > "$backup" )
+  docker exec -i chemisttasker_postgres_staging pg_restore --list < "$backup" >/dev/null
+  printf 'DB_BACKUP=%s\n' "$backup"
+  # Keep the ten most recent pre-deploy dumps; other backups are untouched.
+  ls -1t "$BACKUP_DIR"/staging-predeploy-*.dump | tail -n +11 | xargs -r rm -f --
+fi
+
+if [[ "$frontend_only" == "1" ]]; then
+  compose up -d --no-deps --wait --wait-timeout 300 frontend landing
+else
+  # Infrastructure changes need a separate maintenance plan. In particular,
+  # logging changes must not recreate a healthy database or broker on release.
+  compose up -d --no-recreate --wait --wait-timeout 300 postgres redis
+  compose up -d --no-deps --wait --wait-timeout 300 web frontend landing
+  if [[ "$with_workers" == "1" ]]; then
+    compose --profile workers up -d --no-deps --wait --wait-timeout 300 celery_worker celery_beat
+  else
+    compose --profile workers stop celery_worker celery_beat
+  fi
+fi
+
+# The gateway resolves its upstreams and reads the bind-mounted staging.conf
+# only at start. Restart (never recreate) it: a restart keeps its address on
+# shared_backend_network, which the production-owned shared Nginx depends on.
+if [[ -n "$gateway_id" ]]; then
+  compose restart gateway
+  test "$(compose ps --all -q gateway)" = "$gateway_id"
+  test "$(docker inspect -f '{{range $name, $network := .NetworkSettings.Networks}}{{$name}}={{$network.IPAddress}}/{{$network.GlobalIPv6Address}};{{end}}' "$gateway_id")" = "$gateway_networks"
+else
+  compose up -d --no-deps --wait --wait-timeout 300 gateway
+fi
+for _ in $(seq 1 30); do
+  [[ "$(docker inspect -f '{{.State.Health.Status}}' chemisttasker_gateway_staging)" == "healthy" ]] && break
+  sleep 2
+done
+if [[ "$(docker inspect -f '{{.State.Health.Status}}' chemisttasker_gateway_staging)" != "healthy" ]]; then
+  echo "Staging gateway did not become healthy." >&2
+  exit 1
 fi
 
 staging_url="https://staging.chemisttasker.com.au"
 curl -fsS --max-time 20 "$staging_url/" >/dev/null
 curl -fsS --max-time 20 "$staging_url/health/" >/dev/null
 
+# Frontend-only releases must not reseed accounts or update backend data.
+if [[ "$frontend_only" == "0" ]]; then
 # Keep credentials exclusively in the staging server's ignored env directory.
 TEST_USERS_FILE="env/staging.test-users.json"
 if [[ -L "$TEST_USERS_FILE" ]]; then
@@ -72,6 +138,7 @@ chmod 600 "$TEST_USERS_FILE"
 compose exec -T web python manage.py shell -c \
   'from testing.staging_test_data import seed_from_stdin; seed_from_stdin()' \
   < "$TEST_USERS_FILE"
+fi
 
 printf 'STAGING_URL=%s\n' "$staging_url"
 compose ps

@@ -17,9 +17,38 @@ grep -qi '^strict-transport-security:' "$tmp_headers"
 grep -qi '^x-frame-options:[[:space:]]*DENY' "$tmp_headers"
 grep -qi '^x-content-type-options:[[:space:]]*nosniff' "$tmp_headers"
 grep -qi '^referrer-policy:[[:space:]]*strict-origin-when-cross-origin' "$tmp_headers"
+# Staging must never be indexed by search engines.
+grep -qi '^x-robots-tag:[[:space:]]*noindex' "$tmp_headers"
+curl -fsS --max-time 20 "$preview_url/robots.txt" | grep -qx 'Disallow: /'
+
+# Vite-owned routes reached through the Next fallback rewrites (kiosk,
+# membership) and the Vite bundle itself, served compressed.
+for path in /kiosk /membership/apply/smoke-invalid-token /setup/; do
+  curl -fsS --max-time 20 -o /dev/null "$preview_url$path"
+done
+vite_js="$(curl -fsS --max-time 20 "$preview_url/setup/" | grep -Eo '/js/app\.[A-Za-z0-9_-]+\.js' | head -n 1)"
+test -n "$vite_js"
+curl -fsS --max-time 20 -H 'Accept-Encoding: gzip' -D "$tmp_headers" -o /dev/null "$preview_url$vite_js"
+grep -qi '^content-encoding:[[:space:]]*gzip' "$tmp_headers"
 
 curl -fsS --max-time 20 "$preview_url/login" >/dev/null
 curl -fsS --max-time 20 "$preview_url/api/v1/users/mobile/app-config/" >/dev/null
+
+# Exercise both the Django feature and Next SSR; a healthy home page alone
+# does not detect private-network HTTPS redirect failures in the Hub client.
+curl -fsS --max-time 20 -o "$tmp_body" "$preview_url/api/v1/public-hub/community/"
+python3 - "$tmp_body" <<'PY'
+import json
+import sys
+with open(sys.argv[1]) as source:
+    hubs = json.load(source)
+assert {hub['key'] for hub in hubs} == {'public', 'pharmacist', 'intern', 'staff', 'explorer', 'owner'}, 'Public Hub directory is incomplete'
+PY
+curl -fsS --max-time 20 -o "$tmp_body" "$preview_url/hubs"
+grep -Fq 'Find your community.' "$tmp_body"
+for hub in public pharmacist intern staff explorer owner; do
+  grep -Fq "href=\"/hubs/$hub\"" "$tmp_body"
+done
 
 status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$preview_url/api/v1/users/me/")"
 if [[ "$status" != "401" && "$status" != "403" ]]; then

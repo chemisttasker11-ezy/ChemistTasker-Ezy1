@@ -6,16 +6,20 @@ between attempts so the tests exercise the endpoints' own lockout rules rather t
 stubbed at requests.post; e-mails are captured at Celery send_task.
 """
 import logging
+import os
+import subprocess
+import sys
 from contextlib import contextmanager
 from datetime import timedelta
+from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from django.core import mail
 from django.core.files.base import ContentFile
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
@@ -148,7 +152,44 @@ class EmailOtpTests(TestCase):
         self.assertTrue(user.otp_code.startswith("pbkdf2_") or "$" in user.otp_code)  # stored hashed
 
 
-@override_settings(DEBUG=False, MOBILEMESSAGE_SENDER="CT", MOBILEMESSAGE_USERNAME="u", MOBILEMESSAGE_PASSWORD="p")
+class MobileOtpDisplaySettingsTests(SimpleTestCase):
+    def test_display_mode_is_limited_to_test_environments(self):
+        cases = [
+            ("local", "True", None, True),
+            ("local", "True", "False", False),
+            ("local", "False", None, False),
+            ("staging", "False", "True", True),
+            ("staging", "False", "False", False),
+            ("vps", "False", "True", False),
+            ("production", "True", "True", False),
+            ("prod", "True", "True", False),
+            ("unknown", "True", "True", False),
+        ]
+        # CI runs manage.py from the repository root, so give the child process
+        # the backend directory explicitly or `core` cannot be imported.
+        backend_dir = str(Path(__file__).resolve().parents[1])
+        for app_env, debug, flag, expected in cases:
+            with self.subTest(app_env=app_env, debug=debug, flag=flag):
+                environment = {**os.environ, "APP_ENV": app_env, "DEBUG": debug,
+                               "DJANGO_ENV_FILE": "/nonexistent/otp-settings-test.env",
+                               "DJANGO_CACHE_URL": "redis://127.0.0.1:6379/15",
+                               "PYTHONPATH": os.pathsep.join(
+                                   filter(None, [backend_dir, os.environ.get("PYTHONPATH")]))}
+                environment.pop("MOBILE_OTP_DISPLAY_IN_APP", None)
+                if flag is not None:
+                    environment["MOBILE_OTP_DISPLAY_IN_APP"] = flag
+                result = subprocess.run(
+                    [sys.executable, "-c",
+                     "from core.settings import MOBILE_OTP_DISPLAY_IN_APP; "
+                     "print('display=' + str(MOBILE_OTP_DISPLAY_IN_APP))"],
+                    env=environment, cwd=backend_dir, capture_output=True, text=True, timeout=30,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+                self.assertIn(f"display={expected}", result.stdout.splitlines())
+
+
+@override_settings(DEBUG=False, MOBILE_OTP_DISPLAY_IN_APP=False, MOBILEMESSAGE_SENDER="CT",
+                   MOBILEMESSAGE_USERNAME="u", MOBILEMESSAGE_PASSWORD="p")
 class MobileOtpTests(TestCase):
     IDENTITY = {"first_name": "Ann", "last_name": "Lee", "username": "ann.lee"}
 
@@ -186,11 +227,12 @@ class MobileOtpTests(TestCase):
         self.assertEqual((again.status_code, resend.status_code), (429, 429))
         sms.assert_not_called()
 
-    @override_settings(DEBUG=True)
-    def test_debug_mobile_otp_response_does_not_log_or_print_the_secret(self):
+    @override_settings(MOBILE_OTP_DISPLAY_IN_APP=True)
+    def test_display_mobile_otp_skips_sms_and_does_not_log_or_print_the_secret(self):
         user = make_user("PHARMACIST", is_otp_verified=True)
         client = self.client_for(user)
         with mock.patch("users.api_otp.generate_otp", return_value="123456"), \
+                mock.patch("users.api_otp._send_mobile_otp_sms") as sms, \
                 mock.patch("builtins.print") as printed, \
                 mock.patch("users.api_otp.logging.getLogger") as get_logger:
             response, _ = post(
@@ -200,20 +242,34 @@ class MobileOtpTests(TestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["debug_otp"], "123456")
+        sms.assert_not_called()
         printed.assert_not_called()
         get_logger.assert_not_called()
 
         user.refresh_from_db()
+        self.assertTrue(check_password("123456", user.mobile_otp_code))
+        self.assertNotEqual(user.mobile_otp_code, "123456")
         user.mobile_otp_created_at = timezone.now() - timedelta(seconds=61)
         user.save(update_fields=["mobile_otp_created_at"])
         with mock.patch("users.api_otp.generate_otp", return_value="654321"), \
+                mock.patch("users.api_otp._send_mobile_otp_sms") as sms, \
                 mock.patch("builtins.print") as printed, \
                 mock.patch("users.api_otp.logging.getLogger") as get_logger:
             response, _ = post(client, "mobile/resend-otp/", {})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["debug_otp"], "654321")
+        sms.assert_not_called()
         printed.assert_not_called()
         get_logger.assert_not_called()
+
+        user.refresh_from_db()
+        self.assertTrue(check_password("654321", user.mobile_otp_code))
+        self.assertFalse(check_password("123456", user.mobile_otp_code))
+        verified, _ = post(client, "mobile/verify-otp/", {"otp": "654321"})
+        self.assertEqual(verified.status_code, 200, verified.data)
+        user.refresh_from_db()
+        self.assertTrue(user.is_mobile_verified)
+        self.assertIsNone(user.mobile_otp_code)
 
     def test_provider_failure_is_a_502(self):
         user = make_user("PHARMACIST", is_otp_verified=True)
