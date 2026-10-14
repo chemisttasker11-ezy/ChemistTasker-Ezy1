@@ -28,6 +28,26 @@ for (const width of [390, 1440]) for (const mode of ['light', 'dark']) for (cons
     const readyText = name === 'shift-filters' && width === 390 ? 'No shifts match your search' : ready;
     await expect(page.getByText(readyText, { exact: true }).filter({ visible: true }).first()).toBeVisible();
     if (name === 'shift-filters') await expect(page.getByText('No shifts match your search', { exact: true })).toBeVisible();
+    if (name === 'shift-filters' && width === 390) {
+      // PR171 intentionally added two navigation rows. Verify the five-item row
+      // remains readable rather than silently accepting an overlapping baseline.
+      const tabs = page.getByRole('tablist', { name: 'Shift lists' }).getByRole('tab');
+      await expect(tabs).toHaveCount(5);
+      const rectangles = await tabs.evaluateAll(nodes => nodes.map(node => {
+        const box = node.getBoundingClientRect();
+        return { left: box.left, right: box.right, top: box.top, bottom: box.bottom,
+          scrollWidth: node.scrollWidth, clientWidth: node.clientWidth };
+      }));
+      for (const tab of rectangles) {
+        expect(tab.scrollWidth, 'Shift tab content must fit without clipping').toBeLessThanOrEqual(tab.clientWidth + 1);
+      }
+      for (let i = 0; i < rectangles.length; i++) for (let j = i + 1; j < rectangles.length; j++) {
+        const a = rectangles[i], b = rectangles[j];
+        const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        expect(overlapX <= 0 || overlapY <= 0, 'Shift tabs must not overlap on phones').toBe(true);
+      }
+    }
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => document.fonts.ready);
     const snapshotName = `${name}-${mode}-${width}.png`;
