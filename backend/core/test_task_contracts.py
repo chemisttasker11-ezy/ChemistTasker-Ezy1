@@ -419,7 +419,9 @@ class ReminderMarkerContractTests(SimpleTestCase):
         self.assertIs(onboarding_views.cancel_referee_reminder, impl(self.TASK, "cancel_referee_reminder"))
 
 
+@override_settings(VERIFICATION_EXTRA_REQUIREMENTS=["gov_id", "referees"])
 class FinalEvaluationContractTests(SimpleTestCase):
+    """The evaluation mechanics under the tightened policy (ID and referees required); the light default is below."""
     TASK = "client_profile.tasks.final_evaluation"
 
     def run_task(self, obj, *, marker=False, enqueue_error=None, **kwargs):
@@ -447,7 +449,8 @@ class FinalEvaluationContractTests(SimpleTestCase):
 
     def pharmacist(self, **values):
         defaults = dict(
-            pk=5, user=SimpleNamespace(email="p@example.com", first_name="Pat", id=11, role="PHARMACIST"), user_id=11,
+            pk=5, user=SimpleNamespace(email="p@example.com", first_name="Pat", id=11, role="PHARMACIST",
+                                       is_otp_verified=True, is_mobile_verified=True), user_id=11,
             payment_preference="TFN", abn="", tfn_number="", verified=False,
             gov_id_verified=True, gov_id_verification_note="", ahpra_verified=True, ahpra_verification_note="",
             referee1_confirmed=True, referee2_confirmed=True, referee1_rejected=False, referee2_rejected=False,
@@ -553,6 +556,15 @@ class FinalEvaluationContractTests(SimpleTestCase):
         self.assertEqual(async_task.call_args.args[0], "users.tasks.send_async_email")
         self.assertEqual(async_task.call_args.kwargs["context"]["verification_reasons"], ["Name mismatch"])
         apply_async.assert_not_called()
+
+    @override_settings(VERIFICATION_EXTRA_REQUIREMENTS=[])
+    def test_light_policy_ignores_optional_id_and_referees(self):
+        obj = self.pharmacist(gov_id_verified=False, gov_id_verification_note="Name mismatch", referee2_confirmed=False)
+        with mock.patch("django.db.transaction.on_commit"):
+            calls, _async_task, emails, _apply_async = self.run_task(obj)
+        self.assertTrue(obj.verified)
+        self.assertEqual(calls.sent, ["verified"])
+        emails.assert_not_called()
 
     def test_success_marks_verified_and_notifies_once(self):
         obj = self.pharmacist()

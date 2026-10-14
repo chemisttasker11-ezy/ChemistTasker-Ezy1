@@ -40,6 +40,7 @@ urlpatterns = [
     path('mobile/request-otp/', RequestMobileOTPView.as_view(), name='mobile-request-otp'),
     path('mobile/verify-otp/', VerifyMobileOTPView.as_view(), name='mobile-verify-otp'),
     path('mobile/resend-otp/', ResendMobileOTPView.as_view(), name='mobile-resend-otp'),
+    path('mobile/skip-overseas/', SkipMobileOverseasView.as_view(), name='mobile-skip-overseas'),
 
     # ... other user routes ...
     path('invite-org-user/', InviteOrgUserView.as_view(), name='invite-org-user'),

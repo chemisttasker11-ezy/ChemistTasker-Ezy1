@@ -69,6 +69,14 @@ management/
 !backend/public_hub/management/
 !backend/public_hub/management/**/
 !backend/public_hub/management/**/*.py
+# The production reevaluate_verification command only; local scripts beside it stay ignored.
+!backend/onboarding/management/
+backend/onboarding/management/*
+!backend/onboarding/management/__init__.py
+!backend/onboarding/management/commands/
+backend/onboarding/management/commands/*
+!backend/onboarding/management/commands/__init__.py
+!backend/onboarding/management/commands/reevaluate_verification.py
 
 .venv/
 frontend_web/landing_next/.next/

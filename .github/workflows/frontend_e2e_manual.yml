@@ -91,6 +91,44 @@ jobs:
           retention-days: 7
 
 
+  appearance-baseline-candidate:
+    name: Capture new Shift Centre snapshots for visual review
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend_web/package-lock.json
+            frontend_web/e2e/package-lock.json
+      - name: Install Vite and Playwright
+        shell: pwsh
+        run: |
+          npm ci --prefix frontend_web
+          npm ci --prefix frontend_web/e2e
+          Push-Location frontend_web/e2e
+          npx playwright install chromium
+          Pop-Location
+      - name: Capture proposed updated Shift Centre screenshots only
+        working-directory: frontend_web/e2e
+        env:
+          CT_CAPTURE_SHIFT_BASELINE: '1'
+        run: npm test -- frontend-appearance.spec.mjs --grep "shift-filters" --update-snapshots --workers=2
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: shift-centre-proposed-windows-baselines
+          path: |
+            frontend_web/e2e/frontend-appearance.spec.mjs-snapshots/shift-filters-*.png
+            frontend_web/e2e/test-results
+          if-no-files-found: error
+          retention-days: 7
+
   vite-to-next-live:
     runs-on: ubuntu-latest
     timeout-minutes: 35

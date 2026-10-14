@@ -6,7 +6,7 @@ for (const role of ['Student', 'Pharmacist']) for (const initiallyRevealed of [t
     const profile = {
       id: 81, first_name: 'Review', last_name: 'Candidate', short_bio: 'Candidate biography',
       role_label: role, suburb: 'Bendigo', state: 'VIC', verified: true,
-      gov_id_verified: true, skills: ['TEST_SKILL'], years_experience: 3,
+      gov_id_verified: true, verification: { verified: true, missing: [], badges: [{ code: 'ID', state: 'verified' }], skill_evidence: {}, outstanding: [], grace_until: null, overseas: false, mobile_waived: false, work_rights: 'CITIZEN_OR_RESIDENT', under_18: false }, skills: ['PRESCRIPTION_DISPENSING'], years_experience: 3,
       open_to_travel: true, coverage_radius_km: 80, travel_states: ['VIC'],
     };
     let reveals = 0;
@@ -44,9 +44,9 @@ for (const role of ['Student', 'Pharmacist']) for (const initiallyRevealed of [t
     }
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText(role, { exact: true })).toBeVisible();
-    await expect(dialog.getByText('Profile verified', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('ID verified', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('TEST_SKILL', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Verified profile', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Photo ID', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Prescription dispensing', { exact: true })).toBeVisible();
     await expect(dialog.getByText('3 years experience', { exact: true })).toBeVisible();
     await expect(dialog.getByText(/Bendigo, VIC/)).toBeVisible();
     expect(reveals).toBe(initiallyRevealed ? 0 : role === 'Student' ? 2 : 1);
@@ -100,7 +100,8 @@ for (const initiallyRevealed of [true, false]) {
   test(`counteroffer review keeps the full interest profile after ${initiallyRevealed ? 'reload' : 'a failed reveal and retry'}`, async ({ page }) => {
     const profile = { id: 81, first_name: 'Review', last_name: 'Candidate', role_label: 'Student',
       short_bio: 'Full work biography', verified: true, gov_id_verified: true,
-      skills: ['COUNTEROFFER_SKILL'], years_experience: 3, suburb: 'Bendigo', state: 'VIC' };
+      verification: { verified: true, missing: [], badges: [{ code: 'ID', state: 'verified' }], skill_evidence: {}, outstanding: [], grace_until: null, overseas: false, mobile_waived: false, work_rights: 'CITIZEN_OR_RESIDENT', under_18: false },
+      skills: ['PRESCRIPTION_DISPENSING'], years_experience: 3, suburb: 'Bendigo', state: 'VIC' };
     let reveals = 0;
     await installApiFixture(page, roleUsers.owner, async (route, { path }) => {
       if (path.endsWith('/shifts/active/')) return json(route, [{ id: 51, pharmacy: 101,
@@ -132,9 +133,9 @@ for (const initiallyRevealed of [true, false]) {
     }
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Student', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('COUNTEROFFER_SKILL', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Prescription dispensing', { exact: true })).toBeVisible();
     await expect(dialog.getByText('Full work biography', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('Profile verified', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Verified profile', { exact: true })).toBeVisible();
     expect(reveals).toBe(initiallyRevealed ? 0 : 2);
   });
 }

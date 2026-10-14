@@ -54,7 +54,7 @@ function ExplorerSidebar({
   return (
     <Portal>
       <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.sidebar}>
-        <Text variant="titleMedium" style={styles.sidebarTitle}>Explorer menu</Text>
+        <Text variant="titleMedium" style={styles.sidebarTitle}>New to pharmacy menu</Text>
         <Divider />
         {sidebarItems.map((item) => (
           <List.Item
@@ -233,7 +233,7 @@ export default function ExplorerTabs() {
             fontWeight: '600',
           },
           headerShown: true,
-          headerTitle: tabTitles[route.name] || 'Explorer',
+          headerTitle: tabTitles[route.name] || 'New to pharmacy',
           headerRightContainerStyle: { paddingRight: 10 },
           headerLeft: () => <IconButton icon="menu" accessibilityLabel="Open explorer menu" onPress={() => setSidebarVisible(true)} />,
           headerRight: () => {

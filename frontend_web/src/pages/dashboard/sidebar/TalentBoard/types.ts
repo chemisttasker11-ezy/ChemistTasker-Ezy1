@@ -1,3 +1,5 @@
+import type { VerificationSummary } from '@chemisttasker/shared-core';
+
 export type EngagementType = 'FULL_TIME' | 'PART_TIME' | 'CASUAL' | 'VOLUNTEERING' | 'PLACEMENT';
 
 export type TalentFilterConfig = {
@@ -55,4 +57,6 @@ export type Candidate = {
   availabilityDays?: Array<string | number> | null;
   availabilityNotice?: string | null;
   availabilitySummary?: string | null;
+  /** Author's badges from the backend; null for posts without a profile. */
+  verification?: VerificationSummary | null;
 };

@@ -224,7 +224,7 @@ export default function OverviewPageStaff() {
     {
       label: isExplorer ? "Public Opportunities" : "Unpaid Invoices",
       value: isExplorer ? data?.community_shifts_count ?? data?.shift_summary?.community_count ?? 0 : data?.invoice_summary?.unpaid_count ?? 0,
-      helper: isExplorer ? "Explorer opportunities on the platform" : data?.invoice_summary?.unpaid_total ?? "$0.00",
+      helper: isExplorer ? "Opportunities for people new to pharmacy" : data?.invoice_summary?.unpaid_total ?? "$0.00",
       icon: isExplorer ? <Heart /> : <ReceiptText />,
       tone: "pink",
     },

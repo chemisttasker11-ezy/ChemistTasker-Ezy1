@@ -5,6 +5,7 @@ from rest_framework import serializers
 from core.serializer_lifecycle import _delete_file_if_unreferenced
 from core.task_queue import async_task
 from onboarding.models import OwnerOnboarding
+from onboarding.verification.policy import revoke_for_changed_evidence
 
 
 def apply_identity_tab(instance, vdata: dict, submit: bool):
@@ -139,12 +140,10 @@ def apply_identity_tab(instance, vdata: dict, submit: bool):
         instance.gov_id_verified = False
         instance.gov_id_verification_note = ""
         update_fields += ['gov_id_verified', 'gov_id_verification_note']
-
-    # Owner identity is a separate marketplace gate; do not revoke an
-    # approved owner profile or unrelated dashboard access on submission.
-    if submit and not isinstance(instance, OwnerOnboarding):
-        instance.verified = False
-        update_fields.append('verified')
+        # Owner identity is a separate marketplace gate. Workers lose Verified only when their Verified relies on the
+        # photo ID (overseas mobile skip, or a tightening that requires it); Submit alone never removes it.
+        if not isinstance(instance, OwnerOnboarding) and revoke_for_changed_evidence(instance, 'gov_id'):
+            update_fields.append('verified')
 
     if update_fields:
         instance.save(update_fields=list(set(update_fields)))

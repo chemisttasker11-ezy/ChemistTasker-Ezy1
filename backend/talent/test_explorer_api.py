@@ -4,14 +4,14 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from client_profile.models import OtherStaffOnboarding
+from client_profile.models import ExplorerOnboarding, OtherStaffOnboarding
 from talent.models import ExplorerPost, ExplorerPostReaction
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_user,
 )
 
 URL = BASE + "explorer-posts/"
-PUBLIC_KEYS = ['ahpra_years_since_first_registration', 'author_user_id', 'availability_days', 'availability_mode', 'availability_notice', 'availability_summary', 'body', 'coverage_radius_km', 'created_at', 'explorer_name', 'explorer_profile', 'explorer_role_type', 'explorer_user_id', 'headline', 'id', 'is_anonymous', 'is_liked_by_me', 'like_count', 'location_postcode', 'location_state', 'location_suburb', 'open_to_travel', 'post_kind', 'rating_average', 'rating_count', 'reference_code', 'reply_count', 'role_category', 'role_title', 'skills', 'software', 'travel_states', 'updated_at', 'view_count', 'work_types', 'years_experience']
+PUBLIC_KEYS = ['ahpra_years_since_first_registration', 'author_user_id', 'availability_days', 'availability_mode', 'availability_notice', 'availability_summary', 'body', 'coverage_radius_km', 'created_at', 'explorer_name', 'explorer_profile', 'explorer_role_type', 'explorer_user_id', 'headline', 'id', 'is_anonymous', 'is_liked_by_me', 'like_count', 'location_postcode', 'location_state', 'location_suburb', 'open_to_travel', 'post_kind', 'rating_average', 'rating_count', 'reference_code', 'reply_count', 'role_category', 'role_title', 'skills', 'software', 'travel_states', 'updated_at', 'verification', 'view_count', 'work_types', 'years_experience']
 
 
 def post_for(user, headline="Available", **kw):
@@ -76,10 +76,11 @@ class ExplorerCreatePermissionTests(TestCase):
         owner, _ = make_owner_with_pharmacy()
         res = client_for(owner).post(URL, self.PAYLOAD, format="json")
         self.assertEqual(res.status_code, 403)
-        self.assertIn("Only Explorer, Pharmacist, or Other Staff", str(res.json()))
+        self.assertIn("Only pharmacists, the pharmacy team and people new to pharmacy", str(res.json()))
 
     def test_explorer_can_create_and_is_stamped_as_author_with_reference_code(self):
         user = make_user("EXPLORER")
+        ExplorerOnboarding.objects.create(user=user, verified=True)
         res = client_for(user).post(URL, self.PAYLOAD, format="json")
         self.assertEqual(res.status_code, 201)
         post = ExplorerPost.objects.get()

@@ -433,9 +433,13 @@ class ShiftSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_slot_assignments(self, shift) -> list[dict]:
         assignments = []
+        # History is an audit view, not a continuing contact authorisation.
+        # Enforce this on the API projection, not only the profile-detail endpoint.
+        view = self.context.get('view')
+        history_view = getattr(view, 'assigned_profile_contact', True) is False
         for assignment in shift.slot_assignments.all():
             user = assignment.user
-            user_name = user.get_full_name() or user.email or getattr(user, 'username', '') or 'Assigned candidate'
+            user_name = user.get_full_name() or ('' if history_view else user.email) or getattr(user, 'username', '') or 'Assigned candidate'
             assignments.append({
                 'slot_id': assignment.slot.id,
                 'user_id': user.id,
@@ -444,7 +448,7 @@ class ShiftSerializer(serializers.ModelSerializer):
                     'first_name': user.first_name,
                     'last_name': user.last_name,
                     'name': user_name,
-                    'email': user.email,
+                    **({} if history_view else {'email': user.email}),
                 },
             })
         return assignments

@@ -5,6 +5,7 @@ from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
 from onboarding.models import OwnerOnboarding
 from notifications.models import Notification
 from users.permissions import AuthenticatedOrganizationMember, IsOwner, OrganizationRolePermission
+from memberships.role_resolution import membership_role_refusal
 from memberships.serializers import required_user_role_for_membership
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -400,7 +401,7 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
         else:
             membership_role = self.STAFF_ROLE_MEMBERSHIP_MAP.get(staff_role, "CONTACT")
             expected_user_role = required_user_role_for_membership(membership_role) or "EXPLORER"
-            if user and user.role != expected_user_role:
+            if user and membership_role_refusal(user, membership_role):
                 # An admin assignment is additional access; do not rewrite the
                 # account persona or imply clinical staff eligibility.
                 membership_role = "CONTACT"

@@ -11,6 +11,7 @@ import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 dayjs.extend(utc);
 
@@ -112,6 +113,8 @@ export default function RefereesV2() {
       });
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
       const nextData = (res as any) || {};
       setData(nextData);
       unsaved.markClean(nextData);
@@ -144,6 +147,8 @@ export default function RefereesV2() {
       });
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
       const nextData = (res as any) || {};
       setData(nextData);
       unsaved.markClean(nextData);
@@ -172,7 +177,6 @@ export default function RefereesV2() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: 960, px: { xs: 2, md: 3 }, pb: 3 }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Referees</Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>{error}</Alert>}
 

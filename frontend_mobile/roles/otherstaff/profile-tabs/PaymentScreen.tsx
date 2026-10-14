@@ -206,7 +206,7 @@ export default function PharmacistPaymentScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text variant="titleLarge" style={styles.title}>Payment</Text>
+        <Text variant="titleLarge" style={styles.title}>How you get paid</Text>
 
         <View style={styles.row}>
           <Button mode={isTFN ? 'contained' : 'outlined'} onPress={() => setField('payment_preference', 'TFN')} style={styles.flex}>TFN</Button>

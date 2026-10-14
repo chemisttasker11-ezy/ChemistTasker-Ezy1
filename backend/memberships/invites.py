@@ -18,6 +18,7 @@ from core.task_queue import async_task
 from memberships.access import user_can_invite_members_to_pharmacy
 from memberships.labels import membership_role_label
 from memberships.models import Membership, MembershipApplication
+from memberships.role_resolution import membership_role_refusal
 from memberships.notifications import _frontend_base_url_for_notifications
 from memberships.serializers import (
     _count_active_memberships,
@@ -109,15 +110,9 @@ def create_membership_invite(data, inviter, *, request=None):
                 transaction.set_rollback(True)
                 return None, 'Failed to create the user account for this invitation.'
         else:
-            required_user_role = required_user_role_for_membership(role)
-            if required_user_role and user.role != required_user_role:
-                membership_role_label_text = membership_role_label(role)
-                user_role_label = dict(User.ROLE_CHOICES).get(user.role, user.role or "Unspecified")
-                required_role_label = dict(User.ROLE_CHOICES).get(required_user_role, required_user_role)
-                return None, (
-                    f"{user.email} is registered as {user_role_label} and cannot be added as "
-                    f"{membership_role_label_text}. Ask them to complete the {required_role_label} onboarding first."
-                )
+            refusal = membership_role_refusal(user, role)
+            if refusal:
+                return None, f"{user.email}: {refusal}"
 
         # Enforce maximum active pharmacy memberships per user
         active_memberships = _count_active_memberships(user)

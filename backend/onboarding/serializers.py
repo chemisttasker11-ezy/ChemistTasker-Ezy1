@@ -26,7 +26,11 @@ from onboarding.services.progress import (
     owner_progress_percent,
     pharmacist_progress_percent,
 )
-from onboarding.services.regulatory import apply_regulatory_tab, required_documents_for_role
+from onboarding.services.regulatory import apply_regulatory_tab, check_role_unchanged
+from drf_spectacular.utils import extend_schema_field
+from onboarding.verification.ahpra_numbers import guard_ahpra_write
+from onboarding.verification.policy import refresh_verified, verification_summary
+from onboarding.verification.schema import VerificationSummarySerializer
 from onboarding.services.skills import (  # noqa: F401  (_load_skills_catalog, _required_cert_skill_codes: historical path)
     _load_skills_catalog,
     _required_cert_skill_codes,
@@ -118,6 +122,8 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
 
     def update(self, instance, validated_data):
         tab = (self.initial_data.get("tab") or "basic").strip().lower()
+        # Owner tabs other than identity are treated as Basic below, so the number check treats them the same way.
+        guard_ahpra_write(instance, validated_data, tab='identity' if tab == 'identity' else 'basic', number_tabs=('basic',))
         submit = bool(validated_data.pop("submitted_for_verification", False))
 
         if tab == "identity":
@@ -171,7 +177,15 @@ class RefereeResponseSerializer(serializers.ModelSerializer):
         ]
 
 
-class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerializer):
+class RefreshVerifiedMixin:
+    """Apply the verification policy once, before any field is read, so `verified` and `verification` agree."""
+
+    def to_representation(self, instance):
+        refresh_verified(instance)
+        return super().to_representation(instance)
+
+
+class PharmacistOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin, serializers.ModelSerializer):
     """
     V2 single-endpoint, tab-aware serializer.
     Implements ONLY the Basic tab (as requested).
@@ -204,6 +218,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # computed
     progress_percent = serializers.SerializerMethodField()
+    verification = serializers.SerializerMethodField()
     upload_validation_map = {
         "profile_photo": IMAGE_UPLOAD_POLICY,
         "government_id": DOCUMENT_UPLOAD_POLICY,
@@ -215,7 +230,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         model = PharmacistOnboarding
         fields = [
             # ---------- BASIC ----------
-            'username','first_name','last_name','phone_number','date_of_birth','gender',
+            'username','first_name','last_name','phone_number','date_of_birth','work_rights','gender',
             'emergency_contact_number','emergency_contact_relation','profile_photo','profile_photo_url',
             'profile_photo','profile_photo_url',
             'ahpra_number',
@@ -257,7 +272,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             # ---------- Profile preferences ----------
             'short_bio', 'resume',
 
-            'verified','progress_percent',
+            'verified','progress_percent','verification',
             'tab','submitted_for_verification',
         ]
         extra_kwargs = {
@@ -390,9 +405,18 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     def get_progress_percent(self, obj):
         return pharmacist_progress_percent(obj)
 
+    @extend_schema_field(VerificationSummarySerializer)
+    def get_verification(self, obj):
+        return verification_summary(obj)
+
     # -------- update --------
+    TABS = ('basic', 'payment', 'referees', 'skills', 'rate', 'profile', 'identity')
+
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
+        if tab not in self.TABS:
+            raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
+        guard_ahpra_write(instance, validated_data, tab=tab, number_tabs=('basic',))
         submit = submit_requested(self.initial_data)
         record_first_submission(instance, tab=tab, submit=submit)
 
@@ -411,7 +435,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         if tab == 'identity':
             return self._identity_tab(instance, validated_data, submit)
 
-        return super().update(instance, validated_data)
+        raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
 
     # ---------------- BASIC TAB ----------------
     def _basic_tab(self, instance, vdata: dict, submit: bool):
@@ -437,7 +461,6 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     def _skills_tab(self, instance, vdata: dict, submit: bool):
         return apply_skills_tab(
             instance, vdata, initial_data=self.initial_data, uploads=self._files_by_skill(), role_key="pharmacist",
-            missing_message="Certificate required for checked skill(s): ",
             keep_history=getattr(self, "KEEP_SKILL_HISTORY", False),
         )
 
@@ -457,7 +480,7 @@ class PharmacistOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return apply_profile_tab(instance, vdata, submit)
 
 
-class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerializer):
+class OtherStaffOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin, serializers.ModelSerializer):
     """
     V2 single-endpoint, tab-aware serializer for OtherStaff.
     Mirrors the Pharmacist V2 procedure but without AHPRA and with a Regulatory tab.
@@ -490,6 +513,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
     # computed
     progress_percent = serializers.SerializerMethodField()
+    verification = serializers.SerializerMethodField()
     upload_validation_map = {
         "profile_photo": IMAGE_UPLOAD_POLICY,
         "government_id": DOCUMENT_UPLOAD_POLICY,
@@ -507,7 +531,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         model = OtherStaffOnboarding
         fields = [
             # ---------- BASIC ----------
-            'username','first_name','last_name','phone_number','date_of_birth','gender',
+            'username','first_name','last_name','phone_number','date_of_birth','work_rights','gender',
             'emergency_contact_number','emergency_contact_relation','profile_photo','profile_photo_url',
             'street_address','suburb','state','postcode','google_place_id','latitude','longitude','open_to_travel','travel_states','coverage_radius_km',
 
@@ -517,6 +541,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
 
             # ---------- REGULATORY DOCS (role + files) ----------
             'role_type','classification_level','student_year','intern_half',
+            'ahpra_number','ahpra_verified','ahpra_verification_note',
             'dispensary_qualification', 'dispensary_qualification_verified', 'dispensary_qualification_verification_note',
             'ahpra_proof','hours_proof','certificate','university_id','cpr_certificate','s8_certificate',
             'ahpra_proof_verified','ahpra_proof_verification_note',
@@ -550,7 +575,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             # ---------- PROFILE ----------
             'short_bio','resume',
 
-            'verified','progress_percent',
+            'verified','progress_percent','verification',
             'tab','submitted_for_verification',
         ]
         extra_kwargs = {
@@ -591,6 +616,9 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
             'dispensary_qualification_verification_note': {'read_only': True},
             'student_year': {'required': False, 'allow_blank': True, 'allow_null': True},
             'intern_half': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'ahpra_number': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'ahpra_verified': {'read_only': True},
+            'ahpra_verification_note': {'read_only': True},
 
             'ahpra_proof': {'required': False, 'allow_null': True},
             'hours_proof': {'required': False, 'allow_null': True},
@@ -677,17 +705,24 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     def _list_existing(self, user_id: int, code: str):
         return list_existing_skill_files(user_id, code)
 
-    # -------- utility: regulatory requirements by role --------
-    def _required_docs_for_role(self, instance):
-        return required_documents_for_role(instance)
-
     # -------- progress --------
     def get_progress_percent(self, obj):
         return otherstaff_progress_percent(obj)
 
+    @extend_schema_field(VerificationSummarySerializer)
+    def get_verification(self, obj):
+        return verification_summary(obj)
+
     # ---------------- update router ----------------
+    TABS = ('basic', 'identity', 'regulatory', 'payment', 'referees', 'skills', 'profile')
+
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
+        if tab not in self.TABS:
+            raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
+        if tab == 'regulatory':
+            check_role_unchanged(instance, validated_data)
+        guard_ahpra_write(instance, validated_data, tab=tab, number_tabs=('regulatory',))
         submit = submit_requested(self.initial_data)
         record_first_submission(instance, tab=tab, submit=submit)
 
@@ -706,7 +741,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         if tab == 'profile':
             return self._profile_tab(instance, validated_data, submit)
 
-        return super().update(instance, validated_data)
+        raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
 
     # ---------------- BASIC TAB ----------------
     def _basic_tab(self, instance, vdata: dict, submit: bool):
@@ -736,7 +771,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
     def _skills_tab(self, instance, vdata: dict, submit: bool):
         return apply_skills_tab(
             instance, vdata, initial_data=self.initial_data, uploads=self._files_by_skill(), role_key="otherstaff",
-            missing_message="Certificate required for: ", track_years_experience=True,
+            track_years_experience=True,
             keep_history=getattr(self, "KEEP_SKILL_HISTORY", False),
         )
 
@@ -752,7 +787,7 @@ class OtherStaffOnboardingV2Serializer(UploadValidationMixin, serializers.ModelS
         return _build_absolute_media_url(self.context.get("request"), getattr(obj, "profile_photo", None))
 
 
-class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerializer):
+class ExplorerOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin, serializers.ModelSerializer):
     """
     V2 tab-aware serializer for Explorer.
     Tabs: basic, identity, interests, referees, profile.
@@ -775,6 +810,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
 
     # computed
     progress_percent = serializers.SerializerMethodField()
+    verification = serializers.SerializerMethodField()
     upload_validation_map = {
         "profile_photo": IMAGE_UPLOAD_POLICY,
         "government_id": DOCUMENT_UPLOAD_POLICY,
@@ -788,7 +824,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             "id",
             # ---------- BASIC ----------
             'username','first_name','last_name','phone_number','profile_photo','profile_photo_url',
-            'role_type','gender','emergency_contact_number','emergency_contact_relation',
+            'role_type','date_of_birth','work_rights','gender','emergency_contact_number','emergency_contact_relation',
             'street_address','suburb','state','postcode','google_place_id','latitude','longitude','open_to_travel','travel_states','coverage_radius_km',
 
             # ---------- IDENTITY ----------
@@ -807,7 +843,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             # ---------- PROFILE ----------
             'short_bio','resume',
 
-            'verified','progress_percent',
+            'verified','progress_percent','verification',
             'tab','submitted_for_verification',
         ]
         extra_kwargs = {
@@ -820,7 +856,8 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
             'profile_photo': {'required': False, 'allow_null': True},
             'profile_photo_url': {'read_only': True},
 
-            # basic
+            # basic; the date of birth is set at sign-up, where the minimum age is checked
+            'date_of_birth': {'read_only': True},
             'role_type': {'required': False, 'allow_blank': True, 'allow_null': True},
             'gender': {'required': False, 'allow_blank': True, 'allow_null': True},
             'emergency_contact_number': {'required': False, 'allow_blank': True, 'allow_null': True},
@@ -875,9 +912,18 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
     def get_progress_percent(self, obj):
         return explorer_progress_percent(obj)
 
+    @extend_schema_field(VerificationSummarySerializer)
+    def get_verification(self, obj):
+        return verification_summary(obj)
+
     # ---------------- update router ----------------
+    TABS = ('basic', 'identity', 'interests', 'referees', 'profile')
+
     def update(self, instance, validated_data):
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
+        if tab not in self.TABS:
+            raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
+        guard_ahpra_write(instance, validated_data, tab=tab, number_tabs=())
         submit = submit_requested(self.initial_data)
         record_first_submission(instance, tab=tab, submit=submit)
 
@@ -892,7 +938,7 @@ class ExplorerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSer
         if tab == 'profile':
             return self._profile_tab(instance, validated_data, submit)
 
-        return super().update(instance, validated_data)
+        raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
 
     # ---------------- BASIC TAB ----------------
     def _basic_tab(self, instance, vdata: dict, submit: bool):

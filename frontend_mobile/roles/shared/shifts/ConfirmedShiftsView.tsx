@@ -19,6 +19,7 @@ import {
     viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
+import { WorkerProfileDialog } from './WorkerProfileDialog';
 
 type DeferredPayrollOffer = {
     id: number;
@@ -203,48 +204,7 @@ export default function ConfirmedShiftsView() {
                 onViewAssigned={openProfile}
             />
 
-            <Portal>
-                <Dialog visible={profileDialog} onDismiss={() => setProfileDialog(false)}>
-                    <Dialog.Title>Assigned Profile</Dialog.Title>
-                    <Dialog.Content>
-                        {profileLoading ? (
-                            <View style={styles.centered}>
-                                <ActivityIndicator />
-                            </View>
-                        ) : profile ? (
-                            <View style={{ gap: 6 }}>
-                                <Text><Text style={styles.bold}>Name:</Text> {profile.firstName} {profile.lastName}</Text>
-                                <Text><Text style={styles.bold}>Email:</Text> {profile.email}</Text>
-                                {profile.phoneNumber ? (
-                                    <Text><Text style={styles.bold}>Phone:</Text> {profile.phoneNumber}</Text>
-                                ) : null}
-                                {profile.shortBio ? (
-                                    <Text><Text style={styles.bold}>Bio:</Text> {profile.shortBio}</Text>
-                                ) : null}
-                                {profile.resume ? (
-                                    <Button mode="text" onPress={() => void Linking.openURL(profile.resume!)}>Download CV</Button>
-                                ) : null}
-                                {profile.ratePreference ? (
-                                    <View style={{ marginTop: 8, gap: 2 }}>
-                                        <Text style={styles.bold}>Rate Preference</Text>
-                                        <Text>Weekday: {profile.ratePreference.weekday || 'N/A'}</Text>
-                                        <Text>Saturday: {profile.ratePreference.saturday || 'N/A'}</Text>
-                                        <Text>Sunday: {profile.ratePreference.sunday || 'N/A'}</Text>
-                                        <Text>Public Holiday: {profile.ratePreference.publicHoliday || 'N/A'}</Text>
-                                        <Text>Early Morning: {profile.ratePreference.earlyMorning || 'N/A'}</Text>
-                                        <Text>Late Night: {profile.ratePreference.lateNight || 'N/A'}</Text>
-                                    </View>
-                                ) : null}
-                            </View>
-                        ) : (
-                            <Text>No profile data available.</Text>
-                        )}
-                    </Dialog.Content>
-                    <Dialog.Actions>
-                        <Button onPress={() => setProfileDialog(false)}>Close</Button>
-                    </Dialog.Actions>
-                </Dialog>
-            </Portal>
+            <WorkerProfileDialog visible={profileDialog} loading={profileLoading} profile={profile} onDismiss={() => setProfileDialog(false)} canMessage />
 
             <Snackbar visible={!!snackbar} onDismiss={closeSnackbar} duration={3000}>
                 {snackbar}

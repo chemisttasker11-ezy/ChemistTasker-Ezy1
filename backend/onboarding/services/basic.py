@@ -28,11 +28,9 @@ def apply_pharmacist_basic_tab(instance, vdata: dict, submit: bool, *, initial_d
     'ahpra_number',
     'street_address', 'suburb', 'state', 'postcode', 'google_place_id',
     'open_to_travel', 'travel_states', 'coverage_radius_km',
-    'date_of_birth', 'gender', 'emergency_contact_number', 'emergency_contact_relation',
+    'date_of_birth', 'work_rights', 'gender', 'emergency_contact_number', 'emergency_contact_relation',
     ]
 
-    # Detect changes that affect verification flags
-    ahpra_changed = 'ahpra_number' in vdata and (vdata.get('ahpra_number') != getattr(instance, 'ahpra_number'))
 
     # --- government_id: delete old file on replace or explicit clear ---
     # gov_id_changed = False
@@ -74,21 +72,12 @@ def apply_pharmacist_basic_tab(instance, vdata: dict, submit: bool, *, initial_d
         instance.longitude = q6(vdata.get('longitude'))
         update_fields.append('longitude')
 
-    # reset only relevant flags when inputs changed
-    if ahpra_changed:
-        instance.ahpra_verified = False
-        instance.ahpra_verification_note = ""
-        update_fields += ['ahpra_verified', 'ahpra_verification_note']
+    # A changed AHPRA number resets its check (and Verified) in the serializer's guard (verification/ahpra_numbers.py).
 
     # if gov_id_changed:
     #     instance.gov_id_verified = False
     #     instance.gov_id_verification_note = ""
     #     update_fields += ['gov_id_verified', 'gov_id_verification_note']
-
-    # full profile remains unverified until all tabs pass
-    if submit:
-        instance.verified = False
-        update_fields.append('verified')
 
     if update_fields:
         instance.save(update_fields=list(set(update_fields)))
@@ -143,8 +132,7 @@ def apply_otherstaff_basic_tab(instance, vdata: dict, submit: bool, *, initial_d
     # regular writes for basic fields (address + dob)
     direct_fields = [
         'street_address','suburb','state','postcode','google_place_id','open_to_travel','travel_states','coverage_radius_km','date_of_birth',
-        'gender','emergency_contact_number','emergency_contact_relation',
-        'role_type','classification_level','student_year','intern_half',  # allow role data in Basic if FE sends them early
+        'gender','work_rights','emergency_contact_number','emergency_contact_relation',
     ]
     for f in direct_fields:
         if f in vdata:
@@ -158,10 +146,6 @@ def apply_otherstaff_basic_tab(instance, vdata: dict, submit: bool, *, initial_d
     if 'longitude' in vdata:
         instance.longitude = q6(vdata.get('longitude'))
         update_fields.append('longitude')
-
-    if submit:
-        instance.verified = False
-        update_fields.append('verified')
 
     if update_fields:
         instance.save(update_fields=list(set(update_fields)))
@@ -180,13 +164,24 @@ def apply_explorer_basic_tab(instance, vdata: dict, submit: bool, *, initial_dat
 
     # role + address
     direct_fields = [
-        'role_type','gender','emergency_contact_number','emergency_contact_relation',
+        'role_type','gender','work_rights','emergency_contact_number','emergency_contact_relation',
         'street_address','suburb','state','postcode','google_place_id','open_to_travel','travel_states','coverage_radius_km',
     ]
+    was_overseas = instance.role_type == 'OVERSEAS'
     for f in direct_fields:
         if f in vdata:
             setattr(instance, f, vdata[f])
             update_fields.append(f)
+
+    # Owner decision 2026-10-13: the mobile skip is for overseas newcomers only. Leaving Overseas cancels it; the
+    # person verifies their mobile and is not Verified until they do.
+    user = instance.user
+    if was_overseas and instance.role_type != 'OVERSEAS' and user.mobile_check_skipped:
+        user.mobile_check_skipped = False
+        user.save(update_fields=['mobile_check_skipped'])
+        if not user.is_mobile_verified:
+            instance.verified = False
+            update_fields.append('verified')
 
     # lat/lon rounding
     if 'latitude' in vdata:
@@ -195,10 +190,6 @@ def apply_explorer_basic_tab(instance, vdata: dict, submit: bool, *, initial_dat
     if 'longitude' in vdata:
         instance.longitude = q6(vdata.get('longitude'))
         update_fields.append('longitude')
-
-    if submit:
-        instance.verified = False
-        update_fields.append('verified')
 
     if update_fields:
         instance.save(update_fields=list(set(update_fields)))

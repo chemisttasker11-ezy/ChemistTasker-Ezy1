@@ -39,9 +39,9 @@ class User(AbstractUser):
     ROLE_CHOICES = (
         ('OWNER',       'Pharmacy Owner'),
         ('PHARMACIST',  'Pharmacist'),
-        ('OTHER_STAFF', 'Other Staff'),
+        ('OTHER_STAFF', 'Pharmacy team'),
         ('ORG_STAFF',   'Organization Staff'),
-        ('EXPLORER',    'Explorer'),
+        ('EXPLORER',    'New to pharmacy'),
         # Created only when an organisation onboards a pharmacy by email: the contact manages that pharmacy through a
         # pharmacy-admin MANAGER assignment and may later choose PHARMACIST or OTHER_STAFF once.
         ('PHARMACY_MANAGER', 'Pharmacy Manager'),
@@ -86,6 +86,8 @@ class User(AbstractUser):
     mobile_otp_failed_attempts = models.PositiveSmallIntegerField(default=0)
     mobile_otp_locked_until = models.DateTimeField(blank=True, null=True)
     is_mobile_verified = models.BooleanField(default=False)
+    # New to pharmacy (overseas) only: no Australian mobile, so a verified photo ID stands in for it.
+    mobile_check_skipped = models.BooleanField(default=False)
 
     deleted_at = models.DateTimeField(blank=True, null=True)
 

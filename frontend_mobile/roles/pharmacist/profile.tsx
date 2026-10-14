@@ -8,6 +8,7 @@ import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteAccount, updateOnboardingForm } from '@chemisttasker/shared-core';
+import { ProfileVerificationCard } from '../shared/skills/ProfileVerificationCard';
 
 export default function PharmacistProfileScreen() {
   const { user, logout, refreshUser, updateUserProfilePhoto } = useAuth();
@@ -124,8 +125,8 @@ export default function PharmacistProfileScreen() {
       route: '/pharmacist/profile-basic-info',
     },
     {
-      title: 'Identity',
-      description: 'Government ID document and verification',
+      title: 'Photo ID',
+      description: 'Optional · earns the Photo ID badge',
       icon: 'card-account-details-outline',
       route: '/pharmacist/profile-identity',
     },
@@ -136,14 +137,14 @@ export default function PharmacistProfileScreen() {
       route: '/pharmacist/profile-skills',
     },
     {
-      title: 'Payment',
-      description: 'TFN/ABN preference and super details',
+      title: 'How you get paid',
+      description: 'ABN or TFN, bank account and super',
       icon: 'cash-multiple',
       route: '/pharmacist/profile-payment',
     },
     {
-      title: 'Referees',
-      description: 'Reference contacts and request status',
+      title: 'References',
+      description: 'Optional · earns the References badge',
       icon: 'account-group-outline',
       route: '/pharmacist/profile-referees',
     },
@@ -258,6 +259,8 @@ export default function PharmacistProfileScreen() {
             </View>
           </LinearGradient>
         </Card>
+
+        <ProfileVerificationCard roleKey="pharmacist" role="PHARMACIST" routes={{ mobile: '/mobile-verify', ahpra: '/pharmacist/profile-basic-info', gov_id: '/pharmacist/profile-identity', referees: '/pharmacist/profile-referees' }} />
 
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (

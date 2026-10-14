@@ -125,6 +125,9 @@ def _build_authenticated_user_payload(user):
     ]
 
     from billing.utils import is_billing_active, is_in_free_trial
+    # Onboarding models depend on the users app: resolve this helper at call time,
+    # so importing users.sessions cannot form a module-level app dependency cycle.
+    from onboarding.services.work_profile import newcomer_type
     from public_hub.permissions import capabilities, member_hubs
 
     return {
@@ -142,6 +145,8 @@ def _build_authenticated_user_payload(user):
         "admin_assignments": admin_payload,
         "is_pharmacy_admin": bool(admin_payload),
         "is_mobile_verified": bool(getattr(user, "is_mobile_verified", False)),
+        "mobile_check_skipped": bool(getattr(user, "mobile_check_skipped", False)),
+        "newcomer_type": newcomer_type(user),
         "billing_active": is_billing_active(),
         "in_free_trial": is_in_free_trial(user),
     }

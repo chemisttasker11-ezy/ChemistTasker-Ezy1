@@ -692,9 +692,23 @@ export interface ShiftUserApi {
 
 export type ShiftUser = CamelCasedPropertiesDeep<ShiftUserApi>;
 
+export interface VerificationSummaryApi {
+    verified: boolean;
+    missing?: ('email' | 'mobile' | 'ahpra' | 'gov_id' | 'referees' | 'role')[];
+    badges: { code: 'AHPRA' | 'AHPRA_PROVISIONAL' | 'QUALIFICATION' | 'DISPENSING' | 'ENROLMENT' | 'ID' | 'REFERENCES' | 'ABN'; state: 'verified' | 'pending' | 'not_supplied' | 'failed' }[];
+    skill_evidence: Record<string, 'verified' | 'pending' | 'not_supplied' | 'failed'>;
+    outstanding?: ('email' | 'mobile' | 'ahpra' | 'gov_id' | 'referees' | 'role')[];
+    grace_until?: string | null;
+    overseas: boolean;
+    mobile_waived?: boolean;
+    work_rights?: '' | 'CITIZEN_OR_RESIDENT' | 'VISA' | 'NONE';
+    under_18?: boolean;
+}
+
 export interface ShiftWorkProfileApi extends ShiftUserApi {
     skill_role?: 'PHARMACIST' | 'INTERN' | 'TECHNICIAN' | 'ASSISTANT' | 'STUDENT';
     verified_skills?: string[];
+    verification?: VerificationSummaryApi | null;
     dispensary_qualification?: string | null;
     dispensary_qualification_verified?: boolean;
     profile_photo?: string | null;

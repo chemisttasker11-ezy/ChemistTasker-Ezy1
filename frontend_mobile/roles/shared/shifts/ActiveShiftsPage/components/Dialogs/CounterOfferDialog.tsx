@@ -106,17 +106,8 @@ export default function CounterOfferDialog({
                     <ScrollView contentContainerStyle={styles.content}>
                         {candidate && (
                             <Surface style={styles.section} elevation={1}>
-                                <Text style={styles.sectionTitle}>Candidate</Text>
-                                <Text style={styles.candidateName}>
-                                    {candidate.name || 'Candidate'}
-                                </Text>
-                                {candidate.shortBio && (
-                                    <Text style={styles.detail}>{candidate.shortBio}</Text>
-                                )}
-                                {candidate.email && (
-                                    <Text style={styles.detail}>{candidate.email}</Text>
-                                )}
-                                <CandidateWorkProfile profile={candidate.profile} />
+                                {/* Same profile as web Review: no contact details before the booking is confirmed. */}
+                                <CandidateWorkProfile name={candidate.name || 'Candidate'} bio={candidate.shortBio} profile={candidate.profile} />
                                 {pendingConfirmation && (
                                     <Chip style={styles.pendingChip}>Offer sent. Waiting for candidate confirmation.</Chip>
                                 )}

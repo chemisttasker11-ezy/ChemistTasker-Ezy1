@@ -47,7 +47,7 @@ export default function LoginScreen() {
   }, []);
 
   const routeAfterLogin = async (userData: any) => {
-    if (!userData.is_mobile_verified) {
+    if (!userData.is_mobile_verified && !userData.mobile_check_skipped) {
       router.replace('/mobile-verify' as never);
       return;
     }
@@ -112,7 +112,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const userData = await loginWithCredentials(email, password);
-      if (!userData.is_mobile_verified) {
+      if (!userData.is_mobile_verified && !userData.mobile_check_skipped) {
         await routeAfterLogin(userData);
         return;
       }

@@ -5,6 +5,9 @@ from talent.models import ExplorerPost, ExplorerPostReaction
 import uuid
 import json
 from onboarding.services.skill_identity import normalize_skills
+from drf_spectacular.utils import extend_schema_field
+from onboarding.verification.policy import under_18, verification_summary
+from onboarding.verification.schema import VerificationSummarySerializer
 
 
 class ExplorerPostReadSerializer(serializers.ModelSerializer):
@@ -21,6 +24,7 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
     rating_count = serializers.IntegerField(read_only=True)
 
     is_liked_by_me = serializers.SerializerMethodField()
+    verification = serializers.SerializerMethodField()
 
     class Meta:
         model = ExplorerPost
@@ -62,12 +66,17 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
             "explorer_user_id",
             "explorer_role_type",
             "is_liked_by_me",
+            "verification",
         ]
         read_only_fields = fields  # read serializer only
 
     def get_explorer_name(self, obj):
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
-        return user.get_full_name() if user else ""
+        if not user:
+            return ""
+        # Under-18s show their first name only; age comes from the author's current profile, not the post link.
+        profile = self._profile(obj)
+        return user.first_name if profile is not None and under_18(profile) else user.get_full_name()
 
     def get_explorer_user_id(self, obj):
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
@@ -79,21 +88,21 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
         return obj.role_title or obj.role_category
 
     def _onboarding(self, obj):
-        """(skill role, saved skills) for the post author, looked up once per author per request."""
+        """(skill role, saved skills, onboarding row) for the post author, looked up once per author per request."""
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
         if not user or obj.role_category not in ("PHARMACIST", "OTHER_STAFF"):
-            return None, []
+            return None, [], None
         cache = self.__dict__.setdefault("_onboarding_cache", {})
         key = (obj.role_category, user.pk)
         if key not in cache and not self.__dict__.get("_onboarding_bulk_loaded"):
             self._bulk_load_onboarding(cache)
         if key not in cache:
             if obj.role_category == "PHARMACIST":
-                profile = PharmacistOnboarding.objects.filter(user=user).only("skills").first()
-                cache[key] = ("PHARMACIST", list(getattr(profile, "skills", None) or []))
+                profile = PharmacistOnboarding.objects.filter(user=user).select_related("user").first()
+                cache[key] = ("PHARMACIST", list(getattr(profile, "skills", None) or []), profile)
             else:
-                profile = OtherStaffOnboarding.objects.filter(user=user).only("skills", "role_type").first()
-                cache[key] = (getattr(profile, "role_type", None) or "UNKNOWN", list(getattr(profile, "skills", None) or []))
+                profile = OtherStaffOnboarding.objects.filter(user=user).select_related("user").first()
+                cache[key] = (getattr(profile, "role_type", None) or "UNKNOWN", list(getattr(profile, "skills", None) or []), profile)
         return cache[key]
 
     def _bulk_load_onboarding(self, cache):
@@ -110,10 +119,10 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
             author = getattr(post, "author_user", None) or getattr(getattr(post, "explorer_profile", None), "user", None)
             if author is not None and getattr(post, "role_category", None) in ("PHARMACIST", "OTHER_STAFF"):
                 users.setdefault(post.role_category, set()).add(author.pk)
-        for row in PharmacistOnboarding.objects.filter(user_id__in=users.get("PHARMACIST", ())).only("user_id", "skills"):
-            cache[("PHARMACIST", row.user_id)] = ("PHARMACIST", list(row.skills or []))
-        for row in OtherStaffOnboarding.objects.filter(user_id__in=users.get("OTHER_STAFF", ())).only("user_id", "skills", "role_type"):
-            cache[("OTHER_STAFF", row.user_id)] = (row.role_type or "UNKNOWN", list(row.skills or []))
+        for row in PharmacistOnboarding.objects.filter(user_id__in=users.get("PHARMACIST", ())).select_related("user"):
+            cache[("PHARMACIST", row.user_id)] = ("PHARMACIST", list(row.skills or []), row)
+        for row in OtherStaffOnboarding.objects.filter(user_id__in=users.get("OTHER_STAFF", ())).select_related("user"):
+            cache[("OTHER_STAFF", row.user_id)] = (row.role_type or "UNKNOWN", list(row.skills or []), row)
 
     def _get_onboarding_skills(self, obj):
         return self._onboarding(obj)[1]
@@ -121,7 +130,7 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
     def get_skills(self, obj):
         # Always prefer onboarding skills for Pharmacist/Other Staff, limited to the author's current role.
         if obj.role_category in ("PHARMACIST", "OTHER_STAFF"):
-            role, skills = self._onboarding(obj)
+            role, skills, _profile = self._onboarding(obj)
             return normalize_skills(skills, allowed_role=role, matchable_only=True)
         # Explorers do not expose skills on TalentBoard.
         if obj.role_category == "EXPLORER":
@@ -134,53 +143,45 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
         # Software belongs to the same current role-compatible onboarding claims.
         return normalize_skills(self.get_skills(obj), matchable_only=True, software_only=True)
 
+    def _profile(self, obj):
+        """The author's onboarding row (newcomer profile for New to pharmacy posts), loaded once per page."""
+        if obj.role_category == "EXPLORER":
+            if obj.explorer_profile is not None:
+                return obj.explorer_profile
+            user = obj.author_user
+            return ExplorerOnboarding.objects.filter(user=user).first() if user else None
+        return self._onboarding(obj)[2]
+
+    @extend_schema_field(VerificationSummarySerializer(allow_null=True))
+    def get_verification(self, obj):
+        """Badges for the author: verified flag, evidence states and the overseas label (labels live in shared-core)."""
+        profile = self._profile(obj)
+        return verification_summary(profile) if profile else None
+
     def get_travel_states(self, obj):
-        user = obj.author_user or getattr(obj.explorer_profile, "user", None)
-        if not user:
-            return []
-        try:
-            if obj.role_category == "PHARMACIST":
-                po = PharmacistOnboarding.objects.filter(user=user).first()
-                return list(getattr(po, "travel_states", []) or []) if po else []
-            if obj.role_category == "OTHER_STAFF":
-                so = OtherStaffOnboarding.objects.filter(user=user).first()
-                return list(getattr(so, "travel_states", []) or []) if so else []
-            if obj.role_category == "EXPLORER":
-                eo = ExplorerOnboarding.objects.filter(user=user).first()
-                return list(getattr(eo, "travel_states", []) or []) if eo else []
-        except Exception:
-            return []
-        return []
+        profile = self._profile(obj) if obj.role_category in ("PHARMACIST", "OTHER_STAFF", "EXPLORER") else None
+        return list(getattr(profile, "travel_states", None) or [])
 
     def get_ahpra_years_since_first_registration(self, obj):
-        user = obj.author_user or getattr(obj.explorer_profile, "user", None)
-        if not user:
-            return None
-        if obj.role_category != "PHARMACIST":
-            return None
-        try:
-            po = PharmacistOnboarding.objects.filter(user=user).first()
-            return getattr(po, "ahpra_years_since_first_registration", None) if po else None
-        except Exception:
-            return None
+        profile = self._profile(obj) if obj.role_category == "PHARMACIST" else None
+        return getattr(profile, "ahpra_years_since_first_registration", None) if profile else None
 
     def get_years_experience(self, obj):
-        user = obj.author_user or getattr(obj.explorer_profile, "user", None)
-        if not user:
-            return None
-        if obj.role_category != "OTHER_STAFF":
-            return None
-        try:
-            so = OtherStaffOnboarding.objects.filter(user=user).first()
-            return getattr(so, "years_experience", None) if so else None
-        except Exception:
-            return None
+        profile = self._profile(obj) if obj.role_category == "OTHER_STAFF" else None
+        return getattr(profile, "years_experience", None) if profile else None
 
     def get_is_liked_by_me(self, obj):
         req = self.context.get("request")
         if not req or not req.user or not req.user.is_authenticated:
             return False
-        return ExplorerPostReaction.objects.filter(post=obj, user=req.user).exists()
+        liked = self.__dict__.get("_liked_post_ids")
+        if liked is None:
+            # One query for the whole page being serialised (a single post falls back to itself).
+            posts = getattr(self.parent, "instance", None) if self.parent is not None else None
+            ids = [post.pk for post in posts] if isinstance(posts, (list, tuple)) else [obj.pk]
+            liked = self._liked_post_ids = set(
+                ExplorerPostReaction.objects.filter(user=req.user, post_id__in=ids).values_list("post_id", flat=True))
+        return obj.pk in liked
 
 
 class PublicExplorerPostReadSerializer(ExplorerPostReadSerializer):
@@ -336,8 +337,7 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
             "software",
             "reference_code",
             "is_anonymous",
-            "explorer_profile",
-        ]
+        ]  # explorer_profile is set by the server at creation and never changed by the client
         changed = []
         for field in updatable_fields:
             if field in validated_data:

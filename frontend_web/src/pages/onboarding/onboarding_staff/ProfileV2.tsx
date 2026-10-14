@@ -17,6 +17,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import { API_BASE_URL } from '../../../constants/api';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 type ApiData = {
   short_bio?: string | null;
@@ -92,6 +93,7 @@ export default function ProfileV2() {
         fd.append('resume', resumePending);
       }
       const res = await updateOnboardingForm(roleKey, fd);
+      announceOnboardingSaved(res);
       const d: ApiData = (res as any) || {};
       setShortBio(d.short_bio || '');
       const nextResumeUrl = getFileUrl(d.resume || '');
@@ -121,9 +123,6 @@ export default function ProfileV2() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: 960, px: { xs: 2, md: 3 }, pb: 3 }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-        Profile
-      </Typography>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>

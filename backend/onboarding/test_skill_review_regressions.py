@@ -15,7 +15,7 @@ class SkillReviewRegressions(SimpleTestCase):
     def test_credentialed_skill_claim_can_be_saved_without_evidence(self):
         profile = SimpleNamespace(user_id=1, skills=[], skill_certificates={}, save=Mock())
         apply_skills_tab(profile, {}, initial_data={'skills': ['VACCINATION']}, uploads={},
-                         role_key='pharmacist', missing_message='Missing: ')
+                         role_key='pharmacist')
         self.assertEqual(profile.skills, ['VACCINATION'])
         self.assertEqual(profile.skill_certificates, {})
         profile.save.assert_called_once()
@@ -40,7 +40,7 @@ class SkillReviewRegressions(SimpleTestCase):
                                   skill_certificates={'ANAPHYLAXIS_MANAGEMENT': {'path': 'anaphylaxis.pdf'}}, save=Mock())
         with patch('onboarding.services.skills.default_storage.delete') as delete:
             apply_skills_tab(profile, {}, initial_data={'skills': ['FIRST_AID']}, uploads={},
-                             role_key='pharmacist', missing_message='Missing: ', keep_history=True)
+                             role_key='pharmacist', keep_history=True)
         profile.save.assert_called_once()
         self.assertEqual(profile.skills, ['FIRST_AID'])  # Explicit claim is allowed, but old proof is not broadened.
         delete.assert_not_called()
@@ -73,7 +73,7 @@ class SkillReviewRegressions(SimpleTestCase):
                                   skill_certificates={'VACCINATOR': {'path': 'historic.pdf'}}, save=Mock())
         with patch('onboarding.services.skills.default_storage.delete') as delete:
             apply_skills_tab(profile, {}, initial_data={'skills': ['Vaccination']}, uploads={},
-                             role_key='pharmacist', missing_message='Missing: ')
+                             role_key='pharmacist')
         self.assertEqual(profile.skills, ['VACCINATION'])
         self.assertEqual(profile.skill_certificates['VACCINATION']['path'], 'historic.pdf')
         delete.assert_not_called()
@@ -83,7 +83,7 @@ class SkillReviewRegressions(SimpleTestCase):
             'VACCINATOR': {'path': 'old.pdf'}, 'VACCINATION': {'path': 'current.pdf'}}, save=Mock())
         with patch('onboarding.services.skills.default_storage.delete') as delete:
             apply_skills_tab(profile, {}, initial_data={'skills': ['VACCINATION']}, uploads={},
-                             role_key='pharmacist', missing_message='Missing: ')
+                             role_key='pharmacist')
         self.assertEqual(profile.skill_certificates['VACCINATION']['path'], 'current.pdf')
         delete.assert_not_called()
 
@@ -92,7 +92,7 @@ class SkillReviewRegressions(SimpleTestCase):
         for payload in ({'FRED': True}, 3, ['FRED', None]):
             with self.assertRaises(ValidationError):
                 apply_skills_tab(profile, {}, initial_data={'skills': payload}, uploads={},
-                                 role_key='pharmacist', missing_message='Missing: ')
+                                 role_key='pharmacist')
 
     def test_role_patch_revalidates_persisted_requirements(self):
         shift = SimpleNamespace(role_needed='PHARMACIST', must_have=['DAA_FINAL_CHECK'], nice_to_have=[])

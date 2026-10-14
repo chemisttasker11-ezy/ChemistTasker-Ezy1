@@ -8,6 +8,7 @@ import GooglePlacesInput from '../../shared/pharmacies/GooglePlacesInput';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
 import { AHPRA_CONSENT_TEXT } from '../../../constants/ahpraConsent';
 import { useAuth } from '../../../context/AuthContext';
+import { WorkRightsMenu } from '../../shared/forms/WorkRightsMenu';
 
 type ApiData = {
   username?: string;
@@ -16,6 +17,7 @@ type ApiData = {
   phone_number?: string;
   ahpra_number?: string;
   date_of_birth?: string | null;
+  work_rights?: string | null;
   gender?: string | null;
   emergency_contact_number?: string | null;
   emergency_contact_relation?: string | null;
@@ -113,6 +115,7 @@ export default function PharmacistBasicInfoScreen() {
       if (form.phone_number != null) fd.append('phone_number', String(form.phone_number));
       if (form.ahpra_number != null) fd.append('ahpra_number', String(form.ahpra_number));
       if (form.date_of_birth != null) fd.append('date_of_birth', String(form.date_of_birth));
+      if (form.work_rights != null) fd.append('work_rights', String(form.work_rights));
       if (form.gender != null) fd.append('gender', String(form.gender));
       if (form.emergency_contact_number != null) fd.append('emergency_contact_number', String(form.emergency_contact_number));
       if (form.emergency_contact_relation != null) fd.append('emergency_contact_relation', String(form.emergency_contact_relation));
@@ -176,6 +179,7 @@ export default function PharmacistBasicInfoScreen() {
         <TextInput mode="outlined" label="Username" value={form.username || ''} onChangeText={(v) => setField('username', v)} />
         <TextInput mode="outlined" label="Phone Number" value={form.phone_number || ''} onChangeText={(v) => setField('phone_number', v)} />
         <TextInput mode="outlined" label="Date of Birth" value={form.date_of_birth || ''} onChangeText={(v) => setField('date_of_birth', v)} placeholder="YYYY-MM-DD" />
+        <WorkRightsMenu value={form.work_rights} onChange={(v) => setField('work_rights', v)} />
         <Menu
           visible={genderMenuVisible}
           onDismiss={() => setGenderMenuVisible(false)}

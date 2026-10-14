@@ -6,6 +6,7 @@ Refusals raise `ShiftActionRefused`, whose response body and status are those th
 from onboarding.services.skill_identity import normalize_skills
 from onboarding.services.work_profile import current_worker_profile
 from onboarding.qualifications import has_verified_dispensing_qualification
+from onboarding.verification.policy import VERIFIED, verification_summary
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -147,13 +148,16 @@ def work_profile(candidate, *, build_absolute_uri):
     os = profile if str(getattr(candidate, 'role', '')).upper() == 'OTHER_STAFF' else None
     if not profile:
         return {'profile_photo': None, 'short_bio': None, 'skills': [], 'role_label': None, 'verified': False}
+    summary = verification_summary(profile)
     data = {
         'profile_photo': build_absolute_uri(profile.profile_photo.url) if profile.profile_photo else None,
         'short_bio': profile.short_bio,
         'skill_role': 'PHARMACIST' if po else str(os.role_type or 'UNKNOWN').upper(),
         # Canonical registry IDs the candidate's current role may claim (same rule as the Talent board).
         'skills': normalize_skills(list(profile.skills or []), allowed_role='PHARMACIST' if po else str(os.role_type or 'UNKNOWN').upper(), matchable_only=True),
-        'verified_skills': normalize_skills([code for code, evidence in (getattr(profile, 'skill_certificates', None) or {}).items() if isinstance(evidence, dict) and evidence.get('path') and evidence.get('verified') is True], allowed_role='PHARMACIST' if po else str(os.role_type or 'UNKNOWN').upper(), matchable_only=True),
+        # verified_skills stays for app builds released before the badge summary.
+        'verified_skills': [code for code, state in summary['skill_evidence'].items() if state == VERIFIED],
+        'verification': summary,
         'suburb': profile.suburb or None,
         'state': profile.state or None,
         'open_to_travel': bool(profile.open_to_travel),
@@ -182,7 +186,7 @@ def work_profile(candidate, *, build_absolute_uri):
             'dispensary_qualification': os.dispensary_qualification or None,
             'dispensary_qualification_verified': has_verified_dispensing_qualification(os),
             'classification': classification,
-            'ahpra_verified': bool(os.ahpra_proof_verified),
+            'ahpra_verified': bool(os.ahpra_verified) if os.role_type == 'INTERN' else False,
             'registered_since': None,
             'years_experience': os.years_experience or None,
             'rate_preference': None,
@@ -470,7 +474,7 @@ def member_status(*, shift, requested_visibility, slot_id, slot_date, request):
     return data
 
 
-def assigned_profile(*, request, shift, candidate, slot_id, slot):
+def assigned_profile(*, request, shift, candidate, slot_id, slot, contact=True):
     """A manager opening the profile of a worker assigned to the shift (or to the given slot). Audited; unlike a
     reveal it uses no quota and sends no e-mail. Returns the profile as the endpoint renders it."""
     # Verify the user is actually assigned to this shift/slot
@@ -506,7 +510,7 @@ def assigned_profile(*, request, shift, candidate, slot_id, slot):
     if profile is None or hasattr(profile, 'rate_preference'):
         profile_data['rate_preference'] = getattr(profile, 'rate_preference', None) or None
 
-    return {
+    result = {
         'id': candidate.id,
         'first_name': candidate.first_name,
         'last_name': candidate.last_name,
@@ -515,3 +519,7 @@ def assigned_profile(*, request, shift, candidate, slot_id, slot):
         'email': candidate.email,
         **profile_data
     }
+    if not contact:
+        for key in ('email', 'phone_number', 'resume'):
+            result.pop(key, None)
+    return result

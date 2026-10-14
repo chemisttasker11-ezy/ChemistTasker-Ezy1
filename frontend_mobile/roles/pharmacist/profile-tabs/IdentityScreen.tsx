@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Chip, HelperText, Menu, Text, TextInput } from 'react-native-paper';
-import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
+import { Button, HelperText, Menu, Text, TextInput } from 'react-native-paper';
+import { evidenceExplainer, getOnboardingDetail, updateOnboardingForm, type EvidenceState } from '@chemisttasker/shared-core';
 import { API_BASE_URL } from '@/constants/api';
-import { AUS_STATES, DOC_TYPES, boolChipProps, pickSingleDocument, roleKey, toRNFile } from './shared';
+import { AUS_STATES, DOC_TYPES, pickSingleDocument, roleKey, toRNFile } from './shared';
+import { EvidenceStatus } from '../../shared/skills/VerificationBadges';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
 
 type ApiData = {
@@ -64,7 +65,10 @@ export default function PharmacistIdentityScreen() {
     };
   }, []);
 
-  const govChip = boolChipProps(data.gov_id_verified);
+  // Same rule as web IdentityV2: an upload is "check pending" until the document check records a result.
+  const idState: EvidenceState = data.gov_id_verified ? 'verified'
+    : !data.government_id ? 'not_supplied'
+    : data.gov_id_verification_note ? 'failed' : 'pending';
   const selectedDocTypeLabel = useMemo(
     () => DOC_TYPES.find((d) => d.value === data.government_id_type)?.label || 'Select document type',
     [data.government_id_type]
@@ -209,10 +213,8 @@ export default function PharmacistIdentityScreen() {
           <Button mode="text" onPress={() => Linking.openURL(fileUrl(data.identity_secondary_file))}>View secondary file</Button>
         ) : null}
 
-        <Chip mode="outlined" icon={govChip.icon} textStyle={{ color: govChip.color }}>
-          Identity {govChip.text}
-        </Chip>
-        {data.gov_id_verification_note ? <HelperText type="info">{data.gov_id_verification_note}</HelperText> : null}
+        <EvidenceStatus code="ID" label="Photo ID" state={idState}
+          explainer={evidenceExplainer(idState, 'worker', 'photo ID', { note: data.gov_id_verification_note })} />
         {error ? <HelperText type="error">{error}</HelperText> : null}
 
         <View style={styles.actions}>

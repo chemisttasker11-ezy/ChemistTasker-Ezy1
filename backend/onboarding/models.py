@@ -18,6 +18,14 @@ GENDER_CHOICES = [
     ("PREFER_NOT_TO_SAY", "Prefer not to say"),
 ]
 
+# Right to work in Australia, as the person tells us (not checked). "No work rights yet" shows as a label to employers;
+# an overseas person may already hold a visa with work rights while still abroad (owner decision 2026-10-13).
+WORK_RIGHTS_CHOICES = [
+    ("CITIZEN_OR_RESIDENT", "Australian or New Zealand citizen, or permanent resident"),
+    ("VISA", "Visa with work rights"),
+    ("NONE", "No work rights in Australia yet"),
+]
+
 
 def onboarding_upload_path(instance, filename, folder):
     user_id = getattr(instance, "user_id", None) or "new"
@@ -218,6 +226,7 @@ class PharmacistOnboarding(models.Model):
     ahpra_number = models.CharField(max_length=100, blank=True, null=True)
     # phone_number = models.CharField(max_length=20, blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
+    work_rights = models.CharField(max_length=24, choices=WORK_RIGHTS_CHOICES, blank=True, default="")
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True, null=True)
     emergency_contact_number = models.CharField(max_length=20, blank=True, null=True)
     emergency_contact_relation = models.CharField(max_length=100, blank=True, null=True)
@@ -373,6 +382,7 @@ class OtherStaffOnboarding(models.Model):
 
     # --- Basic (address + dob; phone comes from User.mobile_number in V2 serializers) ---
     date_of_birth = models.DateField(blank=True, null=True)
+    work_rights = models.CharField(max_length=24, choices=WORK_RIGHTS_CHOICES, blank=True, default="")
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True, null=True)
     emergency_contact_number = models.CharField(max_length=20, blank=True, null=True)
     emergency_contact_relation = models.CharField(max_length=100, blank=True, null=True)
@@ -419,6 +429,10 @@ class OtherStaffOnboarding(models.Model):
     classification_level = models.CharField(max_length=20, choices=ASSISTANT_LEVEL_CHOICES, blank=True, null=True)
     student_year = models.CharField(max_length=20, choices=STUDENT_YEAR_CHOICES, blank=True, null=True)
     intern_half = models.CharField(max_length=20, choices=INTERN_HALF_CHOICES, blank=True, null=True)
+    # Interns: provisional AHPRA registration, checked manually by admin like pharmacists.
+    ahpra_number = models.CharField(max_length=100, blank=True, null=True)
+    ahpra_verified = models.BooleanField(default=False, db_index=True)
+    ahpra_verification_note = models.TextField(blank=True, null=True)
 
     # --- Role-specific docs (kept) ---
     dispensary_qualification = models.CharField(max_length=32, blank=True, default='', choices=DISPENSARY_QUALIFICATION_CHOICES)
@@ -494,11 +508,14 @@ class OtherStaffOnboarding(models.Model):
 
 
 class ExplorerOnboarding(models.Model):
+    # "New to pharmacy": which kind of newcomer, asked once at sign-up (codes kept from the Explorer profile).
     ROLE_CHOICES = [
-        ("STUDENT", "Student"),
-        ("JUNIOR", "Junior"),
-        ("CAREER_SWITCHER", "Career Switcher"),
+        ("OVERSEAS", "Overseas-qualified"),
+        ("JUNIOR", "School student or junior"),
+        ("STUDENT", "Looking for an internship or placement"),
+        ("CAREER_SWITCHER", "New to the field"),
     ]
+    MINIMUM_AGE = 15
   
     REFEREE_REL_CHOICES = [
     ('manager', 'Manager'),
@@ -519,6 +536,10 @@ class ExplorerOnboarding(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     government_id = models.FileField(upload_to=explorer_gov_id_upload_path, blank=True, null=True)
     role_type = models.CharField(max_length=50, choices=ROLE_CHOICES, blank=True, null=True)
+    date_of_birth = models.DateField(blank=True, null=True)
+    work_rights = models.CharField(max_length=24, choices=WORK_RIGHTS_CHOICES, blank=True, default="")
+    # Feed position of the newcomer's one talent post: a re-post within 7 days keeps it (no bumping by re-posting).
+    last_talent_post_at = models.DateTimeField(blank=True, null=True)
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True, null=True)
     emergency_contact_number = models.CharField(max_length=20, blank=True, null=True)
     emergency_contact_relation = models.CharField(max_length=100, blank=True, null=True)
@@ -573,6 +594,14 @@ class ExplorerOnboarding(models.Model):
     gov_id_verification_note = models.TextField(blank=True, null=True)
 
 
+    def age(self, today=None):
+        """Whole years from the date of birth given at sign-up; None when unknown."""
+        if not self.date_of_birth:
+            return None
+        today = today or timezone.localdate()
+        born = self.date_of_birth
+        return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
     def __str__(self):
         return f"{self.user.get_full_name()} - Explorer Onboarding"
 
@@ -582,6 +611,22 @@ class ExplorerOnboarding(models.Model):
             raise ValidationError({"user": "Explorer onboarding can only be linked to users with role EXPLORER."})
     class Meta:
         app_label = "client_profile"
+
+
+
+class AhpraRegistration(models.Model):
+    """Who holds an AHPRA number: one person per number, for life (owner decision 2026-10-13). The person may use it
+    on each of their own profiles. Kept by onboarding/verification/ahpra_numbers.py; the unique number makes concurrent
+    claims safe."""
+    number = models.CharField(max_length=100, unique=True)  # normalised: no spaces, upper case
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ahpra_registrations')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = "client_profile"
+
+    def __str__(self):
+        return f"{self.number} -> user {self.user_id}"
 
 
 

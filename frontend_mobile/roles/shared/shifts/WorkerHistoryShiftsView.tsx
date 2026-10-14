@@ -1,292 +1,137 @@
+// The worker's Shift Centre: History (native). Same content and actions as web MyHistoryShiftsPage: create an invoice,
+// rate the pharmacy, see its details.
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, Linking, Platform } from 'react-native';
-import {
-    ActivityIndicator,
-    Button,
-    Card,
-    Dialog,
-    Divider,
-    IconButton,
-    Portal,
-    Text,
-    Title,
-    Paragraph,
-    Snackbar,
-    TextInput,
-    useTheme
-} from 'react-native-paper';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Button, Dialog, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
-    fetchMyHistoryShifts,
-    fetchRatingsSummaryService,
-    fetchMyRatingForTargetService,
-    createRatingService,
-    type Shift,
-    type ShiftRatingSummary,
+  createRatingService,
+  fetchMyHistoryShifts,
+  fetchMyRatingForTargetService,
+  fetchRatingsSummaryService,
+  type Shift,
+  type ShiftRatingSummary,
 } from '@chemisttasker/shared-core';
+import { BookedShiftsState, PharmacyDetailsDialog, WorkerBookedShiftCard } from './WorkerBookedShifts';
 
-const buildFullAddress = (pharmacy?: Shift['pharmacyDetail'] | null) => {
-    if (!pharmacy) return '';
-    const parts = [
-        pharmacy.streetAddress,
-        pharmacy.suburb,
-        pharmacy.state,
-        pharmacy.postcode,
-    ].filter(Boolean);
-    return parts.join(', ');
-};
+const STAR_WORDS = ['', 'Poor', 'Below expectations', 'Good', 'Very good', 'Excellent'];
 
-type Props = {
-    invoiceRoute?: string;
-};
+export default function WorkerHistoryShiftsView({ invoiceRoute }: { invoiceRoute?: string }) {
+  const router = useRouter();
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [ratings, setRatings] = useState<Record<number, ShiftRatingSummary>>({});
+  const [pharmacy, setPharmacy] = useState<Shift['pharmacyDetail'] | null>(null);
+  const [rateTarget, setRateTarget] = useState<{ id: number; name: string } | null>(null);
+  const [stars, setStars] = useState(0);
+  const [comment, setComment] = useState('');
+  const [loadingExisting, setLoadingExisting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-export default function WorkerHistoryShiftsView({ invoiceRoute }: Props) {
-    const theme = useTheme();
-    const router = useRouter();
-    const [shifts, setShifts] = useState<Shift[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [snackbar, setSnackbar] = useState<string>('');
-    const [pharmacySummaries, setPharmacySummaries] = useState<Record<number, ShiftRatingSummary>>({});
-    const [generatingId, setGeneratingId] = useState<number | null>(null);
+  const loadRating = (id: number) =>
+    fetchRatingsSummaryService({ targetType: 'pharmacy', targetId: id })
+      .then(summary => setRatings(prev => ({ ...prev, [id]: summary })))
+      .catch(() => undefined);
 
-    // Rating Modal
-    const [ratingDialogVisible, setRatingDialogVisible] = useState(false);
-    const [selectedPharmacy, setSelectedPharmacy] = useState<{ id: number; name: string } | null>(null);
-    const [currentStars, setCurrentStars] = useState(0);
-    const [currentComment, setCurrentComment] = useState('');
-    const [loadingRatingAction, setLoadingRatingAction] = useState(false);
-    const [loadingExistingRating, setLoadingExistingRating] = useState(false);
+  useEffect(() => {
+    fetchMyHistoryShifts()
+      .then(data => {
+        const list = Array.isArray(data) ? data : [];
+        setShifts(list);
+        new Set(list.map(shift => shift.pharmacyDetail?.id).filter((id): id is number => typeof id === 'number')).forEach(id => void loadRating(id));
+      })
+      .catch(() => setMessage('We could not load your past shifts. Try again in a moment.'))
+      .finally(() => setLoading(false));
+  }, []);
 
-    useEffect(() => {
-        loadHistory();
-    }, []);
-
-    const loadHistory = async () => {
-        setLoading(true);
-        try {
-            const data = await fetchMyHistoryShifts();
-            setShifts(Array.isArray(data) ? data : []);
-
-            // Load summaries for unique pharmacies
-            const uniqueIds = Array.from(new Set(data.map((s: Shift) => s.pharmacyDetail?.id).filter((id: any) => typeof id === 'number'))) as number[];
-
-            uniqueIds.forEach(id => {
-                fetchRatingsSummaryService({ targetType: 'pharmacy', targetId: id })
-                    .then(summary => setPharmacySummaries(prev => ({ ...prev, [id]: summary })))
-                    .catch(() => { });
-            });
-
-        } catch (err: any) {
-            setSnackbar('Failed to load history shifts');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleGenerateInvoice = (shift: Shift) => {
-        setGeneratingId(shift.id);
-        const pharmId = shift.pharmacyDetail?.id ?? '';
-        // Assuming there's a route for invoice creation. Adjust path as needed based on mobile router structure.
-        // If route doesn't exist yet, we might need to create it or stub it. 
-        // Based on analysis, 'roles/pharmacist/invoice/new' might be the path? 
-        // Or simply '/invoice/new' if shared? 
-        // Let's try to navigate to a generic location that we can fix if broken.
-        // Use the passed route or default to a safe fallback
-        const route = invoiceRoute || '/pharmacist/invoice/new';
-        router.push({ pathname: route as any, params: { shiftId: shift.id, pharmacyId: pharmId } });
-        setGeneratingId(null);
-    };
-
-    const openRatingDialog = async (pharmId: number, name: string) => {
-        setSelectedPharmacy({ id: pharmId, name });
-        setRatingDialogVisible(true);
-        setLoadingExistingRating(true);
-        try {
-            const existing = await fetchMyRatingForTargetService({ targetType: 'pharmacy', targetId: pharmId });
-            if (existing) {
-                setCurrentStars(existing.stars || 0);
-                setCurrentComment(existing.comment || '');
-            } else {
-                setCurrentStars(0);
-                setCurrentComment('');
-            }
-        } catch {
-            setCurrentStars(0);
-            setCurrentComment('');
-        } finally {
-            setLoadingExistingRating(false);
-        }
-    };
-
-    const saveRating = async () => {
-        if (!selectedPharmacy) return;
-        setLoadingRatingAction(true);
-        try {
-            await createRatingService({
-                direction: 'WORKER_TO_PHARMACY',
-                ratee_pharmacy: selectedPharmacy.id,
-                stars: currentStars,
-                comment: currentComment,
-            });
-            setSnackbar('Rating saved!');
-            setRatingDialogVisible(false);
-
-            // Refresh summary
-            const summary = await fetchRatingsSummaryService({ targetType: 'pharmacy', targetId: selectedPharmacy.id });
-            setPharmacySummaries(prev => ({ ...prev, [selectedPharmacy.id]: summary }));
-
-        } catch (err) {
-            setSnackbar('Failed to save rating');
-        } finally {
-            setLoadingRatingAction(false);
-        }
-    };
-
-    const openMap = (address: string) => {
-        const query = encodeURIComponent(address);
-        const url = Platform.select({
-            ios: `maps:0,0?q=${query}`,
-            android: `geo:0,0?q=${query}`,
-            default: `https://www.google.com/maps/search/?api=1&query=${query}`,
-        });
-        Linking.openURL(url!).catch(() => setSnackbar('Could not open map'));
-    };
-
-    if (loading) {
-        return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-            </View>
-        );
+  const openRating = async (id: number, name: string) => {
+    setRateTarget({ id, name });
+    setLoadingExisting(true);
+    try {
+      const existing = await fetchMyRatingForTargetService({ targetType: 'pharmacy', targetId: id });
+      setStars(existing?.stars || 0);
+      setComment(existing?.comment || '');
+    } catch {
+      setStars(0);
+      setComment('');
+    } finally {
+      setLoadingExisting(false);
     }
+  };
 
-    if (shifts.length === 0) {
-        return (
-            <View style={styles.centered}>
-                <Text style={{ color: theme.colors.outline }}>No past shifts found.</Text>
-            </View>
-        );
+  const saveRating = async () => {
+    if (!rateTarget) return;
+    setSaving(true);
+    try {
+      await createRatingService({ direction: 'WORKER_TO_PHARMACY', ratee_pharmacy: rateTarget.id, stars, comment });
+      await loadRating(rateTarget.id);
+      setMessage('Thanks. Your rating is saved.');
+      setRateTarget(null);
+    } catch {
+      setMessage('Your rating could not be saved. Try again.');
+    } finally {
+      setSaving(false);
     }
+  };
 
-    return (
-        <View style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scroll}>
-                {shifts.map((shift) => {
-                    const slots = shift.slots ?? [];
-                    const pharmId = shift.pharmacyDetail?.id;
-                    const pharmacyAddress = buildFullAddress(shift.pharmacyDetail);
-                    const summary = pharmId ? pharmacySummaries[pharmId] : null;
+  return (
+    <View style={{ flex: 1 }}>
+      {loading || !shifts.length ? <BookedShiftsState mode="history" loading={loading} /> : (
+        <ScrollView contentContainerStyle={styles.list}>
+          {shifts.map(shift => {
+            const p = shift.pharmacyDetail;
+            return (
+              <WorkerBookedShiftCard key={shift.id} shift={shift} mode="history" rating={p?.id ? ratings[p.id] : undefined}
+                actions={<>
+                  <Button mode="contained" icon="receipt" onPress={() => router.push({ pathname: (invoiceRoute || '/pharmacist/invoice/new') as any, params: { shiftId: shift.id, pharmacyId: p?.id ?? '' } })}>Create invoice</Button>
+                  <Button mode="outlined" icon="star-outline" disabled={!p?.id} onPress={() => p?.id && void openRating(p.id, p.name ?? 'Pharmacy')}>Rate pharmacy</Button>
+                  <Button mode="text" icon="storefront-outline" disabled={!p} onPress={() => setPharmacy(p)}>Details</Button>
+                </>} />
+            );
+          })}
+        </ScrollView>
+      )}
 
-                    return (
-                        <Card key={shift.id} style={styles.card} mode="outlined">
-                            <Card.Content>
-                                <View style={styles.headerRow}>
-                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                                        <Title>{shift.pharmacyDetail?.name ?? 'Unknown Pharmacy'}</Title>
-                                        {pharmacyAddress ? (
-                                            <IconButton
-                                                icon="map-marker"
-                                                size={18}
-                                                onPress={() => openMap(pharmacyAddress)}
-                                                style={{ marginLeft: 4 }}
-                                            />
-                                        ) : null}
-                                        {summary && (
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <IconButton icon="star" iconColor="#F59E0B" size={14} style={{ margin: 0 }} />
-                                                <Text style={{ fontSize: 12, color: '#6B7280' }}>
-                                                    {summary.average?.toFixed(1)} ({summary.count})
-                                                </Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                </View>
+      <PharmacyDetailsDialog pharmacy={pharmacy ?? null} onDismiss={() => setPharmacy(null)} />
 
-                                <Text style={{ marginBottom: 8 }}>Role: {shift.roleNeeded}</Text>
+      <Portal>
+        <Dialog visible={Boolean(rateTarget)} onDismiss={() => !saving && setRateTarget(null)}>
+          <Dialog.Title>Rate {rateTarget?.name}</Dialog.Title>
+          <Dialog.Content style={{ gap: 12 }}>
+            {loadingExisting ? <ActivityIndicator /> : (
+              <>
+                <Text style={styles.muted}>Your rating helps other workers choose where to work.</Text>
+                <View style={styles.stars} accessibilityRole="radiogroup" accessibilityLabel="Star rating">
+                  {[1, 2, 3, 4, 5].map(value => (
+                    <Pressable key={value} onPress={() => setStars(value)} accessibilityRole="radio" accessibilityState={{ checked: stars === value }}
+                      accessibilityLabel={`${value} ${value === 1 ? 'star' : 'stars'}`} hitSlop={6} style={styles.star}>
+                      <MaterialCommunityIcons name={value <= stars ? 'star' : 'star-outline'} size={32} color={value <= stars ? '#F59E0B' : '#8A97AD'} />
+                    </Pressable>
+                  ))}
+                  <Text style={styles.word}>{STAR_WORDS[stars]}</Text>
+                </View>
+                <TextInput mode="outlined" label="Comment (optional)" multiline numberOfLines={3} value={comment} onChangeText={setComment} />
+              </>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setRateTarget(null)} disabled={saving}>Cancel</Button>
+            <Button mode="contained" onPress={saveRating} loading={saving} disabled={saving || stars === 0}>Save rating</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
-                                <View style={styles.slotsContainer}>
-                                    {slots.map(slot => (
-                                        <Text key={slot.id} variant="bodySmall" style={{ marginBottom: 2 }}>
-                                            • {slot.date} {slot.startTime}–{slot.endTime}
-                                        </Text>
-                                    ))}
-                                </View>
-
-                                <View style={styles.actionsRow}>
-                                    <Button
-                                        mode="contained"
-                                        compact
-                                        onPress={() => handleGenerateInvoice(shift)}
-                                        loading={generatingId === shift.id}
-                                        style={{ backgroundColor: '#7C3AED', flex: 1, marginRight: 8 }}
-                                    >
-                                        Generate Invoice
-                                    </Button>
-                                    <Button
-                                        mode="outlined"
-                                        compact
-                                        onPress={() => pharmId && openRatingDialog(pharmId, shift.pharmacyDetail?.name || 'Pharmacy')}
-                                        style={{ flex: 1 }}
-                                    >
-                                        Rate Pharmacy
-                                    </Button>
-                                </View>
-                            </Card.Content>
-                        </Card>
-                    );
-                })}
-            </ScrollView>
-
-            <Portal>
-                <Dialog visible={ratingDialogVisible} onDismiss={() => setRatingDialogVisible(false)}>
-                    <Dialog.Title>Rate {selectedPharmacy?.name}</Dialog.Title>
-                    <Dialog.Content>
-                        {loadingExistingRating ? (
-                            <ActivityIndicator />
-                        ) : (
-                            <View>
-                                <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 16 }}>
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                        <IconButton
-                                            key={star}
-                                            icon={star <= currentStars ? "star" : "star-outline"}
-                                            iconColor="#F59E0B"
-                                            size={32}
-                                            onPress={() => setCurrentStars(star)}
-                                        />
-                                    ))}
-                                </View>
-                                <TextInput
-                                    label="Comment (Optional)"
-                                    value={currentComment}
-                                    onChangeText={setCurrentComment}
-                                    mode="outlined"
-                                    multiline
-                                    numberOfLines={3}
-                                />
-                            </View>
-                        )}
-                    </Dialog.Content>
-                    <Dialog.Actions>
-                        <Button onPress={() => setRatingDialogVisible(false)}>Cancel</Button>
-                        <Button onPress={saveRating} loading={loadingRatingAction} disabled={currentStars === 0}>Save</Button>
-                    </Dialog.Actions>
-                </Dialog>
-            </Portal>
-
-            <Snackbar visible={!!snackbar} onDismiss={() => setSnackbar('')} duration={3000}>
-                {snackbar}
-            </Snackbar>
-        </View>
-    );
+      <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={4000}>{message}</Snackbar>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    scroll: { padding: 16 },
-    card: { marginBottom: 16, borderRadius: 12, backgroundColor: '#fff', elevation: 2 },
-    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-    slotsContainer: { marginVertical: 8, padding: 8, backgroundColor: '#F9FAFB', borderRadius: 8 },
-    actionsRow: { flexDirection: 'row', marginTop: 12 }
+  list: { padding: 16, gap: 16, paddingBottom: 40 },
+  muted: { fontSize: 13.5, lineHeight: 20, color: '#445474' },
+  stars: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  star: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  word: { marginLeft: 8, fontWeight: '600', color: '#06214A' },
 });

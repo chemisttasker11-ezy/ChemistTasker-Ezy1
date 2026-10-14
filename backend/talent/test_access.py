@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
-from client_profile.models import OtherStaffOnboarding, PharmacistOnboarding
+from client_profile.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
 from talent.views.explorer import ExplorerPostViewSet
 
 
@@ -17,10 +17,13 @@ class TalentPublishingAccessTests(TestCase):
         self.view.request = type("Request", (), {"user": user})()
         self.view._require_public_staff_access()
 
-    def test_explorer_does_not_need_staff_onboarding(self):
+    def test_newcomer_needs_a_verified_profile_but_no_staff_onboarding(self):
         user = get_user_model().objects.create_user(
             email="explorer-talent@example.com", password="test", role="EXPLORER"
         )
+        with self.assertRaises(PermissionDenied):
+            self.check_access(user)
+        ExplorerOnboarding.objects.create(user=user, verified=True)
         self.check_access(user)
 
     def test_other_staff_needs_mobile_and_verified_profile(self):

@@ -4,12 +4,7 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Container,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   Snackbar,
   Stack,
@@ -26,6 +21,7 @@ import {
   viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
+import { WorkerProfileDialog } from './ActiveShiftsPage/components/Dialogs/WorkerProfileDialog';
 
 type DeferredPayrollOffer = {
   id: number;
@@ -227,61 +223,7 @@ export default function ConfirmedShiftsPage() {
         }
       />
 
-      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Assigned Profile</DialogTitle>
-        <DialogContent>
-          {loadingProfile ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-              <CircularProgress />
-            </Box>
-          ) : profile ? (
-            <>
-              <Typography>
-                <strong>Name:</strong> {profile.firstName} {profile.lastName}
-              </Typography>
-              <Typography>
-                <strong>Email:</strong> {profile.email}
-              </Typography>
-              {profile.phoneNumber && (
-                <Typography>
-                  <strong>Phone:</strong> {profile.phoneNumber}
-                </Typography>
-              )}
-              {profile.shortBio && (
-                <Typography>
-                  <strong>Bio:</strong> {profile.shortBio}
-                </Typography>
-              )}
-              {profile.resume && (
-                <Button href={profile.resume} target="_blank">
-                  Download CV
-                </Button>
-              )}
-              {profile.ratePreference && (
-                <Box mt={2}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    <strong>Rate Preference</strong>
-                  </Typography>
-                  <ul style={{ margin: 0, paddingLeft: 16 }}>
-                    <li>Weekday: {profile.ratePreference.weekday || 'N/A'}</li>
-                    <li>Saturday: {profile.ratePreference.saturday || 'N/A'}</li>
-                    <li>Sunday: {profile.ratePreference.sunday || 'N/A'}</li>
-                    <li>Public Holiday: {profile.ratePreference.publicHoliday || 'N/A'}</li>
-                    <li>Early Morning: {profile.ratePreference.earlyMorning || 'N/A'}</li>
-                    <li>Late Night: {profile.ratePreference.lateNight || 'N/A'}</li>
-                  </ul>
-                </Box>
-              )}
-
-            </>
-          ) : (
-            <Typography>No profile data available.</Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDialog}>Close</Button>
-        </DialogActions>
-      </Dialog>
+      <WorkerProfileDialog open={dialogOpen} loading={loadingProfile} profile={profile} onClose={closeDialog} canMessage />
     </Container>
   );
 }
