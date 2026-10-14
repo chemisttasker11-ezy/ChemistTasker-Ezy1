@@ -7,6 +7,13 @@ from core.serializer_lifecycle import _delete_file_if_unreferenced
 from core.task_queue import async_task
 
 
+def check_role_unchanged(instance, vdata: dict) -> None:
+    """Owner decision 2026-10-14: a Pharmacy team role is fixed once chosen."""
+    original_role = str(instance.role_type or '').upper()
+    if 'role_type' in vdata and original_role and str(vdata.get('role_type') or '').upper() != original_role:
+        raise serializers.ValidationError({'role_type': ['Your role is set and cannot be changed. Contact support if it is wrong.']})
+
+
 def apply_regulatory_tab(instance, vdata: dict, submit: bool):
     """
     Keeps your current role/subrole logic and per-role docs,
@@ -28,9 +35,7 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
     original_dispensing = instance.dispensary_qualification
     # Owner decision 2026-10-14: a Pharmacy team role is fixed once chosen (a pharmacy may still give the person a
     # different role in its own team through the membership; that never reaches the public profile).
-    new_role = str(vdata.get('role_type') or '').upper()
-    if 'role_type' in vdata and original_role and new_role != original_role:
-        raise serializers.ValidationError({'role_type': ['Your role is set and cannot be changed. Contact support if it is wrong.']})
+    check_role_unchanged(instance, vdata)
 
     # role classification inputs
     for f in ['role_type','classification_level','student_year','intern_half','dispensary_qualification','ahpra_number']:

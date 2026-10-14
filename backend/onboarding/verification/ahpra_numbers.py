@@ -32,44 +32,72 @@ def _user_numbers(user_id, *, skip=None) -> set[str]:
 
 
 def guard_ahpra_number(profile, new_number) -> bool:
-    """Refuse a change to a checked number or a number another account holds; claim the new number for this person,
-    release numbers they no longer use, and reset the AHPRA check and Verified on a change (fields saved here).
-    Returns whether the number changed.
-
-    The claim commits before the tab saves (tabs keep a refused submission's edits, so they are not one transaction).
-    shortcut: if the tab save itself then fails, the number stays registered to this same person until they change it;
-    it never blocks them. Wrap claim and save in one transaction if tabs ever become atomic."""
+    """Change this profile's AHPRA number: refuse a checked number or one another account holds; otherwise save the new
+    number, its reset check (and Verified when the role needs AHPRA), the claim and the release of numbers the person
+    no longer uses, all in one transaction with this person's number changes serialised (third review 2026-10-14:
+    ownership never drifts from the saved profile). Returns whether the number changed. The rest of the tab saves
+    separately, so a refused Submit still keeps its other edits."""
+    from django.contrib.auth import get_user_model
     from onboarding.models import AhpraRegistration
     from onboarding.verification.policy import revoke_for_changed_evidence
 
-    old, new = normalize(getattr(profile, 'ahpra_number', None)), normalize(new_number)
-    if new == old:
-        return False
-    if getattr(profile, 'ahpra_verified', False):
-        raise serializers.ValidationError({'ahpra_number': [LOCKED]})
-    if new:
-        try:
-            with transaction.atomic():
-                owner_id = AhpraRegistration.objects.get_or_create(number=new, defaults={'user_id': profile.user_id})[0].user_id
-        except IntegrityError:  # a concurrent claim won the unique number
-            owner_id = AhpraRegistration.objects.get(number=new).user_id
-        if owner_id != profile.user_id:
-            raise serializers.ValidationError({'ahpra_number': [TAKEN]})
-    keep = _user_numbers(profile.user_id, skip=profile) | ({new} if new else set())
-    AhpraRegistration.objects.filter(user_id=profile.user_id).exclude(number__in=keep).delete()
+    with transaction.atomic():
+        get_user_model().objects.select_for_update().filter(pk=profile.user_id).first()  # one change at a time per person
+        if profile.pk:
+            profile.refresh_from_db(fields=['ahpra_number', 'ahpra_verified'])
+        old, new = normalize(getattr(profile, 'ahpra_number', None)), normalize(new_number)
+        if new == old:
+            return False
+        if getattr(profile, 'ahpra_verified', False):
+            raise serializers.ValidationError({'ahpra_number': [LOCKED]})
+        if new:
+            try:
+                with transaction.atomic():
+                    owner_id = AhpraRegistration.objects.get_or_create(number=new, defaults={'user_id': profile.user_id})[0].user_id
+            except IntegrityError:  # a concurrent claim by another account won the unique number
+                owner_id = AhpraRegistration.objects.get(number=new).user_id
+            if owner_id != profile.user_id:
+                raise serializers.ValidationError({'ahpra_number': [TAKEN]})
 
-    # A new number needs a new check, and Verified waits for it when the role needs AHPRA.
-    profile.ahpra_verified = False
-    profile.ahpra_verification_note = ''
-    fields = ['ahpra_verified', 'ahpra_verification_note']
-    if hasattr(profile, 'verified') and not type(profile).__name__.startswith('Owner') and revoke_for_changed_evidence(profile, 'ahpra'):
-        fields.append('verified')
-    if profile.pk:
-        profile.save(update_fields=fields)
+        # A new number needs a new check, and Verified waits for it when the role needs AHPRA.
+        profile.ahpra_number = (new_number or '').strip() or None
+        profile.ahpra_verified = False
+        profile.ahpra_verification_note = ''
+        fields = ['ahpra_number', 'ahpra_verified', 'ahpra_verification_note']
+        if hasattr(profile, 'verified') and not type(profile).__name__.startswith('Owner') and revoke_for_changed_evidence(profile, 'ahpra'):
+            fields.append('verified')
+        if profile.pk:
+            profile.save(update_fields=fields)
+            AhpraRegistration.objects.filter(user_id=profile.user_id).exclude(number__in=_user_numbers(profile.user_id)).delete()
     return True
 
 
-def guard_ahpra_write(profile, validated_data: dict) -> None:
-    """The onboarding serializers' write boundary: every accepted write that carries an AHPRA number passes here."""
-    if 'ahpra_number' in validated_data:
-        guard_ahpra_number(profile, validated_data['ahpra_number'])
+def guard_ahpra_write(profile, validated_data: dict, *, tab: str, number_tabs: tuple[str, ...]) -> None:
+    """The onboarding serializers' write boundary. Only the step that owns the number may change it; elsewhere an
+    AHPRA field is dropped so it can never touch ownership."""
+    if 'ahpra_number' not in validated_data:
+        return
+    if tab not in number_tabs:
+        validated_data.pop('ahpra_number')
+        return
+    guard_ahpra_number(profile, validated_data['ahpra_number'])
+
+
+def ahpra_number_owner_conflict(user_id, number) -> bool:
+    """True when another account holds this number (admin form check before saving a support correction)."""
+    from onboarding.models import AhpraRegistration
+    number = normalize(number)
+    return bool(number) and AhpraRegistration.objects.filter(number=number).exclude(user_id=user_id).exists()
+
+
+def sync_ahpra_registrations(user_id) -> None:
+    """Make the registry match this person's saved profiles: claim every number they hold and release the rest.
+    Support corrections in Django admin call this after saving (they may change a checked number; that is the
+    support override). Raises IntegrityError when another account holds a number, so the admin save rolls back."""
+    from onboarding.models import AhpraRegistration
+    numbers = _user_numbers(user_id)
+    for number in numbers:
+        owner = AhpraRegistration.objects.get_or_create(number=number, defaults={'user_id': user_id})[0].user_id
+        if owner != user_id:
+            raise IntegrityError(f'AHPRA number already belongs to user {owner}')
+    AhpraRegistration.objects.filter(user_id=user_id).exclude(number__in=numbers).delete()

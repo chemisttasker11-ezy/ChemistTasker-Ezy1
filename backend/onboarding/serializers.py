@@ -26,7 +26,7 @@ from onboarding.services.progress import (
     owner_progress_percent,
     pharmacist_progress_percent,
 )
-from onboarding.services.regulatory import apply_regulatory_tab
+from onboarding.services.regulatory import apply_regulatory_tab, check_role_unchanged
 from drf_spectacular.utils import extend_schema_field
 from onboarding.verification.ahpra_numbers import guard_ahpra_write
 from onboarding.verification.policy import refresh_verified, verification_summary
@@ -122,7 +122,8 @@ class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerial
 
     def update(self, instance, validated_data):
         tab = (self.initial_data.get("tab") or "basic").strip().lower()
-        guard_ahpra_write(instance, validated_data)
+        # Owner tabs other than identity are treated as Basic below, so the number check treats them the same way.
+        guard_ahpra_write(instance, validated_data, tab='identity' if tab == 'identity' else 'basic', number_tabs=('basic',))
         submit = bool(validated_data.pop("submitted_for_verification", False))
 
         if tab == "identity":
@@ -415,7 +416,7 @@ class PharmacistOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
         if tab not in self.TABS:
             raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
-        guard_ahpra_write(instance, validated_data)
+        guard_ahpra_write(instance, validated_data, tab=tab, number_tabs=('basic',))
         submit = submit_requested(self.initial_data)
         record_first_submission(instance, tab=tab, submit=submit)
 
@@ -719,7 +720,9 @@ class OtherStaffOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
         if tab not in self.TABS:
             raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
-        guard_ahpra_write(instance, validated_data)
+        if tab == 'regulatory':
+            check_role_unchanged(instance, validated_data)
+        guard_ahpra_write(instance, validated_data, tab=tab, number_tabs=('regulatory',))
         submit = submit_requested(self.initial_data)
         record_first_submission(instance, tab=tab, submit=submit)
 
@@ -920,7 +923,7 @@ class ExplorerOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMixin
         tab = (self.initial_data.get('tab') or 'basic').strip().lower()
         if tab not in self.TABS:
             raise serializers.ValidationError({'tab': [f'Unknown tab "{tab}".']})
-        guard_ahpra_write(instance, validated_data)
+        guard_ahpra_write(instance, validated_data, tab=tab, number_tabs=())
         submit = submit_requested(self.initial_data)
         record_first_submission(instance, tab=tab, submit=submit)
 

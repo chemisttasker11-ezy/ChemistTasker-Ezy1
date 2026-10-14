@@ -3,9 +3,11 @@ AHPRA numbers are for life and unique, an upgraded newcomer's post comes off the
 mobile skip, and one verification decision serves the screens and the background evaluation."""
 from datetime import date
 from io import StringIO
-from unittest import mock
+from unittest import mock, skipUnless
 
 from django.core.management import call_command
+
+from django.db import connection
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
@@ -285,6 +287,7 @@ class NewcomerTransitionTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
 
 
+@skipUnless(connection.vendor == 'postgresql', 'needs real concurrent writes: runs in the PostgreSQL job (SQLite locks the table)')
 class AhpraConcurrentClaimTests(TransactionTestCase):
     """The reviewer's race (2026-10-14): two accounts claim one number at the same moment; exactly one may hold it."""
 
@@ -304,6 +307,8 @@ class AhpraConcurrentClaimTests(TransactionTestCase):
             close_old_connections()
             try:
                 results.put(client_for(user).patch(PHARMACIST_URL, {'tab': 'basic', 'ahpra_number': 'PHA0000000099'}, format='json').status_code)
+            except Exception as error:  # report the worker's real failure instead of an empty queue
+                results.put(repr(error))
             finally:
                 close_old_connections()
 
@@ -313,7 +318,89 @@ class AhpraConcurrentClaimTests(TransactionTestCase):
                 thread.start()
             for thread in threads:
                 thread.join(timeout=25)
-        statuses = sorted(results.get_nowait() for _ in threads)
+        self.assertFalse([thread for thread in threads if thread.is_alive()], 'a claim did not finish')
+        statuses = sorted((results.get_nowait() for _ in threads), key=str)
         self.assertEqual(statuses, [200, 400])
         self.assertEqual(PharmacistOnboarding.objects.filter(ahpra_number='PHA0000000099').count(), 1)
         self.assertEqual(AhpraRegistration.objects.filter(number='PHA0000000099').count(), 1)
+
+
+class AhpraSupportCorrectionTests(TestCase):
+    """Third review (2026-10-14): Django admin corrections keep the owner registry in step, with the support override."""
+
+    def correct(self, profile, number):
+        from django.contrib import admin
+        from django.test import RequestFactory
+        model_admin = admin.site._registry[type(profile)]
+        request = RequestFactory().post('/admin/')
+        request.user = make_user('OWNER', is_superuser=True, is_staff=True)
+        profile.ahpra_number = number
+        form = model_admin.get_form(request, profile)(instance=profile)
+        form.cleaned_data = {'user': profile.user, 'ahpra_number': number, 'phone_number': getattr(profile, 'phone_number', None),
+                             'role': getattr(profile, 'role', None)}
+        form._errors = {}
+        form.clean()
+        if form.errors:
+            return form.errors
+        model_admin.save_model(request, profile, form, True)
+        return None
+
+    def test_admin_corrections_move_ownership_for_each_profile_type(self):
+        for profile in (PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'), ahpra_number='PHAA1', ahpra_verified=True),
+                        worker(role_type='INTERN', ahpra_number='PHAA2', ahpra_verified=True),
+                        OwnerOnboarding.objects.create(user=make_user('OWNER', mobile_number='0400000003'), role='PHARMACIST', ahpra_number='PHAA3', ahpra_verified=True, phone_number='0400000003')):
+            old = profile.ahpra_number
+            AhpraRegistration.objects.create(number=old, user=profile.user)
+            self.assertIsNone(self.correct(profile, old + 'B'))  # support may change a checked number
+            self.assertEqual(list(AhpraRegistration.objects.filter(user=profile.user).values_list('number', flat=True)), [old + 'B'])
+            other = worker(role_type='INTERN')
+            response = client_for(other.user).patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': old + 'B'}, format='json')
+            self.assertEqual(response.status_code, 400, response.data)
+
+    def test_admin_cannot_give_a_number_another_account_holds(self):
+        AhpraRegistration.objects.create(number='PHAA9', user=make_user('PHARMACIST'))
+        profile = PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'))
+        self.assertIn('ahpra_number', self.correct(profile, 'PHAA9'))
+
+
+class ConsumedRefereeLinkTests(TestCase):
+    def test_a_link_answered_before_upgrade_cannot_be_used_again(self):
+        from django.core.signing import TimestampSigner
+        user, profile, post = newcomer(age=30, referee1_name='Dr Lee', referee1_email='lee@example.test',
+                                       referee1_relation='manager', referee1_workplace='Clinic')
+        ExplorerOnboarding.objects.filter(pk=profile.pk).update(referee1_confirmed=True)  # answered Yes before upgrade
+        token = TimestampSigner().sign(f'exploreronboarding:{profile.pk}:1')
+        upgrade_newcomer(user.pk, 'OTHER_STAFF', 'ASSISTANT')
+        with mock.patch('core.task_queue.async_task'):
+            rejected = client_for(None).post(BASE + f'onboarding/referee-reject/{token}/', {}, format='json')
+            answered = client_for(None).post(BASE + f'onboarding/submit-reference/{token}/', {'would_rehire': 'NO'}, format='json')
+        self.assertEqual(rejected.status_code, 200)
+        self.assertEqual(answered.status_code, 400)
+        target = OtherStaffOnboarding.objects.get(user=user)
+        self.assertEqual((target.referee1_confirmed, target.referee1_rejected), (True, False))
+
+
+class AhpraOwnershipDriftTests(TestCase):
+    """Third review (2026-10-14): the registry never releases a number the saved profile still holds."""
+
+    def test_a_tab_that_ignores_the_number_does_not_touch_ownership(self):
+        user = make_user('PHARMACIST', is_otp_verified=True)
+        PharmacistOnboarding.objects.create(user=user)
+        client = client_for(user)
+        self.assertEqual(client.patch(PHARMACIST_URL, {'tab': 'basic', 'ahpra_number': 'PHAD1'}, format='json').status_code, 200)
+        self.assertEqual(client.patch(PHARMACIST_URL, {'tab': 'profile', 'short_bio': 'Hi', 'ahpra_number': 'PHAD2'}, format='json').status_code, 200)
+        self.assertEqual(PharmacistOnboarding.objects.get(user=user).ahpra_number, 'PHAD1')
+        self.assertEqual(AhpraRegistration.objects.get(number='PHAD1').user_id, user.pk)
+        self.assertFalse(AhpraRegistration.objects.filter(number='PHAD2').exists())
+        other = worker(role_type='INTERN')
+        self.assertEqual(client_for(other.user).patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'PHAD1'}, format='json').status_code, 400)
+
+    def test_a_refused_role_change_does_not_move_the_number(self):
+        intern = worker(role_type='INTERN')
+        client = client_for(intern.user)
+        self.assertEqual(client.patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'PHAD3'}, format='json').status_code, 200)
+        response = client.patch(STAFF_URL, {'tab': 'regulatory', 'role_type': 'ASSISTANT', 'ahpra_number': 'PHAD4'}, format='json')
+        self.assertEqual(response.status_code, 400)
+        intern.refresh_from_db()
+        self.assertEqual(intern.ahpra_number, 'PHAD3')
+        self.assertEqual(list(AhpraRegistration.objects.filter(user=intern.user).values_list('number', flat=True)), ['PHAD3'])

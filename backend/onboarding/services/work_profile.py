@@ -27,3 +27,19 @@ def referee_profile_target(model_name: str, pk: int) -> tuple[str, int]:
         if current is not None:
             return current._meta.model_name, current.pk
     return model_name, pk
+
+
+def referee_answered_before_upgrade(model_name: str, pk: int, index: int) -> bool:
+    """A link answered on the newcomer profile stays used after the upgrade (review 2026-10-14): its response and flags
+    were recorded on that row, which the carried flags came from."""
+    from django.contrib.contenttypes.models import ContentType
+    from onboarding.models import RefereeResponse
+    if str(model_name).lower() != 'exploreronboarding':
+        return False
+    row = ExplorerOnboarding.objects.filter(pk=pk).first()
+    if row is None:
+        return False
+    if getattr(row, f'referee{index}_confirmed', False) or getattr(row, f'referee{index}_rejected', False):
+        return True
+    return RefereeResponse.objects.filter(content_type=ContentType.objects.get_for_model(ExplorerOnboarding),
+                                          object_id=pk, referee_index=index).exists()
