@@ -5,7 +5,7 @@ import React, { useEffect, useState, type ReactNode } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Button, Dialog, Portal, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchRatingsPageService, fetchRatingsSummaryService, type Shift, type ShiftRatingComment, type ShiftRatingSummary } from '@chemisttasker/shared-core';
+import { bookedShiftRateLabel, fetchRatingsPageService, fetchRatingsSummaryService, type Shift, type ShiftRatingComment, type ShiftRatingSummary } from '@chemisttasker/shared-core';
 
 type Pharmacy = NonNullable<Shift['pharmacyDetail']>;
 const INK = '#06214A';
@@ -29,14 +29,6 @@ const dateBits = (raw?: string | null) => {
 const clock = (raw?: string | null) => (raw ? String(raw).slice(0, 5) : '--');
 const humanize = (value?: string | null) => String(value || '').toLowerCase().replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
 
-function rateLabel(shift: Shift) {
-  if (shift.roleNeeded === 'PHARMACIST') {
-    if (shift.rateType === 'FIXED') return `$${shift.fixedRate}/hr fixed`;
-    if (shift.rateType === 'PHARMACIST_PROVIDED') return 'Your provided rate';
-    return 'Flexible rate';
-  }
-  return shift.ownerAdjustedRate ? `Award rate + $${shift.ownerAdjustedRate}/hr bonus` : 'Award rate';
-}
 
 function Pill({ label, tone = 'neutral' }: { label: string; tone?: 'navy' | 'green' | 'neutral' }) {
   const look = { navy: ['#06214A', '#FFFFFF'], green: ['#E4F5EA', '#17663A'], neutral: ['#F1F4F9', '#334565'] }[tone];
@@ -61,7 +53,7 @@ export function WorkerBookedShiftCard({ shift, mode, rating, actions }: {
             <View style={styles.pills}>
               {shift.roleNeeded ? <Pill tone="navy" label={humanize(shift.roleLabel ?? shift.roleNeeded)} /> : null}
               {shift.employmentType ? <Pill label={humanize(shift.employmentType)} /> : null}
-              <Pill tone={shift.ownerAdjustedRate && shift.roleNeeded !== 'PHARMACIST' ? 'green' : 'neutral'} label={rateLabel(shift)} />
+              <Pill tone={shift.ownerAdjustedRate && shift.roleNeeded !== 'PHARMACIST' ? 'green' : 'neutral'} label={bookedShiftRateLabel(shift)} />
             </View>
             {address ? (
               <Pressable onPress={() => openMap(address)} accessibilityRole="link" accessibilityLabel={`Open ${address} in maps`} style={styles.address}>
