@@ -34,7 +34,11 @@ class AhpraOwnershipAdminMixin:
                 cleaned = super().clean()
                 user = cleaned.get('user') or getattr(self.instance, 'user', None)
                 if 'ahpra_number' in cleaned and user is not None and ahpra_number_owner_conflict(user.pk, cleaned.get('ahpra_number')):
-                    self.add_error('ahpra_number', 'This AHPRA number belongs to another account.')
+                    from onboarding.verification.ahpra_numbers import normalize
+                    previous = type(self.instance).objects.filter(pk=self.instance.pk).values_list('ahpra_number', flat=True).first() if self.instance.pk else None
+                    # Grandfather unchanged legacy duplicates; reject a new or changed claim.
+                    if normalize(previous) != normalize(cleaned.get('ahpra_number')):
+                        self.add_error('ahpra_number', 'This AHPRA number belongs to another account.')
                 return cleaned
 
         return AhpraOwnershipForm
