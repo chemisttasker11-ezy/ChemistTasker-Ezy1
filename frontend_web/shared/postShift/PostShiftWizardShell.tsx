@@ -27,9 +27,11 @@ type Props = {
 const tone = (name: StepTone = 'violet') => ({ bg: `var(--ct-tone-${name}-bg)`, fg: `var(--ct-tone-${name}-fg)` });
 const BRAND = '#5222B8';
 
-/** Progress header: icon tiles on wider screens, "Step n of N" with a segmented bar on phones. */
-function StepProgress({ steps, activeStep, onSelect, canSelect, compact }: {
-  steps: PostShiftWizardStep[]; activeStep: number; onSelect: (index: number) => void; canSelect: (index: number) => boolean; compact: boolean;
+/** Progress header: icon tiles on wider screens, "Step n of N" with a segmented bar on phones. Onboarding reuses it. */
+export function StepProgress({ steps, activeStep, onSelect, canSelect, compact, label = 'Post shift steps', wrapLabels = false }: {
+  steps: PostShiftWizardStep[]; activeStep: number; onSelect: (index: number) => void; canSelect: (index: number) => boolean; compact: boolean; label?: string;
+  /** Let step names wrap onto two lines instead of truncating (many steps in a narrow column). */
+  wrapLabels?: boolean;
 }) {
   if (compact) {
     const current = steps[activeStep];
@@ -63,7 +65,7 @@ function StepProgress({ steps, activeStep, onSelect, canSelect, compact }: {
   }
 
   return (
-    <Box component="ol" aria-label="Post shift steps" sx={{ listStyle: 'none', m: 0, mb: 3, p: 0, display: 'flex' }}>
+    <Box component="ol" aria-label={label} sx={{ listStyle: 'none', m: 0, mb: 3, p: 0, display: 'flex' }}>
       {steps.map((step, index) => {
         const done = index < activeStep;
         const active = index === activeStep;
@@ -105,7 +107,7 @@ function StepProgress({ steps, activeStep, onSelect, canSelect, compact }: {
               </Box>
               <Typography sx={{
                 fontSize: 13.5, fontWeight: active ? 700 : 600, color: active ? 'text.primary' : done ? fg : 'text.secondary',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', px: 0.5,
+                ...(wrapLabels ? { lineHeight: 1.25, textAlign: 'center' } : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }), maxWidth: '100%', px: 0.5,
               }}>{step.label}</Typography>
             </ButtonBase>
           </Box>

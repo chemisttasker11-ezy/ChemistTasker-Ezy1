@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { canSkipOverseasMobileCheck, skipMobileOverseas } from '@chemisttasker/shared-core';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   TextField,
@@ -38,7 +39,7 @@ export default function MobileOTPVerify() {
 
   const extractError = (err: unknown, fallback: string) => {
     const anyErr = err as any;
-    const data = anyErr?.response?.data;
+    const data = anyErr?.response?.data ?? anyErr?.payload;
     if (typeof data?.detail === 'string' && data.detail) return data.detail;
     if (typeof data?.error === 'string' && data.error) return data.error;
     if (data && typeof data === 'object') {
@@ -97,6 +98,25 @@ export default function MobileOTPVerify() {
       setTimeout(() => window.location.assign('/dashboard'), 800);
     } catch (err) {
       setError(extractError(err, 'Verification failed.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const canSkipOverseas = canSkipOverseasMobileCheck(user);
+  // Overseas newcomers without an Australian mobile: keep the legal name, skip the code, verify with photo ID instead.
+  const handleSkipOverseas = async () => {
+    setError('');
+    setStatus('');
+    setLoading(true);
+    try {
+      // Same authenticated shared-core operation as Expo; the current user is present when this action is visible.
+      await skipMobileOverseas({ first_name: firstName, last_name: lastName, username });
+      setUser((prev) => (prev ? { ...prev, first_name: firstName, last_name: lastName, username, mobile_check_skipped: true } : prev));
+      setStatus('Done. Next, upload photo ID to verify your profile.');
+      setTimeout(() => window.location.assign('/dashboard/explorer/onboarding?step=identity'), 800);
+    } catch (err) {
+      setError(extractError(err, 'Could not skip the mobile check.'));
     } finally {
       setLoading(false);
     }
@@ -225,6 +245,18 @@ export default function MobileOTPVerify() {
             Resend Code
           </Link>
         </Box>
+
+        {canSkipOverseas && (
+          <Box sx={{ mt: 3, p: 2, borderRadius: 3, border: '1px solid rgba(148,163,184,0.35)' }}>
+            <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Joining from overseas?</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              No Australian mobile yet? Fill in your legal name and username above, then skip this step. You will verify with photo ID instead, and your profile shows an Overseas label.
+            </Typography>
+            <Button fullWidth variant="outlined" onClick={handleSkipOverseas} disabled={loading || !firstName || !lastName || !username}>
+              Skip and verify with photo ID
+            </Button>
+          </Box>
+        )}
 
         <Typography variant="body2" mt={3} textAlign="center">
           Back to{' '}

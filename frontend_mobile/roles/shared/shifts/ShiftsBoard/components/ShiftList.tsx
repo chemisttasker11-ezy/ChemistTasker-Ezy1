@@ -29,6 +29,7 @@ import {
 } from '../utils/shift';
 import { buildMapAddress, openMap, type ShiftListProps } from './ShiftList.model';
 
+import { ReportButton } from '../../../skills/ReportButton';
 const ShiftList: React.FC<ShiftListProps> = ({
     loading,
     processedShifts,
@@ -330,6 +331,7 @@ const isPharmacistProvided = showPublishedRates && shift.rateType === 'PHARMACIS
                                     >
                                         {isApplied && !isOffersMode ? 'Applied' : (applyLabel ?? 'Apply Now')}
                                     </Button>
+                                    {shift.visibility === 'PLATFORM' ? <ReportButton kind="jobs" id={shift.id} /> : null}
                                     {showCounter && onSubmitCounterOffer && (
                                         <Button
                                             mode="outlined"

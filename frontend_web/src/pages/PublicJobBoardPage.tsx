@@ -294,7 +294,7 @@ export default function PublicJobBoardPage() {
       throw new Error('Login required.');
     }
     if (!isVerified) {
-      const msg = 'You must be verified before applying to public shifts. Please complete your onboarding and verification process.';
+      const msg = 'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }

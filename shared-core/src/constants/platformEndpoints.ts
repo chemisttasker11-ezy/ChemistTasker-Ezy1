@@ -29,6 +29,7 @@ export const PLATFORM_ENDPOINTS = {
     comment: (id: number) => `/public-hub/comments/${id}/`,
     commentReaction: (id: number) => `/public-hub/comments/${id}/reaction/`,
     commentReport: (id: number) => `/public-hub/comments/${id}/report/`,
+    boardReport: (kind: 'talent' | 'jobs', id: number) => `/public-hub/boards/${kind}/${id}/report/`,
   },
 
   content: {

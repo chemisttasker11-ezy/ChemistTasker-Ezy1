@@ -1,12 +1,15 @@
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
-import { skillLabel } from '@chemisttasker/shared-core';
+import { skillEvidenceState, skillLabel } from '@chemisttasker/shared-core';
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Card, Chip, IconButton, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SkillIcon } from '../../../../components/SkillIcon';
+import { VerificationBadges } from '../../skills/VerificationBadges';
+import { WorkerSkillRows } from '../../skills/WorkerSkillRows';
 import { Candidate } from '../types';
 
+import { ReportButton } from '../../skills/ReportButton';
 const formatAuSlotDate = (date: string) => {
   const d = new Date(`${date}T00:00:00`);
   if (Number.isNaN(d.getTime())) return date;
@@ -98,8 +101,9 @@ export default function TalentCardV2({
           <Text style={styles.rating}>★ {candidate.ratingAverage.toFixed(1)} ({candidate.ratingCount})</Text>
         </View>
 
-        <View>
+        <View style={{ gap: 8 }}>
           <Text variant="bodySmall" style={styles.subtle}>{candidate.headline}</Text>
+          {candidate.verification ? <VerificationBadges summary={candidate.verification} role={candidate.role} compact /> : null}
         </View>
         {candidate.pitch ? <Text style={styles.pitch}>“{candidate.pitch}”</Text> : null}
 
@@ -153,20 +157,7 @@ export default function TalentCardV2({
 
           {!candidate.isExplorer ? (
             <View style={styles.skillsBlock}>
-              {[
-                { title: 'Clinical services', skills: candidate.clinicalServices },
-                { title: 'Software', skills: candidate.dispenseSoftware },
-                { title: 'Other pharmacy skills', skills: candidate.expandedScope },
-              ].filter(group => group.skills.length > 0).map(group => <View key={group.title} style={{ gap: 6 }}>
-                <Text style={styles.skillTitle}>{group.title}</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  {group.skills.map(code => {
-                    return <Chip key={code} icon={() => <SkillIcon skill={code} size={16} />}>
-                      {skillLabel(skillsRegistry as any, code)}
-                    </Chip>;
-                  })}
-                </View>
-              </View>)}
+              <WorkerSkillRows skills={[...candidate.clinicalServices, ...candidate.dispenseSoftware, ...candidate.expandedScope]} verification={candidate.verification ?? null} />
             </View>
           ) : null}
         </View>
@@ -188,7 +179,7 @@ export default function TalentCardV2({
       </Card.Content>
 
       <View style={styles.actions}>
-        <View />
+        <ReportButton kind="talent" id={candidate.id} />
         <View style={styles.likeWrap}>
           <IconButton
             icon={candidate.isLikedByMe ? 'heart' : 'heart-outline'}

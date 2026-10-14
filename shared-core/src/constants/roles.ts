@@ -100,8 +100,8 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const USER_ROLE_LABELS: Record<UserPortalRole, string> = {
     OWNER: 'Pharmacy Owner',
     PHARMACIST: 'Pharmacist',
-    OTHER_STAFF: 'Other Staff',
-    EXPLORER: 'Explorer',
+    OTHER_STAFF: 'Pharmacy team',
+    EXPLORER: 'New to pharmacy',
 };
 
 export const STAFF_ROLE_LABELS: Record<AdminStaffRole, string> = {

@@ -171,9 +171,10 @@ class IdentityTabTests(TabFixture):
                 self.assertEqual(set(response.data), {"identity_meta.expiry", "identity_secondary_file",
                                                       "identity_meta.visa_type_number", "identity_meta.valid_to"})
                 obj.refresh_from_db()
-                # the edit is saved even though submission was refused; owners keep their approval
+                # the edit is saved even though submission was refused; nobody loses Verified for a photo ID that
+                # their Verified does not rely on (owner decision 2026-10-14)
                 self.assertEqual(obj.government_id_type, "OTHER_PASSPORT")
-                self.assertEqual(obj.verified, label == "owner")
+                self.assertTrue(obj.verified)
 
                 response, work = self.save_identity(user, url, government_id_type="AUS_PASSPORT",
                                                     identity_meta={"expiry": "2030-01-01"},
@@ -275,7 +276,7 @@ class PaymentTabTests(TabFixture):
                 response, work = self.patch(user, url, {"tab": "payment", "submitted_for_verification": True})
                 self.assertEqual(response.status_code, 200, response.data)
                 obj.refresh_from_db()
-                self.assertFalse(obj.verified)
+                self.assertTrue(obj.verified)  # owner decision 2026-10-14: Submit never removes Verified
                 self.assertEqual(work["tasks"], [(
                     "client_profile.tasks.verify_abn_task",
                     (obj._meta.model_name, obj.pk, "51824753556", user.first_name, user.last_name, user.email),
@@ -361,7 +362,7 @@ class ProfileTabTests(TabFixture):
                                                      "submitted_for_verification": True}, multipart=True)
                 obj.refresh_from_db()
                 self.assertFalse(default_storage.exists(first))
-                self.assertFalse(obj.verified)
+                self.assertTrue(obj.verified)  # owner decision 2026-10-14: Submit never removes Verified
 
 
 class ProfilePhotoTests(TabFixture):

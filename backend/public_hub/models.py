@@ -107,6 +107,20 @@ class Report(models.Model):
         constraints = [models.UniqueConstraint(fields=['comment', 'reporter'], name='hub_one_report_per_user')]
 
 
+class BoardReport(models.Model):
+    """A report on a public talent hub post or job board shift, reviewed in the Moderation tab (board:* areas)."""
+    KIND_CHOICES = [('talent', 'Talent board post'), ('jobs', 'Job board shift')]
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES)
+    object_id = models.PositiveIntegerField()
+    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='+')
+    reason = models.CharField(max_length=500)
+    resolved = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['kind', 'object_id', 'reporter'], name='board_one_report_per_user')]
+
+
 class ContentAdministrator(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='content_administrator')
     active = models.BooleanField(default=True)

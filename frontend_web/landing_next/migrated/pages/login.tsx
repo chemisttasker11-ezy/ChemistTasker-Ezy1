@@ -90,7 +90,7 @@ export default function Login() {
       const destination=returnDestination();
       if(destination){rememberDestination(destination);finishDestination(destination);return;}
 
-      if (!userInfo?.is_mobile_verified) {
+      if (!userInfo?.is_mobile_verified && !userInfo?.mobile_check_skipped) {
         navigate('/mobile-verify');
         return;
       }

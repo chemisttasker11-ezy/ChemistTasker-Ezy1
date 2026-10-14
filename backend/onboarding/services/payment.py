@@ -89,10 +89,7 @@ def apply_payment_tab(instance, vdata: dict, submit: bool):
             if errors:
                 raise serializers.ValidationError(errors)
 
-    # 7) submitting this tab keeps the whole profile unverified until all tabs pass
-    if submit:
-        instance.verified = False
-        update_fields.append('verified')
+    # 7) Submit never removes Verified (owner decision 2026-10-14); payment details are not verification evidence.
 
     if update_fields:
         instance.save(update_fields=list(set(update_fields)))

@@ -1,7 +1,10 @@
 from rest_framework.permissions import BasePermission
 
-HUBS = {'public': 'ChemistTasker Hub', 'pharmacist': 'Pharmacist Hub', 'intern': 'Intern Hub', 'staff': 'Other Staff Hub', 'explorer': 'Explorer Hub', 'owner': 'Owner Hub'}
+HUBS = {'public': 'ChemistTasker Hub', 'pharmacist': 'Pharmacist Hub', 'intern': 'Intern Hub', 'staff': 'Pharmacy Team Hub', 'explorer': 'New to Pharmacy Hub', 'owner': 'Owner Hub'}
 AREAS = {'blog': 'Blog', 'news': 'News', **{f'hub:{k}': v for k, v in HUBS.items()}}
+# Moderation-only areas: reports on public talent posts and job board shifts. Not places to publish.
+BOARDS = {'board:talent': 'Talent board', 'board:jobs': 'Job board'}
+ASSIGNABLE_AREAS = {**AREAS, **BOARDS}
 
 
 def verified(user):
@@ -18,7 +21,7 @@ def capabilities(user):
     if not verified(user):
         return {'administrator': False, 'areas': {}}
     administrator = is_content_admin(user)
-    areas = {key: 'publisher' for key in AREAS} if administrator else dict(ContentAssignment.objects.filter(user=user).values_list('area', 'role'))
+    areas = {key: 'publisher' for key in ASSIGNABLE_AREAS} if administrator else dict(ContentAssignment.objects.filter(user=user).values_list('area', 'role'))
     return {'administrator': administrator, 'areas': areas}
 
 

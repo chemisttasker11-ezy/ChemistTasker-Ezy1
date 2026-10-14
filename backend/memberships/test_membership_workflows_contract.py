@@ -76,6 +76,19 @@ class InviteTests(MembershipFixture):
         payload = {"pharmacy": self.pharmacy.id, "role": "PHARMACIST", "employment_type": "LOCUM", **data}
         return self.call(user or self.owner, "post", "memberships/", payload)
 
+    def test_a_pharmacy_may_give_a_different_team_role_inside_its_own_team(self):
+        # Owner decision 2026-10-14: assistant / technician / student memberships for any pharmacist or Pharmacy team
+        # account; pharmacist and intern memberships need the matching registered profile. Internal only.
+        assistant = make_user("OTHER_STAFF")
+        OtherStaffOnboarding.objects.create(user=assistant, role_type="ASSISTANT")
+        pharmacist = make_user("PHARMACIST")
+        self.assertEqual(self.invite(email=assistant.email, role="TECHNICIAN")[0].status_code, 201)
+        self.assertEqual(self.invite(email=pharmacist.email, role="ASSISTANT")[0].status_code, 201)
+        refused = self.invite(email=assistant.email, role="INTERN")[0]
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("intern", refused.data["detail"])
+        self.assertEqual(OtherStaffOnboarding.objects.get(user=assistant).role_type, "ASSISTANT")  # profile role unchanged
+
     def test_inviting_a_new_person_creates_an_active_account_and_emails_a_password_link(self):
         response, work = self.invite(email=" New.Person@Example.com ", invited_name="New Person")
         self.assertEqual(response.status_code, 201, response.data)
@@ -138,7 +151,7 @@ class InviteTests(MembershipFixture):
                 if detail:
                     self.assertEqual(response.data["detail"], detail)
                 self.assertEqual(work["emails"], [])
-        self.assertIn("cannot be added as Pharmacist", self.invite(email=assistant.email)[0].data["detail"])
+        self.assertIn("Only a registered pharmacist", self.invite(email=assistant.email)[0].data["detail"])
         self.assertFalse(User.objects.filter(email="a@example.com").exists())
 
     def test_who_may_invite(self):

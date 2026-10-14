@@ -1,27 +1,6 @@
-// src/pages/onboardingV2/PharmacistOnboardingV2Layout.tsx
-import * as React from "react";
-import { useSearchParams } from "react-router-dom";
-import {
-  Box,
-  Button,
-  Container,
-  LinearProgress,
-  Paper,
-  Stack,
-  Typography,
-} from "@mui/material";
-import { alpha } from "@mui/material/styles";
-import { getOnboardingDetail } from "@chemisttasker/shared-core";
-import { UnsavedChangesBoundary } from "../../../hooks/useUnsavedChangesGuard";
-import AccountDeletionSection from "../../../components/AccountDeletionSection";
-
-
-const BRAND = {
-  grad: "linear-gradient(90deg, #5222B8 0%, #3C18A8 100%)",
-};
-
-
-// your tab pages
+// Pharmacist profile on the shared onboarding shell.
+import { BadgeDollarSign, FileText, IdCard, ListChecks, UserRound, Users, Wallet } from "lucide-react";
+import OnboardingShell, { type OnboardingStep } from "../OnboardingShell";
 import BasicInfoV2 from "./BasicInfoV2";
 import SkillsV2 from "./SkillsV2";
 import PaymentV2 from "./PaymentV2";
@@ -30,220 +9,26 @@ import ProfileV2 from "./ProfileV2";
 import RatesV2 from "./RatesV2";
 import IdentityV2 from "./IdentityV2";
 
-type StepKey = "basic" | "identity" | "skills" | "payment" | "rate" | "referees" | "profile";
-const isStepKey = (value: string | null): value is StepKey => STEPS.some((item) => item.key === value);
-const STEPS: Array<{ key: StepKey; label: string }> = [
-  { key: "basic",    label: "Basic Info" },
-  { key: "identity", label: "Identity" },
-  { key: "skills",   label: "Skills" },
-  { key: "payment",  label: "Payment" },
-  { key: "referees", label: "Referees" },
-  { key: "rate", label: "Rate" },
-  { key: "profile",  label: "Profile" },
+// Keys stay as before: links into ?step= keep working.
+const STEPS: OnboardingStep[] = [
+  { key: "basic", label: "Basics", title: "Basic info & AHPRA", icon: UserRound, tone: "violet", purpose: "Your contact details, where you can work and your AHPRA number. Our team checks it on the public register.", render: () => <BasicInfoV2 /> },
+  { key: "skills", label: "Skills", title: "Skills & software", icon: ListChecks, tone: "cyan", purpose: "Services you provide and software you use. Certificates are optional and earn a Verified mark on that skill.", render: () => <SkillsV2 /> },
+  { key: "rate", label: "Rates", icon: BadgeDollarSign, tone: "magenta", purpose: "The hourly rates you would like. Pharmacies see them before they book you.", render: () => <RatesV2 /> },
+  { key: "identity", label: "Photo ID", icon: IdCard, tone: "blue", purpose: "Optional. A checked photo ID earns the Photo ID badge pharmacies look for.", render: () => <IdentityV2 /> },
+  { key: "payment", label: "Getting paid", title: "How you get paid", icon: Wallet, tone: "violet", purpose: "How pharmacies pay you for shifts: ABN or TFN, bank account and super. This is not a ChemistTasker fee.", render: () => <PaymentV2 /> },
+  { key: "referees", label: "References", icon: Users, tone: "blue", purpose: "Optional. Two referees who confirm earn the References badge.", render: () => <RefereesV2 /> },
+  { key: "profile", label: "Profile", title: "Profile & CV", icon: FileText, tone: "cyan", purpose: "Your photo, a short bio and your CV: what pharmacies read first.", render: () => <ProfileV2 /> },
 ];
 
 export default function PharmacistOnboardingV2Layout() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requestedStep = searchParams.get("step");
-  const [step, setStep] = React.useState<StepKey>(() => isStepKey(requestedStep) ? requestedStep : "basic");
-  const [progress, setProgress] = React.useState<number>(0);
-  const idx = STEPS.findIndex(s => s.key === step);
-  // const stepLabel = STEPS[idx]?.label ?? "";
-
-  React.useEffect(() => {
-    const next = searchParams.get("step");
-    if (isStepKey(next) && next !== step) {
-      setStep(next);
-    }
-  }, [searchParams, step]);
-
-  // Load real progress from backend on mount
-  React.useEffect(() => {
-    getOnboardingDetail("pharmacist")
-      .then((res: any) => {
-        const p = res?.progress_percent ?? 0;
-        setProgress(Number.isFinite(p) ? p : 0);
-      })
-      .catch(() => setProgress(0));
-  }, []);
-
-return (
-    <UnsavedChangesBoundary>
-      {({ confirmIfNeeded }) => {
-        const requestStepChange = async (nextStep: StepKey) => {
-          if (nextStep === step || (await confirmIfNeeded())) {
-            setStep(nextStep);
-            const nextParams = new URLSearchParams(searchParams);
-            nextParams.set("step", nextStep);
-            setSearchParams(nextParams, { replace: true });
-          }
-        };
-        const goNext = () => void requestStepChange(STEPS[Math.min(idx + 1, STEPS.length - 1)].key);
-        const goBack = () => void requestStepChange(STEPS[Math.max(idx - 1, 0)].key);
-
-        return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
-      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 } }}>
-        {/* Header + ONLY progress bar here */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h5" fontWeight={700} gutterBottom>
-            Pharmacist Onboarding
-          </Typography>
-          <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Progress: {progress}%
-            </Typography>
-          </Box>
-          <LinearProgress
-            color="primary"
-            variant="determinate"
-            value={progress}
-            sx={{ height: 8, borderRadius: 999 }}
-          />
-        </Box>
-        {/* Top pills nav */}
-        <Box
-          sx={{
-            display: { xs: "none", md: "grid" }, // <-- hide on small screens
-            gridTemplateColumns: { md: "repeat(7, 1fr)" },
-            gap: 1,
-            mb: 2,
-          }}
-        >
-          {STEPS.map((s) => {
-            const active = s.key === step;
-            return (
-              <Button
-                key={s.key}
-                onClick={() => void requestStepChange(s.key)}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 700,
-                  borderRadius: 3,
-                  py: 1,
-                  ...(active
-                    ? {
-                        background: BRAND.grad,
-                        color: "#fff",
-                        boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                        "&:hover": { opacity: 0.95, background: BRAND.grad },
-                      }
-                    : {}),
-                }}
-                variant={active ? "contained" : "outlined"}
-                fullWidth
-              >
-                {STEPS.findIndex(x => x.key === s.key) + 1}. {s.label}
-              </Button>
-            );
-          })}
-        </Box>
-
-        {/* Two-column layout */}
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "1fr",
-            gap: 2.5,
-          }}
-        >
-          {/* Left: step buttons — light blue border, subtle fade when active */}
-          <Box sx={{ display: "none" }}>
-            <Stack spacing={1.2}>
-              {STEPS.map((s) => {
-                const active = s.key === step;
-                return (
-                  <Button
-                    key={s.key}
-                    onClick={() => void requestStepChange(s.key)}
-                    fullWidth
-                    size="large"
-                    variant={active ? "contained" : "outlined"}
-                    color="primary"
-                    sx={(theme) => ({
-                      justifyContent: "flex-start",
-                      fontWeight: 700,
-                      textTransform: "none",
-                      borderRadius: 2,
-                      borderWidth: active ? 0 : 1,
-                      borderColor: active ? "transparent" : theme.palette.divider,
-                      ...(active
-                        ? {
-                            // match the top bar gradient
-                            background: BRAND.grad,
-                            color: "#fff",
-                            boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                            "&:hover": { opacity: 0.95, background: BRAND.grad },
-                          }
-                        : {
-                            backgroundColor: "transparent",
-                            "&:hover": {
-                              borderColor: theme.palette.primary.main,
-                              backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                            },
-                          }),
-                    })}
-                  >
-                    {STEPS.findIndex((x) => x.key === s.key) + 1}. {s.label}
-                  </Button>
-
-
-                );
-              })}
-            </Stack>
-          </Box>
-        {/* Right: page content with header actions */}
-        <Box
-          sx={{
-            minHeight: 320,
-            p: { xs: 2, md: 3 },
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 3,
-            bgcolor: "background.paper",
-          }}
-        >
-          {/* Header row – hide Next on last step */}
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", mb: 2 }}>
-            <Box sx={{ display: "flex", gap: 1 }}>
-              {/* Always show Back button except on the very first page */}
-              {idx > 0 && (
-                <Button variant="outlined" onClick={goBack}>
-                  Back
-                </Button>
-              )}
-
-              {/* Only show Next button when it's NOT the last step */}
-              {idx < STEPS.length - 1 && (
-                <Button
-                  variant="contained"
-                  onClick={goNext}
-                  sx={{ background: BRAND.grad }}
-                >
-                  Next
-                </Button>
-              )}
-            </Box>
-          </Box>
-
-          {/* Render the current page */}
-          {step === "basic" && <BasicInfoV2 />}
-          {step === "identity" && <IdentityV2 />}
-          {step === "skills" && <SkillsV2 />}
-          {step === "payment" && <PaymentV2 />}
-          {step === "referees" && <RefereesV2 />}
-          {step === "rate" && <RatesV2 />}
-          {step === "profile" && <ProfileV2 />}
-        </Box>
-
-        </Box>
-      </Paper>
-      <Box sx={{ mt: { xs: 8, md: 10 } }}>
-        <AccountDeletionSection />
-      </Box>
-    </Container>
-        );
-      }}
-    </UnsavedChangesBoundary>
-);
+  return (
+    <OnboardingShell
+      roleKey="pharmacist"
+      title="Your profile"
+      subtitle="Pharmacist. Verify your mobile and AHPRA registration to apply for shifts; the rest earns badges."
+      steps={STEPS}
+      role="PHARMACIST"
+      targets={{ mobile: { path: "/mobile-verify" }, ahpra: { step: "basic" }, gov_id: { step: "identity" }, referees: { step: "referees" } }}
+    />
+  );
 }

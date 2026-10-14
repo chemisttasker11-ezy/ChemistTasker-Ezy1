@@ -1,10 +1,11 @@
-import { projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
+import { normalizeVerification, projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 ﻿import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Alert, Box, Button, Chip, Divider, Drawer, IconButton, Paper, Stack, Pagination, Typography, Dialog } from "@mui/material";
 import { Megaphone, SlidersHorizontal } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
+import { BadgeGuideLink } from "@chemisttasker/shared-ui/VerificationBadges";
 import {
   Close as CloseIcon,
 } from "@mui/icons-material";
@@ -209,6 +210,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         rawRoleCategory: post.roleCategory ?? null,
         explorerRoleType: post.explorerRoleType ?? null,
         explorerProfileId: post.explorerProfileId ?? null,
+        verification: normalizeVerification((post as any).verification),
       };
     });
   }, [posts, ratingSummary]);
@@ -417,7 +419,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const [pitchSaving, setPitchSaving] = useState(false);
   const [pitchError, setPitchError] = useState<string | null>(null);
   const [existingPostId, setExistingPostId] = useState<number | null>(null);
-  const [roleTitle, setRoleTitle] = useState<string>("Explorer");
+  const [roleTitle, setRoleTitle] = useState<string>("New to pharmacy");
   const [explorerProfileId, setExplorerProfileId] = useState<number | null>(null);
   const [pitchForm, setPitchForm] = useState<PitchFormState>({
     headline: "",
@@ -482,7 +484,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     });
     setExplorerProfileId(null);
     setExistingPostId(null);
-    setRoleTitle("Explorer");
+    setRoleTitle("New to pharmacy");
     setPitchSkills([]);
   }, []);
 
@@ -497,7 +499,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       if (isExplorer) {
         const onboarding: any = await getOnboarding("explorer");
         setRoleTitle(
-          (onboarding?.role_type || "Explorer")
+          (onboarding?.role_type || "New to pharmacy")
             .replace("_", " ")
             .toLowerCase()
             .replace(/(^|\s)\S/g, (t: string) => t.toUpperCase())
@@ -820,13 +822,18 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         <PageHeader
           title="Find talent"
           subtitle={
-            <Box component="span" aria-live="polite">
-              {loading
-                ? "Finding published profiles…"
-                : error && pagedCandidates.length === 0
-                ? "Browse verified pharmacy professionals and request a booking."
-                : `${processedCandidates.length} ${processedCandidates.length === 1 ? "profile matches" : "profiles match"} your filters`}
-            </Box>
+            <>
+              <Box component="span" aria-live="polite">
+                {loading
+                  ? "Finding published profiles…"
+                  : error && pagedCandidates.length === 0
+                  ? "Browse verified pharmacy professionals and request a booking."
+                  : `${processedCandidates.length} ${processedCandidates.length === 1 ? "profile matches" : "profiles match"} your filters`}
+              </Box>
+              <Box component="span" sx={{ display: "inline-block", ml: 1 }}>
+                <BadgeGuideLink />
+              </Box>
+            </>
           }
           actions={
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">

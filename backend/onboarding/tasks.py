@@ -8,6 +8,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import urlencode
 
 import dateutil.parser
@@ -22,6 +23,7 @@ from django.utils import timezone
 from core.integrations.abr import _parse_abn_html_fields, abn_lookup
 from core.task_queue import async_task
 from onboarding.emails import get_candidate_role, simple_name_match
+from onboarding.services.work_profile import referee_profile_target
 from onboarding.verification.ahpra import _update_ahpra_fields, ahpra_lookup, parse_ahpra_html
 from onboarding.verification.documents import azure_ocr, get_local_file_or_download, ocr_input_path_for_file
 from onboarding.verification.orchestration import mark_notification_sent, notification_already_sent
@@ -38,6 +40,66 @@ from onboarding.verification.support import fetch_instance_with_retries
 from users.normalization import sanitize_email_text as clean_email
 
 logger = logging.getLogger(__name__)
+
+
+def _document_name_check(file_obj, first_name, last_name):
+    """OCR the uploaded document and look for the person's name: (verified, note shown to the user on failure)."""
+    is_verified = False
+    failure_note = ""
+
+    if not file_obj:
+        failure_note = "No file uploaded for this verification."
+        logger.info(f"[verify_filefield_task] {failure_note} Setting as not verified.")
+    else:
+        local_path = get_local_file_or_download(file_obj)
+        if not local_path or not os.path.exists(local_path):
+            # the note is shown to the user: never a server path
+            failure_note = "Could not obtain the uploaded file for OCR."
+            logger.info(f"[verify_filefield_task] {failure_note}")
+        else:
+            converted_path = None
+            try:
+                ocr_path, converted_path = ocr_input_path_for_file(local_path)
+                logger.info("[verify_filefield_task] Sending the document to Azure OCR")
+                ocr_data = azure_ocr(ocr_path)
+                lines = ocr_data.get("lines", [])
+                text = " ".join(lines)
+                is_name_match = simple_name_match(text, first_name, last_name)
+
+                if is_name_match:
+                    is_verified = True
+                    logger.info("[verify_filefield_task] Name match result: %s", is_name_match)
+                else:
+                    failure_note = f"Name mismatch found in your uploaded document"
+                    logger.info(f"[verify_filefield_task] {failure_note}")
+
+            except Exception as exc:
+                # Keep traceback frames for operators without re-logging a possibly sensitive service exception value.
+                failure_note = "OCR processing failed."
+                logger.warning("[verify_filefield_task] OCR processing failed error_type=%s", type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
+            finally:
+                if converted_path and os.path.exists(converted_path):
+                    os.remove(converted_path)
+                if local_path and os.path.exists(local_path) and Path(local_path).parent == Path(tempfile.gettempdir()):
+                    os.remove(local_path)
+    return is_verified, failure_note
+
+
+@shared_task(name="onboarding.tasks.verify_skill_certificate_task", queue="ocr")
+def verify_skill_certificate_task(model_name, object_pk, skill_code, path):
+    """Name-match one skill certificate and record the result on that skill's entry, unless it was replaced since."""
+    Model = apps.get_model("client_profile", model_name)
+    obj = fetch_instance_with_retries(Model, object_pk)
+    is_verified, note = _document_name_check(SimpleNamespace(name=path), obj.user.first_name or "", obj.user.last_name or "")
+    with transaction.atomic():
+        row = Model.objects.select_for_update().get(pk=object_pk)
+        certificates = dict(row.skill_certificates or {})
+        meta = certificates.get(skill_code)
+        if not isinstance(meta, dict) or meta.get("path") != path:
+            return
+        certificates[skill_code] = {**meta, "verified": is_verified, "note": note[:255]}
+        row.skill_certificates = certificates
+        row.save(update_fields=["skill_certificates"])
 
 
 @shared_task(name="client_profile.tasks.verify_filefield_task", queue="ocr")
@@ -72,45 +134,7 @@ def verify_filefield_task(
     else:
         obj.save(update_fields=[verification_field])
 
-    file_obj = getattr(obj, file_field)
-    is_verified = False
-    failure_note = ""
-
-    if not file_obj:
-        failure_note = "No file uploaded for this verification."
-        logger.info(f"[verify_filefield_task] {failure_note} Setting as not verified.")
-    else:
-        local_path = get_local_file_or_download(file_obj)
-        if not local_path or not os.path.exists(local_path):
-            # the note is shown to the user: never a server path
-            failure_note = "Could not obtain the uploaded file for OCR."
-            logger.info(f"[verify_filefield_task] {failure_note}")
-        else:
-            converted_path = None
-            try:
-                ocr_path, converted_path = ocr_input_path_for_file(local_path)
-                logger.info("[verify_filefield_task] Sending the document to Azure OCR pk=%s field=%s", object_pk, file_field)
-                ocr_data = azure_ocr(ocr_path)
-                lines = ocr_data.get("lines", [])
-                text = " ".join(lines)
-                is_name_match = simple_name_match(text, first_name, last_name)
-
-                if is_name_match:
-                    is_verified = True
-                    logger.info("[verify_filefield_task] Name match result: %s pk=%s field=%s", is_name_match, object_pk, file_field)
-                else:
-                    failure_note = f"Name mismatch found in your uploaded document"
-                    logger.info(f"[verify_filefield_task] {failure_note}")
-
-            except Exception as exc:
-                # Keep traceback frames for operators without re-logging a possibly sensitive service exception value.
-                failure_note = "OCR processing failed."
-                logger.warning("[verify_filefield_task] OCR processing failed error_type=%s", type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
-            finally:
-                if converted_path and os.path.exists(converted_path):
-                    os.remove(converted_path)
-                if local_path and os.path.exists(local_path) and Path(local_path).parent == Path(tempfile.gettempdir()):
-                    os.remove(local_path)
+    is_verified, failure_note = _document_name_check(getattr(obj, file_field), first_name, last_name)
 
     setattr(obj, verification_field, is_verified)
     if note_field and hasattr(obj, note_field):
@@ -318,19 +342,22 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
     if not _marker_get(key):
         return
 
+    # The reminder's marker stays on the profile it was scheduled for; the referee and the new link follow the person.
+    scheduled_model, scheduled_pk = model_name, pk
+    model_name, pk = referee_profile_target(model_name, pk)
     Model = apps.get_model('client_profile', model_name)
     try:
         obj = Model.objects.get(pk=pk)
     except Model.DoesNotExist:
         # the profile was deleted after this ETA reminder was queued: nothing left to remind about
-        cancel_referee_reminder(model_name, pk, ref_idx)
+        cancel_referee_reminder(scheduled_model, scheduled_pk, ref_idx)
         logger.info("[referee-reminder] Profile gone; reminder dropped model=%s pk=%s ref_idx=%s", model_name, pk, ref_idx)
         return
 
     confirmed = bool(getattr(obj, f'referee{ref_idx}_confirmed', False))
     rejected = bool(getattr(obj, f'referee{ref_idx}_rejected', False))
     if confirmed or rejected:
-        cancel_referee_reminder(model_name, pk, ref_idx)
+        cancel_referee_reminder(scheduled_model, scheduled_pk, ref_idx)
         return
 
     # Build the single-ref reminder email
@@ -340,7 +367,7 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
     workplace = getattr(obj, f'referee{ref_idx}_workplace', '')
     email = clean_email(email_raw)
     if not email:
-        cancel_referee_reminder(model_name, pk, ref_idx)
+        cancel_referee_reminder(scheduled_model, scheduled_pk, ref_idx)
         return
 
     signer = TimestampSigner()
@@ -375,7 +402,7 @@ def run_referee_reminder(model_name: str, pk: int, ref_idx: int) -> None:
 
     # Re-schedule this referee only
     _marker_delete(key)
-    schedule_referee_reminder(model_name, pk, ref_idx)
+    schedule_referee_reminder(scheduled_model, scheduled_pk, ref_idx)
 
 
 @shared_task(name="client_profile.tasks.run_all_verifications", queue="default")
@@ -495,42 +522,15 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
         _marker_delete(_final_evaluation_reminder_key(model_name, object_pk))
         logger.info(f"[FINAL EVALUATION] pk={object_pk} reached a final state. All pending reminders cancelled.")
 
-    # Build required checks
-    required_checks = []
-    model_name_lower = model_name.lower()
-
-    if model_name_lower == 'owneronboarding':
-        if getattr(obj, 'role', None) == "PHARMACIST":
-            required_checks.append('ahpra')
-
-    elif model_name_lower == 'pharmacistonboarding':
-        required_checks.extend(['gov_id', 'ahpra'])
-        if obj.payment_preference == "ABN":
-            if obj.abn:
-                required_checks.append('abn')
-        elif obj.payment_preference == "TFN":
-            if obj.tfn_number:
-                required_checks.append('tfn_number')
-
-    elif model_name_lower == 'otherstaffonboarding':
-        required_checks.append('gov_id')
-        if obj.payment_preference == 'ABN' and obj.abn:
-            required_checks.append('abn')
-        if obj.payment_preference == 'TFN' and obj.tfn_number:
-            required_checks.append('tfn_number')
-        if getattr(obj, 'role_type', None) == 'INTERN':
-            required_checks.extend(['ahpra_proof', 'hours_proof'])
-        if getattr(obj, 'role_type', None) in ['ASSISTANT', 'TECHNICIAN']:
-            required_checks.append('certificate')
-        if getattr(obj, 'role_type', None) == 'STUDENT':
-            required_checks.append('university_id')
-        if getattr(obj, 'cpr_certificate', None):
-            required_checks.append('cpr_certificate')
-        if getattr(obj, 's8_certificate', None):
-            required_checks.append('s8_certificate')
-
-    elif model_name_lower == 'exploreronboarding':
-        required_checks.append('gov_id')
+    # Required checks come from the verification policy; optional evidence (ID, documents) never fails a profile.
+    # Extras covered by the tightening grace period do not count yet: the same decision as the onboarding screens.
+    from onboarding.verification.policy import evaluate, requirements
+    if model_name.lower() != 'owneronboarding':
+        grace = evaluate(obj)['grace']
+        required = {check: met for check, met in requirements(obj).items() if check not in grace}
+    else:
+        required = {'ahpra': bool(obj.ahpra_verified)} if getattr(obj, 'role', None) == "PHARMACIST" else {}
+    required_checks = [check for check in ('ahpra', 'gov_id') if check in required]
 
     # Evaluate checks
     has_failed_check, is_pending_check, failure_reasons = False, False, []
@@ -545,11 +545,13 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
                 failure_reasons.append(note)
             elif not is_verified and not note:
                 is_pending_check = True
+    # Email and mobile are confirmed interactively; until then the profile simply waits.
+    if any(not required.get(check, True) for check in ('email', 'mobile', 'role')):
+        is_pending_check = True
 
-    # Referee requirements
-    referees_needed = model_name_lower in ['pharmacistonboarding', 'otherstaffonboarding', 'exploreronboarding']
+    # Referee requirements (only when the owner has tightened the policy)
     is_pending_referee = False
-    if referees_needed:
+    if 'referees' in required:
         for idx in [1, 2]:
             if getattr(obj, f"referee{idx}_rejected", False):
                 has_failed_check = True

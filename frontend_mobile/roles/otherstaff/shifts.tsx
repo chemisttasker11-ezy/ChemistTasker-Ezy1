@@ -56,13 +56,13 @@ export default function OtherStaffShiftsScreen() {
   const subtitle = useMemo(() => {
     switch (activeTab) {
       case 'community':
-        return 'Internal or network shifts shared with you.';
+        return 'Shifts shared by the pharmacies and teams you belong to.';
       case 'confirmed':
-        return 'Shifts you have accepted.';
+        return "Shifts you are booked for, with the pharmacy's details and your locked rate.";
       case 'history':
-        return 'Completed shifts and history.';
+        return 'Shifts you have worked. Raise an invoice and rate the pharmacy.';
       case 'public':
-        return 'Open marketplace shifts available to claim.';
+        return 'Open shifts from pharmacies across ChemistTasker. Save the ones you like and show interest in one tap.';
       default:
         return 'Browse available shifts.';
     }

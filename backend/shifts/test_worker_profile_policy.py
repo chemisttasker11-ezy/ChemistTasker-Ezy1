@@ -17,7 +17,7 @@ class WorkerProfilePolicyTests(SimpleTestCase):
     def test_changing_claim_resets_its_evidence_badge_without_blocking_general_profile(self):
         profile = SimpleNamespace(role_type='ASSISTANT',classification_level='LEVEL_3',student_year=None,intern_half=None,
             dispensary_qualification='LEVEL_3',dispensary_qualification_verified=True,dispensary_qualification_verification_note='Checked',
-            verified=True,save=Mock(),ahpra_proof=None,hours_proof=None,certificate=None,university_id=None,cpr_certificate=None,s8_certificate=None)
+            verified=True,save=Mock(),ahpra_number=None,ahpra_proof=None,hours_proof=None,certificate=None,university_id=None,cpr_certificate=None,s8_certificate=None)
         apply_regulatory_tab(profile, {'dispensary_qualification':'LEVEL_4'}, False)
         self.assertFalse(profile.dispensary_qualification_verified)
         self.assertEqual(profile.dispensary_qualification_verification_note, '')

@@ -1,6 +1,6 @@
 import { ENGAGEMENT_LABELS } from "./constants";
 import skillsRegistry from "../../../../../../shared-core/skills_registry.json";
-import { skillId, skillLabel } from "@chemisttasker/shared-core";
+import { skillId, skillLabel, newcomerTypeLabel } from "@chemisttasker/shared-core";
 
 const titleCase = (value: string) =>
   value
@@ -9,8 +9,11 @@ const titleCase = (value: string) =>
     .replace(/(^|\s)\S/g, (t) => t.toUpperCase());
 
 const formatRoleLabel = (role?: string | null) => {
-  if (!role) return "Explorer";
-  return titleCase(role);
+  if (!role) return "New to pharmacy";
+  const code = role.toUpperCase();
+  if (code === "EXPLORER") return "New to pharmacy";
+  if (code === "OTHER_STAFF") return "Pharmacy team";
+  return newcomerTypeLabel(role) ?? titleCase(role);
 };
 
 const formatWorkType = (workType?: string | null) => {

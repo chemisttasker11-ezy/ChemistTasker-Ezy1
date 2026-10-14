@@ -58,7 +58,7 @@ const ROLE_LABELS: Record<string, string> = {
   TECHNICIAN: 'Dispensary technicians',
   ASSISTANT: 'Pharmacy assistants',
   STUDENT: 'Pharmacy students',
-  EXPLORER: 'Explorers',
+  EXPLORER: 'People new to pharmacy',
   CAREER_SWITCHER: 'Career explorers',
 };
 

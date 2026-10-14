@@ -12,7 +12,7 @@ from pharmacy_hub.models import PharmacyCommunityGroup, PharmacyCommunityGroupMe
 
 
 CHEMISTTASKER_HUB_DEFINITIONS = {
-    PharmacyHubPost.PlatformHub.EXPLORER: {"key": "explorer", "label": "Explorer Hub", "audience_type": "EXPLORER"},
+    PharmacyHubPost.PlatformHub.EXPLORER: {"key": "explorer", "label": "New to Pharmacy Hub", "audience_type": "EXPLORER"},
     PharmacyHubPost.PlatformHub.PUBLIC: {
         "key": PharmacyHubPost.PlatformHub.PUBLIC,
         "label": "Public Hub",
@@ -35,7 +35,7 @@ CHEMISTTASKER_HUB_DEFINITIONS = {
     },
     PharmacyHubPost.PlatformHub.STAFF: {
         "key": PharmacyHubPost.PlatformHub.STAFF,
-        "label": "Other Staff Hub",
+        "label": "Pharmacy Team Hub",
         "audience_type": "STAFF",
     },
 }

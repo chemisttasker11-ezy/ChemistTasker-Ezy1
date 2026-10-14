@@ -4,7 +4,8 @@ import { SoftwarePicker, SOFTWARE_GROUP, roleSoftware } from '../../shared/skill
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Checkbox, Chip, HelperText, Searchbar, Text } from 'react-native-paper';
-import { getOnboardingDetail, updateOnboardingForm, searchRoleSkillGroups, normalizeSavedSkillCodes, skillId, skillLabel, workerSkillRole, claimModeLabel } from '@chemisttasker/shared-core';
+import { getOnboardingDetail, updateOnboardingForm, searchRoleSkillGroups, normalizeSavedSkillCodes, normalizeVerification, skillId, skillLabel, workerSkillRole, claimModeLabel, evidenceExplainer, evidenceStateLabel, type EvidenceState } from '@chemisttasker/shared-core';
+import { SkillEvidenceIcon } from '../../shared/skills/VerificationBadges';
 import { pickSingleDocument, roleKey, toRNFile } from './shared';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
 
@@ -23,6 +24,7 @@ export default function PharmacistSkillsScreen() {
   const [error, setError] = useState('');
   const [tab, setTab] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const [evidence, setEvidence] = useState<Record<string, EvidenceState>>({});
   const [existingCerts, setExistingCerts] = useState<Record<string, CertRow>>({});
   const [pendingFiles, setPendingFiles] = useState<Record<string, any>>({});
   const unsaved = useUnsavedChangesGuard(
@@ -43,6 +45,7 @@ export default function PharmacistSkillsScreen() {
         const map: Record<string, CertRow> = {};
         (res?.skill_certificates || []).forEach((row) => { map[skillId(registry, row.skill_code) || row.skill_code] = row; });
         setExistingCerts(map);
+        setEvidence(normalizeVerification((res as any)?.verification)?.skillEvidence ?? {});
         unsaved.markClean({ selected: skills, pendingFiles: {} });
       } catch (err: any) {
         if (!mounted) return;
@@ -90,6 +93,7 @@ export default function PharmacistSkillsScreen() {
       const map: Record<string, CertRow> = {};
       (res?.skill_certificates || []).forEach((row) => { map[skillId(registry, row.skill_code) || row.skill_code] = row; });
       setExistingCerts(map);
+      setEvidence(normalizeVerification((res as any)?.verification)?.skillEvidence ?? {});
       setPendingFiles({});
       unsaved.markClean({ selected: normalizeSavedSkillCodes(registry, res?.skills || []), pendingFiles: {} });
       Alert.alert('Saved', 'Skills saved.');
@@ -122,7 +126,7 @@ export default function PharmacistSkillsScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text variant="titleLarge" style={styles.title}>Skills</Text>
-        <Text variant="bodySmall" style={styles.help}>Tick what you have actually done on the job, then the software you have used. A tick is not a verified credential; certificates are checked separately.</Text>
+        <Text variant="bodySmall" style={styles.help}>Tick what you have done on the job, then the software you use: pharmacies match shifts on these. A certificate is never required; adding one earns a Verified mark on that skill once we have checked it.</Text>
 
         <Searchbar placeholder="Search skills or software" value={query} onChangeText={setQuery} accessibilityLabel="Search skills or software" />
         <Text style={styles.help}>{selected.filter(code => (skillIndex.get(code) as any)?.group !== SOFTWARE_GROUP).length} skills selected. There is no minimum.</Text>
@@ -136,7 +140,7 @@ export default function PharmacistSkillsScreen() {
         {currentItems.map((item: any) => {
           const checked = selected.includes(item.code);
           const required = requiresCert(item.code);
-          const fileState = hasPending(item.code) ? 'Selected' : hasExisting(item.code) ? 'Document uploaded' : required && checked ? 'Required' : '';
+          const state: EvidenceState = evidence[item.code] ?? (hasExisting(item.code) ? 'pending' : 'not_supplied');
           return (
             <View key={item.code} style={[styles.rowCard, checked && { borderColor: '#2463A6', backgroundColor: '#F0F6FC' }]}>
               <View style={styles.rowTop}>
@@ -150,10 +154,17 @@ export default function PharmacistSkillsScreen() {
                   {item.definition ? <Text style={styles.itemDesc}>{item.definition}</Text> : null}
                 </View>
               </View>
-              {fileState ? <Chip mode="outlined" style={{ alignSelf: 'flex-start' }}>{fileState}</Chip> : null}
+              {checked && required ? (
+                hasPending(item.code)
+                  ? <Text style={styles.itemDesc}>Certificate selected · save to send it for checking</Text>
+                  : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessible accessibilityLabel={`${evidenceStateLabel(state)}. ${evidenceExplainer(state, 'worker')}`}>
+                      <SkillEvidenceIcon state={state} audience="worker" />
+                      <Text style={styles.itemDesc}>{evidenceStateLabel(state)} · {state === 'not_supplied' ? 'certificate optional' : evidenceExplainer(state, 'worker')}</Text>
+                    </View>
+              ) : !checked && required ? <Text style={styles.itemDesc}>Certificate optional · earns a Verified mark</Text> : null}
               {checked && required ? (
                 <Button mode="outlined" onPress={() => pickForSkill(item.code)}>
-                  {hasPending(item.code) ? 'Change certificate' : 'Upload certificate'}
+                  {hasPending(item.code) ? 'Change certificate' : hasExisting(item.code) ? 'Replace certificate' : 'Add certificate (optional)'}
                 </Button>
               ) : null}
             </View>

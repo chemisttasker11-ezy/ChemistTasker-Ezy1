@@ -20,6 +20,7 @@ import {
     viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
+import { WorkerProfileDialog } from './WorkerProfileDialog';
 
 export default function HistoryShiftsView() {
     const { user } = useAuth();
@@ -150,40 +151,7 @@ export default function HistoryShiftsView() {
                 onRateAssigned={openRateWorker}
             />
 
-            <Portal>
-                <Dialog visible={profileDialog} onDismiss={() => setProfileDialog(false)}>
-                    <Dialog.Title>Assigned Profile</Dialog.Title>
-                    <Dialog.Content>
-                        {profile ? (
-                            <View style={{ gap: 6 }}>
-                                <Text><Text style={styles.bold}>Name:</Text> {profile.firstName} {profile.lastName}</Text>
-                                <Text><Text style={styles.bold}>Email:</Text> {profile.email}</Text>
-                                {profile.phoneNumber ? <Text><Text style={styles.bold}>Phone:</Text> {profile.phoneNumber}</Text> : null}
-                                {profile.shortBio ? <Text><Text style={styles.bold}>Bio:</Text> {profile.shortBio}</Text> : null}
-                                {profile.resume ? <Button mode="text" onPress={() => void Linking.openURL(profile.resume!)}>Download CV</Button> : null}
-                                {profile.ratePreference ? (
-                                    <View style={{ marginTop: 8, gap: 2 }}>
-                                        <Text style={styles.bold}>Rate Preference</Text>
-                                        <Text>Weekday: {profile.ratePreference.weekday || 'N/A'}</Text>
-                                        <Text>Saturday: {profile.ratePreference.saturday || 'N/A'}</Text>
-                                        <Text>Sunday: {profile.ratePreference.sunday || 'N/A'}</Text>
-                                        <Text>Public Holiday: {profile.ratePreference.publicHoliday || 'N/A'}</Text>
-                                        <Text>Early Morning: {profile.ratePreference.earlyMorning || 'N/A'}</Text>
-                                        <Text>Late Night: {profile.ratePreference.lateNight || 'N/A'}</Text>
-                                    </View>
-                                ) : null}
-                            </View>
-                        ) : (
-                            <View style={styles.centered}>
-                                <Text>No profile data.</Text>
-                            </View>
-                        )}
-                    </Dialog.Content>
-                    <Dialog.Actions>
-                        <Button onPress={() => setProfileDialog(false)}>Close</Button>
-                    </Dialog.Actions>
-                </Dialog>
-            </Portal>
+            <WorkerProfileDialog visible={profileDialog} loading={false} profile={profile} onDismiss={() => setProfileDialog(false)} />
 
             <Portal>
                 <Dialog visible={ratingDialog} onDismiss={() => setRatingDialog(false)}>

@@ -6,13 +6,16 @@ import {
     mobileRequestOtp,
     mobileVerifyOtp,
     mobileResendOtp,
+    skipMobileOverseas,
+    canSkipOverseasMobileCheck,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
 
 export default function MobileVerifyScreen() {
     const router = useRouter();
-    const { logout, markMobileVerified, user } = useAuth();
+    const { logout, markMobileVerified, markMobileCheckSkipped, user } = useAuth();
+    const canSkipOverseas = canSkipOverseasMobileCheck(user);
 
     const [mobile, setMobile] = useState('');
     const [firstName, setFirstName] = useState('');
@@ -90,6 +93,27 @@ export default function MobileVerifyScreen() {
             setTimeout(() => router.replace(getRoleHome(user?.role) as any), 800);
         } catch (err: any) {
             setError(err?.message || 'Verification failed.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Overseas newcomers without an Australian mobile: keep the legal name, skip the code, verify with photo ID instead.
+    const handleSkipOverseas = async () => {
+        setError('');
+        setStatus('');
+        if (!firstName || !lastName || !username) {
+            setError('Please enter your first name, last name and username first.');
+            return;
+        }
+        setLoading(true);
+        try {
+            await skipMobileOverseas({ first_name: firstName, last_name: lastName, username });
+            await markMobileCheckSkipped({ first_name: firstName, last_name: lastName, username });
+            setStatus('Done. Next, upload photo ID to verify your profile.');
+            setTimeout(() => router.replace('/explorer/profile-identity' as any), 800);
+        } catch (err: any) {
+            setError(err?.message || 'Could not skip the mobile check.');
         } finally {
             setLoading(false);
         }
@@ -237,6 +261,16 @@ export default function MobileVerifyScreen() {
                 </Button>
             </View>
 
+            {canSkipOverseas ? (
+                <Surface style={styles.overseas} elevation={0}>
+                    <Text style={styles.overseasTitle}>Joining from overseas?</Text>
+                    <Text style={styles.overseasBody}>
+                        No Australian mobile yet? Fill in your legal name and username above, then skip this step. You will verify with photo ID instead, and your profile shows an Overseas label.
+                    </Text>
+                    <Button mode="outlined" onPress={handleSkipOverseas} disabled={loading}>Skip and verify with photo ID</Button>
+                </Surface>
+            ) : null}
+
             <View style={styles.backRow}>
                 <Button mode="text" onPress={handleBackToLogin} style={styles.backButton}>
                     Back to login
@@ -330,4 +364,7 @@ const styles = StyleSheet.create({
     successText: {
         color: '#166534',
     },
+    overseas: { marginTop: 20, padding: 14, gap: 8, borderRadius: 14, borderWidth: 1, borderColor: '#D5DCE8', backgroundColor: '#FFFFFF' },
+    overseasTitle: { fontSize: 15, fontWeight: '600', color: '#06214A' },
+    overseasBody: { fontSize: 13, lineHeight: 19, color: '#445474' },
 });

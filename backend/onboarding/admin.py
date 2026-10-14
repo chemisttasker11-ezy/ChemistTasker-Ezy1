@@ -2,6 +2,9 @@
 from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from onboarding.verification.ahpra_numbers import _user_numbers
+from onboarding.verification.ahpra_numbers import ahpra_number_owner_conflict, normalize, sync_ahpra_registrations
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding, RefereeResponse
 
 
@@ -18,6 +21,55 @@ class RoleScopedOnboardingAdminMixin:
         if db_field.name == "user" and self.user_role:
             kwargs["queryset"] = db_field.remote_field.model.objects.filter(role=self.user_role)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class AhpraOwnershipAdminMixin:
+    """Support corrections keep the AHPRA owner registry in step (one person per number): the form refuses a number
+    another account holds, and the save claims and releases numbers in the same transaction."""
+
+    def get_form(self, request, obj=None, **kwargs):
+        form_class = super().get_form(request, obj, **kwargs)
+
+        class AhpraOwnershipForm(form_class):
+            def clean(self):
+                cleaned = super().clean()
+                user = cleaned.get('user') or getattr(self.instance, 'user', None)
+                if user is None or 'ahpra_number' not in cleaned:
+                    return cleaned
+                new_number = normalize(cleaned.get('ahpra_number'))
+                # Read the persisted identity rather than mutable form.instance:
+                # a profile cannot be silently transferred to a different account.
+                old = (
+                    type(self.instance).objects.filter(pk=self.instance.pk)
+                    .values('user_id', 'ahpra_number').first()
+                    if self.instance.pk else None
+                )
+                old_number = normalize(old['ahpra_number']) if old else ''
+                user_changed = old is not None and old['user_id'] != user.pk
+                if user_changed and (old_number or new_number):
+                    self.add_error('user', 'A profile with an AHPRA number cannot be reassigned to another account.')
+                elif (old is None or user_changed or old_number != new_number) and ahpra_number_owner_conflict(user.pk, new_number):
+                    # Historical duplicate holders can edit without claiming anything new.
+                    self.add_error('ahpra_number', 'This AHPRA number belongs to another account.')
+                return cleaned
+
+        return AhpraOwnershipForm
+
+    def save_model(self, request, obj, form, change):
+        with transaction.atomic():
+            # This snapshot must precede saving. Merely checking the current
+            # profile after save cannot tell a new claim from a legacy duplicate.
+            earlier = (
+                type(obj).objects.filter(pk=obj.pk).values('user_id', 'ahpra_number').first()
+                if obj.pk else None
+            )
+            if earlier and earlier['user_id'] != obj.user_id and (
+                normalize(earlier['ahpra_number']) or normalize(obj.ahpra_number)
+            ):
+                raise ValidationError({'user': 'A profile with an AHPRA number cannot be reassigned to another account.'})
+            grandfathered_numbers = _user_numbers(obj.user_id)
+            super().save_model(request, obj, form, change)
+            sync_ahpra_registrations(obj.user_id, grandfathered_numbers=grandfathered_numbers)
 
 
 class OwnerOnboardingAdminForm(forms.ModelForm):
@@ -70,7 +122,7 @@ class OwnerOnboardingAdminForm(forms.ModelForm):
 
 
 @admin.register(OwnerOnboarding)
-class OwnerOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+class OwnerOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     user_role = "OWNER"
     form = OwnerOnboardingAdminForm
     list_display = [
@@ -109,7 +161,7 @@ class OwnerOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(PharmacistOnboarding)
-class PharmacistOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+class PharmacistOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     user_role = "PHARMACIST"
     list_display = [
         'user', 'payment_preference', 'verified', 'member_of_chain',
@@ -157,7 +209,7 @@ class PharmacistOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin
 
 
 @admin.register(OtherStaffOnboarding)
-class OtherStaffOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+class OtherStaffOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     user_role = "OTHER_STAFF"
     list_display = [
         'user', 'role_type', 'classification_level', 'student_year',
@@ -184,6 +236,7 @@ class OtherStaffOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin
     fields = [
         'user', 'government_id', 'role_type', 'skills', 'skill_certificates', 'years_experience',
         'payment_preference', 'classification_level', 'student_year', 'intern_half',
+        'ahpra_number', 'ahpra_verified', 'ahpra_verification_note',
         'ahpra_proof', 'hours_proof', 'certificate', 'university_id',
         'dispensary_qualification', 'dispensary_qualification_verified', 'dispensary_qualification_verification_note',
         'cpr_certificate', 's8_certificate',

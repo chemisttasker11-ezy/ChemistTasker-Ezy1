@@ -45,7 +45,7 @@ def _require_public_shift_onboarding(user):
             )
         if not po.verified:
             raise ShiftActionRefused(
-                'Your onboarding must be verified by admin before applying for public shifts.',
+                'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.',
                 status.HTTP_403_FORBIDDEN,
             )
     elif user.role == 'OTHER_STAFF':
@@ -57,7 +57,7 @@ def _require_public_shift_onboarding(user):
             )
         if not os.verified:
             raise ShiftActionRefused(
-                'Your onboarding must be verified by admin before applying for public shifts.',
+                'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.',
                 status.HTTP_403_FORBIDDEN,
             )
 

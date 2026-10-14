@@ -14,7 +14,7 @@ class Shift(models.Model):
         ('STUDENT', 'Student'),
         ('ASSISTANT', 'Assistant'),
         ('TECHNICIAN', 'Technician'),
-        ('EXPLORER', 'Explorer'),
+        ('EXPLORER', 'New to pharmacy'),
     ]
     RATE_TYPE_CHOICES = [
         ('FIXED', 'Fixed'),
@@ -107,6 +107,8 @@ class Shift(models.Model):
         ],
         default='PLATFORM'
     )
+    # Taken off the public job board by a moderator after a report; internal audiences are unaffected.
+    public_hidden_at = models.DateTimeField(blank=True, null=True)
 
     reveal_count = models.IntegerField(default=0)
     reveal_quota = models.IntegerField(null=True, blank=True)

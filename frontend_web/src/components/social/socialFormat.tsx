@@ -51,7 +51,7 @@ export const ROLE_LABELS: Record<string, string> = {
   STUDENT: 'Pharmacy student',
   CONTACT: 'Contact',
   OTHER_STAFF: 'Pharmacy staff',
-  EXPLORER: 'Explorer',
+  EXPLORER: 'New to pharmacy',
   ORG_ADMIN: 'Organisation admin',
   ORG_OWNER: 'Organisation owner',
   ORG_STAFF: 'Organisation staff',

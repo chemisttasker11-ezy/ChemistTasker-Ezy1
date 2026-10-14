@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { configureApi, logoutSession } from './api';
+import { configureApi, logoutSession, skipMobileOverseas } from './api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -43,5 +43,26 @@ describe('logoutSession', () => {
     expect(new Headers(init?.headers).get('X-Client-Platform')).toBe('mobile');
     expect(new Headers(init?.headers).has('X-CSRFToken')).toBe(false);
     expect(new Headers(init?.headers).has('Authorization')).toBe(false);
+  });
+});
+
+describe('skipMobileOverseas', () => {
+  it('uses the canonical authenticated endpoint and legal identity fields', async () => {
+    const payload = { first_name: 'Amina', last_name: 'Ali', username: 'amina.ali' };
+    const fetchImpl = vi.fn(async () => Response.json({
+      detail: 'Mobile check skipped.',
+      user: { role: 'EXPLORER', newcomer_type: 'OVERSEAS', mobile_check_skipped: true },
+    })) as unknown as typeof fetch;
+    configure(fetchImpl);
+
+    const result = await skipMobileOverseas(payload);
+
+    expect(result).toMatchObject({ user: { mobile_check_skipped: true } });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const [url, init] = vi.mocked(fetchImpl).mock.calls[0];
+    expect(String(url)).toBe('https://example.test/api/v1/users/mobile/skip-overseas/');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual(payload);
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer should-not-be-used');
   });
 });

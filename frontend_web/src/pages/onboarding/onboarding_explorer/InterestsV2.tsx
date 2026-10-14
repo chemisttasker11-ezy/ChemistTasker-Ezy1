@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Box, Typography, Checkbox, FormControlLabel, Button, Alert, Snackbar } from '@mui/material';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 const INTEREST_CHOICES: Array<{ value: string; label: string }> = [
   { value: 'SHADOWING',    label: 'Shadowing' },
@@ -58,6 +59,7 @@ export default function InterestsV2() {
       fd.append('tab', 'interests');
       fd.append('interests', JSON.stringify(selected));
       const res = await updateOnboardingForm(roleKey, fd);
+      announceOnboardingSaved(res);
       const d: ApiData = (res as any) || {};
       setSelected(d.interests || []);
       unsaved.markClean(d.interests || []);
@@ -78,9 +80,6 @@ export default function InterestsV2() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: 960, px: { xs: 2, md: 3 }, pb: 3 }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-        Interests
-      </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>{error}</Alert>}
 

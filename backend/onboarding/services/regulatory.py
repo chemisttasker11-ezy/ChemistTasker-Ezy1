@@ -1,35 +1,17 @@
-"""The regulatory tab of the other-staff onboarding: role classification and the documents each role must provide
-(AHPRA and hours proof for interns, a certificate for technicians and assistants, a university ID for students),
-reset on change, required on submit and checked by the document verification task."""
+"""The regulatory tab of the other-staff onboarding: role classification, the intern's AHPRA number and optional
+evidence documents (qualification certificate, university ID, ...). Documents earn badges and are checked by the
+document verification task; they never block submission (onboarding/verification/policy.py)."""
 from rest_framework import serializers
 
 from core.serializer_lifecycle import _delete_file_if_unreferenced
 from core.task_queue import async_task
 
 
-def required_documents_for_role(instance):
-    """
-    Returns list of (field_name, verified_flag, note_field) tuples required for the selected role.
-    """
-    role = (instance.role_type or '').upper()
-    mapping = {
-        'INTERN': [
-            ('ahpra_proof', 'ahpra_proof_verified', 'ahpra_proof_verification_note'),
-            ('hours_proof', 'hours_proof_verified', 'hours_proof_verification_note'),
-        ],
-        # Level 3/4 dispensary and Levels 2/3/4 assistants can submit
-        # qualifications, RPL or workplace competency evidence in this field.
-        'TECHNICIAN': [
-            ('certificate', 'certificate_verified', 'certificate_verification_note'),
-        ],
-        'ASSISTANT': [
-            ('certificate', 'certificate_verified', 'certificate_verification_note'),
-        ] if instance.classification_level in ('LEVEL_2', 'LEVEL_3', 'LEVEL_4') else [],
-        'STUDENT': [
-            ('university_id', 'university_id_verified', 'university_id_verification_note'),
-        ],
-    }
-    return mapping.get(role, [])
+def check_role_unchanged(instance, vdata: dict) -> None:
+    """Owner decision 2026-10-14: a Pharmacy team role is fixed once chosen."""
+    original_role = str(instance.role_type or '').upper()
+    if 'role_type' in vdata and original_role and str(vdata.get('role_type') or '').upper() != original_role:
+        raise serializers.ValidationError({'role_type': ['Your role is set and cannot be changed. Contact support if it is wrong.']})
 
 
 def apply_regulatory_tab(instance, vdata: dict, submit: bool):
@@ -51,13 +33,17 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
     original_year = instance.student_year
     original_half = instance.intern_half
     original_dispensing = instance.dispensary_qualification
+    # Owner decision 2026-10-14: a Pharmacy team role is fixed once chosen (a pharmacy may still give the person a
+    # different role in its own team through the membership; that never reaches the public profile).
+    check_role_unchanged(instance, vdata)
 
     # role classification inputs
-    for f in ['role_type','classification_level','student_year','intern_half','dispensary_qualification']:
+    for f in ['role_type','classification_level','student_year','intern_half','dispensary_qualification','ahpra_number']:
         if f in vdata:
             if getattr(instance, f) != vdata[f]:
                 setattr(instance, f, vdata[f])
                 update_fields.append(f)
+    # A changed AHPRA number resets its check (and Verified) in the serializer's guard (verification/ahpra_numbers.py).
 
     role_or_class_changed = (
         original_role != str(instance.role_type or '').upper()
@@ -66,10 +52,8 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
         or original_half != instance.intern_half
     )
     if role_or_class_changed:
-        # Previously verified documents must not silently authorise a new
-        # professional role or award classification.
-        instance.verified = False
-        update_fields.append('verified')
+        # Previously checked documents must not silently back a new award classification (their badges reset;
+        # Verified does not depend on them).
         for flag in ('ahpra_proof_verified', 'hours_proof_verified', 'certificate_verified', 'university_id_verified'):
             setattr(instance, flag, False)
             update_fields.append(flag)
@@ -111,17 +95,8 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
         update_fields.extend(['dispensary_qualification_verified', 'dispensary_qualification_verification_note'])
 
     if submit:
-        instance.verified = False
-        update_fields.append('verified')
-
-        # Validate required per role
-        req = required_documents_for_role(instance)
-        errors = {}
-        for field, _, _ in req:
-            if not getattr(instance, field, None):
-                errors[field] = ['This file is required for the selected role.']
-        if errors:
-            raise serializers.ValidationError(errors)
+        if str(instance.role_type or '').upper() == 'INTERN' and not (instance.ahpra_number or '').strip():
+            raise serializers.ValidationError({'ahpra_number': ['Enter your AHPRA number (provisional registration).']})
 
     if update_fields:
         instance.save(update_fields=list(set(update_fields)))
@@ -134,6 +109,15 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
             _delete_file_if_unreferenced(old_file, current_instance=instance)
         except Exception:
             pass
+
+    # Interns: the admin team checks the AHPRA number on the public register, as for pharmacists (who send theirs from
+    # the basic tab); the difference is the registration type, provisional.
+    if submit and str(instance.role_type or '').upper() == 'INTERN' and not instance.ahpra_verified:
+        from onboarding.emails import notify_superuser_on_onboarding
+        try:
+            notify_superuser_on_onboarding(instance)
+        except Exception:
+            pass  # never block the worker on email problems
 
     # schedule verification tasks for any provided file that changed or is not verified
     if submit:

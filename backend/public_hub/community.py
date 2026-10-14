@@ -7,7 +7,7 @@ from django.db.models import Count, Q
 from rest_framework import generics, permissions, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import ContentDocument, CommunityReport
+from .models import BoardReport, ContentDocument, CommunityReport
 from .permissions import HUBS, member_hubs, VerifiedMember
 from .serializers import public_name
 from .views import HubPagination, DiscussionThrottle
@@ -195,3 +195,24 @@ class ReportPost(APIView):
             get_object_or_404(comments(post), pk=comment)
         CommunityReport.objects.get_or_create(post_id=post.pk, comment_id=comment, reporter=request.user, resolved=False, defaults={'reason': reason})
         return Response({'detail': 'Report received.'}, status=201)
+
+
+class BoardReportView(APIView):
+    """Report a public talent hub post or job board shift; moderators of the board area review it."""
+    permission_classes = [VerifiedMember]
+    throttle_classes = [DiscussionThrottle]
+
+    def post(self, request, kind, pk):
+        if kind == 'talent':
+            from talent.models import ExplorerPost
+            get_object_or_404(ExplorerPost, pk=pk, hidden_at__isnull=True)
+        elif kind == 'jobs':
+            from shifts.models import Shift
+            get_object_or_404(Shift, pk=pk, visibility='PLATFORM', public_hidden_at__isnull=True)
+        else:
+            raise Http404
+        reason = str(request.data.get('reason', '')).strip()[:500]
+        if not reason:
+            return Response({'reason': ['Tell us what is wrong with this post.']}, status=400)
+        _, created = BoardReport.objects.get_or_create(kind=kind, object_id=pk, reporter=request.user, defaults={'reason': reason})
+        return Response({'detail': 'Report received. Our moderators will review it.'}, status=201 if created else 200)
