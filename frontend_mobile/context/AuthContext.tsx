@@ -34,6 +34,7 @@ export type User = {
   is_mobile_verified?: boolean;
   /** New to pharmacy (overseas) skipped the mobile check; photo ID verifies them instead. */
   mobile_check_skipped?: boolean;
+  newcomer_type?: string | null;
   first_name?: string;
   last_name?: string;
   profile_photo?: string;
