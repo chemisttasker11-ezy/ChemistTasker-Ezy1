@@ -715,7 +715,7 @@ jobs:
           mkdir -p "$HOME/.ccache-ios"
 
       - name: Restore iOS native compile cache
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.ccache-ios
           key: ios-ccache-${{ runner.os }}-${{ hashFiles('frontend_mobile/package-lock.json') }}-${{ github.sha }}
