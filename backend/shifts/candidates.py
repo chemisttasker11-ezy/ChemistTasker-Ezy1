@@ -186,7 +186,7 @@ def work_profile(candidate, *, build_absolute_uri):
             'dispensary_qualification': os.dispensary_qualification or None,
             'dispensary_qualification_verified': has_verified_dispensing_qualification(os),
             'classification': classification,
-            'ahpra_verified': bool(os.ahpra_proof_verified),
+            'ahpra_verified': bool(os.ahpra_verified) if os.role_type == 'INTERN' else False,
             'registered_since': None,
             'years_experience': os.years_experience or None,
             'rate_preference': None,
