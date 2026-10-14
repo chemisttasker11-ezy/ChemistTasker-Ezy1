@@ -9,9 +9,9 @@ Correct integration defects without replacing the PR165/166 skills registry or s
 - [x] Review PR171 source and prior handover; identify API and cross-platform gaps.
 - [x] Create isolated follow-up branch from PR171 head.
 - [x] History list contact redaction and HTTP regression test added (pending execution).
-- [ ] Shared-core booked-shift rate presentation; Vite and Expo parity tests.
+- [x] Shared-core booked-shift rate presenter, Vite/Expo wiring, unit tests added (execution pending).
 - [ ] AHPRA registration legacy projection and membership/assignment policy tests.
-- [ ] Overseas skip visibility parity on Vite/Next/Expo.
+- [x] Overseas skip visibility gated by subtype in Vite/Next/Expo; auth contract updated (execution pending).
 - [ ] Diagnose shared-core boundary audit and remove any duplication.
 - [ ] Run full Django SQLite/PostgreSQL, API replay, migration rehearsal, web/Expo gates and browser/device E2E.
 - [ ] Record exact commands, results, screenshots, and unresolved risks.
@@ -28,3 +28,9 @@ Django owns authorisation and verification; shared-core owns canonical skills an
 - Changed `backend/shifts/serialization/shifts.py` to omit assigned-user email from History list projection, preserving Confirmed email.
 - Added `test_history_list_does_not_disclose_assigned_worker_email` to the existing shift listing contract suite. **Not yet executed**; needs PostgreSQL/SQLite HTTP validation.
 - Next: inspect CI results and address rate redaction, verification and membership contracts. Do not infer E2E success from source changes.
+
+## Session 2 changes
+- Added `bookedShiftRateLabel` in shared-core, exported from both public and shifts domain facades. Vite and Expo cards now use it. Added Vitest cases for redaction, missing fixed rate, visible rate and award bonus.
+- Corrected intern legacy AHPRA projection to use the checked registration field rather than the document flag.
+- Added `newcomer_type` to login/refresh user payload and shared-core account contract, with a safe query helper. Overseas skip controls now require `EXPLORER + OVERSEAS` on Vite/Next/Expo; backend remains authoritative.
+- Pending: check other current-user endpoints for subtype parity, membership policy, boundary audit, runtime E2E, PostgreSQL migration rehearsal, CI.
