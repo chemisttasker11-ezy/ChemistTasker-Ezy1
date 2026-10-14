@@ -99,5 +99,15 @@ def sync_ahpra_registrations(user_id) -> None:
     for number in numbers:
         owner = AhpraRegistration.objects.get_or_create(number=number, defaults={'user_id': user_id})[0].user_id
         if owner != user_id:
-            raise IntegrityError(f'AHPRA number already belongs to user {owner}')
+            # Existing legacy duplicate profiles may still carry another
+            # canonical owner's number. Do not unverify or block unrelated
+            # admin saves; never create a competing registry ownership row.
+            from onboarding.models import OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding
+            existing = any(
+                normalize(value) == number
+                for model in (PharmacistOnboarding, OtherStaffOnboarding, OwnerOnboarding)
+                for value in model.objects.filter(user_id=user_id).values_list('ahpra_number', flat=True)
+            )
+            if not existing:
+                raise IntegrityError(f'AHPRA number already belongs to user {owner}')
     AhpraRegistration.objects.filter(user_id=user_id).exclude(number__in=numbers).delete()
