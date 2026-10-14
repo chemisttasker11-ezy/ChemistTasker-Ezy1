@@ -45,3 +45,9 @@ Django owns authorisation and verification; shared-core owns canonical skills an
 - Frontend E2E: 130 passed, 6 failed, 27 skipped. Six failures in `frontend-candidates.spec.mjs` use legacy `verified` / `gov_id_verified` fixture fields but the PR171 candidate UI now consumes canonical `verification`. Updated fixture profiles to include `verification: {identity:'verified',profile:'verified'}`. This is a test fixture correction, not weakening production checks.
 - Other failure: Vite appearance job; investigate separately, do not claim visual parity.
 - Fresh hosted CI required for the latest commit; no final acceptance yet.
+
+## Acceptance principle — PR165/166 are design history, not immutable contracts
+Review earlier PR handover reasoning and accepted decisions before changing behavior. Preserve canonical identity and security boundaries, but permit intentional improvements to eligibility, verification and UI where the newer requirement explicitly supersedes earlier behavior. Record the prior rule, new decision, affected callers and tests. Avoid blindly freezing or restoring older behavior.
+
+## Latest CI (1097419)
+Backend finalization, serializer contracts, frontend static/mobile lint, E2E smoke, and public security passed. Frontend E2E still failed (vite-playwright and shift-filter appearance). Shared-core consolidation was in progress at observation. Remaining failures require exact failure analysis; do not refresh screenshots without visual comparison.
