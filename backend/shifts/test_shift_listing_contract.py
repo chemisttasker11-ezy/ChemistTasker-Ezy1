@@ -236,6 +236,24 @@ class AssignedProfileTests(ShiftListingFixture):
                     shift=shift, target_user=staff, action=ShiftProfileAccessAudit.Action.VIEW_ASSIGNED_PROFILE,
                 ).exists())
 
+    def test_history_list_does_not_disclose_assigned_worker_email(self):
+        # Detail redaction is insufficient if the list serializer still exposes contacts.
+        staff = self.users['staff']
+        for endpoint, label, should_expose in (
+            ('shifts/confirmed/', 'confirmed', True),
+            ('shifts/history/', 'past', False),
+        ):
+            with self.subTest(endpoint=endpoint):
+                response = client_for(self.owner).get(f'{API}{endpoint}')
+                self.assertEqual(response.status_code, 200, response.data)
+                rows = response.data.get('results', response.data) if isinstance(response.data, dict) else response.data
+                shift = next(row for row in rows if row['id'] == self.shifts[label].id)
+                assignments = shift['slot_assignments']
+                self.assertTrue(assignments)
+                assigned = next(row['user'] for row in assignments if row['user_id'] == staff.id)
+                self.assertEqual('email' in assigned, should_expose)
+                self.assertNotIn(staff.email, str(shift) if not should_expose else '')
+
     def test_booked_profile_contact_and_cv_follow_the_current_worker_role(self):
         staff = self.users['staff']
         old = PharmacistOnboarding.objects.get(user=staff)
