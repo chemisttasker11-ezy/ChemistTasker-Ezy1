@@ -22,6 +22,7 @@ export default function SegmentTabs<T extends string>({
   onChange,
   label,
   idPrefix,
+  mobileWrap = false,
 }: {
   tabs: SegmentTab<T>[];
   value: T;
@@ -29,6 +30,8 @@ export default function SegmentTabs<T extends string>({
   label: string;
   /** Prefix for tab and panel ids; pair with `tabPanelProps(idPrefix, value)` on the content. */
   idPrefix: string;
+  /** Wrap crowded five-option sub-navigation on phones rather than compressing tab labels. */
+  mobileWrap?: boolean;
 }) {
   return (
     <Tabs
@@ -43,7 +46,11 @@ export default function SegmentTabs<T extends string>({
         borderRadius: "var(--ct-card-radius)",
         border: "1px solid var(--ct-border-color)",
         bgcolor: "var(--ct-surface-bg)",
-        "& .MuiTabs-flexContainer": { gap: { xs: 0.75, sm: 1.25 } },
+        "& .MuiTabs-flexContainer": {
+          gap: { xs: 0.75, sm: 1.25 },
+          ...(mobileWrap ? { flexWrap: { xs: "wrap", sm: "nowrap" } } : {}),
+        },
+        ...(mobileWrap ? { "& .MuiTab-root": { flexBasis: { xs: "29%", sm: 0 }, minWidth: { xs: 90, sm: 0 }, flexGrow: 1, maxWidth: "none" } } : {}),
       }}
     >
       {tabs.map((tab) => (
