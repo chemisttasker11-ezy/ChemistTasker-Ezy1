@@ -10,6 +10,15 @@ export const NEWCOMER_TYPES = [
 
 export type NewcomerType = (typeof NEWCOMER_TYPES)[number]['value'];
 
+/** UI affordance only; the backend validates who may bypass Australian mobile verification. */
+export function canSkipOverseasMobileCheck(user?: {
+  role?: string | null;
+  newcomer_type?: string | null;
+} | null): boolean {
+  return String(user?.role || '').toUpperCase() === 'EXPLORER'
+    && String(user?.newcomer_type || '').toUpperCase() === 'OVERSEAS';
+}
+
 export const newcomerTypeLabel = (value?: string | null) =>
   NEWCOMER_TYPES.find(item => item.value === String(value || '').toUpperCase())?.label ?? null;
 

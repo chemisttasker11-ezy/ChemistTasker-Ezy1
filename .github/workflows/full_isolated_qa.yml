@@ -1,4 +1,4 @@
-name: PR172 Full Isolated QA
+name: Full Isolated QA
 on:
   pull_request:
     paths:
@@ -7,16 +7,24 @@ on:
       - 'frontend_mobile/**'
       - 'shared-core/**'
       - 'scripts/run-staging-qa.sh'
-      - '.github/workflows/pr172_full_qa.yml'
+      - '.github/workflows/full_isolated_qa.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend_web/**'
+      - 'frontend_mobile/**'
+      - 'shared-core/**'
+      - 'scripts/run-staging-qa.sh'
+      - '.github/workflows/full_isolated_qa.yml'
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: pr172-full-isolated-qa-${{ github.ref }}
+  group: full-isolated-qa-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   full-isolated-qa:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 172 }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     services:

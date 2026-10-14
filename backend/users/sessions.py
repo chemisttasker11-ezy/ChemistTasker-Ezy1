@@ -5,7 +5,7 @@ from organizations.access import admin_assignments_for
 from memberships.models import Membership
 from organizations.models import Pharmacy
 from django.conf import settings
-from users.serializers import serialize_org_memberships
+from users.serializers import _newcomer_type, serialize_org_memberships
 
 
 def _is_web_client(request):
@@ -143,6 +143,7 @@ def _build_authenticated_user_payload(user):
         "is_pharmacy_admin": bool(admin_payload),
         "is_mobile_verified": bool(getattr(user, "is_mobile_verified", False)),
         "mobile_check_skipped": bool(getattr(user, "mobile_check_skipped", False)),
+        "newcomer_type": _newcomer_type(user),
         "billing_active": is_billing_active(),
         "in_free_trial": is_in_free_trial(user),
     }

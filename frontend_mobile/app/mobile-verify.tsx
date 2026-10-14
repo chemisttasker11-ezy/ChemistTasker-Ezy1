@@ -7,6 +7,7 @@ import {
     mobileVerifyOtp,
     mobileResendOtp,
     skipMobileOverseas,
+    canSkipOverseasMobileCheck,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
@@ -14,8 +15,7 @@ import AuthLayout from '../components/AuthLayout';
 export default function MobileVerifyScreen() {
     const router = useRouter();
     const { logout, markMobileVerified, markMobileCheckSkipped, user } = useAuth();
-    const isNewcomer = String(user?.role || '').toUpperCase() === 'EXPLORER';
-  const canSkipOverseas = isNewcomer && String(user?.newcomer_type || '').toUpperCase() === 'OVERSEAS';
+    const canSkipOverseas = canSkipOverseasMobileCheck(user);
 
     const [mobile, setMobile] = useState('');
     const [firstName, setFirstName] = useState('');

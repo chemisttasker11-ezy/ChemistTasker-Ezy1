@@ -1,5 +1,14 @@
 import type { Shift } from '../../types';
 
+/** Only expose a bonus-related signal when the worker is permitted to see rates. */
+export function hasVisibleBookedShiftBonus(shift: Shift): boolean {
+  return shift.publishedRatesVisible !== false
+    && shift.roleNeeded !== 'PHARMACIST'
+    && shift.ownerAdjustedRate != null
+    && shift.ownerAdjustedRate !== ''
+    && Number(shift.ownerAdjustedRate) > 0;
+}
+
 /** Respect the backend's PR166 pay redaction; never infer a hidden internal rate. */
 export function bookedShiftRateLabel(shift: Shift): string {
   if (shift.publishedRatesVisible === false) return 'Internal staff arrangement';
@@ -12,7 +21,7 @@ export function bookedShiftRateLabel(shift: Shift): string {
     if (shift.rateType === 'PHARMACIST_PROVIDED') return 'Your provided rate';
     return 'Flexible rate';
   }
-  return shift.ownerAdjustedRate != null && shift.ownerAdjustedRate !== '' && Number(shift.ownerAdjustedRate) !== 0
+  return hasVisibleBookedShiftBonus(shift)
     ? `Award rate + $${shift.ownerAdjustedRate}/hr bonus`
     : 'Award rate';
 }

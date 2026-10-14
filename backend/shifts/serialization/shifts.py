@@ -436,7 +436,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         # History is an audit view, not a continuing contact authorisation.
         # Enforce this on the API projection, not only the profile-detail endpoint.
         view = self.context.get('view')
-        history_view = view is not None and view.__class__.__name__ == 'HistoryShiftViewSet'
+        history_view = getattr(view, 'assigned_profile_contact', True) is False
         for assignment in shift.slot_assignments.all():
             user = assignment.user
             user_name = user.get_full_name() or ('' if history_view else user.email) or getattr(user, 'username', '') or 'Assigned candidate'

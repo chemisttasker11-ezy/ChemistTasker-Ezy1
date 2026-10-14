@@ -5,7 +5,7 @@ import React, { useEffect, useState, type ReactNode } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Button, Dialog, Portal, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { bookedShiftRateLabel, fetchRatingsPageService, fetchRatingsSummaryService, type Shift, type ShiftRatingComment, type ShiftRatingSummary } from '@chemisttasker/shared-core';
+import { bookedShiftRateLabel, hasVisibleBookedShiftBonus, fetchRatingsPageService, fetchRatingsSummaryService, type Shift, type ShiftRatingComment, type ShiftRatingSummary } from '@chemisttasker/shared-core';
 
 type Pharmacy = NonNullable<Shift['pharmacyDetail']>;
 const INK = '#06214A';
@@ -53,7 +53,7 @@ export function WorkerBookedShiftCard({ shift, mode, rating, actions }: {
             <View style={styles.pills}>
               {shift.roleNeeded ? <Pill tone="navy" label={humanize(shift.roleLabel ?? shift.roleNeeded)} /> : null}
               {shift.employmentType ? <Pill label={humanize(shift.employmentType)} /> : null}
-              <Pill tone={shift.ownerAdjustedRate && shift.roleNeeded !== 'PHARMACIST' ? 'green' : 'neutral'} label={bookedShiftRateLabel(shift)} />
+              <Pill tone={hasVisibleBookedShiftBonus(shift) ? 'green' : 'neutral'} label={bookedShiftRateLabel(shift)} />
             </View>
             {address ? (
               <Pressable onPress={() => openMap(address)} accessibilityRole="link" accessibilityLabel={`Open ${address} in maps`} style={styles.address}>

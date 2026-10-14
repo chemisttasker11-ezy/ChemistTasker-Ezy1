@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UPGRADE_COPY, ageFromBirthDate, newcomerTypeLabel } from './newcomer';
+import { UPGRADE_COPY, ageFromBirthDate, canSkipOverseasMobileCheck, newcomerTypeLabel } from './newcomer';
 import { VERIFICATION_GUIDE, verifiedProfileExplainer } from './verification';
 
 describe('new to pharmacy', () => {
@@ -8,6 +8,15 @@ describe('new to pharmacy', () => {
     expect(ageFromBirthDate('2011-10-13', today)).toBe(15);
     expect(ageFromBirthDate('2011-10-14', today)).toBe(14);
     expect(ageFromBirthDate('13/10/2011', today)).toBeNull();
+  });
+  it('allows mobile-check skip only for overseas newcomers', () => {
+    expect(canSkipOverseasMobileCheck({ role: 'EXPLORER', newcomer_type: 'OVERSEAS' })).toBe(true);
+    expect(canSkipOverseasMobileCheck({ role: 'explorer', newcomer_type: 'overseas' })).toBe(true);
+    for (const subtype of ['JUNIOR', 'STUDENT', 'CAREER_SWITCHER', null]) {
+      expect(canSkipOverseasMobileCheck({ role: 'EXPLORER', newcomer_type: subtype })).toBe(false);
+    }
+    expect(canSkipOverseasMobileCheck({ role: 'PHARMACIST', newcomer_type: 'OVERSEAS' })).toBe(false);
+    expect(canSkipOverseasMobileCheck(null)).toBe(false);
   });
   it('labels the sign-up answer', () => {
     expect(newcomerTypeLabel('overseas')).toBe('Overseas-qualified');

@@ -1,5 +1,6 @@
 import {returnDestination,finishDestination,announceSession} from '../../shared/browser-session';
 import React, { useEffect, useState } from 'react';
+import { canSkipOverseasMobileCheck } from '@chemisttasker/shared-core';
 import { Link as RouterLink } from '@/public/navigation';
 import {
   TextField,
@@ -109,8 +110,7 @@ export default function MobileOTPVerify() {
     }
   };
 
-  const isNewcomer = String(user?.role || '').toUpperCase() === 'EXPLORER';
-  const canSkipOverseas = isNewcomer && String(user?.newcomer_type || '').toUpperCase() === 'OVERSEAS';
+  const canSkipOverseas = canSkipOverseasMobileCheck(user);
   // Overseas newcomers without an Australian mobile: keep the legal name, skip the code, verify with photo ID instead.
   const handleSkipOverseas = async () => {
     setError('');

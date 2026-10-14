@@ -6,6 +6,7 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paginat
 import { Building2, CalendarCheck, Clock, FileText, History, MapPin, Receipt, Star, Store } from "lucide-react";
 import {
   bookedShiftRateLabel,
+  hasVisibleBookedShiftBonus,
   fetchRatingsPageService,
   fetchRatingsSummaryService,
   type Shift,
@@ -78,7 +79,7 @@ export function WorkerBookedShiftBoard({ mode, shifts, loading, ratings = {}, ac
                   <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
                     {shift.roleNeeded && <Pill tone="navy" label={humanizeEnum(shift.roleLabel ?? shift.roleNeeded)} />}
                     {shift.employmentType && <Pill outlined label={humanizeEnum(shift.employmentType)} />}
-                    <Pill tone={shift.ownerAdjustedRate && shift.roleNeeded !== "PHARMACIST" ? "green" : "neutral"} label={bookedShiftRateLabel(shift)} />
+                    <Pill tone={hasVisibleBookedShiftBonus(shift) ? "green" : "neutral"} label={bookedShiftRateLabel(shift)} />
                   </Stack>
                   {address && (
                     <Box component="a" href={mapUrl(address)} target="_blank" rel="noopener noreferrer"

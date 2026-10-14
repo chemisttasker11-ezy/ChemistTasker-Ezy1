@@ -87,3 +87,13 @@ Backend finalization, serializer contracts, frontend static/mobile lint, E2E smo
 - Full isolated QA failed at `docker build -t ... backend` because `backend/Dockerfile` uses `COPY shared-core/skills_registry.json` and `COPY backend/...`, which require the repository root as the build context. Fixed it to `docker build -f backend/Dockerfile -t "$backend_image" .`. Previous JavaScript QA ran 209 shared-core tests successfully.
 - Added a **separate** Windows `appearance-baseline-candidate` job and opt-in `CT_CAPTURE_SHIFT_BASELINE` to capture proposed Shift Centre baselines without overwriting or relaxing the original visual gate. Review newly captured images, then commit only approved screenshot files and fixed date geometry. Until then, the old Shift Centre golden intentionally fails due to the accepted layout redesign. Do not report 100% acceptance.
 - No staging/production access, migration 0080 execution, native-device validation, or merges occurred in this session. PR173 was not modified. Final CI rerun underway on `fbc1b4f` after these changes.
+
+
+## Session 11 — independent review corrections (2026-10-14)
+- Reused the canonical `users.serializers._newcomer_type` in `_build_authenticated_user_payload`, so the authenticated `/api/v1/users/me/` restore contains the same newcomer subtype as login/refresh. Added HTTP tests for overseas, junior, and non-explorer session payloads.
+- History assigned-worker list now obeys the existing `assigned_profile_contact` policy flag, avoiding class-name tests; existing Confirmed and History HTTP regression tests remain.
+- Enabled opt-in phone wrapping for the Community five-tab shift list to match Public. Added a cross-page 390px no-overlap/no-clipping Playwright contract; golden appearance snapshots are deliberately unchanged.
+- Centralised the overseas mobile-skip presentation condition in shared-core, consumed by Vite/Next/Expo, with role/subtype unit tests. Backend skip authorisation remains authoritative.
+- Introduced a shared visible-bonus predicate consumed by the booked-rate label and pill tone in both web and Expo. Hidden rates cannot indirectly advertise the bonus colour.
+- Replaced the PR-number-specific isolated QA workflow with a general pull-request and main-push workflow using the same existing QA script and PostgreSQL service. No CI checks are represented as passed until the exact new commit finishes.
+- PR171 remains open and PR172 draft; no merge, deployment, live data change, legacy skills migration, or unapproved snapshot regeneration.

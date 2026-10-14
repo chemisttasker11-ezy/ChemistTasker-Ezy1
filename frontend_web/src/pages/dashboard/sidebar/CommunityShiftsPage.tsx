@@ -513,7 +513,7 @@ export default function CommunityShiftsPage({
       >
         {!hideTabs && (
           <Box sx={{ px: { xs: 1.5, md: 2.5 }, pt: { xs: 1.5, md: 2 } }}>
-            <SegmentTabs label="Shift lists" idPrefix="community-shift-lists" value={boardTab as any}
+            <SegmentTabs mobileWrap label="Shift lists" idPrefix="community-shift-lists" value={boardTab as any}
               onChange={value => handleBoardTabChange(value as any)}
               tabs={[
                 { value: 'browse', label: 'Browse' },
