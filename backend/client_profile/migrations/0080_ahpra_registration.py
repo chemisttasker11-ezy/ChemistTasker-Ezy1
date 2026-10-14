@@ -36,7 +36,7 @@ def claim_existing_numbers(apps, schema_editor):
         inherited += sum(row.user_id != owner_id for row in rows)
 
     print(
-        f"\\n  AHPRA numbers registered: {len(claims)}; "
+        f"\n  AHPRA numbers registered: {len(claims)}; "
         f"pre-existing duplicate profile rows retained: {inherited}; "
         "onboarding and Verified values unchanged"
     )
