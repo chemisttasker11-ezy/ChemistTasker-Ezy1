@@ -82,3 +82,5 @@ export * from './domains/onboarding/qualifications';
 export * from './domains/onboarding/verification';
 export * from './domains/onboarding/newcomer';
 export * from './domains/moderation/reports';
+
+export * from './domains/shifts/bookedRate';
