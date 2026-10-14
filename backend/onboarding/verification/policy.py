@@ -94,7 +94,10 @@ def evaluate(profile) -> dict:
     elif was_verified and extras_only:
         verified = bool(grace)
     else:
-        verified = was_verified
+        # Base requirements are not grandfathered. Explicit evidence-change paths
+        # revoke immediately; this also prevents stale verified flags bypassing
+        # professional registration or mobile/email checks.
+        verified = False
     return {'verified': verified, 'missing': missing, 'grace': grace,
             'grace_until': getattr(settings, 'VERIFICATION_GRACE_UNTIL', None) if grace else None}
 
