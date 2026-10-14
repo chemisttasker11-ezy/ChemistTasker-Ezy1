@@ -21,6 +21,22 @@ grep -qi '^referrer-policy:[[:space:]]*strict-origin-when-cross-origin' "$tmp_he
 curl -fsS --max-time 20 "$preview_url/login" >/dev/null
 curl -fsS --max-time 20 "$preview_url/api/v1/users/mobile/app-config/" >/dev/null
 
+# Exercise both the Django feature and Next SSR; a healthy home page alone
+# does not detect private-network HTTPS redirect failures in the Hub client.
+curl -fsS --max-time 20 -o "$tmp_body" "$preview_url/api/v1/public-hub/community/"
+python3 - "$tmp_body" <<'PY'
+import json
+import sys
+with open(sys.argv[1]) as source:
+    hubs = json.load(source)
+assert {hub['key'] for hub in hubs} == {'public', 'pharmacist', 'intern', 'staff', 'explorer', 'owner'}, 'Public Hub directory is incomplete'
+PY
+curl -fsS --max-time 20 -o "$tmp_body" "$preview_url/hubs"
+grep -Fq 'Find your community.' "$tmp_body"
+for hub in public pharmacist intern staff explorer owner; do
+  grep -Fq "href=\"/hubs/$hub\"" "$tmp_body"
+done
+
 status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$preview_url/api/v1/users/me/")"
 if [[ "$status" != "401" && "$status" != "403" ]]; then
   echo "Expected anonymous /api/v1/users/me/ to be denied, got HTTP $status" >&2
