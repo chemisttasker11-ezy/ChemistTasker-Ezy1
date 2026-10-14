@@ -5,7 +5,7 @@ const OTHER_STAFF_ROLE_LABELS: Record<string, string> = {
   STUDENT: "Pharmacy Student",
 };
 
-export function otherStaffRoleLabel(roleType?: string | null, fallback = "Other Staff") {
+export function otherStaffRoleLabel(roleType?: string | null, fallback = "Pharmacy team") {
   const normalized = String(roleType || "").trim().toUpperCase();
   return OTHER_STAFF_ROLE_LABELS[normalized] ?? fallback;
 }
@@ -15,7 +15,7 @@ export function dashboardTitleForRole(role?: string | null, otherStaffRoleType?:
   if (normalized === "OWNER") return "Owner Dashboard";
   if (normalized === "PHARMACIST") return "Pharmacist Dashboard";
   if (normalized === "OTHER_STAFF") return `${otherStaffRoleLabel(otherStaffRoleType)} Dashboard`;
-  if (normalized === "EXPLORER") return "Explorer Dashboard";
+  if (normalized === "EXPLORER") return "New to pharmacy dashboard";
   if (normalized.includes("ORG") || normalized === "ORGANIZATION") return "Organization Dashboard";
   return "Dashboard";
 }
@@ -23,6 +23,7 @@ export function dashboardTitleForRole(role?: string | null, otherStaffRoleType?:
 export function userRoleLabel(role?: string | null, otherStaffRoleType?: string | null) {
   const normalized = String(role || "").toUpperCase();
   if (normalized === "OTHER_STAFF") return otherStaffRoleLabel(otherStaffRoleType);
+  if (normalized === "EXPLORER") return "New to pharmacy";
   if (normalized.includes("ORG") || normalized === "ORGANIZATION") return "Organization";
   if (!normalized) return "Member";
   return normalized

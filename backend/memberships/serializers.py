@@ -31,6 +31,8 @@ def _count_active_memberships(user, exclude_membership_id=None):
     return qs.count()
 
 
+from memberships.role_resolution import membership_role_refusal  # noqa: E402
+
 ROLE_REQUIRED_USER_ROLE = {
     "PHARMACIST": "PHARMACIST",
     "INTERN": "OTHER_STAFF",
@@ -144,54 +146,11 @@ class MembershipSerializer(serializers.ModelSerializer):
                         'user': f'User already belongs to {MAX_ACTIVE_PHARMACY_MEMBERSHIPS} pharmacies.'
                     })
 
-        # --- (2) Enforce role consistency with user onboarding ---
+        # --- (2) The role this pharmacy gives the person in its own team (memberships.role_resolution) ---
         if user:
-            pharmacist_onboard = getattr(user, 'pharmacistonboarding', None)
-            otherstaff_onboard = getattr(user, 'otherstaffonboarding', None)
-            explorer_onboard = getattr(user, 'exploreronboarding', None)
-
-            # Pharmacist accounts
-            if pharmacist_onboard and role not in ['PHARMACIST']:
-                raise serializers.ValidationError({
-                    'role': 'This user is a Pharmacist and can only be assigned as PHARMACIST.'
-                })
-
-            # Other staff (interns, assistants, etc.)
-            if otherstaff_onboard:
-                onboard_role = otherstaff_onboard.role_type
-                if onboard_role == 'INTERN' and role != 'INTERN':
-                    raise serializers.ValidationError({
-                        'role': 'This user is onboarded as an Intern and cannot be invited as another role.'
-                    })
-                elif onboard_role == 'TECHNICIAN' and role != 'TECHNICIAN':
-                    raise serializers.ValidationError({
-                        'role': 'This user is onboarded as a Technician and cannot be invited as another role.'
-                    })
-                elif onboard_role == 'ASSISTANT' and role != 'ASSISTANT':
-                    raise serializers.ValidationError({
-                        'role': 'This user is onboarded as an Assistant and cannot be invited as another role.'
-                    })
-
-            # Explorer users
-            if explorer_onboard:
-                raise serializers.ValidationError({
-                    'role': 'Explorer users cannot be added to pharmacies.'
-                })
-
-        # --- (3) Enforce user-role mapping if defined globally ---
-        required_user_role = required_user_role_for_membership(role)
-        user_role = getattr(user, 'role', None) if user else None
-        if required_user_role and user_role and user_role != required_user_role:
-            role_label = dict(Membership.ROLE_CHOICES).get(role, role)
-            required_label = dict(User.ROLE_CHOICES).get(required_user_role, required_user_role)
-            actual_label = dict(User.ROLE_CHOICES).get(user_role, user_role)
-            identifier = getattr(user, 'email', getattr(user, 'username', 'This user'))
-            raise serializers.ValidationError({
-                'role': (
-                    f'{identifier} is registered as {actual_label} and cannot be assigned the {role_label} role. '
-                    f'Ask them to complete the {required_label} onboarding first.'
-                )
-            })
+            refusal = membership_role_refusal(user, role)
+            if refusal:
+                raise serializers.ValidationError({'role': refusal})
 
         job_title_value = attrs.get('job_title', getattr(self.instance, 'job_title', '') if self.instance else '')
         job_title_value = (job_title_value or '').strip()
@@ -515,13 +474,9 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
             if email_value != (authenticated_user.email or "").strip().lower():
                 raise serializers.ValidationError({"email": "Use the email address on your signed-in account."})
 
-            required_user_role = required_user_role_for_membership(role)
-            if required_user_role and user_role != required_user_role:
-                role_label = dict(Membership.ROLE_CHOICES).get(role, role)
-                actual_label = dict(User.ROLE_CHOICES).get(user_role, user_role)
-                raise serializers.ValidationError({
-                    "role": f"Your account is registered as {actual_label} and cannot apply as {role_label}."
-                })
+            refusal = membership_role_refusal(authenticated_user, role)
+            if refusal:
+                raise serializers.ValidationError({"role": refusal})
 
             pharmacist_onboard = getattr(authenticated_user, "pharmacistonboarding", None)
             otherstaff_onboard = getattr(authenticated_user, "otherstaffonboarding", None)
@@ -534,13 +489,6 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     "date_of_birth": "Date of birth must match your verified onboarding profile."
                 })
-            if user_role == "OTHER_STAFF" and otherstaff_onboard:
-                onboard_role = getattr(otherstaff_onboard, "role_type", None)
-                if onboard_role in ("INTERN", "TECHNICIAN", "ASSISTANT", "STUDENT") and role != onboard_role:
-                    role_label = dict(Membership.ROLE_CHOICES).get(onboard_role, onboard_role)
-                    raise serializers.ValidationError({
-                        "role": f"Your account is onboarded as {role_label} and cannot apply as another role."
-                    })
 
             identity_checks = {
                 "first_name": authenticated_user.first_name,
@@ -642,11 +590,9 @@ class MembershipApplicationReviewSerializer(serializers.ModelSerializer):
 
         worker = self.instance.submitted_by or User.objects.filter(email__iexact=self.instance.email).first()
         if worker:
-            required_user_role = required_user_role_for_membership(role)
-            if required_user_role and worker.role != required_user_role:
-                raise serializers.ValidationError({
-                    "role": "The reviewed role conflicts with the applicant's ChemistTasker account role."
-                })
+            refusal = membership_role_refusal(worker, role)
+            if refusal:
+                raise serializers.ValidationError({"role": refusal})
 
         _normalise_application_role_fields(
             merged,

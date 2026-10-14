@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Typography, Snackbar, Alert, Box, Button, Chip, Paper, Stack, Tabs, Tab, alpha, useTheme } from '@mui/material';
+import { Typography, Snackbar, Alert, Box, Button, Chip, Paper, Stack, alpha, useTheme } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import ShiftsBoard from './ShiftsBoard';
@@ -26,6 +26,8 @@ import { submitCounterOfferDirect } from './ShiftsBoard/utils/submitCounterOffer
 import ShiftEngagementTermsDialog from './ShiftsBoard/components/ShiftEngagementTermsDialog';
 import type { ShiftOfferAcceptancePayload } from '@chemisttasker/shared-core';
 import PageHeader from "../../../components/ui/PageHeader";
+import SegmentTabs from "../../../components/ui/SegmentTabs";
+import { STAFF_SECTION_COPY, StaffShiftCentreTabs } from "../shiftCenter/StaffShiftCentreTabs";
 
 type FilterConfig = {
   city: string[];
@@ -275,7 +277,7 @@ export default function PublicShiftsPage({
 
   const handleApplyAll = async (shift: Shift) => {
     if (!isVerified) {
-      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
+      const msg = 'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }
@@ -298,7 +300,7 @@ export default function PublicShiftsPage({
 
   const handleApplySlot = async (shift: Shift, slotId: number) => {
     if (!isVerified) {
-      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
+      const msg = 'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }
@@ -350,7 +352,7 @@ export default function PublicShiftsPage({
 
   const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload) => {
     if (!isVerified) {
-      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
+      const msg = 'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.';
       throw new Error(msg);
     }
     try {
@@ -498,7 +500,7 @@ export default function PublicShiftsPage({
 
   const handleApplySlots = async (shift: Shift, slotIds: number[]) => {
     if (!isVerified) {
-      const msg = 'Your onboarding must be verified by admin before applying for public shifts.';
+      const msg = 'Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.';
       showError(msg);
       throw new Error(msg);
     }
@@ -701,7 +703,9 @@ export default function PublicShiftsPage({
         gap: { xs: 2.5, md: 3 },
       }}
     >
-      <PageHeader title="Discover shifts at a glance" subtitle="Browse open shifts, review your saved list, and track interested or rejected opportunities." />
+      <PageHeader title="Shift Centre" subtitle={STAFF_SECTION_COPY.public}>
+        <StaffShiftCentreTabs value="public" />
+      </PageHeader>
 
       <Paper
         elevation={0}
@@ -711,51 +715,17 @@ export default function PublicShiftsPage({
         }}
       >
         {!hideTabs && (
-          <Tabs
-            value={boardTab}
-            onChange={(_, value) => handleBoardTabChange(value as any)}
-            variant="scrollable"
-            allowScrollButtonsMobile
-            sx={{
-              px: { xs: 1.5, md: 2.5 },
-              pt: { xs: 1.5, md: 2 },
-              '& .MuiTabs-flexContainer': {
-                gap: { xs: 1, sm: 1.5 },
-                justifyContent: { xs: 'flex-start', md: 'center' },
-              },
-              '& .MuiTabs-indicator': {
-                display: 'none',
-              },
-              '& .MuiTab-root': {
-                textTransform: 'none',
-                fontWeight: 700,
-                fontSize: { xs: 14, sm: 16 },
-                minHeight: 52,
-                minWidth: 0,
-                borderRadius: 999,
-                px: { xs: 2.5, sm: 3.5 },
-                py: { xs: 1, sm: 1.3 },
-                color: alpha(theme.palette.text.primary, 0.72),
-                border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                transition: theme.transitions.create(['color', 'background-color', 'border-color', 'box-shadow']),
-                '&.Mui-selected': {
-                  color: 'var(--ct-accent-strong)',
-                  backgroundColor: 'var(--ct-tone-violet-bg)',
-                  borderColor: 'transparent',
-                },
-                '&:not(.Mui-selected):hover': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                  borderColor: alpha(theme.palette.primary.main, 0.25),
-                },
-              },
-            }}
-          >
-            <Tab value="browse" label="Browse" disableRipple />
-            <Tab value="saved" label={`Saved (${savedShiftIds.size})`} disableRipple />
-            <Tab value="interested" label="Interested" disableRipple />
-            <Tab value="rejected" label="Rejected" disableRipple />
-            <Tab value="accepted" label="Offers" disableRipple />
-          </Tabs>
+          <Box sx={{ px: { xs: 1.5, md: 2.5 }, pt: { xs: 1.5, md: 2 } }}>
+            <SegmentTabs mobileWrap label="Shift lists" idPrefix="public-shift-lists" value={boardTab as any}
+              onChange={value => handleBoardTabChange(value as any)}
+              tabs={[
+                { value: 'browse', label: 'Browse' },
+                { value: 'saved', label: `Saved (${savedShiftIds.size})` },
+                { value: 'interested', label: 'Interested' },
+                { value: 'rejected', label: 'Rejected' },
+                { value: 'accepted', label: 'Offers' },
+              ]} />
+          </Box>
         )}
         <Box
           sx={{

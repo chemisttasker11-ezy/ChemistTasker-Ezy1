@@ -19,6 +19,7 @@ from core.task_queue import async_task
 from django.core.signing import BadSignature, TimestampSigner
 from django.contrib.contenttypes.models import ContentType
 from django.apps import apps
+from onboarding.services.work_profile import referee_answered_before_upgrade, referee_profile_target
 from onboarding.verification.reminders import cancel_referee_reminder
 from django.db import IntegrityError, transaction
 from datetime import timedelta
@@ -59,6 +60,9 @@ class RefereeSubmitResponseView(generics.CreateAPIView):
                 raise ValueError
         except (BadSignature, ValueError):
             raise PermissionDenied("This reference link is invalid or has expired.")
+        if referee_answered_before_upgrade(model_name, pk, referee_index):
+            raise ValidationError({"detail": "A reference has already been submitted for this candidate."})
+        model_name, pk = referee_profile_target(model_name, pk)
 
         # 2) Locate onboarding record dynamically
         OnboardingModel = apps.get_model('client_profile', model_name)
@@ -167,6 +171,9 @@ class RefereeRejectView(APIView):
                 raise ValueError
         except (BadSignature, ValueError):
             raise PermissionDenied("This referee link is invalid or has expired.")
+        if referee_answered_before_upgrade(model_name, pk, idx):
+            return Response({'success': True, 'message': 'This reference was already answered.'}, status=200)
+        model_name, pk = referee_profile_target(model_name, pk)
 
         try:
             Model = apps.get_model('client_profile', model_name)

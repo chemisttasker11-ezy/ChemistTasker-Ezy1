@@ -2,6 +2,8 @@
 from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from onboarding.verification.ahpra_numbers import ahpra_number_owner_conflict, sync_ahpra_registrations
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding, RefereeResponse
 
 
@@ -18,6 +20,33 @@ class RoleScopedOnboardingAdminMixin:
         if db_field.name == "user" and self.user_role:
             kwargs["queryset"] = db_field.remote_field.model.objects.filter(role=self.user_role)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class AhpraOwnershipAdminMixin:
+    """Support corrections keep the AHPRA owner registry in step (one person per number): the form refuses a number
+    another account holds, and the save claims and releases numbers in the same transaction."""
+
+    def get_form(self, request, obj=None, **kwargs):
+        form_class = super().get_form(request, obj, **kwargs)
+
+        class AhpraOwnershipForm(form_class):
+            def clean(self):
+                cleaned = super().clean()
+                user = cleaned.get('user') or getattr(self.instance, 'user', None)
+                if 'ahpra_number' in cleaned and user is not None and ahpra_number_owner_conflict(user.pk, cleaned.get('ahpra_number')):
+                    from onboarding.verification.ahpra_numbers import normalize
+                    previous = type(self.instance).objects.filter(pk=self.instance.pk).values_list('ahpra_number', flat=True).first() if self.instance.pk else None
+                    # Grandfather unchanged legacy duplicates; reject a new or changed claim.
+                    if normalize(previous) != normalize(cleaned.get('ahpra_number')):
+                        self.add_error('ahpra_number', 'This AHPRA number belongs to another account.')
+                return cleaned
+
+        return AhpraOwnershipForm
+
+    def save_model(self, request, obj, form, change):
+        with transaction.atomic():
+            super().save_model(request, obj, form, change)
+            sync_ahpra_registrations(obj.user_id)
 
 
 class OwnerOnboardingAdminForm(forms.ModelForm):
@@ -70,7 +99,7 @@ class OwnerOnboardingAdminForm(forms.ModelForm):
 
 
 @admin.register(OwnerOnboarding)
-class OwnerOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+class OwnerOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     user_role = "OWNER"
     form = OwnerOnboardingAdminForm
     list_display = [
@@ -109,7 +138,7 @@ class OwnerOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(PharmacistOnboarding)
-class PharmacistOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+class PharmacistOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     user_role = "PHARMACIST"
     list_display = [
         'user', 'payment_preference', 'verified', 'member_of_chain',
@@ -157,7 +186,7 @@ class PharmacistOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin
 
 
 @admin.register(OtherStaffOnboarding)
-class OtherStaffOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+class OtherStaffOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     user_role = "OTHER_STAFF"
     list_display = [
         'user', 'role_type', 'classification_level', 'student_year',
@@ -184,6 +213,7 @@ class OtherStaffOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin
     fields = [
         'user', 'government_id', 'role_type', 'skills', 'skill_certificates', 'years_experience',
         'payment_preference', 'classification_level', 'student_year', 'intern_half',
+        'ahpra_number', 'ahpra_verified', 'ahpra_verification_note',
         'ahpra_proof', 'hours_proof', 'certificate', 'university_id',
         'dispensary_qualification', 'dispensary_qualification_verified', 'dispensary_qualification_verification_note',
         'cpr_certificate', 's8_certificate',

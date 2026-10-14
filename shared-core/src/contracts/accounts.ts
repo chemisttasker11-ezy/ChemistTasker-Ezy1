@@ -9,6 +9,9 @@ export interface CurrentUserApi {
     public_community_enabled?: boolean;
     is_pharmacy_admin?: boolean;
     is_mobile_verified?: boolean;
+    /** New to pharmacy (overseas) skipped the mobile check. */
+    mobile_check_skipped?: boolean;
+    newcomer_type?: string | null;
     profile_photo_url?: string | null;
     billing_active?: boolean;
     in_free_trial?: boolean;

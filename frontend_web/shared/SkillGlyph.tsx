@@ -1,5 +1,6 @@
 import { useId, type CSSProperties, type ReactNode } from 'react';
 import {
+  Award, Backpack, BriefcaseBusiness, Earth, GraduationCap, IdCard,
   Armchair, Bandage, BriefcaseMedical, CalendarClock, CalendarPlus, CircleHelp, ClipboardCheck, Clock3, Coffee, ClipboardPenLine, ClipboardPlus, Droplet, Files, GlassWater, Hand, HeartHandshake, HeartPulse, Hospital, HousePlus, ListChecks, LockKeyhole, MessagesSquare, Monitor, MonitorCog, PillBottle, Plane, QrCode, ReceiptText, ScanEye, ShelvingUnit, ShieldUser, ShoppingCart, SoapDispenserDroplet, Stethoscope, Store, Syringe, TabletSmartphone, Tablets, TestTubeDiagonal, ThermometerSnowflake, Truck, UsersRound, Venus,
   type LucideIcon,
 } from 'lucide-react';
@@ -8,6 +9,8 @@ import { findSkill } from '@chemisttasker/shared-core';
 import { SoftwareMark, hasSoftwareMark } from './SoftwareLogo';
 
 const icons: Record<string, LucideIcon> = {
+  // Verification badge subjects (shared/VerificationBadges.tsx).
+  Award, Backpack, BriefcaseBusiness, Earth, GraduationCap, IdCard,
   Armchair, Bandage, BriefcaseMedical, CalendarClock, CalendarPlus, CircleHelp, ClipboardCheck, Clock3, Coffee, ClipboardPenLine, ClipboardPlus, Droplet, Files, GlassWater, Hand, HeartHandshake, HeartPulse, Hospital, HousePlus, ListChecks, LockKeyhole, MessagesSquare, Monitor, MonitorCog, PillBottle, Plane, QrCode, ReceiptText, ScanEye, ShelvingUnit, ShieldUser, ShoppingCart, SoapDispenserDroplet, Stethoscope, Store, Syringe, TabletSmartphone, Tablets, TestTubeDiagonal, ThermometerSnowflake, Truck, UsersRound, Venus,
 };
 
@@ -237,3 +240,21 @@ export function ScriptLoadSymbol({ level, color, size = 24, title }: { level: nu
     </svg>
   );
 }
+
+export type BadgeSubject = 'PROFILE' | 'AHPRA' | 'AHPRA_PROVISIONAL' | 'QUALIFICATION' | 'DISPENSING' | 'ENROLMENT' | 'ID' | 'REFERENCES' | 'ABN' | 'OVERSEAS' | 'NO_WORK_RIGHTS' | 'UNDER_18';
+
+/** Verification badge subjects (VerificationBadges.tsx); also rendered to PNG for Expo by scripts/render-mobile-skill-symbols.mjs. */
+export const BADGE_SUBJECTS: Record<BadgeSubject, { icon: string; tone: SkillTone; accent: SkillTone }> = {
+  PROFILE: { icon: 'ShieldUser', tone: 'violet', accent: 'cyan' },
+  AHPRA: { icon: 'Award', tone: 'violet', accent: 'magenta' },
+  AHPRA_PROVISIONAL: { icon: 'Award', tone: 'violet', accent: 'cyan' },
+  QUALIFICATION: { icon: 'GraduationCap', tone: 'magenta', accent: 'violet' },
+  DISPENSING: { icon: 'PillBottle', tone: 'violet', accent: 'blue' },
+  ENROLMENT: { icon: 'GraduationCap', tone: 'cyan', accent: 'blue' },
+  ID: { icon: 'IdCard', tone: 'blue', accent: 'violet' },
+  REFERENCES: { icon: 'UsersRound', tone: 'cyan', accent: 'magenta' },
+  ABN: { icon: 'ReceiptText', tone: 'blue', accent: 'cyan' },
+  OVERSEAS: { icon: 'Earth', tone: 'blue', accent: 'cyan' },
+  NO_WORK_RIGHTS: { icon: 'BriefcaseBusiness', tone: 'blue', accent: 'magenta' },
+  UNDER_18: { icon: 'Backpack', tone: 'magenta', accent: 'cyan' },
+};

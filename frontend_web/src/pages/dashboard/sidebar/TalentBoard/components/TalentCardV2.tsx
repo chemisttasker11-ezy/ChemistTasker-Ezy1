@@ -1,7 +1,6 @@
 import { useState } from "react";
-import skillsRegistry from "../../../../../../../shared-core/skills_registry.json";
-import { skillLabel } from "@chemisttasker/shared-core";
-import { SkillSymbol } from "../../../../../components/SkillGlyph";
+import { VerificationBadges } from "@chemisttasker/shared-ui/VerificationBadges";
+import { WorkerSkillRows } from "@chemisttasker/shared-ui/WorkerSkills";
 import {
   Box,
   Card,
@@ -31,6 +30,7 @@ import { RoleTile } from "../../../../../../landing_next/shared-ui/talent/RoleTi
 import dayjs from "dayjs";
 import { Candidate } from "../types";
 
+import { ReportButton } from '@chemisttasker/shared-ui/ReportButton';
 const formatAuSlotDate = (date: string) => {
   const parsed = dayjs(date);
   return parsed.isValid() ? parsed.format("ddd, D MMM YYYY") : date;
@@ -127,6 +127,11 @@ export default function TalentCard({
                 <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 14, mt: 0.5 }}>
                   {candidate.headline}
                 </Typography>
+                {candidate.verification && (
+                  <Box sx={{ mt: 1 }}>
+                    <VerificationBadges summary={candidate.verification} role={candidate.role} compact />
+                  </Box>
+                )}
                 <Stack direction="row" spacing={0} useFlexGap flexWrap="wrap" gap={1.5} sx={{ mt: 1.25, color: "var(--ct-text-secondary)", "& svg": { fontSize: 18 } }}>
                   {(candidate.city || candidate.state) && (
                     <Stack direction="row" spacing={0.5} alignItems="center">
@@ -278,51 +283,17 @@ export default function TalentCard({
         </Stack>
 
         {!candidate.isExplorer && (
-          <Stack spacing={1} sx={{ mt: 2 }}>
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Clinical Services:
-              </Typography>
-              {candidate.clinicalServices.length > 0 ? (
-                candidate.clinicalServices.map((skill) => <Chip key={skill} size="small" icon={<SkillSymbol skill={skill} size={16} />} label={skillLabel(skillsRegistry as any, skill)} />)
-              ) : (
-                <Typography variant="caption" color="text.secondary">
-                  --
-                </Typography>
-              )}
-            </Stack>
-
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Software:
-              </Typography>
-              {candidate.dispenseSoftware.length > 0 ? (
-                candidate.dispenseSoftware.map((skill) => <Chip key={skill} size="small" icon={<SkillSymbol skill={skill} size={16} />} label={skillLabel(skillsRegistry as any, skill)} />)
-              ) : (
-                <Typography variant="caption" color="text.secondary">
-                  --
-                </Typography>
-              )}
-            </Stack>
-
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Other pharmacy skills:
-              </Typography>
-              {candidate.expandedScope.length > 0 ? (
-                candidate.expandedScope.map((skill) => <Chip key={skill} size="small" icon={<SkillSymbol skill={skill} size={16} />} label={skillLabel(skillsRegistry as any, skill)} />)
-              ) : (
-                <Typography variant="caption" color="text.secondary">
-                  --
-                </Typography>
-              )}
-            </Stack>
-          </Stack>
+          <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
+            <WorkerSkillRows compact skills={[...candidate.clinicalServices, ...candidate.dispenseSoftware, ...candidate.expandedScope]}
+              verification={candidate.verification ?? null} />
+          </Box>
         )}
 
       </CardContent>
 
-      <Box sx={{ position: "absolute", right: 16, bottom: 16 }}>
+      {/* Phones: under the card content (an absolute row would cover the booking button). */}
+      <Box sx={{ position: { xs: "static", md: "absolute" }, right: 16, bottom: 16, display: "flex", alignItems: "center", justifyContent: "flex-end", px: { xs: 2, md: 0 }, pb: { xs: 1.5, md: 0 } }}>
+        <ReportButton kind="talent" id={candidate.id} />
         <IconButton
           onClick={() => onToggleLike(candidate)}
           color={candidate.isLikedByMe ? "error" : "default"}

@@ -10,6 +10,7 @@ from django.utils.text import slugify
 from rest_framework import serializers
 
 from core.file_validation import DOCUMENT_UPLOAD_POLICY, validate_uploaded_file
+from core.task_queue import async_task
 from onboarding.services.skill_identity import canonical_skill, registry
 
 def _load_skills_catalog():
@@ -132,12 +133,12 @@ def skill_certificate_summary(obj):
     return sorted(data, key=lambda r: r["skill_code"])
 
 
-def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: str, missing_message: str,
+def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: str,
                      track_years_experience: bool = False, keep_history: bool = False):
     """
     Legacy-aligned Skills tab:
     - `skills`: list of codes (string or JSON array)
-    - Per-skill certificate upload (must exist if the skill is selected)
+    - Per-skill certificate upload (optional evidence: earns the skill's badge once checked)
     - `years_experience`: simple string bucket stored on the model
 
     Storage mutations happen only after certificate validation. Superseded files
@@ -227,5 +228,10 @@ def apply_skills_tab(instance, vdata: dict, *, initial_data, uploads, role_key: 
             default_storage.delete(path)
         except Exception:
             pass
+
+    # A new upload is "check pending" until the document check (or admin) records a result on its entry.
+    for code, meta in cert_map.items():
+        if meta.get("path") in newly_saved_paths:
+            async_task("onboarding.tasks.verify_skill_certificate_task", instance._meta.model_name, instance.pk, code, meta["path"])
 
     return instance

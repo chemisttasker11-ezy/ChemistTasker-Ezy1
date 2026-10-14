@@ -48,6 +48,7 @@ export {
   mobileRequestOtp,
   mobileVerifyOtp,
   mobileResendOtp,
+  skipMobileOverseas,
   deleteAccount,
   getCurrentUser,
   passwordReset,

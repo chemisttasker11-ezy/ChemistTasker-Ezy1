@@ -32,7 +32,7 @@ export default function CustomAppTitle({
       : rawRole === "otherstaff" || rawRole === "other_staff"
       ? "Staff Dashboard"
       : rawRole === "explorer"
-      ? "Explorer"
+      ? "New to pharmacy"
       : "Pharmacist Dashboard";
 
   const displayTitle =

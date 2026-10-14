@@ -39,3 +39,5 @@ export * from './descriptionTemplates';
 export * from './skillPresets';
 // Draft previews (post shift review) render an unsaved payload through the same mapping as API responses.
 export { mapShift } from './mappers';
+
+export * from './bookedRate';

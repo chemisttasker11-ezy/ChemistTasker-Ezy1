@@ -14,6 +14,7 @@ urlpatterns = [
     path('posts/<int:pk>/', community.PostDetail.as_view()),
     path('posts/<int:pk>/comments/', community.CommentList.as_view()),
     path('posts/<int:pk>/report/', community.ReportPost.as_view()),
+    path('boards/<str:kind>/<int:pk>/report/', community.BoardReportView.as_view()),
     path('attachments/<int:pk>/', community.Attachment.as_view()),
     path('me/', views.MemberView.as_view()),
     path('articles/', views.ArticleList.as_view()),

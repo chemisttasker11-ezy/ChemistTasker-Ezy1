@@ -43,6 +43,10 @@ export function mobileRequestOtp(data: unknown) {
 export function mobileVerifyOtp(data: unknown) {
     return fetchApi('/users/mobile/verify-otp/', { method: 'POST', body: JSON.stringify(data) });
 }
+/** New to pharmacy (overseas) only: skip the Australian mobile check; a verified photo ID stands in for it. */
+export function skipMobileOverseas(data: { first_name: string; last_name: string; username: string }) {
+    return fetchApi('/users/mobile/skip-overseas/', { method: 'POST', body: JSON.stringify(data) });
+}
 export function mobileResendOtp(data: unknown) {
     return fetchApi('/users/mobile/resend-otp/', { method: 'POST', body: JSON.stringify(data) });
 }

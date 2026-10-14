@@ -1,12 +1,12 @@
 // src/pages/onboarding_explorer/IdentityV2.tsx
 import * as React from 'react';
-import { Box, Button, Link, TextField, Typography, MenuItem, Chip, Alert, Snackbar } from '@mui/material';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
+import { Box, Button, Link, TextField, Typography, MenuItem, Alert, Snackbar } from '@mui/material';
 import { API_BASE_URL } from '../../../constants/api';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
+import { evidenceExplainer, type EvidenceState } from '@chemisttasker/shared-core';
+import { EvidencePill } from '@chemisttasker/shared-ui/VerificationBadges';
 
 type ApiData = {
   government_id?: string | null;
@@ -97,6 +97,8 @@ export default function IdentityV2() {
       }
 
       const res = await updateOnboardingForm('explorer', fd);
+
+      announceOnboardingSaved(res);
       const nextData = res as any;
       const nextMeta = (nextData.identity_meta as Record<string, string> | null) || {};
       setData(nextData);
@@ -119,17 +121,14 @@ export default function IdentityV2() {
 
   if (loading) return <Typography>Loading...</Typography>;
 
-  const VerifiedChip = ({ ok, label }: { ok?: boolean | null; label: string }) => {
-    if (ok === true)   return <Chip icon={<CheckCircleOutlineIcon />} color="success" label={label} variant="outlined" />;
-    if (ok === false)  return <Chip icon={<ErrorOutlineIcon />}   color="error"   label={label} variant="outlined" />;
-    return               <Chip icon={<HourglassBottomIcon />}      label={label}               variant="outlined" />;
-  };
+  // Optional evidence: an upload is "check pending" until the document check records a result.
+  const idState: EvidenceState = data.gov_id_verified ? 'verified'
+    : !data.government_id ? 'not_supplied'
+    : data.gov_id_verification_note ? 'failed' : 'pending';
+
 
   return (
     <Box sx={{ width: '100%' }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-        Identity Document
-      </Typography>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>
@@ -318,10 +317,7 @@ export default function IdentityV2() {
 
       {/* Status chips */}
       <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-        <VerifiedChip ok={data.gov_id_verified} label="Government ID" />
-        {data.gov_id_verification_note && (
-          <Chip icon={<ErrorOutlineIcon />} color="warning" label={data.gov_id_verification_note} variant="outlined" />
-        )}
+        <EvidencePill label="Photo ID" state={idState} explainer={evidenceExplainer(idState, 'worker', 'photo ID', { note: data.gov_id_verification_note })} />
       </Box>
 
       {/* Action buttons */}

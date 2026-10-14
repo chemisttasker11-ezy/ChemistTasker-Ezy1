@@ -123,7 +123,9 @@ class ActiveShiftViewSet(BaseShiftViewSet):
 
 class AssignedProfileActions:
     """The view_assigned_profile action of the confirmed and history lists: a manager opens the profile of a worker
-    assigned to the shift (audited, no reveal quota, no e-mail)."""
+    assigned to the shift (audited, no reveal quota, no e-mail). Contact details and the CV only for upcoming booked
+    work (owner decision 2026-10-14): History shows the work profile alone."""
+    assigned_profile_contact = True
 
     @action(detail=True, methods=['post'], url_path='view_assigned_profile')
     def view_assigned_profile(self, request, pk=None):
@@ -135,7 +137,8 @@ class AssignedProfileActions:
         candidate = get_object_or_404(User, pk=user_id)
         slot_id = request.data.get('slot_id')
         slot = get_object_or_404(ShiftSlot, pk=slot_id, shift=shift) if slot_id is not None else None
-        return Response(assigned_profile(request=request, shift=shift, candidate=candidate, slot_id=slot_id, slot=slot))
+        return Response(assigned_profile(request=request, shift=shift, candidate=candidate, slot_id=slot_id, slot=slot,
+                                         contact=self.assigned_profile_contact))
 
 
 class ConfirmedShiftViewSet(AssignedProfileActions, BaseShiftViewSet):
@@ -161,6 +164,8 @@ class ConfirmedShiftViewSet(AssignedProfileActions, BaseShiftViewSet):
 
 class HistoryShiftViewSet(AssignedProfileActions, BaseShiftViewSet):
     """History shifts for managed pharmacies."""
+    assigned_profile_contact = False
+
     def get_queryset(self):
         user = self.request.user
         now  = timezone.now()

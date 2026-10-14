@@ -12,6 +12,7 @@ import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 dayjs.extend(utc);
 
@@ -231,6 +232,8 @@ export default function PaymentV2() {
       fd.append('submitted_for_verification', 'true');
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
       const nextData = res as any;
       setData(nextData);
       setTfnInput(''); // do not persist raw TFN in UI
@@ -265,6 +268,8 @@ export default function PaymentV2() {
       if (data.super_member_number != null) fd.append('super_member_number', String(data.super_member_number));
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
       const nextData = res as any;
       setData(nextData);
       unsaved.markClean({
@@ -297,6 +302,8 @@ export default function PaymentV2() {
       fd.append('submitted_for_verification', 'true'); // trigger scrape task
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
       const nextData = res as any;
       setData(nextData);
       unsaved.markClean({
@@ -330,6 +337,8 @@ export default function PaymentV2() {
       fd.append('abn_entity_confirmed', 'true');
 
       const res = await updateOnboardingForm(roleKey, fd);
+
+      announceOnboardingSaved(res);
       const nextData = res as any;
       setData(nextData);
       unsaved.markClean({
@@ -355,7 +364,6 @@ export default function PaymentV2() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: 960, px: { xs: 2, md: 3 }, pb: 3 }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Payment</Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>{error}</Alert>}
 

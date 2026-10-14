@@ -55,4 +55,6 @@ export type Candidate = {
   availabilityDays?: Array<string | number> | null;
   availabilityNotice?: string | null;
   availabilitySummary?: string | null;
+  /** Author's badges from the backend; null for posts without a profile. */
+  verification?: import('@chemisttasker/shared-core').VerificationSummary | null;
 };

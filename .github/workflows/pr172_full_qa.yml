@@ -1,0 +1,42 @@
+name: PR172 Full Isolated QA
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend_web/**'
+      - 'frontend_mobile/**'
+      - 'shared-core/**'
+      - 'scripts/run-staging-qa.sh'
+      - '.github/workflows/pr172_full_qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pr172-full-isolated-qa-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  full-isolated-qa:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 172 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: chemisttasker_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d chemisttasker_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Full isolated staging QA on exact source
+        shell: bash
+        run: bash scripts/run-staging-qa.sh

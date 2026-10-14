@@ -10,10 +10,12 @@ import {
 } from "@mui/icons-material";
 import type { Candidate } from "../types";
 import skillsRegistry from "@chemisttasker/shared-core/skills_registry.json";
-import { splitSkillsAndSoftware } from "@chemisttasker/shared-core";
+import { VerificationBadges } from "@chemisttasker/shared-ui/VerificationBadges";
+import { WorkerSkillRows } from "@chemisttasker/shared-ui/WorkerSkills";
 import SkillIcon, { skillLabel } from "@/public/skill-icon";
 import { RoleTile } from "../../../../../../shared-ui/talent/RoleTile";
 
+import { ReportButton } from '@chemisttasker/shared-ui/ReportButton';
 type PublicTalentCardProps = {
   candidate: Candidate;
   onViewCalendar: (candidate: Candidate) => void;
@@ -40,10 +42,6 @@ export default function PublicTalentCard({
     .join(", ");
   const isOpenToWork = Boolean(candidate.isFullTimeApplication || candidate.postKind === "FULL_TIME_APPLICATION");
   const datesPublished = candidate.availableDates?.length || 0;
-  // Registry IDs: skills and named software shown apart, three of each on the compact card.
-  const split = splitSkillsAndSoftware(skillsRegistry as any, [...(candidate.skills || []), ...(candidate.dispenseSoftware || [])].filter(Boolean));
-  const skills = split.skills.slice(0, 3);
-  const software = split.software.slice(0, 3);
   const roleLabel = candidate.role || "Pharmacy professional";
   const hasRating = Number.isFinite(candidate.ratingAverage) && candidate.ratingCount > 0;
   const canBook = canRequestBooking && !isOpenToWork && datesPublished > 0;
@@ -83,6 +81,11 @@ export default function PublicTalentCard({
                 <Typography sx={{ color: MUTED, fontSize: 14, lineHeight: 1.45, mt: 0.55, overflowWrap: "anywhere" }}>
                   {candidate.headline}
                 </Typography>
+              )}
+              {candidate.verification && (
+                <Box sx={{ mt: 1 }}>
+                  <VerificationBadges summary={candidate.verification} role={candidate.role} compact />
+                </Box>
               )}
             </Box>
             {hasRating && (
@@ -136,33 +139,11 @@ export default function PublicTalentCard({
             </Stack>
           )}
 
-          {(skills.length > 0 || software.length > 0) && (
-            <Stack spacing={1} sx={{ mt: 2 }}>
-              {skills.length > 0 && (
-                <Stack direction="row" useFlexGap flexWrap="wrap" gap={0.75} alignItems="center">
-                  <Typography sx={{ fontSize: 12, color: MUTED, fontWeight: 800, minWidth: 65 }}>Skills</Typography>
-                  {skills.map((skill) => (
-                    <Chip key={skill} size="small" icon={<SkillIcon skill={skill} size={16} />} label={skillLabel(skill)} variant="outlined" sx={{
-                      maxWidth: "100%", height: "auto", minHeight: 28, bgcolor: "#FAFBFE",
-                      borderColor: "#DCE3EF", borderRadius: "8px", color: "#344563",
-                      "& .MuiChip-label": { whiteSpace: "normal", fontSize: 12, py: 0.45 },
-                    }} />
-                  ))}
-                </Stack>
-              )}
-              {software.length > 0 && (
-                <Stack direction="row" useFlexGap flexWrap="wrap" gap={0.75} alignItems="center">
-                  <Typography sx={{ fontSize: 12, color: MUTED, fontWeight: 800, minWidth: 65 }}>Software</Typography>
-                  {software.map((skill) => (
-                    <Chip key={skill} size="small" icon={<SkillIcon skill={skill} size={16} />} label={skillLabel(skill)} variant="outlined" sx={{
-                      maxWidth: "100%", minHeight: 28, height: "auto", borderColor: "#CBE5EB",
-                      borderRadius: "8px", bgcolor: "#F1FAFB", color: "#075B71",
-                      "& .MuiChip-label": { whiteSpace: "normal", fontSize: 12, py: 0.45 },
-                    }} />
-                  ))}
-                </Stack>
-              )}
-            </Stack>
+          {!candidate.isExplorer && (
+            <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px solid #E6EAF2" }}>
+              <WorkerSkillRows compact skills={[...(candidate.clinicalServices || []), ...(candidate.dispenseSoftware || []), ...(candidate.expandedScope || [])]}
+                verification={candidate.verification ?? null} />
+            </Box>
           )}
         </Box>
 
@@ -217,6 +198,7 @@ export default function PublicTalentCard({
               {candidate.refId}
             </Typography>
           )}
+          <Box sx={{ mt: 0.5, alignSelf: { md: "center" } }}><ReportButton kind="talent" id={candidate.id} /></Box>
         </Box>
       </Stack>
     </Paper>

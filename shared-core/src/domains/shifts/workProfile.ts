@@ -18,15 +18,3 @@ export function groupWorkProfileSkills(registry: SkillsRegistry, codes: readonly
   }
   return groups;
 }
-
-/** Verification is a display signal and is never application eligibility. */
-export function workProfileSkillVerification(registry: SkillsRegistry, profile: Partial<ShiftWorkProfile>, code: string): 'Verified' | 'Not verified' | '' {
-  const id = skillId(registry, code) || code;
-  if (profile.verifiedSkills?.includes(id)) return 'Verified';
-  if (id === 'PRESCRIPTION_DISPENSING' && ['ASSISTANT','TECHNICIAN'].includes(profile.skillRole || '')) {
-    return profile.dispensaryQualificationVerified ? 'Verified' : 'Not verified';
-  }
-  const skill = findSkill(registry, id);
-  const mode = profile.skillRole ? skill?.eligibility[profile.skillRole] : undefined;
-  return skill?.certificate && mode !== 'familiarity' ? 'Not verified' : '';
-}

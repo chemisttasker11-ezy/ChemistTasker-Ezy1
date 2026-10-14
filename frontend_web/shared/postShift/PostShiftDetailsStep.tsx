@@ -44,7 +44,7 @@ const ROLES = [
   { value: 'TECHNICIAN', label: 'Dispensary technician' },
   { value: 'ASSISTANT', label: 'Assistant' },
   { value: 'STUDENT', label: 'Pharmacy student' },
-  { value: 'EXPLORER', label: 'Explorer' },
+  { value: 'EXPLORER', label: 'New to pharmacy' },
 ];
 
 export const sectionTitleSx = { fontSize: 16, fontWeight: 700, color: 'text.primary' } as const;

@@ -11,12 +11,13 @@ import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 
 import { API_BASE_URL } from '../../../constants/api';
-import { getOnboardingDetail, updateOnboardingForm, mobileRequestOtp, mobileVerifyOtp, mobileResendOtp } from '@chemisttasker/shared-core';
+import { getOnboardingDetail, updateOnboardingForm, mobileRequestOtp, mobileVerifyOtp, mobileResendOtp, WORK_RIGHTS_OPTIONS } from '@chemisttasker/shared-core';
 import ProfilePhotoUploader from '../../../components/profilePhoto/ProfilePhotoUploader';
 import { useAuth } from '../../../contexts/AuthContext';
 import type { User } from '../../../contexts/AuthContext';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
 import { AHPRA_CONSENT_TEXT } from '../../../constants/ahpraConsent';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 
 type ApiData = {
@@ -31,6 +32,7 @@ type ApiData = {
   ahpra_number?: string;
   government_id?: string | null;
   date_of_birth?: string | null;
+  work_rights?: string | null;
   gender?: string | null;
   emergency_contact_number?: string | null;
   emergency_contact_relation?: string | null;
@@ -211,6 +213,7 @@ export default function BasicInfoV2() {
 
       // date of birth
       if (data.date_of_birth != null) fd.append('date_of_birth', String(data.date_of_birth));
+      if (data.work_rights != null) fd.append('work_rights', String(data.work_rights));
       if (data.gender != null) fd.append('gender', String(data.gender));
       if (data.emergency_contact_number != null) fd.append('emergency_contact_number', String(data.emergency_contact_number));
       if (data.emergency_contact_relation != null) fd.append('emergency_contact_relation', String(data.emergency_contact_relation));
@@ -231,6 +234,8 @@ export default function BasicInfoV2() {
       // government id file
 
       const res = await updateOnboardingForm(roleKey, fd as any);
+
+      announceOnboardingSaved(res);
       const nextData = (res as any) || {};
       setData(nextData);
       setLockedNames({
@@ -353,9 +358,6 @@ export default function BasicInfoV2() {
 
   return (
     <Box sx={{ width: '100%' }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-        Basic Information
-      </Typography>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>
@@ -437,6 +439,17 @@ export default function BasicInfoV2() {
           InputLabelProps={{ shrink: true }}
           sx={{ flex: '1 1 220px', minWidth: 200, maxWidth: 220 }}
         />
+        <TextField
+          select
+          label="Work rights in Australia"
+          value={data.work_rights || ''}
+          onChange={e => setField('work_rights', e.target.value)}
+          sx={{ flex: '1 1 260px', minWidth: 220, maxWidth: 360 }}
+        >
+          {WORK_RIGHTS_OPTIONS.map(opt => (
+            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+          ))}
+        </TextField>
         <TextField
           select
           label="Gender"
@@ -534,7 +547,7 @@ export default function BasicInfoV2() {
           onChange={e => setField('ahpra_number', e.target.value)}
           disabled={isAhpraVerified}
           InputProps={{ startAdornment: <InputAdornment position="start">PHA</InputAdornment> }}
-          helperText={isAhpraVerified ? 'AHPRA number is locked after verification.' : AHPRA_CONSENT_TEXT}
+          helperText={isAhpraVerified ? 'Checked by our team. Your AHPRA number stays with you for life; contact support to correct it.' : AHPRA_CONSENT_TEXT}
           sx={{ flex: '1 1 320px', minWidth: 240, maxWidth: 420 }}
         />
         <TextField

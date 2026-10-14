@@ -50,6 +50,8 @@ export type Candidate = {
   rawRoleCategory?: string | null;
   explorerRoleType?: string | null;
   explorerProfileId?: number | null;
+  /** Author's badges from the backend; null for posts without a profile. */
+  verification?: import('@chemisttasker/shared-core').VerificationSummary | null;
   openToTravel?: boolean | null;
   coverageRadiusKm?: number | null;
   availabilityDays?: Array<string | number> | null;

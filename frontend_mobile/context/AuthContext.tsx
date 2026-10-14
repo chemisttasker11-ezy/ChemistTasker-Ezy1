@@ -32,6 +32,9 @@ export type User = {
   role: string;
   mobile_number?: string | null;
   is_mobile_verified?: boolean;
+  /** New to pharmacy (overseas) skipped the mobile check; photo ID verifies them instead. */
+  mobile_check_skipped?: boolean;
+  newcomer_type?: string | null;
   first_name?: string;
   last_name?: string;
   profile_photo?: string;
@@ -71,6 +74,7 @@ type AuthContextType = {
   verifyOTP: (code: string, email?: string) => Promise<void>;
   resendOTP: (email?: string) => Promise<void>;
   markMobileVerified: (updates?: Partial<User>) => Promise<void>;
+  markMobileCheckSkipped: (updates?: Partial<User>) => Promise<void>;
   updateUserProfilePhoto: (photoUrl: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   isLoading: boolean;
@@ -90,6 +94,7 @@ const AuthContext = createContext<AuthContextType>({
   verifyOTP: async () => { },
   resendOTP: async () => { },
   markMobileVerified: async () => { },
+  markMobileCheckSkipped: async () => { },
   updateUserProfilePhoto: async () => { },
   refreshUser: async () => { },
   isLoading: true,
@@ -451,9 +456,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const markMobileVerified = async (updates?: Partial<User>) => {
+  const markMobileVerified = (updates?: Partial<User>) => persistUser({ ...updates, is_mobile_verified: true });
+  const markMobileCheckSkipped = (updates?: Partial<User>) => persistUser({ ...updates, mobile_check_skipped: true });
+
+  const persistUser = async (updates: Partial<User>) => {
     if (!user) return;
-    const updated = { ...user, ...updates, is_mobile_verified: true };
+    const updated = { ...user, ...updates };
     setUser(updated);
     const session = await readStoredSession();
     await writeStoredSession({
@@ -544,6 +552,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         verifyOTP,
         resendOTP,
         markMobileVerified,
+        markMobileCheckSkipped,
         updateUserProfilePhoto,
         refreshUser,
         isLoading,

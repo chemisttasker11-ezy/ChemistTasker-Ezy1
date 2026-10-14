@@ -59,7 +59,7 @@ interface InternalSidebarProps {
 }
 
 const membersText = (count?: number | null) => (count == null ? undefined : `${count} ${count === 1 ? 'member' : 'members'}`);
-const AUDIENCE_TEXT: Record<string, string> = { ALL: 'Everyone', PUBLIC: 'Everyone', OWNER: 'Owners', PHARMACIST: 'Pharmacists', INTERN: 'Interns', STAFF: 'Pharmacy staff', OTHER_STAFF: 'Pharmacy staff', EXPLORER: 'Explorers' };
+const AUDIENCE_TEXT: Record<string, string> = { ALL: 'Everyone', PUBLIC: 'Everyone', OWNER: 'Owners', PHARMACIST: 'Pharmacists', INTERN: 'Interns', STAFF: 'Pharmacy team', OTHER_STAFF: 'Pharmacy team', EXPLORER: 'New to pharmacy' };
 
 export function InternalSidebar({
   isOpen,

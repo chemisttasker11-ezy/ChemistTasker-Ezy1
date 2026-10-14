@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import { announceOnboardingSaved } from '../OnboardingShell';
 
 type RatePref = {
   weekday: string;
@@ -98,6 +99,8 @@ export default function RatesV2() {
 
       const res = await updateOnboardingForm(roleKey, form);
 
+      announceOnboardingSaved(res);
+
       const d: ApiData = (res as any) || {};
       const nextRates = { ...emptyRates, ...(d.rate_preference || {}) };
       setRates(nextRates);
@@ -119,9 +122,6 @@ export default function RatesV2() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: 960, px: { xs: 2, md: 3 }, pb: 3 }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-        Rates
-      </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>{error}</Alert>}
 

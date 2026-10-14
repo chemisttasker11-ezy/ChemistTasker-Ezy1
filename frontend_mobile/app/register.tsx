@@ -13,28 +13,23 @@ import {
   TextInput,
   Button,
   Checkbox,
-  RadioButton,
   Surface,
   Divider,
 } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
+import { DatePickerModal } from 'react-native-paper-dates';
+import { NEWCOMER_MINIMUM_AGE, NEWCOMER_TYPES, ageFromBirthDate } from '@chemisttasker/shared-core';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
 
 const ROLE_OPTIONS = [
-  { label: 'Pharmacy Owner', description: 'Manage pharmacies, teams, shifts and business tools.', value: 'OWNER', icon: 'storefront', color: '#4f46e5' },
-  { label: 'Pharmacist', description: 'Find shifts, manage availability and build your professional profile.', value: 'PHARMACIST', icon: 'local-pharmacy', color: '#0ea5e9' },
-  {
-    label: 'Other Staff (Intern, Technician, Assistant, Student)',
-    description: 'Manage shifts, availability, attendance and your work profile.',
-    value: 'OTHER_STAFF',
-    icon: 'badge',
-    color: '#22c55e',
-  },
-  { label: 'Explorer (Shadowing/Volunteering)', description: 'Explore pharmacy opportunities and build an entry-level profile.', value: 'EXPLORER', icon: 'travel-explore', color: '#f97316' },
+  { label: 'Pharmacy owner', description: 'Post shifts, run rosters and manage your team.', value: 'OWNER', icon: 'storefront' },
+  { label: 'Pharmacist', description: 'Find locum, casual and permanent work.', value: 'PHARMACIST', icon: 'local-pharmacy' },
+  { label: 'Pharmacy team', description: 'Assistant · Technician · Intern · Student', value: 'OTHER_STAFF', icon: 'groups' },
 ];
+const BRAND = '#5222B8';
 
 const TERMS_URL = 'https://www.chemisttasker.com.au/terms-of-service';
 const PRIVACY_URL = 'https://www.chemisttasker.com.au/privacy-policy';
@@ -53,9 +48,13 @@ export default function RegisterScreen() {
     email: '',
     password: '',
     confirm_password: '',
-    role: 'OWNER',
+    role: '',
     accepted_terms: false,
   });
+  const [newcomerType, setNewcomerType] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [dobPickerOpen, setDobPickerOpen] = useState(false);
+  const newcomerAge = ageFromBirthDate(dateOfBirth);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -135,6 +134,26 @@ export default function RegisterScreen() {
       return;
     }
 
+    if (!formData.role) {
+      setError("Choose how you're joining.");
+      return;
+    }
+
+    if (formData.role === 'EXPLORER') {
+      if (!newcomerType) {
+        setError('Tell us which describes you best.');
+        return;
+      }
+      if (newcomerAge == null) {
+        setError('Enter your date of birth.');
+        return;
+      }
+      if (newcomerAge < NEWCOMER_MINIMUM_AGE) {
+        setError(`You need to be at least ${NEWCOMER_MINIMUM_AGE} to join ChemistTasker.`);
+        return;
+      }
+    }
+
     if (!formData.accepted_terms) {
       setError('Please accept the terms and conditions');
       return;
@@ -157,6 +176,7 @@ export default function RegisterScreen() {
         password: formData.password,
         confirm_password: formData.confirm_password,
         role: formData.role,
+        ...(formData.role === 'EXPLORER' ? { newcomer_type: newcomerType, date_of_birth: dateOfBirth } : {}),
         accepted_terms: formData.accepted_terms,
         captcha_token: captchaToken,
         referral_code: referralCode || undefined,
@@ -235,42 +255,74 @@ export default function RegisterScreen() {
 
         <Divider style={styles.divider} />
 
-        <Text variant="titleSmall" style={styles.sectionTitle}>I am a:</Text>
-        <View style={styles.roleGrid}>
+        <Text variant="titleSmall" style={styles.sectionTitle} accessibilityRole="header">{"I'm joining as"}</Text>
+        <View style={styles.roleList} accessibilityRole="radiogroup">
           {ROLE_OPTIONS.map((option) => {
             const isSelected = formData.role === option.value;
             return (
-              <TouchableOpacity
-                key={option.value}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: isSelected }}
-                accessibilityLabel={`${option.label}. ${option.description}`}
-                style={[
-                  styles.roleCard,
-                  { borderColor: isSelected ? option.color : '#e5e7eb' },
-                  isSelected && { backgroundColor: '#f8fafc' },
-                ]}
-                activeOpacity={0.85}
-                onPress={() => setFormData({ ...formData, role: option.value })}
-              >
-                <View style={styles.roleHeader}>
-                  <View style={[styles.roleIconWrap, { backgroundColor: `${option.color}1A` }]}>
-                    <MaterialIcons name={option.icon as any} size={22} color={option.color} />
-                  </View>
-                  <View pointerEvents="none" importantForAccessibility="no-hide-descendants">
-                    <RadioButton
-                      value={option.value}
-                      status={isSelected ? 'checked' : 'unchecked'}
-                      color={option.color}
-                    />
-                  </View>
+              <TouchableOpacity key={option.value} accessibilityRole="radio" accessibilityState={{ checked: isSelected }}
+                accessibilityLabel={`${option.label}. ${option.description}`} activeOpacity={0.85}
+                style={[styles.roleCard, isSelected && styles.roleCardSelected]}
+                onPress={() => setFormData({ ...formData, role: option.value })}>
+                <View style={[styles.roleIconWrap, isSelected && { backgroundColor: BRAND }]}>
+                  <MaterialIcons name={option.icon as any} size={22} color={isSelected ? '#FFFFFF' : '#4A1FA8'} />
                 </View>
-                <Text style={styles.radioLabel}>{option.label}</Text>
-                <Text style={styles.roleDescription}>{option.description}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.radioLabel}>{option.label}</Text>
+                  <Text style={styles.roleDescription}>{option.description}</Text>
+                </View>
               </TouchableOpacity>
             );
           })}
+          <View style={styles.orRow} importantForAccessibility="no-hide-descendants">
+            <View style={styles.orLine} /><Text style={styles.orText}>or</Text><View style={styles.orLine} />
+          </View>
+          <TouchableOpacity accessibilityRole="radio" accessibilityState={{ checked: formData.role === 'EXPLORER' }}
+            accessibilityLabel="New to pharmacy in Australia? Start here. Overseas-qualified, school students, placement seekers and anyone curious about pharmacy."
+            activeOpacity={0.85} style={[styles.roleCard, formData.role === 'EXPLORER' && styles.roleCardSelected]}
+            onPress={() => setFormData({ ...formData, role: 'EXPLORER' })}>
+            <View style={[styles.roleIconWrap, formData.role === 'EXPLORER' && { backgroundColor: BRAND }]}>
+              <MaterialIcons name="explore" size={22} color={formData.role === 'EXPLORER' ? '#FFFFFF' : '#4A1FA8'} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.radioLabel}>New to pharmacy in Australia? Start here</Text>
+              <Text style={styles.roleDescription}>Overseas-qualified, school students, placement seekers and anyone curious about pharmacy.</Text>
+            </View>
+            <MaterialIcons name="arrow-forward" size={20} color={BRAND} />
+          </TouchableOpacity>
         </View>
+
+        {formData.role === 'EXPLORER' ? (
+          <View style={styles.newcomerPanel}>
+            <Text style={styles.newcomerTitle} accessibilityRole="header">Which describes you best?</Text>
+            <View style={styles.roleList} accessibilityRole="radiogroup">
+              {NEWCOMER_TYPES.map(item => {
+                const checked = newcomerType === item.value;
+                return (
+                  <TouchableOpacity key={item.value} accessibilityRole="radio" accessibilityState={{ checked }} accessibilityLabel={`${item.label}. ${item.description}`}
+                    activeOpacity={0.85} style={[styles.roleCard, checked && styles.roleCardSelected]} onPress={() => setNewcomerType(item.value)}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.radioLabel}>{item.label}</Text>
+                      <Text style={styles.roleDescription}>{item.description}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Button mode="outlined" icon="calendar" onPress={() => setDobPickerOpen(true)} contentStyle={{ justifyContent: 'flex-start', minHeight: 44 }}>
+              {dateOfBirth ? `Date of birth: ${dateOfBirth.split('-').reverse().join('/')}` : 'Date of birth'}
+            </Button>
+            <Text style={[styles.roleDescription, newcomerAge != null && newcomerAge < NEWCOMER_MINIMUM_AGE && { color: '#B42318' }]}>
+              {newcomerAge != null && newcomerAge < NEWCOMER_MINIMUM_AGE
+                ? `You need to be at least ${NEWCOMER_MINIMUM_AGE} to join ChemistTasker.`
+                : `You need to be at least ${NEWCOMER_MINIMUM_AGE}. If you're under 18, only your first name is shown.`}
+            </Text>
+            <DatePickerModal locale="en" mode="single" visible={dobPickerOpen} onDismiss={() => setDobPickerOpen(false)}
+              date={dateOfBirth ? new Date(`${dateOfBirth}T00:00:00`) : new Date(new Date().getFullYear() - 18, 0, 1)}
+              validRange={{ endDate: new Date() }} label="Date of birth"
+              onConfirm={({ date }) => { setDobPickerOpen(false); if (date) setDateOfBirth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`); }} />
+          </View>
+        ) : null}
 
         <Divider style={styles.divider} />
 
@@ -505,32 +557,32 @@ const styles = StyleSheet.create({
   linkLabel: {
     textTransform: 'none',
   },
-  roleGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
+  roleList: { gap: 10 },
   roleCard: {
-    width: '48%',
-    minHeight: 82,
-    borderWidth: 1,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 64,
+    borderWidth: 1.5,
+    borderColor: '#D5DCE8',
+    borderRadius: 14,
     padding: 12,
     backgroundColor: '#fff',
   },
-  roleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
+  roleCardSelected: { borderColor: '#3C18A8', backgroundColor: '#EEEAF9' },
   roleIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#EEEAF9',
   },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
+  orLine: { flex: 1, height: 1, backgroundColor: '#D5DCE8' },
+  orText: { fontSize: 12.5, color: '#445474' },
+  newcomerPanel: { marginTop: 12, gap: 10, padding: 12, borderRadius: 16, backgroundColor: '#F5F8FC' },
+  newcomerTitle: { fontSize: 14.5, fontWeight: '600', color: '#06214A' },
   roleDescription: {
     color: '#64748B',
     fontSize: 12,
