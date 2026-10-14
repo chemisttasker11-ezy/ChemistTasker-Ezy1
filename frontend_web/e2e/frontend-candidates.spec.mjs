@@ -6,7 +6,7 @@ for (const role of ['Student', 'Pharmacist']) for (const initiallyRevealed of [t
     const profile = {
       id: 81, first_name: 'Review', last_name: 'Candidate', short_bio: 'Candidate biography',
       role_label: role, suburb: 'Bendigo', state: 'VIC', verified: true,
-      gov_id_verified: true, skills: ['TEST_SKILL'], years_experience: 3,
+      gov_id_verified: true, verification: { identity: 'verified', profile: 'verified' }, skills: ['TEST_SKILL'], years_experience: 3,
       open_to_travel: true, coverage_radius_km: 80, travel_states: ['VIC'],
     };
     let reveals = 0;
@@ -100,6 +100,7 @@ for (const initiallyRevealed of [true, false]) {
   test(`counteroffer review keeps the full interest profile after ${initiallyRevealed ? 'reload' : 'a failed reveal and retry'}`, async ({ page }) => {
     const profile = { id: 81, first_name: 'Review', last_name: 'Candidate', role_label: 'Student',
       short_bio: 'Full work biography', verified: true, gov_id_verified: true,
+      verification: { identity: 'verified', profile: 'verified' },
       skills: ['COUNTEROFFER_SKILL'], years_experience: 3, suburb: 'Bendigo', state: 'VIC' };
     let reveals = 0;
     await installApiFixture(page, roleUsers.owner, async (route, { path }) => {
