@@ -45,15 +45,16 @@ printing secret values. They are not stored in Git.
 Deployment logs, release markers and one-off scripts belong in
 `/opt/apps/chemisttasker-staging-ops/`, not in `env/`.
 
-Prepare the provider files on Windows from the legacy production env files:
+For an initial installation only, the legacy import helper is available:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-staging-env.ps1
 ```
 
-The script copies the backend, web and mobile settings into ignored staging
-files. It changes the mobile URLs to the staging domain and starts SMTP in
-console mode. On the server, `STAGING_EMAIL_BACKEND` in `staging.runtime.env`
+Do not run that helper over the working staging files: it overwrites provider
+files with legacy production values and does not preserve the curated layout.
+The deployed environment is already organized and must be retained. On the
+server, `STAGING_EMAIL_BACKEND` in `staging.runtime.env`
 decides whether staging sends real email; it is currently the SMTP backend at
 the owner's request, so remember that the database contains copied production
 users.
@@ -73,9 +74,10 @@ From `/opt/apps/chemisttasker-staging`, run:
 bash scripts/deploy-staging.sh
 ```
 
-The script validates Compose, dumps the staging database to
-`/opt/backups/chemisttasker/staging-predeploy-*.dump` (the ten newest are
-kept), builds the images, waits for container health, restarts the gateway,
+The script validates Compose, builds images before replacing services, dumps
+the staging database to `/opt/backups/chemisttasker/staging-predeploy-*.dump`
+(the ten newest are kept, with archive validation),
+waits for container health, restarts the existing gateway,
 checks the public site and backend health endpoint, then prints container
 status. Then run the smoke test:
 
@@ -89,7 +91,25 @@ Celery worker and beat start by default. To deploy without them:
 bash scripts/deploy-staging.sh --without-workers
 ```
 
-The gateway is restarted, never recreated. The production-owned shared Nginx
+When a reviewed release changes only the frontend images or staging Nginx
+configuration, use:
+
+```bash
+bash scripts/deploy-staging.sh --frontend-only
+```
+
+This builds Vite and Next, backs up the database, replaces only those frontend
+containers and restarts the existing gateway. Backend, worker, beat, PostgreSQL
+and Redis containers are preserved, and synthetic accounts are not reseeded.
+It must not be used to release backend code or migrations.
+
+The full deployment creates missing database/Redis services but does not
+recreate existing ones. Infrastructure configuration changes, including their
+log rotation settings, require a separately reviewed maintenance operation.
+
+The gateway is excluded from application `up` commands and an existing gateway
+is restarted, never recreated; its identity and network addresses are checked.
+The production-owned shared Nginx
 resolves the gateway address only when it loads, so a recreated gateway with a
 new address would leave staging unreachable until shared Nginx reloads. Keep
 the `gateway` service definition unchanged unless that reload is planned.
