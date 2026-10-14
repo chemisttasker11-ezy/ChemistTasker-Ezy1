@@ -83,6 +83,9 @@ backend_run() {
 backend_run python manage.py check --settings=core.contract_test_settings
 backend_run python manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
 backend_run python manage.py test users.tests billing.tests --settings=core.contract_test_settings
+# Explicitly execute the follow-up contract modules; users.tests alone does not
+# discover users/test_current_user_newcomer_contract.py or shifts listing contracts.
+backend_run python manage.py test users.test_current_user_newcomer_contract shifts.test_shift_listing_contract.AssignedProfileTests --settings=core.contract_test_settings
 backend_run python manage.py test marketplace.tests ethical_marketplace.tests --settings=core.contract_test_settings
 backend_run python manage.py test public_hub.tests --settings=public_hub.test_settings
 backend_run python manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity --settings=core.contract_test_settings

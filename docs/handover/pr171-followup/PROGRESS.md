@@ -97,3 +97,9 @@ Backend finalization, serializer contracts, frontend static/mobile lint, E2E smo
 - Introduced a shared visible-bonus predicate consumed by the booked-rate label and pill tone in both web and Expo. Hidden rates cannot indirectly advertise the bonus colour.
 - Replaced the PR-number-specific isolated QA workflow with a general pull-request and main-push workflow using the same existing QA script and PostgreSQL service. No CI checks are represented as passed until the exact new commit finishes.
 - PR171 remains open and PR172 draft; no merge, deployment, live data change, legacy skills migration, or unapproved snapshot regeneration.
+
+
+## Session 12 — regression-suite discovery and safe shared API retention
+- The isolated QA script originally only selected `users.tests` and several other named modules; this does **not** run the new `users.test_current_user_newcomer_contract`. Added explicit execution of that HTTP test plus `shifts.test_shift_listing_contract.AssignedProfileTests` in the existing Docker backend test phase, under `core.contract_test_settings`.
+- Independently verified `groupWorkProfileSkills` remains used by `frontend_mobile/roles/shared/skills/CandidateWorkProfile.tsx` and `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Dialogs/CandidateProfile.tsx`, in addition to its shared-core tests. The review suggestion to delete it is incorrect; retain this stable shared API. Do not remove it or its tests.
+- These checks require a fresh head CI run. The exact source commit and final results must be verified, not inferred.
