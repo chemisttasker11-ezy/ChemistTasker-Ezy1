@@ -75,6 +75,7 @@ ADMIN_LEVEL_CHOICES = tuple(
     (definition.key, definition.label) for definition in ADMIN_LEVEL_DEFINITIONS.values()
 )
 
+
 class UserRegistrationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(
         required=True,
@@ -347,13 +348,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'role', 'memberships']
         read_only_fields = fields
 
-def _newcomer_type(user):
-    if user.role != 'EXPLORER':
-        return None
-    from onboarding.models import ExplorerOnboarding
-    return ExplorerOnboarding.objects.filter(user=user).values_list('role_type', flat=True).first()
-
-
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     remember_me = serializers.BooleanField(write_only=True, required=False)
 
@@ -431,6 +425,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # 3) Combined user payload (+ is_mobile_verified added)
         from billing.utils import is_billing_active, is_in_free_trial
+        from onboarding.services.work_profile import newcomer_type as current_newcomer_type
         data['user'] = {
             'id':       self.user.id,
             'username': self.user.username,
@@ -444,7 +439,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'is_pharmacy_admin': bool(admin_payload),
             'is_mobile_verified': bool(getattr(self.user, 'is_mobile_verified', False)),
             'mobile_check_skipped': bool(getattr(self.user, 'mobile_check_skipped', False)),
-            'newcomer_type': (_newcomer_type(self.user)),
+            'newcomer_type': current_newcomer_type(self.user),
             'billing_active': is_billing_active(),
             'in_free_trial': is_in_free_trial(self.user),
         }
@@ -504,6 +499,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             ]
 
             from billing.utils import is_billing_active, is_in_free_trial
+            from onboarding.services.work_profile import newcomer_type as current_newcomer_type
             data['user'] = {
                 'id': user.id,
                 'username': user.username,
@@ -517,7 +513,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                 'is_pharmacy_admin': bool(admin_payload),
                 'is_mobile_verified': bool(getattr(user, 'is_mobile_verified', False)),
                 'mobile_check_skipped': bool(getattr(user, 'mobile_check_skipped', False)),
-                'newcomer_type': (_newcomer_type(user)),
+                'newcomer_type': current_newcomer_type(user),
                 'billing_active': is_billing_active(),
                 'in_free_trial': is_in_free_trial(user),
             }

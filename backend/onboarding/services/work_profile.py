@@ -11,6 +11,14 @@ def current_worker_profile(user):
     return None
 
 
+def newcomer_type(user):
+    """The New to pharmacy subtype (OVERSEAS, JUNIOR, ...) for every current-user payload: login, token refresh and
+    /users/me. None for other roles."""
+    if str(getattr(user, 'role', '') or '').upper() != 'EXPLORER':
+        return None
+    return ExplorerOnboarding.objects.filter(user=user).values_list('role_type', flat=True).first()
+
+
 def current_profile_short_bio(user):
     profile = current_worker_profile(user)
     if str(getattr(user, 'role', '') or '').upper() == 'EXPLORER':

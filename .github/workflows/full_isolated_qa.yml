@@ -1,6 +1,8 @@
 name: Full Isolated QA
 on:
+  # Up to 120 minutes with Docker builds: on pull requests only when labelled `full-qa`; always on main and on demand.
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - 'backend/**'
       - 'frontend_web/**'
@@ -25,6 +27,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   full-isolated-qa:
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-qa') }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     services:
