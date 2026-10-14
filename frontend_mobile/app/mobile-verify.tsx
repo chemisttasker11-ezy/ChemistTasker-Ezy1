@@ -15,6 +15,7 @@ export default function MobileVerifyScreen() {
     const router = useRouter();
     const { logout, markMobileVerified, markMobileCheckSkipped, user } = useAuth();
     const isNewcomer = String(user?.role || '').toUpperCase() === 'EXPLORER';
+  const canSkipOverseas = isNewcomer && String(user?.newcomer_type || '').toUpperCase() === 'OVERSEAS';
 
     const [mobile, setMobile] = useState('');
     const [firstName, setFirstName] = useState('');
@@ -258,7 +259,7 @@ export default function MobileVerifyScreen() {
                 </Button>
             </View>
 
-            {isNewcomer ? (
+            {canSkipOverseas ? (
                 <Surface style={styles.overseas} elevation={0}>
                     <Text style={styles.overseasTitle}>Joining from overseas?</Text>
                     <Text style={styles.overseasBody}>
