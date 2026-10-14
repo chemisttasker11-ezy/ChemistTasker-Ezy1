@@ -120,17 +120,38 @@ class AhpraNumberTests(TestCase):
         new = worker()  # choosing a role the first time is still allowed
         self.assertEqual(client_for(new.user).patch(STAFF_URL, {'tab': 'regulatory', 'role_type': 'STUDENT'}, format='json').status_code, 200)
 
-    def test_existing_duplicates_are_cleaned_by_the_migration_rule(self):
+    def test_existing_duplicates_are_preserved_by_the_migration_rule(self):
         from importlib import import_module
         from django.apps import apps
         claim = import_module('client_profile.migrations.0080_ahpra_registration').claim_existing_numbers
-        checked = PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'), ahpra_number='pha 77', ahpra_verified=True)
-        other = worker(role_type='INTERN', ahpra_number='PHA77', verified=True)
+        checked = PharmacistOnboarding.objects.create(
+            user=make_user('PHARMACIST'), ahpra_number='pha 77', ahpra_verified=True, verified=True
+        )
+        other = worker(role_type='INTERN', ahpra_number='PHA77', ahpra_verified=True, verified=True)
         with mock.patch('builtins.print'):
             claim(apps, None)
         other.refresh_from_db()
+        checked.refresh_from_db()
         self.assertEqual(AhpraRegistration.objects.get(number='PHA77').user_id, checked.user_id)
-        self.assertEqual((other.ahpra_number, other.ahpra_verified, other.verified), (None, False, False))
+        self.assertEqual((other.ahpra_number, other.ahpra_verified, other.verified), ('PHA77', True, True))
+        self.assertEqual((checked.ahpra_number, checked.ahpra_verified, checked.verified), ('pha 77', True, True))
+        new_account = worker(role_type='INTERN')
+        response = client_for(new_account.user).patch(
+            STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'PHA 77'}, format='json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(OtherStaffOnboarding.objects.get(pk=new_account.pk).ahpra_number)
+
+    def test_existing_duplicate_owner_keeps_verified_on_ordinary_save(self):
+        canonical = worker(role_type='INTERN', ahpra_number='PHA888', ahpra_verified=True, verified=True)
+        duplicate = worker(role_type='INTERN', ahpra_number='PHA888', ahpra_verified=True, verified=True)
+        AhpraRegistration.objects.create(number='PHA888', user=canonical.user)
+        response = client_for(duplicate.user).patch(
+            STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'PHA888'}, format='json'
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        duplicate.refresh_from_db()
+        self.assertEqual((duplicate.ahpra_number, duplicate.ahpra_verified, duplicate.verified), ('PHA888', True, True))
 
     def test_an_intern_submitting_an_unchecked_number_notifies_the_admin_team(self):
         profile = worker(role_type='INTERN', ahpra_number='PHA0000000001')
