@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Pagination, Rating, Skeleton, Stack, Typography } from "@mui/material";
 import { Building2, CalendarCheck, Clock, FileText, History, MapPin, Receipt, Star, Store } from "lucide-react";
 import {
+  bookedShiftRateLabel,
   fetchRatingsPageService,
   fetchRatingsSummaryService,
   type Shift,
@@ -31,14 +32,6 @@ const dateBits = (raw?: string | null) => {
 const clock = (raw?: string | null) => (raw ? String(raw).slice(0, 5) : "--");
 
 /** The pay the worker sees: pharmacist rate type, or the award with any owner bonus. */
-function rateLabel(shift: Shift) {
-  if (shift.roleNeeded === "PHARMACIST") {
-    if (shift.rateType === "FIXED") return `$${shift.fixedRate}/hr fixed`;
-    if (shift.rateType === "PHARMACIST_PROVIDED") return "Your provided rate";
-    return "Flexible rate";
-  }
-  return shift.ownerAdjustedRate ? `Award rate + $${shift.ownerAdjustedRate}/hr bonus` : "Award rate";
-}
 
 export function WorkerBookedShiftBoard({ mode, shifts, loading, ratings = {}, actions }: {
   mode: "confirmed" | "history";
@@ -85,7 +78,7 @@ export function WorkerBookedShiftBoard({ mode, shifts, loading, ratings = {}, ac
                   <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
                     {shift.roleNeeded && <Pill tone="navy" label={humanizeEnum(shift.roleLabel ?? shift.roleNeeded)} />}
                     {shift.employmentType && <Pill outlined label={humanizeEnum(shift.employmentType)} />}
-                    <Pill tone={shift.ownerAdjustedRate && shift.roleNeeded !== "PHARMACIST" ? "green" : "neutral"} label={rateLabel(shift)} />
+                    <Pill tone={shift.ownerAdjustedRate && shift.roleNeeded !== "PHARMACIST" ? "green" : "neutral"} label={bookedShiftRateLabel(shift)} />
                   </Stack>
                   {address && (
                     <Box component="a" href={mapUrl(address)} target="_blank" rel="noopener noreferrer"
