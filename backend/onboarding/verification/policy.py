@@ -81,8 +81,8 @@ def evaluate(profile) -> dict:
 
     verified: whether the profile has public access now. Profiles are promoted automatically. The only automatic
     demotion is tightening: an already-verified profile that lacks only the extra requirements keeps Verified until the
-    grace date and loses it afterwards. Missing base requirements always demote; only configured extra requirements
-    may receive a tightening grace period.
+    grace date and loses it afterwards. Base requirements never auto-demote (admin decisions stand); the tabs reset the
+    flag when the evidence itself changes.
     missing: everything full verification needs and lacks. grace: the missing extras that do not count yet because the
     profile was verified before the tightening; they are due by grace_until."""
     missing = missing_requirements(profile)
@@ -94,10 +94,9 @@ def evaluate(profile) -> dict:
     elif was_verified and extras_only:
         verified = bool(grace)
     else:
-        # Base requirements are not grandfathered. Explicit evidence-change paths
-        # revoke immediately; this also prevents stale verified flags bypassing
-        # professional registration or mobile/email checks.
-        verified = False
+        # Preserve existing verified profiles until the evidence itself changes.
+        # Explicit change paths revoke immediately; ordinary saves do not.
+        verified = was_verified
     return {'verified': verified, 'missing': missing, 'grace': grace,
             'grace_until': getattr(settings, 'VERIFICATION_GRACE_UNTIL', None) if grace else None}
 
