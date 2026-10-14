@@ -52,8 +52,8 @@ export default function SegmentTabs<T extends string>({
         },
         ...(mobileWrap ? {
           "& .MuiTab-root": {
-            flex: { xs: "1 1 30%", sm: "1 1 0" },
-            minWidth: { xs: 90, sm: 0 },
+            flex: { xs: "1 1 calc(33.333% - 8px)", sm: "1 1 0" },
+            minWidth: { xs: 100, sm: 0 },
             maxWidth: "none",
             px: { xs: 1, sm: 2 },
           },
