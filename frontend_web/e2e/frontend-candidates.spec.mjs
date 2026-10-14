@@ -46,7 +46,7 @@ for (const role of ['Student', 'Pharmacist']) for (const initiallyRevealed of [t
     await expect(dialog.getByText(role, { exact: true })).toBeVisible();
     await expect(dialog.getByText('Verified profile', { exact: true })).toBeVisible();
     await expect(dialog.getByText('Photo ID', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('PRESCRIPTION_DISPENSING', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Prescription dispensing', { exact: true })).toBeVisible();
     await expect(dialog.getByText('3 years experience', { exact: true })).toBeVisible();
     await expect(dialog.getByText(/Bendigo, VIC/)).toBeVisible();
     expect(reveals).toBe(initiallyRevealed ? 0 : role === 'Student' ? 2 : 1);
@@ -133,7 +133,7 @@ for (const initiallyRevealed of [true, false]) {
     }
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Student', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('PRESCRIPTION_DISPENSING', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Prescription dispensing', { exact: true })).toBeVisible();
     await expect(dialog.getByText('Full work biography', { exact: true })).toBeVisible();
     await expect(dialog.getByText('Verified profile', { exact: true })).toBeVisible();
     expect(reveals).toBe(initiallyRevealed ? 0 : 2);
