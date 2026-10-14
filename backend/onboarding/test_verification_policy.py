@@ -51,15 +51,10 @@ class VerifiedRequirementTests(SimpleTestCase):
             self.assertFalse(refresh_verified(obj))
             obj.save.assert_called_once_with(update_fields=["verified"])
 
-    def test_missing_base_requirement_revokes_stale_verification(self):
+    def test_missing_base_requirement_never_demotes_automatically(self):
         obj = profile(verified=True, mobile=False)
-        self.assertFalse(refresh_verified(obj))
-        obj.save.assert_called_once_with(update_fields=['verified'])
-
-    def test_missing_ahpra_revokes_stale_intern_verification(self):
-        obj = profile(role_type='INTERN', verified=True, ahpra_verified=False)
-        self.assertFalse(refresh_verified(obj))
-        obj.save.assert_called_once_with(update_fields=['verified'])
+        self.assertTrue(refresh_verified(obj))
+        obj.save.assert_not_called()
 
 
 class BadgeTests(SimpleTestCase):
