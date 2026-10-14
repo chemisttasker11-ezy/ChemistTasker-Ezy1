@@ -297,3 +297,16 @@ now treats it as Basic too, so it cannot slip past the lock.
   `frontend_web/landing_next/.env.local`, `frontend_mobile/.env.local`.
 - Test accounts: playground accounts (password in `playground/data.json`), plus `newcomer.overseas.qa@` (upgraded to
   pharmacist) and `newcomer.overseas.qa2@playground.test` created in the DB copy only.
+
+## Final senior D34 hardening — canonical-holder release and admin claims (2026-10-14)
+
+The temporary grandfathering migration keeps existing profiles, checked flags and Verified values exactly as agreed.
+The runtime must also keep every *remaining* historical number reserved if its canonical owner changes to another number.
+At release the registry row is transferred to the best remaining historical holder (checked first, then lowest user ID);
+a new third account is never permitted to claim a number still present on a legacy profile. A genuinely unused number
+is released as before. The operation runs within the same transaction as the corresponding number change.
+
+The admin form rejects changing the linked user of a numbered profile, even if its number is textually unchanged.
+An admin save snapshots numbers held *before* the save and only grandfathers those existing claims; it aborts
+atomically if a new claimant races with the form check. The corrected policy is exercised on SQLite and PostgreSQL
+through `onboarding.test_verification_transitions`. It does not alter the existing migration 0080 content or clear accounts.

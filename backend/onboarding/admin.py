@@ -3,6 +3,7 @@ from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from onboarding.verification.ahpra_numbers import _user_numbers
 from onboarding.verification.ahpra_numbers import ahpra_number_owner_conflict, normalize, sync_ahpra_registrations
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding, RefereeResponse
 
@@ -33,9 +34,22 @@ class AhpraOwnershipAdminMixin:
             def clean(self):
                 cleaned = super().clean()
                 user = cleaned.get('user') or getattr(self.instance, 'user', None)
-                changed = normalize(cleaned.get('ahpra_number')) != normalize(getattr(self.instance, 'ahpra_number', None))
-                # Only a change is checked: legacy duplicates kept by migration 0080 can still be edited (owner, 2026-10-14).
-                if changed and 'ahpra_number' in cleaned and user is not None and ahpra_number_owner_conflict(user.pk, cleaned.get('ahpra_number')):
+                if user is None or 'ahpra_number' not in cleaned:
+                    return cleaned
+                new_number = normalize(cleaned.get('ahpra_number'))
+                # Read the persisted identity rather than mutable form.instance:
+                # a profile cannot be silently transferred to a different account.
+                old = (
+                    type(self.instance).objects.filter(pk=self.instance.pk)
+                    .values('user_id', 'ahpra_number').first()
+                    if self.instance.pk else None
+                )
+                old_number = normalize(old['ahpra_number']) if old else ''
+                user_changed = old is not None and old['user_id'] != user.pk
+                if user_changed and (old_number or new_number):
+                    self.add_error('user', 'A profile with an AHPRA number cannot be reassigned to another account.')
+                elif (old is None or user_changed or old_number != new_number) and ahpra_number_owner_conflict(user.pk, new_number):
+                    # Historical duplicate holders can edit without claiming anything new.
                     self.add_error('ahpra_number', 'This AHPRA number belongs to another account.')
                 return cleaned
 
@@ -43,8 +57,19 @@ class AhpraOwnershipAdminMixin:
 
     def save_model(self, request, obj, form, change):
         with transaction.atomic():
+            # This snapshot must precede saving. Merely checking the current
+            # profile after save cannot tell a new claim from a legacy duplicate.
+            earlier = (
+                type(obj).objects.filter(pk=obj.pk).values('user_id', 'ahpra_number').first()
+                if obj.pk else None
+            )
+            if earlier and earlier['user_id'] != obj.user_id and (
+                normalize(earlier['ahpra_number']) or normalize(obj.ahpra_number)
+            ):
+                raise ValidationError({'user': 'A profile with an AHPRA number cannot be reassigned to another account.'})
+            grandfathered_numbers = _user_numbers(obj.user_id)
             super().save_model(request, obj, form, change)
-            sync_ahpra_registrations(obj.user_id)
+            sync_ahpra_registrations(obj.user_id, grandfathered_numbers=grandfathered_numbers)
 
 
 class OwnerOnboardingAdminForm(forms.ModelForm):

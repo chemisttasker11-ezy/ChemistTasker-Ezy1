@@ -31,6 +31,50 @@ def _user_numbers(user_id, *, skip=None) -> set[str]:
     return numbers
 
 
+def _remaining_legacy_owner(number: str, *, releasing_user_id: int) -> int | None:
+    """Find another pre-0080 holder before relinquishing the canonical registry row.
+
+    This scan is deliberately limited to number releases (rare support or unchecked-number
+    corrections), not normal profile saves. Legacy source values were not normalised in the
+    original tables, so a raw SQL equality check would miss whitespace variants.
+    """
+    from onboarding.models import OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding
+
+    candidates = []
+    for model in (PharmacistOnboarding, OtherStaffOnboarding, OwnerOnboarding):
+        rows = (
+            model.objects.exclude(user_id=releasing_user_id)
+            .exclude(ahpra_number__isnull=True).exclude(ahpra_number='')
+            .values_list('user_id', 'ahpra_number', 'ahpra_verified')
+            .iterator(chunk_size=1000)
+        )
+        for user_id, saved_number, checked in rows:
+            if normalize(saved_number) == number:
+                candidates.append((not bool(checked), user_id))
+    return min(candidates)[1] if candidates else None
+
+
+def _release_or_transfer_unused_registrations(user_id) -> None:
+    """Do not free a number while any grandfathered account still holds it.
+
+    Called inside a transaction. Row locking prevents a new claimant from slipping
+    between release of the old owner and registration of the legacy successor.
+    """
+    from onboarding.models import AhpraRegistration
+
+    current_numbers = _user_numbers(user_id)
+    stale = AhpraRegistration.objects.select_for_update().filter(user_id=user_id).exclude(
+        number__in=current_numbers
+    )
+    for registration in stale:
+        successor = _remaining_legacy_owner(registration.number, releasing_user_id=user_id)
+        if successor is None:
+            registration.delete()
+        else:
+            registration.user_id = successor
+            registration.save(update_fields=['user'])
+
+
 def guard_ahpra_number(profile, new_number) -> bool:
     """Change this profile's AHPRA number: refuse a checked number or one another account holds; otherwise save the new
     number, its reset check (and Verified when the role needs AHPRA), the claim and the release of numbers the person
@@ -68,7 +112,7 @@ def guard_ahpra_number(profile, new_number) -> bool:
             fields.append('verified')
         if profile.pk:
             profile.save(update_fields=fields)
-            AhpraRegistration.objects.filter(user_id=profile.user_id).exclude(number__in=_user_numbers(profile.user_id)).delete()
+            _release_or_transfer_unused_registrations(profile.user_id)
     return True
 
 
@@ -90,13 +134,27 @@ def ahpra_number_owner_conflict(user_id, number) -> bool:
     return bool(number) and AhpraRegistration.objects.filter(number=number).exclude(user_id=user_id).exists()
 
 
-def sync_ahpra_registrations(user_id) -> None:
-    """Make the registry match this person's saved profiles: claim every number they hold and release the rest.
-    Support corrections in Django admin call this after saving (they may change a checked number; that is the
-    support override; the admin form refuses a change to a number another account holds). A legacy duplicate kept by
-    migration 0080 stays registered to its owner and is left alone here (owner decision 2026-10-14)."""
+def sync_ahpra_registrations(user_id, *, grandfathered_numbers=frozenset()) -> None:
+    """Sync an admin correction without losing legacy reservations.
+
+    Only numbers already present on this account before the admin save may be
+    grandfathered if another account owns the registry row. New/changed claims
+    still fail atomically, including if a competing admin write wins after form
+    validation. Callers can use the default empty allowance for strict writes.
+    """
     from onboarding.models import AhpraRegistration
-    numbers = _user_numbers(user_id)
-    for number in numbers:
-        AhpraRegistration.objects.get_or_create(number=number, defaults={'user_id': user_id})
-    AhpraRegistration.objects.filter(user_id=user_id).exclude(number__in=numbers).delete()
+
+    with transaction.atomic():
+        numbers = _user_numbers(user_id)
+        for number in numbers:
+            try:
+                with transaction.atomic():
+                    registration, _ = AhpraRegistration.objects.get_or_create(
+                        number=number, defaults={'user_id': user_id}
+                    )
+                    owner_id = registration.user_id
+            except IntegrityError:
+                owner_id = AhpraRegistration.objects.get(number=number).user_id
+            if owner_id != user_id and number not in grandfathered_numbers:
+                raise IntegrityError('This AHPRA number belongs to another account.')
+        _release_or_transfer_unused_registrations(user_id)

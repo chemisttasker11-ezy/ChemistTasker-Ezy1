@@ -138,6 +138,29 @@ class AhpraNumberTests(TestCase):
         self.assertEqual(client_for(newcomer_account.user).patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'PHA77'}, format='json').status_code, 400)
         self.assertIsNone(AhpraSupportCorrectionTests.correct(self, other, 'PHA77'))  # support can still edit the legacy holder
 
+    def test_grandfathered_number_stays_reserved_after_original_owner_changes_in_app(self):
+        original = PharmacistOnboarding.objects.create(
+            user=make_user('PHARMACIST', is_otp_verified=True, is_mobile_verified=True),
+            ahpra_number='PHA 202', ahpra_verified=False,
+        )
+        legacy = worker(role_type='INTERN', ahpra_number='pha202', verified=True)
+        AhpraRegistration.objects.create(number='PHA202', user=original.user)
+        response = client_for(original.user).patch(
+            PHARMACIST_URL, {'tab': 'basic', 'ahpra_number': 'PHA203'}, format='json'
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        legacy.refresh_from_db()
+        self.assertEqual((legacy.ahpra_number, legacy.verified), ('pha202', True))
+        self.assertEqual(AhpraRegistration.objects.get(number='PHA202').user_id, legacy.user_id)
+        self.assertEqual(AhpraRegistration.objects.get(number='PHA203').user_id, original.user_id)
+        third = worker(role_type='INTERN')
+        denied = client_for(third.user).patch(
+            STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'PHA 202'}, format='json'
+        )
+        self.assertEqual(denied.status_code, 400, denied.data)
+        third.refresh_from_db()
+        self.assertFalse(third.ahpra_number)
+
     def test_an_intern_submitting_an_unchecked_number_notifies_the_admin_team(self):
         profile = worker(role_type='INTERN', ahpra_number='PHA0000000001')
         with mock.patch('onboarding.emails.notify_superuser_on_onboarding') as notify:
@@ -362,6 +385,67 @@ class AhpraSupportCorrectionTests(TestCase):
             other = worker(role_type='INTERN')
             response = client_for(other.user).patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': old + 'B'}, format='json')
             self.assertEqual(response.status_code, 400, response.data)
+
+    def test_grandfathered_number_stays_reserved_after_canonical_admin_correction(self):
+        canonical = PharmacistOnboarding.objects.create(
+            user=make_user('PHARMACIST'), ahpra_number='PHA 301', ahpra_verified=True
+        )
+        legacy = worker(role_type='INTERN', ahpra_number='PHA301', verified=True)
+        AhpraRegistration.objects.create(number='PHA301', user=canonical.user)
+        self.assertIsNone(self.correct(canonical, 'PHA302'))
+        legacy.refresh_from_db()
+        self.assertEqual((legacy.ahpra_number, legacy.verified), ('PHA301', True))
+        self.assertEqual(AhpraRegistration.objects.get(number='PHA301').user_id, legacy.user_id)
+        self.assertEqual(AhpraRegistration.objects.get(number='PHA302').user_id, canonical.user_id)
+        third = worker(role_type='INTERN')
+        self.assertEqual(client_for(third.user).patch(
+            STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'PHA301'}, format='json'
+        ).status_code, 400)
+
+    def test_admin_cannot_reassign_a_numbered_profile_to_another_user(self):
+        from django.contrib import admin
+        from django.test import RequestFactory
+        canonical = worker(role_type='INTERN', ahpra_number='PHA401')
+        replacement = make_user('OTHER_STAFF')
+        AhpraRegistration.objects.create(number='PHA401', user=canonical.user)
+        model_admin = admin.site._registry[type(canonical)]
+        request = RequestFactory().post('/admin/')
+        request.user = make_user('OWNER', is_superuser=True, is_staff=True)
+        form = model_admin.get_form(request, canonical)(instance=canonical)
+        form.cleaned_data = {'user': replacement, 'ahpra_number': 'PHA401'}
+        form._errors = {}
+        form.clean()
+        self.assertIn('user', form.errors)
+        # The transactional save path enforces the same invariant even if bypassing the form.
+        canonical.user = replacement
+        with self.assertRaisesMessage(Exception, 'cannot be reassigned'):
+            model_admin.save_model(request, canonical, form, True)
+        canonical.refresh_from_db()
+        self.assertNotEqual(canonical.user_id, replacement.pk)
+        self.assertEqual(AhpraRegistration.objects.get(number='PHA401').user_id, canonical.user_id)
+
+    def test_admin_concurrent_new_claim_cannot_bypass_form_check(self):
+        from django.contrib import admin
+        from django.db import IntegrityError
+        from django.test import RequestFactory
+        profile = PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'))
+        model_admin = admin.site._registry[PharmacistOnboarding]
+        request = RequestFactory().post('/admin/')
+        request.user = make_user('OWNER', is_superuser=True, is_staff=True)
+        form = model_admin.get_form(request, profile)(instance=profile)
+        form.cleaned_data = {'user': profile.user, 'ahpra_number': 'PHA402'}
+        form._errors = {}
+        form.clean()
+        self.assertFalse(form.errors)
+        # Another account wins the registry after validation but before save.
+        winner = make_user('PHARMACIST')
+        AhpraRegistration.objects.create(number='PHA402', user=winner)
+        profile.ahpra_number = 'PHA402'
+        with self.assertRaises(IntegrityError):
+            model_admin.save_model(request, profile, form, True)
+        profile.refresh_from_db()
+        self.assertFalse(profile.ahpra_number)
+        self.assertEqual(AhpraRegistration.objects.get(number='PHA402').user_id, winner.pk)
 
     def test_admin_cannot_give_a_number_another_account_holds(self):
         AhpraRegistration.objects.create(number='PHAA9', user=make_user('PHARMACIST'))
