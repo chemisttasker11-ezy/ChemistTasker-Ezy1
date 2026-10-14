@@ -51,3 +51,9 @@ Review earlier PR handover reasoning and accepted decisions before changing beha
 
 ## Latest CI (1097419)
 Backend finalization, serializer contracts, frontend static/mobile lint, E2E smoke, and public security passed. Frontend E2E still failed (vite-playwright and shift-filter appearance). Shared-core consolidation was in progress at observation. Remaining failures require exact failure analysis; do not refresh screenshots without visual comparison.
+
+## Session 5 — exact follow-up on candidate and appearance tests
+- Diagnosed six Playwright failures: the UI now uses the canonical `VerificationSummary` object (`verified`, `badges` etc.) and `Verified profile` / `Photo ID` labels. Initial fixture change had mistakenly supplied `identity/profile` keys, which the canonical normalizer ignores. Replaced them with actual summary shape and aligned text assertions to the current badge labels. Re-run required.
+- Appearance job failures are real relative to the approved 3df951b baselines: shift filters move desktop date inputs down exactly 90px (832.14 -> 922.14), and 390px screenshots differ by ~5-6%. Do NOT waive or auto-approve; needs intended-layout decision against PR165/166 handovers and visual diff. Other 20 screenshots passed.
+- Latest shared-core consolidation jobs (1097419) have passed shared-core, architecture, boundary, Vite, Next, Expo; PostgreSQL concurrency and release gate were pending when observed.
+- PR171 handover explicitly leaves migration 0080 staging snapshot, real-device Expo, admin UI, referee email E2E and membership-role UI as outstanding. Keep those visible rather than falsely claiming complete acceptance.
