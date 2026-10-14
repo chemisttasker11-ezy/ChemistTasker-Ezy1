@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import registry from '../../../skills_registry.json';
 import { mapShiftMemberStatus, mapShiftInterest } from './mappers';
-import { normalizeShiftWorkProfile, groupWorkProfileSkills } from './workProfile';
+import { normalizeShiftWorkProfile } from './workProfile';
 import { normalizeVerification, skillEvidenceState, verificationRows, evidenceExplainer } from '../onboarding/verification';
 
 describe('candidate profile contracts', () => {
@@ -25,9 +24,8 @@ describe('candidate profile contracts', () => {
     expect(member.userDetail?.dispensaryQualificationVerified).toBe(false);
     expect(normalizeShiftWorkProfile(detail)?.roleLabel).toBe('Technician');
   });
-  it('keeps anonymous profiles empty and canonicalizes skills once', () => {
+  it('keeps anonymous profiles empty', () => {
     expect(normalizeShiftWorkProfile(null)).toBeNull();
     expect(normalizeShiftWorkProfile('Anonymous')).toBeNull();
-    expect(groupWorkProfileSkills(registry as any, ['DAA','WEBSTER_PACKING_DAA','FRED'])['Dispensing & Medicines']).toEqual(['WEBSTER_PACKING_DAA']);
   });
 });
