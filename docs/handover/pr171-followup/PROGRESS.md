@@ -34,3 +34,8 @@ Django owns authorisation and verification; shared-core owns canonical skills an
 - Corrected intern legacy AHPRA projection to use the checked registration field rather than the document flag.
 - Added `newcomer_type` to login/refresh user payload and shared-core account contract, with a safe query helper. Overseas skip controls now require `EXPLORER + OVERSEAS` on Vite/Next/Expo; backend remains authoritative.
 - Pending: check other current-user endpoints for subtype parity, membership policy, boundary audit, runtime E2E, PostgreSQL migration rehearsal, CI.
+
+## Session 3 CI and environment
+- Attempted public HTTPS Git clone in the execution container; network DNS cannot resolve github.com. This blocks local Django/PostgreSQL and Playwright execution in this runtime. GitHub connector remains available for code changes and hosted CI.
+- Hosted CI on earlier head 12183e4: Frontend Static and Mobile Lint **passed**, Public Repository Security **passed**; backend, serializer, shared-core and E2E workflows were still running at observation. New commits require their own fresh gate results.
+- Do not claim a full E2E run or migration rehearsal until hosted workflows provide specific execution evidence. No merge.
