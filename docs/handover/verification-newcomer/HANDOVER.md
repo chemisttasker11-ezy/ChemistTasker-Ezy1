@@ -46,12 +46,18 @@ first: it is not a logic change by mistake.
 | D26 | **Interns are checked like pharmacists** (manual check on the public register; provisional registration). Submitting the Role step with an unchecked number emails the admin team, as the pharmacist basic step does. | `services/regulatory.py` |
 | open | **Under-18s: rules to be discussed** (regulations, our responsibilities). Unchanged for now: minimum age 15, first name only, Under 18 label. The review's "no contact before a match" rule is **not implemented** pending that discussion. | - |
 
+### Legacy AHPRA duplicates (owner, 2026-10-14)
+
+| # | Decision | Enforced in |
+|---|---|---|
+| D34 | **Legacy duplicate AHPRA numbers are kept**, on local, staging and production (test accounts stay active). Migration 0080 only registers one owner per number. The rules stay strict for anything new: no account can newly claim a number another account holds, in the app or in admin. Legacy holders can still save their profile and be edited by support. **Tighten again at launch, starting from clean data.** | `client_profile/migrations/0080`, `ahpra_numbers.sync_ahpra_registrations`, admin form (checks only a changed number); test `test_existing_duplicates_are_kept_and_one_owner_registered` |
+
 ### Decisions after the second review (owner, 2026-10-14)
 
 | # | Decision | Enforced in |
 |---|---|---|
 | D27 | **A Pharmacy team role is fixed once chosen** (assistant / technician / intern / student). Basic takes no role fields; the Role step refuses a change ("Contact support"); the picker is locked on web and Expo. Supersedes D21's "check stays across role changes" (roles no longer change). | `services/regulatory.py`, `services/basic.py`, `RegulatoryV2.tsx`, Expo `RegulatoryScreen` |
-| D28 | **AHPRA ownership is a table** (`AhpraRegistration`, unique normalised number, one user). Every onboarding write passes one guard (`verification/ahpra_numbers.guard_ahpra_write`); unknown tabs are refused so nothing skips it. Migration 0080 registers existing numbers and **clears duplicates**: the account whose number was checked keeps it (else the lowest user id); others lose the number, its check and (workers) Verified, with a note to contact support. Owner: duplicates on local, staging and production are fake accounts. | `onboarding/verification/ahpra_numbers.py`, `serializers.py`, `client_profile/migrations/0080` |
+| D28 | **AHPRA ownership is a table** (`AhpraRegistration`, unique normalised number, one user). Every onboarding write passes one guard (`verification/ahpra_numbers.guard_ahpra_write`); unknown tabs are refused so nothing skips it. Migration 0080 registers one owner per existing number and **changes no profile** (D34): legacy duplicates stay as they are. | `onboarding/verification/ahpra_numbers.py`, `serializers.py`, `client_profile/migrations/0080` |
 | D29 | **Submit never removes Verified.** Only evidence changes do: a changed AHPRA number, a changed photo ID when Verified relies on it (overseas mobile skip or a tightening), leaving Overseas. A verified mobile number is already locked. Rates, payment, profile, interests, skills and identity edits that Verified does not rely on keep access, including during a tightening grace period. | `policy.revoke_for_changed_evidence`; submit resets removed from basic, identity, payment, preferences, profile, regulatory (owner profile unchanged) |
 | D30 | **Referee links and reminders sent before an upgrade follow the person** to their new worker profile (answers and reminders kept). | `services/work_profile.referee_profile_target`, `views.py` (questionnaire + reject), `tasks.run_referee_reminder` |
 | D31 | **Worker skills show as two rows, Skills and Software** (the job board's split), on talent cards (symbol tiles) and profiles (name chips), web, Next and Expo. | `frontend_web/shared/WorkerSkills.tsx`, Expo `WorkerSkillRows.tsx` |
@@ -157,7 +163,7 @@ differently: the race probe patches the removed `basic.ahpra_number_error` (the 
 the Basic role probe expects the role to change (D27: it can no longer change, so the assistant correctly stays
 Verified).
 
-**Before staging/production:** migration 0080 on the local DB copy registered 3 numbers and cleared 279 duplicates;
+**Superseded by D34 (2026-10-14):** the first version of 0080 cleared duplicates; on the local DB copy it registered 3 numbers and cleared 279 duplicates;
 263 of 265 seed pharmacists lost their number and Verified (all `.test` accounts). Expect the same on staging and
 production seed data. Run it on a staging snapshot first and read the printed counts.
 
@@ -210,8 +216,11 @@ now treats it as Basic too, so it cannot slip past the lock.
 - `talent` 0004 label-only; 0005 `ExplorerPost.hidden_at`. `pharmacy_hub` 0004 label-only. `public_hub` 0005 BoardReport.
 - `client_profile` 0079 `work_rights` on pharmacist, Pharmacy team and newcomer profiles (additive, default '').
   Applied to the DB copy after a backup (`playground/backups/ct_verification_before_0079_20261014.dump`).
-- `client_profile` 0080 `AhpraRegistration` + data step (registers numbers, clears duplicates, prints counts; reverse is a
-  no-op for the cleared numbers). Applied to the DB copy after a backup (`playground/backups/ct_verification_before_0080_20261014.dump`).
+- `client_profile` 0080 `AhpraRegistration` + data step: registers one owner per existing number (the checked account,
+  else the lowest user id) and **changes no profile**; prints how many legacy duplicate holders were kept (D34). On the local
+  DB copy: 3 numbers registered, 279 legacy duplicate holders kept, 244 of 265 seed pharmacists still Verified. The copy was
+  rebuilt from `playground/backups/ct_verification_before_0080_20261014.dump` (the destructive first version had been applied;
+  that state is kept in `ct_verification_after_old0080_20261014.dump`) and then migrated with the final 0080.
 - Label-only migrations checked with `sqlmigrate`: no SQL. No data is rewritten. Existing ExplorerOnboarding codes kept
   (STUDENT/JUNIOR/CAREER_SWITCHER relabelled; OVERSEAS added).
 - Applied only to a **copy** of the dev DB (`ct_verification` in container `ctpg`). The dev DB `chemisttasker_preview`
@@ -261,8 +270,8 @@ now treats it as Basic too, so it cannot slip past the lock.
 
 1. **The full regression gate on the final commit** (all backend suites on SQLite and PostgreSQL, isolated attendance
    commands, API replay, OpenAPI/migration identity, web builds) — not re-run after round 3 by request.
-2. **Migration 0080 on a staging snapshot**: read the printed counts and the list of affected accounts; it clears
-   duplicate AHPRA numbers on every duplicate account (not only `.test` seed accounts) and its reverse does not restore them.
+2. **Migration 0080 on a staging snapshot**: it changes no profile, but read the printed counts (numbers registered,
+   legacy duplicate holders kept) to know how much clean-up the launch tightening will need.
 3. **Expo on a real device or the Expo web build**: the staff Shift Centre redesign, the worker profile dialog with
    Message, date pickers, role lock and upgrade warning.
 4. **Admin corrections in the real Django admin UI** (the tests drive the ModelAdmin form and save directly).

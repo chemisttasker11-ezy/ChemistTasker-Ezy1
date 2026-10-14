@@ -4,14 +4,13 @@ import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
-DUPLICATE_NOTE = 'This AHPRA number belongs to another account. Contact support if it is yours.'
-
 
 def claim_existing_numbers(apps, schema_editor):
-    """One owner per AHPRA number (owner decision 2026-10-13/14). For a number on several accounts, the account whose
-    number was checked keeps it (the lowest user id among several, or among none checked); the other accounts lose the
-    number and its check, and their Verified when their role needs AHPRA. Local, staging and production duplicates are
-    fake accounts (owner, 2026-10-14). Prints what it changed."""
+    """Register one owner per existing AHPRA number; change no profile. Owner decision 2026-10-14: legacy duplicates
+    (test accounts on local, staging and production) are kept as they are and stay active; the rules are tightened
+    again at launch with clean data. Where a number appears on several accounts, the account whose number was checked
+    (else the lowest user id) is registered as its owner; the others keep the number on their profile, and the
+    runtime guard stops any further account from claiming it. Prints the counts."""
     import re
     Registration = apps.get_model('client_profile', 'AhpraRegistration')
     models_ = [apps.get_model('client_profile', name) for name in ('PharmacistOnboarding', 'OtherStaffOnboarding', 'OwnerOnboarding')]
@@ -20,20 +19,13 @@ def claim_existing_numbers(apps, schema_editor):
         for row in model.objects.exclude(ahpra_number__isnull=True).exclude(ahpra_number='').only('pk', 'user_id', 'ahpra_number', 'ahpra_verified'):
             number = re.sub(r'\s+', '', row.ahpra_number).upper()
             if number:
-                claims.setdefault(number, []).append((model, row))
-    cleared = 0
+                claims.setdefault(number, []).append(row)
+    legacy = 0
     for number, rows in claims.items():
-        owner = min(rows, key=lambda item: (not item[1].ahpra_verified, item[1].user_id))[1].user_id
+        owner = min(rows, key=lambda row: (not row.ahpra_verified, row.user_id)).user_id
         Registration.objects.create(number=number, user_id=owner)
-        for model, row in rows:
-            if row.user_id == owner:
-                continue
-            fields = {'ahpra_number': None, 'ahpra_verified': False, 'ahpra_verification_note': DUPLICATE_NOTE}
-            if model.__name__ != 'OwnerOnboarding':
-                fields['verified'] = False
-            model.objects.filter(pk=row.pk).update(**fields)
-            cleared += 1
-    print(f"\n  AHPRA numbers registered: {len(claims)}; duplicate numbers cleared from other accounts: {cleared}")
+        legacy += len({row.user_id for row in rows} - {owner})
+    print(f"\n  AHPRA numbers registered: {len(claims)}; legacy duplicate holders kept unchanged: {legacy}")
 
 
 class Migration(migrations.Migration):

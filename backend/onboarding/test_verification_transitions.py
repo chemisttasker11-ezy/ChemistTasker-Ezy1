@@ -120,7 +120,7 @@ class AhpraNumberTests(TestCase):
         new = worker()  # choosing a role the first time is still allowed
         self.assertEqual(client_for(new.user).patch(STAFF_URL, {'tab': 'regulatory', 'role_type': 'STUDENT'}, format='json').status_code, 200)
 
-    def test_existing_duplicates_are_cleaned_by_the_migration_rule(self):
+    def test_existing_duplicates_are_kept_and_one_owner_registered(self):
         from importlib import import_module
         from django.apps import apps
         claim = import_module('client_profile.migrations.0080_ahpra_registration').claim_existing_numbers
@@ -130,7 +130,13 @@ class AhpraNumberTests(TestCase):
             claim(apps, None)
         other.refresh_from_db()
         self.assertEqual(AhpraRegistration.objects.get(number='PHA77').user_id, checked.user_id)
-        self.assertEqual((other.ahpra_number, other.ahpra_verified, other.verified), (None, False, False))
+        # Owner decision 2026-10-14: legacy duplicates stay as they are (tightened again at launch).
+        self.assertEqual((other.ahpra_number, other.verified), ('PHA77', True))
+        # ...and can still be saved, while a new account cannot claim the number.
+        self.assertEqual(client_for(other.user).patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'PHA77'}, format='json').status_code, 200)
+        newcomer_account = worker(role_type='INTERN')
+        self.assertEqual(client_for(newcomer_account.user).patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'PHA77'}, format='json').status_code, 400)
+        self.assertIsNone(AhpraSupportCorrectionTests.correct(self, other, 'PHA77'))  # support can still edit the legacy holder
 
     def test_an_intern_submitting_an_unchecked_number_notifies_the_admin_team(self):
         profile = worker(role_type='INTERN', ahpra_number='PHA0000000001')
@@ -334,7 +340,6 @@ class AhpraSupportCorrectionTests(TestCase):
         model_admin = admin.site._registry[type(profile)]
         request = RequestFactory().post('/admin/')
         request.user = make_user('OWNER', is_superuser=True, is_staff=True)
-        profile.ahpra_number = number
         form = model_admin.get_form(request, profile)(instance=profile)
         form.cleaned_data = {'user': profile.user, 'ahpra_number': number, 'phone_number': getattr(profile, 'phone_number', None),
                              'role': getattr(profile, 'role', None)}
@@ -342,6 +347,7 @@ class AhpraSupportCorrectionTests(TestCase):
         form.clean()
         if form.errors:
             return form.errors
+        profile.ahpra_number = number
         model_admin.save_model(request, profile, form, True)
         return None
 

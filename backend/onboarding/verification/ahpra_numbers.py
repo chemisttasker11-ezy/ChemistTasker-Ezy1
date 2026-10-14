@@ -84,7 +84,7 @@ def guard_ahpra_write(profile, validated_data: dict, *, tab: str, number_tabs: t
 
 
 def ahpra_number_owner_conflict(user_id, number) -> bool:
-    """True when another account holds this number (admin form check before saving a support correction)."""
+    """True when another account holds this number (admin form check when a support correction changes it)."""
     from onboarding.models import AhpraRegistration
     number = normalize(number)
     return bool(number) and AhpraRegistration.objects.filter(number=number).exclude(user_id=user_id).exists()
@@ -93,11 +93,10 @@ def ahpra_number_owner_conflict(user_id, number) -> bool:
 def sync_ahpra_registrations(user_id) -> None:
     """Make the registry match this person's saved profiles: claim every number they hold and release the rest.
     Support corrections in Django admin call this after saving (they may change a checked number; that is the
-    support override). Raises IntegrityError when another account holds a number, so the admin save rolls back."""
+    support override; the admin form refuses a change to a number another account holds). A legacy duplicate kept by
+    migration 0080 stays registered to its owner and is left alone here (owner decision 2026-10-14)."""
     from onboarding.models import AhpraRegistration
     numbers = _user_numbers(user_id)
     for number in numbers:
-        owner = AhpraRegistration.objects.get_or_create(number=number, defaults={'user_id': user_id})[0].user_id
-        if owner != user_id:
-            raise IntegrityError(f'AHPRA number already belongs to user {owner}')
+        AhpraRegistration.objects.get_or_create(number=number, defaults={'user_id': user_id})
     AhpraRegistration.objects.filter(user_id=user_id).exclude(number__in=numbers).delete()

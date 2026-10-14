@@ -3,7 +3,7 @@ from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from onboarding.verification.ahpra_numbers import ahpra_number_owner_conflict, sync_ahpra_registrations
+from onboarding.verification.ahpra_numbers import ahpra_number_owner_conflict, normalize, sync_ahpra_registrations
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding, RefereeResponse
 
 
@@ -33,7 +33,9 @@ class AhpraOwnershipAdminMixin:
             def clean(self):
                 cleaned = super().clean()
                 user = cleaned.get('user') or getattr(self.instance, 'user', None)
-                if 'ahpra_number' in cleaned and user is not None and ahpra_number_owner_conflict(user.pk, cleaned.get('ahpra_number')):
+                changed = normalize(cleaned.get('ahpra_number')) != normalize(getattr(self.instance, 'ahpra_number', None))
+                # Only a change is checked: legacy duplicates kept by migration 0080 can still be edited (owner, 2026-10-14).
+                if changed and 'ahpra_number' in cleaned and user is not None and ahpra_number_owner_conflict(user.pk, cleaned.get('ahpra_number')):
                     self.add_error('ahpra_number', 'This AHPRA number belongs to another account.')
                 return cleaned
 

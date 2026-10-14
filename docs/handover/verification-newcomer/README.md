@@ -56,6 +56,6 @@ actually checked. People new to pharmacy had no proper path in.
 
 ## Open items
 - **Under-18 rules** are an open product decision (contact before a match is not restricted).
-- **Migration 0080 clears duplicate AHPRA numbers** on every duplicate account and cannot be reversed without a backup.
-  Rehearse it on a staging snapshot first.
+- **Legacy duplicate AHPRA numbers are kept** (test accounts stay active everywhere): migration 0080 only registers one
+  owner per number and changes no profile; new claims of a taken number are refused. Tighten again at launch with clean data.
 - See `HANDOVER.md` "What still needs testing".
