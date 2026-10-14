@@ -347,6 +347,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'role', 'memberships']
         read_only_fields = fields
 
+def _newcomer_type(user):
+    if user.role != 'EXPLORER':
+        return None
+    from onboarding.models import ExplorerOnboarding
+    return ExplorerOnboarding.objects.filter(user=user).values_list('role_type', flat=True).first()
+
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     remember_me = serializers.BooleanField(write_only=True, required=False)
 
@@ -437,7 +444,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'is_pharmacy_admin': bool(admin_payload),
             'is_mobile_verified': bool(getattr(self.user, 'is_mobile_verified', False)),
             'mobile_check_skipped': bool(getattr(self.user, 'mobile_check_skipped', False)),
-            'newcomer_type': (getattr(getattr(self.user, 'exploreronboarding', None), 'role_type', None) if self.user.role == 'EXPLORER' else None),
+            'newcomer_type': (_newcomer_type(self.user)),
             'billing_active': is_billing_active(),
             'in_free_trial': is_in_free_trial(self.user),
         }
@@ -510,7 +517,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                 'is_pharmacy_admin': bool(admin_payload),
                 'is_mobile_verified': bool(getattr(user, 'is_mobile_verified', False)),
                 'mobile_check_skipped': bool(getattr(user, 'mobile_check_skipped', False)),
-                'newcomer_type': (getattr(getattr(user, 'exploreronboarding', None), 'role_type', None) if user.role == 'EXPLORER' else None),
+                'newcomer_type': (_newcomer_type(user)),
                 'billing_active': is_billing_active(),
                 'in_free_trial': is_in_free_trial(user),
             }
