@@ -81,8 +81,8 @@ def evaluate(profile) -> dict:
 
     verified: whether the profile has public access now. Profiles are promoted automatically. The only automatic
     demotion is tightening: an already-verified profile that lacks only the extra requirements keeps Verified until the
-    grace date and loses it afterwards. Base requirements never auto-demote (admin decisions stand); the tabs reset the
-    flag when the evidence itself changes.
+    grace date and loses it afterwards. Missing base requirements always demote; only configured extra requirements
+    may receive a tightening grace period.
     missing: everything full verification needs and lacks. grace: the missing extras that do not count yet because the
     profile was verified before the tightening; they are due by grace_until."""
     missing = missing_requirements(profile)
