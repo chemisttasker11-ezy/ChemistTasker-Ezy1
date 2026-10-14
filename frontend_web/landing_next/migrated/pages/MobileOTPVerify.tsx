@@ -110,6 +110,7 @@ export default function MobileOTPVerify() {
   };
 
   const isNewcomer = String(user?.role || '').toUpperCase() === 'EXPLORER';
+  const canSkipOverseas = isNewcomer && String(user?.newcomer_type || '').toUpperCase() === 'OVERSEAS';
   // Overseas newcomers without an Australian mobile: keep the legal name, skip the code, verify with photo ID instead.
   const handleSkipOverseas = async () => {
     setError('');
@@ -245,7 +246,7 @@ export default function MobileOTPVerify() {
           </Link>
         </Box>
 
-        {isNewcomer && (
+        {canSkipOverseas && (
           <Box sx={{ mt: 3, p: 2, borderRadius: 3, border: '1px solid rgba(148,163,184,0.35)' }}>
             <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Joining from overseas?</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
