@@ -17,6 +17,19 @@ grep -qi '^strict-transport-security:' "$tmp_headers"
 grep -qi '^x-frame-options:[[:space:]]*DENY' "$tmp_headers"
 grep -qi '^x-content-type-options:[[:space:]]*nosniff' "$tmp_headers"
 grep -qi '^referrer-policy:[[:space:]]*strict-origin-when-cross-origin' "$tmp_headers"
+# Staging must never be indexed by search engines.
+grep -qi '^x-robots-tag:[[:space:]]*noindex' "$tmp_headers"
+curl -fsS --max-time 20 "$preview_url/robots.txt" | grep -qx 'Disallow: /'
+
+# Vite-owned routes reached through the Next fallback rewrites (kiosk,
+# membership) and the Vite bundle itself, served compressed.
+for path in /kiosk /membership/apply/smoke-invalid-token /setup/; do
+  curl -fsS --max-time 20 -o /dev/null "$preview_url$path"
+done
+vite_js="$(curl -fsS --max-time 20 "$preview_url/setup/" | grep -Eo '/js/app\.[A-Za-z0-9_-]+\.js' | head -n 1)"
+test -n "$vite_js"
+curl -fsS --max-time 20 -H 'Accept-Encoding: gzip' -D "$tmp_headers" -o /dev/null "$preview_url$vite_js"
+grep -qi '^content-encoding:[[:space:]]*gzip' "$tmp_headers"
 
 curl -fsS --max-time 20 "$preview_url/login" >/dev/null
 curl -fsS --max-time 20 "$preview_url/api/v1/users/mobile/app-config/" >/dev/null

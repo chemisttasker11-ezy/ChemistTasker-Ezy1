@@ -11,6 +11,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import timedelta
+from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -164,11 +165,16 @@ class MobileOtpDisplaySettingsTests(SimpleTestCase):
             ("prod", "True", "True", False),
             ("unknown", "True", "True", False),
         ]
+        # CI runs manage.py from the repository root, so give the child process
+        # the backend directory explicitly or `core` cannot be imported.
+        backend_dir = str(Path(__file__).resolve().parents[1])
         for app_env, debug, flag, expected in cases:
             with self.subTest(app_env=app_env, debug=debug, flag=flag):
                 environment = {**os.environ, "APP_ENV": app_env, "DEBUG": debug,
                                "DJANGO_ENV_FILE": "/nonexistent/otp-settings-test.env",
-                               "DJANGO_CACHE_URL": "redis://127.0.0.1:6379/15"}
+                               "DJANGO_CACHE_URL": "redis://127.0.0.1:6379/15",
+                               "PYTHONPATH": os.pathsep.join(
+                                   filter(None, [backend_dir, os.environ.get("PYTHONPATH")]))}
                 environment.pop("MOBILE_OTP_DISPLAY_IN_APP", None)
                 if flag is not None:
                     environment["MOBILE_OTP_DISPLAY_IN_APP"] = flag
@@ -176,8 +182,9 @@ class MobileOtpDisplaySettingsTests(SimpleTestCase):
                     [sys.executable, "-c",
                      "from core.settings import MOBILE_OTP_DISPLAY_IN_APP; "
                      "print('display=' + str(MOBILE_OTP_DISPLAY_IN_APP))"],
-                    env=environment, capture_output=True, text=True, check=True, timeout=30,
+                    env=environment, cwd=backend_dir, capture_output=True, text=True, timeout=30,
                 )
+                self.assertEqual(result.returncode, 0, result.stderr[-2000:])
                 self.assertIn(f"display={expected}", result.stdout.splitlines())
 
 

@@ -22,6 +22,12 @@ ARG NEXT_PUBLIC_PLATFORM_URL=https://chemisttasker.com.au
 ARG NEXT_PUBLIC_Maps_API_KEY=
 ARG NEXT_PUBLIC_RECAPTCHA_SITE_KEY=
 ARG REQUIRE_WEB_INTEGRATIONS=0
+# next.config.ts compiles its fallback rewrites at build time, so the image
+# needs the Docker-network addresses here; runtime env alone is too late.
+ARG DASHBOARD_INTERNAL_URL=http://frontend:80
+ARG PLATFORM_API_URL=http://web:8000/api/v1
+ENV DASHBOARD_INTERNAL_URL=$DASHBOARD_INTERNAL_URL
+ENV PLATFORM_API_URL=$PLATFORM_API_URL
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_PLATFORM_URL=$NEXT_PUBLIC_PLATFORM_URL
 ENV NEXT_PUBLIC_Maps_API_KEY=$NEXT_PUBLIC_Maps_API_KEY
@@ -32,7 +38,10 @@ RUN if [ "$REQUIRE_WEB_INTEGRATIONS" = "1" ]; then \
       test -n "$NEXT_PUBLIC_PLATFORM_URL" && \
       test -n "$NEXT_PUBLIC_Maps_API_KEY" && \
       test -n "$NEXT_PUBLIC_RECAPTCHA_SITE_KEY"; \
-    fi && npm run build
+    fi && npm run build \
+    && if grep -Eq '127\.0\.0\.1|localhost' .next/routes-manifest.json; then \
+      echo "routes-manifest.json contains loopback rewrite destinations" >&2; exit 1; \
+    fi
 
 FROM node:22-alpine
 WORKDIR /app

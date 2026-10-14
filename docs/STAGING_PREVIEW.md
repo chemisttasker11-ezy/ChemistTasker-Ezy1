@@ -24,16 +24,26 @@ a recoverable backup exists.
 ## Environment files
 
 The server keeps these ignored files under
-`/opt/apps/chemisttasker-staging/env/`:
+`/opt/apps/chemisttasker-staging/env/` (directory `0700`, files `0600`). Each
+file holds only the keys `docker-compose.staging.yml` actually reads, and no
+key appears in more than one file:
 
-- `staging.secrets.env`
-- `staging.runtime.env`
-- `staging.integrations.env`
-- `staging.web.env`
-- `staging.mobile.env`, used only for Expo staging builds
+| File | Contents |
+| --- | --- |
+| `staging.secrets.env` | Server-generated `STAGING_POSTGRES_PASSWORD` and `STAGING_DJANGO_SECRET_KEY` |
+| `staging.runtime.env` | Origin and behaviour switches: `STAGING_PUBLIC_URL`, `STAGING_ALLOWED_HOSTS`, `STAGING_RUN_MIGRATIONS`, `STAGING_MOBILE_OTP_DISPLAY_IN_APP`, `STAGING_EMAIL_BACKEND`, `STAGING_USE_AZURE_STORAGE` |
+| `staging.integrations.env` | Third-party credentials: reCAPTCHA secret, SMTP, Azure storage/OCR, ScrapingBee, MobileMessage, Stripe **test** keys |
+| `staging.web.env` | Browser build keys: `VITE_Maps_API_KEY`, `VITE_RECAPTCHA_SITE_KEY` |
+| `staging.mobile.env` | Expo staging builds only; not read by the server stack |
+| `staging.test-users.json` | Generated synthetic-user credentials |
 
-The deployment script reads them without printing secret values. They are not
-stored in Git.
+Production-only values (production `SECRET_KEY`, `PROD_DB`, admin path,
+security flags) do not belong in these files; staging sets its own security
+flags in the Compose file. The deployment script reads the files without
+printing secret values. They are not stored in Git.
+
+Deployment logs, release markers and one-off scripts belong in
+`/opt/apps/chemisttasker-staging-ops/`, not in `env/`.
 
 Prepare the provider files on Windows from the legacy production env files:
 
@@ -42,8 +52,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-stagin
 ```
 
 The script copies the backend, web and mobile settings into ignored staging
-files. It changes the mobile URLs to the staging domain. It also keeps SMTP in
-console mode, so staging cannot send email to copied production users.
+files. It changes the mobile URLs to the staging domain and starts SMTP in
+console mode. On the server, `STAGING_EMAIL_BACKEND` in `staging.runtime.env`
+decides whether staging sends real email; it is currently the SMTP backend at
+the owner's request, so remember that the database contains copied production
+users.
 
 `staging.runtime.env` must contain the permanent origin:
 
@@ -60,16 +73,26 @@ From `/opt/apps/chemisttasker-staging`, run:
 bash scripts/deploy-staging.sh
 ```
 
-The script validates Compose, builds the images, waits for container health,
+The script validates Compose, dumps the staging database to
+`/opt/backups/chemisttasker/staging-predeploy-*.dump` (the ten newest are
+kept), builds the images, waits for container health, restarts the gateway,
 checks the public site and backend health endpoint, then prints container
-status.
-
-This command leaves Celery workers stopped. After the database migrations have
-passed and outbound task behavior has been reviewed, start them with:
+status. Then run the smoke test:
 
 ```bash
-bash scripts/deploy-staging.sh --with-workers
+bash scripts/smoke-staging.sh https://staging.chemisttasker.com.au
 ```
+
+Celery worker and beat start by default. To deploy without them:
+
+```bash
+bash scripts/deploy-staging.sh --without-workers
+```
+
+The gateway is restarted, never recreated. The production-owned shared Nginx
+resolves the gateway address only when it loads, so a recreated gateway with a
+new address would leave staging unreachable until shared Nginx reloads. Keep
+the `gateway` service definition unchanged unless that reload is planned.
 
 ## Production data refresh
 
@@ -95,15 +118,25 @@ migration history before changing that value to `1`.
 The staging database now contains personal production data. Restrict VPS access
 and do not download its dumps into this repository.
 
-## GitHub Actions runner
+## Manual deployments only
 
-The optional self-hosted workflow deploys to
-`/opt/apps/chemisttasker-staging`. Configure its runner with the
-`chemisttasker-staging` label and Docker access. The workflow preserves the
-ignored `env/` directory between deployments.
+GitHub does not deploy staging. The self-hosted deployment workflow was
+removed and no runner is registered; `Staging QA` still runs the test suite on
+GitHub-hosted runners. An operator updates the staging checkout to the
+reviewed commit over SSH and runs `scripts/deploy-staging.sh`. Record the
+deployed commit in `/opt/apps/chemisttasker-staging-ops/`.
 
-Once the runner shows **Idle** in GitHub, every push to this repository's
-`main` branch redeploys staging automatically.
+## Search engines
+
+The staging gateway sends `X-Robots-Tag: noindex, nofollow`, serves a
+`Disallow: /` robots file and returns 404 for `/sitemap.xml`. These rules live
+only in `nginx/staging.conf`; production is unaffected.
+
+## Local frontend development against staging
+
+The frontend developer runs Next on `http://localhost:3000` or Vite on
+`http://localhost:5173` against the staging API. Both origins are in the
+staging `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS`; keep them there.
 
 ## Synthetic test users in staging
 
@@ -128,16 +161,14 @@ No real licence or identity verification has been performed.
 
 After a successful deployment, the developer uses the normal staging HTTPS API
 from the local Next application on port 3000 or the local Vite application on
-port 5173. Database access is not required for frontend login. If deployment
-remains queued because the OVH self-hosted runner is offline, the accounts are
-not yet available.
+port 5173. Database access is not required for frontend login.
 
 ## Review workflow
 
 1. Make proposed changes in this staging repository.
 2. Commit them to this repository's `main` branch.
-3. Let the staging deployment workflow deploy them.
-4. Open the staging URL from the workflow summary and test it.
+3. Deploy the reviewed commit manually (see *Deployment*).
+4. Run the smoke test and open the staging URL to test it.
 5. Iterate here until approved.
 6. Only after approval, transfer the approved changes to the separate production repository.
 

@@ -30,12 +30,42 @@ compose() {
 }
 
 compose config --quiet
-if [[ "${1:-}" == "--with-workers" ]]; then
+
+# Celery worker and beat run by default; --without-workers is the explicit
+# opt-out. --with-workers is accepted for older runbooks.
+case "${1:-}" in
+  ""|--with-workers) with_workers=1 ;;
+  --without-workers) with_workers=0 ;;
+  *) echo "Usage: $0 [--without-workers]" >&2; exit 2 ;;
+esac
+
+# Startup runs migrations, so keep a restorable copy of the current database.
+BACKUP_DIR="${STAGING_BACKUP_DIR:-/opt/backups/chemisttasker}"
+if docker ps --format '{{.Names}}' | grep -qx chemisttasker_postgres_staging; then
+  mkdir -p "$BACKUP_DIR"
+  backup="$BACKUP_DIR/staging-predeploy-$(date -u +%Y%m%dT%H%M%SZ).dump"
+  ( umask 077; docker exec chemisttasker_postgres_staging \
+      pg_dump -U chemisttasker_staging -d chemisttasker_staging -Fc > "$backup" )
+  printf 'DB_BACKUP=%s\n' "$backup"
+  # Keep the ten most recent pre-deploy dumps; other backups are untouched.
+  ls -1t "$BACKUP_DIR"/staging-predeploy-*.dump | tail -n +11 | xargs -r rm -f --
+fi
+
+if [[ "$with_workers" == "1" ]]; then
   compose --profile workers up -d --build --wait --wait-timeout 300
 else
   compose up -d --build --wait --wait-timeout 300
-  compose stop celery_worker celery_beat >/dev/null 2>&1 || true
+  compose --profile workers stop celery_worker celery_beat >/dev/null 2>&1 || true
 fi
+
+# The gateway resolves its upstreams and reads the bind-mounted staging.conf
+# only at start. Restart (never recreate) it: a restart keeps its address on
+# shared_backend_network, which the production-owned shared Nginx depends on.
+compose restart gateway
+for _ in $(seq 1 30); do
+  [[ "$(docker inspect -f '{{.State.Health.Status}}' chemisttasker_gateway_staging)" == "healthy" ]] && break
+  sleep 2
+done
 
 staging_url="https://staging.chemisttasker.com.au"
 curl -fsS --max-time 20 "$staging_url/" >/dev/null
