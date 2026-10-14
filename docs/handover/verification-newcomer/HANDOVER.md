@@ -1,8 +1,9 @@
 # Handover: light verification, badges, Pharmacy team, New to pharmacy
 
 For the senior reviewer. Base: local `main` bd68162 (origin/main at the time). Work lives in worktree
-`main-verification`, now on branch `feat/light-verification-new-to-pharmacy` (origin/main merged in at cbfb01d). **No PR yet: the owner
-asked for no PR until everything is finished and verified** (draft PR #168 was opened by mistake and closed).
+`main-verification`, now on branch `feat/light-verification-new-to-pharmacy` (origin/main merged in at cbfb01d). The owner asked for a fresh PR
+after the third review's fixes (the earlier draft PR #168 was opened by mistake and closed). `README.md` explains the work
+and its reasons in short.
 
 **Every behaviour change listed under "Owner decisions" is deliberate.** They were agreed with the owner in the
 conversation of 2026-10-13 (decision table in `PLAN.md`). If a diff looks like a loosened rule, check this list
@@ -78,36 +79,19 @@ first: it is not a logic change by mistake.
 - **Staff Shift Centre (Expo):** Confirmed and History rebuilt on the same pattern (`roles/shared/shifts/WorkerBookedShifts.tsx`),
   header subtitles match web. Typecheck and lint pass. **On-screen check skipped at the owner's request** (the Expo web
   login reached the dashboard, then the dev server stalled); run it before release.
-- **Third review** (`playground/verification-third-review/REVIEW.txt`): read; its four findings (ownership drift
-  before the tab saves, admin corrections bypassing the registry, consumed referee links after upgrade, the threaded
-  test failing on SQLite) are the next work.
+- **Third review**: see "Round 3" below (all four findings fixed).
 
-## Second senior review (2026-10-14, commit 3fffcd1) and what was done
+## Review rounds, in order
 
-Reviewer file: `playground/verification-rereview/REVIEW.txt` (local only).
+1. **Round 1** (2026-10-13, reviewed 349e9ab): 12 findings plus finishing gaps. Owner decisions D21-D26 came out of it.
+   Fixed in ac77e03 and 9b82a1c.
+2. **Round 2** (2026-10-14, reviewed 3fffcd1): 9 findings. Owner decisions D27-D30. Fixed in a9bd85d.
+3. **Round 3** (2026-10-14, reviewed d65a868): 4 findings. Fixed in 1e38266.
 
-| # | Finding | Outcome |
-|---|---|---|
-| 1 (P1) | Unknown `tab` reached ModelSerializer.update and changed a checked AHPRA number | Fixed: unknown tabs refused (pharmacist, Pharmacy team, newcomer); the AHPRA guard runs first on every write (D28). Owner already normalised to Basic. |
-| 2 (P1) | Basic draft `role_type: INTERN` kept Verified | Fixed by D27: Basic takes no role fields; the Role step refuses a change |
-| 3 (P2) | Concurrent claims saved one number twice | Fixed by D28: unique registry row; threaded API test returns 200 + 400 and one owner |
-| 4 (P2) | Submit removed Verified during grace | Fixed by D29 (all tabs) |
-| 5 (P2) | Upgrade dropped work rights | Fixed: carried (an answer already on the target wins) |
-| 6 (P2) | Newcomer posts with blank/null category survived upgrade | Fixed: deleted by provenance (profile link, or authored with EXPLORER/blank/null category) |
-| 7 (P2) | Referee links updated the old newcomer row | Fixed by D30 |
-| 8 (P2) | Upgrade copy promised the post comes along | Fixed: shared `UPGRADE_COPY` says it is removed with its likes and views, before and in the confirmation |
-| 9 (P2) | General guide claimed every Verified profile has a mobile | Fixed: states the overseas exception and no guarantee; shared-core test |
+Between rounds the owner also asked for D31-D33 (skills rows, one worker profile everywhere, membership roles) and the
+staff Shift Centre redesign; those are in "Staff Shift Centre redesign and membership roles" above.
 
-The reviewer's probes (`backend/onboarding/management/test_rereview.py`, ignored) still fail where the owner decided
-differently: the race probe patches the removed `basic.ahpra_number_error` (the tracked threaded test replaces it), and
-the Basic role probe expects the role to change (D27: it can no longer change, so the assistant correctly stays
-Verified).
-
-**Before staging/production:** migration 0080 on the local DB copy registered 3 numbers and cleared 279 duplicates;
-263 of 265 seed pharmacists lost their number and Verified (all `.test` accounts). Expect the same on staging and
-production seed data. Run it on a staging snapshot first and read the printed counts.
-
-## Senior review (2026-10-13) and what was done
+## Round 1: senior review (2026-10-13) and what was done
 
 Reviewer file: `playground/verification-review/REVIEW.txt` (local only). Every finding, with its outcome:
 
@@ -152,6 +136,48 @@ owner decided differently: lock instead of reset (1), check kept across role cha
 - Codex was asked to run these checks but the CLI launch was blocked by the permission checker; all checks were run
   directly.
 
+## Round 2: second senior review (2026-10-14, reviewed 3fffcd1) and what was done
+
+Reviewer file: `playground/verification-rereview/REVIEW.txt` (local only).
+
+| # | Finding | Outcome |
+|---|---|---|
+| 1 (P1) | Unknown `tab` reached ModelSerializer.update and changed a checked AHPRA number | Fixed: unknown tabs refused (pharmacist, Pharmacy team, newcomer); the AHPRA guard runs first on every write (D28). Owner already normalised to Basic. |
+| 2 (P1) | Basic draft `role_type: INTERN` kept Verified | Fixed by D27: Basic takes no role fields; the Role step refuses a change |
+| 3 (P2) | Concurrent claims saved one number twice | Fixed by D28: unique registry row; threaded API test returns 200 + 400 and one owner |
+| 4 (P2) | Submit removed Verified during grace | Fixed by D29 (all tabs) |
+| 5 (P2) | Upgrade dropped work rights | Fixed: carried (an answer already on the target wins) |
+| 6 (P2) | Newcomer posts with blank/null category survived upgrade | Fixed: deleted by provenance (profile link, or authored with EXPLORER/blank/null category) |
+| 7 (P2) | Referee links updated the old newcomer row | Fixed by D30 |
+| 8 (P2) | Upgrade copy promised the post comes along | Fixed: shared `UPGRADE_COPY` says it is removed with its likes and views, before and in the confirmation |
+| 9 (P2) | General guide claimed every Verified profile has a mobile | Fixed: states the overseas exception and no guarantee; shared-core test |
+
+The reviewer's probes (`backend/onboarding/management/test_rereview.py`, ignored) still fail where the owner decided
+differently: the race probe patches the removed `basic.ahpra_number_error` (the tracked threaded test replaces it), and
+the Basic role probe expects the role to change (D27: it can no longer change, so the assistant correctly stays
+Verified).
+
+**Before staging/production:** migration 0080 on the local DB copy registered 3 numbers and cleared 279 duplicates;
+263 of 265 seed pharmacists lost their number and Verified (all `.test` accounts). Expect the same on staging and
+production seed data. Run it on a staging snapshot first and read the printed counts.
+
+## Round 3: third senior review (2026-10-14, reviewed d65a868)
+
+Reviewer file: `playground/verification-third-review/REVIEW.txt` (local only). Verdict: request changes, four findings.
+The reviewer also confirmed the round-2 fixes, the shared frontend structure, and (headless Playwright) the Skills/Software
+rows, role locks, upgrade warning, overseas guide text and Confirmed-vs-History contact controls.
+
+| # | Finding | Fix (commit 1e38266) | Test |
+|---|---|---|---|
+| 1 (P2) | The AHPRA registry could release a number the saved profile still held: the guard ran before the tab, so a tab that ignored the number (Profile), a refused Role-step save, or two overlapping saves by the same person left them out of step | The number change is saved together with its claim and the release of unused numbers in **one small transaction, serialised per person** (user row lock), and only on the step that owns the number (pharmacist Basic, Role step, owner Basic), after the role-lock check. Other tabs drop the field. The rest of the tab still saves separately, so a refused Submit keeps its other edits | `AhpraOwnershipDriftTests` (ignored field, refused role change) |
+| 2 (P2) | Django admin corrections bypassed the registry | `AhpraOwnershipAdminMixin` on the pharmacist, Pharmacy team and owner admins: the form refuses a number another account holds; the save re-syncs the registry in the same transaction. Support may change a checked number (the support override) | `AhpraSupportCorrectionTests` (all three admins, conflict refused) |
+| 3 (P2) | A referee link answered before an upgrade could be answered again afterwards | A link whose newcomer row already holds an answer (flag or stored response) is refused before it follows the person | `ConsumedRefereeLinkTests` |
+| 4 (P2) | The threaded concurrency test failed on the SQLite regression settings | It runs only on PostgreSQL (`skipUnless`), reports a worker's real error and fails if a thread does not finish; SQLite keeps the serial ownership tests | SQLite: 30 run, 1 skipped, OK; PostgreSQL: 45 run, OK |
+
+Also from this round: an **unknown tab** (a save naming a step that does not exist, e.g. `tab: "xyz"`; the apps never send
+one) is refused for pharmacist, Pharmacy team and newcomer profiles; owner profiles treat it as Basic, and the AHPRA check
+now treats it as Basic too, so it cannot slip past the lock.
+
 ## Commits (in order)
 | Commit | Milestone |
 |---|---|
@@ -172,8 +198,13 @@ owner decided differently: lock instead of reset (1), check kept across role cha
 | 3fffcd1 | handover after the first review |
 | 2d5253b | one worker profile everywhere, contact only in Confirmed, Message, skills layout (D31, D32) |
 | a9bd85d | second review fixes (D27-D30; findings 1-9) |
+| d65a868 | handover after round 2 |
+| c447328 | membership roles (D33) |
+| 7f3787e | staff Shift Centre redesign, web |
+| 890f997 | staff Shift Centre redesign, Expo; handover |
+| 1e38266 | third review fixes (findings 1-4) |
 
-## Migrations (all additive or label-only)
+## Migrations (all additive or label-only, except the 0080 data step)
 - `client_profile` 0075 intern AHPRA fields; 0076 label-only; 0077 newcomer date_of_birth, last_talent_post_at, role_type choices (labels + OVERSEAS); 0078 `Shift.public_hidden_at`.
 - `users` 0004 label-only; 0005 `mobile_check_skipped`.
 - `talent` 0004 label-only; 0005 `ExplorerPost.hidden_at`. `pharmacy_hub` 0004 label-only. `public_hub` 0005 BoardReport.
@@ -216,6 +247,29 @@ owner decided differently: lock instead of reset (1), check kept across role cha
 - Talent feed N+1: 603 -> 4 queries per 200-post page (pre-existing per-row lookups now read the loaded profile row).
 - Onboarding panel did not refresh after a save; stepper labels truncated; panel order on phones.
 - Duplicated "Verified." in worker wording; red error chip on Photo ID before any upload; raw EXPLORER in the top bar.
+
+## Tests run for the latest fixes (targeted, as the owner asked)
+
+- Round 3: `onboarding.test_verification_transitions` on SQLite contract settings (30, 1 skipped) and, with
+  `onboarding.test_role_tabs_contract`, on PostgreSQL (45, OK).
+- Membership roles: memberships, organizations and shifts suites (152, OK).
+- Staff Shift Centre: Vite typecheck/lint; headless Playwright at 1365 px and 390 px (no page errors, tabs fit, details
+  and rating dialogs load); Expo typecheck and lint. Expo on-screen check skipped at the owner's request.
+- Earlier full runs (round 2 and before) are listed in the round sections; no full regression run was repeated after round 3.
+
+## What still needs testing (my view)
+
+1. **The full regression gate on the final commit** (all backend suites on SQLite and PostgreSQL, isolated attendance
+   commands, API replay, OpenAPI/migration identity, web builds) — not re-run after round 3 by request.
+2. **Migration 0080 on a staging snapshot**: read the printed counts and the list of affected accounts; it clears
+   duplicate AHPRA numbers on every duplicate account (not only `.test` seed accounts) and its reverse does not restore them.
+3. **Expo on a real device or the Expo web build**: the staff Shift Centre redesign, the worker profile dialog with
+   Message, date pickers, role lock and upgrade warning.
+4. **Admin corrections in the real Django admin UI** (the tests drive the ModelAdmin form and save directly).
+5. **Referee flows end to end with email**: links before/after upgrade, reminders following the person.
+6. **Membership roles in the UI**: inviting an assistant as technician, a pharmacist as assistant, and refusing an
+   unregistered intern; community shift eligibility follows the membership role.
+7. **Under-18 rules** remain an open product decision (contact before a match is not restricted).
 
 ## Known limits / follow-ups (not done)
 - Expo `ChooseAccountTypeCard` (manager conversion, pre-existing) routes to `/otherstaff/onboarding`, which does not
