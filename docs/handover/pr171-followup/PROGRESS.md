@@ -8,7 +8,7 @@ Correct integration defects without replacing the PR165/166 skills registry or s
 ## Status
 - [x] Review PR171 source and prior handover; identify API and cross-platform gaps.
 - [x] Create isolated follow-up branch from PR171 head.
-- [ ] History list contact redaction and HTTP regression tests.
+- [x] History list contact redaction and HTTP regression test added (pending execution).
 - [ ] Shared-core booked-shift rate presentation; Vite and Expo parity tests.
 - [ ] AHPRA registration legacy projection and membership/assignment policy tests.
 - [ ] Overseas skip visibility parity on Vite/Next/Expo.
@@ -21,3 +21,10 @@ Original head: a51f49f022e8d3ab3701669d2a3a26ac3b16ed44. PR171 handover acknowle
 
 ## Required boundaries
 Django owns authorisation and verification; shared-core owns canonical skills and cross-platform presentation decisions; Vite/Next/Expo only render and navigate. Do not rewrite canonical skill codes, membership/payroll policy or shift lifecycle without explicit contract tests. PR171 stays open; this PR stays draft until acceptance.
+
+## Session 1 change log
+- Created draft #172 targeting the PR171 feature branch, leaving #171 open.
+- Requested failed-job reruns for PR171 CI workflows.
+- Changed `backend/shifts/serialization/shifts.py` to omit assigned-user email from History list projection, preserving Confirmed email.
+- Added `test_history_list_does_not_disclose_assigned_worker_email` to the existing shift listing contract suite. **Not yet executed**; needs PostgreSQL/SQLite HTTP validation.
+- Next: inspect CI results and address rate redaction, verification and membership contracts. Do not infer E2E success from source changes.
