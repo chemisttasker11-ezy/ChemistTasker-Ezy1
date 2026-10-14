@@ -25,7 +25,7 @@ def claim_existing_numbers(apps, schema_editor):
             'pk', 'user_id', 'ahpra_number', 'ahpra_verified'
         )
         for row in rows:
-            number = re.sub(r'\\s+', '', row.ahpra_number).upper()
+            number = re.sub(r'\s+', '', row.ahpra_number).upper()
             if number:
                 claims.setdefault(number, []).append(row)
 
