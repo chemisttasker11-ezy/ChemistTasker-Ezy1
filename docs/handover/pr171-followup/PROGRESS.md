@@ -39,3 +39,9 @@ Django owns authorisation and verification; shared-core owns canonical skills an
 - Attempted public HTTPS Git clone in the execution container; network DNS cannot resolve github.com. This blocks local Django/PostgreSQL and Playwright execution in this runtime. GitHub connector remains available for code changes and hosted CI.
 - Hosted CI on earlier head 12183e4: Frontend Static and Mobile Lint **passed**, Public Repository Security **passed**; backend, serializer, shared-core and E2E workflows were still running at observation. New commits require their own fresh gate results.
 - Do not claim a full E2E run or migration rehearsal until hosted workflows provide specific execution evidence. No merge.
+
+## Session 4 hosted CI diagnostics and corrections
+- Head 88f496d: backend finalization PASS; serializer contracts PASS; E2E runner smoke PASS; frontend static/mobile lint PASS; public security PASS. Shared-core consolidation failed at Vite, Next and Expo TypeScript; each error was the missing `newcomer_type` property in its platform AuthContext User type. Corrected all three user contracts.
+- Frontend E2E: 130 passed, 6 failed, 27 skipped. Six failures in `frontend-candidates.spec.mjs` use legacy `verified` / `gov_id_verified` fixture fields but the PR171 candidate UI now consumes canonical `verification`. Updated fixture profiles to include `verification: {identity:'verified',profile:'verified'}`. This is a test fixture correction, not weakening production checks.
+- Other failure: Vite appearance job; investigate separately, do not claim visual parity.
+- Fresh hosted CI required for the latest commit; no final acceptance yet.
