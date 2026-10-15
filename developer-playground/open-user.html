@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Opening playground account</title>
+<style>body{font:16px/1.6 'Segoe UI',sans-serif;background:#f3f5f1;color:#24332f;margin:0;padding:10vh 24px}main{max-width:550px;margin:auto;background:white;padding:32px;border:1px solid #dce3dc;border-radius:16px}h1{font-size:24px}img{width:72px;height:72px;border-radius:12px;object-fit:cover}p{overflow-wrap:anywhere}small{color:#66766f}a,button{color:#176852}button{font:inherit;background:#e3eacb;border:0;border-radius:8px;padding:10px 18px;cursor:pointer}[hidden]{display:none}</style></head>
+<body><main><img id="photo" hidden alt="Fictional account portrait"><h1 id="title">Opening your test account…</h1><p id="status" role="status" aria-live="polite">Connecting to the local app.</p><p id="error" role="alert" hidden></p><button id="retry" hidden>Try again</button><p><a href="/">Back to directory</a></p><small>This uses the normal login flow. Tabs on the same localhost share the most recently opened account.</small></main>
+<script src="data.js"></script><script>
+'use strict';
+const params=new URLSearchParams(location.search);
+const user=window.PLAYGROUND?.users.find(u=>String(u.id)===params.get('user'));
+const target=params.get('target');
+const statusNode=document.querySelector('#status');
+const errorNode=document.querySelector('#error');
+const retry=document.querySelector('#retry');
+let busy=false;
+async function request(path,options={}){
+ const response=await fetch(`http://${location.hostname}:8000/api/users/${path}/`,{...options,credentials:'include',cache:'no-store',signal:AbortSignal.timeout(20000),headers:{'X-Client-Platform':'web',...options.headers}});
+ const body=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(typeof body.detail==='string'?body.detail:typeof body.error==='string'?body.error:`Sign-in was refused (${response.status}). Check this account's state in the directory.`);
+ return body;
+}
+async function openAccount(){
+ if(busy)return;busy=true;retry.hidden=true;errorNode.hidden=true;
+ try{
+  if(!['127.0.0.1','localhost'].includes(location.hostname)||location.protocol!=='http:')throw new Error('Automatic sign-in is available only on the local playground.');
+  if(!user||!['main','expo'].includes(target))throw new Error('Choose an account from the directory.');
+  // The app canonicalises dashboard navigation to localhost. Sign in on that
+  // same cookie host even when the directory was opened through 127.0.0.1.
+  if(location.hostname!=='localhost'){
+   location.replace(`http://localhost:8090/open-user.html?user=${user.id}&target=${target}`);
+   return;
+  }
+  document.querySelector('#title').textContent=`Opening ${user.name}`;
+  const photo=document.querySelector('#photo');photo.src=user.photo;photo.hidden=false;
+  if(user.status==='inactive')throw new Error('This account is intentionally inactive. Login remains disabled for this test case.');
+  statusNode.textContent=`Signing in as ${user.email}…`;
+  const csrf=await request('csrf');
+  await request('login',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf.csrfToken},body:JSON.stringify({email:user.email,password:window.PLAYGROUND.password,remember_me:false})});
+  // Confirm the HttpOnly session cookie is usable before leaving this page.
+  const me=await request('me');
+  if(Number(me.id)!==user.id)throw new Error('The active account changed during sign-in. Please try again.');
+  statusNode.textContent='Signed in. Opening the app…';
+  location.replace(target==='expo'
+   ? `http://${location.hostname}:8082/?playground=1`
+   : `http://${location.hostname}:3000${user.content.length?'/content':'/dashboard'}`);
+ }catch(error){
+  statusNode.textContent='The account could not be opened.';
+  errorNode.textContent=error.name==='TimeoutError'?'The local backend did not respond. Start it with playground/start.ps1, then retry.':error instanceof TypeError?'Cannot reach the local backend. Run playground/start.ps1 and retry.':error.message;
+  errorNode.hidden=false;retry.hidden=!user||user.status==='inactive';
+ }finally{busy=false;}
+}
+retry.addEventListener('click',openAccount);openAccount();
+</script></body></html>
