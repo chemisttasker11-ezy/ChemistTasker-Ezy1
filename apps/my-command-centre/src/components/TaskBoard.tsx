@@ -1,17 +1,19 @@
 import { useState, type HTMLAttributes } from 'react';
-import { Archive, ArrowRight, CalendarDays, Check, Clock3, Flag, GripVertical, MoreHorizontal, Plus, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { Archive, ArrowRight, CalendarDays, Check, Clock3, Copy, Flag, GripVertical, MoreHorizontal, Plus, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { LANES, type Lane, type Task } from '../model';
+import { LANES, type Lane, type Task, type TaskStatus } from '../model';
 import { categoryInfo, formatDate, RECUR_LABEL, taskDue } from '../lib/display';
+import { TaskStatusPicker } from './TaskStatusPicker';
 
 interface CardProps {
   task: Task; done: boolean; day: string; onComplete: (id: string) => void;
-  onEdit: (t: Task) => void; onMove: (id: string, lane: Lane) => void; onArchive: (id: string) => void;
+  onEdit: (t: Task) => void; onDuplicate: (t: Task) => void; onMove: (id: string, lane: Lane) => void; onArchive: (id: string) => void;
+  onStatus: (id: string, status: TaskStatus, postponedTo?: string) => void;
   onSubtask: (taskId: string, subtaskId: string) => void; ghost?: boolean; dragHandle?: HTMLAttributes<HTMLButtonElement>;
 }
-export function CardPresentation({ task, done, day, onComplete, onEdit, onMove, onArchive, onSubtask, ghost, dragHandle }: CardProps) {
+export function CardPresentation({ task, done, day, onComplete, onEdit, onDuplicate, onMove, onArchive, onStatus, onSubtask, ghost, dragHandle }: CardProps) {
   const [menu, setMenu] = useState(false);
   const due = taskDue(task, day, done);
   const tally = task.subtasks.filter(s => s.done).length;
@@ -30,6 +32,7 @@ export function CardPresentation({ task, done, day, onComplete, onEdit, onMove, 
           )}
           {menu && !ghost && <div className="card-popover">
             <button type="button" onClick={() => { setMenu(false); onEdit(task); }}><SlidersHorizontal size={15}/> Edit task</button>
+            <button type="button" onClick={() => { setMenu(false); onDuplicate(task); }}><Copy size={15}/> Duplicate & edit</button>
             <div className="popover-label">Move to</div>
             {LANES.filter(l => l.id !== task.lane).map(l => <button type="button" key={l.id} onClick={() => { setMenu(false); onMove(task.id, l.id); }}><ArrowRight size={14}/> {l.title}</button>)}
             <button type="button" className="danger" onClick={() => { setMenu(false); onArchive(task.id); }}><Archive size={15}/> Archive task</button>
@@ -43,6 +46,8 @@ export function CardPresentation({ task, done, day, onComplete, onEdit, onMove, 
         <button type="button" className="task-title" onClick={() => !ghost && onEdit(task)}>{task.title}</button>
       </div>
       {task.description && <p className="task-description">{task.description}</p>}
+      {!ghost && <TaskStatusPicker title={task.title} value={done ? 'finished' : task.status} dueDate={task.dueDate} onChange={(status, date) => onStatus(task.id, status, date)} compact/>}
+      {ghost && <span className={`status-label status-${done ? 'finished' : task.status}`}>{done ? 'Finished' : task.status.replace('-', ' ')}</span>}
       {task.subtasks.length > 0 && <div className="subtasks-snippet">
         <div className="mini-progress"><span style={{ width: `${(tally / task.subtasks.length) * 100}%` }}/></div>
         <span>{tally}/{task.subtasks.length}</span>
@@ -74,10 +79,11 @@ function SortableCard(props: Omit<CardProps, 'dragHandle' | 'ghost'>) {
 interface LaneProps {
   lane: (typeof LANES)[number]; tasks: Task[]; completed: (task: Task) => boolean;
   day: string; onAdd: (lane: Lane) => void; onComplete: (id: string) => void;
-  onEdit: (t: Task) => void; onMove: (id: string, lane: Lane) => void; onArchive: (id: string) => void;
+  onEdit: (t: Task) => void; onDuplicate: (t: Task) => void; onMove: (id: string, lane: Lane) => void; onArchive: (id: string) => void;
+  onStatus: (id: string, status: TaskStatus, postponedTo?: string) => void;
   onSubtask: (taskId: string, subtaskId: string) => void;
 }
-export function BoardLane({ lane, tasks, completed, day, onAdd, onComplete, onEdit, onMove, onArchive, onSubtask }: LaneProps) {
+export function BoardLane({ lane, tasks, completed, day, onAdd, onComplete, onEdit, onDuplicate, onMove, onArchive, onStatus, onSubtask }: LaneProps) {
   const { setNodeRef, isOver } = useDroppable({ id: lane.id, data: { type: 'lane', lane: lane.id } });
   return <section className={`board-lane lane-${lane.tone} ${isOver ? 'lane-over' : ''}`} aria-label={`${lane.title} tasks`}>
     <header className="lane-header">
@@ -86,7 +92,7 @@ export function BoardLane({ lane, tasks, completed, day, onAdd, onComplete, onEd
     </header>
     <div ref={setNodeRef} className="lane-dropzone" data-testid={`lane-${lane.id}`}>
       <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-        {tasks.map(task => <SortableCard key={task.id} task={task} day={day} done={completed(task)} onComplete={onComplete} onEdit={onEdit} onMove={onMove} onArchive={onArchive} onSubtask={onSubtask}/>)}
+        {tasks.map(task => <SortableCard key={task.id} task={task} day={day} done={completed(task)} onComplete={onComplete} onEdit={onEdit} onDuplicate={onDuplicate} onMove={onMove} onArchive={onArchive} onStatus={onStatus} onSubtask={onSubtask}/>)}
       </SortableContext>
       {tasks.length === 0 && <div className="lane-empty"><span>✦</span><p>Drop a task here</p><button onClick={() => onAdd(lane.id)}>+ Add a task</button></div>}
       <button className="lane-new" type="button" onClick={() => onAdd(lane.id)}><Plus size={15}/> Add task</button>
