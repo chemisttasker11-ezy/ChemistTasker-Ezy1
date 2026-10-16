@@ -134,7 +134,7 @@ export default function SharedCalendarScreen() {
         const managers = managersResult.status === 'fulfilled'
           ? managersResult.value.pharmacies.map(p => ({ id: 'managed-' + p.id, pharmacyId: p.id, pharmacyName: p.name }))
           : [];
-        const staffIds = new Set(staff.map(m => Number(getPharmacyId(m))));
+        const staffIds = new Set(staff.map((m: any) => Number(getPharmacyId(m))));
         const list = [...staff, ...managers.filter(p => !staffIds.has(p.pharmacyId))];
         setMemberships(list);
         if (list.length > 0 && selectedPharmacyId === null) {

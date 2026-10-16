@@ -1139,8 +1139,8 @@ export default function PharmacyCalendarPage() {
                                                                 }}
                                                             >
                                                                 Edit
-                                                            </Button>}
-                                                            {!item.noteData?.operation && <Button
+                                                            </Button>
+                                                            <Button
                                                                 size="small"
                                                                 variant="text"
                                                                 color="error"
@@ -1172,8 +1172,8 @@ export default function PharmacyCalendarPage() {
                                                                 }}
                                                             >
                                                                 Edit
-                                                            </Button>
-                                                            <Button
+                                                            </Button>}
+                                                            {!item.noteData?.operation && <Button
                                                                 size="small"
                                                                 variant="text"
                                                                 color="error"

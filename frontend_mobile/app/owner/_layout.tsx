@@ -479,6 +479,7 @@ export default function OwnerLayout() {
           }}
         />
         <Tabs.Screen name="calendar" options={{ href: null }} />
+        <Tabs.Screen name="operations" options={{ href: null }} />
         <Tabs.Screen name="talent-board" options={{ href: null }} />
         <Tabs.Screen name="pills" options={{ href: null }} />
         <Tabs.Screen name="onboarding" options={{ href: null }} />

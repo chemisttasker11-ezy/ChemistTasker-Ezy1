@@ -234,7 +234,7 @@ class PharmacyOperationsContracts(TestCase):
         self.assertEqual(client_for(self.other_worker).post(
             BASE + "work-notes/" + str(note_id) + "/mark_done/",
             {"occurrence_date": self.day}, format="json",
-        ).status_code, 403)
+        ).status_code, 404)
 
     def test_kpi_idempotency_preserves_single_actual_value(self):
         _, task, _ = self.publish_named(target_value=20, target_unit="contacts")
@@ -305,7 +305,7 @@ class PharmacyOperationsContracts(TestCase):
         uri = BASE + "work-notes/" + str(note_id) + "/mark_done/"
         self.assertEqual(client_for(manager_worker).post(
             uri, {"occurrence_date": self.day}, format="json",
-        ).status_code, 403)
+        ).status_code, 404)
         self.assertEqual(WorkNoteCompletion.objects.count(), 0)
 
     def test_clinical_work_blocks_noncredentialed_and_unrostered_pharmacist(self):
