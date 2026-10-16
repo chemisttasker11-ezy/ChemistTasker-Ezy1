@@ -19,7 +19,7 @@ export function greeting(): string {
   return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 }
 export function categoryInfo(category: Category) { return CATEGORIES.find(c => c.id === category)!; }
-export function activeItem(task: Task) { return !task.archivedAt && !(task.recurrence === 'none' && task.completedAt); }
+export function activeItem(task: Task) { return !task.archivedAt; } // Finished tasks remain visible on the board.
 export function taskDue(task: Task, day: string, done: boolean) { return Boolean(task.dueDate && task.dueDate <= day && !done); }
 export function downloadable(filename: string, value: string) {
   const objectURL = URL.createObjectURL(new Blob([value], { type: 'application/json;charset=utf-8' }));
