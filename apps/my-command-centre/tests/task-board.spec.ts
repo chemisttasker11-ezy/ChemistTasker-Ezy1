@@ -24,6 +24,7 @@ test('creates, edits, moves and persists a task', async ({ page }) => {
   await page.getByRole('button', { name: 'More options for Review supplier proposal' }).click();
   await page.getByRole('button', { name: 'Weekly', exact: true }).click();
   await page.reload();
+  await page.getByRole('button', { name: 'My task board' }).click();
   const card = page.locator('[data-testid^="task-"]').filter({ hasText: 'Review supplier proposal' });
   await expect(card).toBeVisible();
   await expect(page.getByTestId('lane-weekly').locator('[data-testid^="task-"]').filter({ hasText: 'Review supplier proposal' })).toBeVisible();
