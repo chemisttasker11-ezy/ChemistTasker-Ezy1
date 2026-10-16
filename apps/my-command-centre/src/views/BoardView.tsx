@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, closestCorners, pointerWithin, useSensor, useSensors, type CollisionDetection, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { ChevronDown, Flag, GripVertical, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
-import { CATEGORIES, LANES, type Category, type Lane, type Priority, type Task } from '../model';
+import { CATEGORIES, LANES, type Category, type Lane, type Priority, type Task, type TaskStatus } from '../model';
 import { BoardLane, CardPresentation } from '../components/TaskBoard';
 
 interface Props {
@@ -12,10 +12,11 @@ interface Props {
   selectedLane: Lane; setSelectedLane: (lane: Lane) => void;
   day: string; completed: (task: Task) => boolean; showEditor: (task: Task | null, lane?: Lane) => void;
   toggleTask: (id: string) => void; moveTask: (id: string, lane: Lane, overId?: string) => void;
-  archiveTask: (id: string) => void; toggleSubtask: (id: string, subtaskId: string) => void;
+  archiveTask: (id: string) => void; duplicateTask: (task: Task) => void;
+  changeStatus: (id: string, status: TaskStatus, postponedTo?: string) => void; toggleSubtask: (id: string, subtaskId: string) => void;
 }
 
-export function BoardView({ visible, search, setSearch, categoryFilter, setCategoryFilter, priorityFilter, setPriorityFilter, selectedLane, setSelectedLane, day, completed, showEditor, toggleTask, moveTask, archiveTask, toggleSubtask }: Props) {
+export function BoardView({ visible, search, setSearch, categoryFilter, setCategoryFilter, priorityFilter, setPriorityFilter, selectedLane, setSelectedLane, day, completed, showEditor, toggleTask, moveTask, archiveTask, duplicateTask, changeStatus, toggleSubtask }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 7 } }),
@@ -45,8 +46,8 @@ export function BoardView({ visible, search, setSearch, categoryFilter, setCateg
           <div className="board-toolbar"><div className="board-search"><Search size={17}/><input aria-label="Search tasks" placeholder="Search your tasks..." value={search} onChange={e => setSearch(e.target.value)}/>{search && <button aria-label="Clear search" onClick={() => setSearch('')}><X size={16}/></button>}</div><label className="filter-select"><SlidersHorizontal size={16}/><select aria-label="Filter by category" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value as Category | 'All')}><option value="All">All areas</option>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}</select><ChevronDown size={14}/></label><label className="filter-select"><Flag size={16}/><select aria-label="Filter by priority" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as Priority | 'All')}><option value="All">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><ChevronDown size={14}/></label><span className="board-total">{visible.length} tasks</span></div>
           <div className="mobile-lane-picker"><label>Choose a column<select value={selectedLane} onChange={e => setSelectedLane(e.target.value as Lane)}>{LANES.map(l => <option key={l.id} value={l.id}>{l.emoji} {l.title}</option>)}</select></label><span>Use ⋯ on a card to move it.</span></div>
           <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={onDragStart} onDragCancel={() => setDraggingId(null)} onDragEnd={onDragEnd}>
-            <div className="board-scroller"><div className="kanban-board">{LANES.map(lane => <div key={lane.id} className={selectedLane === lane.id ? 'mobile-lane-visible' : 'mobile-lane-hidden'}><BoardLane lane={lane} tasks={visible.filter(t => t.lane === lane.id)} completed={completed} day={day} onAdd={l => showEditor(null, l)} onComplete={toggleTask} onEdit={showEditor} onMove={moveTask} onArchive={archiveTask} onSubtask={toggleSubtask}/></div>)}</div></div>
-            <DragOverlay>{draggingTask ? <div className="drag-overlay"><CardPresentation task={draggingTask} done={completed(draggingTask)} day={day} onComplete={() => {}} onEdit={() => {}} onMove={() => {}} onArchive={() => {}} onSubtask={() => {}} ghost/></div> : null}</DragOverlay>
+            <div className="board-scroller"><div className="kanban-board">{LANES.map(lane => <div key={lane.id} className={selectedLane === lane.id ? 'mobile-lane-visible' : 'mobile-lane-hidden'}><BoardLane lane={lane} tasks={visible.filter(t => t.lane === lane.id)} completed={completed} day={day} onAdd={l => showEditor(null, l)} onComplete={toggleTask} onEdit={showEditor} onMove={moveTask} onArchive={archiveTask} onDuplicate={duplicateTask} onStatus={changeStatus} onSubtask={toggleSubtask}/></div>)}</div></div>
+            <DragOverlay>{draggingTask ? <div className="drag-overlay"><CardPresentation task={draggingTask} done={completed(draggingTask)} day={day} onComplete={() => {}} onEdit={() => {}} onMove={() => {}} onArchive={() => {}} onDuplicate={() => {}} onStatus={() => {}} onSubtask={() => {}} ghost/></div> : null}</DragOverlay>
           </DndContext><p className="board-help"><GripVertical size={14}/> Drag by the handle to reorder or move. On touch screens, press and hold. The ⋯ menu works everywhere. Moving columns does not change a custom repeat schedule; edit a task to adjust it.</p>
         </>;
 }
