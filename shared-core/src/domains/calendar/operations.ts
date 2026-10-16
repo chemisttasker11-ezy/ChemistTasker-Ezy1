@@ -56,6 +56,7 @@ export type OperationTask = {
   target_kind: 'operational' | 'clinical' | 'safety';
   training_url: string;
   progress: OperationProgress;
+  can_manage: boolean;
 };
 export type OperationPlan = {
   id: number;
@@ -138,6 +139,16 @@ export function publishOperationPlan(id: number, revision: number) {
     '/operation-plans/' + id + '/publish/',
     { method: 'POST', body: JSON.stringify({ revision }) },
   );
+}
+export function copyOperationDay(planId: number, sourceDate: string, destinationDate: string, revision: number, requestKey: string) {
+  return fetchApi<{created: number; already_copied: boolean; revision: number}>('/operation-plans/' + planId + '/copy_day/', {
+    method: 'POST', body: JSON.stringify({source_date: sourceDate, destination_date: destinationDate, revision, request_key: requestKey}),
+  });
+}
+export function managerReopenOperationTask(id: number, reason: string) {
+  return fetchApi<{reopened: boolean; reset_submissions: number}>('/operation-items/' + id + '/manager_reopen/', {
+    method: 'POST', body: JSON.stringify({reason}),
+  });
 }
 export function createOperationTask(payload: DraftTask) {
   return fetchApi<OperationTask>('/operation-items/', { method: 'POST', body: JSON.stringify(payload) });

@@ -129,7 +129,7 @@ export default function PharmacyCalendarPage() {
                 const manager = managerResult.status === "fulfilled"
                     ? managerResult.value.pharmacies.map(p => ({ id: "managed-" + p.id, pharmacyId: p.id, pharmacyName: p.name }))
                     : [];
-                const staffedIds = new Set(staff.map(m => Number(getPharmacyId(m))));
+                const staffedIds = new Set(staff.map((m: any) => Number(getPharmacyId(m))));
                 const data = [...staff, ...manager.filter(p => !staffedIds.has(p.pharmacyId))];
                 setMemberships(data);
                 if (data.length > 0 && selectedPharmacyId === null) {

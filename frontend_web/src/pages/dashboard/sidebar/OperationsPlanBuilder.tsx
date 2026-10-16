@@ -8,7 +8,7 @@ import { format, addDays, differenceInCalendarDays } from 'date-fns';
 import {
   type OperationCatalogEntry, type OperationPlan,
   type OperationPreflight, type OperationTask, type OperationTemplate,
-  applyOperationTemplate, createOperationPlan, createOperationTask, editOperationTask,
+  applyOperationTemplate, createOperationPlan, createOperationTask, copyOperationDay, editOperationTask,
   deleteOperationTask, previewOperationPlan, publishOperationPlan,
   fetchMembershipsByPharmacy,
 } from '@chemisttasker/shared-core';
@@ -42,6 +42,8 @@ export default function OperationsPlanBuilder({
   const [templateId, setTemplateId] = useState<number | ''>('');
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [editingTask, setEditingTask] = useState<number | null>(null);
+  const [originalSteps, setOriginalSteps] = useState<OperationTask['checklist']>([]);
+  const [copyRetry, setCopyRetry] = useState<{source: string; target: string; key: string} | null>(null);
   const [selectedDay, setSelectedDay] = useState(today());
   const [copyTo, setCopyTo] = useState(today());
   const [members, setMembers] = useState<Member[]>([]);
@@ -103,6 +105,7 @@ export default function OperationsPlanBuilder({
   function editDraft(item?: OperationTask) {
     if (item) {
       setEditingTask(item.id);
+      setOriginalSteps(item.checklist.map(x => ({...x})));
       setTaskDraft({
         title: item.title, date: item.date, description: item.description, area: item.area,
         audience: item.audience, role: item.role_codes[0] ?? '', members: item.membership_ids,
@@ -113,6 +116,7 @@ export default function OperationsPlanBuilder({
       });
     } else {
       setEditingTask(null);
+      setOriginalSteps([]);
       setTaskDraft(blankDraft(selectedDay));
     }
   }
@@ -128,7 +132,7 @@ export default function OperationsPlanBuilder({
       membership_ids: taskDraft.audience === 'NAMED' ? taskDraft.members : [],
       role_codes: taskDraft.role ? [taskDraft.role] : taskDraft.targetKind === 'clinical' ? ['PHARMACIST'] : [],
       checklist: taskDraft.steps.split('\n').map(s => s.trim()).filter(Boolean).map((label, index) => ({
-        id: String(index + 1), label, required: true,
+        id: originalSteps[index]?.id ?? String(index + 1), label, required: originalSteps[index]?.required ?? true,
       })),
       start_time: taskDraft.startTime || null, end_time: taskDraft.endTime || null,
       requires_verification: taskDraft.requiresVerification,
@@ -159,25 +163,20 @@ export default function OperationsPlanBuilder({
     }), 'Independent task copy added.');
   }
   async function copyDay() {
-    if (!plan || copyTo < plan.starts_on || copyTo > plan.ends_on) {
-      setError('Destination must be inside this plan.'); return;
+    if (!plan || copyTo < plan.starts_on || copyTo > plan.ends_on || copyTo === selectedDay) {
+      setError('Copy between different dates inside this plan.'); return;
     }
-    const originals = taskList.filter(x => x.date === selectedDay);
-    if (!originals.length) { setError('There are no tasks on the chosen source date.'); return; }
-    await mutate(async () => {
-      for (const original of originals) {
-        await createOperationTask({
-          plan: plan.id, date: copyTo, title: original.title, description: original.description,
-          area: original.area, audience: original.audience,
-          membership_ids: [...original.membership_ids], role_codes: [...original.role_codes],
-          checklist: original.checklist.map(step => ({ ...step })),
-          start_time: original.start_time, end_time: original.end_time,
-          requires_verification: original.requires_verification,
-          target_value: original.target_value, target_unit: original.target_unit,
-          target_kind: original.target_kind, training_url: original.training_url,
-        });
-      }
-    }, 'Independent daily tasks copied.');
+    const key = copyRetry?.source === selectedDay && copyRetry?.target === copyTo
+      ? copyRetry.key : crypto.randomUUID();
+    setCopyRetry({source: selectedDay, target: copyTo, key});
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await copyOperationDay(plan.id, selectedDay, copyTo, plan.revision, key);
+      await onReload();
+      setCopyRetry(null); setReview(null); setReviewedRevision(null);
+      setNotice(result.already_copied ? 'Previous copy confirmed.' : 'All tasks copied together.');
+    } catch (error) { setError(readableError(error)); }
+    finally { setBusy(false); }
   }
   async function moveTask(event: DragEvent, destination: string) {
     event.preventDefault();
