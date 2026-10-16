@@ -419,3 +419,10 @@ a { color: inherit; }
 .today-task-row {display:flex;align-items:center;gap:10px;padding:13px 1px;border-bottom:1px solid var(--border);}
 .today-task-row:last-child {border:0;}
 .today-task-row .focus-content {flex:1;min-width:0;}
+
+/* Year overview reflects the same five statuses as day/week/month entries. */
+.year-mini-grid span.scheduled.status-not-started {background:#e8ebf1;color:#5d677b;}
+.year-mini-grid span.scheduled.status-started {background:#d9f0fc;color:#2e83a8;}
+.year-mini-grid span.scheduled.status-progressing {background:#e4dcff;color:#7660ca;}
+.year-mini-grid span.scheduled.status-finished {background:#d9f4e8;color:#2e956f;}
+.year-mini-grid span.scheduled.status-postponed {background:#ffebcc;color:#a67b32;}
