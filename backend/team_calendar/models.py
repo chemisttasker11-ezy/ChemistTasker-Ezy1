@@ -204,3 +204,101 @@ class WorkNoteCompletion(models.Model):
             f"WorkNoteCompletion#{self.pk} note={self.work_note_id} "
             f"membership={self.membership_id} date={self.occurrence_date}"
         )
+
+
+# Operations planning belongs to the team_calendar domain. Drafts never become
+# visible work until publish creates their authoritative WorkNote records.
+class OperationsTemplate(models.Model):
+    pharmacy = models.ForeignKey(
+        "client_profile.Pharmacy", on_delete=models.CASCADE, related_name="operations_templates")
+    title = models.CharField(max_length=180)
+    instructions = models.TextField(blank=True)
+    area = models.CharField(max_length=40, default="dispensary")
+    kind = models.CharField(max_length=20, default="routine")
+    frequency = models.CharField(max_length=20, default="daily")
+    target_role = models.CharField(max_length=30, blank=True)
+    duration_minutes = models.PositiveSmallIntegerField(default=15)
+    checklist = models.JSONField(default=list, blank=True)
+    reference_url = models.URLField(blank=True)
+    needs_verification = models.BooleanField(default=False)
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["area", "title"]
+        indexes = [models.Index(fields=["pharmacy", "area"])]
+
+
+class OperationsPlan(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        PUBLISHED = "PUBLISHED", "Published"
+
+    pharmacy = models.ForeignKey(
+        "client_profile.Pharmacy", on_delete=models.CASCADE, related_name="operations_plans")
+    title = models.CharField(max_length=180)
+    date_from = models.DateField()
+    date_to = models.DateField()
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="created_operations_plans")
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="published_operations_plans")
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date_from", "-id"]
+        indexes = [models.Index(fields=["pharmacy", "date_from", "date_to"])]
+
+
+class OperationsItem(models.Model):
+    class Audience(models.TextChoices):
+        NAMED = "NAMED", "Named staff"
+        ROSTER_ROLE = "ROSTER_ROLE", "Rostered role"
+        ON_DUTY = "ON_DUTY", "All rostered staff"
+        TEAM_POOL = "TEAM_POOL", "Rostered shared team pool"
+
+    plan = models.ForeignKey(OperationsPlan, on_delete=models.CASCADE, related_name="items")
+    template = models.ForeignKey(
+        OperationsTemplate, on_delete=models.SET_NULL, null=True, blank=True)
+    work_note = models.OneToOneField(
+        WorkNote, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="operations_item")
+    date = models.DateField()
+    title = models.CharField(max_length=180)
+    instructions = models.TextField(blank=True)
+    area = models.CharField(max_length=40, default="dispensary")
+    kind = models.CharField(max_length=20, default="routine")
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    audience = models.CharField(
+        max_length=20, choices=Audience.choices, default=Audience.ROSTER_ROLE)
+    target_role = models.CharField(max_length=30, blank=True)
+    named_membership_ids = models.JSONField(default=list, blank=True)
+    checklist = models.JSONField(default=list, blank=True)
+    target_value = models.PositiveIntegerField(null=True, blank=True)
+    target_metric = models.CharField(max_length=90, blank=True)
+    reference_url = models.URLField(blank=True)
+    needs_verification = models.BooleanField(default=False)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["date", "order", "id"]
+        indexes = [models.Index(fields=["plan", "date"])]
+
+
+class OperationsStepCheck(models.Model):
+    """Evidence of individual steps; WorkNoteCompletion remains the final done record."""
+    item = models.ForeignKey(
+        OperationsItem, on_delete=models.CASCADE, related_name="step_checks")
+    membership = models.ForeignKey(
+        "client_profile.Membership", on_delete=models.CASCADE)
+    step_index = models.PositiveSmallIntegerField()
+    checked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=["item", "membership", "step_index"], name="operations_step_unique")]
