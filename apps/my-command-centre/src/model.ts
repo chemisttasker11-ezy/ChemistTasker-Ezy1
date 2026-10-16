@@ -3,7 +3,7 @@ export type Category = 'ChemistTasker' | 'Pharmacy' | 'Family' | 'Finance' | 'Pe
 export type Priority = 'high' | 'medium' | 'low';
 export type Recurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 export type TaskStatus = 'not-started' | 'started' | 'progressing' | 'finished' | 'postponed';
-export type View = 'overview' | 'board' | 'today' | 'calendar' | 'upcoming' | 'goals' | 'completed' | 'archived' | 'settings';
+export type View = 'overview' | 'board' | 'today' | 'week' | 'calendar' | 'upcoming' | 'goals' | 'completed' | 'archived' | 'settings';
 
 export interface Subtask { id: string; title: string; done: boolean }
 export interface Task {
@@ -38,11 +38,32 @@ export interface Completion {
   previousStatus?: TaskStatus;
   previousSubtasks?: Subtask[];
 }
+/** A commitment is a snapshot: moving or postponing a task never silently removes it from the score. */
+export interface WeeklyCommitment {
+  taskId: string;
+  title: string;
+  priority: Priority;
+  plannedDate: string;
+}
+export interface WeekReview {
+  wins: string;
+  blockers: string;
+  adjustment: string;
+  savedAt: string;
+  scoreSnapshot: number | null;
+}
+export interface WeeklyPlan {
+  weekStart: string;
+  commitments: WeeklyCommitment[];
+  review: WeekReview | null;
+}
 export interface BoardState {
   version: 1;
   tasks: Task[];
   completions: Completion[];
   theme: 'light' | 'dark';
+  weekPlans: Record<string, WeeklyPlan>;
+  dailyFocus: Record<string, string[]>;
 }
 
 export const LANES: { id: Lane; title: string; description: string; emoji: string; tone: string }[] = [
@@ -323,7 +344,7 @@ export function createTask(values: Partial<Task> & Pick<Task, 'title'>): Task {
 }
 
 export function initialState(): BoardState {
-  return { version: 1, theme: 'light', completions: [], tasks: seed.map((t, i) => createTask({ ...t, id: `notebook-${i + 1}`, origin: 'notebook' })) };
+  return { version: 1, theme: 'light', completions: [], weekPlans: {}, dailyFocus: {}, tasks: seed.map((t, i) => createTask({ ...t, id: `notebook-${i + 1}`, origin: 'notebook' })) };
 }
 
 export const STORAGE_KEY = 'my-command-centre:v1';
@@ -399,5 +420,93 @@ export function validateImported(raw: unknown): BoardState {
       previousStatus: c.previousStatus && statuses.has(c.previousStatus) ? c.previousStatus : undefined,
       previousSubtasks: Array.isArray(c.previousSubtasks) && c.previousSubtasks.length <= 100 ? c.previousSubtasks.filter(s => s && typeof s.id === 'string' && typeof s.title === 'string' && s.title.length <= 250 && typeof s.done === 'boolean').map(s => ({ id: s.id.slice(0, 100), title: s.title, done: s.done })) : undefined }; 
   });
-  return { version: 1, tasks, completions, theme: obj.theme === 'dark' ? 'dark' : 'light' };
+  // Backward-compatible with backups created before weekly planning was introduced.
+  // Reject malformed optional records rather than persisting arbitrary imported shapes.
+  const weekPlans: Record<string, WeeklyPlan> = Object.create(null) as Record<string, WeeklyPlan>;
+  if (obj.weekPlans !== undefined) {
+    if (!obj.weekPlans || typeof obj.weekPlans !== 'object' || Array.isArray(obj.weekPlans) || Object.keys(obj.weekPlans).length > 260) throw new Error('Invalid weekly plans in backup.');
+    for (const [key, rawPlan] of Object.entries(obj.weekPlans)) {
+      const plan = rawPlan as WeeklyPlan;
+      if (!validISODate(key) || !key || new Date(`${key}T12:00:00Z`).getUTCDay() !== 1 ||
+        !plan || typeof plan !== 'object' || plan.weekStart !== key ||
+        !Array.isArray(plan.commitments) || plan.commitments.length > 150) throw new Error('Invalid weekly plan.');
+      const seen = new Set<string>();
+      const commitments = plan.commitments.map(item => {
+        if (!item || typeof item.taskId !== 'string' || !item.taskId || item.taskId.length > 100 || seen.has(item.taskId) ||
+          typeof item.title !== 'string' || item.title.length > 250 ||
+          !priority.has(item.priority) || !validISODate(item.plannedDate)) throw new Error('Invalid weekly commitment.');
+        seen.add(item.taskId);
+        return { taskId: item.taskId, title: item.title, priority: item.priority, plannedDate: item.plannedDate };
+      });
+      let review: WeekReview | null = null;
+      if (plan.review !== null && plan.review !== undefined) {
+        const r = plan.review;
+        if (typeof r !== 'object' || typeof r.wins !== 'string' || typeof r.blockers !== 'string' ||
+          typeof r.adjustment !== 'string' || [r.wins, r.blockers, r.adjustment].some(s => s.length > 1400) ||
+          typeof r.savedAt !== 'string' || (r.scoreSnapshot !== null && (!Number.isInteger(r.scoreSnapshot) || r.scoreSnapshot < 0 || r.scoreSnapshot > 100))) throw new Error('Invalid weekly review.');
+        review = { wins: r.wins, blockers: r.blockers, adjustment: r.adjustment, savedAt: r.savedAt, scoreSnapshot: r.scoreSnapshot };
+      }
+      weekPlans[key] = { weekStart: key, commitments, review };
+    }
+  }
+  const dailyFocus: Record<string, string[]> = Object.create(null) as Record<string, string[]>;
+  if (obj.dailyFocus !== undefined) {
+    if (!obj.dailyFocus || typeof obj.dailyFocus !== 'object' || Array.isArray(obj.dailyFocus) || Object.keys(obj.dailyFocus).length > 1100) throw new Error('Invalid daily focus backup.');
+    for (const [key, ids] of Object.entries(obj.dailyFocus)) {
+      if (!validISODate(key) || !key || !Array.isArray(ids) || ids.length > 3 ||
+        ids.some(id => typeof id !== 'string' || !id || id.length > 100) ||
+        new Set(ids).size !== ids.length) throw new Error('Invalid daily focus selection.');
+      dailyFocus[key] = ids;
+    }
+  }
+  return { version: 1, tasks, completions, weekPlans, dailyFocus, theme: obj.theme === 'dark' ? 'dark' : 'light' };
+}
+
+/** A weekly plan remains explicit, so postponement cannot silently inflate progress. */
+export function setWeekCommitment(state: BoardState, weekStart: string, task: Task, include: boolean): BoardState {
+  if (!validISODate(weekStart) || !weekStart || new Date(`${weekStart}T12:00:00Z`).getUTCDay() !== 1) return state;
+  const current = state.weekPlans?.[weekStart] ?? { weekStart, commitments: [], review: null };
+  const already = current.commitments.some(c => c.taskId === task.id);
+  if (already === include) return state;
+  if (include && (task.archivedAt || current.commitments.length >= 150)) return state;
+  const commitments = include
+    ? [...current.commitments, {
+      taskId: task.id, title: task.title, priority: task.priority,
+      plannedDate: task.dueDate >= weekStart && task.dueDate <= addDaysUTC(weekStart, 6) ? task.dueDate : ''
+    }]
+    : current.commitments.filter(c => c.taskId !== task.id);
+  const review = current.review ? { ...current.review, savedAt: '', scoreSnapshot: null } : null;
+  return { ...state, weekPlans: { ...state.weekPlans, [weekStart]: { weekStart, commitments, review } } };
+}
+
+function addDaysUTC(day: string, count: number): string {
+  const date = new Date(`${day}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + count);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Pick no more than three deliberate daily priorities; independent of task status. */
+export function toggleDailyFocus(state: BoardState, day: string, taskId: string): BoardState {
+  if (!validISODate(day) || !day || !state.tasks.some(t => t.id === taskId && !t.archivedAt)) return state;
+  const current = state.dailyFocus?.[day] ?? [];
+  const included = current.includes(taskId);
+  if (!included && current.length >= 3) return state;
+  const next = included ? current.filter(id => id !== taskId) : [...current, taskId];
+  return { ...state, dailyFocus: { ...state.dailyFocus, [day]: next } };
+}
+
+/** The saved review freezes an end-of-week score for later comparison. */
+export function saveWeekReview(state: BoardState, weekStart: string, notes: Pick<WeekReview, 'wins' | 'blockers' | 'adjustment'>, score: number | null, now = new Date()): BoardState {
+  const plan = state.weekPlans?.[weekStart];
+  if (!plan || ![notes.wins, notes.blockers, notes.adjustment].every(text => typeof text === 'string' && text.length <= 1400) ||
+    (score !== null && (!Number.isInteger(score) || score < 0 || score > 100))) return state;
+  return {
+    ...state, weekPlans: {
+      ...state.weekPlans,
+      [weekStart]: { ...plan, review: {
+        wins: notes.wins.trim(), blockers: notes.blockers.trim(), adjustment: notes.adjustment.trim(),
+        savedAt: now.toISOString(), scoreSnapshot: score
+      } }
+    }
+  };
 }
