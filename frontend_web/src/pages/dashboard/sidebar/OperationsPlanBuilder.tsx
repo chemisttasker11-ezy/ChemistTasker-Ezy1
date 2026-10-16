@@ -1,46 +1,22 @@
 import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from 'react';
 import {
-  Alert, Box, Button, Card, CardContent, Checkbox, Chip, Divider,
-  FormControlLabel, MenuItem, Paper, Stack, TextField, Tooltip, Typography,
+  Alert, Box, Button, Card, CardContent, Chip, Divider,
+  MenuItem, Paper, Stack, TextField, Tooltip, Typography,
 } from '@mui/material';
 import { CalendarDays, ClipboardPlus, Copy, FileCheck2, GripVertical, Plus, Send, Trash2 } from 'lucide-react';
 import { format, addDays, differenceInCalendarDays } from 'date-fns';
 import {
-  type OperationAudience, type OperationCatalogEntry, type OperationPlan,
+  type OperationCatalogEntry, type OperationPlan,
   type OperationPreflight, type OperationTask, type OperationTemplate,
   applyOperationTemplate, createOperationPlan, createOperationTask, editOperationTask,
   deleteOperationTask, previewOperationPlan, publishOperationPlan,
   fetchMembershipsByPharmacy,
 } from '@chemisttasker/shared-core';
 
-const ROLE_OPTIONS = [
-  { value: '', label: 'Any eligible pharmacy role' },
-  { value: 'PHARMACIST', label: 'Pharmacist' },
-  { value: 'INTERN', label: 'Intern' },
-  { value: 'TECHNICIAN', label: 'Dispensary technician' },
-  { value: 'ASSISTANT', label: 'Pharmacy assistant' },
-  { value: 'STUDENT', label: 'Student' },
-];
-const AUDIENCES: Array<{ value: OperationAudience; label: string; description: string }> = [
-  { value: 'ROLE_ON_DUTY', label: 'Eligible role on shift', description: 'Match the published roster and chosen role' },
-  { value: 'ON_DUTY', label: 'Working at this time', description: 'Use staff scheduled during the time window' },
-  { value: 'TEAM_POOL', label: 'Shared team task', description: 'One authorised staff member can complete for the pool' },
-  { value: 'EVERY_ON_DUTY', label: 'Every scheduled employee', description: 'Each assigned person must complete separately' },
-  { value: 'NAMED', label: 'Named individual(s)', description: 'Directly choose active members; may be outside a shift for training' },
-];
+import OperationsTaskEditor from './OperationsTaskEditor';
+import { blankDraft, normalizeMembers, type Member, type TaskDraft } from './operationsDraftModel';
+
 const today = () => format(new Date(), 'yyyy-MM-dd');
-type TaskDraft = {
-  title: string; date: string; description: string; area: string; audience: OperationAudience;
-  role: string; members: number[]; steps: string; startTime: string; endTime: string;
-  requiresVerification: boolean; target: string; targetUnit: string;
-  targetKind: 'operational' | 'clinical' | 'safety'; trainingUrl: string;
-};
-const blankDraft = (day: string): TaskDraft => ({
-  title: '', date: day, description: '', area: 'dispensary', audience: 'ROLE_ON_DUTY',
-  role: '', members: [], steps: '', startTime: '', endTime: '',
-  requiresVerification: false, target: '', targetUnit: '',
-  targetKind: 'operational', trainingUrl: '',
-});
 type Props = {
   pharmacyId: number;
   plans: OperationPlan[];
@@ -50,25 +26,8 @@ type Props = {
   onOpenTask: (id: number) => void;
   onShowTemplates: () => void;
 };
-type Member = { id: number; role?: string; invitedName?: string; invited_name?: string; userDetails?: { firstName?: string; lastName?: string }; user_details?: { first_name?: string; last_name?: string } };
 function readableError(error: unknown): string {
   return error instanceof Error ? error.message : 'The operation could not be completed.';
-}
-
-function normalizeMembers(source: unknown): Member[] {
-  if (Array.isArray(source)) return source as Member[];
-  if (source && typeof source === 'object' && 'results' in source) {
-    return ((source as { results?: unknown }).results ?? []) as Member[];
-  }
-  return [];
-}
-function memberName(m: Member) {
-  const details = m.userDetails ?? m.user_details;
-  const name = m.invitedName || m.invited_name || [
-    (details as { firstName?: string })?.firstName || (details as { first_name?: string })?.first_name,
-    (details as { lastName?: string })?.lastName || (details as { last_name?: string })?.last_name,
-  ].filter(Boolean).join(' ') || 'Member ' + m.id;
-  return name + (m.role ? ' · ' + m.role : '');
 }
 
 export default function OperationsPlanBuilder({
@@ -277,69 +236,9 @@ export default function OperationsPlanBuilder({
           <Button variant="outlined" disabled={busy || !taskList.some(t => t.date === selectedDay)} startIcon={<Copy size={16}/>} onClick={() => void copyDay()}>Copy day</Button>
         </Stack>}
       </Paper>
-      {taskDraft && <Paper component="form" onSubmit={e => void saveTask(e)} variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
-        <Typography variant="h6" fontWeight={700} mb={2}>{editingTask ? 'Edit draft task' : 'New calendar task'}</Typography>
-        <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField required label="Task title" size="small" fullWidth value={taskDraft.title} onChange={e => setTaskDraft(s => s && ({ ...s, title: e.target.value }))} />
-            <TextField required label="Date" type="date" size="small" value={taskDraft.date} InputLabelProps={{ shrink: true }}
-              inputProps={{ min: plan.starts_on, max: plan.ends_on }} onChange={e => setTaskDraft(s => s && ({ ...s, date: e.target.value }))} />
-          </Stack>
-          <TextField label="Instructions" size="small" fullWidth multiline minRows={2} value={taskDraft.description}
-            onChange={e => setTaskDraft(s => s && ({ ...s, description: e.target.value }))} />
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField label="Work area" size="small" fullWidth value={taskDraft.area}
-              onChange={e => setTaskDraft(s => s && ({ ...s, area: e.target.value }))} />
-            <TextField type="time" label="Start" size="small" value={taskDraft.startTime} InputLabelProps={{ shrink: true }}
-              onChange={e => setTaskDraft(s => s && ({ ...s, startTime: e.target.value }))} />
-            <TextField type="time" label="End" size="small" value={taskDraft.endTime} InputLabelProps={{ shrink: true }}
-              onChange={e => setTaskDraft(s => s && ({ ...s, endTime: e.target.value }))} />
-          </Stack>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField select label="Assignment rule" size="small" fullWidth value={taskDraft.audience}
-              helperText={AUDIENCES.find(x => x.value === taskDraft.audience)?.description}
-              onChange={e => setTaskDraft(s => s && ({ ...s, audience: e.target.value as OperationAudience }))}>
-              {AUDIENCES.map(a => <MenuItem key={a.value} value={a.value}>{a.label}</MenuItem>)}
-            </TextField>
-            <TextField select label="Eligible role" size="small" fullWidth value={taskDraft.role}
-              onChange={e => setTaskDraft(s => s && ({ ...s, role: e.target.value }))}>
-              {ROLE_OPTIONS.map(a => <MenuItem key={a.value} value={a.value}>{a.label}</MenuItem>)}
-            </TextField>
-          </Stack>
-          {taskDraft.audience === 'NAMED' && <Box>
-            <Typography fontWeight={700} variant="subtitle2">Assign active members</Typography>
-            <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
-              {members.map(member => <FormControlLabel key={member.id}
-                control={<Checkbox checked={taskDraft.members.includes(member.id)}
-                  onChange={(_, checked) => setTaskDraft(s => s && ({
-                    ...s, members: checked ? [...s.members, member.id] : s.members.filter(id => id !== member.id),
-                  }))} />}
-                label={memberName(member)} />)}
-            </Stack>
-          </Box>}
-          <TextField label="Checklist (one required step per line)" size="small" fullWidth multiline minRows={3}
-            value={taskDraft.steps} onChange={e => setTaskDraft(s => s && ({ ...s, steps: e.target.value }))} />
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField select label="KPI classification" size="small" value={taskDraft.targetKind} fullWidth
-              onChange={e => setTaskDraft(s => s && ({ ...s, targetKind: e.target.value as TaskDraft['targetKind'] }))}>
-              {['operational', 'clinical', 'safety'].map(k => <MenuItem key={k} value={k}>{k}</MenuItem>)}
-            </TextField>
-            <TextField type="number" size="small" label="Team target (optional)" value={taskDraft.target}
-              inputProps={{ min: 0, max: 100000 }} onChange={e => setTaskDraft(s => s && ({ ...s, target: e.target.value }))} />
-            <TextField size="small" label="Unit" value={taskDraft.targetUnit}
-              onChange={e => setTaskDraft(s => s && ({ ...s, targetUnit: e.target.value }))} />
-          </Stack>
-          <TextField label="Training link (optional)" size="small" type="url" fullWidth value={taskDraft.trainingUrl}
-            onChange={e => setTaskDraft(s => s && ({ ...s, trainingUrl: e.target.value }))} />
-          <FormControlLabel label="Require separate supervisor verification"
-            control={<Checkbox checked={taskDraft.requiresVerification}
-              onChange={(_, checked) => setTaskDraft(s => s && ({ ...s, requiresVerification: checked }))} />} />
-          <Stack direction="row" gap={1}>
-            <Button type="submit" variant="contained" disabled={busy || !taskDraft.title.trim()}>Save task</Button>
-            <Button onClick={() => { setTaskDraft(null); setEditingTask(null); }}>Cancel</Button>
-          </Stack>
-        </Stack>
-      </Paper>}
+      {taskDraft && <OperationsTaskEditor draft={taskDraft} setDraft={setTaskDraft}
+        editingTask={editingTask} plan={plan} members={members} busy={busy}
+        onSave={e => void saveTask(e)} onCancel={() => { setTaskDraft(null); setEditingTask(null); }} />}
       <Box>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1} alignItems={{ sm: 'center' }} mb={2}>
           <Typography variant="h6" fontWeight={750}>Scheduled work · {taskList.length} tasks</Typography>
