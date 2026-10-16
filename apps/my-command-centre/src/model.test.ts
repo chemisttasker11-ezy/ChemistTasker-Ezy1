@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { brisbaneToday, createTask, initialState, isCompleted, nextDueDate, periodKey, toggleCompletion, validateImported } from './model';
+import { brisbaneToday, createTask, initialState, isCompleted, nextDueDate, periodKey, toggleCompletion, validateImported, moveInBoard } from './model';
 
 describe('periods and recurring completion', () => {
   it('computes Australia/Brisbane date correctly', () => {
@@ -49,7 +49,6 @@ describe('periods and recurring completion', () => {
   });
 });
 
-import { moveInBoard } from './model';
 
 describe('task board ordering and undo semantics', () => {
   it('moves a notebook card into a different lane without losing its identity', () => {
