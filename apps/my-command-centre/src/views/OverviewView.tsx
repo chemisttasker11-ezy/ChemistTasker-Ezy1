@@ -2,16 +2,23 @@ import { ArrowRight, ArrowUpRight, Check, CheckCircle2, ChevronRight, Circle, Fl
 import { LANES, type Lane, type Task, type View } from '../model';
 import { LANE_LABEL, greeting } from '../lib/display';
 import { EmptyState } from '../components/EmptyState';
+import { WeeklyScoreMeter } from '../components/WeeklyScoreMeter';
+import type { WeekScore } from '../lib/scoring';
 
 interface Props {
-  active: Task[]; todayTasks: Task[]; doneToday: number; goals: Task[];
+  active: Task[]; todayTasks: Task[]; doneToday: number; goals: Task[]; weekScore: WeekScore;
   navigate: (view: View) => void; showEditor: (task: Task | null, lane?: Lane) => void;
   toggleTask: (id: string) => void; setSelectedLane: (lane: Lane) => void;
 }
 
-export function OverviewView({ active, todayTasks, doneToday, goals, navigate, showEditor, toggleTask, setSelectedLane }: Props) {
+export function OverviewView({ active, todayTasks, doneToday, goals, weekScore, navigate, showEditor, toggleTask, setSelectedLane }: Props) {
   return <>
           <div className="overview-hero"><div className="hero-text"><div className="eyebrow hero-eyebrow"><span className="live-pulse"/> YOUR PERSONAL SPACE</div><h1>{greeting()} <span className="wave">✳</span></h1><p>One clear place for your work, your family, and everything in between.</p><div className="hero-actions"><button className="button button-white" onClick={() => navigate('today')}>See today's focus <ArrowRight size={17}/></button><button className="button button-glass" onClick={() => navigate('board')}>Open my board <ArrowUpRight size={17}/></button></div></div><div className="hero-art" aria-hidden="true"><div className="art-circle art-a"/><div className="art-circle art-b"/><div className="hero-floating-card"><span className="float-check"><Check size={20}/></span><div><b>Keep moving forward</b><small>One good thing at a time</small></div><Sparkles size={18}/></div><div className="art-sparkle s1">✳</div><div className="art-sparkle s2">✦</div></div></div>
+          <section className="overview-week-pulse" aria-label="Weekly planning and progress">
+            <div><h2>Make this week count</h2><p>{weekScore.planned ? `${weekScore.finished} of ${weekScore.planned} committed tasks finished. Keep your plan honest and achievable.` : 'Turn your task list into a realistic plan for the next seven days.'}</p></div>
+            <div className="overview-week-score"><WeeklyScoreMeter percent={weekScore.percent} label="This week's score" compact/></div>
+            <button className="button button-primary" onClick={() => navigate('week')}>Open weekly planner <ArrowRight size={17}/></button>
+          </section>
           <div className="stats-row"><div className="stat-card"><div className="stat-icon violet"><ListTodo size={22}/></div><div><span>Tasks on board</span><strong>{active.length}</strong><small>Across your workspace</small></div></div><div className="stat-card"><div className="stat-icon coral"><Flag size={22}/></div><div><span>Focus today</span><strong>{todayTasks.length}</strong><small>Ready for your attention</small></div></div><div className="stat-card"><div className="stat-icon mint"><CheckCircle2 size={22}/></div><div><span>Completed today</span><strong>{doneToday}</strong><small>Every step counts</small></div></div><div className="stat-card"><div className="stat-icon amber"><Target size={22}/></div><div><span>Long-term goals</span><strong>{goals.length}</strong><small>Keep the big picture</small></div></div></div>
           <div className="dashboard-grid">
             <section className="panel todays-panel"><div className="panel-heading"><div><span className="eyebrow">YOUR FOCUS</span><h2>Today's priorities <span className="section-emoji">☀️</span></h2><p>Start with what matters most.</p></div><button className="text-link" onClick={() => navigate('today')}>View all <ArrowRight size={16}/></button></div>

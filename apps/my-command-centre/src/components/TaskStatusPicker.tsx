@@ -3,6 +3,7 @@ import { CalendarClock, Check, X } from 'lucide-react';
 import { brisbaneToday, type TaskStatus } from '../model';
 import { addDays } from '../lib/calendar';
 import { STATUS_LABEL, STATUS_ORDER } from '../lib/progress';
+import { STATUS_POINTS } from '../lib/scoring';
 
 interface Props {
   title: string;
@@ -29,6 +30,7 @@ export function TaskStatusPicker({ title, value, dueDate, onChange, compact = fa
         {STATUS_ORDER.map(status => <option key={status} value={status}>{STATUS_LABEL[status]}</option>)}
       </select>
     </label>
+    <span className="task-status-points" title="Status points for weekly scoring">{STATUS_POINTS[value]} pts</span>
     {value === 'postponed' && <button type="button" className="status-replan" onClick={() => { setTarget(addDays(earliest, 1)); setPostponing(true); }} title="Move to another date" aria-label={`Change postponed date for ${title}`}><CalendarClock size={14}/></button>}
     {postponing && <div className="postpone-popup" role="group" aria-label={`Postpone ${title}`}>
       <label>Move to another date<input aria-label={`New date for ${title}`} type="date" min={addDays(earliest, 1)} value={target} onChange={e => setTarget(e.target.value)}/></label>

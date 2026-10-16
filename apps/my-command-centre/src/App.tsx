@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, CalendarDays, CalendarRange, Check, CheckCircle2, ChevronRight, LayoutDashboard, ListTodo, Menu, Moon, Plus, Settings2, Sparkles, Sun, Target, X } from 'lucide-react';
-import { type BoardState, type Category, type Lane, type Priority, type Task, type TaskStatus, type View, STORAGE_KEY, brisbaneToday, duplicateTask as cloneTask, initialState, isCompleted, moveInBoard, readState, rescheduleTask, saveTaskChanges, setTaskStatus, toggleCompletion, validateImported } from './model';
+import { Archive, CalendarDays, CalendarRange, BarChart3, Check, CheckCircle2, ChevronRight, LayoutDashboard, ListTodo, Menu, Moon, Plus, Settings2, Sparkles, Sun, Target, X } from 'lucide-react';
+import { type BoardState, type Category, type Lane, type Priority, type Task, type TaskStatus, type View, STORAGE_KEY, brisbaneToday, duplicateTask as cloneTask, initialState, isCompleted, moveInBoard, readState, rescheduleTask, saveTaskChanges, saveWeekReview, setTaskStatus, setWeekCommitment, toggleCompletion, toggleDailyFocus, validateImported } from './model';
 import { activeItem, downloadable, LANE_LABEL, longToday } from './lib/display';
 import { TaskModal } from './components/TaskModal';
 import { OverviewView } from './views/OverviewView';
@@ -13,11 +13,14 @@ import { SettingsView } from './views/SettingsView';
 import { ArchivedView } from './views/ArchivedView';
 import { CalendarView } from './views/CalendarView';
 import { visibleStatus } from './lib/progress';
+import { mondayOf } from './lib/calendar';
+import { scoreWeek } from './lib/scoring';
+import { WeekPlannerView } from './views/WeekPlannerView';
 
-const ICONS = { overview: LayoutDashboard, board: ListTodo, today: Sun, calendar: CalendarRange, upcoming: CalendarDays, goals: Target, completed: CheckCircle2, archived: Archive, settings: Settings2 };
+const ICONS = { overview: LayoutDashboard, board: ListTodo, today: Sun, week: BarChart3, calendar: CalendarRange, upcoming: CalendarDays, goals: Target, completed: CheckCircle2, archived: Archive, settings: Settings2 };
 const NAV: { id: View; label: string }[] = [
   { id: 'overview', label: 'Overview' }, { id: 'board', label: 'My task board' },
-  { id: 'today', label: 'Today' }, { id: 'calendar', label: 'Calendar' }, { id: 'upcoming', label: 'Upcoming' },
+  { id: 'today', label: 'Today' }, { id: 'week', label: 'Week planner' }, { id: 'calendar', label: 'Calendar' }, { id: 'upcoming', label: 'Upcoming' },
   { id: 'goals', label: 'Long-term goals' }, { id: 'completed', label: 'Completed' },
   { id: 'archived', label: 'Archived tasks' }
 ];
@@ -46,6 +49,8 @@ export default function App() {
   const todayTasks = outstanding.filter(t => t.status !== 'postponed' && (t.lane === 'daily' || t.lane === 'urgent' || (t.dueDate && t.dueDate <= day)));
   const doneToday = board.completions.filter(c => brisbaneToday(new Date(c.completedAt)) === day).length;
   const goals = active.filter(t => t.lane === 'goals');
+  const currentWeekStart = mondayOf(day);
+  const currentWeekScore = useMemo(() => scoreWeek(board.weekPlans?.[currentWeekStart], board, currentWeekStart, day), [board, currentWeekStart, day]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = board.theme;
@@ -64,6 +69,28 @@ export default function App() {
   function changeStatus(id: string, status: TaskStatus, postponedTo?: string) {
     setBoard(s => setTaskStatus(s, id, status, postponedTo));
     alertNotice(status === 'postponed' ? 'Task postponed to its new date' : `Status updated`);
+  }
+  function includeInWeek(weekStart: string, id: string, include: boolean) {
+    const task = board.tasks.find(item => item.id === id);
+    if (!task) return;
+    setBoard(state => setWeekCommitment(state, weekStart, task, include));
+    alertNotice(include ? 'Added to weekly commitments' : 'Removed from weekly commitments');
+  }
+  function chooseDailyFocus(date: string, id: string) {
+    const selected = board.dailyFocus?.[date] ?? [];
+    if (!selected.includes(id) && selected.length >= 3) {
+      alertNotice('Choose no more than three priorities per day');
+      return;
+    }
+    setBoard(state => toggleDailyFocus(state, date, id));
+    alertNotice(selected.includes(id) ? 'Removed from daily priorities' : 'Added to daily priorities');
+  }
+  function saveReview(weekStart: string, notes: { wins: string; blockers: string; adjustment: string }) {
+    setBoard(state => {
+      const percent = scoreWeek(state.weekPlans?.[weekStart], state, weekStart, brisbaneToday()).percent;
+      return saveWeekReview(state, weekStart, notes, percent);
+    });
+    alertNotice('Weekly review saved');
   }
   function rescheduleCalendarTask(id: string, date: string) {
     setBoard(s => rescheduleTask(s, id, date));
@@ -114,15 +141,16 @@ export default function App() {
   const selectedNav = NAV.find(n => n.id === view);
 
   return <div className="app-shell">
+    <a className="skip-link" href="#main-content">Skip to main content</a>
     <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`}>
       <div className="brand"><div className="brand-mark"><Check size={21} strokeWidth={3}/></div><div className="brand-name">my<span>command</span><strong>centre</strong></div><button className="icon-button mobile-close" type="button" aria-label="Close menu" onClick={() => setMobileNav(false)}><X size={20}/></button></div>
       <div className="workspace-label">YOUR WORKSPACE <span className="workspace-dot" /></div>
-      <nav className="side-nav" aria-label="Main navigation">
+      <nav id="main-navigation" className="side-nav" aria-label="Main navigation">
         <p className="nav-section">WORKSPACE</p>
         {NAV.map(n => {
           const Icon = ICONS[n.id];
           const count = n.id === 'today' ? todayTasks.length : n.id === 'goals' ? goals.length : undefined;
-          return <button key={n.id} className={`nav-link ${view === n.id ? 'selected' : ''}`} onClick={() => navigate(n.id)}><Icon size={19} strokeWidth={1.9}/><span>{n.label}</span>{typeof count === 'number' && <span className="nav-count">{count}</span>}</button>;
+          return <button key={n.id} className={`nav-link ${view === n.id ? 'selected' : ''}`} aria-current={view === n.id ? 'page' : undefined} onClick={() => navigate(n.id)}><Icon size={19} strokeWidth={1.9}/><span>{n.label}</span>{typeof count === 'number' && <span className="nav-count">{count}</span>}</button>;
         })}
         <p className="nav-section">PREFERENCES</p>
         <button className={`nav-link ${view === 'settings' ? 'selected' : ''}`} onClick={() => navigate('settings')}><Settings2 size={19}/><span>Settings & backup</span></button>
@@ -131,12 +159,13 @@ export default function App() {
     </aside>
     {mobileNav && <button className="mobile-backdrop" onClick={() => setMobileNav(false)} aria-label="Close navigation"/>}
     <div className="main-shell">
-      <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileNav(true)}><Menu size={23}/></button><div className="breadcrumb">Workspace <ChevronRight size={14}/> <strong>{view === 'board' ? 'Task board' : view === 'settings' ? 'Settings' : selectedNav?.label}</strong></div></div><div className="topbar-right"><span className="date-chip"><CalendarDays size={16}/>{longToday(day)}</span><button className="icon-button theme-toggle" aria-label="Toggle light or dark theme" onClick={() => setBoard(s => ({ ...s, theme: s.theme === 'light' ? 'dark' : 'light' }))}>{board.theme === 'light' ? <Moon size={19}/> : <Sun size={19}/>}</button><button className="top-add" onClick={() => showEditor(null, 'urgent')}><Plus size={18}/> <span>New task</span></button></div></header>
-      <main className="content">
+      <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" aria-controls="main-navigation" aria-expanded={mobileNav} onClick={() => setMobileNav(true)}><Menu size={23}/></button><div className="breadcrumb">Workspace <ChevronRight size={14}/> <strong>{view === 'board' ? 'Task board' : view === 'settings' ? 'Settings' : selectedNav?.label}</strong></div></div><div className="topbar-right"><span className="date-chip"><CalendarDays size={16}/>{longToday(day)}</span><button className="icon-button theme-toggle" aria-label="Toggle light or dark theme" onClick={() => setBoard(s => ({ ...s, theme: s.theme === 'light' ? 'dark' : 'light' }))}>{board.theme === 'light' ? <Moon size={19}/> : <Sun size={19}/>}</button><button className="top-add" onClick={() => showEditor(null, 'urgent')}><Plus size={18}/> <span>New task</span></button></div></header>
+      <main className="content" id="main-content" tabIndex={-1}>
         {saveError && <div className="save-warning" role="alert">Browser storage is unavailable or full. Export your work before leaving this page.</div>}
-        {view === 'overview' && <OverviewView active={active} todayTasks={todayTasks} doneToday={doneToday} goals={goals} navigate={navigate} showEditor={showEditor} toggleTask={toggleTask} setSelectedLane={setSelectedLane}/>}
+        {view === 'overview' && <OverviewView active={active} todayTasks={todayTasks} doneToday={doneToday} goals={goals} navigate={navigate} showEditor={showEditor} toggleTask={toggleTask} setSelectedLane={setSelectedLane} weekScore={currentWeekScore}/>}
         {view === 'board' && <BoardView visible={visible} search={search} setSearch={setSearch} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} priorityFilter={priorityFilter} setPriorityFilter={setPriorityFilter} selectedLane={selectedLane} setSelectedLane={setSelectedLane} day={day} completed={completed} showEditor={showEditor} toggleTask={toggleTask} moveTask={moveTask} archiveTask={archiveTask} duplicateTask={duplicateTask} changeStatus={changeStatus} toggleSubtask={toggleSubtask}/>}
-        {view === 'today' && <TodayView day={day} todayTasks={todayTasks} doneToday={doneToday} navigate={navigate} showEditor={showEditor} toggleTask={toggleTask}/>}
+        {view === 'today' && <TodayView day={day} todayTasks={todayTasks} doneToday={doneToday} navigate={navigate} showEditor={showEditor} toggleTask={toggleTask} allTasks={board.tasks} completed={completed} focusIds={board.dailyFocus?.[day] ?? []} onFocus={chooseDailyFocus}/>}
+        {view === 'week' && <WeekPlannerView board={board} today={day} navigate={navigate} onEdit={showEditor} onInclude={includeInWeek} onFocus={chooseDailyFocus} onReview={saveReview}/>}
         {view === 'calendar' && <CalendarView tasks={board.tasks} completions={board.completions} today={day} onEdit={showEditor} onDuplicate={duplicateTask} onStatus={changeStatus} onReschedule={rescheduleCalendarTask}/>}
         {view === 'upcoming' && <UpcomingView active={active} day={day} completed={completed} showEditor={showEditor} toggleTask={toggleTask}/>}
         {view === 'goals' && <GoalsView goals={goals} showEditor={showEditor}/>}
