@@ -72,6 +72,10 @@ export default function OperationsTaskEditor({ draft, setDraft, editingTask, pla
           </Stack>
           <TextField label="Training link (optional)" size="small" type="url" fullWidth value={taskDraft.trainingUrl}
             onChange={e => setTaskDraft(s => s && ({ ...s, trainingUrl: e.target.value }))} />
+          {taskDraft.targetKind === 'clinical' && <Typography color="warning.main" variant="caption">
+            Clinical work requires verified, non-expired pharmacist registration and published on-duty coverage.
+            Service-specific certificates must be checked by the responsible supervisor.
+          </Typography>}
           <FormControlLabel label="Require separate supervisor verification"
             control={<Checkbox checked={taskDraft.requiresVerification}
               onChange={(_, checked) => setTaskDraft(s => s && ({ ...s, requiresVerification: checked }))} />} />

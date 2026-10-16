@@ -105,21 +105,32 @@ def resolve_memberships(item):
     if item.role_codes:
         eligible = eligible.filter(role__in=item.role_codes)
     if item.target_kind == "clinical":
-        eligible = eligible.filter(role="PHARMACIST")
+        # Identity-only role is insufficient for clinical services. Require the
+        # existing manual AHPRA verification and a non-expired known registration.
+        # Vaccination and other service-specific credentials remain supervisor SOP checks.
+        eligible = eligible.filter(
+            role="PHARMACIST",
+            user__pharmacistonboarding__ahpra_verified=True,
+            user__pharmacistonboarding__ahpra_expiry_date__gte=item.date,
+        )
     if item.audience == "NAMED":
         if not item.membership_ids:
             return [], ["Select at least one staff member."]
         selected = set(item.membership_ids)
         chosen = list(eligible.filter(id__in=selected))
         if len(chosen) != len(selected):
-            return [], ["A nominated member is inactive, outside this pharmacy, or not eligible."]
+            return [], ["A nominated member is inactive, outside this pharmacy, or lacks required eligibility or current registration."]
+        if item.target_kind == "clinical":
+            rostered = _rostered_user_ids(item)
+            if not {member.user_id for member in chosen}.issubset(rostered):
+                return [], ["Clinical service work must be covered by a published on-duty pharmacist roster."]
         return chosen, []
     rostered = _rostered_user_ids(item)
     if not rostered:
         return [], ["No matching staff are assigned to a published roster at the selected date and time."]
     matched = list(eligible.filter(user_id__in=rostered))
     if not matched:
-        return [], ["Published roster workers have no eligible active pharmacy memberships."]
+        return [], ["No eligible, currently authorised staff with a published roster match."]
     return matched, []
 
 

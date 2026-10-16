@@ -308,6 +308,24 @@ class PharmacyOperationsContracts(TestCase):
         ).status_code, 403)
         self.assertEqual(WorkNoteCompletion.objects.count(), 0)
 
+    def test_clinical_work_blocks_noncredentialed_and_unrostered_pharmacist(self):
+        from client_profile.characterization_support import make_user
+        from memberships.models import Membership
+        pharmacist = make_user("PHARMACIST")
+        pharmacist_membership = Membership.objects.create(
+            user=pharmacist, pharmacy=self.pharmacy, role="PHARMACIST",
+            status=Membership.Status.ACCEPTED,
+        )
+        plan = self.new_plan()
+        self.new_item(
+            plan, title="Clinical service", target_kind="clinical",
+            membership_ids=[pharmacist_membership.id], role_codes=["PHARMACIST"],
+        )
+        response = self.publish(plan)
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(WorkNote.objects.count(), 0)
+        self.assertIn("preflight", response.json())
+
 
 class OperationsTemplateDates(TestCase):
     def test_weekly_dates_and_month_boundaries(self):
