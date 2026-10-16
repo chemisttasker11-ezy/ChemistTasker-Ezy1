@@ -34,7 +34,7 @@ import {
   startOfWeek,
   subMonths,
 } from 'date-fns';
-import { fetchMembershipsByPharmacy, fetchMyMemberships } from '@chemisttasker/shared-core';
+import { fetchMembershipsByPharmacy, fetchMyMemberships, getOperationsContext } from '@chemisttasker/shared-core';
 import {
   type ItemType,
   type CalendarItem,
@@ -50,6 +50,7 @@ import {
   parseTime,
   formatTime,
 } from './calendarModel';
+import OperationTaskDialogNative from './OperationTaskDialog';
 
 export default function SharedCalendarScreen() {
   const theme = useTheme();
@@ -77,6 +78,7 @@ export default function SharedCalendarScreen() {
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
+  const [activeOperationTask, setActiveOperationTask] = useState<number | null>(null);
   const [pharmacyMenuVisible, setPharmacyMenuVisible] = useState(false);
   const [eventRepeatMenuVisible, setEventRepeatMenuVisible] = useState(false);
   const [noteRepeatMenuVisible, setNoteRepeatMenuVisible] = useState(false);
@@ -125,8 +127,15 @@ export default function SharedCalendarScreen() {
   useEffect(() => {
     const loadMemberships = async () => {
       try {
-        const raw = await fetchMyMemberships({ page_size: 200 } as any);
-        const list = normalizeList(raw);
+        const [membersResult, managersResult] = await Promise.allSettled([
+          fetchMyMemberships({ page_size: 200 } as any), getOperationsContext(),
+        ]);
+        const staff = membersResult.status === 'fulfilled' ? normalizeList(membersResult.value) : [];
+        const managers = managersResult.status === 'fulfilled'
+          ? managersResult.value.pharmacies.map(p => ({ id: 'managed-' + p.id, pharmacyId: p.id, pharmacyName: p.name }))
+          : [];
+        const staffIds = new Set(staff.map(m => Number(getPharmacyId(m))));
+        const list = [...staff, ...managers.filter(p => !staffIds.has(p.pharmacyId))];
         setMemberships(list);
         if (list.length > 0 && selectedPharmacyId === null) {
           const paramPharmacy = getParamString(params?.pharmacy_id);
@@ -854,13 +863,13 @@ export default function SharedCalendarScreen() {
                               </Button>
                             )}
 
-                            {item.type === 'note' && (
+                            {item.type === 'note' && !item.noteData?.operation && (
                               <Button mode="text" onPress={() => handleEditNote(item)}>
                                 Edit
                               </Button>
                             )}
 
-                            {item.type === 'note' && (
+                            {item.type === 'note' && !item.noteData?.operation && (
                               <Button
                                 mode="text"
                                 textColor={theme.colors.error}
@@ -888,7 +897,14 @@ export default function SharedCalendarScreen() {
                               </Button>
                             )}
 
-                            {item.type === 'note' && item.status && (
+                            {item.type === 'note' && item.noteData?.operation?.task_id && (
+                              <Button mode="contained-tonal"
+                                onPress={() => setActiveOperationTask(Number(item.noteData.operation.task_id))}>
+                                Checklist &amp; progress
+                              </Button>
+                            )}
+
+                            {item.type === 'note' && item.status && !item.noteData?.operation && (
                               <Button
                                 mode="outlined"
                                 onPress={async () => {
@@ -923,6 +939,7 @@ export default function SharedCalendarScreen() {
           </Card>
         </View>
       </ScrollView>
+      <OperationTaskDialogNative taskId={activeOperationTask} onDismiss={() => setActiveOperationTask(null)} onUpdated={() => { void loadFeed(); }} />
       <Portal>
         <Dialog visible={eventModalOpen} onDismiss={() => setEventModalOpen(false)} style={styles.dialog}>
           <Dialog.Title>{editingEventId ? 'Update Event' : 'Create Event'}</Dialog.Title>
