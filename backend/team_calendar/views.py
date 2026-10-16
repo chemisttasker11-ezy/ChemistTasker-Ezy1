@@ -418,6 +418,7 @@ class WorkNoteViewSet(
         ).first()
     
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def mark_done(self, request, pk=None):
         """Mark a work note as done."""
         note = self.get_object()
@@ -434,6 +435,10 @@ class WorkNoteViewSet(
         occurrence_date = self._get_occurrence_date(request, note)
         operation = getattr(note, "operation_item", None)
         if operation:
+            from team_calendar.operations_models import OperationTask, OperationVerification
+            operation = OperationTask.objects.select_for_update().get(pk=operation.pk)
+            if OperationVerification.objects.filter(task=operation).exists():
+                raise PermissionDenied("Verified work needs an authorised manager correction.")
             if membership.status != Membership.Status.ACCEPTED or not WorkNoteAssignee.objects.filter(
                 work_note=note, membership=membership,
             ).exists():
@@ -459,6 +464,7 @@ class WorkNoteViewSet(
         return Response(self.get_serializer(note).data)
     
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def mark_open(self, request, pk=None):
         """Mark a work note as open."""
         note = self.get_object()
@@ -469,6 +475,8 @@ class WorkNoteViewSet(
         occurrence_date = self._get_occurrence_date(request, note)
         operation = getattr(note, "operation_item", None)
         if operation:
+            from team_calendar.operations_models import OperationTask
+            operation = OperationTask.objects.select_for_update().get(pk=operation.pk)
             if membership.status != Membership.Status.ACCEPTED or not WorkNoteAssignee.objects.filter(
                 work_note=note, membership=membership,
             ).exists():

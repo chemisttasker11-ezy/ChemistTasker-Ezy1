@@ -4,6 +4,8 @@ Calendar owns published work. The planner owns drafts and read-only metadata
 for each linked WorkNote. All mutations enforce pharmacy scope on the server.
 """
 import uuid
+from copy import deepcopy
+from datetime import date
 
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -25,7 +27,7 @@ from team_calendar.operations_models import (
     OperationTemplate, OperationPlan, OperationTask, OperationStep, OperationKpiRecord,
     OperationVerification, OperationAudit,
 )
-from team_calendar.operations_rules import apply_template, preflight, publish_plan
+from team_calendar.operations_rules import apply_template, preflight, publish_plan, check_item, resolve_memberships, MAX_ITEMS
 from team_calendar.operations_serializers import (
     OperationTemplateSerializer, OperationPlanSerializer, OperationTaskSerializer,
 )
@@ -200,6 +202,65 @@ class OperationPlanViewSet(viewsets.ModelViewSet):
         updated, preview = publish_plan(plan.id, request.user, revision=revision)
         return Response({"plan": self.get_serializer(updated).data, "preflight": preview})
 
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def copy_day(self, request, pk=None):
+        """Atomic, idempotent day copy. The plan lock serializes concurrent retries."""
+        visible = self.get_object()
+        _manager_required(request.user, visible.pharmacy)
+        plan = OperationPlan.objects.select_for_update().get(pk=visible.pk)
+        try:
+            source = date.fromisoformat(request.data["source_date"])
+            destination = date.fromisoformat(request.data["destination_date"])
+            request_key = str(uuid.UUID(request.data["request_key"]))
+        except (KeyError, ValueError, TypeError, AttributeError):
+            raise ValidationError("Provide valid source_date, destination_date and UUID request_key.")
+        if source == destination or not (plan.starts_on <= source <= plan.ends_on
+                                          and plan.starts_on <= destination <= plan.ends_on):
+            raise ValidationError("Source and destination must be different dates inside this plan.")
+        previous = OperationAudit.objects.filter(
+            plan=plan, action="DAY_COPIED", details__request_key=request_key,
+        ).first()
+        if previous:
+            if previous.details.get("source_date") != source.isoformat() or (
+                previous.details.get("destination_date") != destination.isoformat()
+            ):
+                raise ValidationError({"request_key": "This key belongs to another day-copy operation."})
+            return Response({"created": previous.details["created"], "already_copied": True,
+                             "revision": plan.revision})
+        if plan.status != "DRAFT":
+            raise ValidationError("Published plans cannot be copied or edited.")
+        revision = request.data.get("revision")
+        if type(revision) is not int or revision != plan.revision:
+            raise ValidationError({"revision": "Plan changed; reload before copying days."})
+        originals = list(plan.items.filter(date=source).order_by("id"))
+        if not originals:
+            raise ValidationError("The chosen source date contains no tasks.")
+        if plan.items.count() + len(originals) > MAX_ITEMS:
+            raise ValidationError("The copy would exceed this plan's 400-task limit.")
+        for original in originals:
+            replica = OperationTask(
+                plan=plan, template=None, date=destination,
+                title=original.title, description=original.description, area=original.area,
+                start_time=original.start_time, end_time=original.end_time,
+                audience=original.audience, membership_ids=deepcopy(original.membership_ids),
+                role_codes=deepcopy(original.role_codes), checklist=deepcopy(original.checklist),
+                requires_verification=original.requires_verification,
+                target_value=original.target_value, target_unit=original.target_unit,
+                target_kind=original.target_kind, training_url=original.training_url,
+            )
+            check_item(replica)
+            replica.save()
+        plan.revision += 1
+        plan.save(update_fields=["revision", "updated_at"])
+        OperationAudit.objects.create(
+            plan=plan, actor=request.user, action="DAY_COPIED",
+            details={"request_key": request_key, "source_date": source.isoformat(),
+                     "destination_date": destination.isoformat(), "created": len(originals)},
+        )
+        return Response({"created": len(originals), "already_copied": False,
+                         "revision": plan.revision}, status=status.HTTP_201_CREATED)
+
 
 class OperationTaskViewSet(viewsets.ModelViewSet):
     serializer_class = OperationTaskSerializer
@@ -254,6 +315,13 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
         plan.revision += 1
         plan.save(update_fields=["revision", "updated_at"])
 
+    def _locked_task(self):
+        # First enforce the normal pharmacy/assignment scoped 404, then lock.
+        visible = self.get_object()
+        return OperationTask.objects.select_for_update().select_related(
+            "plan", "calendar_note"
+        ).get(pk=visible.pk)
+
     def _worker_membership(self, request, task):
         if not task.calendar_note_id:
             raise ValidationError("This item is not published in the calendar.")
@@ -270,7 +338,7 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def step(self, request, pk=None):
-        task = self.get_object()
+        task = self._locked_task()
         member = self._worker_membership(request, task)
         step_id = request.data.get("step_id")
         if not isinstance(step_id, str) or step_id not in {
@@ -302,7 +370,7 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def record_kpi(self, request, pk=None):
-        task = self.get_object()
+        task = self._locked_task()
         member = self._worker_membership(request, task)
         if OperationVerification.objects.filter(task=task).exists():
             raise ValidationError("Verified tasks cannot accept KPI updates.")
@@ -336,7 +404,7 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def verify(self, request, pk=None):
-        task = self.get_object()
+        task = self._locked_task()
         _manager_required(request.user, task.plan.pharmacy)
         if not task.calendar_note_id or not task.requires_verification:
             raise ValidationError("This calendar task does not need supervisor verification.")
@@ -351,7 +419,7 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
             pharmacy_id=task.plan.pharmacy_id, user=request.user, is_active=True,
             status=Membership.Status.ACCEPTED, role="PHARMACIST",
             user__pharmacistonboarding__ahpra_verified=True,
-            user__pharmacistonboarding__ahpra_expiry_date__gte=task.date,
+            user__pharmacistonboarding__ahpra_expiry_date__gte=max(task.date, timezone.localdate()),
         ).exists():
             raise PermissionDenied("Clinical verification requires an active pharmacist membership.")
         note = request.data.get("note", "")
@@ -367,9 +435,8 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def manager_reopen(self, request, pk=None):
-        task = self.get_object()
+        task = self._locked_task()
         _manager_required(request.user, task.plan.pharmacy)
-        OperationTask.objects.select_for_update().get(pk=task.pk)
         verification = OperationVerification.objects.filter(task=task).first()
         if not verification:
             raise ValidationError("Only verified tasks require manager correction.")
@@ -377,11 +444,25 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
         if not isinstance(reason, str) or not 10 <= len(reason.strip()) <= 2000:
             raise ValidationError({"reason": "Provide a correction reason of 10-2000 characters."})
         previous = verification.verified_by_id
-        verification.delete()
+        submissions = list(WorkNoteCompletion.objects.filter(
+            work_note_id=task.calendar_note_id, occurrence_date=task.date,
+        ).values("membership_id", "completed_by_id", "completed_at"))
+        # Preserve the prior submission identities and timestamps in an
+        # append-only audit before resetting the canonical calendar completion.
         _audit(task, request.user, "MANAGER_REOPENED", {
             "reason": reason.strip(), "previous_verifier_id": previous,
+            "prior_submissions": [
+                {"membership_id": entry["membership_id"],
+                 "completed_by_id": entry["completed_by_id"],
+                 "completed_at": entry["completed_at"].isoformat()}
+                for entry in submissions
+            ],
         })
-        return Response({"reopened": True})
+        verification.delete()
+        WorkNoteCompletion.objects.filter(
+            work_note_id=task.calendar_note_id, occurrence_date=task.date,
+        ).delete()
+        return Response({"reopened": True, "reset_submissions": len(submissions)})
 
     @action(detail=True, methods=["get"])
     def my_steps(self, request, pk=None):

@@ -1,6 +1,7 @@
 """Typed, bounded input and output for pharmacy operation workflows."""
 from django.db.models import Sum
 from rest_framework import serializers
+from organizations.access import managed_pharmacies
 
 from team_calendar.operations_models import (
     OperationTemplate, OperationPlan, OperationTask, OperationStep,
@@ -51,6 +52,7 @@ class OperationTemplateSerializer(serializers.ModelSerializer):
 
 class OperationTaskSerializer(serializers.ModelSerializer):
     progress = serializers.SerializerMethodField()
+    can_manage = serializers.SerializerMethodField()
     calendar_note_id = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -59,9 +61,9 @@ class OperationTaskSerializer(serializers.ModelSerializer):
             "id", "plan", "template", "calendar_note_id", "date", "title", "description",
             "area", "start_time", "end_time", "audience", "membership_ids",
             "role_codes", "checklist", "requires_verification", "target_value",
-            "target_unit", "target_kind", "training_url", "progress", "created_at",
+            "target_unit", "target_kind", "training_url", "progress", "can_manage", "created_at",
         ]
-        read_only_fields = ["id", "calendar_note_id", "created_at", "progress"]
+        read_only_fields = ["id", "calendar_note_id", "created_at", "progress", "can_manage"]
 
     def validate(self, attrs):
         plan = attrs.get("plan", getattr(self.instance, "plan", None))
@@ -85,6 +87,14 @@ class OperationTaskSerializer(serializers.ModelSerializer):
                                         OperationTask._meta.get_field(f).get_default()))
         check_item(sample)
         return attrs
+
+    def get_can_manage(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        if not hasattr(self, "_manager_pharmacy_ids"):
+            self._manager_pharmacy_ids = set(managed_pharmacies(request.user).values_list("id", flat=True))
+        return obj.plan.pharmacy_id in self._manager_pharmacy_ids
 
     def get_progress(self, obj):
         if not obj.calendar_note_id:

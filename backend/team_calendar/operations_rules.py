@@ -111,7 +111,7 @@ def resolve_memberships(item):
         eligible = eligible.filter(
             role="PHARMACIST",
             user__pharmacistonboarding__ahpra_verified=True,
-            user__pharmacistonboarding__ahpra_expiry_date__gte=item.date,
+            user__pharmacistonboarding__ahpra_expiry_date__gte=max(item.date, timezone.localdate()),
         )
     if item.audience == "NAMED":
         if not item.membership_ids:

@@ -326,6 +326,119 @@ class PharmacyOperationsContracts(TestCase):
         self.assertEqual(WorkNote.objects.count(), 0)
         self.assertIn("preflight", response.json())
 
+    def test_day_copy_is_atomic_and_retry_idempotent(self):
+        plan = self.new_plan()
+        updated = client_for(self.owner).patch(
+            PLAN + str(plan["id"]) + "/", {"ends_on": "2026-10-21"}, format="json",
+        )
+        self.assertEqual(updated.status_code, 200, updated.content)
+        self.new_item(plan)
+        self.new_item(plan, title="Independent second task")
+        original_revision = self.revision(plan)
+        key = str(uuid.uuid4())
+        uri = PLAN + str(plan["id"]) + "/copy_day/"
+        body = {"source_date": self.day, "destination_date": "2026-10-20",
+                "revision": original_revision, "request_key": key}
+        first = client_for(self.owner).post(uri, body, format="json")
+        self.assertEqual(first.status_code, 201, first.content)
+        self.assertEqual(first.json()["created"], 2)
+        again = client_for(self.owner).post(uri, body, format="json")
+        self.assertEqual(again.status_code, 200, again.content)
+        self.assertTrue(again.json()["already_copied"])
+        self.assertEqual(OperationTask.objects.filter(plan_id=plan["id"]).count(), 4)
+        self.assertEqual(OperationAudit.objects.filter(
+            plan_id=plan["id"], action="DAY_COPIED"
+        ).count(), 1)
+        self.assertEqual(client_for(self.other_worker).post(uri, body, format="json").status_code, 404)
+        conflict = client_for(self.owner).post(
+            uri, {**body, "request_key": str(uuid.uuid4())}, format="json",
+        )
+        self.assertEqual(conflict.status_code, 400)
+
+    def test_day_copy_rolls_back_if_one_item_is_invalid(self):
+        plan = self.new_plan()
+        self.assertEqual(client_for(self.owner).patch(
+            PLAN + str(plan["id"]) + "/", {"ends_on": "2026-10-21"}, format="json",
+        ).status_code, 200)
+        self.new_item(plan)
+        invalid = self.new_item(plan, title="A deliberately corrupted historical draft")
+        OperationTask.objects.filter(pk=invalid["id"]).update(role_codes=["NONEXISTENT"])
+        revision = self.revision(plan)
+        response = client_for(self.owner).post(
+            PLAN + str(plan["id"]) + "/copy_day/",
+            {"source_date": self.day, "destination_date": "2026-10-20",
+             "revision": revision, "request_key": str(uuid.uuid4())}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(OperationTask.objects.filter(
+            plan_id=plan["id"], date="2026-10-20",
+        ).count(), 0)
+        self.assertEqual(self.revision(plan), revision)
+        self.assertFalse(OperationAudit.objects.filter(plan_id=plan["id"], action="DAY_COPIED").exists())
+
+    def test_verified_task_is_locked_until_audited_manager_correction(self):
+        _, item, note_id = self.publish_named(target_value=10, target_unit="items")
+        task_url = ITEM + str(item["id"]) + "/"
+        finish = BASE + "work-notes/" + str(note_id) + "/mark_done/"
+        worker = client_for(self.worker)
+        self.assertEqual(worker.post(
+            task_url + "step/", {"step_id": "s1", "done": True}, format="json",
+        ).status_code, 200)
+        self.assertEqual(worker.post(finish, {"occurrence_date": self.day}, format="json").status_code, 200)
+        self.assertEqual(client_for(self.owner).post(task_url + "verify/", {}, format="json").status_code, 200)
+        self.assertEqual(worker.post(
+            task_url + "step/", {"step_id": "s1", "done": False}, format="json",
+        ).status_code, 400)
+        self.assertEqual(worker.post(
+            task_url + "record_kpi/", {"key": str(uuid.uuid4()), "value": 2}, format="json",
+        ).status_code, 400)
+        self.assertEqual(worker.post(finish, {"occurrence_date": self.day}, format="json").status_code, 403)
+        self.assertEqual(client_for(self.other_worker).post(
+            task_url + "manager_reopen/", {"reason": "Fix reported task error"}, format="json",
+        ).status_code, 404)
+        self.assertEqual(client_for(self.owner).post(
+            task_url + "manager_reopen/", {"reason": "short"}, format="json",
+        ).status_code, 400)
+        reopened = client_for(self.owner).post(
+            task_url + "manager_reopen/",
+            {"reason": "Incorrect checklist entry; authorise worker correction"},
+            format="json",
+        )
+        self.assertEqual(reopened.status_code, 200, reopened.content)
+        self.assertEqual(reopened.json()["reset_submissions"], 1)
+        self.assertFalse(OperationVerification.objects.filter(task_id=item["id"]).exists())
+        self.assertEqual(WorkNoteCompletion.objects.filter(work_note_id=note_id).count(), 0)
+        self.assertEqual(worker.post(
+            task_url + "step/", {"step_id": "s1", "done": False}, format="json",
+        ).status_code, 200)
+        self.assertEqual(worker.post(
+            task_url + "record_kpi/", {"key": str(uuid.uuid4()), "value": 2}, format="json",
+        ).status_code, 201)
+        audit = OperationAudit.objects.get(task_id=item["id"], action="MANAGER_REOPENED")
+        self.assertIn("Incorrect checklist", audit.details["reason"])
+        self.assertEqual(len(audit.details["prior_submissions"]), 1)
+
+    def test_daa_final_check_requires_verified_pharmacist(self):
+        from team_calendar.operations_catalog import catalog
+        final = next(x for x in catalog() if x["name"] == "DAA final check")
+        self.assertEqual(final["target_kind"], "clinical")
+        self.assertEqual(final["role_codes"], ["PHARMACIST"])
+        self.assertTrue(final["requires_verification"])
+
+    def test_roster_slot_boundary_is_not_an_overlap(self):
+        from unittest.mock import Mock
+        from team_calendar.operations_rules import _rostered_user_ids
+        self.published_roster_for_worker()
+        task = Mock(date=date(2026, 10, 19), start_time=time(17), end_time=time(18))
+        task.plan.pharmacy_id = self.pharmacy.pk
+        self.assertEqual(_rostered_user_ids(task), set())
+        task.start_time = time(8)
+        task.end_time = time(9)
+        self.assertEqual(_rostered_user_ids(task), set())
+        task.start_time = time(9)
+        task.end_time = time(10)
+        self.assertEqual(_rostered_user_ids(task), {self.worker.pk})
+
 
 class OperationsTemplateDates(TestCase):
     def test_weekly_dates_and_month_boundaries(self):

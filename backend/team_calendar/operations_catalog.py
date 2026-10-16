@@ -59,7 +59,7 @@ STARTER_TEMPLATES = [
     _row("DAA final check", "daa", "packing", [
         "Conduct authorised final clinical and accuracy checks",
         "Resolve and document discrepancies", "Release only verified packs",
-    ], roles=["PHARMACIST"], requires_verification=True),
+    ], roles=["PHARMACIST"], requires_verification=True, target_kind="clinical"),
     _row("Fridge evening check", "closing", "dispensary", [
         "Record current, minimum and maximum temperatures",
         "Action out of-range readings according to cold-chain procedure",
