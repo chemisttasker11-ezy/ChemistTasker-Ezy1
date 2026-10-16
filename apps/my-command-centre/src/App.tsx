@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, CalendarDays, Check, CheckCircle2, ChevronRight, LayoutDashboard, ListTodo, Menu, Moon, Plus, Settings2, Sparkles, Sun, Target, X } from 'lucide-react';
-import { type BoardState, type Category, type Lane, type Priority, type Task, type View, STORAGE_KEY, brisbaneToday, initialState, isCompleted, moveInBoard, readState, toggleCompletion, validateImported } from './model';
+import { Archive, CalendarDays, CalendarRange, Check, CheckCircle2, ChevronRight, LayoutDashboard, ListTodo, Menu, Moon, Plus, Settings2, Sparkles, Sun, Target, X } from 'lucide-react';
+import { type BoardState, type Category, type Lane, type Priority, type Task, type TaskStatus, type View, STORAGE_KEY, brisbaneToday, duplicateTask as cloneTask, initialState, isCompleted, moveInBoard, readState, rescheduleTask, saveTaskChanges, setTaskStatus, toggleCompletion, validateImported } from './model';
 import { activeItem, downloadable, LANE_LABEL, longToday } from './lib/display';
 import { TaskModal } from './components/TaskModal';
 import { OverviewView } from './views/OverviewView';
@@ -11,11 +11,13 @@ import { GoalsView } from './views/GoalsView';
 import { CompletedView } from './views/CompletedView';
 import { SettingsView } from './views/SettingsView';
 import { ArchivedView } from './views/ArchivedView';
+import { CalendarView } from './views/CalendarView';
+import { visibleStatus } from './lib/progress';
 
-const ICONS = { overview: LayoutDashboard, board: ListTodo, today: Sun, upcoming: CalendarDays, goals: Target, completed: CheckCircle2, archived: Archive, settings: Settings2 };
+const ICONS = { overview: LayoutDashboard, board: ListTodo, today: Sun, calendar: CalendarRange, upcoming: CalendarDays, goals: Target, completed: CheckCircle2, archived: Archive, settings: Settings2 };
 const NAV: { id: View; label: string }[] = [
   { id: 'overview', label: 'Overview' }, { id: 'board', label: 'My task board' },
-  { id: 'today', label: 'Today' }, { id: 'upcoming', label: 'Upcoming' },
+  { id: 'today', label: 'Today' }, { id: 'calendar', label: 'Calendar' }, { id: 'upcoming', label: 'Upcoming' },
   { id: 'goals', label: 'Long-term goals' }, { id: 'completed', label: 'Completed' },
   { id: 'archived', label: 'Archived tasks' }
 ];
@@ -24,7 +26,7 @@ export default function App() {
   const [board, setBoard] = useState<BoardState>(readState);
   const [view, setView] = useState<View>('overview');
   const [selectedLane, setSelectedLane] = useState<Lane>('urgent');
-  const [editor, setEditor] = useState<{ task: Task | null; lane: Lane } | null>(null);
+  const [editor, setEditor] = useState<{ task: Task | null; lane: Lane; date?: string; isCopy?: boolean } | null>(null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<Category | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'All'>('All');
@@ -41,7 +43,7 @@ export default function App() {
     (!search.trim() || `${t.title} ${t.description} ${t.category}`.toLocaleLowerCase().includes(search.toLocaleLowerCase().trim()))
   ), [active, categoryFilter, priorityFilter, search]);
   const outstanding = active.filter(t => !completed(t));
-  const todayTasks = outstanding.filter(t => t.lane === 'daily' || t.lane === 'urgent' || (t.dueDate && t.dueDate <= day));
+  const todayTasks = outstanding.filter(t => t.status !== 'postponed' && (t.lane === 'daily' || t.lane === 'urgent' || (t.dueDate && t.dueDate <= day)));
   const doneToday = board.completions.filter(c => brisbaneToday(new Date(c.completedAt)) === day).length;
   const goals = active.filter(t => t.lane === 'goals');
 
@@ -53,10 +55,19 @@ export default function App() {
 
   function alertNotice(message: string) { setNotice(message); }
   function navigate(next: View) { setView(next); setMobileNav(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-  function showEditor(task: Task | null, lane: Lane = 'urgent') { setEditor({ task, lane }); }
+  function showEditor(task: Task | null, lane: Lane = 'urgent', date = '') { setEditor({ task, lane, date }); }
+  function duplicateTask(task: Task) { setEditor({ task: cloneTask(task), lane: task.lane, isCopy: true }); }
   function saveTask(task: Task) {
-    setBoard(s => ({ ...s, tasks: s.tasks.some(t => t.id === task.id) ? s.tasks.map(t => t.id === task.id ? task : t) : [...s.tasks, task] }));
+    setBoard(s => saveTaskChanges(s, task));
     setEditor(null); alertNotice('Task saved');
+  }
+  function changeStatus(id: string, status: TaskStatus, postponedTo?: string) {
+    setBoard(s => setTaskStatus(s, id, status, postponedTo));
+    alertNotice(status === 'postponed' ? 'Task postponed to its new date' : `Status updated`);
+  }
+  function rescheduleCalendarTask(id: string, date: string) {
+    setBoard(s => rescheduleTask(s, id, date));
+    alertNotice(date ? 'Calendar date updated' : 'Removed from calendar; still on task board');
   }
   function moveTask(id: string, lane: Lane, overId?: string) {
     setBoard(state => moveInBoard(state, id, lane, overId));
@@ -124,8 +135,9 @@ export default function App() {
       <main className="content">
         {saveError && <div className="save-warning" role="alert">Browser storage is unavailable or full. Export your work before leaving this page.</div>}
         {view === 'overview' && <OverviewView active={active} todayTasks={todayTasks} doneToday={doneToday} goals={goals} navigate={navigate} showEditor={showEditor} toggleTask={toggleTask} setSelectedLane={setSelectedLane}/>}
-        {view === 'board' && <BoardView visible={visible} search={search} setSearch={setSearch} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} priorityFilter={priorityFilter} setPriorityFilter={setPriorityFilter} selectedLane={selectedLane} setSelectedLane={setSelectedLane} day={day} completed={completed} showEditor={showEditor} toggleTask={toggleTask} moveTask={moveTask} archiveTask={archiveTask} toggleSubtask={toggleSubtask}/>}
-        {view === 'today' && <TodayView todayTasks={todayTasks} doneToday={doneToday} navigate={navigate} showEditor={showEditor} toggleTask={toggleTask}/>}
+        {view === 'board' && <BoardView visible={visible} search={search} setSearch={setSearch} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} priorityFilter={priorityFilter} setPriorityFilter={setPriorityFilter} selectedLane={selectedLane} setSelectedLane={setSelectedLane} day={day} completed={completed} showEditor={showEditor} toggleTask={toggleTask} moveTask={moveTask} archiveTask={archiveTask} duplicateTask={duplicateTask} changeStatus={changeStatus} toggleSubtask={toggleSubtask}/>}
+        {view === 'today' && <TodayView day={day} todayTasks={todayTasks} doneToday={doneToday} navigate={navigate} showEditor={showEditor} toggleTask={toggleTask}/>}
+        {view === 'calendar' && <CalendarView tasks={board.tasks} completions={board.completions} today={day} onEdit={showEditor} onDuplicate={duplicateTask} onStatus={changeStatus} onReschedule={rescheduleCalendarTask}/>}
         {view === 'upcoming' && <UpcomingView active={active} day={day} completed={completed} showEditor={showEditor} toggleTask={toggleTask}/>}
         {view === 'goals' && <GoalsView goals={goals} showEditor={showEditor}/>}
         {view === 'completed' && <CompletedView board={board} day={day} showEditor={showEditor} navigate={navigate} toggleTask={toggleTask}/>}
@@ -134,7 +146,7 @@ export default function App() {
         <footer className="site-footer"><span>Built for your real life <span>✳</span></span><span>Local-first · Australia/Brisbane · Version 1.0</span></footer>
       </main>
     </div>
-    {editor && <TaskModal key={editor.task?.id ?? `new-${editor.lane}`} task={editor.task} defaultLane={editor.lane} onDismiss={() => setEditor(null)} onSave={saveTask}/>}
+    {editor && <TaskModal key={`${editor.task?.id ?? `new-${editor.lane}`}-${editor.date ?? ''}`} task={editor.task} defaultLane={editor.lane} defaultDate={editor.date ?? ''} effectiveStatus={editor.task ? visibleStatus(editor.task, isCompleted(editor.task, board.completions, day)) : undefined} isCopy={editor.isCopy} onDismiss={() => setEditor(null)} onSave={saveTask}/>}
     {notice && <div className="toast" role="status"><CheckCircle2 size={17}/>{notice}<button onClick={() => setNotice('')} aria-label="Dismiss notification"><X size={15}/></button></div>}
   </div>;
 }
