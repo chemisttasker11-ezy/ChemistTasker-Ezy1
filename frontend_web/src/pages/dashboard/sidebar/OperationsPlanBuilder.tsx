@@ -135,11 +135,17 @@ export default function OperationsPlanBuilder({
       target_value: taskDraft.target.trim() ? Number(taskDraft.target) : null,
       target_unit: taskDraft.targetUnit, target_kind: taskDraft.targetKind, training_url: taskDraft.trainingUrl,
     };
-    await mutate(async () => {
+    setBusy(true); setError('');
+    try {
       if (editingTask) await editOperationTask(editingTask, payload);
       else await createOperationTask(payload);
-    }, editingTask ? 'Task updated.' : 'Task added to the draft.');
-    setTaskDraft(null); setEditingTask(null);
+      await onReload();
+      setReview(null); setReviewedRevision(null);
+      setNotice(editingTask ? 'Task updated.' : 'Task added to the draft.');
+      setTaskDraft(null); setEditingTask(null);
+    } catch (error) {
+      setError(readableError(error)); // Preserve edits on API failure.
+    } finally { setBusy(false); }
   }
   async function copyTask(task: OperationTask, date: string) {
     if (!plan) return;

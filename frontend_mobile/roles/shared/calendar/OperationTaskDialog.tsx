@@ -32,6 +32,7 @@ export default function OperationTaskDialogNative({ taskId, onDismiss, onUpdated
   const [workerCanAct, setWorkerCanAct] = useState(false);
   const [evidence, setEvidence] = useState('');
   const [kpiValue, setKpiValue] = useState('1');
+  const [pendingKpiKey, setPendingKpiKey] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -115,11 +116,10 @@ export default function OperationTaskDialogNative({ taskId, onDismiss, onUpdated
                   style={styles.progress}/>
                 {workerCanAct && <View style={styles.row}>
                   <TextInput mode="outlined" label="Increment" keyboardType="number-pad" style={styles.flex}
-                    value={kpiValue} onChangeText={setKpiValue}/>
+                    value={kpiValue} onChangeText={value => { setKpiValue(value); setPendingKpiKey(null); }}/>
                   <Button disabled={busy || !Number.isInteger(Number(kpiValue)) || Number(kpiValue) < 1}
-                    mode="outlined" onPress={() => void act(
-                      () => recordOperationKpi(task.id, Number(kpiValue), idempotencyId()), 'KPI update recorded.',
-                    )}>Record</Button>
+                    mode="outlined" onPress={() => { const key = pendingKpiKey ?? idempotencyId(); setPendingKpiKey(key);
+                      void act(() => recordOperationKpi(task.id, Number(kpiValue), key), 'KPI update recorded.'); }}>Record</Button>
                 </View>}
               </>}
               {task.training_url ? <Button icon="open-in-new"

@@ -91,7 +91,7 @@ def _rostered_user_ids(item):
         shift_end = datetime.combine(slot_day, slot.end_time)
         if shift_end <= shift_start:
             shift_end += timedelta(days=1)
-        if shift_start <= task_end and task_start < shift_end:
+        if shift_start < task_end and task_start < shift_end:
             matched.add(assignment.user_id)
     return matched
 

@@ -23,6 +23,7 @@ export default function OperationTaskDialog({ taskId, onClose, onUpdated }: Prop
   const [canAct, setCanAct] = useState(false);
   const [evidence, setEvidence] = useState('');
   const [kpiValue, setKpiValue] = useState('1');
+  const [pendingKpiKey, setPendingKpiKey] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -139,9 +140,10 @@ export default function OperationTaskDialog({ taskId, onClose, onUpdated }: Prop
               aria-label="KPI progress" sx={{ height: 8, borderRadius: 6, my: 1 }} />
             {canAct && <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
               <TextField label="Add achieved" size="small" type="number" value={kpiValue} sx={{ width: 150 }}
-                inputProps={{ min: 1, max: 10000, step: 1 }} onChange={e => setKpiValue(e.target.value)} />
+                inputProps={{ min: 1, max: 10000, step: 1 }} onChange={e => { setKpiValue(e.target.value); setPendingKpiKey(null); }} />
               <Button variant="outlined" disabled={busy || !Number.isInteger(Number(kpiValue)) || Number(kpiValue) < 1}
-                onClick={() => void act(() => recordOperationKpi(task.id, Number(kpiValue), crypto.randomUUID()), 'Progress recorded.')}>
+                onClick={() => { const key = pendingKpiKey ?? crypto.randomUUID(); setPendingKpiKey(key);
+                  void act(() => recordOperationKpi(task.id, Number(kpiValue), key), 'Progress recorded.'); }}>
                 Record progress
               </Button>
             </Stack>}

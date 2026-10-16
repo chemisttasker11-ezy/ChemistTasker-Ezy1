@@ -283,6 +283,8 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
         evidence = request.data.get("evidence_note", "")
         if not isinstance(evidence, str) or len(evidence) > 2000:
             raise ValidationError({"evidence_note": "Maximum 2000 characters."})
+        if OperationVerification.objects.filter(task=task).exists():
+            raise ValidationError("Verified tasks cannot be modified without manager correction.")
         if task.calendar_note.completions.filter(membership=member, occurrence_date=task.date).exists():
             raise ValidationError("Reopen the calendar task before modifying a submitted checklist.")
         if done:
@@ -292,7 +294,6 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
             )
         else:
             OperationStep.objects.filter(task=task, membership=member, step_id=step_id).delete()
-            OperationVerification.objects.filter(task=task).delete()
         _audit(task, request.user, "CHECKLIST_STEP", {"step_id": step_id, "done": done})
         return Response({"completed_step_ids": list(
             OperationStep.objects.filter(task=task, membership=member).values_list("step_id", flat=True)
@@ -303,6 +304,8 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
     def record_kpi(self, request, pk=None):
         task = self.get_object()
         member = self._worker_membership(request, task)
+        if OperationVerification.objects.filter(task=task).exists():
+            raise ValidationError("Verified tasks cannot accept KPI updates.")
         if task.target_value is None:
             raise ValidationError("This task is not configured for numeric progress.")
         try:
@@ -345,7 +348,10 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
         if completed.filter(completed_by=request.user).exists():
             raise PermissionDenied("The person who completed this task cannot independently verify it.")
         if task.target_kind == "clinical" and not Membership.objects.filter(
-            pharmacy_id=task.plan.pharmacy_id, user=request.user, is_active=True, role="PHARMACIST"
+            pharmacy_id=task.plan.pharmacy_id, user=request.user, is_active=True,
+            status=Membership.Status.ACCEPTED, role="PHARMACIST",
+            user__pharmacistonboarding__ahpra_verified=True,
+            user__pharmacistonboarding__ahpra_expiry_date__gte=task.date,
         ).exists():
             raise PermissionDenied("Clinical verification requires an active pharmacist membership.")
         note = request.data.get("note", "")
@@ -357,6 +363,25 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
         if created:
             _audit(task, request.user, "VERIFIED")
         return Response({"verified": True, "by": verification.verified_by_id})
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def manager_reopen(self, request, pk=None):
+        task = self.get_object()
+        _manager_required(request.user, task.plan.pharmacy)
+        OperationTask.objects.select_for_update().get(pk=task.pk)
+        verification = OperationVerification.objects.filter(task=task).first()
+        if not verification:
+            raise ValidationError("Only verified tasks require manager correction.")
+        reason = request.data.get("reason", "")
+        if not isinstance(reason, str) or not 10 <= len(reason.strip()) <= 2000:
+            raise ValidationError({"reason": "Provide a correction reason of 10-2000 characters."})
+        previous = verification.verified_by_id
+        verification.delete()
+        _audit(task, request.user, "MANAGER_REOPENED", {
+            "reason": reason.strip(), "previous_verifier_id": previous,
+        })
+        return Response({"reopened": True})
 
     @action(detail=True, methods=["get"])
     def my_steps(self, request, pk=None):
