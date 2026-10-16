@@ -4,8 +4,8 @@ import {
   Paper, Stack, Tab, Tabs, TextField, Typography, useTheme,
 } from '@mui/material';
 import {
-  BarChart3, BookOpen, CalendarCheck2, CalendarDays, GraduationCap,
-  ListTodo, PlusCircle, ShieldCheck, Target, UsersRound,
+  BookOpen, CalendarCheck2, CalendarDays, GraduationCap,
+  ListTodo, PlusCircle, ShieldCheck, UsersRound,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate, useSearchParams } from 'react-router-dom';

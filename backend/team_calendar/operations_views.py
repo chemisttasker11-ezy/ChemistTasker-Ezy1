@@ -77,11 +77,14 @@ class OperationTemplateViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         managed = list(_manager_ids(self.request.user))
+        managed_org_ids = list(managed_pharmacies(self.request.user).exclude(
+            organization_id__isnull=True
+        ).values_list("organization_id", flat=True))
         org_ids = list(OrganizationMembership.objects.filter(
             user=self.request.user, role__in=ORG_WIDE_ADMIN_ROLES
         ).values_list("organization_id", flat=True))
         qs = OperationTemplate.objects.filter(
-            Q(pharmacy_id__in=managed) | Q(organization_id__in=org_ids)
+            Q(pharmacy_id__in=managed) | Q(organization_id__in=managed_org_ids + org_ids)
         )
         pharmacy_id = self.request.query_params.get("pharmacy_id")
         if pharmacy_id:
@@ -92,7 +95,7 @@ class OperationTemplateViewSet(viewsets.ModelViewSet):
             if pharmacy_id not in managed:
                 raise PermissionDenied("Cannot access this pharmacy.")
             org_id = Pharmacy.objects.filter(id=pharmacy_id).values_list("organization_id", flat=True).first()
-            qs = qs.filter(Q(pharmacy_id=pharmacy_id) | Q(organization_id=org_id, organization_id__in=org_ids))
+            qs = qs.filter(Q(pharmacy_id=pharmacy_id) | Q(organization_id=org_id, organization_id__in=managed_org_ids + org_ids))
         return qs.distinct()
 
     def _authorize(self, obj):
@@ -201,6 +204,7 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
             plan__status="PUBLISHED",
             calendar_note__assignees__membership__user=user,
             calendar_note__assignees__membership__is_active=True,
+            calendar_note__assignees__membership__status=Membership.Status.ACCEPTED,
         )
         return OperationTask.objects.filter(
             Q(plan__pharmacy_id__in=_manager_ids(user)) | assigned
@@ -327,7 +331,7 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
             raise ValidationError("This calendar task does not need supervisor verification.")
         assigned = task.calendar_note.assignees.count()
         completed = task.calendar_note.completions.filter(occurrence_date=task.date)
-        threshold = assigned if task.audience == "EVERY_ON_DUTY" else 1
+        threshold = assigned if task.audience in {"NAMED", "EVERY_ON_DUTY"} else 1
         if assigned < 1 or completed.values("membership_id").distinct().count() < threshold:
             raise ValidationError("Assigned workers must submit the task before verification.")
         if completed.filter(completed_by=request.user).exists():

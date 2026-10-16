@@ -12,6 +12,16 @@ import {
 
 type Props = { taskId: number | null; onDismiss: () => void; onUpdated: () => void };
 
+function idempotencyId(): string {
+  // UUID is a collision-resistant retry token, not a secret or authentication factor.
+  const bytes = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const str = bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+  return str.slice(0, 8) + '-' + str.slice(8, 12) + '-' + str.slice(12, 16)
+    + '-' + str.slice(16, 20) + '-' + str.slice(20);
+}
+
 function messageOf(e: unknown) {
   return e instanceof Error ? e.message : 'Unable to complete the operation.';
 }
@@ -108,7 +118,7 @@ export default function OperationTaskDialogNative({ taskId, onDismiss, onUpdated
                     value={kpiValue} onChangeText={setKpiValue}/>
                   <Button disabled={busy || !Number.isInteger(Number(kpiValue)) || Number(kpiValue) < 1}
                     mode="outlined" onPress={() => void act(
-                      () => recordOperationKpi(task.id, Number(kpiValue), crypto.randomUUID()), 'KPI update recorded.',
+                      () => recordOperationKpi(task.id, Number(kpiValue), idempotencyId()), 'KPI update recorded.',
                     )}>Record</Button>
                 </View>}
               </>}

@@ -14,6 +14,23 @@ export interface WorkNoteApi {
     title: string;
     body: string;
     status: string;
+    operation?: {
+        task_id: number;
+        plan_id: number;
+        area: string;
+        progress: {
+            status: string;
+            assigned: number;
+            completed: number;
+            kpi_actual: number;
+            verified: boolean;
+        };
+        requires_verification: boolean;
+        target_value: number | null;
+        target_unit: string;
+        target_kind: string;
+        training_url: string;
+    } | null;
     notify_on_shift_start: boolean;
     is_general: boolean;
     recurrence?: string;

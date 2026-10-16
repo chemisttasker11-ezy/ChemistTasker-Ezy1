@@ -263,7 +263,7 @@ export default function PharmacyCalendarPage() {
                     assignees: assigneeNames,
                     completedBy: Array.isArray(note.completed_by) ? note.completed_by : [],
                     assigneeMembershipIds: (note.assignees ?? []).map((a: any) => a.membershipId ?? a.membership_id),
-                    status: (note.status ?? "").toString().toUpperCase(),
+                    status: (note.operation?.progress?.status ?? note.status ?? "").toString().toUpperCase(),
                     noteData: note,
                 };
             });

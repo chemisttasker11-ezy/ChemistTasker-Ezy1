@@ -35,6 +35,7 @@ export const mapWorkNote = (api: WorkNoteApi) => ({
     title: api.title,
     body: api.body,
     status: api.status,
+    operation: api.operation ?? null,
     notifyOnShiftStart: api.notify_on_shift_start ?? false,
     isGeneral: api.is_general ?? false,
     assignees: ensureArray(api.assignees).map(mapWorkNoteAssignee),

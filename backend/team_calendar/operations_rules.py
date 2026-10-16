@@ -69,8 +69,9 @@ def check_item(item):
 def _rostered_user_ids(item):
     """Published roster only, including unpublish marker and task time overlap."""
     assignments = ShiftSlotAssignment.objects.filter(
+        Q(slot_date=item.date) | Q(slot_date__isnull=True, slot__date=item.date),
         shift__pharmacy_id=item.plan.pharmacy_id, is_rostered=True,
-        slot_date=item.date, slot__roster_period__status="PUBLISHED",
+        slot__roster_period__status="PUBLISHED",
         slot__unpublished_at__isnull=True,
     )
     if item.start_time:

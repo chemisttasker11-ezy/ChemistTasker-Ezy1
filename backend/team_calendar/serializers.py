@@ -75,8 +75,10 @@ class WorkNoteSerializer(serializers.ModelSerializer):
         item = getattr(obj, "operation_item", None)
         if not item:
             return None
+        from team_calendar.operations_serializers import OperationTaskSerializer
         return {
             "task_id": item.id, "plan_id": item.plan_id, "area": item.area,
+            "progress": OperationTaskSerializer(item).data["progress"],
             "start_time": str(item.start_time) if item.start_time else None,
             "end_time": str(item.end_time) if item.end_time else None,
             "requires_verification": item.requires_verification,

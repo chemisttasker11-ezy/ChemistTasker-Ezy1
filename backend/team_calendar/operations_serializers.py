@@ -92,14 +92,14 @@ class OperationTaskSerializer(serializers.ModelSerializer):
         note = obj.calendar_note
         assigned = note.assignees.count()
         finished = note.completions.filter(occurrence_date=obj.date).values("membership_id").distinct().count()
-        required = assigned if obj.audience == "EVERY_ON_DUTY" else 1
+        required = assigned if obj.audience in {"NAMED", "EVERY_ON_DUTY"} else 1
         verified = OperationVerification.objects.filter(task=obj).exists()
         done = assigned > 0 and finished >= required
         if done and obj.requires_verification and not verified:
             status = "AWAITING_VERIFICATION"
         elif done:
             status = "FINISHED"
-        elif note.status == "in_progress":
+        elif note.status == "in_progress" or obj.step_completions.exists() or obj.kpi_records.exists():
             status = "PROGRESSING"
         else:
             status = "NOT_STARTED"
