@@ -3,7 +3,7 @@
 Published plan items are WorkNotes, never a shadow task calendar. Validation
 and writes take place inside a single row-locked database transaction.
 """
-from datetime import date, timedelta
+from datetime import date, time, datetime, timedelta
 from calendar import monthrange
 
 from django.db import transaction
@@ -67,18 +67,33 @@ def check_item(item):
 
 
 def _rostered_user_ids(item):
-    """Published roster only, including unpublish marker and task time overlap."""
+    """Published roster presence, including midnight-crossing shifts.
+
+    Times are pharmacy-local wall-clock schedule values. Actual break windows
+    are not tracked by roster slot; task-level assignment must not be interpreted
+    as evidence that a worker was available through a break.
+    """
+    yesterday = item.date - timedelta(days=1)
     assignments = ShiftSlotAssignment.objects.filter(
-        Q(slot_date=item.date) | Q(slot_date__isnull=True, slot__date=item.date),
+        Q(slot_date__in=(yesterday, item.date))
+        | Q(slot_date__isnull=True, slot__date__in=(yesterday, item.date)),
         shift__pharmacy_id=item.plan.pharmacy_id, is_rostered=True,
         slot__roster_period__status="PUBLISHED",
         slot__unpublished_at__isnull=True,
-    )
-    if item.start_time:
-        assignments = assignments.filter(slot__end_time__gt=item.start_time)
-    if item.end_time:
-        assignments = assignments.filter(slot__start_time__lt=item.end_time)
-    return set(assignments.values_list("user_id", flat=True))
+    ).select_related("slot")
+    task_start = datetime.combine(item.date, item.start_time or time.min)
+    task_end = datetime.combine(item.date, item.end_time or time.max)
+    matched = set()
+    for assignment in assignments:
+        slot = assignment.slot
+        slot_day = assignment.slot_date or slot.date
+        shift_start = datetime.combine(slot_day, slot.start_time)
+        shift_end = datetime.combine(slot_day, slot.end_time)
+        if shift_end <= shift_start:
+            shift_end += timedelta(days=1)
+        if shift_start <= task_end and task_start < shift_end:
+            matched.add(assignment.user_id)
+    return matched
 
 
 def resolve_memberships(item):
@@ -185,7 +200,7 @@ def template_dates(recurrence, start, end):
     """
     check_window(start, end)
     freq = str((recurrence or {}).get("freq", "ONCE")).upper()
-    allowed = {"ONCE", "DAILY", "WEEKLY", "MONTHLY", "MONTHLY_28",
+    allowed = {"ONCE", "DAILY", "WEEKLY", "MONTHLY", "FIRST_DAY_MONTH", "MONTHLY_28",
                "FIRST_WEEKDAY_MONTH", "LAST_WEEKDAY_MONTH", "FIRST_BUSINESS_DAY",
                "LAST_BUSINESS_DAY", "YEARLY"}
     if freq not in allowed:
@@ -202,6 +217,7 @@ def template_dates(recurrence, start, end):
             or freq == "DAILY"
             or (freq == "WEEKLY" and current.weekday() in weekdays)
             or (freq == "MONTHLY" and current.day == min(start.day, last))
+            or (freq == "FIRST_DAY_MONTH" and current.day == 1)
             or (freq == "MONTHLY_28" and current.day == min(28, last))
             or (freq in {"FIRST_WEEKDAY_MONTH", "FIRST_BUSINESS_DAY"}
                 and current == _first_weekday(current.year, current.month))

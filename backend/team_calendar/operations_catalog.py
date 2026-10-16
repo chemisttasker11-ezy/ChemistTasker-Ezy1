@@ -104,7 +104,7 @@ STARTER_TEMPLATES = [
     _row("Month-start MSR", "monthly", "manager", [
         "Prepare monthly sales report using current reporting instructions",
         "Investigate anomalies and record sign-off",
-    ], roles=["PHARMACIST"], freq="MONTHLY", requires_verification=True),
+    ], roles=["PHARMACIST"], freq="FIRST_DAY_MONTH", requires_verification=True),
     _row("Month-start compliance pack", "monthly", "dispensary", [
         "Complete weekly dispensary checklist reconciliation",
         "Review cold-chain minimum and maximum report",

@@ -267,6 +267,47 @@ class PharmacyOperationsContracts(TestCase):
         self.assertEqual(self.publish(plan).status_code, 400)
         self.assertEqual(WorkNote.objects.count(), 0)
 
+    def test_overnight_roster_presence(self):
+        """Shift beginning the previous evening may cover today's early task."""
+        from unittest.mock import Mock
+        from team_calendar.operations_rules import _rostered_user_ids
+        p = self.pharmacy
+        period = RosterPeriod.objects.create(
+            pharmacy=p, week_start=date(2026, 10, 19),
+            status=RosterPeriod.Status.DRAFT, created_by=self.owner,
+        )
+        shift = Shift.objects.create(
+            pharmacy=p, created_by=self.owner,
+            role_needed="ASSISTANT", employment_type="LOCUM",
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift, roster_period=period,
+            date=date(2026, 10, 19), start_time=time(22, 0), end_time=time(6, 0),
+        )
+        ShiftSlotAssignment.objects.create(
+            shift=shift, slot=slot, user=self.worker,
+            slot_date=date(2026, 10, 19), is_rostered=True,
+        )
+        period.status = RosterPeriod.Status.PUBLISHED
+        period.published_at = timezone.now()
+        period.save(update_fields=["status", "published_at"])
+        task = Mock(date=date(2026, 10, 20), start_time=time(3), end_time=time(4))
+        task.plan.pharmacy_id = p.id
+        self.assertEqual(_rostered_user_ids(task), {self.worker.id})
+        task.start_time = time(14)
+        task.end_time = time(15)
+        self.assertEqual(_rostered_user_ids(task), set())
+
+    def test_unassigned_manager_cannot_sign_off_worker_completion(self):
+        """A manager cannot impersonate a target worker in calendar completion."""
+        manager_worker, manager_membership = make_staff_member(self.pharmacy)
+        _, item, note_id = self.publish_named()
+        uri = BASE + "work-notes/" + str(note_id) + "/mark_done/"
+        self.assertEqual(client_for(manager_worker).post(
+            uri, {"occurrence_date": self.day}, format="json",
+        ).status_code, 403)
+        self.assertEqual(WorkNoteCompletion.objects.count(), 0)
+
 
 class OperationsTemplateDates(TestCase):
     def test_weekly_dates_and_month_boundaries(self):

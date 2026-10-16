@@ -434,6 +434,10 @@ class WorkNoteViewSet(
         occurrence_date = self._get_occurrence_date(request, note)
         operation = getattr(note, "operation_item", None)
         if operation:
+            if membership.status != Membership.Status.ACCEPTED or not WorkNoteAssignee.objects.filter(
+                work_note=note, membership=membership,
+            ).exists():
+                raise PermissionDenied("Published tasks can only be completed by an assigned, active worker.")
             if occurrence_date != operation.date:
                 raise ValidationError({"occurrence_date": "Operational tasks belong to one published date."})
             from team_calendar.operations_models import OperationStep
@@ -465,6 +469,10 @@ class WorkNoteViewSet(
         occurrence_date = self._get_occurrence_date(request, note)
         operation = getattr(note, "operation_item", None)
         if operation:
+            if membership.status != Membership.Status.ACCEPTED or not WorkNoteAssignee.objects.filter(
+                work_note=note, membership=membership,
+            ).exists():
+                raise PermissionDenied("Published tasks can only be reopened by an assigned, active worker.")
             if occurrence_date != operation.date:
                 raise ValidationError({"occurrence_date": "Operational tasks belong to one published date."})
             from team_calendar.operations_models import OperationVerification
