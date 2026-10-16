@@ -478,3 +478,6 @@ export {
   chargeShiftFulfillment,
   chargeShiftPenalty,
 } from './domains/billing/api';
+
+// Calendar-owned pharmacy operations planner. Reused by web and native.
+export * from './domains/calendar/operations';
