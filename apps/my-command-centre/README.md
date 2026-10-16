@@ -97,3 +97,27 @@ The new repository needs no ChemistTasker backend, npm workspaces, shared packag
 No files outside the app folder are needed.
 
 **Finished tasks remain visible on the task board** for status review and reopening, and also appear in the Completed history. This avoids hiding the Finished status.
+
+## Weekly planning and scoring
+
+The **Week planner** reuses the calendar scheduling model and adds deliberate weekly commitments, up to three daily focus selections, and brief weekly reviews. Commit to the week's tasks explicitly; moving or postponing a task will not remove it from the week.
+
+**Status points:** Not started 0, Started 25, Progressing 60, Finished 100, Postponed 0. **Priority weights:** High 3, Medium 2, Low 1. The score is `round(sum(status points × weight) / sum(100 × weight) × 100)`. Weeks without commitments show **Not scored**. Checklists remain optional, and their ticks do not change points.
+
+Commitments capture original task title, priority and planned date. When you save a weekly review, the score is snapshotted alongside your wins, blockers and proposed adjustment. Historical status changes prior to a saved review cannot be reliably reconstructed; a frozen review provides the historical reference. This is a planning aid, not an employee performance rating.
+
+The original version-1 JSON backups still import. New `weekPlans` and `dailyFocus` fields are validated and persisted, while existing local-only privacy limitations remain in force.
+
+UI guidance: the repository's `.agents/skills/ui-ux-pro-max/SKILL.md` and `docs/frontend/IMPECCABLE_UI_UX_RULES.md`; see `REVIEW.md` for the release checklist.
+
+### Acceptance gate
+
+```bash
+npm install
+npm run build
+npm test
+npx playwright install chromium
+npm run test:e2e
+```
+
+Run these from the extracted standalone app folder, not the parent monorepo. Do not release without a successful production build and real React browser tests.

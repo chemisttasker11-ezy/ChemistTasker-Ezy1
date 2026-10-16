@@ -47,3 +47,18 @@ Standalone Vite + React + TypeScript application. All work resides within `apps/
 - The Year view provides 12-month summaries; open a month to inspect/change individual tasks.
 - Storage remains per-browser localStorage, not an authenticated, cross-device calendar. No Google/Outlook Calendar connection is implied.
 - Package registry DNS is unavailable in this execution environment; no claim of passing `npm run build`, Vitest, or React Playwright E2E until these are run on a machine with dependencies installed.
+
+## Weekly planner follow-up — release checklist
+
+Implementation keeps scoring in `src/lib/scoring.ts`, persistence/commitment mutations in `src/model.ts`, reuse of the calendar projector in `src/views/WeekPlannerView.tsx`, and styling in `src/styles/`. No ChemistTasker API, runtime, auth, or existing frontend module is touched.
+
+The reviewed UX rules prioritise accessible keyboard focus, meaningful control labels, 44px touch targets, restrained color, reduced motion and full responsive coverage. The Impeccable reference uses an **Operate** design approach: let task execution and readable progress take precedence over ornamental UI.
+
+Required checks before production:
+- Build and Vitest unit suite; check score arithmetic, blank weeks, committed postponements, backup imports, and review score snapshots.
+- React Playwright E2E for selecting weekly work, status changes, daily top-three limits, export/import, calendar scheduling, mobile views and archive/restore.
+- Visual inspection at 375, 390, 768 and 1440 pixels across both themes. Check horizontal overflow, modal operation, contrast, keyboard focus, and touch buttons.
+- Review a completed past week and verify that saved score and review notes remain available after a full reload.
+- Do not claim cloud sync, reminders, multi-device use or safe storage of patient information.
+
+Status: source and dedicated tests added to PR. Dependency-based tests remain unverified until they actually run; repository CI failures must be individually diagnosed.
