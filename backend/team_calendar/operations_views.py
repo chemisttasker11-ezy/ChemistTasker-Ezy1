@@ -271,6 +271,8 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
         evidence = request.data.get("evidence_note", "")
         if not isinstance(evidence, str) or len(evidence) > 2000:
             raise ValidationError({"evidence_note": "Maximum 2000 characters."})
+        if task.calendar_note.completions.filter(membership=member, occurrence_date=task.date).exists():
+            raise ValidationError("Reopen the calendar task before modifying a submitted checklist.")
         if done:
             OperationStep.objects.update_or_create(
                 task=task, membership=member, step_id=step_id,

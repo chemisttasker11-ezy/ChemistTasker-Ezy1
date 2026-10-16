@@ -218,7 +218,9 @@ def template_dates(recurrence, start, end):
 def apply_template(plan, template, actor):
     if plan.status != "DRAFT":
         raise ValidationError("Published plans cannot be modified.")
-    if template.pharmacy_id != plan.pharmacy_id and template.organization_id != plan.pharmacy.organization_id:
+    if not (template.pharmacy_id == plan.pharmacy_id or (
+        template.organization_id is not None and template.organization_id == plan.pharmacy.organization_id
+    )):
         raise ValidationError("This template is not available to the pharmacy.")
     dates = template_dates(template.recurrence, plan.starts_on, plan.ends_on)
     if plan.items.count() + len(dates) > MAX_ITEMS:
