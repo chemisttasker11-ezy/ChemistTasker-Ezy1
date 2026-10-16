@@ -116,6 +116,7 @@ const InvoiceManagePage = React.lazy(() => import('./pages/dashboard/sidebar/Inv
 const InvoiceGeneratePage = React.lazy(() => import('./pages/dashboard/sidebar/Invoices/InvoiceGeneratePage'));
 const InvoiceDetailPage = React.lazy(() => import('./pages/dashboard/sidebar/Invoices/InvoiceDetailPage'));
 const PharmacyCalendarPage = React.lazy(() => import('./pages/dashboard/sidebar/PharmacyCalendarPage'));
+const PharmacyOperationsPage = React.lazy(() => import('./pages/dashboard/sidebar/PharmacyOperationsPage'));
 const ManageMembershipsPage = React.lazy(() => import('./pages/dashboard/sidebar/ManageMembershipsPage'));
 
 import { AuthProvider } from './contexts/AuthContext';
@@ -289,6 +290,7 @@ const router = createBrowserRouter([
           { path: 'chat', element: <ChatPage /> },
           { path: 'pharmacy-hub', element: <Navigate to="/dashboard/pharmacy-hub" replace /> },
           { path: 'calendar', element: <PharmacyCalendarPage /> },
+          { path: 'operations', element: <PharmacyOperationsPage /> },
           { path: 'logout', element: <LogoutPage /> },
 
         ],
@@ -345,6 +347,7 @@ const router = createBrowserRouter([
           },
           { path: 'chat', element: <ChatPage /> },
           { path: 'calendar', element: <PharmacyCalendarPage /> },
+          { path: 'operations', element: <PharmacyOperationsPage /> },
           { path: 'logout', element: <LogoutPage /> },
         ],
       },
@@ -455,6 +458,7 @@ const router = createBrowserRouter([
           { path: 'chat', element: <ChatPage /> },
           { path: 'pharmacy-hub', element: <Navigate to="/dashboard/pharmacy-hub" replace /> },
           { path: 'calendar', element: <PharmacyCalendarPage /> },
+          { path: 'operations', element: <PharmacyOperationsPage /> },
           { path: 'logout', element: <LogoutPage /> },
         ],
       },

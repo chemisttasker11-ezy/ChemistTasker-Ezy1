@@ -43,7 +43,7 @@ import {
     startOfWeek,
     subMonths,
 } from "date-fns";
-import { fetchMembershipsByPharmacy, fetchMyMemberships } from "@chemisttasker/shared-core";
+import { fetchMembershipsByPharmacy, fetchMyMemberships, getOperationsContext } from "@chemisttasker/shared-core";
 import { useSearchParams } from "react-router-dom";
 import {
     type ItemType,
@@ -59,6 +59,7 @@ import {
     formatChoiceLabel,
 } from "./PharmacyCalendarPage.model";
 import PharmacyCalendarDialogs from "./PharmacyCalendarDialogs";
+import OperationTaskDialog from "./OperationTaskDialog";
 
 export default function PharmacyCalendarPage() {
     const theme = useTheme();
@@ -88,6 +89,7 @@ export default function PharmacyCalendarPage() {
     const [editingEventId, setEditingEventId] = useState<number | null>(null);
     const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
     const [expandedId, setExpandedId] = useState<number | string | null>(null);
+    const [activeOperationTask, setActiveOperationTask] = useState<number | null>(null);
     const selectedDayRef = useRef(selectedDay);
     const currentMonthRef = useRef(currentMonth);
   const [eventForm, setEventForm] = useState({
@@ -120,12 +122,20 @@ export default function PharmacyCalendarPage() {
     useEffect(() => {
         const loadMemberships = async () => {
             try {
-                const data = await fetchMyMemberships({ page_size: 200 });
+                const [staffResult, managerResult] = await Promise.allSettled([
+                    fetchMyMemberships({ page_size: 200 }), getOperationsContext(),
+                ]);
+                const staff = staffResult.status === "fulfilled" ? normalizeList(staffResult.value) : [];
+                const manager = managerResult.status === "fulfilled"
+                    ? managerResult.value.pharmacies.map(p => ({ id: "managed-" + p.id, pharmacyId: p.id, pharmacyName: p.name }))
+                    : [];
+                const staffedIds = new Set(staff.map((m: any) => Number(getPharmacyId(m))));
+                const data = [...staff, ...manager.filter(p => !staffedIds.has(p.pharmacyId))];
                 setMemberships(data);
                 if (data.length > 0 && selectedPharmacyId === null) {
-                    const paramPharmacy = searchParams.get("pharmacy_id");
-                    const initialId = paramPharmacy ? Number(paramPharmacy) : getPharmacyId(data[0]);
-                    setSelectedPharmacyId(Number.isFinite(initialId) ? initialId : getPharmacyId(data[0]));
+                    const queryId = Number(searchParams.get("pharmacy_id"));
+                    const candidate = data.find(m => Number(getPharmacyId(m)) === queryId);
+                    setSelectedPharmacyId(getPharmacyId(candidate ?? data[0]));
                 }
             } catch (e) {
                 setError("Unable to load your pharmacy memberships.");
@@ -253,7 +263,7 @@ export default function PharmacyCalendarPage() {
                     assignees: assigneeNames,
                     completedBy: Array.isArray(note.completed_by) ? note.completed_by : [],
                     assigneeMembershipIds: (note.assignees ?? []).map((a: any) => a.membershipId ?? a.membership_id),
-                    status: (note.status ?? "").toString().toUpperCase(),
+                    status: (note.operation?.progress?.status ?? note.status ?? "").toString().toUpperCase(),
                     noteData: note,
                 };
             });
@@ -1153,7 +1163,7 @@ export default function PharmacyCalendarPage() {
                                                     )}
                                                     {item.type === "note" && (
                                                         <>
-                                                            <Button
+                                                            {!item.noteData?.operation && <Button
                                                                 size="small"
                                                                 variant="text"
                                                                 onClick={(e) => {
@@ -1162,8 +1172,8 @@ export default function PharmacyCalendarPage() {
                                                                 }}
                                                             >
                                                                 Edit
-                                                            </Button>
-                                                            <Button
+                                                            </Button>}
+                                                            {!item.noteData?.operation && <Button
                                                                 size="small"
                                                                 variant="text"
                                                                 color="error"
@@ -1181,8 +1191,12 @@ export default function PharmacyCalendarPage() {
                                                                 }}
                                                             >
                                                                 Delete
-                                                            </Button>
-                                                            {item.status && (
+                                                            </Button>}
+                                                            {item.noteData?.operation?.task_id && <Button size="small" variant="contained"
+                                                                onClick={(e) => { e.stopPropagation(); setActiveOperationTask(Number(item.noteData.operation.task_id)); }}>
+                                                                Checklist &amp; progress
+                                                            </Button>}
+                                                            {item.status && !item.noteData?.operation && (
                                                                 <Button
                                                                     size="small"
                                                                     variant="outlined"
@@ -1256,6 +1270,7 @@ export default function PharmacyCalendarPage() {
                 </Stack>
             )}
 
+            <OperationTaskDialog taskId={activeOperationTask} onClose={() => setActiveOperationTask(null)} onUpdated={() => { void loadFeed(); }} />
             <PharmacyCalendarDialogs
                 eventModalOpen={eventModalOpen}
                 setEventModalOpen={setEventModalOpen}

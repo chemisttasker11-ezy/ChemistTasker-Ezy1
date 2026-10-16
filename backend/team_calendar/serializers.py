@@ -47,6 +47,7 @@ class WorkNoteAssigneeSerializer(serializers.ModelSerializer):
 class WorkNoteSerializer(serializers.ModelSerializer):
     """Serializer for work notes."""
     assignees = WorkNoteAssigneeSerializer(many=True, read_only=True)
+    operation = serializers.SerializerMethodField()
     assignee_membership_ids = serializers.ListField(
         child=serializers.IntegerField(),
         write_only=True,
@@ -59,7 +60,7 @@ class WorkNoteSerializer(serializers.ModelSerializer):
         model = WorkNote
         fields = [
             'id', 'pharmacy', 'date', 'title', 'body', 'status',
-            'notify_on_shift_start', 'is_general', 'recurrence',
+            'notify_on_shift_start', 'is_general', 'recurrence', 'operation',
             'assignees', 'assignee_membership_ids',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
         ]
@@ -69,7 +70,22 @@ class WorkNoteSerializer(serializers.ModelSerializer):
         if obj.created_by:
             return obj.created_by.get_full_name() or obj.created_by.email
         return None
-    
+
+    def get_operation(self, obj):
+        item = getattr(obj, "operation_item", None)
+        if not item:
+            return None
+        from team_calendar.operations_serializers import OperationTaskSerializer
+        return {
+            "task_id": item.id, "plan_id": item.plan_id, "area": item.area,
+            "progress": OperationTaskSerializer(item).data["progress"],
+            "start_time": str(item.start_time) if item.start_time else None,
+            "end_time": str(item.end_time) if item.end_time else None,
+            "requires_verification": item.requires_verification,
+            "target_value": item.target_value, "target_unit": item.target_unit,
+            "target_kind": item.target_kind, "training_url": item.training_url,
+        }
+
     def validate_assignee_membership_ids(self, value):
         """Validate that all membership IDs are valid and belong to the pharmacy."""
         if not value:
