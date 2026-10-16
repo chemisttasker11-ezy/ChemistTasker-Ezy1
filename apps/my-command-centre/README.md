@@ -95,3 +95,5 @@ The new repository needs no ChemistTasker backend, npm workspaces, shared packag
 - `tests/` — Playwright user-flow tests.
 
 No files outside the app folder are needed.
+
+**Finished tasks remain visible on the task board** for status review and reopening, and also appear in the Completed history. This avoids hiding the Finished status.
