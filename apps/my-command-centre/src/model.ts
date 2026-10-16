@@ -2,7 +2,8 @@ export type Lane = 'urgent' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'go
 export type Category = 'ChemistTasker' | 'Pharmacy' | 'Family' | 'Finance' | 'Personal';
 export type Priority = 'high' | 'medium' | 'low';
 export type Recurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-export type View = 'overview' | 'board' | 'today' | 'upcoming' | 'goals' | 'completed' | 'archived' | 'settings';
+export type TaskStatus = 'not-started' | 'started' | 'progressing' | 'finished' | 'postponed';
+export type View = 'overview' | 'board' | 'today' | 'calendar' | 'upcoming' | 'goals' | 'completed' | 'archived' | 'settings';
 
 export interface Subtask { id: string; title: string; done: boolean }
 export interface Task {
@@ -13,9 +14,12 @@ export interface Task {
   category: Category;
   priority: Priority;
   dueDate: string;
+  scheduledTime: string; // Optional HH:mm in Australia/Brisbane local time
+  scheduleAnchor: string; // Original recurrence date; avoids month-end drift
   recurrence: Recurrence;
   estimateMinutes: number;
   subtasks: Subtask[];
+  status: TaskStatus; // Simple state, independent of an optional checklist.
   createdAt: string;
   updatedAt: string;
   completedAt: string;
@@ -30,6 +34,9 @@ export interface Completion {
   completedAt: string;
   periodKey: string;
   previousDueDate?: string;
+  nextDueDate?: string;
+  previousStatus?: TaskStatus;
+  previousSubtasks?: Subtask[];
 }
 export interface BoardState {
   version: 1;
@@ -119,9 +126,12 @@ export function nextDueDate(date: string, recurrence: Recurrence, today: string)
   return cursor.toISOString().slice(0, 10);
 }
 
+/** Completing a repeating task closes the current period and starts fresh next period.
+ * A completion snapshot lets Undo restore status, checklist and due date.
+ */
 export function toggleCompletion(state: BoardState, id: string, now = new Date()): BoardState {
   const task = state.tasks.find(t => t.id === id);
-  if (!task) return state;
+  if (!task || task.archivedAt) return state;
   const today = brisbaneToday(now);
   const key = periodKey(task.recurrence, today);
   const matching = state.completions.find(c => c.taskId === id && c.periodKey === key);
@@ -129,17 +139,109 @@ export function toggleCompletion(state: BoardState, id: string, now = new Date()
     return {
       ...state,
       completions: state.completions.filter(c => c.id !== matching.id),
-      tasks: state.tasks.map(t => t.id === id ? { ...t, completedAt: '', dueDate: matching.previousDueDate ?? t.dueDate, updatedAt: now.toISOString() } : t)
+      tasks: state.tasks.map(t => {
+        if (t.id !== id) return t;
+        // Do not move a date backwards if the series was rescheduled after completion.
+        const canRestore = matching.nextDueDate !== undefined && t.dueDate === matching.nextDueDate;
+        return {
+          ...t,
+          completedAt: t.recurrence === 'none' ? '' : t.completedAt,
+          dueDate: canRestore ? matching.previousDueDate ?? t.dueDate : t.dueDate,
+          status: matching.previousStatus ?? 'not-started',
+          subtasks: canRestore && matching.previousSubtasks ? matching.previousSubtasks : t.subtasks,
+          updatedAt: now.toISOString()
+        };
+      })
     };
   }
-  const completion: Completion = { id: generateId(), taskId: id, title: task.title, category: task.category, completedAt: now.toISOString(), periodKey: key, previousDueDate: task.dueDate };
-  const updated = state.tasks.map(t => t.id === id ? {
+  const repeating = task.recurrence !== 'none';
+  const next = repeating && task.dueDate
+    ? nextDueDate(task.scheduleAnchor || task.dueDate, task.recurrence, today >= task.dueDate ? today : task.dueDate)
+    : task.dueDate;
+  const completion: Completion = {
+    id: generateId(), taskId: id, title: task.title, category: task.category,
+    completedAt: now.toISOString(), periodKey: key,
+    previousDueDate: task.dueDate, nextDueDate: next,
+    previousStatus: task.status, previousSubtasks: task.subtasks.map(s => ({ ...s }))
+  };
+  const tasks = state.tasks.map(t => t.id !== id ? t : {
     ...t,
-    completedAt: t.recurrence === 'none' ? now.toISOString() : '',
-    dueDate: t.dueDate && t.recurrence !== 'none' ? nextDueDate(t.dueDate, t.recurrence, today) : t.dueDate,
+    completedAt: repeating ? '' : now.toISOString(),
+    dueDate: next,
+    status: repeating ? 'not-started' as TaskStatus : 'finished' as TaskStatus,
+    subtasks: repeating ? t.subtasks.map(sub => ({ ...sub, done: false })) : t.subtasks,
     updatedAt: now.toISOString()
-  } : t);
-  return { ...state, tasks: updated, completions: [completion, ...state.completions] };
+  });
+  return { ...state, tasks, completions: [completion, ...state.completions] };
+}
+
+/** Changes a calendar schedule, not its task-board lane or existing completion log.
+ * A recurring task is rescheduled as a whole series (not just one occurrence).
+ */
+export function rescheduleTask(state: BoardState, id: string, date: string, time?: string): BoardState {
+  if (!validISODate(date) || (time !== undefined && !validTime(time))) return state;
+  if (!state.tasks.some(t => t.id === id && !t.archivedAt)) return state;
+  return {
+    ...state,
+    tasks: state.tasks.map(t => t.id !== id ? t : {
+      ...t, dueDate: date, scheduleAnchor: date, scheduledTime: date ? (time ?? t.scheduledTime) : '',
+      status: !date && t.status === 'postponed' ? 'not-started' : t.status, updatedAt: new Date().toISOString()
+    })
+  };
+}
+
+/** Clones task content without cloning identity, progress, or completion status/history. */
+export function duplicateTask(task: Task): Task {
+  return createTask({
+    ...task, id: generateId(), title: `${task.title} (copy)`, origin: 'personal',
+    createdAt: undefined, completedAt: '', archivedAt: '', status: 'not-started',
+    subtasks: task.subtasks.map(s => ({ id: generateId(), title: s.title, done: false })),
+    scheduleAnchor: task.dueDate
+  });
+}
+
+/** Changing progress is deliberately independent from optional checklist ticks. */
+export function setTaskStatus(state: BoardState, id: string, status: TaskStatus, postponedTo?: string, now = new Date()): BoardState {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task || task.archivedAt) return state;
+  if (status === 'postponed') {
+    const earliest = task.dueDate > brisbaneToday(now) ? task.dueDate : brisbaneToday(now);
+    if (!postponedTo || !validISODate(postponedTo) || postponedTo <= earliest) return state;
+  }
+  const day = brisbaneToday(now);
+  const done = isCompleted(task, state.completions, day);
+  if (status === 'finished') return done ? state : toggleCompletion(state, id, now);
+  const reopened = done ? toggleCompletion(state, id, now) : state;
+  return {
+    ...reopened,
+    tasks: reopened.tasks.map(t => t.id === id ? {
+      ...t, status,
+      dueDate: status === 'postponed' ? postponedTo! : t.dueDate,
+      scheduleAnchor: status === 'postponed' ? postponedTo! : t.scheduleAnchor,
+      updatedAt: now.toISOString()
+    } : t)
+  };
+}
+
+/** Save modal changes, without creating fake completions or losing existing history. */
+export function saveTaskChanges(state: BoardState, draft: Task, now = new Date()): BoardState {
+  const prior = state.tasks.find(t => t.id === draft.id);
+  const status = draft.status;
+  let base = state;
+  if (prior && isCompleted(prior, base.completions, brisbaneToday(now)) && status !== 'finished') {
+    base = toggleCompletion(base, draft.id, now);
+  }
+  // Finished is a recorded occurrence. Leave the persisted pending status until
+  // completion is recorded, so recurring tasks do not remain finished next time.
+  const updated: Task = { ...draft, status: status === 'finished' ? (prior?.status ?? 'not-started') : status,
+    updatedAt: now.toISOString() };
+  base = { ...base, tasks: prior
+    ? base.tasks.map(t => t.id === draft.id ? updated : t)
+    : [...base.tasks, updated] };
+  if (status === 'finished' && !isCompleted(updated, base.completions, brisbaneToday(now))) {
+    return toggleCompletion(base, draft.id, now);
+  }
+  return base;
 }
 
 /** Pure Kanban reducer: destination position is independent of browser drag events. */
@@ -206,9 +308,12 @@ export function createTask(values: Partial<Task> & Pick<Task, 'title'>): Task {
     category: values.category ?? 'Personal',
     priority: values.priority ?? 'medium',
     dueDate: values.dueDate ?? '',
+    scheduledTime: values.scheduledTime ?? '',
+    scheduleAnchor: values.scheduleAnchor ?? values.dueDate ?? '',
     recurrence: values.recurrence ?? DEFAULT_RECURRENCE[lane],
     estimateMinutes: values.estimateMinutes ?? 0,
     subtasks: values.subtasks ?? [],
+    status: values.status ?? 'not-started',
     createdAt: values.createdAt ?? now,
     updatedAt: now,
     completedAt: values.completedAt ?? '',
@@ -232,8 +337,15 @@ export function readState(): BoardState {
   }
 }
 
-function validISODate(value: unknown): boolean {
-  return typeof value === 'string' && (value === '' || /^\d{4}-\d{2}-\d{2}$/.test(value));
+function validISODate(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  if (value === '') return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T12:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+function validTime(value: unknown): value is string {
+  return typeof value === 'string' && (value === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(value));
 }
 export function validateImported(raw: unknown): BoardState {
   if (!raw || typeof raw !== 'object') throw new Error('This is not a task backup.');
@@ -245,13 +357,17 @@ export function validateImported(raw: unknown): BoardState {
   const categories = new Set(CATEGORIES.map(c => c.id));
   const recurrence = new Set<Recurrence>(['none', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly']);
   const priority = new Set<Priority>(['high', 'medium', 'low']);
+  const statuses = new Set<TaskStatus>(['not-started', 'started', 'progressing', 'finished', 'postponed']);
   const ids = new Set<string>();
   const tasks: Task[] = obj.tasks.map((t: Task) => {
     if (!t || typeof t !== 'object' || typeof t.id !== 'string' || !t.id || t.id.length > 100 || ids.has(t.id) ||
       typeof t.title !== 'string' || !t.title.trim() || t.title.length > 250 ||
       typeof t.description !== 'string' || t.description.length > 10000 ||
       !lanes.has(t.lane) || !categories.has(t.category) || !recurrence.has(t.recurrence) || !priority.has(t.priority) ||
-      !validISODate(t.dueDate) || !Array.isArray(t.subtasks) || t.subtasks.length > 100 ||
+      !validISODate(t.dueDate) || (t.scheduleAnchor !== undefined && !validISODate(t.scheduleAnchor)) ||
+      (t.scheduledTime !== undefined && !validTime(t.scheduledTime)) ||
+      (t.status !== undefined && !statuses.has(t.status)) ||
+      !Array.isArray(t.subtasks) || t.subtasks.length > 100 ||
       !Number.isInteger(t.estimateMinutes) || t.estimateMinutes < 0 || t.estimateMinutes > 100000) {
       throw new Error('Backup contains invalid tasks.');
     }
@@ -264,6 +380,9 @@ export function validateImported(raw: unknown): BoardState {
     });
     return {
       ...t, subtasks,
+      scheduledTime: t.scheduledTime || '',
+      scheduleAnchor: t.scheduleAnchor || t.dueDate,
+      status: t.completedAt ? 'finished' : t.status ?? 'not-started',
       createdAt: typeof t.createdAt === 'string' ? t.createdAt : '',
       updatedAt: typeof t.updatedAt === 'string' ? t.updatedAt : '',
       completedAt: typeof t.completedAt === 'string' ? t.completedAt : '',
@@ -275,7 +394,10 @@ export function validateImported(raw: unknown): BoardState {
     if (!c || typeof c.id !== 'string' || typeof c.taskId !== 'string' || typeof c.title !== 'string' || typeof c.completedAt !== 'string' || typeof c.periodKey !== 'string' || !categories.has(c.category)) {
       throw new Error('Backup contains invalid completion history.');
     }
-    return { id: c.id.slice(0, 100), taskId: c.taskId.slice(0, 100), title: c.title.slice(0, 250), category: c.category, completedAt: c.completedAt, periodKey: c.periodKey.slice(0, 40), previousDueDate: validISODate(c.previousDueDate) ? c.previousDueDate : undefined };
+    return { id: c.id.slice(0, 100), taskId: c.taskId.slice(0, 100), title: c.title.slice(0, 250), category: c.category, completedAt: c.completedAt, periodKey: c.periodKey.slice(0, 40), previousDueDate: validISODate(c.previousDueDate) ? c.previousDueDate : undefined,
+      nextDueDate: validISODate(c.nextDueDate) ? c.nextDueDate : undefined,
+      previousStatus: c.previousStatus && statuses.has(c.previousStatus) ? c.previousStatus : undefined,
+      previousSubtasks: Array.isArray(c.previousSubtasks) && c.previousSubtasks.length <= 100 ? c.previousSubtasks.filter(s => s && typeof s.id === 'string' && typeof s.title === 'string' && s.title.length <= 250 && typeof s.done === 'boolean').map(s => ({ id: s.id.slice(0, 100), title: s.title, done: s.done })) : undefined }; 
   });
   return { version: 1, tasks, completions, theme: obj.theme === 'dark' ? 'dark' : 'light' };
 }
