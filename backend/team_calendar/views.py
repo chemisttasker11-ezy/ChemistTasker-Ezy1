@@ -4,6 +4,7 @@ Reuses existing scoping helpers (HubScopeResolver, org_roles, admin_helpers).
 """
 from datetime import date, timedelta
 
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
