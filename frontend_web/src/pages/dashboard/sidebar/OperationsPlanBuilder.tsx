@@ -269,7 +269,7 @@ export default function OperationsPlanBuilder({
           <Button variant="contained" onClick={() => editDraft()} startIcon={<Plus size={17}/>}>Add task</Button>
         </Stack>}
         {editable && templates.length === 0 && <Alert severity="info" sx={{ mt: 2 }}>
-          Start by saving a pharmacy template from the curated library. <Button onClick={onShowTemplates}>Browse templates</Button>
+          Start by saving a pharmacy template from the curated library ({catalog.length} ready-to-customise starting points). <Button onClick={onShowTemplates}>Browse templates</Button>
         </Alert>}
         {editable && <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mt: 2 }} alignItems={{ md: 'center' }}>
           <TextField type="date" label="Copy tasks from" size="small" value={selectedDay} onChange={e => setSelectedDay(e.target.value)} InputLabelProps={{ shrink: true }} />

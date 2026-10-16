@@ -3,7 +3,7 @@ export function addDashboardScopeParams(path: string, selectedPharmacyId: number
   const [pathname, query = ""] = path.split("?");
   const params = new URLSearchParams(query);
   const isRoster = pathname.includes("/manage-pharmacies/roster") || pathname.includes("/shifts/roster");
-  const isCalendar = pathname.endsWith("/calendar");
+  const isCalendar = pathname.endsWith("/calendar") || pathname.endsWith("/operations");
   const isPostShift = pathname.endsWith("/post-shift");
   const isMyPharmacies = pathname.includes("/manage-pharmacies/my-pharmacies");
 

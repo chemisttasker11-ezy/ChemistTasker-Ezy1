@@ -8,7 +8,7 @@ import {
   ListTodo, PlusCircle, ShieldCheck, Target, UsersRound,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   type OperationCatalogEntry, type OperationPlan, type OperationTask,
   type OperationTemplate, type OperationsContext, createOperationTemplate,
@@ -32,7 +32,7 @@ const humanError = (e: unknown) => e instanceof Error ? e.message : 'Unable to l
 
 function PillMetric({ value, label, color }: { value: string | number; label: string; color: string }) {
   return <Paper elevation={0} variant="outlined" sx={{ p: 2.5, borderRadius: 3, flex: '1 1 165px', minWidth: 0 }}>
-    <Typography sx={{ fontSize: 30, fontWeight: 800, color, lineHeight: 1.2 }} fontVariant="tabular-nums">{value}</Typography>
+    <Typography sx={{ fontSize: 30, fontWeight: 800, color, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{value}</Typography>
     <Typography variant="body2" color="text.secondary" mt={0.5}>{label}</Typography>
   </Paper>;
 }
@@ -66,6 +66,7 @@ function KpiGroup({ title, subtitle, items, accent }: {
 
 export default function PharmacyOperationsPage() {
   const theme = useTheme();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<TabKey>('today');
   const [context, setContext] = useState<OperationsContext | null>(null);
@@ -186,7 +187,7 @@ export default function PharmacyOperationsPage() {
           <Button variant="outlined" size="small" sx={{ borderColor: '#b5caf9', color: 'white', '&:hover': { borderColor: '#fff' } }}
             onClick={() => {
               const path = window.location.pathname.replace(/\/operations$/, '/calendar');
-              window.location.assign(path + '?pharmacy_id=' + pharmacyId);
+              navigate(path + '?pharmacy_id=' + pharmacyId);
             }}
             startIcon={<CalendarDays size={16}/>}>Open authoritative calendar</Button>
         </Stack>
