@@ -4,7 +4,7 @@ import { CATEGORIES, type Category, type Completion, type Lane, type Task, type 
 import { addDays, calendarOccurrences, dateTitle, dateUTC, monthDates, shiftCalendar, visibleRange, type CalendarScale, type CalendarOccurrence } from '../lib/calendar';
 import { formatDate } from '../lib/display';
 import { CalendarEntry } from '../components/CalendarEntry';
-import { STATUS_LABEL, STATUS_ORDER } from '../lib/progress';
+import { STATUS_LABEL, STATUS_ORDER, visibleStatus } from '../lib/progress';
 
 const SCALES: { id: CalendarScale; label: string }[] = [
   { id: 'day', label: 'Day' }, { id: 'week', label: 'Week' }, { id: 'month', label: 'Month' }, { id: 'year', label: 'Year' }
@@ -111,7 +111,16 @@ export function CalendarView({ tasks, completions, today, onEdit, onDuplicate, o
           const count = occurrences.filter(item => item.date.slice(0, 7) === monthAnchor.slice(0, 7)).length;
           return <button type="button" className="panel calendar-year-month" key={month} onClick={() => { setAnchor(monthAnchor); setScale('month'); }} aria-label={`Open ${dateTitle(monthAnchor, 'month')}, ${count} tasks`}>
             <div className="year-month-heading"><strong>{dateTitle(monthAnchor, 'month').split(' ')[0]}</strong><span>{count} tasks</span></div>
-            <div className="year-mini-grid">{WEEKDAYS.map(day => <small key={day}>{day[0]}</small>)}{days.map(date => <span key={date} className={`${date.slice(0, 7) === monthAnchor.slice(0, 7) ? '' : 'outside'} ${date === today ? 'today' : ''} ${byDay.has(date) ? 'scheduled' : ''}`}>{date.slice(0, 7) === monthAnchor.slice(0, 7) ? Number(date.slice(-2)) : ''}</span>)}</div>
+            <div className="year-mini-grid">{WEEKDAYS.map(day => <small key={day}>{day[0]}</small>)}{days.map(date => {
+              const occurrences = byDay.get(date) ?? [];
+              const labels = occurrences.map(item => visibleStatus(item.task, item.completed));
+              const important = (['postponed', 'progressing', 'started', 'not-started', 'finished'] as TaskStatus[]).find(status => labels.includes(status));
+              const summary = [...new Set(labels)].map(status => STATUS_LABEL[status]).join(', ');
+              return <span key={date} title={occurrences.length ? `${date}: ${occurrences.length} task(s) — ${summary}` : date}
+                className={`${date.slice(0, 7) === monthAnchor.slice(0, 7) ? '' : 'outside'} ${date === today ? 'today' : ''} ${occurrences.length ? 'scheduled' : ''} ${important ? `status-${important}` : ''}`}>
+                {date.slice(0, 7) === monthAnchor.slice(0, 7) ? Number(date.slice(-2)) : ''}
+              </span>;
+            })}</div>
           </button>;
         })}</div>}
         <p className="calendar-footnote">Drag tasks between dates on desktop or edit a task's date on mobile. Moving a repeating task moves its whole series, not an individual occurrence. Removing it from the calendar keeps it on the task board.</p>
