@@ -149,7 +149,10 @@ export function moveInBoard(state: BoardState, id: string, destination: Lane, ov
   const tasks = state.tasks.filter(t => t.id !== id);
   let index = overId ? tasks.findIndex(t => t.id === overId && t.lane === destination) : -1;
   if (index < 0) {
-    const last = tasks.findLastIndex(t => t.lane === destination && !t.archivedAt);
+    let last = -1;
+    tasks.forEach((entry, position) => {
+      if (entry.lane === destination && !entry.archivedAt) last = position;
+    });
     index = last >= 0 ? last + 1 : tasks.length;
   }
   tasks.splice(index, 0, { ...task, lane: destination, updatedAt: new Date().toISOString() });
