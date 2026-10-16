@@ -7,7 +7,7 @@ import {
 import {
   type OperationTask, getOperationTask, getOperationMySteps,
   toggleOperationStep, submitOperationWork, reopenOperationWork,
-  recordOperationKpi, verifyOperationTask,
+  recordOperationKpi, verifyOperationTask, managerReopenOperationTask,
 } from '@chemisttasker/shared-core';
 
 type Props = { taskId: number | null; onDismiss: () => void; onUpdated: () => void };
@@ -34,6 +34,7 @@ export default function OperationTaskDialogNative({ taskId, onDismiss, onUpdated
   const [kpiValue, setKpiValue] = useState('1');
   const [pendingKpiKey, setPendingKpiKey] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [correctionReason, setCorrectionReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -54,8 +55,8 @@ export default function OperationTaskDialogNative({ taskId, onDismiss, onUpdated
     return () => { alive = false; };
   }, [taskId]);
 
-  async function act(callback: () => Promise<unknown>, ok: string) {
-    if (!taskId || busy) return;
+  async function act(callback: () => Promise<unknown>, ok: string): Promise<boolean> {
+    if (!taskId || busy) return false;
     setBusy(true); setError(''); setSuccess('');
     try {
       await callback();
@@ -65,7 +66,8 @@ export default function OperationTaskDialogNative({ taskId, onDismiss, onUpdated
       setTask(current); setDoneSteps(own?.completed_step_ids ?? []);
       setWorkerCanAct(Boolean(own));
       setSuccess(ok); onUpdated();
-    } catch (e) { setError(messageOf(e)); }
+      return true;
+    } catch (e) { setError(messageOf(e)); return false; }
     finally { setBusy(false); }
   }
   const required = task?.checklist.filter(x => x.required) ?? [];
@@ -119,7 +121,7 @@ export default function OperationTaskDialogNative({ taskId, onDismiss, onUpdated
                     value={kpiValue} onChangeText={value => { setKpiValue(value); setPendingKpiKey(null); }}/>
                   <Button disabled={busy || !Number.isInteger(Number(kpiValue)) || Number(kpiValue) < 1}
                     mode="outlined" onPress={() => { const key = pendingKpiKey ?? idempotencyId(); setPendingKpiKey(key);
-                      void act(() => recordOperationKpi(task.id, Number(kpiValue), key), 'KPI update recorded.'); }}>Record</Button>
+                      void act(() => recordOperationKpi(task.id, Number(kpiValue), key), 'KPI update recorded.').then(ok => { if (ok) setPendingKpiKey(null); }); }}>Record</Button>
                 </View>}
               </>}
               {task.training_url ? <Button icon="open-in-new"
@@ -134,6 +136,17 @@ export default function OperationTaskDialogNative({ taskId, onDismiss, onUpdated
                   onPress={() => void act(() => reopenOperationWork(task.calendar_note_id!, task.date),
                     'Task reopened.')}>Reopen</Button>
               </View>}
+              {task.progress.verified && task.can_manage && <>
+                <Divider style={styles.divider}/>
+                <Text variant="titleMedium">Authorise correction</Text>
+                <TextInput mode="outlined" label="Correction reason (10 characters minimum)"
+                  value={correctionReason} multiline maxLength={2000} onChangeText={setCorrectionReason}/>
+                <Button mode="outlined" disabled={busy || correctionReason.trim().length < 10}
+                  onPress={() => void act(() => managerReopenOperationTask(task.id, correctionReason),
+                    'Verification reopened. Workers must resubmit.').then(ok => {if (ok) setCorrectionReason('');})}>
+                  Authorise correction
+                </Button>
+              </>}
               {task.requires_verification && task.progress.status === 'AWAITING_VERIFICATION' && <>
                 <Divider style={styles.divider}/>
                 <Text variant="titleMedium">Independent supervisor verification</Text>

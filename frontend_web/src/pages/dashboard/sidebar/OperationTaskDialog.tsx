@@ -7,7 +7,7 @@ import { ClipboardCheck, ExternalLink, ShieldCheck, Target } from 'lucide-react'
 import {
   type OperationTask, getOperationTask, getOperationMySteps,
   toggleOperationStep, submitOperationWork, reopenOperationWork,
-  recordOperationKpi, verifyOperationTask,
+  recordOperationKpi, verifyOperationTask, managerReopenOperationTask,
 } from '@chemisttasker/shared-core';
 
 type Props = { taskId: number | null; onClose: () => void; onUpdated?: () => void };
@@ -25,6 +25,7 @@ export default function OperationTaskDialog({ taskId, onClose, onUpdated }: Prop
   const [kpiValue, setKpiValue] = useState('1');
   const [pendingKpiKey, setPendingKpiKey] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [correctionReason, setCorrectionReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -60,16 +61,18 @@ export default function OperationTaskDialog({ taskId, onClose, onUpdated }: Prop
     return () => { cancelled = true; };
   }, [taskId]);
 
-  async function act(fn: () => Promise<unknown>, success: string) {
-    if (!taskId) return;
+  async function act(fn: () => Promise<unknown>, success: string): Promise<boolean> {
+    if (!taskId) return false;
     setBusy(true); setError(''); setMessage('');
     try {
       await fn();
       await refresh(taskId);
       setMessage(success);
       onUpdated?.();
+      return true;
     } catch (e) {
       setError(errorText(e));
+      return false;
     } finally { setBusy(false); }
   }
 
@@ -143,7 +146,7 @@ export default function OperationTaskDialog({ taskId, onClose, onUpdated }: Prop
                 inputProps={{ min: 1, max: 10000, step: 1 }} onChange={e => { setKpiValue(e.target.value); setPendingKpiKey(null); }} />
               <Button variant="outlined" disabled={busy || !Number.isInteger(Number(kpiValue)) || Number(kpiValue) < 1}
                 onClick={() => { const key = pendingKpiKey ?? crypto.randomUUID(); setPendingKpiKey(key);
-                  void act(() => recordOperationKpi(task.id, Number(kpiValue), key), 'Progress recorded.'); }}>
+                  void act(() => recordOperationKpi(task.id, Number(kpiValue), key), 'Progress recorded.').then(ok => { if (ok) setPendingKpiKey(null); }); }}>
                 Record progress
               </Button>
             </Stack>}
@@ -163,6 +166,20 @@ export default function OperationTaskDialog({ taskId, onClose, onUpdated }: Prop
               Reopen
             </Button>
           </Stack>}
+          {task.progress.verified && task.can_manage && <Box>
+            <Divider sx={{ mb: 2 }} />
+            <Typography variant="subtitle1" fontWeight={700}>Correct verified work</Typography>
+            <TextField label="Mandatory correction reason" size="small" fullWidth multiline
+              value={correctionReason} inputProps={{maxLength: 2000}}
+              helperText="Minimum 10 characters. Workers must resubmit after correction."
+              onChange={e => setCorrectionReason(e.target.value)} />
+            <Button color="warning" variant="outlined" sx={{mt: 1}}
+              disabled={busy || correctionReason.trim().length < 10}
+              onClick={() => void act(() => managerReopenOperationTask(task.id, correctionReason),
+                'Verification reopened; workers must resubmit.').then(ok => {if (ok) setCorrectionReason('');})}>
+              Authorise correction
+            </Button>
+          </Box>}
           {task.requires_verification && task.progress.status === 'AWAITING_VERIFICATION' && <Box>
             <Divider sx={{ mb: 2 }} />
             <Typography variant="subtitle1" fontWeight={700} mb={1}>Supervisor verification</Typography>
