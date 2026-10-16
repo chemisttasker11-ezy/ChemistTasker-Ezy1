@@ -22,10 +22,16 @@ The production files are in `dist/`.
 
 ## Views and features
 
-- Overview, six-column drag-and-drop task board, Today, Upcoming, Goals, Completed history, Archived tasks, Settings.
+- Overview, six-column drag-and-drop task board, Today, **Calendar (Day / Week / Month / Year)**, Upcoming, Goals, Completed history, Archived tasks, Settings.
 - Drag-and-drop within and between columns using mouse, touch hold or keyboard. The card menu is an alternative for mobile.
-- Add and edit tasks, assign category and priority, optional due dates, recurrence and subtasks.
-- Recurrence is recorded **once per daily, weekly, monthly, quarterly or annual period**. Undo preserves the original due date.
+- Create and edit tasks, assign category/priority, optional due dates and start times, recurrence and **optional checklists** for tasks needing several steps.
+- **Simple status tracking:** Not started, Started, Progressing, Finished, Postponed. No manual percentages.
+- Choose **Postponed** to pick a **later date**. The task's next due date changes; if recurring, the whole series is moved.
+- **Duplicate & edit** from a board card's menu or calendar day/week entry. The copy opens for renaming and keeps its own ID, unchecked checklist and empty history.
+- Calendar: add by clicking a date, edit by selecting an event, reschedule by dragging events to dates on desktop (or editing the date on mobile), and remove from calendar without deleting from the task board. Unscheduled tasks stay in their own list.
+- Month calendar chips show status-coloured indicators and a legend; Day and Week entries allow direct status updates. Year shows month summaries that open the month view.
+- Finishing recurrence is recorded **once per daily, weekly, monthly, quarterly or annual period**. The next period starts Not started and with its checklist reset; Undo restores the previous status, date and steps.
+- Changing a repeating task's date reschedules the entire series, not one occurrence. Existing completion history stays in Completed.
 - Task and completion records persist in this **browser's localStorage**, including dark mode.
 - Settings > Download backup saves JSON; Settings > Import backup restores it after confirmation.
 - Initial tasks are sourced from a handwritten notebook. Additional tailored task suggestions are opt-in under Settings.
@@ -76,7 +82,11 @@ The new repository needs no ChemistTasker backend, npm workspaces, shared packag
 
 ## Structure
 
-- `src/model.ts` — typed task domain model, pure scheduling and moving logic, initial notebook tasks, backup validation.
+- `src/model.ts` — typed task domain model, simple status transitions, duplication, pure scheduling, initial notebook tasks, backup migration/validation.
+- `src/lib/calendar.ts` — pure date arithmetic and calendar occurrence projection.
+- `src/lib/progress.ts` — shared status labels and optional checklist tally.
+- `src/views/CalendarView.tsx` — four calendar layouts, navigation and unscheduled tasks.
+- `src/components/CalendarEntry.tsx` and `TaskStatusPicker.tsx` — reusable calendar event and postpone/status controls.
 - `src/components/` — reusable card, board lane, dialog and empty state.
 - `src/views/` — small, independent screens.
 - `src/lib/display.ts` — date presentation and UI labels.
