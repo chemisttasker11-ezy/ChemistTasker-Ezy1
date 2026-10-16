@@ -2,7 +2,7 @@ export type Lane = 'urgent' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'go
 export type Category = 'ChemistTasker' | 'Pharmacy' | 'Family' | 'Finance' | 'Personal';
 export type Priority = 'high' | 'medium' | 'low';
 export type Recurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-export type View = 'overview' | 'board' | 'today' | 'upcoming' | 'goals' | 'completed' | 'settings';
+export type View = 'overview' | 'board' | 'today' | 'upcoming' | 'goals' | 'completed' | 'archived' | 'settings';
 
 export interface Subtask { id: string; title: string; done: boolean }
 export interface Task {
@@ -29,6 +29,7 @@ export interface Completion {
   category: Category;
   completedAt: string;
   periodKey: string;
+  previousDueDate?: string;
 }
 export interface BoardState {
   version: 1;
@@ -128,10 +129,10 @@ export function toggleCompletion(state: BoardState, id: string, now = new Date()
     return {
       ...state,
       completions: state.completions.filter(c => c.id !== matching.id),
-      tasks: state.tasks.map(t => t.id === id ? { ...t, completedAt: '', updatedAt: now.toISOString() } : t)
+      tasks: state.tasks.map(t => t.id === id ? { ...t, completedAt: '', dueDate: matching.previousDueDate ?? t.dueDate, updatedAt: now.toISOString() } : t)
     };
   }
-  const completion: Completion = { id: generateId(), taskId: id, title: task.title, category: task.category, completedAt: now.toISOString(), periodKey: key };
+  const completion: Completion = { id: generateId(), taskId: id, title: task.title, category: task.category, completedAt: now.toISOString(), periodKey: key, previousDueDate: task.dueDate };
   const updated = state.tasks.map(t => t.id === id ? {
     ...t,
     completedAt: t.recurrence === 'none' ? now.toISOString() : '',
@@ -139,6 +140,20 @@ export function toggleCompletion(state: BoardState, id: string, now = new Date()
     updatedAt: now.toISOString()
   } : t);
   return { ...state, tasks: updated, completions: [completion, ...state.completions] };
+}
+
+/** Pure Kanban reducer: destination position is independent of browser drag events. */
+export function moveInBoard(state: BoardState, id: string, destination: Lane, overId?: string): BoardState {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task || task.archivedAt || (id === overId && destination === task.lane)) return state;
+  const tasks = state.tasks.filter(t => t.id !== id);
+  let index = overId ? tasks.findIndex(t => t.id === overId && t.lane === destination) : -1;
+  if (index < 0) {
+    const last = tasks.findLastIndex(t => t.lane === destination && !t.archivedAt);
+    index = last >= 0 ? last + 1 : tasks.length;
+  }
+  tasks.splice(index, 0, { ...task, lane: destination, updatedAt: new Date().toISOString() });
+  return { ...state, tasks };
 }
 
 const seed: { lane: Lane; category: Category; title: string; recurrence?: Recurrence; priority?: Priority; description?: string }[] = [
@@ -257,7 +272,7 @@ export function validateImported(raw: unknown): BoardState {
     if (!c || typeof c.id !== 'string' || typeof c.taskId !== 'string' || typeof c.title !== 'string' || typeof c.completedAt !== 'string' || typeof c.periodKey !== 'string' || !categories.has(c.category)) {
       throw new Error('Backup contains invalid completion history.');
     }
-    return { id: c.id.slice(0, 100), taskId: c.taskId.slice(0, 100), title: c.title.slice(0, 250), category: c.category, completedAt: c.completedAt, periodKey: c.periodKey.slice(0, 40) };
+    return { id: c.id.slice(0, 100), taskId: c.taskId.slice(0, 100), title: c.title.slice(0, 250), category: c.category, completedAt: c.completedAt, periodKey: c.periodKey.slice(0, 40), previousDueDate: validISODate(c.previousDueDate) ? c.previousDueDate : undefined };
   });
   return { version: 1, tasks, completions, theme: obj.theme === 'dark' ? 'dark' : 'light' };
 }
