@@ -146,17 +146,21 @@ class OperationPlanViewSet(viewsets.ModelViewSet):
         _manager_required(self.request.user, pharmacy)
         serializer.save(created_by=self.request.user)
 
+    @transaction.atomic
     def perform_update(self, serializer):
-        if serializer.instance.status != "DRAFT":
+        locked = OperationPlan.objects.select_for_update().get(pk=serializer.instance.pk)
+        if locked.status != "DRAFT":
             raise ValidationError("Published plans are immutable; manage execution from the calendar.")
         plan = serializer.save()
-        plan.revision += 1
+        plan.revision = locked.revision + 1
         plan.save(update_fields=["revision", "updated_at"])
 
+    @transaction.atomic
     def perform_destroy(self, instance):
-        if instance.status != "DRAFT":
+        locked = OperationPlan.objects.select_for_update().get(pk=instance.pk)
+        if locked.status != "DRAFT":
             raise ValidationError("Published plans cannot be deleted.")
-        instance.delete()
+        locked.delete()
 
     @action(detail=True, methods=["post"])
     def apply_template(self, request, pk=None):
@@ -170,6 +174,9 @@ class OperationPlanViewSet(viewsets.ModelViewSet):
         if not template.active:
             raise ValidationError("Template is inactive.")
         with transaction.atomic():
+            plan = OperationPlan.objects.select_for_update().get(pk=plan.pk)
+            if plan.status != "DRAFT":
+                raise ValidationError("Only drafts accept templates.")
             created = apply_template(plan, template, request.user)
         return Response({"created": len(created), "plan": self.get_serializer(plan).data})
 
@@ -212,8 +219,9 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        plan = serializer.validated_data["plan"]
-        _manager_required(self.request.user, plan.pharmacy)
+        requested = serializer.validated_data["plan"]
+        _manager_required(self.request.user, requested.pharmacy)
+        plan = OperationPlan.objects.select_for_update().get(pk=requested.pk)
         if plan.status != "DRAFT":
             raise ValidationError("Cannot add tasks to a published plan.")
         if plan.items.count() >= 400:
@@ -227,10 +235,10 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         task = serializer.instance
         _manager_required(self.request.user, task.plan.pharmacy)
-        if task.plan.status != "DRAFT":
+        plan = OperationPlan.objects.select_for_update().get(pk=task.plan_id)
+        if plan.status != "DRAFT":
             raise ValidationError("Published calendar tasks cannot be edited in the draft planner.")
         task = serializer.save()
-        plan = task.plan
         plan.revision += 1
         plan.save(update_fields=["revision", "updated_at"])
         _audit(task, self.request.user, "ITEM_UPDATED")
@@ -238,9 +246,9 @@ class OperationTaskViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def perform_destroy(self, instance):
         _manager_required(self.request.user, instance.plan.pharmacy)
-        if instance.plan.status != "DRAFT":
+        plan = OperationPlan.objects.select_for_update().get(pk=instance.plan_id)
+        if plan.status != "DRAFT":
             raise ValidationError("Published calendar tasks cannot be deleted here.")
-        plan = instance.plan
         _audit(instance, self.request.user, "ITEM_REMOVED")
         instance.delete()
         plan.revision += 1
