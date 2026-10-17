@@ -9,7 +9,7 @@
 - **SOURCE MISMATCH**: current source does not yet enforce the accepted decision; a documented implementation task, not a claim it has been fixed.
 - The *internal roster*, *community vacancy*, *favourites notification*, *owner-chain*, *organisation-chain*, *public job board* and *direct/dedicated offer* are distinct product contexts. Their signals cannot be inferred from a single `Shift.visibility` value.
 - **Publication versus release**: allowing a worker to share a cover request with eligible peers **does not** remove their original assignment. Only the manager's approved release/reassignment or a confirmed eligible replacement under an agreed approved workflow can release them. Preserve existing audit, payroll, privacy and timetable authority.
-- **Posting audience versus notification**: skipping a tier is a change to what audience may see the vacancy; choosing not to notify a tier only suppresses messages. These are independent controls. When a shift is public and anonymous, privacy redaction and public eligibility/quota requirements still apply.
+- **Posting audience versus notification (owner clarified E01A/E01B)**: higher-tier publication **accumulates eligible visibility** from earlier tiers; e.g. at ORG_CHAIN, eligible own-pharmacy staff, pharmacy favourites/locums, owner-chain workers and organisation workers retain their respective discovery channels. The owner may opt **not** to email/notify prior audiences, but doing so never revokes their discovery access. There is no organisation-worker broadcast notification. Posting public and anonymous uses existing public privacy redaction and remains a separate option.
 - **Source-of-booking for penalties**: the owner prioritises audience/source of acquisition, not one uniform contract-based external penalty. Snapshot actual worker discovery/booking source and attribution during the accepted engagement, **not merely the shift's latest escalation level**; employment rules and enforceable agreed terms remain separate prerequisites for any charge.
 
 ## Existing foundational decisions (do not re-ask)
@@ -29,7 +29,7 @@
 | **R01** | **A** | None | **Internal roster is for active employed pharmacy staff only (FT/PT/casual)**. External locums/favourites must follow the applicable shift engagement/offer workflow, not be directly roster-published as employees. | APPROVED |
 | **R04** | **A** | “Also we have swap and cover request in our logic that staff member can ask swap and cover and this feature publishing is decided via the owner if they can publish it directly or manager has to do it. Any way no release until manager decide or fulfilled. For public audiancefrom the platform, need to give reason and notification and manager approves if there enough window to act” | (1) Worker may initiate swap/cover and, **if owner enables** it, may initiate outward **cover visibility**, otherwise manager controls publication; (2) no premature assignment release—manager decision or properly fulfilled replacement first; (3) for a platform-public shift worker cancellation, require reason/notification and manager-approval guard when adequate notice remains. **Configuration UI/storage, exact 'fulfilled' rule and 'enough window' threshold are not yet agreed.** | APPROVED DIRECTION / DETAIL REQUIRED |
 | **R06** | **A** | None | If internal cover is opened as a vacancy, **keep the same Shift/Slot** represented as uncovered/needs cover on manager/employee roster with a link to the vacancy; do not duplicate or delete the original roster occurrence. | APPROVED |
-| **E01** | **A** | “Also the owner can skip tiers, by not notifying and also posting anonymous to public” | Default available eligible tiers follow staff → locum/favourites community → owner-chain → organisation-chain → public. **Owner may choose to skip tiers/start at a later eligible tier**, omit notifications to selected audiences, and post **anonymously** to public, subject to scoping, quota and pharmacy-identity privacy controls. Skipping audience ≠ suppressing a notification. | APPROVED DIRECTION / DETAIL REQUIRED |
+| **E01** | **A** | “Also the owner can skip tiers, by not notifying and also posting anonymous to public” | Default available eligible tiers follow staff → locum/favourites community → owner-chain → organisation-chain → public. **Superseded clarification:** Owner can begin at a later eligible tier while earlier eligible groups **still retain visibility through their own channels**. A skipped notification is **not** skipped access. Owner may omit notices to pharmacy staff, favourites or chain members, and post **anonymously** to public, subject to privacy/quota controls. Organisation workers cannot be notified through an organisation broadcast. | APPROVED DIRECTION / DETAIL REQUIRED |
 | **E03** | **A** | None | On posted vacancies the owner selects the escalation time interval(s) at posting time. These must be persisted/reviewable, obey allowed-tier/publishing rules and not allow roster publication itself to trigger escalation. | APPROVED |
 | **P02** | **B** | None | **Audience where worker was sourced** (favourites, owner chain, organisation chain, public) is the primary axis for cancellation *warning/penalty policy*. Preserve worker's employment/contract classification separately and never charge an employee or external worker without a lawful, disclosed, agreed basis. | APPROVED DIRECTION / DETAIL REQUIRED |
 
@@ -52,9 +52,43 @@ No new automatic penalties, forced employee wage deductions, refund/credit, rele
 1. Who can set the per-pharmacy self-publication permission, and is it employee-level or role-wide? Does "publish directly" reveal the uncovered slot before manager approval while incumbent is still assigned?
 2. What exactly counts as “fulfilled” replacement—eligible worker applies, agrees, accepts with payment confirmed where applicable, or manager manually validates?
 3. Does the platform-public cancellation approval window vary with shift proximity? Which action is permitted outside that window (emergency/support override, provisional cancellation, or worker self-cancel with warning)?
-4. For E01, selecting “do not notify” must **not** be mistaken for restricting visibility; do we want both independent controls in owner UI?
+4. **Resolved (E01A/E01B):** preserve existing notification choices; they never restrict visibility. A shift at ORG_CHAIN remains discoverable to eligible pharmacy staff, favourites, owner-chain and organisation workers. No organisation broadcast exists. No new notification-setting UI is requested.
 5. For P02, what is the stable attribution when a shift was first shown to favourites, escalated to public, but the accepting worker was already a favourite? Freeze at candidate engagement/offer confirmation, before later escalation, and ask owner to decide precedence.
 
 ## Verification
 
 Exact-head runtime QA and GitHub CI checks are **not claimed**. This PR remains **draft and not merge-ready**; PR #181 remains unchanged.
+
+## Round 3 — explicit six owner decisions (17 October 2026)
+
+Owner message received verbatim:
+- `R04A=A`; explanation: None.
+- `R04B=C`; explanation: None.
+- `R04C=A`; explanation: None.
+- `E01A=OTHER`; explanation: "It is already built as notifying or not notifying previous tiers and posting anonymous. So publishing on org, the pharmacy staff, fav locum, chain workers can still see it via their own channels but the only difference is the owner send them notification and email or not. Org workers can't notified any way."
+- `E01B=OTHER`; explanation: "Keep the existing behaviour as i explained".
+- `R04D=A`; explanation: None.
+
+| ID | Approved decision | Required code/QA boundary |
+|---|---|---|
+| **R04A=A** | Owner sets the staff-initiated cover publication permission **per pharmacy**, not per worker or role. | Configuration owned by pharmacy/roster permissions. No default grant invented; roster worker requests still preserve assignment. |
+| **R04B=C** | Workers may **invite named, eligible colleagues** to cover; a manager must approve widening a vacancy to favourites or public. | This is not immediate marketplace publication or automatic release. `request_direct_swap` currently records a worker-selected target but must additionally confirm target acceptance before manager transfers (R04C). |
+| **R04C=A** | Replacement is fulfilled only when target **accepts**, meets role/eligibility/conflict checks, and the authorised manager **approves transfer**. | Add explicit target acceptance proof before release. Existing `approve_direct_swap` and `approve_cover_replacement` require review: they validate and manager-approve, but acceptance evidence is not established in inspected code. Do not silently switch assignment. |
+| **E01A=OTHER** | Keep the existing **cumulative discovery** model; at organisation-tier publication, eligible own pharmacy staff, pharmacy favourite locums, owner-chain workers and organisation workers may still find the shift through **their own existing channels**. Owners control *whether to notify* previous audiences, NOT their access. Anonymous public posting remains available. | `CommunityShiftViewSet.get_queryset` currently tests `visibility='ORG_CHAIN'` only for org membership: update it to retain prior eligible audiences. Do not introduce new tier-skip filters. |
+| **E01B=OTHER** | **Keep existing staff/favourite/chain notification flags and anonymous-posting behaviour.** Organisation workers **do not receive an organisation-targeted notification**, even though they may discover an org-visible shift. | `announce_posted_shift` already offers `notify_pharmacy_staff`, `notify_favorite_staff`, `notify_chain_members`, but no `notify_org_members`; do not add a separate org broadcast. Verify that a skipped notification never hides a shift. |
+| **R04D=A** | **Public-platform worker cancellation always requires manager approval.** As start approaches, use **emergency escalation**, reason and notifications; there is no automatic self-cancellation rule created by a short deadline. | Exact emergency timings, recipient and escalation SLA remain decisions in the next warning/penalty interview. Worker remains assigned until authorised approval/fulfilled replacement. |
+
+### Resolution and correction of earlier E01 interpretations
+
+An earlier register phrase "skip tiers/start at later tier" was misleading when read as hiding the shift from previous audiences. **The owner's latest explanation governs:** publication to a wider eligible audience does not revoke visibility of earlier eligible audiences. The only user-configured skips mentioned are **notifications** (and the existing choice of initial eligible visibility), not exclusion lists. When `post_anonymously=True` in public, preserve existing identity redaction; public visibility of internal channels under anonymity needs a separate privacy test and must not be guessed.
+
+### Pending implementation
+
+1. Correct cumulative `ORG_CHAIN` (and where applicable `OWNER_CHAIN`/`PLATFORM`) discovery without expanding to unrelated tenants or leaking anonymous details. Include view-query tests and a notification-disabled still-visible test.
+2. Preserve existing notification selectors and absence of organisation broadcast; no new toggles or emails.
+3. Implement per-pharmacy owner approval of named-worker cover invitations only after verifying suitable persisted permission configuration and consent. No immediate assignment release.
+4. Add explicit target-acceptance evidence before manager transfer, then end-to-end role/overlap/attendance/roster tests; do not accidentally invalidate established roster operations.
+5. Emergency public cancellation requires manual manager approval; do not invent cutoff, fee or auto-termination.
+6. Continue D06–D15 and audience-specific penalties separately. No charges, refunds or punitive actions without approved thresholds, contract/legal safeguards and tests.
+
+**Branch policy:** PR #182 only; PR #181 unchanged. GitHub CI deliberately deferred until the later testing phase, not counted green.
