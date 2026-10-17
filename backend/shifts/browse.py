@@ -111,7 +111,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         eligible_q = (
             # 1. Full/part time at this pharmacy
             Q(
-                visibility='FULL_PART_TIME',
+                visibility__in=['FULL_PART_TIME', 'LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN'],
                 pharmacy__memberships__user=user,
                 pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
@@ -119,14 +119,14 @@ class CommunityShiftViewSet(BaseShiftViewSet):
             |
             # 2. Any active member at this pharmacy (for locum_casual)
             Q(
-                visibility='LOCUM_CASUAL',
+                visibility__in=['LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN'],
                 pharmacy__memberships__user=user,
                 pharmacy__memberships__employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
             )
             |
             Q(
-                visibility='LOCUM_CASUAL',
+                visibility__in=['LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN'],
                 post_anonymously=False,
                 pharmacy__memberships__user=user,
                 pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
@@ -145,7 +145,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
             |
             # 3. Any active member at any pharmacy with the same owner as the shift’s pharmacy
             Q(
-                visibility='OWNER_CHAIN',
+                visibility__in=['OWNER_CHAIN', 'ORG_CHAIN'],
                 pharmacy__owner__in=Pharmacy.objects.filter(
                     memberships__user=user,
                     memberships__is_active=True,
