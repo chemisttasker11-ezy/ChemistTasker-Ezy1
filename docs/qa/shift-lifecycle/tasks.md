@@ -44,3 +44,19 @@ All unchecked items are **not done**; a static source investigation never marks 
 - [ ] Owner grill D04–D11 cancellation/fees; no unilateral cancellation policy invented.
 
 **NOT MERGE-READY**, even though the implementation paths are committed. Do not merge or deploy.
+
+## D04–D15 continuation — irreversible-operation safety gate
+
+- [x] Audit inherited DELETE and destructive slot replacement against existing assignment, applicant, published roster and payment models.
+- [x] Add domain-owned hard-delete guard: only pristine unengaged shifts may use ordinary deletion; rostered, offered, paid, reserved, candidate-history or audited shifts require future explicit cancellation.
+- [x] Block destructive collection replacement once the shift has offers, interest, counteroffers or assignments.
+- [x] Add Django endpoint regression coverage for unchanged pristine delete, linked offer/interest/payment refusal, slot identity retention and cross-tenant worker permission refusal.
+- [x] Re-read existing roster/worker-request safeguards and refuse to substitute a new release engine for roster manager approval.
+- [ ] Execute `python3 backend/manage.py test shifts.test_deletion_safety shifts.test_reservations --settings=core.contract_test_settings` in the authenticated Codex Docker environment; record actual output.
+- [ ] D04/D05 owner policy: cancel confirmed external worker, authority, whole-shift/occurrence/recurring selection, preserving payment/audit.
+- [ ] D06/D07 owner policy: standard offer decline/expiry audience, notifications and privacy.
+- [ ] D08–D11 owner policy: penalties, refunds, post-acceptance amendments, fee overrides, audit and disputes.
+- [ ] D12–D15 owner policy: reminders, no-show threshold, completion authority, ratings/history.
+- [ ] Only after each owner choice, implement approved transitions in existing shifts/workforce/billing/attendance domains and test real PostgreSQL, web and native flows.
+
+**Do not interpret the guardrail as completion of D04–D15.** Nothing has been merged, deployed or passed in runtime testing here. GitHub CI remains deferred by owner request.
