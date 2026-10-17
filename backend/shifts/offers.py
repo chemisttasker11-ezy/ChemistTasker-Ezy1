@@ -373,7 +373,26 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         billing_state = get_billing_state_for_pharmacy(shift.pharmacy, acting_user=request.user)
         requires_payment = billing_state == BILLING_STATE_PAYMENT_REQUIRED
 
+        from shifts.reservations import payment_deadline
         with transaction.atomic():
+            # Serialise competing candidates and billing against the same Shift row.
+            shift = Shift.objects.select_for_update().get(pk=shift.pk)
+            offer = ShiftOffer.objects.select_for_update().get(pk=offer.pk)
+            if offer.status != ShiftOffer.Status.PENDING:
+                return Response({'detail': 'Offer is no longer pending.'}, status=400)
+            if ShiftSlotAssignment.objects.filter(shift=shift).exists() and shift.single_user_only:
+                return Response({'detail': 'Shift already assigned.'}, status=409)
+            if ShiftOffer.objects.filter(
+                shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            ).exclude(pk=offer.pk).filter(
+                slot_id=offer.slot_id,
+            ).exists():
+                return Response({'detail': 'Shift already reserved.'}, status=409)
+            if requires_payment:
+                due = payment_deadline(shift, offer, now=timezone.now())
+                if due is None:
+                    return Response({'detail': 'Shift start has passed or cannot be determined.'}, status=400)
+                offer.payment_due_at = due
             offer.payment_preference_snapshot = accepted_terms.get("payment_preference", "")
             offer.settlement_channel = accepted_terms.get("settlement_channel", "")
             offer.engagement_kind = accepted_terms.get("engagement_kind", "")
@@ -385,6 +404,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                 "engagement_kind",
                 "engagement_terms_snapshot",
                 "engagement_terms_accepted_at",
+                "payment_due_at",
                 "updated_at",
             ])
 
@@ -435,7 +455,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             ctx["rate"] = offer_details["slot_details"][0].get("rate") if offer_details["slot_details"] else ""
             worker_title = "Offer accepted - owner payment pending" if requires_payment else "Shift confirmed"
             worker_body = (
-                f"Thanks for confirming. The owner must complete payment before you are locked in. {offer_details['shift_summary']}"
+                f"Your shift is reserved, not yet confirmed. The pharmacy must pay before {offer.payment_due_at.isoformat()}. {offer_details['shift_summary']}"
                 if requires_payment
                 else f"You are confirmed for a shift at {pharmacy_display}. {offer_details['shift_summary']}"
             )
@@ -450,13 +470,14 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                     "assignment_ids": assignment_ids,
                     "status": offer.status,
                     "payment_required": requires_payment,
+                    "payment_due_at": offer.payment_due_at.isoformat() if offer.payment_due_at else None,
                     **offer_details,
                 },
             )
             async_task(
                 'users.tasks.send_async_email',
                 subject=(
-                    f"Thanks for confirming your shift at {pharmacy_display} - owner payment pending"
+                    f"Your shift is reserved at {pharmacy_display} - owner payment pending"
                     if requires_payment
                     else f"You've been accepted for a shift at {pharmacy_display}"
                 ),
@@ -491,8 +512,10 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             notify_shift_users(
                 [owner_user],
                 shift=shift,
-                title=f"{worker_role_label} confirmed: {pharmacy_display}",
-                body=f"{worker_name} confirmed your shift offer." + (" Payment is required to finalize." if requires_payment else ""),
+                title=(f"{worker_role_label} reserved: {pharmacy_display}" if requires_payment
+                       else f"{worker_role_label} confirmed: {pharmacy_display}"),
+                body=(f"{worker_name} accepted. Reservation expires at {offer.payment_due_at.isoformat()} unless payment completes."
+                      if requires_payment and offer.payment_due_at else f"{worker_name} confirmed your shift offer."),
                 kind="shift_worker_confirmed",
                 payload={
                     "offer_id": offer.id,
@@ -504,7 +527,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             )
             async_task(
                 'users.tasks.send_async_email',
-                subject=f"{worker_role_label} confirmed shift offer at {pharmacy_display}" + (" - Action Required" if requires_payment else ""),
+                subject=(f"{worker_role_label} reservation awaiting payment at {pharmacy_display}" if requires_payment else f"{worker_role_label} confirmed shift offer at {pharmacy_display}"),
                 recipient_list=[owner_user.email],
                 template_name="emails/owner_worker_confirmed.html",
                 context=owner_ctx,
@@ -519,6 +542,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             'payment_status': shift.payment_status,
             'requires_payment': requires_payment,
             'billing_state': billing_state,
+            'payment_due_at': offer.payment_due_at.isoformat() if offer.payment_due_at else None,
         }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='activate-payroll')

@@ -18,6 +18,13 @@ from shifts.models import ShiftSlotAssignment
 logger = logging.getLogger(__name__)
 
 
+@shared_task(name="shifts.tasks.expire_payment_reservations", queue="notifications")
+def expire_payment_reservations():
+    from shifts.reservations import expire_overdue_reservations
+    return expire_overdue_reservations()
+
+
+
 @shared_task(name="client_profile.tasks.send_shift_reminders", queue="notifications")
 def send_shift_reminders():
     now_utc = timezone.now()

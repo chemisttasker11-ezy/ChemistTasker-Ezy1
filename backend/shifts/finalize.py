@@ -40,8 +40,18 @@ def finalize_shift_offer(offer: ShiftOffer):
                 if entry["slot"].id != slot.id:
                     continue
                 slot_date = entry["date"]
-                if ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot_date).exists():
-                    continue
+                existing = ShiftSlotAssignment.objects.filter(
+                    slot=slot, slot_date=slot_date,
+                ).first()
+                if existing:
+                    if existing.source_offer_id == offer.pk and existing.user_id == offer.user_id:
+                        # Genuine webhook retry for an already finalized occurrence.
+                        assignment_ids.append(existing.id)
+                        assignment_rates.append(existing.unit_rate)
+                        continue
+                    raise ValidationError({
+                        "detail": "This occurrence is already assigned to another booking."
+                    })
 
                 staff_defaults = {}
                 if offer.engagement_kind == KIND_STAFF_EMPLOYMENT:

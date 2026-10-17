@@ -212,54 +212,57 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
             ).values("slot_id").distinct().count()
             if matching_count != len(slot_ids):
                 raise DRFValidationError({"detail": "One or more selected slots do not require payment."})
-        payment_units = max(1, len(offer_ids) or len(slot_ids))
+        from shifts.reservations import reservation_available
         ledgers = []
-        try:
-            for _ in range(payment_units):
-                ledgers.append(spend_pills_for_shift_post(user=request.user, shift=shift))
-        except RewardError as exc:
-            raise DRFValidationError({
-                "detail": str(exc),
-                "code": "insufficient_pills" if "Insufficient" in str(exc) else "pill_payment_failed",
-                "balance": get_pill_balance(request.user),
-                "required": get_shift_post_pill_cost() * payment_units,
-            })
-        finalized_count = 0
         finalized_offers = []
         with transaction.atomic():
-            pending_offers = ShiftOffer.objects.filter(
-                shift=shift,
-                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            ).order_by("created_at")
+            # Keep the reward debit and booking transition indivisible.
+            shift = Shift.objects.select_for_update().get(pk=shift.pk)
+            pending = ShiftOffer.objects.select_for_update().filter(
+                shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            ).order_by("created_at", "pk")
             if offer_ids:
-                pending_offers = pending_offers.filter(id__in=offer_ids)
+                pending = pending.filter(id__in=offer_ids)
             elif slot_ids:
-                pending_offers = pending_offers.filter(slot_id__in=slot_ids)
-            selected_slot_ids = set()
-            for offer in pending_offers:
+                pending = pending.filter(slot_id__in=slot_ids)
+            candidates = list(pending)
+            if not candidates or any(not reservation_available(o) for o in candidates):
+                raise DRFValidationError({"detail": "Reservation expired or no longer payable."})
+            if offer_ids and len(candidates) != len(offer_ids):
+                raise DRFValidationError({"detail": "One or more selected offers are no longer payable."})
+            keys = [(o.slot_id, o.offered_slot_date) for o in candidates]
+            if len(keys) != len(set(keys)):
+                raise DRFValidationError({"detail": "Select one reserved candidate per occurrence."})
+            try:
+                for _ in candidates:
+                    ledgers.append(spend_pills_for_shift_post(user=request.user, shift=shift))
+            except RewardError as exc:
+                raise DRFValidationError({
+                    "detail": str(exc),
+                    "code": "insufficient_pills" if "Insufficient" in str(exc) else "pill_payment_failed",
+                }) from exc
+            for offer in candidates:
                 finalize_shift_offer(offer)
                 finalized_offers.append(offer)
-                if offer.slot_id:
-                    selected_slot_ids.add(offer.slot_id)
-                finalized_count += 1
+            selected_slot_ids = {o.slot_id for o in candidates if o.slot_id}
             if selected_slot_ids:
                 ShiftOffer.objects.filter(
-                    shift=shift,
-                    slot_id__in=selected_slot_ids,
+                    shift=shift, slot_id__in=selected_slot_ids,
                     status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
-                ).exclude(id__in=offer_ids).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
-            has_pending_payment = ShiftOffer.objects.filter(
-                shift=shift,
-                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            ).exists()
-            shift.payment_status = "PENDING" if has_pending_payment else "PAID"
+                ).exclude(id__in=[o.id for o in candidates]).update(
+                    status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now(),
+                )
+            shift.payment_status = (
+                "PENDING" if ShiftOffer.objects.filter(
+                    shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                ).exists() else "PAID"
+            )
             shift.save(update_fields=["payment_status"])
-        send_shift_payment_finalized_notifications(
-            shift=shift,
-            offers=finalized_offers,
-            paid_by=request.user,
-            payment_method="pills",
-        )
+            transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
+                shift=shift, offers=finalized_offers,
+                paid_by=request.user, payment_method="pills",
+            ))
+        finalized_count = len(finalized_offers)
         return Response({
             "detail": "Shift paid with pills.",
             "balance": get_pill_balance(request.user),

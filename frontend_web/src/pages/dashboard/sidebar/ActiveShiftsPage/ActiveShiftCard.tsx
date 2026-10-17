@@ -236,16 +236,17 @@ export default function ActiveShiftCard({
             .map((option) => {
                 const offerId = toFiniteNumber(option.offerId ?? option.offer_id);
                 const slotId = toFiniteNumber(option.slotId ?? option.slot_id);
-                if (!offerId || !slotId) return null;
-                const slot = slotById.get(slotId) || {
-                    id: slotId,
+                if (!offerId || (!slotId && !isSingleUserShift)) return null;
+                const resolvedSlotId = slotId ?? 0;
+                const slot = slotById.get(resolvedSlotId) || (((shift as any).slots || []) as any[])[0] || {
+                    id: resolvedSlotId,
                     date: option.slotDate ?? option.slot_date,
                     start_time: option.startTime ?? option.start_time,
                     end_time: option.endTime ?? option.end_time,
                 };
                 return {
                     offerId,
-                    slotId,
+                    slotId: resolvedSlotId,
                     slot,
                     name: option.candidateName ?? option.candidate_name ?? option.candidateEmail ?? option.candidate_email ?? 'Participant',
                 };
@@ -278,6 +279,11 @@ export default function ActiveShiftCard({
                 };
             })
             .filter(Boolean) as Array<{ offerId: number; slotId: number; slot: any; name: string }>;
+        const reservationDueTimes = (((shift as any).paymentOptions ?? (shift as any).payment_options ?? []) as any[])
+            .map(option => option.paymentDueAt ?? option.payment_due_at)
+            .filter((value): value is string => typeof value === 'string' && !Number.isNaN(Date.parse(value)))
+            .sort();
+        const earliestReservationDue = reservationDueTimes[0] ?? null;
         const paymentRequiredOffers = directPaymentOptions.length > 0
             ? directPaymentOptions
             : [...memberPaymentOptions, ...publicInterestPaymentOptions].filter((item, index, list) => (
@@ -577,6 +583,11 @@ export default function ActiveShiftCard({
                                                     ? `${paymentRequiredOffers.length} bundle payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`
                                                     : `${paymentUnitCount} selected of ${paymentRequiredOffers.length} payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`}
                                             </Typography>
+                                            {earliestReservationDue && (
+                                                <Typography sx={{ fontSize: 12, color: 'var(--ct-status-red-fg)' }}>
+                                                    Reservation expires {new Date(earliestReservationDue).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}
+                                                </Typography>
+                                            )}
                                         </Box>
                                     </Stack>
                                     <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 20, color: 'var(--ct-text-primary)', whiteSpace: 'nowrap' }}>

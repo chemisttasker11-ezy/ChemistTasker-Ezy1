@@ -1,4 +1,6 @@
 from unittest.mock import patch
+from datetime import timedelta, date, time
+from decimal import Decimal
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -47,7 +49,11 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertEqual(ShiftPayment.objects.count(), 1)
         self.assertEqual(finalize.call_count, 2)
         shift.refresh_from_db()
-        self.assertEqual(shift.payment_status, 'PAID')
+        # This fixture mocks an empty finalizer (there was no payable offer).
+        # Under the new policy, payment is recorded for reconciliation rather
+        # than falsely claiming the shift was confirmed.
+        self.assertEqual(shift.payment_status, 'PENDING')
+        self.assertTrue(ShiftPayment.objects.get().needs_reconciliation)
 
     @patch('billing.views.logger.exception')
     @patch('billing.views._process_stripe_event', side_effect=RuntimeError('failed attempt'))
@@ -127,6 +133,192 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertEqual(process_event.call_count, 2)
         self.assertEqual(delivery.status, StripeWebhookEvent.Status.PROCESSED)
         self.assertIsNotNone(delivery.processed_at)
+
+
+    @patch('billing.views.stripe.Webhook.construct_event')
+    @patch('billing.views._finalize_pending_offers_for_shift')
+    def test_paid_cancellation_penalty_does_not_confirm_reserved_worker(self, finalize, construct_event):
+        """A penalty settlement is not a fulfillment fee: pending work stays pending."""
+        owner = get_user_model().objects.create_user(
+            email='cancellation-payment-owner@example.test', role='OWNER',
+        )
+        pharmacy = Pharmacy.objects.create(name='Penalty isolation pharmacy')
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', payment_status='PENDING',
+        )
+        construct_event.return_value = _StripeObject(
+            id='evt_penalty_does_not_confirm', type='checkout.session.completed',
+            data=_StripeObject(object=_StripeObject(
+                mode='payment', payment_status='paid', amount_total=1000,
+                payment_intent='pi_penalty_isolated',
+                metadata={
+                    'shift_id': str(shift.pk),
+                    'type': 'cancellation',
+                    'owner_user_id': str(owner.pk),
+                },
+            )),
+        )
+        response = self.client.post(
+            reverse('api_v1:billing:stripe_webhook'),
+            b'{}', content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        finalize.assert_not_called()
+        shift.refresh_from_db()
+        self.assertEqual(shift.payment_status, 'PENDING')
+        payment = ShiftPayment.objects.get(stripe_payment_intent_id='pi_penalty_isolated')
+        self.assertEqual(payment.payment_type, 'cancellation')
+
+
+
+    @patch('billing.views.stripe.Webhook.construct_event')
+    def test_late_fulfillment_payment_is_held_for_reconciliation_not_booking(self, construct_event):
+        from shifts.models import ShiftOffer
+        owner = get_user_model().objects.create_user(
+            email='late-fulfillment-owner@example.test', role='OWNER',
+        )
+        worker = get_user_model().objects.create_user(
+            email='late-fulfillment-worker@example.test', role='PHARMACIST',
+        )
+        pharmacy = Pharmacy.objects.create(name='Late payment pharmacy')
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', single_user_only=True,
+            payment_status='NOT_REQUIRED',
+        )
+        offer = ShiftOffer.objects.create(
+            shift=shift, user=worker, status=ShiftOffer.Status.EXPIRED,
+            payment_due_at=timezone.now() - timedelta(minutes=1),
+            payment_expired_at=timezone.now(),
+        )
+        construct_event.return_value = _StripeObject(
+            id='evt_late_reservation_payment', type='checkout.session.completed',
+            data=_StripeObject(object=_StripeObject(
+                mode='payment', payment_status='paid', amount_total=1500,
+                payment_intent='pi_late_payment_reservation',
+                metadata={
+                    'shift_id': str(shift.pk), 'type': 'fulfillment',
+                    'owner_user_id': str(owner.pk),
+                    'offer_ids': str(offer.pk),
+                },
+            )),
+        )
+        with patch('shifts.emails.send_shift_payment_finalized_notifications') as notice:
+            response = self.client.post(
+                reverse('api_v1:billing:stripe_webhook'), b'{}',
+                content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 200)
+        notice.assert_not_called()
+        shift.refresh_from_db()
+        offer.refresh_from_db()
+        self.assertEqual(shift.payment_status, 'NOT_REQUIRED')
+        self.assertEqual(offer.status, ShiftOffer.Status.EXPIRED)
+        self.assertTrue(ShiftPayment.objects.get(
+            stripe_payment_intent_id='pi_late_payment_reservation',
+        ).needs_reconciliation)
+
+    @patch('billing.views.stripe.Webhook.construct_event')
+    def test_after_deadline_before_sweep_is_not_falsely_booked(self, construct_event):
+        from shifts.models import ShiftOffer
+        owner = get_user_model().objects.create_user(
+            email='late-before-sweep-owner@example.test', role='OWNER',
+        )
+        worker = get_user_model().objects.create_user(
+            email='late-before-sweep-worker@example.test', role='PHARMACIST',
+        )
+        pharmacy = Pharmacy.objects.create(name='Before sweep pharmacy')
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', payment_status='PENDING',
+        )
+        offer = ShiftOffer.objects.create(
+            shift=shift, user=worker,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            payment_due_at=timezone.now() - timedelta(minutes=1),
+        )
+        construct_event.return_value = _StripeObject(
+            id='evt_expired_before_sweep', type='checkout.session.completed',
+            data=_StripeObject(object=_StripeObject(
+                mode='payment', payment_status='paid', amount_total=1500,
+                payment_intent='pi_after_expiry_before_sweep',
+                metadata={
+                    'shift_id': str(shift.pk), 'type': 'fulfillment',
+                    'owner_user_id': str(owner.pk), 'offer_ids': str(offer.pk),
+                },
+            )),
+        )
+        response = self.client.post(
+            reverse('api_v1:billing:stripe_webhook'), b'{}',
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.assertTrue(ShiftPayment.objects.get(
+            stripe_payment_intent_id='pi_after_expiry_before_sweep',
+        ).needs_reconciliation)
+
+
+
+    @patch('billing.views.stripe.Webhook.construct_event')
+    def test_verified_fulfillment_before_deadline_confirms_once(self, construct_event):
+        from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
+        owner = get_user_model().objects.create_user(
+            email='on-time-owner@example.test', role='OWNER',
+        )
+        worker = get_user_model().objects.create_user(
+            email='on-time-worker@example.test', role='PHARMACIST',
+        )
+        pharmacy = Pharmacy.objects.create(name='On-time payment pharmacy')
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', single_user_only=True, payment_status='PENDING',
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift, date=date.today() + timedelta(days=5),
+            start_time=time(9, 0), end_time=time(17, 0), rate=Decimal('75.00'),
+        )
+        offer = ShiftOffer.objects.create(
+            shift=shift, user=worker,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            payment_due_at=timezone.now() + timedelta(hours=6),
+        )
+        construct_event.return_value = _StripeObject(
+            id='evt_on_time_confirmed', type='checkout.session.completed',
+            data=_StripeObject(object=_StripeObject(
+                mode='payment', payment_status='paid', amount_total=1500,
+                payment_intent='pi_on_time_confirmed',
+                metadata={
+                    'shift_id': str(shift.pk), 'type': 'fulfillment',
+                    'owner_user_id': str(owner.pk), 'offer_ids': str(offer.pk),
+                },
+            )),
+        )
+        with self.captureOnCommitCallbacks(execute=False):
+            response = self.client.post(
+                reverse('api_v1:billing:stripe_webhook'),
+                b'{}', content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 200)
+        offer.refresh_from_db()
+        shift.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED)
+        self.assertEqual(shift.payment_status, 'PAID')
+        self.assertEqual(ShiftSlotAssignment.objects.filter(
+            shift=shift, slot=slot, user=worker, source_offer=offer,
+        ).count(), 1)
+        self.assertFalse(ShiftPayment.objects.get(
+            stripe_payment_intent_id='pi_on_time_confirmed',
+        ).needs_reconciliation)
+        again = self.client.post(
+            reverse('api_v1:billing:stripe_webhook'),
+            b'{}', content_type='application/json',
+        )
+        self.assertEqual(again.status_code, 200)
+        self.assertEqual(ShiftSlotAssignment.objects.filter(shift=shift).count(), 1)
+
 
 class OrganizationBillingScopeTests(TestCase):
     def setUp(self):
@@ -302,6 +494,40 @@ class OrganizationBillingScopeTests(TestCase):
                 response = client.post(url, {}, format='json')
                 # No assignments means no penalty: authorised payers get 200 without reaching Stripe.
                 self.assertEqual(response.status_code, 200 if user in allowed else 403, response.data)
+
+    def test_internal_employed_shift_never_enters_penalty_checkout(self):
+        from rest_framework.test import APIClient
+        from shifts.models import Shift
+        for employment in ("FULL_TIME", "PART_TIME", "CASUAL"):
+            with self.subTest(employment=employment):
+                shift = Shift.objects.create(
+                    pharmacy=self.pharmacy, created_by=self.owner,
+                    role_needed="ASSISTANT", employment_type=employment,
+                )
+                client = APIClient()
+                client.force_authenticate(self.owner)
+                response = client.post(
+                    reverse("api_v1:billing:charge_penalty", args=[shift.pk]),
+                    {}, format="json",
+                )
+                self.assertEqual(response.status_code, 409, response.data)
+
+    def test_roster_owned_shift_never_enters_penalty_checkout(self):
+        from rest_framework.test import APIClient
+        from shifts.models import Shift
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner,
+            role_needed="PHARMACIST", employment_type="LOCUM",
+        )
+        # Roster origin is immutable outside the workforce-owned commands.
+        Shift.objects.filter(pk=shift.pk).update(is_roster_container=True)
+        client = APIClient()
+        client.force_authenticate(self.owner)
+        response = client.post(
+            reverse("api_v1:billing:charge_penalty", args=[shift.pk]),
+            {}, format="json",
+        )
+        self.assertEqual(response.status_code, 409, response.data)
 
     def test_http_shift_charge_rejects_communication_only_region_admin(self):
         from rest_framework.test import APIClient

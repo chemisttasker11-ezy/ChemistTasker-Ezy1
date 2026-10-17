@@ -480,5 +480,7 @@ class ShiftSerializer(serializers.ModelSerializer):
                 'candidate_user_id': user.id,
                 'candidate_name': name,
                 'candidate_email': user.email,
+                'payment_due_at': offer.payment_due_at.isoformat() if offer.payment_due_at else None,
+                'payment_expired_at': offer.payment_expired_at.isoformat() if offer.payment_expired_at else None,
             })
         return options

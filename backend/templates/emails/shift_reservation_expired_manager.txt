@@ -1,0 +1,7 @@
+Payment was not completed before the deadline for a shift at {{ pharmacy_name }}.
+
+The temporary worker reservation has expired, and the opening is available again to its existing audience. No automatic escalation or cancellation penalty was applied.
+
+Offer reference: {{ offer_id }}
+
+ChemistTasker

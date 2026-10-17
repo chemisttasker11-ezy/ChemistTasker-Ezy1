@@ -60,6 +60,7 @@ LEGACY_TASKS = {
 
 LEGACY_BEAT = {
     "marketplace-escalations-every-minute": ("marketplace.tasks.process_goods_escalations", {}),
+    "shift-reservation-expiry-every-minute": ("shifts.tasks.expire_payment_reservations", {"queue": "notifications"}),
     "ethical-marketplace-escalations-every-minute": ("ethical_marketplace.tasks.process_ethical_escalations", {}),
     "calendar-birthdays-daily": ("client_profile.calendar_tasks.generate_all_birthday_events", {"queue": "notifications"}),
     "calendar-work-notes-hourly": ("client_profile.calendar_tasks.send_shift_start_work_note_notifications", {"queue": "notifications"}),

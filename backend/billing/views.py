@@ -326,7 +326,8 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     from shifts.models import ShiftOffer
     from shifts.finalize import finalize_shift_offer
 
-    offers = ShiftOffer.objects.filter(
+    from shifts.reservations import reservation_available
+    offers = ShiftOffer.objects.select_for_update().filter(
         shift=shift,
         status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
     ).order_by("created_at")
@@ -340,10 +341,17 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     if target_slot_ids:
         offers = offers.filter(slot_id__in=target_slot_ids)
 
+    # A legacy checkout without any offer/slot/candidate selection must not
+    # opportunistically confirm multiple workers after a delayed webhook.
+    if not target_offer_ids and not target_slot_ids and not candidate_id and offers.count() > 1:
+        return (0, []) if return_offers else 0
+
     finalized = 0
     finalized_offers = []
     selected_slot_ids = set()
     for offer in offers:
+        if not reservation_available(offer):
+            continue
         finalize_shift_offer(offer)
         finalized_offers.append(offer)
         if offer.slot_id:
@@ -590,29 +598,63 @@ def charge_shift_fulfillment(request, shift_id):
         if matching_count != len(slot_ids):
             return Response({'error': 'One or more selected slots do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # A checkout URL is not a booking. Reject an already-expired reservation
+    # before starting a new paid or free settlement request; a checkout that
+    # completes later is independently checked again by the webhook.
+    from shifts.reservations import reservation_available
+    from shifts.models import ShiftOffer
+    payable = ShiftOffer.objects.filter(
+        shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+    )
+    if offer_ids:
+        payable = payable.filter(id__in=offer_ids)
+    elif slot_ids:
+        payable = payable.filter(slot_id__in=slot_ids)
+    if candidate_id:
+        payable = payable.filter(user_id=candidate_id)
+    selected_payable = list(payable)
+    if not selected_payable or any(not reservation_available(offer) for offer in selected_payable):
+        return Response(
+            {'error': 'The shift reservation has expired or is not payable.'},
+            status=status.HTTP_409_CONFLICT,
+        )
+    if offer_ids and len(selected_payable) != len(offer_ids):
+        return Response({'error': 'Some selected reservations are unavailable.'}, status=status.HTTP_409_CONFLICT)
+    if not offer_ids and not slot_ids and candidate_id and not selected_payable:
+        return Response({'error': 'Selected candidate has no payable reservation.'}, status=status.HTTP_409_CONFLICT)
+
+    # The payment is for these exact reservations, even when a legacy
+    # caller supplied only shift_id or slot_ids. This immutable snapshot goes
+    # in Stripe metadata, so a late webhook cannot charge worker A's old
+    # checkout and accidentally book replacement worker B.
+    selected_keys = [(offer.slot_id, offer.offered_slot_date) for offer in selected_payable]
+    if len(selected_keys) != len(set(selected_keys)):
+        return Response(
+            {'error': 'Select only one worker for each occurrence.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    payable_offer_ids = [offer.id for offer in selected_payable]
+
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
-        finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
-            shift,
-            candidate_id=candidate_id,
-            slot_ids=slot_ids,
-            offer_ids=offer_ids,
-            return_offers=True,
-        )
         from shifts.models import ShiftOffer
         from shifts.emails import send_shift_payment_finalized_notifications
-        has_pending_payment = ShiftOffer.objects.filter(
-            shift=shift,
-            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-        ).exists()
-        shift.payment_status = 'PENDING' if has_pending_payment else 'PAID'
-        shift.save(update_fields=['payment_status'])
-        send_shift_payment_finalized_notifications(
-            shift=shift,
-            offers=finalized_offers,
-            paid_by=request.user,
-            payment_method="free",
-        )
+        with transaction.atomic():
+            shift = Shift.objects.select_for_update().get(pk=shift.pk)
+            finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
+                shift, candidate_id=candidate_id, slot_ids=slot_ids,
+                offer_ids=offer_ids, return_offers=True,
+            )
+            has_pending_payment = ShiftOffer.objects.filter(
+                shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            ).exists()
+            if finalized_count:
+                shift.payment_status = 'PENDING' if has_pending_payment else 'PAID'
+                shift.save(update_fields=['payment_status'])
+            transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
+                shift=shift, offers=finalized_offers,
+                paid_by=request.user, payment_method="free",
+            ))
         if billing_state == BILLING_STATE_PRE_LIVE:
             return Response({
                 'free': True,
@@ -662,7 +704,7 @@ def charge_shift_fulfillment(request, shift_id):
             'payment_method_types': ['card'],
             'line_items': [{
                 'price': price_id,
-                'quantity': max(1, len(offer_ids) or len(slot_ids)),
+                'quantity': len(payable_offer_ids),
             }],
             'mode': 'payment',
             'success_url': success_url,
@@ -678,7 +720,7 @@ def charge_shift_fulfillment(request, shift_id):
                 'candidate_id': candidate_id,
                 'slot_id': slot_ids[0] if len(slot_ids) == 1 else '',
                 'slot_ids': ','.join(str(value) for value in slot_ids),
-                'offer_ids': ','.join(str(value) for value in offer_ids),
+                'offer_ids': ','.join(str(value) for value in payable_offer_ids),
             }
         }
         if sub and sub.stripe_customer_id:
@@ -711,6 +753,17 @@ def charge_penalty(request, shift_id):
     # 0. Authorization check
     if not user_can_pay_shift_charge_for_pharmacy(user, shift.pharmacy):
         return Response({'error': 'Not authorized to pay charges for this shift.'}, status=status.HTTP_403_FORBIDDEN)
+
+    # Internal employed-staff and roster operations have their own workforce
+    # rules. A marketplace cancellation checkout is never a substitute for
+    # payroll/roster corrections or staff disciplinary procedures.
+    # This guard does NOT approve any fee for other booking channels.
+    from shifts.distribution import is_roster_owned_for_marketplace
+    if shift.employment_type in ('FULL_TIME', 'PART_TIME', 'CASUAL') or is_roster_owned_for_marketplace(shift):
+        return Response(
+            {'detail': 'Internal employee/roster shifts are not eligible for marketplace cancellation penalties.'},
+            status=status.HTTP_409_CONFLICT,
+        )
 
     account = resolve_billing_account(shift.pharmacy, acting_user=user)
     sub = _get_subscription_for_account(account)
@@ -845,7 +898,7 @@ def _process_stripe_event(event):
 
                 owner_id = metadata.get('owner_user_id') or metadata.get('billing_contact_user_id') or metadata.get('actor_user_id')
 
-                ShiftPayment.objects.create(
+                payment = ShiftPayment.objects.create(
                     owner_id=owner_id,
                     shift_id=shift_id,
                     stripe_payment_intent_id=session.payment_intent,
@@ -856,11 +909,22 @@ def _process_stripe_event(event):
                     paid_at=timezone.now(),
                 )
 
+                # Only fulfillment payments may confirm a worker booking. A cancellation
+                # penalty is a distinct liability and must not release pending offers.
+                if payment_type != 'fulfillment':
+                    return
+
                 # Mark shift paid, then finalize pending offers waiting on payment.
                 try:
                     from shifts.models import Shift as ShiftModel
                     shift_obj = ShiftModel.objects.filter(id=shift_id).first()
                     if shift_obj:
+                        from shifts.models import Shift, ShiftOffer
+                        shift_obj = Shift.objects.select_for_update().get(pk=shift_id)
+                        pending_count = ShiftOffer.objects.filter(
+                            shift=shift_obj,
+                            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                        ).count()
                         finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
                             shift_obj,
                             candidate_id=metadata.get('candidate_id'),
@@ -874,19 +938,32 @@ def _process_stripe_event(event):
                         )
                         from users.models import User
                         paid_by_user = User.objects.filter(id=metadata.get('actor_user_id')).first()
-                        send_shift_payment_finalized_notifications(
-                            shift=shift_obj,
-                            offers=finalized_offers,
-                            paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
-                            payment_method='stripe',
-                        )
-                        from shifts.models import ShiftOffer
+                        if finalized_offers:
+                            transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
+                                shift=shift_obj, offers=finalized_offers,
+                                paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
+                                payment_method='stripe',
+                            ))
+                        requested_ids = _normalize_offer_ids(metadata.get("offer_ids"))
+                        if requested_ids and finalized_count < len(requested_ids):
+                            payment.needs_reconciliation = True
+                            payment.reconciliation_reason = "partial_or_expired_reservations"
+                            payment.save(update_fields=["needs_reconciliation", "reconciliation_reason"])
+                        elif finalized_count == 0 and pending_count:
+                            payment.needs_reconciliation = True
+                            payment.reconciliation_reason = "reservation_expired_or_unavailable"
+                            payment.save(update_fields=["needs_reconciliation", "reconciliation_reason"])
+                        elif finalized_count == 0:
+                            payment.needs_reconciliation = True
+                            payment.reconciliation_reason = "no_open_reservation"
+                            payment.save(update_fields=["needs_reconciliation", "reconciliation_reason"])
                         has_pending_payment = ShiftOffer.objects.filter(
                             shift=shift_obj,
                             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
                         ).exists()
-                        shift_obj.payment_status = 'PENDING' if has_pending_payment else 'PAID'
-                        shift_obj.save(update_fields=['payment_status'])
+                        if finalized_count:
+                            shift_obj.payment_status = 'PENDING' if has_pending_payment else 'PAID'
+                            shift_obj.save(update_fields=['payment_status'])
                 except Exception as e:
                     logger.warning('Could not finalize paid shift offers: %s', e)
                     # Roll back payment and offer changes together so Stripe can

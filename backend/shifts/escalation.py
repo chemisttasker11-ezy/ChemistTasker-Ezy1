@@ -92,7 +92,10 @@ def auto_escalate_due_shifts(now, tiers_for=allowed_tiers):
         interests__isnull=True
     ).filter(date_filter).select_related('pharmacy', 'pharmacy__owner', 'created_by')
 
+    from shifts.distribution import marketplace_escalation_block_reason
     for shift in candidates:
+        if marketplace_escalation_block_reason(shift):
+            continue
         tiers = tiers_for(shift.pharmacy)
         if not tiers:
             continue
@@ -122,6 +125,10 @@ def auto_escalate_due_shifts(now, tiers_for=allowed_tiers):
 def escalate_shift(shift, *, allowed_tiers, target_visibility=None):
     """A manager widening a shift's visibility: to `target_visibility`, or one tier up. Going public counts against
     the pharmacy's daily public-shift limit. Returns the new visibility."""
+    from shifts.distribution import marketplace_escalation_block_reason
+    reason = marketplace_escalation_block_reason(shift)
+    if reason:
+        raise ShiftActionRefused(reason)
     current_index = resolve_current_index(shift, allowed_tiers)
 
     if target_visibility:

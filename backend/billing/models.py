@@ -95,6 +95,10 @@ class ShiftPayment(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(blank=True, null=True)
+    # A verified payment may arrive after the reserved worker was released.
+    # Money was received, but the old assignment must NOT be resurrected.
+    needs_reconciliation = models.BooleanField(default=False)
+    reconciliation_reason = models.CharField(max_length=80, blank=True, default='')
 
     def __str__(self):
         return f"{self.get_payment_type_display()} - {self.owner.email} - ${self.amount_aud} ({self.status})"

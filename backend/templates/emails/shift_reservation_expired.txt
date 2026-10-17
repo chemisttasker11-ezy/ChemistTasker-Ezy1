@@ -1,0 +1,7 @@
+Your shift reservation at {{ pharmacy_name }} has expired because the pharmacy did not complete the booking payment before the deadline.
+
+You were not confirmed for this shift. The opportunity may be offered again subject to the pharmacy's current availability.
+
+Offer reference: {{ offer_id }}
+
+ChemistTasker

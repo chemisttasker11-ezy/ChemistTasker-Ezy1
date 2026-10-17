@@ -243,6 +243,7 @@ CELERY_TASK_ROUTES = {
     "client_profile.tasks.run_all_verifications": {"queue": "default"},
     "client_profile.tasks.final_evaluation": {"queue": "default"},
     "client_profile.tasks.send_shift_reminders": {"queue": "notifications"},
+    "shifts.tasks.expire_payment_reservations": {"queue": "notifications"},
     "client_profile.tasks.run_referee_reminder": {"queue": "notifications"},
     "client_profile.tasks.email_membership_application_submitted": {"queue": "notifications"},
     "client_profile.tasks.email_membership_application_approved": {"queue": "notifications"},
@@ -274,6 +275,11 @@ CELERY_BEAT_SCHEDULE = {
     "shift-reminders-hourly": {
         "task": "client_profile.tasks.send_shift_reminders",
         "schedule": crontab(minute=15),
+        "options": {"queue": "notifications"},
+    },
+    "shift-reservation-expiry-every-minute": {
+        "task": "shifts.tasks.expire_payment_reservations",
+        "schedule": 60.0,
         "options": {"queue": "notifications"},
     },
 }

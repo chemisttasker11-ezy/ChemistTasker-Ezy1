@@ -259,6 +259,8 @@ class ShiftOfferSerializer(serializers.ModelSerializer):
             'engagement_terms_accepted_at',
             'payroll_activated_at',
             'expires_at',
+            'payment_due_at',
+            'payment_expired_at',
             'created_at',
             'updated_at',
         ]
@@ -282,6 +284,8 @@ class ShiftOfferSerializer(serializers.ModelSerializer):
             'engagement_terms_accepted_at',
             'payroll_activated_at',
             'expires_at',
+            'payment_due_at',
+            'payment_expired_at',
             'created_at',
             'updated_at',
         ]
