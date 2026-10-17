@@ -856,6 +856,11 @@ def _process_stripe_event(event):
                     paid_at=timezone.now(),
                 )
 
+                # Only fulfillment payments may confirm a worker booking. A cancellation
+                # penalty is a distinct liability and must not release pending offers.
+                if payment_type != 'fulfillment':
+                    return
+
                 # Mark shift paid, then finalize pending offers waiting on payment.
                 try:
                     from shifts.models import Shift as ShiftModel
