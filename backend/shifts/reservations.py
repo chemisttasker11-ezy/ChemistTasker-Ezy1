@@ -22,6 +22,18 @@ def start_at(shift, offer):
     ]
     if not matches:
         return None
+    # For a recurring/whole-shift offer, reserve against the next eligible
+    # occurrence, rather than an already elapsed series start.
+    now = timezone.now()
+    zone = get_pharmacy_timezone(shift.pharmacy)
+    future_matches = [
+        entry for entry in matches
+        if timezone.make_aware(datetime.combine(
+            entry["date"], offer.offered_start_time or entry["start_time"],
+        ), zone) > now
+    ]
+    if future_matches:
+        matches = future_matches
     earliest = min(matches, key=lambda entry: (entry["date"], entry["start_time"]))
     return timezone.make_aware(
         datetime.combine(earliest["date"], offer.offered_start_time or earliest["start_time"]),
