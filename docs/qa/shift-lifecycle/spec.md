@@ -37,3 +37,14 @@ One traceable, domain-owned shift lifecycle from draft through discovery, applic
 - D02=D: deadline varies with proximity to the occurrence start. Numerical time bands are **not yet chosen**; no automatic expiry may be activated using guessed values. Timezone/overnight and start-imminent tests required.
 - D03=B: unpaid expiry releases the reservation and returns the opportunity to the **existing** audience (no automatic visibility escalation), with truthful worker/manager notifications. Historic accepted terms must be retained, and late successful Stripe events must be reconciled instead of silently rebooking the shift. No automatic penalties.
 - Additional safety fix: a paid **cancellation** checkout cannot finalize fulfillment offers. See `billing/views.py` and `billing/tests.py`.
+
+## Approved D02 timing (17 October 2026)
+
+Payment deadline is selected **at worker acceptance**, using the pharmacy's local upcoming occurrence start:
+- `lead > 48 hours` => `min(now + 24h, start)`
+- `12h < lead <= 48h` => `min(now + 6h, start)`
+- `2h < lead <= 12h` => `min(now + 2h, start)`
+- `0 < lead <= 2h` => `min(now + 30min, start)`
+- `lead <= 0` or undated occurrence => reject a new paid reservation.
+
+On expiry, atomically mark offer expired, preserve accepted terms/audit, retain existing visibility, update payment status only when no other awaiting-payment offers remain, then send worker and manager notifications. A late verified Stripe payment remains a paid financial record flagged for reconciliation, with zero auto rebooking. The agreed rule does not retroactively impose a deadline on pre-migration legacy reservations.
