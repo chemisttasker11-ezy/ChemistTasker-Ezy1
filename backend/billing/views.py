@@ -866,7 +866,7 @@ def _process_stripe_event(event):
                     from shifts.models import Shift as ShiftModel
                     shift_obj = ShiftModel.objects.filter(id=shift_id).first()
                     if shift_obj:
-                        from shifts.models import Shift
+                        from shifts.models import Shift, ShiftOffer
                         shift_obj = Shift.objects.select_for_update().get(pk=shift_id)
                         pending_count = ShiftOffer.objects.filter(
                             shift=shift_obj,
@@ -885,13 +885,12 @@ def _process_stripe_event(event):
                         )
                         from users.models import User
                         paid_by_user = User.objects.filter(id=metadata.get('actor_user_id')).first()
-                        send_shift_payment_finalized_notifications(
-                            shift=shift_obj,
-                            offers=finalized_offers,
-                            paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
-                            payment_method='stripe',
-                        )
-                        from shifts.models import ShiftOffer
+                        if finalized_offers:
+                            transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
+                                shift=shift_obj, offers=finalized_offers,
+                                paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
+                                payment_method='stripe',
+                            ))
                         if finalized_count == 0 and pending_count:
                             payment.needs_reconciliation = True
                             payment.reconciliation_reason = "reservation_expired_or_unavailable"
@@ -904,8 +903,9 @@ def _process_stripe_event(event):
                             shift=shift_obj,
                             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
                         ).exists()
-                        shift_obj.payment_status = 'PENDING' if has_pending_payment else 'PAID'
-                        shift_obj.save(update_fields=['payment_status'])
+                        if finalized_count:
+                            shift_obj.payment_status = 'PENDING' if has_pending_payment else 'PAID'
+                            shift_obj.save(update_fields=['payment_status'])
                 except Exception as e:
                     logger.warning('Could not finalize paid shift offers: %s', e)
                     # Roll back payment and offer changes together so Stripe can
