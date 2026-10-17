@@ -326,7 +326,8 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     from shifts.models import ShiftOffer
     from shifts.finalize import finalize_shift_offer
 
-    offers = ShiftOffer.objects.filter(
+    from shifts.reservations import reservation_available
+    offers = ShiftOffer.objects.select_for_update().filter(
         shift=shift,
         status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
     ).order_by("created_at")
@@ -344,6 +345,8 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     finalized_offers = []
     selected_slot_ids = set()
     for offer in offers:
+        if not reservation_available(offer):
+            continue
         finalize_shift_offer(offer)
         finalized_offers.append(offer)
         if offer.slot_id:
@@ -592,8 +595,10 @@ def charge_shift_fulfillment(request, shift_id):
 
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
-        finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
-            shift,
+        with transaction.atomic():
+            shift = Shift.objects.select_for_update().get(pk=shift.pk)
+            finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
+                shift,
             candidate_id=candidate_id,
             slot_ids=slot_ids,
             offer_ids=offer_ids,
@@ -845,7 +850,7 @@ def _process_stripe_event(event):
 
                 owner_id = metadata.get('owner_user_id') or metadata.get('billing_contact_user_id') or metadata.get('actor_user_id')
 
-                ShiftPayment.objects.create(
+                payment = ShiftPayment.objects.create(
                     owner_id=owner_id,
                     shift_id=shift_id,
                     stripe_payment_intent_id=session.payment_intent,
@@ -866,6 +871,12 @@ def _process_stripe_event(event):
                     from shifts.models import Shift as ShiftModel
                     shift_obj = ShiftModel.objects.filter(id=shift_id).first()
                     if shift_obj:
+                        from shifts.models import Shift
+                        shift_obj = Shift.objects.select_for_update().get(pk=shift_id)
+                        pending_count = ShiftOffer.objects.filter(
+                            shift=shift_obj,
+                            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                        ).count()
                         finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
                             shift_obj,
                             candidate_id=metadata.get('candidate_id'),
@@ -886,6 +897,14 @@ def _process_stripe_event(event):
                             payment_method='stripe',
                         )
                         from shifts.models import ShiftOffer
+                        if finalized_count == 0 and pending_count:
+                            payment.needs_reconciliation = True
+                            payment.reconciliation_reason = "reservation_expired_or_unavailable"
+                            payment.save(update_fields=["needs_reconciliation", "reconciliation_reason"])
+                        elif finalized_count == 0:
+                            payment.needs_reconciliation = True
+                            payment.reconciliation_reason = "no_open_reservation"
+                            payment.save(update_fields=["needs_reconciliation", "reconciliation_reason"])
                         has_pending_payment = ShiftOffer.objects.filter(
                             shift=shift_obj,
                             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
