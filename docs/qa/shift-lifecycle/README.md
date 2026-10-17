@@ -82,3 +82,7 @@ Source changes now include `shifts/reservations.py`, `shifts/offers.py`, `shifts
 **Known product exception:** historical `ACCEPTED_AWAITING_PAYMENT` rows whose `payment_due_at` is null are deliberately grandfathered rather than expired from guessed legacy timestamps. Finance owners must review pre-existing stuck rows before launch. Paid Stripe events after an expired reservation are flagged for manual reconciliation; no automatic refund has been authorised.
 
 **Branch isolation:** stacked on PR #181, draft, no merge/deployment. Follow `tasks.md` for remaining verification and D04–D15 decisions.
+
+## Round 2 owner decision record
+
+R01=A, R04=A, R06=A, E01=A, E03=A and P02=B are recorded, including all free-text exceptions, in [OWNER_DECISION_REGISTER.md](OWNER_DECISION_REGISTER.md). The interview master file marks those six decisions answered. **No fee, manager window, self-publication permission defaults or direct cancellation conditions are invented.** PR #181 remains unchanged; GitHub CI diagnosis stays deferred.
