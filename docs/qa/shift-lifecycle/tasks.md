@@ -120,3 +120,13 @@ All unchecked items are **not done**; a static source investigation never marks 
 - [ ] Agree worker/channel provenance where a favourite member applies on a public-escalated posting.
 - [ ] Agree P10/P11/P12, F01–F07, N01–N05, H01–H06 and D06–D15 before corresponding irreversible changes.
 - [ ] Run Django/PostgreSQL/Next/Vite/Expo test gates later via proper Codex/Docker environment; do not claim pass now. CI diagnosis deferred.
+
+## Round 5 — progressive warning and financial settlement design
+
+- [x] Record P09=A, P10=OTHER, P11=D, P12=D, F01=C, F04=C; preserve verbatim sanction explanation.
+- [x] Compare against existing relationship `ratings`, `RatingReport`, `users.User` and owner-side `charge_penalty` source: no existing verified incident sanctions/domain found.
+- [ ] Select 7 notice-band owner cancellation compensation percentages and caps/beneficiary; no default percentages.
+- [ ] Decide what counts as verified incident, review actor, appeals, reset/cap and rating badge visibility before application restriction.
+- [ ] Decide mutual-agreement waiver, emergency evidence and replacement mitigation for each channel.
+- [ ] Design original payer refund vs credit and worker compensation separately, with idempotence and authorisation.
+- [ ] Continue D06–D15 and run source-grounded tests in Docker/Codex later; CI debugging deferred.
