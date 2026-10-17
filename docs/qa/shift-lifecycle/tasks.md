@@ -108,3 +108,15 @@ All unchecked items are **not done**; a static source investigation never marks 
 - [ ] Implement per-pharmacy self-publication owner permission only with accepted permission defaults and existing roster ownership.
 - [ ] Require colleague's affirmative acceptance and manager's approval before worker transfer; no release on cover request.
 - [ ] Implement manager-reviewed public cancellation and emergency escalation only after user sets alert SLA and channel penalties.
+
+## Round 4 — owner warning and penalty policy
+
+- [x] Record P04=A, P05=OTHER, P06=C, P07=C and P08=B with every free-text owner explanation.
+- [x] Inspect existing relationship ratings, rating reports, account status, and `charge_penalty` endpoint: no reliable dedicated case-review/no-show suspension domain identified.
+- [x] Prevent owner-side marketplace penalty checkout for internal employee FT/PT/casual and roster-owned shifts in the existing billing endpoint.
+- [x] Add negative Django HTTP regression tests for internal employee classes and roster-owned shift.
+- [ ] Agree platform-only incident reporting and review, badge display/duration, application restriction, appeal, and emergency evidence checks before creating punitive actions.
+- [ ] Agree pharmacy-side external cancellation fee amounts and precise six-band timing with legal terms and refundable fee handling; do not infer from legacy 10%/20% code.
+- [ ] Agree worker/channel provenance where a favourite member applies on a public-escalated posting.
+- [ ] Agree P10/P11/P12, F01–F07, N01–N05, H01–H06 and D06–D15 before corresponding irreversible changes.
+- [ ] Run Django/PostgreSQL/Next/Vite/Expo test gates later via proper Codex/Docker environment; do not claim pass now. CI diagnosis deferred.
