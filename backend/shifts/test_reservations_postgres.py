@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, time, timedelta
 from decimal import Decimal
 from threading import Barrier
+from unittest import mock
 
 from django.db import close_old_connections, connection, transaction
 from django.test import TransactionTestCase
@@ -88,7 +89,8 @@ class ReservationPostgresConcurrencyTests(TransactionTestCase):
             with transaction.atomic():
                 locked = Shift.objects.select_for_update().get(pk=self.shift.pk)
                 return _finalize_pending_offers_for_shift(locked, offer_ids=[offer.pk])
-        self._run_parallel([sweep, settle])
+        with mock.patch("shifts.reservations.expiry_notification"):
+            self._run_parallel([sweep, settle])
         offer.refresh_from_db()
         self.assertEqual(offer.status, ShiftOffer.Status.EXPIRED)
         self.assertFalse(ShiftSlotAssignment.objects.filter(source_offer=offer).exists())
