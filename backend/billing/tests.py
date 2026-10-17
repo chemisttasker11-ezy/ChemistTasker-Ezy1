@@ -495,6 +495,40 @@ class OrganizationBillingScopeTests(TestCase):
                 # No assignments means no penalty: authorised payers get 200 without reaching Stripe.
                 self.assertEqual(response.status_code, 200 if user in allowed else 403, response.data)
 
+    def test_internal_employed_shift_never_enters_penalty_checkout(self):
+        from rest_framework.test import APIClient
+        from shifts.models import Shift
+        for employment in ("FULL_TIME", "PART_TIME", "CASUAL"):
+            with self.subTest(employment=employment):
+                shift = Shift.objects.create(
+                    pharmacy=self.pharmacy, created_by=self.owner,
+                    role_needed="ASSISTANT", employment_type=employment,
+                )
+                client = APIClient()
+                client.force_authenticate(self.owner)
+                response = client.post(
+                    reverse("api_v1:billing:charge_penalty", args=[shift.pk]),
+                    {}, format="json",
+                )
+                self.assertEqual(response.status_code, 409, response.data)
+
+    def test_roster_owned_shift_never_enters_penalty_checkout(self):
+        from rest_framework.test import APIClient
+        from shifts.models import Shift
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner,
+            role_needed="PHARMACIST", employment_type="LOCUM",
+        )
+        # Roster origin is immutable outside the workforce-owned commands.
+        Shift.objects.filter(pk=shift.pk).update(is_roster_container=True)
+        client = APIClient()
+        client.force_authenticate(self.owner)
+        response = client.post(
+            reverse("api_v1:billing:charge_penalty", args=[shift.pk]),
+            {}, format="json",
+        )
+        self.assertEqual(response.status_code, 409, response.data)
+
     def test_http_shift_charge_rejects_communication_only_region_admin(self):
         from rest_framework.test import APIClient
         from shifts.models import Shift
