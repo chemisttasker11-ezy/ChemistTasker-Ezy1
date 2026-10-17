@@ -135,6 +135,17 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
 
         self.permission_denied(request)
 
+    def perform_destroy(self, instance):
+        from django.db import transaction
+        from shifts.deletion import hard_delete_block_reason
+
+        with transaction.atomic():
+            locked = Shift.objects.select_for_update().get(pk=instance.pk)
+            reason = hard_delete_block_reason(locked)
+            if reason:
+                raise ValidationError({"detail": reason})
+            locked.delete()
+
     # Historical entry points: the rules are owned by organizations.access.
     _user_can_manage_pharmacy = staticmethod(user_can_manage_pharmacy)
     _managed_pharmacies = staticmethod(managed_pharmacies)
