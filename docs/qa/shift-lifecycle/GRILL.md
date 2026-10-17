@@ -12,13 +12,25 @@ Source: PR #181 exact parent SHA `9d1c6b760fcb3bb4e43215d03e37e0aacf047af3`. **D
 - No automatic charging of a cancellation penalty has been approved; existing endpoint creates a voluntary Stripe checkout session rather than charging a card directly.
 - Existing code currently uses owner cancellation penalty windows: within 24 hours 20% of expected wage, within 72 hours 10%, beyond 72 hours 0%. **This is a code observation, not approval to apply automatically or to workers.**
 
+## Round 1 owner decisions — 17 October 2026 (confirmed)
+
+| Decision | Owner selection | Binding behaviour | Remaining precision |
+| --- | --- | --- | --- |
+| D01 | **C** | Worker acceptance makes a **temporary reservation**, not a confirmed/assigned shift. Confirmation requires verified final payment. Show reserved/payment-pending distinctly to worker and pharmacy. | Ensure no double booking, no pending state portrayed as confirmed. |
+| D02 | **D** | Payment deadline must **vary with proximity to shift start** and never extend beyond that start. | **The owner has not yet specified numeric lead-time bands or timeout durations.** Engineering may add configurable tested policy, but must not turn invented thresholds into production-active owner policy. |
+| D03 | **B** | Once a valid reservation deadline passes without fulfilled payment: **expire reservation**, notify affected worker and pharmacy manager(s), and restore the opportunity to the **same existing audience**. Do **not** advance escalation tier automatically or charge a penalty. Preserve immutable accepted terms/audit history. | Late successful Stripe events require safe reconciliation and no stale rebooking; finance exception action requires explicit rules. |
+
+Owner message: "D01 booking=C; D02 payment deadline=D; D03 failure handling=B; Additional notes: None."
+
+Implementation limit: verified payment events alone confirm; payment-required acceptance must not create an assignment, and unconfigured numeric D02 thresholds must not silently go live. No automatic refund/charge or post-expiry rebooking from delayed events.
+
 ## First interview — critical decision gates
 
-**D01. When does the external worker become firmly booked?** Currently payment-required acceptance puts the offer in `ACCEPTED_AWAITING_PAYMENT` without assignment. Do you want (A) confirmed *only after owner payment*, (B) reserved and contractually committed on worker acceptance with payment collected later, or (C) another rule? Clarify what is displayed to both actors and whether a worker can accept another conflicting shift while payment is outstanding.
+**D01 [ANSWERED: C]. When does the external worker become firmly booked?** Currently payment-required acceptance puts the offer in `ACCEPTED_AWAITING_PAYMENT` without assignment. Do you want (A) confirmed *only after owner payment*, (B) reserved and contractually committed on worker acceptance with payment collected later, or (C) another rule? Clarify what is displayed to both actors and whether a worker can accept another conflicting shift while payment is outstanding.
 
-**D02. How long does owner payment have after worker acceptance?** Choose an explicit deadline, potentially shorter when the shift begins soon; define reminder, failure, abandonment and expiry behaviour. What if start time arrives while still unpaid? What if a payment webhook arrives after expiry? Don't assume Stripe checkout success URL constitutes payment.
+**D02 [ANSWERED: D; numerical bands pending]. How long does owner payment have after worker acceptance?** Choose an explicit deadline, potentially shorter when the shift begins soon; define reminder, failure, abandonment and expiry behaviour. What if start time arrives while still unpaid? What if a payment webhook arrives after expiry? Don't assume Stripe checkout success URL constitutes payment.
 
-**D03. If payment expires or fails, what happens to the original accepted offer?** Release/reserve/keep? Notify who? Automatically restore prior tier or restart escalation? Preserve agreed terms and audit. Can an owner retry checkout, and for how long?
+**D03 [ANSWERED: B]. If payment expires or fails, what happens to the original accepted offer?** Release/reserve/keep? Notify who? Automatically restore prior tier or restart escalation? Preserve agreed terms and audit. Can an owner retry checkout, and for how long?
 
 **D04. What are the user-visible cancellation actions and authorities?** Distinguish *delete unpublished draft*, *withdraw unfilled advertised shift*, *cancel confirmed external booking*, *worker requests cancellation*, *manager approves release*, and *cancel rostered internal shift*. Who may perform each: Owner, Org Admin, delegated Admin/Manager, worker? Does anyone have unilateral cancellation power?
 
