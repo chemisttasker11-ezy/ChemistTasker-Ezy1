@@ -376,37 +376,33 @@ Keep UI warnings, account reliability flags, booking-fee consequences, contractu
 - A: flat platform service fee; B: percentage of frozen expected wage; C: demonstrated costs with a cap; D: mixed fee components
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **A — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Percentage of agreed shift wages varying with notice. Exact seven percentages not yet provided.
 ### P10 — Should repeated short-notice cancellations increase warning severity?
 
 - A: yes rolling 90-day window; B: yes rolling 12-month window; C: no automatic account strike; D: warning reset after completed shifts
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **OTHER — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> First one warning, second It will be suspended from applying for 2 weeks, 3rd will show the badge in the review and rate and suspension period double everytime
 ### P11 — What are automatic fee/warning exemptions?
 
 - A: medical/family emergencies, pharmacy closure, force majeure, regulator suspension; B: support-reviewed exceptions only; C: tiered by evidence and urgency
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **D — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Including mutually agreed cancellation. Distinct owner/worker/public exemptions, mutual agreement included.
 ### P12 — If another eligible worker is found before start, should penalties reduce or disappear?
 
 - A: fully waived; B: retain documented unrecovered costs only; C: retain contracted fee; D: split by who cancelled
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **D — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Depends on cancelling actor and proximity to shift; no additional explanation.
 ## F. Booking fees, worker compensation, refunds and disputes
 
 Never confuse a platform booking charge with a locum's wage/invoice, employee payroll, travel expense, or compensation. Do not collect new funds or deduct wages from a question-only policy.
@@ -416,10 +412,9 @@ Never confuse a platform booking charge with a locum's wage/invoice, employee pa
 - A: full refund/credit when shift was not worked; B: time-dependent refund; C: refundable platform fee but worker compensation separate
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **C — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Keep platform booking charge/refund separate from worker compensation and wages; no additional explanation.
 ### F02 — Does a worker get compensation if a pharmacy cancels a confirmed paid locum shift?
 
 - A: no automatic payment until terms agreed; B: specific time-based cancellation compensation; C: actual unrecoverable costs plus notice guard
@@ -443,10 +438,9 @@ Never confuse a platform booking charge with a locum's wage/invoice, employee pa
 - A: automatic refund to original payer, never rebook; B: support-only review before refund; C: credit to pharmacy if expressly chosen
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **C — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Refund or pharmacy credit subject to approval, without late rebooking; no additional explanation.
 ### F05 — Who may waive or override a proposed fee or refund, and with what audit?
 
 - A: restricted support/billing admin with mandatory reason; B: pharmacy owner within limits; C: two-person approval above threshold
@@ -620,3 +614,7 @@ The owner resolved follow-ups R04A=A, R04B=C, R04C=A, E01A=OTHER, E01B=OTHER, R0
 - **R04D:** public-platform worker cancellation always needs manager approval. Urgent requests use emergency escalation, not automatic withdrawal; exact SLA pending.
 
 **Owner attention next:** cancellation source-specific warnings/fees and notification matrix (P01/P04–P12, F01–F07, N01–N05), not an unnecessary repeat of approved E01 options.
+
+## Round 5 latest answer precedence
+
+P09=A, P10=OTHER, P11=D, P12=D, F01=C, F04=C were answered using the **latest form choices**, which are not always letter-identical to the older 59-question master questionnaire. The binding meanings and exact P10 explanation are in [OWNER_DECISION_REGISTER.md](OWNER_DECISION_REGISTER.md), which takes precedence over old question option labels. This update does NOT implement any account suspension, fee, badge, or refund.
