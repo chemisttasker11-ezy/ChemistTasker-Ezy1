@@ -119,3 +119,46 @@ An earlier register phrase "skip tiers/start at later tier" was misleading when 
 - Do not add a red badge, unreviewed poor rating, application block or suspension until a source-grounded moderation workflow with platform-only permission, evidence, appeal and expiry is agreed.
 
 **Follow-up decision set:** P09 owner cancellation fee type and exact six-band schedule, P10 repeated incidents/no-show badges, P11 exemptions, P12 replacement mitigation, F01–F07 refunds/financial review and N/H audit/attendance. Also pin the provenance rule for public vs own-pharmacy/favourites/chain/org when a vacancy escalates. PR #181 remains untouched, GitHub CI deferred.
+
+## Round 5 — owner financial and moderation choices (17 October 2026)
+
+**Recorded from the owner's latest instructions, using the wording of the latest interactive choices** (the older master interview had different option-letter descriptions; the latest choices supersede those option labels):
+
+- **P09=A; explanation=None.** The pharmacy/owner-side cancellation fee for a confirmed **external** booking is a **percentage of the agreed/frozen shift wages**, varying by P08 notice band. **No percentage, minimum, maximum or payable beneficiary has yet been selected.** No wages may be deducted from an employee; do not use the cancelled shift's current public visibility as fee provenance.
+- **P10=OTHER; explanation:** "First one warning, second It will be suspended from applying for 2 weeks, 3rd will show the badge in the review and rate and suspension period double everytime". Interpret as a **proposed progressive sequence following verified applicable incidents**: **incident 1 → warning**; **incident 2 → application suspension 14 days**; **incident 3 → application suspension 28 days and an incident/reliability badge presented in review/rating context**; **incident 4 → 56 days**, further subsequent verified incidents doubling the previous suspension duration. This progression needs clarification about incident types, lookback/reset, platform adjudication, scope, badge expiry, sanctions ceiling and appeal before code activation. **A pharmacy manager submits a report and must not apply the sanction directly.** A badge is not an invented star review.
+- **P11=D; explanation:** "Including mutually agreed cancellation". **Different fee/warning exemptions for owners, internal workers and public-platform workers, including mutually agreed cancellation.** Mutually agreed does not automatically establish an incident; log both parties' consent, actor, time and evidence. Exact waiver approval/verification authority pending.
+- **P12=D; explanation=None.** Whether a successfully replaced cancellation reduces/waives consequences depends on **who cancelled** and **time remaining**; no reduction percentage selected.
+- **F01=C; explanation=None.** Keep the **platform booking fee, its possible refund/credit and the worker's compensation/earned wages as separate financial concepts and ledgers** when a pharmacy cancels. **This does not approve automatic fee retention/refund or a worker compensation percentage.**
+- **F04=C; explanation=None.** For real late payment **after a reservation expired**, do not rebook; let the pharmacy choose a **credit or a refund, subject to authorised review and approval**. Existing `ShiftPayment.needs_reconciliation` is an exception flag, not a payout/refund engine. Prevent issuing both credit and refund and preserve original payer identity.
+
+### P10 progression — design target, NOT an active automatic sanction
+
+| Platform-reviewed, qualifying incident | Consequence suggested by owner's answer | Where exposed |
+|---|---|---|
+| 1 | Warning; no application suspension | Private notice/account history subject to notification policy |
+| 2 | 14 days ineligible to **apply** for shifts | Applications blocked server-side only after authorised decision |
+| 3 | 28 days ineligible to apply + verified reliability/incident badge | Review/rating context, with human-reviewed provenance and appeal |
+| 4 | 56 days ineligible to apply; badge treatment needs clarification | Same |
+| 5 | 112 days, **only if** no maximum/rehabilitation override is later approved | Same, subject to an approved sanctions ceiling |
+| 6+ | Double prior period in the owner-described progression | **Do not activate** before cap/reset/appeal are selected |
+
+Counting starts only after an authoritative incident is **confirmed** following platform review, not when a manager reports it; avoid duplicate reports for the same booked occurrence, overturned outcomes, malicious ratings or medically exempt cancellations. Public-platform cases and chain/org internal cases must have separately defined scope, consistent with P04–P06. A manager's ordinary rating is independent of any platform-issued reliability badge.
+
+### Important source-verification boundaries
+
+- `ratings.Rating` currently stores **one editable relationship rating** per rater/worker or worker/pharmacy pair, and `RatingReport` reports an existing rating. Neither stores occurrence-specific verified cancellation/no-show incidents, appeal decisions or application-suspension expiry. A new **domain-owned moderation process** is required for the proposed consequences, but no such model/automatic sanction is authorised for implementation until scope, evidence, appeal and expiry rules are approved.
+- `users.User` has an account identity and deletion status, but no evidenced application-only suspension-until record in reviewed code. **Do not switch `is_active=False`** as a shortcut: that would disable login/other roles rather than just applications.
+- `billing/views.py:charge_penalty` still implements an older 10%/20% owner-side checkout based on *all assignments* and earliest shift start. It does not reflect P08's seven notice bands, selected occurrences or the newly approved basis. **Do not describe those percentages as approved; do not expand their use.** Employee/roster checkout is now guarded on this PR.
+- A proposed expiry/replacement/incident event may affect multiple people/dates. The notice-clock and provenance must be frozen per **occurrence and accepted worker**, not the shift's latest tier or earliest date alone.
+
+### Still pending owner answers, in strict order
+
+1. **P09:** seven explicit percentage values for `>7d`, `>72h–7d`, `>24–72h`, `>12–24h`, `>2–12h`, `>0–2h`, and `at/after start`; percentage base, cap, minimum, legitimate recipient and terms enforceability.
+2. **P10:** what counts as a qualifying incident (cancellation versus no-show), scope by source, reset/expiry, maximum duration, badge exposure and support-reviewed appeal.
+3. **P11/P12:** mutually agreed and emergency exemptions, timing when replacement occurs, actor-based waiver and proof.
+4. **F01/F04:** exact refundable booking-fee treatment, eligibility for worker compensation, approver for credit/refund, original payer handling, Stripe replay/idempotency and dispute.
+5. **D06–D15:** declined/expired offer fallback and notification matrix, post-acceptance amendments, worker cancellation review, reminder suppression, no-show proof, completion authority, history/reviews.
+
+### Freeze on irreversible actions
+
+**No percentage schedule, automatic suspension/badge, reputation-rating manipulation, wage deduction, refund or account restriction has been enabled by this decision-only update.** PR #182 remains draft and unverified. PR #181 unchanged; GitHub CI troubleshooting deferred.
