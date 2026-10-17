@@ -1,3 +1,16 @@
+## Complete owner interview: eight independent subdomains
+
+- [x] Inspect current parent/child refs, roster publishing, explicit roster escalation, community discovery, owner/organisation/public tiers, favourite outreach, and existing charge_penalty code.
+- [x] Create a 59-question owner interview with individual choice and notes space: `OWNER_DECISION_INTERVIEW_D04_D15.md`.
+- [x] Distinguish roster publication from market posting; distinguish audience from favourites notifications and worker employment contract.
+- [ ] Owner answer rounds R/C/E/X/P/F/N/H as appropriate (59 questions in eight sections); log decisions and exceptions with date.
+- [ ] Resolve conflicting direct-cancel versus manager-reviewed worker cancellation; treat prior D04=A as binding until explicitly changed.
+- [ ] Resolve the unsafe explicit roster escalation release path and source of authorisation/audit; do not disable or rewrite accepted published-roster behaviour without domain tests.
+- [ ] Decide whether approved cover releases are always LOCUM_CASUAL or need manager-selected audience.
+- [ ] Replace global wage-percentage cancellation checkout assumptions with audience/contract/actor/occurrence-aware policy after explicit agreement and Australian employment/contract review.
+- [ ] Implement later agreed changes only in their owning workforce/shifts/billing/attendance domains, each with exact-head Django+Postgres+web+Expo proof.
+- [ ] Github CI diagnosis remains deferred until owner-directed QA stage.
+
 # Tasks and convergence backlog
 
 - [x] Identify exact PR #181 parent head and create isolated child branch.
