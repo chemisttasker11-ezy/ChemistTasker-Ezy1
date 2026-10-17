@@ -477,7 +477,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             async_task(
                 'users.tasks.send_async_email',
                 subject=(
-                    f"Thanks for confirming your shift at {pharmacy_display} - owner payment pending"
+                    f"Your shift is reserved at {pharmacy_display} - owner payment pending"
                     if requires_payment
                     else f"You've been accepted for a shift at {pharmacy_display}"
                 ),
@@ -527,7 +527,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             )
             async_task(
                 'users.tasks.send_async_email',
-                subject=f"{worker_role_label} confirmed shift offer at {pharmacy_display}" + (" - Action Required" if requires_payment else ""),
+                subject=(f"{worker_role_label} reservation awaiting payment at {pharmacy_display}" if requires_payment else f"{worker_role_label} confirmed shift offer at {pharmacy_display}"),
                 recipient_list=[owner_user.email],
                 template_name="emails/owner_worker_confirmed.html",
                 context=owner_ctx,
