@@ -593,6 +593,27 @@ def charge_shift_fulfillment(request, shift_id):
         if matching_count != len(slot_ids):
             return Response({'error': 'One or more selected slots do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # A checkout URL is not a booking. Reject an already-expired reservation
+    # before starting a new paid or free settlement request; a checkout that
+    # completes later is independently checked again by the webhook.
+    from shifts.reservations import reservation_available
+    from shifts.models import ShiftOffer
+    payable = ShiftOffer.objects.filter(
+        shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+    )
+    if offer_ids:
+        payable = payable.filter(id__in=offer_ids)
+    elif slot_ids:
+        payable = payable.filter(slot_id__in=slot_ids)
+    selected_payable = list(payable)
+    if not selected_payable or any(not reservation_available(offer) for offer in selected_payable):
+        return Response(
+            {'error': 'The shift reservation has expired or is not payable.'},
+            status=status.HTTP_409_CONFLICT,
+        )
+    if offer_ids and len(selected_payable) != len(offer_ids):
+        return Response({'error': 'Some selected reservations are unavailable.'}, status=status.HTTP_409_CONFLICT)
+
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
         from shifts.models import ShiftOffer
