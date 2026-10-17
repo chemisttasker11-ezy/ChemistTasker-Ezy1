@@ -700,6 +700,10 @@ class ShiftOffer(models.Model):
         related_name="generated_shift_offers",
     )
     expires_at = models.DateTimeField(null=True, blank=True)
+    # Offer-expiry and payment-expiry are different clocks. Never overwrite the
+    # original 48-hour response deadline after a worker has accepted.
+    payment_due_at = models.DateTimeField(null=True, blank=True)
+    payment_expired_at = models.DateTimeField(null=True, blank=True)
     last_buzzed_at = models.DateTimeField(null=True, blank=True)
     payment_preference_snapshot = models.CharField(max_length=10, blank=True)
     settlement_channel = models.CharField(max_length=16, blank=True)
@@ -716,6 +720,7 @@ class ShiftOffer(models.Model):
             models.Index(fields=["shift", "status"]),
             models.Index(fields=["user", "status"]),
             models.Index(fields=["expires_at"]),
+            models.Index(fields=["status", "payment_due_at"], name="ct_offer_payment_due_idx"),
         ]
 
     def __str__(self):
