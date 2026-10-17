@@ -90,18 +90,18 @@ def expiry_notification(offer_id):
                 "users.tasks.send_async_email",
                 subject="Shift reservation expired - payment deadline missed",
                 recipient_list=[manager.email],
+                template_name="emails/shift_reservation_expired_manager.html",
                 text_template="emails/shift_reservation_expired_manager.txt",
                 context={"pharmacy_name": shift.pharmacy.name, "offer_id": offer.id},
-                suppress_auto_notification=True,
             )
     if offer.user.email:
         async_task(
             "users.tasks.send_async_email",
             subject="Your shift reservation has expired",
             recipient_list=[offer.user.email],
+            template_name="emails/shift_reservation_expired.html",
             text_template="emails/shift_reservation_expired.txt",
             context={"pharmacy_name": shift.pharmacy.name, "offer_id": offer.id},
-            suppress_auto_notification=True,
         )
 
 
