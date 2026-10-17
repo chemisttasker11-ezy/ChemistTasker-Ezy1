@@ -162,6 +162,17 @@ def revise_shift(
         raise serializers.ValidationError({
             "slots": "Use the roster editor to update existing roster slots in place."
         })
+    # Replacing slot rows can silently cascade candidate interest/offer records.
+    # Once anyone has engaged, preserving occurrence identities is mandatory.
+    if slots_payload is not None and (
+        instance.offers.exists()
+        or instance.interests.exists()
+        or instance.counter_offers.exists()
+        or instance.slot_assignments.exists()
+    ):
+        raise serializers.ValidationError({
+            "slots": "This shift has candidate or booking history. Use an audited occurrence adjustment workflow."
+        })
     # Validate the new slots before changing anything, and apply the whole edit atomically.
     protect_direct_booking(validated_data, instance=instance)
     if 'visibility' in validated_data and allowed_tiers is None:
