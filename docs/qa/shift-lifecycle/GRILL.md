@@ -76,3 +76,21 @@ For a start closer than the selected allowance, the deadline is capped to shift 
 ## Financial reconciliation rule (safety, not refund authorisation)
 
 A verified Stripe settlement that arrives after expiry is recorded with `ShiftPayment.needs_reconciliation=True` and must not resurrect the old worker booking. This flags a finance exception for manual review; no automatic refund, credit, chargeback or charge is authorised without D08–D11.
+
+## D04–D15 progress and decision boundary — 17 October 2026
+
+The owner has instructed continuation **through D15**, but this is approval to **investigate and implement approved safety invariants**, not agreement to any one cancellation/penalty/no-show/refund policy. No financial transfer, assignment release or cancellation has been automatically enabled. A safe source change now blocks generic shift DELETE once there is an offer, applicant history, roster relationship, assignment, payment, or financial status; it preserves ordinary deletion for pristine, unengaged shifts. Slot collection replacement is likewise rejected when it would destroy interested/engaged occurrence identities. See `shifts/deletion.py`, `shifts/base.py`, `shifts/posting.py`, `shifts/test_deletion_safety.py`.
+
+**D04–D05:** ownership/permission and per-occurrence vs whole-shift cancelled state remain for owner choice. Meanwhile hard deletion cannot substitute for cancellation. Existing approved worker requests and roster replacement rules remain the only supported release path.
+
+**D06–D07:** existing worker offer-decline/expiry and notification contracts remain; do not invent automatic escalation or cross-tenant notifications. D03 specifically retains the same audience for unpaid reservation expiry, but does not decide treatment for ordinary declined offers or cancellations.
+
+**D08–D11:** current optional `charge_penalty` percentages are source behaviour, not an approved mandatory fee. Never issue automatic payment/refund or silently restore booked work from a late webhook. Financial exception reconciliation remains separate.
+
+**D12:** attendance reminders are currently derived from real `ShiftSlotAssignment` records. Pending payment reservations have no assignment and therefore are excluded by construction; cancellation reminder suppression needs a proper cancelled assignment-state decision.
+
+**D13–D14:** attendance, manager corrections and invoice/payroll have separate authoritative domains. Do not infer a no-show penalty or paid-completion gate merely from elapsed time.
+
+**D15:** the current confirmed/history queries derive from assignments and occurrence times. Protect records and history visibility; rating eligibility for unworked/cancelled engagements requires owner rule.
+
+Before implementing the remaining state transitions, collect owner answers to D04+D05 (actions, authority and cancellation granularity), D06+D07 (offer fallback and notification recipient matrix), D08–D11 (penalties/refunds/consent/disputes), and D12–D15 (attendance/reminders/history). The first cluster should be answered **before** allowing irreversible cancellation.
