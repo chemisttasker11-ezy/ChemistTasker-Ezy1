@@ -236,16 +236,17 @@ export default function ActiveShiftCard({
             .map((option) => {
                 const offerId = toFiniteNumber(option.offerId ?? option.offer_id);
                 const slotId = toFiniteNumber(option.slotId ?? option.slot_id);
-                if (!offerId || !slotId) return null;
-                const slot = slotById.get(slotId) || {
-                    id: slotId,
+                if (!offerId || (!slotId && !isSingleUserShift)) return null;
+                const resolvedSlotId = slotId ?? 0;
+                const slot = slotById.get(resolvedSlotId) || (((shift as any).slots || []) as any[])[0] || {
+                    id: resolvedSlotId,
                     date: option.slotDate ?? option.slot_date,
                     start_time: option.startTime ?? option.start_time,
                     end_time: option.endTime ?? option.end_time,
                 };
                 return {
                     offerId,
-                    slotId,
+                    slotId: resolvedSlotId,
                     slot,
                     name: option.candidateName ?? option.candidate_name ?? option.candidateEmail ?? option.candidate_email ?? 'Participant',
                 };
