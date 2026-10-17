@@ -130,3 +130,14 @@ All unchecked items are **not done**; a static source investigation never marks 
 - [ ] Decide mutual-agreement waiver, emergency evidence and replacement mitigation for each channel.
 - [ ] Design original payer refund vs credit and worker compensation separately, with idempotence and authorisation.
 - [ ] Continue D06–D15 and run source-grounded tests in Docker/Codex later; CI debugging deferred.
+
+## Round 6 — approved seven rates and fifth-incident escalation
+
+- [x] Record the owner's seven exact external owner-side percentages and affected-occurrence wage base.
+- [x] Record **no worker monetary penalty** and incident progression warning / 14d / 28d+verified badge / 56d / fifth permanent, superseding the earlier indefinite doubling policy.
+- [x] Save incident verification choice A and temporary cap choice A (6 months); mark mandatory due process, legal review and appeal before any permanent restriction.
+- [x] Add side-effect-free `shifts/cancellation_policy.py` and rate-boundary/occurrence tests. No Stripe charge invoked by this new module.
+- [ ] Decide fee beneficiary, pre-agreed clause and proportionality before enabling any percentage in live checkout; old external `charge_penalty` remains a nonconverged risk.
+- [ ] Determine recurring-series incident counting, notice exemptions, moderator appeal/reinstatement, and legal approval of fifth-incident sanction.
+- [ ] Owner D06-D15: offer fallback, notification recipients, contract amendment consent, financial refund/credit, dispute authority, reminders, no-show evidence, completion and ratings.
+- [ ] Run targeted Django/Postgres/Next/Vite/Expo acceptance on Codex Docker environment; GitHub CI troubleshooting still deferred.
