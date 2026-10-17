@@ -754,6 +754,17 @@ def charge_penalty(request, shift_id):
     if not user_can_pay_shift_charge_for_pharmacy(user, shift.pharmacy):
         return Response({'error': 'Not authorized to pay charges for this shift.'}, status=status.HTTP_403_FORBIDDEN)
 
+    # Internal employed-staff and roster operations have their own workforce
+    # rules. A marketplace cancellation checkout is never a substitute for
+    # payroll/roster corrections or staff disciplinary procedures.
+    # This guard does NOT approve any fee for other booking channels.
+    from shifts.distribution import is_roster_owned_for_marketplace
+    if shift.employment_type in ('FULL_TIME', 'PART_TIME', 'CASUAL') or is_roster_owned_for_marketplace(shift):
+        return Response(
+            {'detail': 'Internal employee/roster shifts are not eligible for marketplace cancellation penalties.'},
+            status=status.HTTP_409_CONFLICT,
+        )
+
     account = resolve_billing_account(shift.pharmacy, acting_user=user)
     sub = _get_subscription_for_account(account)
     platform = request.data.get('platform', 'web')
