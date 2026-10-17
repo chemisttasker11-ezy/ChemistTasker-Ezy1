@@ -45,3 +45,11 @@ This is an explicit correction to PR #182. **Do not collapse weekly roster publi
 - [ ] Preserve the exact PR #181 parent and no change to planner/calendar authority. GitHub CI failures deferred on owner request.
 
 **Status:** domain classification and guard/tests committed; runtime not verified. Cancellation timing fees and unilateral-guard decisions remain unresolved. No deployment/merge.
+
+## Owner E01 clarification — cumulative visibility (17 October 2026)
+
+**Correct the earlier language about skipping an audience:** an organisation-level vacancy remains visible in the eligible existing staff, favourite/locum, owner-chain and organisation discovery channels. The owner can skip **sending a notification** to an earlier audience; that does **not** hide the shift from it. No organisation-wide notification/email is supported or requested. Anonymous public publication is a separate existing option.
+
+Source-level correction on PR #182: `backend/shifts/browse.py` broadens *only the intended eligible earlier-source query branches* to include `ORG_CHAIN` (and owner-chain where appropriate); `backend/shifts/test_cumulative_community_visibility.py` covers staff, favourites, owner-chain, organisation, and unrelated tenant denial. Existing `shifts/announcements.py` staff/favourite/chain flags are deliberately untouched. **Runtime test status remains unverified.**
+
+R04A per-pharmacy permission, R04B named colleague invitations, R04C accepted eligible replacement plus manager approval, and R04D manager-reviewed public cancellations with emergency routing remain implementation work after confirming their source contracts. No employee is released on a request, no new public notification is sent, and no penalty rule is introduced.
