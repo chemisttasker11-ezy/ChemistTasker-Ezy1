@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from datetime import timedelta
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -187,7 +188,7 @@ class StripeWebhookIdempotencyTests(TestCase):
         )
         offer = ShiftOffer.objects.create(
             shift=shift, user=worker, status=ShiftOffer.Status.EXPIRED,
-            payment_due_at=timezone.now() - timezone.timedelta(minutes=1),
+            payment_due_at=timezone.now() - timedelta(minutes=1),
             payment_expired_at=timezone.now(),
         )
         construct_event.return_value = _StripeObject(
@@ -234,7 +235,7 @@ class StripeWebhookIdempotencyTests(TestCase):
         offer = ShiftOffer.objects.create(
             shift=shift, user=worker,
             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            payment_due_at=timezone.now() - timezone.timedelta(minutes=1),
+            payment_due_at=timezone.now() - timedelta(minutes=1),
         )
         construct_event.return_value = _StripeObject(
             id='evt_expired_before_sweep', type='checkout.session.completed',
