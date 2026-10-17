@@ -90,3 +90,7 @@ R01=A, R04=A, R06=A, E01=A, E03=A and P02=B are recorded, including all free-tex
 ## Round 3 cumulative-audience correction
 
 The owner specified existing higher-tier publication as **cumulative access** with optional email/notification to earlier groups, not a tier-exclusion feature. PR #182 now contains a narrow backend `CommunityShiftViewSet` access correction and five Django contract tests under `shifts.test_cumulative_community_visibility`. No organisation broadcast or new notification UI added. See `OWNER_DECISION_REGISTER.md`.
+
+## Round 4 — platform warning vs owner fee policy
+
+The owner selected P04=A, P05=OTHER, P06=C, P07=C, P08=B. See exact explanations in [OWNER_DECISION_REGISTER.md](OWNER_DECISION_REGISTER.md). External platform workers face warnings and **platform-reviewed, case-by-case** restrictions; managers only report evidence. Pharmacy/chain/organisation cancellation remains internal in the first instance, but no-show/repeated cancellation badges may apply with evidence review. **Owner-side** cancellation charges apply to external confirmed engagements by notice band, **not** internal employed/roster shifts. The existing flat legacy 10%/20% computation is **not approval of amounts**. PR #182 adds a narrow billing guard and negative tests. No automatic punitive action, refund or fee schedule introduced.
