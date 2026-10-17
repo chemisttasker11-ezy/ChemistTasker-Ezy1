@@ -98,3 +98,7 @@ The owner selected P04=A, P05=OTHER, P06=C, P07=C, P08=B. See exact explanations
 ## Round 5 owner progression, not yet active
 
 P09=A (percentage of wages varying with notice, exact values pending), P10=OTHER (warning, then 14-day application ban, then 28-day ban plus verified rating-context badge, further periods doubling), P11=D (channel/actor waivers including mutually agreed cancellation), P12=D (replacement mitigation by actor/time), F01=C (booking fee separate from worker compensation), F04=C (late payment may be credited or refunded to pharmacy by approved decision). `OWNER_DECISION_REGISTER.md` is authoritative. These are **specification choices only**; no sanctions, new fees or refunds applied.
+
+## Round 6 owner policy and pending legality
+
+P09 seven-band owner external cancellation percentages are now specified (0, 0, 10, 15, 20, 25, 30 percent), computed solely against frozen wages for affected occurrences, not entire recurring engagements. **No worker monetary penalties**. P10 is now warning, 14d, 28d plus verified badge, 56d, then a proposed **permanent application suspension after fifth qualifying incident**, not earlier continued doubling, with a six-month cap only for temporary stages. Platform review, legal classification, exemption, dispute and appeal remain prerequisites to activation. A side-effect-free fee preview and test file were added, but legacy Stripe penalty checkout is **not** aligned and no execution evidence is claimed. Refer to `OWNER_DECISION_REGISTER.md` for sources and unresolved D06–D15.
