@@ -610,6 +610,8 @@ def charge_shift_fulfillment(request, shift_id):
         payable = payable.filter(id__in=offer_ids)
     elif slot_ids:
         payable = payable.filter(slot_id__in=slot_ids)
+    if candidate_id:
+        payable = payable.filter(user_id=candidate_id)
     selected_payable = list(payable)
     if not selected_payable or any(not reservation_available(offer) for offer in selected_payable):
         return Response(
@@ -619,11 +621,17 @@ def charge_shift_fulfillment(request, shift_id):
     if offer_ids and len(selected_payable) != len(offer_ids):
         return Response({'error': 'Some selected reservations are unavailable.'}, status=status.HTTP_409_CONFLICT)
 
-    if not offer_ids and not slot_ids and len(selected_payable) > 1:
+    # The payment is for these exact reservations, even when a legacy
+    # caller supplied only shift_id or slot_ids. This immutable snapshot goes
+    # in Stripe metadata, so a late webhook cannot charge worker A's old
+    # checkout and accidentally book replacement worker B.
+    selected_keys = [(offer.slot_id, offer.offered_slot_date) for offer in selected_payable]
+    if len(selected_keys) != len(set(selected_keys)):
         return Response(
-            {'error': 'Select the exact worker offer(s) before paying.'},
+            {'error': 'Select only one worker for each occurrence.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    payable_offer_ids = [offer.id for offer in selected_payable]
 
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
@@ -694,7 +702,7 @@ def charge_shift_fulfillment(request, shift_id):
             'payment_method_types': ['card'],
             'line_items': [{
                 'price': price_id,
-                'quantity': max(1, len(offer_ids) or len(slot_ids)),
+                'quantity': len(payable_offer_ids),
             }],
             'mode': 'payment',
             'success_url': success_url,
@@ -710,7 +718,7 @@ def charge_shift_fulfillment(request, shift_id):
                 'candidate_id': candidate_id,
                 'slot_id': slot_ids[0] if len(slot_ids) == 1 else '',
                 'slot_ids': ','.join(str(value) for value in slot_ids),
-                'offer_ids': ','.join(str(value) for value in offer_ids),
+                'offer_ids': ','.join(str(value) for value in payable_offer_ids),
             }
         }
         if sub and sub.stripe_customer_id:
