@@ -38,10 +38,9 @@ The workforce/roster service owns weekly publish/unpublish, staff acknowledgemen
 - A: Staff see only published weeks and changes; B: staff can preview drafts clearly labelled; C: draft view only for selected managers
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **A — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Internal roster for employed FT/PT/casual staff only; no additional explanation.
 ### R02 — Who can be assigned directly to an internal roster without confirming a marketplace offer?
 
 - A: active FT/PT/casual employed staff; B: any active member including favourite external locums; C: manager-chosen people but external must still accept frozen terms
@@ -65,10 +64,9 @@ The workforce/roster service owns weekly publish/unpublish, staff acknowledgemen
 - A: roster manager explicitly confirms each occurrence and audience; B: scheduled automatic handoff after internal time window; C: owner only
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **A — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Existing staff swap and cover requests continue. Owner decides whether a staff member can self-publish a provisional request or manager must publish. Original assignment remains until manager decision or eligible replacement is fulfilled. For platform-public audience, require reason/notification and manager approval when there is enough lead time; thresholds and emergency exceptions remain unanswered.
 ### R05 — When a roster occurrence is handed off, which audience sees it first?
 
 - A: the same pharmacy's internal community; B: favourites/locums; C: manager selects initial tier per situation; D: public immediately only for urgent coverage
@@ -83,10 +81,9 @@ The workforce/roster service owns weekly publish/unpublish, staff acknowledgemen
 - A: yes, clearly marked unfilled and linked, no duplicate shift; B: remove from staff roster and show only in marketplace; C: hybrid depending on worker type
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **A — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Retain original Shift/Slot visible as uncovered/needs cover and link any vacancy. No other exception.
 ### R07 — What constitutes a dangerous roster conflict: worker assigned twice, cancelled cover, or a marketplace worker booked for a roster slot?
 
 - A: blocking errors until resolved; B: reviewed warning with explicit manager acknowledgement for some cases; C: manager override with audit and reason
@@ -163,10 +160,9 @@ Existing possible tiers: FULL_PART_TIME → LOCUM_CASUAL → OWNER_CHAIN (if act
 - A: yes, skip tiers that do not exist; B: owner chain and organisation should be interchangeable order; C: owner chooses selected eligible tiers
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **A — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Normal sequence staff → favourites/locums → owner chain → organisation → public. Owner can skip eligible tiers/start later, choose not to notify a tier and post anonymous public. Audience visibility vs notification flags are distinct; public anonymity must preserve privacy.
 ### E02 — At posting time may the pharmacy start directly at any eligible tier?
 
 - A: yes explicit manager choice with disclosure; B: must always start internal; C: only urgent shifts may start public
@@ -181,10 +177,9 @@ Existing possible tiers: FULL_PART_TIME → LOCUM_CASUAL → OWNER_CHAIN (if act
 - A: after manager-specified interval at posting; B: use centrally set tier-dependent time windows; C: never automatically, manager approves each step
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **A — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Owner selects time interval(s) when posting; no further explanation.
 ### E04 — Should the first expression of interest block escalation?
 
 - A: yes, any interest holds; B: only a real offer/acceptance stops; C: pause while manager reviews, resume after timeout
@@ -324,10 +319,9 @@ Keep UI warnings, account reliability flags, booking-fee consequences, contractu
 - A: contract type first, audience adjusts consequences; B: audience first (public vs chain/org vs favourites); C: identical contractual fees across external channels
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **B — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Source/audience of booking is the primary policy axis for warning and penalties. No percentages, exceptions or charges approved yet; preserve engagement/legal guard.
 ### P03 — Should internal rostered FT/PT/casual employees have any ChemistTasker monetary cancellation charge?
 
 - A: no platform charge, use leave/roster/HR and legal rules; B: certain employee charges subject to legal approval; C: owner-specific policy (requires legal review)
