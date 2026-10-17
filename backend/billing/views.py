@@ -595,29 +595,24 @@ def charge_shift_fulfillment(request, shift_id):
 
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
+        from shifts.models import ShiftOffer
+        from shifts.emails import send_shift_payment_finalized_notifications
         with transaction.atomic():
             shift = Shift.objects.select_for_update().get(pk=shift.pk)
             finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
-                shift,
-            candidate_id=candidate_id,
-            slot_ids=slot_ids,
-            offer_ids=offer_ids,
-            return_offers=True,
-        )
-        from shifts.models import ShiftOffer
-        from shifts.emails import send_shift_payment_finalized_notifications
-        has_pending_payment = ShiftOffer.objects.filter(
-            shift=shift,
-            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-        ).exists()
-        shift.payment_status = 'PENDING' if has_pending_payment else 'PAID'
-        shift.save(update_fields=['payment_status'])
-        send_shift_payment_finalized_notifications(
-            shift=shift,
-            offers=finalized_offers,
-            paid_by=request.user,
-            payment_method="free",
-        )
+                shift, candidate_id=candidate_id, slot_ids=slot_ids,
+                offer_ids=offer_ids, return_offers=True,
+            )
+            has_pending_payment = ShiftOffer.objects.filter(
+                shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            ).exists()
+            if finalized_count:
+                shift.payment_status = 'PENDING' if has_pending_payment else 'PAID'
+                shift.save(update_fields=['payment_status'])
+            transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
+                shift=shift, offers=finalized_offers,
+                paid_by=request.user, payment_method="free",
+            ))
         if billing_state == BILLING_STATE_PRE_LIVE:
             return Response({
                 'free': True,
