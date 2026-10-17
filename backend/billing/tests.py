@@ -128,6 +128,43 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertEqual(delivery.status, StripeWebhookEvent.Status.PROCESSED)
         self.assertIsNotNone(delivery.processed_at)
 
+
+    @patch('billing.views.stripe.Webhook.construct_event')
+    @patch('billing.views._finalize_pending_offers_for_shift')
+    def test_paid_cancellation_penalty_does_not_confirm_reserved_worker(self, finalize, construct_event):
+        """A penalty settlement is not a fulfillment fee: pending work stays pending."""
+        owner = get_user_model().objects.create_user(
+            email='cancellation-payment-owner@example.test', role='OWNER',
+        )
+        pharmacy = Pharmacy.objects.create(name='Penalty isolation pharmacy')
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', payment_status='PENDING',
+        )
+        construct_event.return_value = _StripeObject(
+            id='evt_penalty_does_not_confirm', type='checkout.session.completed',
+            data=_StripeObject(object=_StripeObject(
+                mode='payment', payment_status='paid', amount_total=1000,
+                payment_intent='pi_penalty_isolated',
+                metadata={
+                    'shift_id': str(shift.pk),
+                    'type': 'cancellation',
+                    'owner_user_id': str(owner.pk),
+                },
+            )),
+        )
+        response = self.client.post(
+            reverse('api_v1:billing:stripe_webhook'),
+            b'{}', content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        finalize.assert_not_called()
+        shift.refresh_from_db()
+        self.assertEqual(shift.payment_status, 'PENDING')
+        payment = ShiftPayment.objects.get(stripe_payment_intent_id='pi_penalty_isolated')
+        self.assertEqual(payment.payment_type, 'cancellation')
+
+
 class OrganizationBillingScopeTests(TestCase):
     def setUp(self):
         from client_profile.characterization_support import make_owner_with_pharmacy, make_user
