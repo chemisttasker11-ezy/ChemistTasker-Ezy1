@@ -40,3 +40,18 @@ For every run record: child PR URL, exact source SHA, clean tree, CI job URL and
 - The TesterArmy authenticated browser backend is SQLite, not PostgreSQL concurrency proof.
 - Native acceptance must record Android and iOS separately. Production DB backup/restore is outside lightweight E2E.
 - Do not publish screenshots or fixture credentials that identify real pharmacies, patients or workers; redact secrets.
+
+## D02 implementation test entrypoints and operational limits
+
+```bash
+cd backend
+python manage.py test shifts.test_reservations billing.tests.StripeWebhookIdempotencyTests core.test_task_contracts --settings=core.contract_test_settings
+# Only with isolated PostgreSQL 16 configured correctly:
+python manage.py test shifts.test_reservations_postgres --settings=core.postgres_test_settings
+```
+
+CI `scripts/run-staging-qa.sh` has been extended to include the PG reservation concurrency suite after migration. On a one-minute Celery beat, `shifts.tasks.expire_payment_reservations` handles at most 200 overdue reservations per tick. Ensure both the task worker and beat worker are deployed before product release.
+
+New fields/migrations: `client_profile.0081_shift_offer_reservation` adds `ShiftOffer.payment_due_at` and `payment_expired_at`; `billing.0003_payment_reconciliation` adds explicit late-payment reconciliation fields. A clean PostgreSQL migration and populated backup rehearsal are mandatory before release. An old accepted unpaid offer with no new deadline is deliberately left unchanged pending a safe backlog policy.
+
+**CI evidence is not asserted green unless the exact final commit's jobs complete successfully.** GitHub Actions is reporting failed jobs whose log-download endpoint returns 404 BlobNotFound in this environment; do not attribute failures to a specific code defect without readable logs.
