@@ -67,3 +67,13 @@ The owner chose D01=C (reserved, not yet confirmed), D02=D (time-to-start-sensit
 PR #182 contains Django source changes, additive migrations, Celery expiry, both-party notifications, Stripe late-payment reconciliation, Pills atomic settlement, contract tests and PostgreSQL concurrency tests. The parent PR #181 is still unchanged. See `GRILL.md`, `TESTING.md`, `tasks.md`. Exact-head CI is required: there are **no claimed passing full QA, migration or device results** for this change.
 
 Known release questions: historical legacy unpaid offers, partial-payment Stripe reconciliation, real device countdown UX, full cross-persona cancellation policy. Treat the new implementation as reviewable but not released.
+
+## Implementation checkpoint — final review scope
+
+Source changes now include `shifts/reservations.py`, `shifts/offers.py`, `shifts/finalize.py`, scheduled `shifts/tasks.py`, billing Stripe and Pills settlement guards, payment-deadline/reconciliation model fields with additive migrations, plain-text + HTML worker/manager expiry notices, and date display on Vite and Expo owner cards. Existing Shift/Slot visibility is left unchanged when a reservation times out. Neither cancellation penalties nor refunds occur automatically.
+
+**Known remaining release gates:** CI consistently reports failures across multiple workflows including non-shift/security/linters. Runner logs returned 404 `BlobNotFound`, so no test result is claimed green. The local container has no authenticated GitHub DNS or Docker, so execution of the source repository's Django/PostgreSQL suite was not possible here. A passing PostgreSQL concurrency test and full container run, migration rehearsal, browser and Android/iOS acceptance are mandatory before merge. Full QA label was added to PR #182.
+
+**Known product exception:** historical `ACCEPTED_AWAITING_PAYMENT` rows whose `payment_due_at` is null are deliberately grandfathered rather than expired from guessed legacy timestamps. Finance owners must review pre-existing stuck rows before launch. Paid Stripe events after an expired reservation are flagged for manual reconciliation; no automatic refund has been authorised.
+
+**Branch isolation:** stacked on PR #181, draft, no merge/deployment. Follow `tasks.md` for remaining verification and D04–D15 decisions.
