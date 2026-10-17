@@ -619,6 +619,12 @@ def charge_shift_fulfillment(request, shift_id):
     if offer_ids and len(selected_payable) != len(offer_ids):
         return Response({'error': 'Some selected reservations are unavailable.'}, status=status.HTTP_409_CONFLICT)
 
+    if not offer_ids and not slot_ids and len(selected_payable) > 1:
+        return Response(
+            {'error': 'Select the exact worker offer(s) before paying.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
         from shifts.models import ShiftOffer
