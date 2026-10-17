@@ -85,3 +85,14 @@ All unchecked items are **not done**; a static source investigation never marks 
 - [ ] Review roster-specific `roster-shifts/{id}/escalate` as an **explicit manager action** and determine its safe release auditing contract, without silently changing its existing accepted behaviour.
 - [ ] Owner D04-D15 cancellation and timing rules still require distinct responses by roster/community/marketplace context.
 - [ ] Execute targeted tests in a real Codex/Docker checkout; not executed here.
+
+## Round 2 owner decisions, preserved 17 October 2026
+
+- [x] R01=A: internal operational roster for employed FT/PT/casual staff, not all marketplace members.
+- [x] R04=A with nuance: swaps/cover retained; owner chooses whether staff may self-publish provisional cover need; no premature assignment release; public cancellation reasons and manager guard when adequate notice.
+- [x] R06=A: same original shift/slot appears uncovered and linked to later posting.
+- [x] E01=A: default staff → fav/locum → owner chain → organisation → public, with owner-selected eligible skips, optional notifications and public anonymity kept independent.
+- [x] E03=A: posting owner selects escalation time intervals.
+- [x] P02=B: cancellation warning/penalty policy primarily depends on booking source/audience, not merely a global fee; legal contract guard remains necessary.
+- [x] Save exact user explanations and reconcile source mismatches in `OWNER_DECISION_REGISTER.md` and master interview.
+- [ ] Resolve R04 owner role/configuration, definition of fulfilled replacement, public cancellation manager window, E01 audience vs notification toggles, P02 snapshot attribution, and all remaining D06–D15 policy choices.
