@@ -1,3 +1,8 @@
+## Decision interview — highest-risk domain
+
+The owner requested a comprehensive question-by-question review instead of guessing at cancellation penalties. See [59-question owner interview](OWNER_DECISION_INTERVIEW_D04_D15.md) and [domain separation](WORKFLOW_BOUNDARIES.md). The interview distinguishes roster vs community vs dedicated/private vs owner-chain vs organisation-chain vs public, with favourites as an outreach option, not a visibility tier. Owner-specific notes are required for every question to settle threshold exceptions. Existing D01–D05 answers remain authoritative.
+
+The current `charge_penalty` service's 10%/20% calculation is **not automatically approved for any channel**. The explicit roster-shift escalation endpoint's assignment-clear behaviour and cover approval's automatic LOCUM_CASUAL audience need special D04–D15 tests/decisions. Do not merge or enable new penalties before these decisions are documented.
 # Shift lifecycle | journey gap closure
 
 **Status:** Phase 1 discovery and Grill With Docs; **DRAFT, NOT MERGE-READY**.  
