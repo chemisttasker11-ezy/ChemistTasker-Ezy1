@@ -1,0 +1,60 @@
+# Shift lifecycle | journey gap closure
+
+**Status:** Phase 1 discovery and Grill With Docs; **DRAFT, NOT MERGE-READY**.  
+**Based on:** PR [#181](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/181), source head `9d1c6b760fcb3bb4e43215d03e37e0aacf047af3`, 17 October 2026.  
+**Stacking:** the PR for this folder must target `feat/pharmacy-ops-calendar-publishing-20261016`, **not main**. Do not squash or merge parent work into main.  
+**Scope:** end-to-end shift lifecycle, including community/public discovery, direct rostering, candidate interest, counteroffers, accepted offers, payment, changes, cancellation, replacement, attendance, and settlement. PR #181's pharmacy operations planner is **out of scope** except for read-only integration verification.
+
+## Read in this order
+
+1. [Journey register](JOURNEYS.md): stable scenario IDs, evidence, status, and uncovered branches.
+2. [Grill With Docs](GRILL.md): accepted decisions versus unanswered questions. Ask only genuinely undecided policy; preserve the owner's prior decisions.
+3. [Specification](spec.md): existing invariants and open contracts, not fabricated user policy.
+4. [Implementation plan](plan.md) and [tasks](tasks.md): implementation and convergence only after decisions.
+5. [Testing and containers](TESTING.md): the project's canonical test commands and explicit limits.
+
+## Evidence hierarchy
+
+1. Owner's explicit accepted business decisions in dated PR handovers and product records.
+2. Current **PR #181-head** Django domain source, shared-core and web/native client code.
+3. Existing tests and historical execution evidence (do not treat historical passes as current passes).
+4. Proposed scenarios from the gap audit (marked as proposals until accepted).
+
+Do **not** call a branch complete because a menu, API route, UI card, or unit test exists. An end-to-end journey is verified only when the actor, initiating action, backend transition, permissions, second-actor effects, notifications, time/financial impact, and platform evidence line up. `IMPLEMENTED_SOURCE_ONLY` is not `VERIFIED`.
+
+## Status legend
+
+- `EXISTING_SOURCE_ONLY` — implementation found, but full end-to-end evidence for this exact head not established.
+- `PARTIAL` — part of the required journey exists, but a linked step is absent or unverified.
+- `SOURCE_GAP` — source-level absence/mismatch observed in inspected paths; dynamic evidence may still be needed.
+- `RISK_TO_PROVE` — potential defect; do not report as reproduced.
+- `DECISION_REQUIRED` — current rule cannot be safely inferred.
+- `NOT_YET_VERIFIED` — proposed acceptance coverage is not evidenced.
+- `VERIFIED` — exact-head recorded test evidence, link, actor, platform and result (currently **none** for this audit).
+
+## Owner-agreed invariants already located
+
+- A direct full-time/part-time/casual pharmacy staff member may be rostered; external locum/Shift Hero workers must accept engagement/offer terms first. See `backend/shifts/assignment.py`, `backend/shifts/browse.py`, `backend/shifts/engagement.py`.
+- A "can't work"/cover request **preserves the original assignment** until an authorised manager approves a replacement or release. See `ROSTER-ATTENDANCE-PLAN.md` and `backend/workforce/roster/worker_actions.py`.
+- Releasing a worker through the roster route reuses the existing Shift/ShiftSlot and escalation rather than creating a duplicate marketplace shift. See `backend/workforce/roster/worker_actions.py`.
+- Private/dedicated bookings must not widen or broadcast; external accepted terms and agreed rates are snapshotted; manager/worker pay visibility follows existing scoped policy. See `docs/handover/pr165/REVIEW_CROSSCHECK_2026-10-12.md`.
+- Publication/withdrawal rules for a roster week and an individual shift are distinct. See `docs/architecture/PRODUCTION_ACCEPTANCE_F07.md` and `backend/workforce/roster/publication.py`.
+- Owner/org/admin permissions are not interchangeable with billing-account authority. See `backend/billing/utils.py` and `backend/billing/tests.py`.
+
+## Current audit observations — NOT blanket conclusions
+
+- `ShiftOffer.Status` includes `PENDING`, `ACCEPTED_AWAITING_PAYMENT`, `ACCEPTED`, `DECLINED`, and `EXPIRED`. `Shift.payment_status` has `NOT_REQUIRED`, `PENDING`, `PAID`; no dedicated overdue state in these model choices. `backend/shifts/tasks.py` currently contains a reminder task only. See L-16 in the register.
+- `BaseShiftViewSet` inherits DRF `ModelViewSet` (including generic destroy), with no shift cancellation/notification action visible there. The shift model enforces save-time roster immutability, not an explicit shift-level delete policy. **Do not assume a destructive DELETE succeeds in every case; test foreign key and publication constraints.**
+- The worker's offer acceptance branch checks `PENDING` before `transaction.atomic`, while assignment uniqueness is stored at `(slot,slot_date)`. This is a **concurrency investigation**, not a proven race.
+- Billing checkout completion processes payment type and pending-offer finalisation together. Test separately for fulfilment, cancellation penalty, replay, outstanding offers, and delayed events; do not assert incorrect charging or finalisation without execution evidence.
+- Current TesterArmy/e2e authenticated suite has login/role-scope journeys, not a complete shift lifecycle. Existing Django contracts/Playwright coverage provide components, but no evidence of the full cross-persona path on this PR head.
+
+## Safety rules
+
+- No schema change, billing charge, webhook replay to live Stripe, real worker messaging, production database mutation, staging deployment, merge, or unapproved policy change in the discovery phase.
+- Use disposable accounts and database. Simulate billing with test events; never create a real payment merely to satisfy a test.
+- No separate shift state machine, notification ledger, payment engine, or duplicated mobile rules. Implementation must happen in the current owning domain with precise regression evidence.
+- Protect PR #181's operations planner: do not touch `team_calendar` or planner UI to solve unrelated shift issues. Work from the exact parent SHA, check for later parent-head movement before final integration.
+- Continue one decision branch at a time; record the owner's answer and source before adding implementation tasks.
+
+**Current release verdict: NOT MERGE-READY.** This is a discovery/specification stack, not completed journey fixes.
