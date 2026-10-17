@@ -1,5 +1,6 @@
 from unittest.mock import patch
-from datetime import timedelta
+from datetime import timedelta, date, time
+from decimal import Decimal
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -258,6 +259,65 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertTrue(ShiftPayment.objects.get(
             stripe_payment_intent_id='pi_after_expiry_before_sweep',
         ).needs_reconciliation)
+
+
+
+    @patch('billing.views.stripe.Webhook.construct_event')
+    def test_verified_fulfillment_before_deadline_confirms_once(self, construct_event):
+        from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
+        owner = get_user_model().objects.create_user(
+            email='on-time-owner@example.test', role='OWNER',
+        )
+        worker = get_user_model().objects.create_user(
+            email='on-time-worker@example.test', role='PHARMACIST',
+        )
+        pharmacy = Pharmacy.objects.create(name='On-time payment pharmacy')
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', single_user_only=True, payment_status='PENDING',
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift, date=date.today() + timedelta(days=5),
+            start_time=time(9, 0), end_time=time(17, 0), rate=Decimal('75.00'),
+        )
+        offer = ShiftOffer.objects.create(
+            shift=shift, user=worker,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            payment_due_at=timezone.now() + timedelta(hours=6),
+        )
+        construct_event.return_value = _StripeObject(
+            id='evt_on_time_confirmed', type='checkout.session.completed',
+            data=_StripeObject(object=_StripeObject(
+                mode='payment', payment_status='paid', amount_total=1500,
+                payment_intent='pi_on_time_confirmed',
+                metadata={
+                    'shift_id': str(shift.pk), 'type': 'fulfillment',
+                    'owner_user_id': str(owner.pk), 'offer_ids': str(offer.pk),
+                },
+            )),
+        )
+        with self.captureOnCommitCallbacks(execute=False):
+            response = self.client.post(
+                reverse('api_v1:billing:stripe_webhook'),
+                b'{}', content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 200)
+        offer.refresh_from_db()
+        shift.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED)
+        self.assertEqual(shift.payment_status, 'PAID')
+        self.assertEqual(ShiftSlotAssignment.objects.filter(
+            shift=shift, slot=slot, user=worker, source_offer=offer,
+        ).count(), 1)
+        self.assertFalse(ShiftPayment.objects.get(
+            stripe_payment_intent_id='pi_on_time_confirmed',
+        ).needs_reconciliation)
+        again = self.client.post(
+            reverse('api_v1:billing:stripe_webhook'),
+            b'{}', content_type='application/json',
+        )
+        self.assertEqual(again.status_code, 200)
+        self.assertEqual(ShiftSlotAssignment.objects.filter(shift=shift).count(), 1)
 
 
 class OrganizationBillingScopeTests(TestCase):
