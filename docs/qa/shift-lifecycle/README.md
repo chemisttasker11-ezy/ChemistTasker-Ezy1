@@ -58,3 +58,6 @@ Do **not** call a branch complete because a menu, API route, UI card, or unit te
 - Continue one decision branch at a time; record the owner's answer and source before adding implementation tasks.
 
 **Current release verdict: NOT MERGE-READY.** This is a discovery/specification stack, not completed journey fixes.
+
+## 17 October 2026 — Round 1 owner decision update
+The owner chose D01=C (reserved, not yet confirmed), D02=D (time-to-start-sensitive deadline, **bands not supplied**), and D03=B (unpaid expiry returns the opening to its original audience with notifications, not an escalated tier). The draft PR now includes a narrow billing guard and a regression test preventing a cancellation-penalty payment from finalizing unpaid fulfillment offers. This is not proof that the new test has passed or that full reservation timeout is implemented. Exact numeric D02 timing must be approved before the automatic expiry rule is enabled.
