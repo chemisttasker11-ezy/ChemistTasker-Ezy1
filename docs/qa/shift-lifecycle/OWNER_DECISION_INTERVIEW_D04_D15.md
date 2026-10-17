@@ -618,3 +618,11 @@ The owner resolved follow-ups R04A=A, R04B=C, R04C=A, E01A=OTHER, E01B=OTHER, R0
 ## Round 5 latest answer precedence
 
 P09=A, P10=OTHER, P11=D, P12=D, F01=C, F04=C were answered using the **latest form choices**, which are not always letter-identical to the older 59-question master questionnaire. The binding meanings and exact P10 explanation are in [OWNER_DECISION_REGISTER.md](OWNER_DECISION_REGISTER.md), which takes precedence over old question option labels. This update does NOT implement any account suspension, fee, badge, or refund.
+
+## Round 6 latest owner approval — supersedes prior proposed percentage placeholders
+
+**P09 percentages:** >7 days 0%; 72h–7d 0%; 24–72h 10%; 12–24h 15%; 2–12h 20%; under 2h 25%; at/after start 30%. **Fee basis A:** each affected cancelled external occurrence's frozen agreed wages only. **Worker monetary cancellation penalties: NONE.**
+
+**Incident verification A:** count non-exempt worker cancellation and no-show incidents after platform review; owner overrides previous fifth-incident progression: first warning, second 14 days, third 28 days plus reviewed badge, fourth 56 days, **fifth permanent application suspension**, requiring legal review, due process and appeal before implementation. **Temporary cap A:** 6 months applies to interim suspensions, not owner-requested fifth permanent rule. Recurring occurrences and incident-counting semantics still need clarification.
+
+This is recorded in `OWNER_DECISION_REGISTER.md`. `shifts/cancellation_policy.py` is a side-effect-free preview calculator; it does not charge. Remaining D06–D15 must continue without inventing exemptions, refunds or punishment enforcement.
