@@ -31,3 +31,9 @@ One traceable, domain-owned shift lifecycle from draft through discovery, applic
 
 ## Convergence rule
 `spec.md` and `plan.md` become implementation authorities **only after owner decisions** resolve their indicated branch(es). Iterate tasks, implement and converge on scoped branches. A "spec converged" report is not release acceptance: the evidence register and Senior Package Testing remain compulsory.
+
+## Owner decisions accepted 17 October 2026
+- D01=C: payment-required worker acceptance reserves the occurrence, **not** a confirmed assignment. Final confirmation requires successful verified fulfillment payment.
+- D02=D: deadline varies with proximity to the occurrence start. Numerical time bands are **not yet chosen**; no automatic expiry may be activated using guessed values. Timezone/overnight and start-imminent tests required.
+- D03=B: unpaid expiry releases the reservation and returns the opportunity to the **existing** audience (no automatic visibility escalation), with truthful worker/manager notifications. Historic accepted terms must be retained, and late successful Stripe events must be reconciled instead of silently rebooking the shift. No automatic penalties.
+- Additional safety fix: a paid **cancellation** checkout cannot finalize fulfillment offers. See `billing/views.py` and `billing/tests.py`.
