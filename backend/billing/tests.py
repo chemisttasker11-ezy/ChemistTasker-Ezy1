@@ -47,7 +47,11 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertEqual(ShiftPayment.objects.count(), 1)
         self.assertEqual(finalize.call_count, 2)
         shift.refresh_from_db()
-        self.assertEqual(shift.payment_status, 'PAID')
+        # This fixture mocks an empty finalizer (there was no payable offer).
+        # Under the new policy, payment is recorded for reconciliation rather
+        # than falsely claiming the shift was confirmed.
+        self.assertEqual(shift.payment_status, 'PENDING')
+        self.assertTrue(ShiftPayment.objects.get().needs_reconciliation)
 
     @patch('billing.views.logger.exception')
     @patch('billing.views._process_stripe_event', side_effect=RuntimeError('failed attempt'))
@@ -163,6 +167,96 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertEqual(shift.payment_status, 'PENDING')
         payment = ShiftPayment.objects.get(stripe_payment_intent_id='pi_penalty_isolated')
         self.assertEqual(payment.payment_type, 'cancellation')
+
+
+
+    @patch('billing.views.stripe.Webhook.construct_event')
+    def test_late_fulfillment_payment_is_held_for_reconciliation_not_booking(self, construct_event):
+        from shifts.models import ShiftOffer
+        owner = get_user_model().objects.create_user(
+            email='late-fulfillment-owner@example.test', role='OWNER',
+        )
+        worker = get_user_model().objects.create_user(
+            email='late-fulfillment-worker@example.test', role='PHARMACIST',
+        )
+        pharmacy = Pharmacy.objects.create(name='Late payment pharmacy')
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', single_user_only=True,
+            payment_status='NOT_REQUIRED',
+        )
+        offer = ShiftOffer.objects.create(
+            shift=shift, user=worker, status=ShiftOffer.Status.EXPIRED,
+            payment_due_at=timezone.now() - timezone.timedelta(minutes=1),
+            payment_expired_at=timezone.now(),
+        )
+        construct_event.return_value = _StripeObject(
+            id='evt_late_reservation_payment', type='checkout.session.completed',
+            data=_StripeObject(object=_StripeObject(
+                mode='payment', payment_status='paid', amount_total=1500,
+                payment_intent='pi_late_payment_reservation',
+                metadata={
+                    'shift_id': str(shift.pk), 'type': 'fulfillment',
+                    'owner_user_id': str(owner.pk),
+                    'offer_ids': str(offer.pk),
+                },
+            )),
+        )
+        with patch('shifts.emails.send_shift_payment_finalized_notifications') as notice:
+            response = self.client.post(
+                reverse('api_v1:billing:stripe_webhook'), b'{}',
+                content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 200)
+        notice.assert_not_called()
+        shift.refresh_from_db()
+        offer.refresh_from_db()
+        self.assertEqual(shift.payment_status, 'NOT_REQUIRED')
+        self.assertEqual(offer.status, ShiftOffer.Status.EXPIRED)
+        self.assertTrue(ShiftPayment.objects.get(
+            stripe_payment_intent_id='pi_late_payment_reservation',
+        ).needs_reconciliation)
+
+    @patch('billing.views.stripe.Webhook.construct_event')
+    def test_after_deadline_before_sweep_is_not_falsely_booked(self, construct_event):
+        from shifts.models import ShiftOffer
+        owner = get_user_model().objects.create_user(
+            email='late-before-sweep-owner@example.test', role='OWNER',
+        )
+        worker = get_user_model().objects.create_user(
+            email='late-before-sweep-worker@example.test', role='PHARMACIST',
+        )
+        pharmacy = Pharmacy.objects.create(name='Before sweep pharmacy')
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', payment_status='PENDING',
+        )
+        offer = ShiftOffer.objects.create(
+            shift=shift, user=worker,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            payment_due_at=timezone.now() - timezone.timedelta(minutes=1),
+        )
+        construct_event.return_value = _StripeObject(
+            id='evt_expired_before_sweep', type='checkout.session.completed',
+            data=_StripeObject(object=_StripeObject(
+                mode='payment', payment_status='paid', amount_total=1500,
+                payment_intent='pi_after_expiry_before_sweep',
+                metadata={
+                    'shift_id': str(shift.pk), 'type': 'fulfillment',
+                    'owner_user_id': str(owner.pk), 'offer_ids': str(offer.pk),
+                },
+            )),
+        )
+        response = self.client.post(
+            reverse('api_v1:billing:stripe_webhook'), b'{}',
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.assertTrue(ShiftPayment.objects.get(
+            stripe_payment_intent_id='pi_after_expiry_before_sweep',
+        ).needs_reconciliation)
 
 
 class OrganizationBillingScopeTests(TestCase):
