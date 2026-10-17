@@ -13,7 +13,7 @@ from shifts.models import Shift, ShiftOffer, ShiftSlotAssignment
 from shifts.pricing import expand_shift_slots
 
 
-def start_at(shift, offer):
+def start_at(shift, offer, *, now=None):
     """The earliest relevant occurrence, in the pharmacy's local timezone."""
     matches = [
         entry for entry in expand_shift_slots(shift)
@@ -24,7 +24,7 @@ def start_at(shift, offer):
         return None
     # For a recurring/whole-shift offer, reserve against the next eligible
     # occurrence, rather than an already elapsed series start.
-    now = timezone.now()
+    now = now or timezone.now()
     zone = get_pharmacy_timezone(shift.pharmacy)
     future_matches = [
         entry for entry in matches
@@ -44,7 +44,7 @@ def start_at(shift, offer):
 def payment_deadline(shift, offer, *, now=None):
     """Owner-approved D02 generous bands, always capped by start time."""
     now = now or timezone.now()
-    start = start_at(shift, offer)
+    start = start_at(shift, offer, now=now)
     if start is None or start <= now:
         return None
     lead = start - now
