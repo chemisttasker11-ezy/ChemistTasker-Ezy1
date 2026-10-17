@@ -94,3 +94,7 @@ The owner specified existing higher-tier publication as **cumulative access** wi
 ## Round 4 — platform warning vs owner fee policy
 
 The owner selected P04=A, P05=OTHER, P06=C, P07=C, P08=B. See exact explanations in [OWNER_DECISION_REGISTER.md](OWNER_DECISION_REGISTER.md). External platform workers face warnings and **platform-reviewed, case-by-case** restrictions; managers only report evidence. Pharmacy/chain/organisation cancellation remains internal in the first instance, but no-show/repeated cancellation badges may apply with evidence review. **Owner-side** cancellation charges apply to external confirmed engagements by notice band, **not** internal employed/roster shifts. The existing flat legacy 10%/20% computation is **not approval of amounts**. PR #182 adds a narrow billing guard and negative tests. No automatic punitive action, refund or fee schedule introduced.
+
+## Round 5 owner progression, not yet active
+
+P09=A (percentage of wages varying with notice, exact values pending), P10=OTHER (warning, then 14-day application ban, then 28-day ban plus verified rating-context badge, further periods doubling), P11=D (channel/actor waivers including mutually agreed cancellation), P12=D (replacement mitigation by actor/time), F01=C (booking fee separate from worker compensation), F04=C (late payment may be credited or refunded to pharmacy by approved decision). `OWNER_DECISION_REGISTER.md` is authoritative. These are **specification choices only**; no sanctions, new fees or refunds applied.
