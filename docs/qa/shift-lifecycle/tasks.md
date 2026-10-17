@@ -96,3 +96,15 @@ All unchecked items are **not done**; a static source investigation never marks 
 - [x] P02=B: cancellation warning/penalty policy primarily depends on booking source/audience, not merely a global fee; legal contract guard remains necessary.
 - [x] Save exact user explanations and reconcile source mismatches in `OWNER_DECISION_REGISTER.md` and master interview.
 - [ ] Resolve R04 owner role/configuration, definition of fulfilled replacement, public cancellation manager window, E01 audience vs notification toggles, P02 snapshot attribution, and all remaining D06–D15 policy choices.
+
+## Round 3 implementation — owner E01, R04
+
+- [x] Record R04A=A, R04B=C, R04C=A, E01A=OTHER, E01B=OTHER, R04D=A in the decision register with exact explanations.
+- [x] Supersede prior incorrect reading of skipped tiers as withdrawing earlier eligible discoverability.
+- [x] Correct community query so ORG_CHAIN postings remain visible to eligible earlier audiences, preserving organisation isolation.
+- [x] Add targeted API tests: own pharmacy staff, own pharmacy favourite locum, owner-chain worker, same-org worker, unrelated worker refused.
+- [x] Preserve existing posted shift notification booleans and no org-workers broadcast.
+- [ ] Execute targeted `shifts.test_cumulative_community_visibility` in Codex/Docker, then regress posting, anonymity and cross-pharmacy scope.
+- [ ] Implement per-pharmacy self-publication owner permission only with accepted permission defaults and existing roster ownership.
+- [ ] Require colleague's affirmative acceptance and manager's approval before worker transfer; no release on cover request.
+- [ ] Implement manager-reviewed public cancellation and emergency escalation only after user sets alert SLA and channel penalties.
