@@ -60,3 +60,15 @@ All unchecked items are **not done**; a static source investigation never marks 
 - [ ] Only after each owner choice, implement approved transitions in existing shifts/workforce/billing/attendance domains and test real PostgreSQL, web and native flows.
 
 **Do not interpret the guardrail as completion of D04–D15.** Nothing has been merged, deployed or passed in runtime testing here. GitHub CI remains deferred by owner request.
+
+## Publication/workflow separation — user correction
+
+- [x] Verify workforce's weekly publication/unpublication and worker-action ownership against architecture and prior roster contract.
+- [x] Verify internal community vacancy tiers and distinct favourites recipient outreach (not a visibility tier).
+- [x] Verify Owner Chain/Organisation/Public escalation only through owning shift marketplace domain and eligibility/quota.
+- [x] Add read-only classification + generic marketplace escalation guard against widening roster-owned/dedicated shifts.
+- [x] Add boundary tests for roster ownership, manual vs auto escalation, explicit release and private offers.
+- [x] Extend PR182 container test script with roster-versus-posting boundary tests.
+- [ ] Review roster-specific `roster-shifts/{id}/escalate` as an **explicit manager action** and determine its safe release auditing contract, without silently changing its existing accepted behaviour.
+- [ ] Owner D04-D15 cancellation and timing rules still require distinct responses by roster/community/marketplace context.
+- [ ] Execute targeted tests in a real Codex/Docker checkout; not executed here.
