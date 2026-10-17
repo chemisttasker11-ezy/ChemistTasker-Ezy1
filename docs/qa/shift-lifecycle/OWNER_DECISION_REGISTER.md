@@ -92,3 +92,30 @@ An earlier register phrase "skip tiers/start at later tier" was misleading when 
 6. Continue D06–D15 and audience-specific penalties separately. No charges, refunds or punitive actions without approved thresholds, contract/legal safeguards and tests.
 
 **Branch policy:** PR #182 only; PR #181 unchanged. GitHub CI deliberately deferred until the later testing phase, not counted green.
+
+## Round 4 — owner cancellation/warning decisions (17 October 2026)
+
+**Verbatim owner selections and explanations:**
+- **P04=A:** "You penalties for owners , and warning and consequences for workers otherthan pharmacy/chain/org members from the platform, like red tag, bad review, forbidden from applying for a period, suspension, it is case by case. Nothing from the manager accept reporting and also according to how far from the shift"
+- **P05=OTHER:** "It is internal issue but , no show badge or repeated cancellation badge consequences"
+- **P06=C:** "As discussed above"
+- **P07=C:** "Not for internal"
+- **P08=B:** None
+
+| Decision | Approved policy direction | Still to be defined |
+|---|---|---|
+| **P04=A** | Favourites/local internal-source worker cancellation receives a warning approach rather than automatic worker monetary penalties. **Pharmacy/owner-side** penalties may apply separately for external bookings. Public-platform external workers may receive case-by-case reliability outcomes such as red tags, reviewed poor ratings, temporary application ineligibility or suspension. Pharmacy managers **only report evidence**; platform authority must review and decide. Severity depends on notice before shift. | Who is a genuine external public-source worker vs a pharmacy/chain/org member (freeze provenance), how reports are assessed, exact notice guards, which platform moderators can impose/reverse restrictions. |
+| **P05=OTHER** | Owner-chain and organisation-chain cancellation is handled internally between the relevant parties. **No-show and repeated cancellation badges** may still result, but no blanket public-platform penalty or direct pharmacy-manager suspension. | Who verifies an incident, what badge thresholds exist, visibility/duration of badges, appeal/correction rights. |
+| **P06=C** | Public marketplace worker cancellation normally uses notice-based warnings; serious late cancellation/no-show is **referred for platform support review**. Potential red tag, negative reviewed rating, temporary ban on applications or suspension is assessed **case-by-case**, not automatic from a single manager report. | Thresholds, evidence, exemptions, sanctions and appeals; avoid unverified punitive badges or automatic star rating. |
+| **P07=C** | For pharmacy-initiated cancellation, **time before shift is the primary dimension** in determining potential owner penalties for **external** confirmed bookings. Internal roster/employed work excluded. | No penalty percentage, basis, waiver, contractual enforceability or refund amount has been approved by P07. Source-specific notice recipients remain distinct. |
+| **P08=B** | Use six notice boundaries: **more than 7 days, 72h, 24h, 12h, 2h, and at/after start**. The actual severity table must be selected separately by actor and internal/external audience. | Exact percent/flat amount at each boundary, clock/timezone rule, emergency exception, refund/wage distinction and what counts as confirmation. |
+
+**Do not infer automatic fines or discipline.** The existing `billing.views.charge_penalty` 10% within 72h and 20% within 24h implementation is merely historical source behaviour; it was **not** approved as the six-band fee schedule. Worker-facing outcomes cannot be set by a manager's report alone, nor should a negative star rating be fabricated as a platform sanction. Current `ratings.Rating` is a relationship rating, not a shift-specific no-show incident; `ratings.RatingReport` is a way to report existing ratings, not a proper no-show review queue.
+
+### Safe implementation in this round
+
+- `billing/views.py:charge_penalty` now refuses **employee** FT/PT/casual or **roster-owned** shifts using the existing shifts-domain ownership guard, avoiding use of platform penalty checkout for internal staff. This is not a newly authorised charge for anyone else; existing external endpoint is still a provisional legacy mechanism.
+- `billing/tests.py` adds negative HTTP contracts for each employee employment class and roster-owned LOCUM shift.
+- Do not add a red badge, unreviewed poor rating, application block or suspension until a source-grounded moderation workflow with platform-only permission, evidence, appeal and expiry is agreed.
+
+**Follow-up decision set:** P09 owner cancellation fee type and exact six-band schedule, P10 repeated incidents/no-show badges, P11 exemptions, P12 replacement mitigation, F01–F07 refunds/financial review and N/H audit/attendance. Also pin the provenance rule for public vs own-pharmacy/favourites/chain/org when a vacancy escalates. PR #181 remains untouched, GitHub CI deferred.
