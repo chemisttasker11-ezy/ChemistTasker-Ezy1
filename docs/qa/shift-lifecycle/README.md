@@ -86,3 +86,7 @@ Source changes now include `shifts/reservations.py`, `shifts/offers.py`, `shifts
 ## Round 2 owner decision record
 
 R01=A, R04=A, R06=A, E01=A, E03=A and P02=B are recorded, including all free-text exceptions, in [OWNER_DECISION_REGISTER.md](OWNER_DECISION_REGISTER.md). The interview master file marks those six decisions answered. **No fee, manager window, self-publication permission defaults or direct cancellation conditions are invented.** PR #181 remains unchanged; GitHub CI diagnosis stays deferred.
+
+## Round 3 cumulative-audience correction
+
+The owner specified existing higher-tier publication as **cumulative access** with optional email/notification to earlier groups, not a tier-exclusion feature. PR #182 now contains a narrow backend `CommunityShiftViewSet` access correction and five Django contract tests under `shifts.test_cumulative_community_visibility`. No organisation broadcast or new notification UI added. See `OWNER_DECISION_REGISTER.md`.
