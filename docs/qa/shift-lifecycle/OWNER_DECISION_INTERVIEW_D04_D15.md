@@ -613,3 +613,15 @@ The attendance/timesheet system is authoritative for hours worked. Cancellation 
 9. Exactly-once cancellation notification and audit survive retry/concurrency; users see truthful state on Next, Vite and Expo.
 
 **Engineering status:** question pack created, no user answers presumed beyond the dated decisions above. The source code changes already in PR #182 remain draft and runtime QA unverified. GitHub CI troubleshooting deferred at owner request.
+
+## Round 3 supplemental approved answers — 17 October 2026
+
+The owner resolved follow-ups R04A=A, R04B=C, R04C=A, E01A=OTHER, E01B=OTHER, R04D=A. Exact quotations and source mismatches are retained in [OWNER_DECISION_REGISTER.md](OWNER_DECISION_REGISTER.md).
+
+- **R04A:** pharmacy owner configures whether employed staff may initiate their own cover publication per pharmacy.
+- **R04B:** workers invite named eligible colleagues; manager approves widening to favourites or public. Worker request is not release.
+- **R04C:** replacement must explicitly accept, satisfy eligibility/conflict guards, **then** manager approves reassignment.
+- **E01A/E01B:** retain existing implementation of notify/not notify earlier audiences; **visibility is cumulative** through eligible older tiers as publication reaches organisation. There is **no organisation-wide notification**; organisation workers can view only via their own scoped channel. Anonymous public posting is separate. Earlier statement that a skipped audience loses access is superseded.
+- **R04D:** public-platform worker cancellation always needs manager approval. Urgent requests use emergency escalation, not automatic withdrawal; exact SLA pending.
+
+**Owner attention next:** cancellation source-specific warnings/fees and notification matrix (P01/P04–P12, F01–F07, N01–N05), not an unnecessary repeat of approved E01 options.
