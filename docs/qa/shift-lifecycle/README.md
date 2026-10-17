@@ -61,3 +61,9 @@ Do **not** call a branch complete because a menu, API route, UI card, or unit te
 
 ## 17 October 2026 — Round 1 owner decision update
 The owner chose D01=C (reserved, not yet confirmed), D02=D (time-to-start-sensitive deadline, **bands not supplied**), and D03=B (unpaid expiry returns the opening to its original audience with notifications, not an escalated tier). The draft PR now includes a narrow billing guard and a regression test preventing a cancellation-penalty payment from finalizing unpaid fulfillment offers. This is not proof that the new test has passed or that full reservation timeout is implemented. Exact numeric D02 timing must be approved before the automatic expiry rule is enabled.
+
+## Approved generous reservation release — D02 implementation
+
+PR #182 contains Django source changes, additive migrations, Celery expiry, both-party notifications, Stripe late-payment reconciliation, Pills atomic settlement, contract tests and PostgreSQL concurrency tests. The parent PR #181 is still unchanged. See `GRILL.md`, `TESTING.md`, `tasks.md`. Exact-head CI is required: there are **no claimed passing full QA, migration or device results** for this change.
+
+Known release questions: historical legacy unpaid offers, partial-payment Stripe reconciliation, real device countdown UX, full cross-persona cancellation policy. Treat the new implementation as reviewable but not released.
