@@ -79,11 +79,21 @@ def expiry_notification(offer_id):
         body="The pharmacy payment deadline passed. Your shift was not confirmed.",
         kind="shift_payment_reservation_expired_worker", payload=payload,
     )
-    notify_shift_managers(
+    managers = notify_shift_managers(
         shift, title="Shift reservation expired",
         body="Payment was not completed before the reservation deadline. The opening is available to the same audience.",
         kind="shift_payment_reservation_expired_manager", payload=payload,
     )
+    for manager in managers:
+        if manager.email:
+            async_task(
+                "users.tasks.send_async_email",
+                subject="Shift reservation expired - payment deadline missed",
+                recipient_list=[manager.email],
+                text_template="emails/shift_reservation_expired_manager.txt",
+                context={"pharmacy_name": shift.pharmacy.name, "offer_id": offer.id},
+                suppress_auto_notification=True,
+            )
     if offer.user.email:
         async_task(
             "users.tasks.send_async_email",
