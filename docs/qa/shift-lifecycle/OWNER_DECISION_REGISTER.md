@@ -162,3 +162,59 @@ Counting starts only after an authoritative incident is **confirmed** following 
 ### Freeze on irreversible actions
 
 **No percentage schedule, automatic suspension/badge, reputation-rating manipulation, wage deduction, refund or account restriction has been enabled by this decision-only update.** PR #182 remains draft and unverified. PR #181 unchanged; GitHub CI troubleshooting deferred.
+
+## Round 6 — exact owner rates, eligibility and fifth-incident rule (17 October 2026)
+
+**Owner message (preserved exactly):**
+
+> For ChemistTasker PR #182, my proposed owner-side cancellation percentage decisions by time to shift are: >7 days=0% | 72 hours–7 days=0% | 24–72 hours=10% | 12–24 hours=15% | 2–12 hours=20% | Under 2 hours=25% | At or after shift start=30%. Fee basis=A; incident verification=A; penalty cap=A. Explanation=If recurrence cancellation and no show, permanent suspension after the 5th time, no monetization penalties on workers.
+
+### Approved seven-band **owner** cancellation proposal
+
+| P08/P09 lead to affected occurrence start | Proposed % of frozen AGREED wages for **only affected cancelled occurrence(s)** |
+|---|---:|
+| >7 days (over 168h) | 0% |
+| 72h–7d | 0% |
+| 24–72h | 10% |
+| 12–24h | 15% |
+| 2–12h | 20% |
+| >0–2h | 25% |
+| Start or after | 30% |
+
+**Boundary interpretation for reproducible test proposals (not independent owner approval):** at precisely 72h, 24h, 12h or 2h use the **less severe adjacent** bracket (72h = 0%, 24h = 10%, 12h = 15%, 2h = 20%); once shift start has passed use 30%. Actual pharmacy local timezone/overnight occurrence start must be calculated from saved slot date/time and repeated series identity. No unaffected occurrence value may enter the percentage base.
+
+**Fee basis=A:** the agreed **affected occurrence wage value**, frozen when external engagement was accepted, excluding unaffected dates; separately model platform booking fee, GST treatment, any worker compensation, and employer payroll. No employee wage deduction. Fee payer = cancelling pharmacy/owner **external engagements only**. No owner-fee collection when cancellation is mutually agreed or otherwise exempt until explicit waiver rules are finalised. **The percentages are NOT yet established as legally enforceable terms and must not be charged from the legacy endpoint.**
+
+### Worker consequences: revised P10 + incident verification A + six-month cap A
+
+- **No monetary penalty whatsoever for workers** for cancelling/no-show, regardless of source. No wage deduction, invoice deduction, automatic debt or cancellation checkout for the worker.
+- **Incident verification=A:** every qualifying cancellation/no-show **except an approved exemption** counts toward the progression; a manager can only **report**, not verify/conclude or punish. A platform-authorised moderation decision must verify actual occurrence, source, notice, mitigating evidence and eligibility before it affects a count. Incident uniqueness is by booked occurrence+worker+event, with upheld appeals and approved waivers excluded. This retains owner P04/P06 platform-only enforcement.
+- **1st** verified qualifying incident → warning.
+- **2nd** → 14-day **application-only** suspension.
+- **3rd** → 28-day application-only suspension and verified badge in review/rating context; badge is not an artificial low star review.
+- **4th** → 56-day application-only suspension.
+- **5th** verified **repeat cancellation / no-show** → **permanent** application suspension under the owner's latest explicit instruction, superseding the earlier implied 112-day fifth incident and the 6-month *temporary* suspension cap. **Do not implement automatic permanent deactivation** before human review, legal assessment, fair process, notice, evidence, right to challenge and reinstatement/appeal authority are settled. Keep account login, earned wages, records, appeals and other user roles separated from worker-application eligibility.
+- **Cap=A:** 6 months maximum for **temporary** suspensions; the expressly requested fifth-case permanent sanction is an **exception**, not a normal doubling step. This is a documented reconciliation of seemingly conflicting selections and must receive final counsel/platform-policy sign-off.
+- The scope of 'repeat cancellation and no show' needs clarification: whether a single cancelled **recurring series** counts once or once per affected shift occurrence; whether long-notice cancellation without replacement is qualifying; how platform-sourced workers compare to internal/pharmacy/chain/org relationships; time-window/lookback and rehabilitation. Preserve P05 internal chain/org status and R04 staff roster separation.
+
+### Source/legal risk review (17 October 2026) — regulatory **validation of concerns**, not a legal enforceability certificate
+
+1. **Fair Work Ombudsman:** employer wage deductions are permitted only in limited circumstances; an employer cannot contract around statutory protections using a cancellation penalty. Sources: https://www.fairwork.gov.au/pay-and-wages/deductions-and-related-issues/deducting-pay and https://www.fairwork.gov.au/find-help-for/independent-contractors/whole-of-relationship-test . Thus internal staff and employee-classified shift engagements must have no automated monetary deductions or platform penalty checkout.
+2. **ACCC/ACL unfair contract terms:** standard-form small-business/consumer contracts must not impose significantly unbalanced, unnecessary or harmful terms; termination penalties are expressly an example of potentially unfair terms. On 9 November 2023 the law introduced prohibitions and penalties for unfair terms. Percentages of agreed wage may be a product starting point but are **not inherently enforceable**; scope, reasonably protectable interest, proportionality to expected detriment, clear pre-acceptance disclosure and parity must be reviewed by qualified Australian counsel. Sources: https://www.accc.gov.au/consumers/buying-products-and-services/contracts and https://www.accc.gov.au/business/selling-products-and-services/contracts .
+3. **Digital-platform deactivation:** some employee-like platform contractors have unfair-deactivation protections; the Fair Work Commission may order reactivation and lost income if an eligible worker was unfairly deactivated. Permanent application bans require platform classification, documented reason, notice, human review, challenge, exception and reinstatement path, not automatic counters. Source: https://www.fwc.gov.au/job-loss-or-dismissal/unfair-deactivation-or-termination-regulated-workers/unfair-deactivation .
+4. **Privacy/reputation:** public badges and adverse account records must have accuracy/relevance/correction safeguards; do not turn a unilateral manager report into a published rating or disciplinary finding. Sources: https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-10-app-10-quality-of-personal-information and https://www.oaic.gov.au/engage-with-us/consultations/consultation-on-guidance-for-transparency-in-automated-decision-making (future transparency obligation from 10 December 2026 for covered APP entities).
+
+**Implementation gate:** record, compute and test proposed policy in a **side-effect-free** module only. Suspend/deprecate incompatible old percentage checkout route until confirmed booking-specific cancellation, signed accepted terms, exemption/compensation recipient, finance idempotence and legal sign-off are delivered. Never enable worker fines or automatic platform bans. PR #181 unchanged; GitHub CI troubleshooting deferred.
+
+### Remaining decision IDs D06–D15
+
+- D06 ordinary offer decline/expiry fallback (distinct from D03 unpaid-payment expiry).
+- D07 cancellation/cover/expiry notification recipient and channels.
+- D08 penalty exceptions, consent, timing and beneficiary despite approved bands.
+- D09 after-acceptance changes of rate/date/location and worker re-consent.
+- D10 refunds, platform booking fee, worker compensation, credits and payments already collected.
+- D11 moderation/support dispute and appeals authority, evidence and SLAs.
+- D12 remittance/reminders following late changes and exclusions.
+- D13 no-show proof, emergency release, recurring-incident attribution.
+- D14 clock-out/timesheet/invoice/payroll completion thresholds.
+- D15 historical transparency and verified badges/ratings only.
