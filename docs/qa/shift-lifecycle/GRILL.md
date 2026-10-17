@@ -94,3 +94,9 @@ The owner has instructed continuation **through D15**, but this is approval to *
 **D15:** the current confirmed/history queries derive from assignments and occurrence times. Protect records and history visibility; rating eligibility for unworked/cancelled engagements requires owner rule.
 
 Before implementing the remaining state transitions, collect owner answers to D04+D05 (actions, authority and cancellation granularity), D06+D07 (offer fallback and notification recipient matrix), D08–D11 (penalties/refunds/consent/disputes), and D12–D15 (attendance/reminders/history). The first cluster should be answered **before** allowing irreversible cancellation.
+
+## Owner workflow separation — 17 October 2026
+
+The owner explicitly distinguished **roster/internal community shifts** from **publication and post-shift distribution** through organisation, public, favourites and escalation. Record this correction separately from the D04/D05 cancellation choices; the two publication mechanisms must never be treated as the same action. See `WORKFLOW_BOUNDARIES.md`.
+
+D04=A: owner or authorised pharmacy/organisation manager can perform approved cancellation; worker can request cancellation or cover with assignment retained until approval. D05=C: allow individual, selected and whole-posting scope **once their safe side effects are specified**. Owner separately requests both sides to have cancellation actions with time-to-shift warnings, guards and potential penalties, with room to describe exceptions. **Penalty thresholds, who can unilaterally cancel, and whether approval is required for a particular time band are not yet resolved.** No automatic financial consequence or confirmed-assignment release is authorised yet.
