@@ -336,46 +336,41 @@ Keep UI warnings, account reliability flags, booking-fee consequences, contractu
 - A: warning only unless repeated/malicious; B: same charge as public booking; C: softer fee/time windows than public; D: case-by-case
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **A — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> You penalties for owners , and warning and consequences for workers otherthan pharmacy/chain/org members from the platform, like red tag, bad review, forbidden from applying for a period, suspension, it is case by case. Nothing from the manager accept reporting and also according to how far from the shift
 ### P05 — If a confirmed worker sourced through owner-chain or organisation-chain cancels, what happens?
 
 - A: warning-only; B: public policy; C: intermediate policy; D: distinct owner-chain and organisation policies
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **OTHER — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> It is internal issue but , no show badge or repeated cancellation badge consequences
 ### P06 — If a public marketplace worker cancels, what consequences can apply?
 
 - A: timing warning and reliability record, no charge; B: contractual cancellation fee with cap; C: support review if very late/no-show; D: tiered combinations
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **C — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> As discussed above
 ### P07 — If the pharmacy cancels a booking, should the consequence vary by source?
 
 - A: same compensation and refund principles across external channels; B: lower/no fee for favourites and chain/org; C: distinct policy for each channel
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **C — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> Not for internal
 ### P08 — Which time thresholds should drive pre-cancel warnings and penalties?
 
 - A: >72h, 24–72h, <=24h (existing code baseline); B: >7d, 72h, 24h, 12h, 2h, after start; C: different thresholds for urgent shifts
 - Other: describe a different rule
 
-**Owner selection:** _(pending)_  ·  **Your explanation / exceptions:** 
+**Owner selection:** **B — APPROVED**  ·  **Your explanation / exceptions:**
 
-> 
-
+> None
 ### P09 — What should the monetary fee be based on, when legally and contractually applicable?
 
 - A: flat platform service fee; B: percentage of frozen expected wage; C: demonstrated costs with a cap; D: mixed fee components
