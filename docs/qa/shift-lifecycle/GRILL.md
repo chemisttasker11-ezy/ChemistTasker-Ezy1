@@ -1,3 +1,18 @@
+## Owner interview master packet — 17 October 2026
+
+**START HERE:** [OWNER_DECISION_INTERVIEW_D04_D15.md](OWNER_DECISION_INTERVIEW_D04_D15.md). This 59-question interview distinguishes the **pharmacy's internal operational roster**, **community vacancy**, **favourites outreach**, **private dedicated offers**, **owner-chain**, **organisation-chain**, and **public** marketplace. It separately grills cancellation initiation, manager authorisation, timing warnings, financial penalties, booking fee refunds, worker compensation, no-show, history and notification privacy. Every question includes a user-notes field.
+
+This packet does **not** overrule D01=C, D02=generous, D03=B, D04=A, or D05=C. D04 still requires a clarification about the owner's phrase "both can cancel with guards": for confirmed work, does an external worker **request** cancellation or can they **directly** release under specified notice windows? The owner has not yet chosen the thresholds or audience-specific consequences. All unselected options are provisional and **not implementation authority**.
+
+**Findings from actual PR #182 source that make this important:**
+- `billing/views.py:charge_penalty`: one owner-side wage-percentage checkout (10% inside 72h; 20% inside 24h), no audience differentiation, calculated using earliest assignment start for the shift, no clear per-occurrence penalty provenance.
+- `workforce/roster/views.py:RosterShiftManageViewSet.escalate`: explicit roster-escalation route deletes existing slot assignments when widening; this cannot silently bypass worker cover approvals or immutable timesheet histories.
+- `shifts/worker_requests.py:approve`: currently chooses `LOCUM_CASUAL` for approved cover release even if the manager did not specifically select that audience. Owner's desired handoff audience and publication review are unresolved.
+- `shifts/escalation.py`: actual tiers depend on active owner chain and organisation; favourites is a notification recipient flag, **not a tier**.
+- `shifts/announcements.py`: staff/favourites/chain are opt-in notification audiences conditioned by posting visibility; a notice is not a booking and should not create cancellation liability.
+
+No new financial charges, automatic refunds, forced staff wage deductions or irreversible external cancellation transitions may be built solely from this preliminary document.
+
 # Grill With Docs — shift lifecycle decision interview
 
 Source: PR #181 exact parent SHA `9d1c6b760fcb3bb4e43215d03e37e0aacf047af3`. **Do not re-ask established policy.** Answer the first decision below before implementing cancellation/payment transitions. Record answers in this document, then converge against the agreed spec.
