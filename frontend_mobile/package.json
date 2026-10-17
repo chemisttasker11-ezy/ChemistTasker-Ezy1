@@ -79,7 +79,7 @@
     "patch-package": "8.0.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.2",
+    "@babel/core": "^8.0.7",
     "@types/lodash.debounce": "^4.0.9",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
