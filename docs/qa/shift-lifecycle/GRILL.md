@@ -62,3 +62,17 @@ Implementation limit: verified payment events alone confirm; payment-required ac
 - If policy already exists in a dated handover, prefer referencing it to re-interviewing the owner; apparent source conflicts require explaining the conflict before asking.
 - No developer may convert a recommendation into an approved business policy without the owner's answer.
 - Once D01–D03 are settled, implement and test the payment lifecycle independently, then continue cancellation D04–D11 and workday D12–D15.
+
+## Round 1 timing amendment — owner approved generous policy, 17 October 2026
+
+**D02 = generous (APPROVED):** At worker acceptance, calculate the earliest applicable upcoming shift start in the pharmacy's timezone, then reserve until the earlier of that start and:
+- Start **more than 48 hours away**: 24 hours after acceptance.
+- Start **more than 12 up to 48 hours away**: 6 hours after acceptance.
+- Start **more than 2 up to 12 hours away**: 2 hours after acceptance.
+- Start **up to 2 hours away**: 30 minutes after acceptance.
+
+For a start closer than the selected allowance, the deadline is capped to shift start. If no eligible future dated occurrence exists, no new paid reservation may be accepted. D01=C and D03=B remain in effect: reservation only, then automatic expiry and same-audience return with worker/manager notifications, never auto penalty/escalation. The owner separately authorised implementation and targeted Django/PostgreSQL testing. **Existing historical unpaid accepted offers with no deadline require an independent reconciliation policy; do not retroactively invent their expiry.**
+
+## Financial reconciliation rule (safety, not refund authorisation)
+
+A verified Stripe settlement that arrives after expiry is recorded with `ShiftPayment.needs_reconciliation=True` and must not resurrect the old worker booking. This flags a finance exception for manual review; no automatic refund, credit, chargeback or charge is authorised without D08–D11.
