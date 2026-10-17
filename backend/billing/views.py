@@ -341,6 +341,11 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     if target_slot_ids:
         offers = offers.filter(slot_id__in=target_slot_ids)
 
+    # A legacy checkout without any offer/slot/candidate selection must not
+    # opportunistically confirm multiple workers after a delayed webhook.
+    if not target_offer_ids and not target_slot_ids and not candidate_id and offers.count() > 1:
+        return (0, []) if return_offers else 0
+
     finalized = 0
     finalized_offers = []
     selected_slot_ids = set()
@@ -912,7 +917,12 @@ def _process_stripe_event(event):
                                 paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
                                 payment_method='stripe',
                             ))
-                        if finalized_count == 0 and pending_count:
+                        requested_ids = _normalize_offer_ids(metadata.get("offer_ids"))
+                        if requested_ids and finalized_count < len(requested_ids):
+                            payment.needs_reconciliation = True
+                            payment.reconciliation_reason = "partial_or_expired_reservations"
+                            payment.save(update_fields=["needs_reconciliation", "reconciliation_reason"])
+                        elif finalized_count == 0 and pending_count:
                             payment.needs_reconciliation = True
                             payment.reconciliation_reason = "reservation_expired_or_unavailable"
                             payment.save(update_fields=["needs_reconciliation", "reconciliation_reason"])
