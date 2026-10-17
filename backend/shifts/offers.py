@@ -455,7 +455,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             ctx["rate"] = offer_details["slot_details"][0].get("rate") if offer_details["slot_details"] else ""
             worker_title = "Offer accepted - owner payment pending" if requires_payment else "Shift confirmed"
             worker_body = (
-                f"Thanks for confirming. The owner must complete payment before you are locked in. {offer_details['shift_summary']}"
+                f"Your shift is reserved, not yet confirmed. The pharmacy must pay before {offer.payment_due_at.isoformat()}. {offer_details['shift_summary']}"
                 if requires_payment
                 else f"You are confirmed for a shift at {pharmacy_display}. {offer_details['shift_summary']}"
             )
@@ -512,8 +512,10 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             notify_shift_users(
                 [owner_user],
                 shift=shift,
-                title=f"{worker_role_label} confirmed: {pharmacy_display}",
-                body=f"{worker_name} confirmed your shift offer." + (" Payment is required to finalize." if requires_payment else ""),
+                title=(f"{worker_role_label} reserved: {pharmacy_display}" if requires_payment
+                       else f"{worker_role_label} confirmed: {pharmacy_display}"),
+                body=(f"{worker_name} accepted. Reservation expires at {offer.payment_due_at.isoformat()} unless payment completes."
+                      if requires_payment and offer.payment_due_at else f"{worker_name} confirmed your shift offer."),
                 kind="shift_worker_confirmed",
                 payload={
                     "offer_id": offer.id,
