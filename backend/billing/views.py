@@ -620,6 +620,8 @@ def charge_shift_fulfillment(request, shift_id):
         )
     if offer_ids and len(selected_payable) != len(offer_ids):
         return Response({'error': 'Some selected reservations are unavailable.'}, status=status.HTTP_409_CONFLICT)
+    if not offer_ids and not slot_ids and candidate_id and not selected_payable:
+        return Response({'error': 'Selected candidate has no payable reservation.'}, status=status.HTTP_409_CONFLICT)
 
     # The payment is for these exact reservations, even when a legacy
     # caller supplied only shift_id or slot_ids. This immutable snapshot goes
