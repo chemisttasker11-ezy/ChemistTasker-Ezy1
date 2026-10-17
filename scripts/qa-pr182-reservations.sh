@@ -21,7 +21,7 @@ export MOBILEMESSAGE_PASSWORD="${MOBILEMESSAGE_PASSWORD:-qa-placeholder}"
 export MOBILEMESSAGE_SENDER="${MOBILEMESSAGE_SENDER:-ChemistTasker}"
 python3 backend/manage.py check --settings=core.contract_test_settings
 python3 backend/manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
-python3 backend/manage.py test shifts.test_reservations shifts.test_distribution_boundaries shifts.test_deletion_safety shifts.test_access_escalation_contract workforce.tests.test_roster_escalation billing.tests.StripeWebhookIdempotencyTests core.test_task_contracts --settings=core.contract_test_settings --verbosity=2 --noinput
+python3 backend/manage.py test shifts.test_reservations shifts.test_cancellation_policy shifts.test_distribution_boundaries shifts.test_deletion_safety shifts.test_access_escalation_contract workforce.tests.test_roster_escalation billing.tests.StripeWebhookIdempotencyTests core.test_task_contracts --settings=core.contract_test_settings --verbosity=2 --noinput
 # Explicit opt-in: never point this at production/staging.
 if [ "${PR182_TEST_POSTGRES:-0}" = "1" ]; then
   test "${LOCAL_DB_NAME:-}" = "chemisttasker_ci" || { echo "Expected dedicated chemisttasker_ci database"; exit 3; }
