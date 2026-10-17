@@ -32,8 +32,9 @@ def start_at(shift, offer, *, now=None):
             entry["date"], offer.offered_start_time or entry["start_time"],
         ), zone) > now
     ]
-    if future_matches:
-        matches = future_matches
+    if not future_matches:
+        return None
+    matches = future_matches
     earliest = min(matches, key=lambda entry: (entry["date"], entry["start_time"]))
     return timezone.make_aware(
         datetime.combine(earliest["date"], offer.offered_start_time or earliest["start_time"]),
