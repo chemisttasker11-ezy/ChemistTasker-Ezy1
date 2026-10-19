@@ -27,22 +27,14 @@
     // Selectors from the AHPRA register DOM (same ones the old ScrapingBee flow used).
     const recordReady = () => !!document.querySelector('.practitioner-detail-header .practitioner-name') &&
       normalize(pageText()).includes(number);
-    const resultLinks = () => [...document.querySelectorAll('.search-results-table-row .search-results-table-col .text a')]
-      .filter(a => a.getClientRects().length);
+    const resultSelector = '.search-results-table-row .search-results-table-col .text a';
+    const resultLinks = () => [...document.querySelectorAll(resultSelector)].filter(a => a.getClientRects().length);
     const setStep = step => chrome.runtime.sendMessage({type: 'step', check_id: job.check_id, step});
-    // AHPRA ignores a bare element.click(), so replay the whole pointer/mouse sequence at the element's centre.
-    // shortcut: synthetic events are untrusted; if AHPRA checks isTrusted, a trusted click (chrome.debugger) is needed.
-    function realClick(element) {
-      element.scrollIntoView({block: 'center'});
-      const rect = element.getBoundingClientRect();
-      const at = {bubbles: true, cancelable: true, composed: true, view: window, button: 0,
-        clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2};
-      const target = document.elementFromPoint(at.clientX, at.clientY) || element;
-      for (const type of ['pointerover', 'mouseover', 'pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
-        target.dispatchEvent(new (type.startsWith('pointer') ? PointerEvent : MouseEvent)(type, {...at, buttons: /down/.test(type) ? 1 : 0}));
-      }
-      target.focus?.();
-      target.click();
+    // The background clicks in the page's world (index counts visible matches), so AHPRA's javascript: links may run.
+    async function pageClick(selector, index = 0) {
+      // Background errors come back as {error}; a rejection means the click already navigated this page away.
+      const response = await chrome.runtime.sendMessage({type: 'click', selector, index}).catch(() => ({clicked: true}));
+      if (!response?.clicked) throw new Error(response?.error || `AHPRA element ${selector} could not be clicked`);
     }
     let outcome = 'error', register = null, error = '';
     try {
@@ -60,7 +52,7 @@
         const button = await waitFor(() => document.querySelector('#predictiveSearchHomeBtn'), 5000);
         if (!button) throw new Error('AHPRA search button was not found');
         await setStep('submitted');
-        realClick(button);
+        await pageClick('#predictiveSearchHomeBtn');
       }
       if (job.step !== 'opened') {
         const found = await waitFor(() => recordReady() ? 'record' : resultLinks().length ? 'results' : noResults() ? 'none' : null, 20000);
@@ -71,10 +63,10 @@
           const links = resultLinks();
           if (links.length !== 1) throw new Error(`Expected one search result, found ${links.length}`);
           await setStep('opened');
-          realClick(links[0]);
+          await pageClick(resultSelector);
         }
       }
-      if (outcome !== 'not_found' && !await waitFor(recordReady, 15000)) throw new Error('Practitioner record did not load');
+      if (outcome !== 'not_found' && !await waitFor(recordReady, job.attemptDeadline - Date.now())) throw new Error('Practitioner record did not load');
       if (outcome !== 'not_found') {
         checkChallenge();
         register = parseRecordText(pageText(), number);

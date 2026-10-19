@@ -100,21 +100,40 @@ async function pump() {
   pumping = true;
   const job = state.queue.shift();
   state.lastStarted = Date.now();
-  state.active = {...job, tabId: null, step: 'search', deadline: Date.now() + 60000};
+  // Two attempts of 60 seconds each; the overall deadline bounds both.
+  state.active = {...job, tabId: null, step: 'search', deadline: Date.now() + 120000, attemptDeadline: Date.now() + 60000};
   try {
     await save();
-    // Create blank first so the tab belongs to this job before navigation completes.
-    const tab = await chrome.tabs.create({url: 'about:blank', active: false});
-    state.active.tabId = tab.id;
-    await save();
-    jobTimer = setTimeout(() => void finish(job.check_id, 'error', null, 'Lookup timed out after 60 seconds'), Math.max(0, state.active.deadline - Date.now()));
-    await chrome.tabs.update(tab.id, {url: REGISTER_URL});
+    jobTimer = setTimeout(() => void finish(job.check_id, 'error', null, 'Lookup timed out after 120 seconds'), 120000);
+    await openTab(state.active);
   } catch (error) { await finish(job.check_id, 'error', null, error.message); }
   finally { pumping = false; void pump(); }
+}
+async function openTab(job) {
+  // Create blank first so the tab belongs to this job before navigation completes.
+  const tab = await chrome.tabs.create({url: 'about:blank', active: false});
+  job.tabId = tab.id;
+  await save();
+  await chrome.tabs.update(tab.id, {url: REGISTER_URL});
+}
+// A slow AHPRA page load is a flake, so retry once in a fresh tab; parse errors and challenges are not retried.
+async function retry(job) {
+  const oldTab = job.tabId;
+  Object.assign(job, {tabId: null, step: 'search', retried: true, attemptDeadline: Math.min(Date.now() + 60000, job.deadline - 5000)});
+  try {
+    await save();
+    // tabId is cleared first so onRemoved does not finish the check.
+    if (oldTab != null) await chrome.tabs.remove(oldTab).catch(() => {});
+    await openTab(job);
+  } catch (error) { await finish(job.check_id, 'error', null, error.message); }
 }
 async function finish(checkId, outcome, record, error = '') {
   if (!state.active || state.active.check_id !== checkId) return;
   const job = state.active;
+  if (outcome === 'error' && !job.retried && ['Practitioner record did not load', 'AHPRA returned no recognizable search results'].includes(error)) {
+    await retry(job);
+    return;
+  }
   clearTimeout(jobTimer);
   state.active = null;
   if (outcome === 'blocked') state.paused = true;
@@ -151,7 +170,7 @@ chrome.tabs.onRemoved.addListener(tabId => {
 });
 chrome.alarms.onAlarm.addListener(() => {
   void initialized.then(async () => {
-    if (state.active && Date.now() >= state.active.deadline) await finish(state.active.check_id, 'error', null, 'Lookup timed out after 60 seconds');
+    if (state.active && Date.now() >= state.active.deadline) await finish(state.active.check_id, 'error', null, 'Lookup timed out after 120 seconds');
     if (Date.now() >= nextConnectAt) connect();
     void pump();
   });
@@ -170,6 +189,17 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     if (sender.origin !== self.location.origin) {
       if (sender.tab.id !== state.active?.tabId || sender.frameId !== 0) return {};
       if (message.type === 'lookup') return state.active;
+      // AHPRA's links are javascript: URLs, which the extension CSP blocks; clicking in the page's world uses its CSP.
+      if (message.type === 'click') {
+        const [{result}] = await chrome.scripting.executeScript({target: {tabId: sender.tab.id}, world: 'MAIN',
+          args: [String(message.selector), Number(message.index) || 0],
+          func: (selector, index) => {
+            const element = [...document.querySelectorAll(selector)].filter(e => e.getClientRects().length)[index];
+            element?.click();
+            return !!element;
+          }});
+        return {clicked: result};
+      }
       // Steps only move forward, so a page reload never repeats the search for this check.
       if (message.type === 'step' && message.check_id === state.active.check_id &&
           ['submitted', 'opened'].includes(message.step)) { state.active.step = message.step; await save(); }
