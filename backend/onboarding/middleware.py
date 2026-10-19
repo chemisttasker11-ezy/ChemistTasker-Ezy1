@@ -26,7 +26,7 @@ class AhpraFreezeMiddleware(MiddlewareMixin):
         if name in {
             'browser-csrf', 'custom_token_obtain_pair', 'token_refresh', 'logout', 'me', 'mobile-app-config',
             'owner-onboarding-me', 'pharmacist-onboarding-me', 'otherstaff-onboarding-me',
-            'explorer-onboarding-me', 'ahpra-recheck',
+            'explorer-onboarding-me', 'ahpra-recheck', 'ahpra-test-key-lookup',
         }:
             return None
         if name in ('notification-list', 'notification-detail') and request.method in ('GET', 'HEAD', 'OPTIONS'):

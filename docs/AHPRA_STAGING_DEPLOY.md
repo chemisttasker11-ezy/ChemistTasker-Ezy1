@@ -357,16 +357,27 @@ after the web restart).
   never touch a real profile.
 - Done check: one lookup with a number the owner supplies comes back with an
   outcome. Do not write that number anywhere.
+- Secret URL for the owner (no login, max 30 lookups an hour, same setting):
+  1. On the server: `python3 -c "import secrets;print(secrets.token_urlsafe(32))"`.
+  2. Put `AHPRA_TEST_LOOKUP_KEY=<key>` in `env/staging.secrets.env`.
+  3. Redeploy web: `bash scripts/deploy-staging.sh`.
+  4. Give the owner `https://staging.chemisttasker.com.au/api/v1/ahpra-test/<key>/`.
+  A missing, short (under 32 characters) or wrong key returns 404.
 - Turn it off: set `STAGING_AHPRA_TEST_LOOKUP_ENABLED=0` in
   `env/staging.runtime.env` and redeploy. The page then returns 404.
 - Delete it later (a code change, done in the repo, not on the server):
   - `backend/onboarding/ahpra_test_lookup.py`
   - `backend/onboarding/test_ahpra_test_lookup.py`
-  - `backend/onboarding/templates/admin/ahpra_test_lookup.html`
+  - `backend/onboarding/templates/admin/ahpra_test_lookup.html` and
+    `ahpra_test_lookup_body.html` next to it
+  - `backend/onboarding/templates/onboarding/ahpra_test_lookup_public.html`
+  - the `ahpra-test-key-lookup` route in `backend/onboarding/urls.py` and its
+    name in `backend/onboarding/middleware.py`
   - the `get_urls` override in `backend/core/admin_site.py`
-  - `AHPRA_TEST_LOOKUP_ENABLED` in `backend/core/settings.py`
-  - the `AHPRA_TEST_LOOKUP_ENABLED` line in `docker-compose.staging.yml`
-  - `STAGING_AHPRA_TEST_LOOKUP_ENABLED` in `env/staging.runtime.env`
+  - `AHPRA_TEST_LOOKUP_ENABLED` and `AHPRA_TEST_LOOKUP_KEY` in `backend/core/settings.py`
+  - the `AHPRA_TEST_LOOKUP_ENABLED` and `AHPRA_TEST_LOOKUP_KEY` lines in `docker-compose.staging.yml`
+  - `STAGING_AHPRA_TEST_LOOKUP_ENABLED` in `env/staging.runtime.env` and
+    `AHPRA_TEST_LOOKUP_KEY` in `env/staging.secrets.env`
 
 ## 13. Rollback
 

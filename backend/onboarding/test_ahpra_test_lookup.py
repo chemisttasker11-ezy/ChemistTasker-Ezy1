@@ -146,3 +146,60 @@ class AhpraTestLookupTests(TestCase):
         self.assertEqual(len(response.context['checks']), 20)
         self.assertNotIn(pending.pk, [check.pk for check in response.context['checks']])
         self.assertContains(response, 'http-equiv="refresh" content="5"')
+
+
+KEY = 'k' * 32
+
+
+@override_settings(
+    AHPRA_TEST_LOOKUP_ENABLED=True, AHPRA_TEST_LOOKUP_KEY=KEY, AHPRA_SOURCE='desktop', CACHES=TEST_CACHES,
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', SECURE_SSL_REDIRECT=False,
+)
+class AhpraKeyLookupTests(TestCase):
+    def setUp(self):
+        caches['ahpra'].clear()
+        self.url = reverse('api_v1:ahpra-test-key-lookup', args=[KEY])
+        self.data = {'registration_number': NUMBER, 'first_name': 'Jane', 'last_name': 'Doe', 'role': 'pharmacist'}
+
+    def test_disabled_short_or_wrong_key_returns_404(self):
+        wrong = reverse('api_v1:ahpra-test-key-lookup', args=['x' * 32])
+        for url, overrides in ((self.url, {'AHPRA_TEST_LOOKUP_ENABLED': False}),
+                               (self.url, {'AHPRA_TEST_LOOKUP_KEY': ''}), (wrong, {})):
+            with self.settings(**overrides):
+                self.assertEqual(self.client.get(url).status_code, 404)
+                self.assertEqual(self.client.post(url, self.data).status_code, 404)
+        with self.settings(AHPRA_TEST_LOOKUP_KEY='short'):
+            self.assertEqual(self.client.get(reverse('api_v1:ahpra-test-key-lookup', args=['short'])).status_code, 404)
+        self.assertFalse(AhpraCheck.objects.exists())
+
+    def test_anonymous_lookup_queues_test_check_only(self):
+        self.assertContains(self.client.get(self.url), 'csrfmiddlewaretoken')
+        profile = PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'), ahpra_number=NUMBER)
+        before = PharmacistOnboarding.objects.filter(pk=profile.pk).values().get()
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(self.url, self.data)
+        self.assertRedirects(response, self.url, fetch_redirect_response=False)
+        check = AhpraCheck.objects.get()
+        self.assertEqual((check.model_name, check.status, check.stage), (TEST_MODEL, 'pending', 'bridge'))
+        self.assertEqual(PharmacistOnboarding.objects.filter(pk=profile.pk).values().get(), before)
+        self.assertEqual(mail.outbox, [])
+        self.assertContains(self.client.get(self.url), 'http-equiv="refresh" content="5"')
+
+    def test_thirty_first_lookup_in_an_hour_refused(self):
+        for _ in range(30):
+            self.assertEqual(self.client.post(self.url, self.data).status_code, 302)
+        self.assertContains(self.client.post(self.url, self.data), 'Too many test lookups')
+        self.assertEqual(AhpraCheck.objects.count(), 30)
+
+    def test_cache_failure_refuses_politely(self):
+        with patch('onboarding.ahpra_test_lookup.caches') as broken:
+            broken.__getitem__.return_value.incr.side_effect = ConnectionError
+            self.assertContains(self.client.post(self.url, self.data), 'Too many test lookups')
+        self.assertFalse(AhpraCheck.objects.exists())
+
+    def test_delete_removes_only_test_checks(self):
+        self.client.post(self.url, self.data)
+        real = AhpraCheck.objects.create(model_name='PharmacistOnboarding', object_pk=1,
+                                         registration_number=NUMBER, reason='onboarding')
+        self.assertRedirects(self.client.post(self.url, {'action': 'delete'}), self.url, fetch_redirect_response=False)
+        self.assertEqual(list(AhpraCheck.objects.values_list('pk', flat=True)), [real.pk])

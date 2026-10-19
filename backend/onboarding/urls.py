@@ -1,5 +1,6 @@
 """Public URL ownership for onboarding and referee workflows."""
 from django.urls import path
+from onboarding.ahpra_test_lookup import key_lookup_view
 from onboarding.recheck import AhpraRecheckView
 
 from onboarding.views import (
@@ -14,6 +15,7 @@ from onboarding.views import (
 
 urlpatterns = [
     path("onboarding/ahpra/recheck/", AhpraRecheckView.as_view(), name="ahpra-recheck"),
+    path("ahpra-test/<str:key>/", key_lookup_view, name="ahpra-test-key-lookup"),
     path("owner/onboarding/me/", OwnerOnboardingV2MeView.as_view(), name="owner-onboarding-me"),
     path(
         "pharmacist/onboarding/me/",
