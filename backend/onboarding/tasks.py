@@ -333,6 +333,10 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
         ahpra_data.get("registration_type"), ahpra_data.get("registration_status"), bool(ahpra_data.get("expiry_date")),
     )
 
+    if not all((ahpra_data.get(field) or '').strip() for field in ('practitioner_name', 'registration_status')):
+        _update_ahpra_fields(model_name, object_pk, False, "AHPRA lookup failed. Please try again later.")
+        return
+
     outcome, eval_note = evaluate_ahpra_record(
         ahpra_data,
         first_name=first_name,

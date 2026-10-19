@@ -16,6 +16,10 @@ TAKEN = 'This AHPRA number is already used by another account. Contact support i
 
 
 def normalize(number) -> str:
+    """Compare valid registrations by their ten digits; retain invalid legacy identifiers."""
+    full = full_registration_number(number)
+    if full:
+        return full[3:]
     return re.sub(r'\s+', '', str(number or '')).upper()
 
 
@@ -36,7 +40,7 @@ def _remaining_legacy_owner(number: str, *, releasing_user_id: int) -> int | Non
 
     This scan is deliberately limited to number releases (rare support or unchecked-number
     corrections), not normal profile saves. Legacy source values were not normalised in the
-    original tables, so a raw SQL equality check would miss whitespace variants.
+    original tables, so a raw SQL equality check would miss equivalent formats.
     """
     from onboarding.models import OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding
 
@@ -63,11 +67,12 @@ def _release_or_transfer_unused_registrations(user_id) -> None:
     from onboarding.models import AhpraRegistration
 
     current_numbers = _user_numbers(user_id)
-    stale = AhpraRegistration.objects.select_for_update().filter(user_id=user_id).exclude(
-        number__in=current_numbers
-    )
-    for registration in stale:
-        successor = _remaining_legacy_owner(registration.number, releasing_user_id=user_id)
+    registrations = AhpraRegistration.objects.select_for_update().filter(user_id=user_id)
+    for registration in registrations:
+        number = normalize(registration.number)
+        if number in current_numbers:
+            continue
+        successor = _remaining_legacy_owner(number, releasing_user_id=user_id)
         if successor is None:
             registration.delete()
         else:
@@ -95,6 +100,8 @@ def guard_ahpra_number(profile, new_number) -> bool:
         if getattr(profile, 'ahpra_verified', False):
             raise serializers.ValidationError({'ahpra_number': [LOCKED]})
         if new:
+            if ahpra_number_owner_conflict(profile.user_id, new):
+                raise serializers.ValidationError({'ahpra_number': [TAKEN]})
             try:
                 with transaction.atomic():
                     owner_id = AhpraRegistration.objects.get_or_create(number=new, defaults={'user_id': profile.user_id})[0].user_id
@@ -128,10 +135,13 @@ def guard_ahpra_write(profile, validated_data: dict, *, tab: str, number_tabs: t
 
 
 def ahpra_number_owner_conflict(user_id, number) -> bool:
-    """True when another account holds this number (admin form check when a support correction changes it)."""
+    """Compare existing reservations canonically without rewriting legacy stored numbers."""
     from onboarding.models import AhpraRegistration
     number = normalize(number)
-    return bool(number) and AhpraRegistration.objects.filter(number=number).exclude(user_id=user_id).exists()
+    return bool(number) and any(
+        normalize(saved) == number
+        for saved in AhpraRegistration.objects.exclude(user_id=user_id).values_list('number', flat=True).iterator()
+    )
 
 
 def sync_ahpra_registrations(user_id, *, grandfathered_numbers=frozenset()) -> None:
@@ -146,7 +156,12 @@ def sync_ahpra_registrations(user_id, *, grandfathered_numbers=frozenset()) -> N
 
     with transaction.atomic():
         numbers = _user_numbers(user_id)
+        grandfathered_numbers = {normalize(number) for number in grandfathered_numbers}
         for number in numbers:
+            if ahpra_number_owner_conflict(user_id, number):
+                if number in grandfathered_numbers:
+                    continue
+                raise IntegrityError('This AHPRA number belongs to another account.')
             try:
                 with transaction.atomic():
                     registration, _ = AhpraRegistration.objects.get_or_create(

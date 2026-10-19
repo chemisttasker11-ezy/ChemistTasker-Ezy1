@@ -81,6 +81,21 @@ class DesktopTests(TestCase):
                 else:
                     self.assertEqual(self.profile.ahpra_verification_note, 'Previously verified')
 
+    def test_found_without_name_or_status_is_error_and_leaves_profile_unchanged(self):
+        self.profile.ahpra_verified = True
+        self.profile.ahpra_verification_note = 'Previously verified'
+        self.profile.ahpra_registration_status = 'Registered'
+        self.profile.save()
+        before = PharmacistOnboarding.objects.filter(pk=self.profile.pk).values().get()
+        for field in ('name', 'registration_status'):
+            for blank in ('', '   '):
+                with self.subTest(field=field, blank=blank):
+                    check = check_fixture(self.profile)
+                    self.assertTrue(apply_ahpra_result(check, result(check.pk, **{field: blank})))
+                    check.refresh_from_db()
+                    self.assertEqual(check.outcome, 'error')
+                    self.assertEqual(PharmacistOnboarding.objects.filter(pk=self.profile.pk).values().get(), before)
+
     def test_shape_validation(self):
         good = result(1)
         self.assertTrue(valid_result(good))

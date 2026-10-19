@@ -101,6 +101,8 @@ def apply_ahpra_result(check, payload):
     note = payload['error']
     if profile is None or full_registration_number(profile.ahpra_number) != check.registration_number:
         outcome, note = 'error', 'Profile missing or registration number changed; manual review required.'
+    elif outcome == 'found' and not all(record[field].strip() for field in ('name', 'registration_status')):
+        outcome, note = 'error', 'AHPRA practitioner record incomplete. Please try again later.'
     elif outcome == 'found':
         from onboarding.tasks import _resolve_ahpra_role
         outcome, note = evaluate_ahpra_record(

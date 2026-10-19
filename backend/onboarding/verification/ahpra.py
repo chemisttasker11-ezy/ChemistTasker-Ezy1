@@ -201,6 +201,9 @@ def evaluate_ahpra_record(record: dict, *, first_name, last_name, role) -> tuple
         except Exception:
             return ("review", f"Could not parse expiry date: '{expiry_val}'")
 
+    if expiry_date is None:
+        return ("review", "Registration expiry date is missing or invalid.")
+
     today = timezone.now().date()
     if expiry_date and expiry_date < today:
         return ("review", f"Registration expired on {expiry_date.strftime('%d/%m/%Y')}")

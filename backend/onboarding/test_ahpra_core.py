@@ -5,15 +5,60 @@ import tempfile
 from unittest import mock
 
 from django.test import TestCase
+from django.db import IntegrityError
+from rest_framework.exceptions import ValidationError
 
 from client_profile.characterization_support import make_user
-from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
-from onboarding.tasks import verify_ahpra_task
+from onboarding.models import AhpraRegistration, OtherStaffOnboarding, PharmacistOnboarding
+from onboarding.tasks import _has_successful_lookup, verify_ahpra_task
 from onboarding.verification.ahpra import (
     evaluate_ahpra_record,
     parse_ahpra_html,
 )
-from onboarding.verification.ahpra_numbers import full_registration_number
+from onboarding.verification.ahpra_numbers import (
+    ahpra_number_owner_conflict, full_registration_number, guard_ahpra_number,
+    normalize, sync_ahpra_registrations,
+)
+
+
+class AhpraCanonicalOwnershipTests(TestCase):
+    def test_equivalent_numbers_cannot_be_claimed_by_a_second_user(self):
+        owner = make_user('PHARMACIST')
+        held = PharmacistOnboarding.objects.create(user=owner, ahpra_number='1234567')
+        claimant = PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'))
+        for stored in ('1234567', '0001234567', 'PHA0001234567', 'pha 000-1234567'):
+            with self.subTest(stored=stored):
+                AhpraRegistration.objects.all().delete()
+                registration = AhpraRegistration.objects.create(user=owner, number=stored)
+                self.assertEqual(normalize(stored), '0001234567')
+                self.assertTrue(ahpra_number_owner_conflict(claimant.user_id, 'PHA0001234567'))
+                with self.assertRaises(ValidationError):
+                    guard_ahpra_number(claimant, 'PHA0001234567')
+                claimant.ahpra_number = 'PHA0001234567'
+                claimant.save(update_fields=['ahpra_number'])
+                with self.assertRaises(IntegrityError):
+                    sync_ahpra_registrations(claimant.user_id)
+                claimant.ahpra_number = None
+                claimant.save(update_fields=['ahpra_number'])
+                registration.refresh_from_db()
+                self.assertEqual(registration.number, stored)
+        held.refresh_from_db()
+        self.assertEqual(held.ahpra_number, '1234567')
+
+    def test_sync_preserves_legacy_format_and_transfers_equivalent_reservation(self):
+        owner = make_user('PHARMACIST')
+        held = PharmacistOnboarding.objects.create(user=owner, ahpra_number='1234567')
+        registration = AhpraRegistration.objects.create(user=owner, number='PHA0001234567')
+        sync_ahpra_registrations(owner.pk)
+        registration.refresh_from_db()
+        self.assertEqual(registration.number, 'PHA0001234567')
+        legacy = PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'), ahpra_number='0001234567')
+        sync_ahpra_registrations(legacy.user_id, grandfathered_numbers={'PHA0001234567'})
+        held.ahpra_number = None
+        held.save(update_fields=['ahpra_number'])
+        sync_ahpra_registrations(owner.pk)
+        registration.refresh_from_db()
+        self.assertEqual(registration.user_id, legacy.user_id)
 
 
 class AhpraNumberFormatTests(TestCase):
@@ -51,6 +96,18 @@ class AhpraNumberFormatTests(TestCase):
 
 
 class EvaluateAhpraRecordTests(TestCase):
+    def test_missing_or_empty_expiry_requires_review(self):
+        for expiry in ('missing', None, '', '   '):
+            with self.subTest(expiry=expiry):
+                record = self.base_record(expiry_date=expiry)
+                if expiry == 'missing':
+                    del record['expiry_date']
+                outcome, note = evaluate_ahpra_record(
+                    record, first_name='Jane', last_name='Doe', role='pharmacist'
+                )
+                self.assertEqual(outcome, 'review')
+                self.assertIn('expiry', note)
+
     def base_record(self, **overrides):
         record = {
             "practitioner_name": "Jane Doe",
@@ -256,6 +313,38 @@ class ParseAhpraHtmlTests(TestCase):
 
 
 class VerifyAhpraTaskIntegrationTests(TestCase):
+    def test_error_or_incomplete_pages_allow_a_successful_retry(self):
+        for missing in ('both', 'practitioner_name', 'registration_status'):
+            with self.subTest(missing=missing):
+                PharmacistOnboarding.objects.filter(pk=self.pharmacist.pk).update(
+                    ahpra_verified=False, ahpra_registration_status=None, ahpra_verification_note=''
+                )
+
+                def incomplete_lookup(number, path, api_key=None):
+                    if missing == 'both':
+                        with open(path, 'w', encoding='utf-8') as page:
+                            page.write('<html><body>Challenge: please try again</body></html>')
+                    else:
+                        self.write_html_page(path, status='' if missing == 'registration_status' else 'Registered')
+                        if missing == 'practitioner_name':
+                            with open(path, encoding='utf-8') as page:
+                                html = page.read().replace(self.user.get_full_name(), ' ')
+                            with open(path, 'w', encoding='utf-8') as page:
+                                page.write(html)
+
+                args = ('PharmacistOnboarding', self.pharmacist.pk, '1234567', 'Jane', 'Doe', self.user.email)
+                with mock.patch('onboarding.tasks.ahpra_lookup', side_effect=incomplete_lookup):
+                    verify_ahpra_task(*args)
+                self.pharmacist.refresh_from_db()
+                self.assertFalse(_has_successful_lookup(self.pharmacist))
+                self.assertIn('try again', self.pharmacist.ahpra_verification_note)
+                self.assertFalse(self.pharmacist.ahpra_registration_status)
+                with mock.patch('onboarding.tasks.ahpra_lookup', side_effect=lambda number, path, api_key=None: self.write_html_page(path)) as lookup:
+                    verify_ahpra_task(*args)
+                lookup.assert_called_once()
+                self.pharmacist.refresh_from_db()
+                self.assertTrue(self.pharmacist.ahpra_verified)
+
     def setUp(self):
         self.user = make_user("PHARMACIST", first_name="Jane", last_name="Doe")
         self.pharmacist = PharmacistOnboarding.objects.create(

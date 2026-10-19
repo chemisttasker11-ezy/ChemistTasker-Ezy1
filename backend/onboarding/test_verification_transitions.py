@@ -71,7 +71,7 @@ class AhpraNumberTests(TestCase):
         PharmacistOnboarding.objects.create(user=pharmacist)
         response = client_for(pharmacist).patch(PHARMACIST_URL, {'tab': 'basic', 'ahpra_number': 'PHA 0000000009'}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(AhpraRegistration.objects.get(number='PHA0000000009').user_id, pharmacist.pk)
+        self.assertEqual(AhpraRegistration.objects.get(number='0000000009').user_id, pharmacist.pk)
         profile = worker(role_type='INTERN')
         response = client_for(profile.user).patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': 'pha0000000009'}, format='json')
         self.assertEqual(response.status_code, 400, response.data)
@@ -91,7 +91,7 @@ class AhpraNumberTests(TestCase):
         client = client_for(profile.user)
         for number in ('PHA0000000011', 'PHA0000000012'):
             self.assertEqual(client.patch(STAFF_URL, {'tab': 'regulatory', 'ahpra_number': number}, format='json').status_code, 200)
-        self.assertEqual(set(AhpraRegistration.objects.filter(user=profile.user).values_list('number', flat=True)), {'PHA0000000012'})
+        self.assertEqual(set(AhpraRegistration.objects.filter(user=profile.user).values_list('number', flat=True)), {'0000000012'})
         owner_profile = OwnerOnboarding.objects.create(user=profile.user)
         self.assertTrue(guard_ahpra_number(owner_profile, 'PHA0000000012'))  # same person: allowed
 
@@ -351,7 +351,7 @@ class AhpraConcurrentClaimTests(TransactionTestCase):
         statuses = sorted((results.get_nowait() for _ in threads), key=str)
         self.assertEqual(statuses, [200, 400])
         self.assertEqual(PharmacistOnboarding.objects.filter(ahpra_number='PHA0000000099').count(), 1)
-        self.assertEqual(AhpraRegistration.objects.filter(number='PHA0000000099').count(), 1)
+        self.assertEqual(AhpraRegistration.objects.filter(number='0000000099').count(), 1)
 
 
 class AhpraSupportCorrectionTests(TestCase):
