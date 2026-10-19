@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import hashlib
 from datetime import timedelta
@@ -14,7 +15,7 @@ from django.utils import timezone
 
 from client_profile.characterization_support import make_user
 from onboarding.admin import AhpraCheckAdmin
-from onboarding.models import AhpraCheck, PharmacistOnboarding
+from onboarding.models import AhpraCheck, OtherStaffOnboarding, PharmacistOnboarding
 from onboarding.routing import websocket_urlpatterns
 from onboarding.tasks import alert_overdue_ahpra_checks, recheck_ahpra_registrations, verify_ahpra_task
 from onboarding.verification.desktop import apply_ahpra_result, claim_checks, enqueue_check, valid_result
@@ -176,6 +177,39 @@ class DesktopTests(TestCase):
         recheck_ahpra_registrations()
         self.assertEqual(AhpraCheck.objects.filter(status='pending').count(), 1)
 
+    @patch('onboarding.verification.desktop.PROFILE_MODELS', ('OtherStaffOnboarding', 'PharmacistOnboarding'))
+    def test_recheck_intern_by_age_then_pharmacist(self):
+        intern = OtherStaffOnboarding.objects.create(
+            user=make_user(), role_type='INTERN', ahpra_number='PHA0007654321', ahpra_verified=True,
+        )
+        self.profile.ahpra_verified = True
+        self.profile.save()
+        completed = AhpraCheck.objects.create(
+            model_name='OtherStaffOnboarding', object_pk=intern.pk,
+            registration_number=intern.ahpra_number, reason='onboarding',
+            status='done', completed_at=timezone.now(),
+        )
+        recheck_ahpra_registrations()
+        self.assertFalse(AhpraCheck.objects.filter(model_name='OtherStaffOnboarding', status='pending').exists())
+        AhpraCheck.objects.filter(pk=completed.pk).update(completed_at=timezone.now() - timedelta(days=31))
+        AhpraCheck.objects.filter(model_name='PharmacistOnboarding').delete()
+        recheck_ahpra_registrations()
+        self.assertSetEqual(
+            set(AhpraCheck.objects.filter(status='pending').values_list('model_name', 'object_pk', 'reason')),
+            {('OtherStaffOnboarding', intern.pk, 'recheck'), ('PharmacistOnboarding', self.profile.pk, 'recheck')},
+        )
+
+    @patch('onboarding.verification.desktop.enqueue_check', side_effect=[ValueError('bad profile'), None])
+    def test_recheck_logs_bad_profile_and_continues(self, enqueue):
+        later = profile_fixture()
+        PharmacistOnboarding.objects.filter(pk__in=[self.profile.pk, later.pk]).update(ahpra_verified=True)
+        with self.assertLogs('onboarding.tasks', level='ERROR') as logs:
+            recheck_ahpra_registrations()
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn('ValueError', logs.output[0])
+        self.assertEqual(enqueue.call_count, 2)
+        self.assertSetEqual({call.args[0].pk for call in enqueue.call_args_list}, {self.profile.pk, later.pk})
+
     def test_overdue_once_and_excludes_done_and_fresh(self):
         check = check_fixture(self.profile)
         alert_overdue_ahpra_checks()
@@ -256,6 +290,37 @@ class VerifierSocketTests(TransactionTestCase):
         socket = self.communicator([(b'authorization', b'Bearer bad')])
         self.assertEqual(await socket.connect(), (False, 4401))
         await socket.disconnect()
+
+    async def test_heartbeat_reclaims_stale_sent_check_without_reconnect(self):
+        await database_sync_to_async(AhpraCheck.objects.filter(pk=self.check.pk).update)(
+            status='sent', sent_at=timezone.now(),
+        )
+        tick = asyncio.Event()
+
+        async def wait_for_tick(seconds):
+            await tick.wait()
+            tick.clear()
+
+        with patch('onboarding.consumers.asyncio', SimpleNamespace(
+                create_task=asyncio.create_task, sleep=wait_for_tick)):
+            socket = self.communicator()
+            try:
+                self.assertTrue((await socket.connect())[0])
+                await socket.send_json_to({'type': 'hello', 'agent': 'bridge', 'token': TOKEN})
+                self.assertEqual(await socket.receive_json_from(), {'type': 'ready'})
+                self.assertTrue(await socket.receive_nothing())
+                await database_sync_to_async(AhpraCheck.objects.filter(pk=self.check.pk).update)(
+                    sent_at=timezone.now() - timedelta(minutes=6),
+                )
+                tick.set()
+                self.assertEqual(await socket.receive_json_from(), {'type': 'ping'})
+                self.assertEqual(await socket.receive_json_from(), {
+                    'type': 'check', 'check_id': self.check.pk, 'registration_number': NUMBER,
+                })
+                await database_sync_to_async(self.check.refresh_from_db)()
+                self.assertGreater(self.check.sent_at, timezone.now() - timedelta(minutes=1))
+            finally:
+                await socket.disconnect()
 
     async def test_bad_and_missing_hello_token(self):
         for token in ('bad', None):

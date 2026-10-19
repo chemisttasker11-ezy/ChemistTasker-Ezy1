@@ -43,6 +43,8 @@ class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
             return
         while True:
             await self.send_json({'type': 'ping'})
+            for message in await database_sync_to_async(claim_checks)():
+                await self.send_json(message)
             await asyncio.sleep(30)
 
     async def disconnect(self, code):

@@ -386,16 +386,20 @@ def recheck_ahpra_registrations():
     for model_name in PROFILE_MODELS:
         Model = apps.get_model('client_profile', model_name)
         for profile in Model.objects.filter(ahpra_verified=True).iterator():
-            number = full_registration_number(profile.ahpra_number)
-            if not number:
-                continue
-            last = AhpraCheck.objects.filter(model_name=model_name, object_pk=profile.pk,
-                                            registration_number=number, status='done').order_by('-completed_at').first()
-            expiry = profile.ahpra_expiry_date
-            if (expiry and expiry <= now.date() + datetime.timedelta(days=30)) or (
-                    last is None or last.completed_at is None or
-                    last.completed_at < now - datetime.timedelta(days=settings.AHPRA_RECHECK_DAYS)):
-                enqueue_check(profile, number, 'recheck')
+            try:
+                number = full_registration_number(profile.ahpra_number)
+                if not number:
+                    continue
+                last = AhpraCheck.objects.filter(model_name=model_name, object_pk=profile.pk,
+                                                registration_number=number, status='done').order_by('-completed_at').first()
+                expiry = getattr(profile, 'ahpra_expiry_date', None)
+                if (expiry and expiry <= now.date() + datetime.timedelta(days=30)) or (
+                        last is None or last.completed_at is None or
+                        last.completed_at < now - datetime.timedelta(days=settings.AHPRA_RECHECK_DAYS)):
+                    enqueue_check(profile, number, 'recheck')
+            except Exception as exc:
+                logger.error('[recheck_ahpra_registrations] Failed model=%s pk=%s error_type=%s',
+                             model_name, profile.pk, type(exc).__name__)
 
 
 @shared_task
