@@ -66,11 +66,39 @@ def ahpra_state(profile):
     }
 
 
+def member_suspension_note(status):
+    return (
+        f"Your AHPRA registration shows as {status}, so you can't apply for public shifts. "
+        "Your work with your own pharmacy or organisation isn't affected. Please contact AHPRA."
+    )
+
+
 def require_ahpra_application(user):
     from shifts.access import ShiftActionRefused
     state = ahpra_state(ahpra_profile(user))
+    if state['state'] == 'suspended' and not ahpra_frozen(user, state):
+        state['note'] = member_suspension_note(state['registration_status'])
     if state['state'] in ('not_found', 'suspended'):
         raise ShiftActionRefused({'code': f"ahpra_{state['state']}", 'detail': state['note']}, 403)
+
+
+def require_public_ahpra(user, shift):
+    from shifts.escalation import PUBLIC_LEVEL
+    from shifts.interest import is_public_shift_member_access
+
+    if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(user, shift):
+        require_ahpra_application(user)
+
+
+def ahpra_frozen(user, state=None):
+    from memberships.models import Membership
+
+    state = state or ahpra_state(ahpra_profile(user))
+    # Owner- and organisation-admin invites both create pharmacy Memberships; OrganizationMembership is admin access.
+    return state['state'] == 'suspended' and (
+        str(user.role).upper() == 'OWNER' or not Membership.objects.filter(
+            user=user, pharmacy__isnull=False, is_active=True, status=Membership.Status.ACCEPTED).exists()
+    )
 
 
 def apply_state_transition(profile, previous):
@@ -90,7 +118,7 @@ def apply_state_transition(profile, previous):
     elif current['state'] == 'ok':
         refresh_verified(profile)
     if current['state'] == 'suspended' and previous['state'] != 'suspended':
-        if not profile.user.is_staff:
+        if not profile.user.is_staff and ahpra_frozen(profile.user):
             transaction.on_commit(lambda: close_chat_sockets(profile.user_id), robust=True)
         transaction.on_commit(lambda: announce_suspension(profile, current), robust=True)
 

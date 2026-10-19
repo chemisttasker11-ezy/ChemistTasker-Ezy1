@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from core.task_queue import async_task
+from shifts.interest import is_public_shift_member_access
 from shifts.models import ShiftOffer, ShiftSlotAssignment
 from shifts.notifications import notify_shift_managers
 from workforce.roster.edit_guards import _protect_assignment_history
@@ -20,10 +21,12 @@ def cancel_upcoming_assignments(user):
     upcoming = Q(slot_date__gt=now.date()) | Q(slot_date=now.date(), slot__start_time__gt=now.time())
     upcoming |= Q(slot_date__isnull=True, slot__date__gt=now.date())
     upcoming |= Q(slot_date__isnull=True, slot__date=now.date(), slot__start_time__gt=now.time())
-    assignments = list(ShiftSlotAssignment.objects.select_for_update().filter(upcoming, user=user)
+    assignments = list(ShiftSlotAssignment.objects.select_for_update().filter(upcoming, user=user, shift__visibility='PLATFORM')
                        .select_related('shift__pharmacy', 'slot'))
     cancelled, retained = {}, {}
     for assignment in assignments:
+        if is_public_shift_member_access(user, assignment.shift):
+            continue
         day = assignment.slot_date or assignment.slot.date
         key = (assignment.shift_id, day)
         try:
@@ -36,9 +39,12 @@ def cancel_upcoming_assignments(user):
         # A safety suspension must also remove published roster bookings. QuerySet.delete keeps deletion signals.
         ShiftSlotAssignment.objects.filter(pk=assignment.pk).delete()
     offers = ShiftOffer.objects.select_for_update(of=('self',)).filter(
-        user=user, status__in=[ShiftOffer.Status.ACCEPTED, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
+        user=user, shift__visibility='PLATFORM',
+        status__in=[ShiftOffer.Status.ACCEPTED, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
     ).select_related('shift__pharmacy', 'slot')
     for offer in offers:
+        if is_public_shift_member_access(user, offer.shift):
+            continue
         slots = [offer.slot] if offer.slot_id else offer.shift.slots.all()
         future = [(slot, offer.offered_slot_date or slot.date) for slot in slots]
         future = [(slot, day) for slot, day in future

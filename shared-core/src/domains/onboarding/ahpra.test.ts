@@ -50,7 +50,7 @@ describe('AHPRA recovery contract', () => {
   });
 
   it('always explains suspension and missing registration, preserving the backend message', () => {
-    const summary: AhpraSummary = { state: 'suspended', note: '', registration_status: null,
+    const summary: AhpraSummary = { state: 'suspended', frozen: true, note: '', registration_status: null,
       registration_type: null, expiry_date: null, checked_at: null, recheck_available_at: null };
     expect(ahpraStatusMessage(summary)).toContain('Your account is paused');
     expect(ahpraStatusMessage({ ...summary, state: 'not_found' })).toContain('Check your number');
@@ -67,9 +67,11 @@ describe('AHPRA recovery contract', () => {
 
   it('keeps employer register status through snake and camel case projections and uses the backend note', () => {
     const summary = normalizeVerification({ badges: [{ code: 'AHPRA', state: 'failed' }] }, {
-      state: 'suspended', registrationStatus: 'Suspended', note: 'Please contact AHPRA.',
+      state: 'suspended', frozen: true, registrationStatus: 'Suspended', note: 'Please contact AHPRA.',
     });
     expect(summary?.ahpra?.registration_status).toBe('Suspended');
+    expect(summary?.ahpra?.frozen).toBe(true);
+    expect(normalizeVerification({}, { state: 'suspended', frozen: false })?.ahpra?.frozen).toBe(false);
     expect(verificationRows(summary, 'worker')[0].explainer).toBe('Please contact AHPRA.');
     expect(evidenceExplainer('failed', 'worker', 'AHPRA registration')).not.toContain('Upload');
     expect(evidenceExplainer('failed', 'worker', 'photo ID')).toContain('Upload a clear copy');

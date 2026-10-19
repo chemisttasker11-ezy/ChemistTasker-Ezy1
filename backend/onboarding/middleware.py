@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 from rest_framework.exceptions import APIException
 
-from onboarding.verification.state import ahpra_profile, ahpra_state
+from onboarding.verification.state import ahpra_frozen, ahpra_profile, ahpra_state
 
 
 class AhpraFreezeMiddleware(MiddlewareMixin):
@@ -33,7 +33,7 @@ class AhpraFreezeMiddleware(MiddlewareMixin):
             return None
         if name == 'notification-mark-read' and request.method == 'POST':
             return None
-        state = ahpra_state(ahpra_profile(user))
-        if state['state'] == 'suspended':
-            return JsonResponse({'code': 'ahpra_suspended', 'detail': state['note']}, status=403)
+        if ahpra_frozen(user):
+            state = ahpra_state(ahpra_profile(user))
+            return JsonResponse({'code': 'ahpra_suspended', 'detail': state['note'], 'frozen': True}, status=403)
         return None

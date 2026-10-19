@@ -57,9 +57,10 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
       }
       setSummary(previous => ({
         registration_status: null, registration_type: null, expiry_date: null, checked_at: null, recheck_available_at: null,
-        ...previous, state: value.code === 'ahpra_suspended' ? 'suspended' : 'not_found', note: value.detail || '',
+        ...previous, state: value.code === 'ahpra_suspended' ? 'suspended' : 'not_found', note: value.detail || '', frozen: Boolean(value.frozen),
       }));
-      setRefusal(true);
+      // Only the account freeze sends frozen; a member refused on a public shift stays where they are.
+      setRefusal(Boolean(value.frozen));
     });
     void load();
     return () => { active = false; generation.current += 1; unsubscribe(); };

@@ -54,10 +54,10 @@ export default function ProtectedRoute({
 
   if (location.pathname.endsWith('/logout')) return children;
   if (ahpra.loading) return <div role="status">Loading AHPRA status...</div>;
-  if ((ahpra.summary?.state === 'suspended' || ahpra.refusal) && !onAhpraStep) {
+  if ((ahpra.summary?.frozen || ahpra.refusal) && !onAhpraStep) {
     return <><AhpraStatus /><Navigate to={recoveryPath} replace /></>;
   }
-  if (ahpra.summary?.state === 'suspended' && onAhpraStep) return children;
+  if (ahpra.summary?.frozen && onAhpraStep) return children;
 
   const hasOrgRole = hasOrganizationAccess(user);
 

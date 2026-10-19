@@ -238,7 +238,7 @@ function AuthGate() {
 
   useEffect(() => {
     if (isLoading || ahpraLoading) return;
-    if (user && (ahpraSummary?.state === 'suspended' || ahpraRefusal)) {
+    if (user && (ahpraSummary?.frozen || ahpraRefusal)) {
       if (!onAhpraStep) router.replace(ahpraPath as any);
       else if (ahpraRefusal) clearRefusal();
       return;
@@ -413,9 +413,9 @@ function AuthGate() {
     return () => {
       active = false;
     };
-  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user, ahpraLoading, ahpraSummary?.state, ahpraRefusal, clearRefusal, ahpraPath, onAhpraStep]);
+  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user, ahpraLoading, ahpraSummary?.frozen, ahpraRefusal, clearRefusal, ahpraPath, onAhpraStep]);
 
-  if (user && (ahpraLoading || ((ahpraSummary?.state === 'suspended' || ahpraRefusal) && !onAhpraStep))) {
+  if (user && (ahpraLoading || ((ahpraSummary?.frozen || ahpraRefusal) && !onAhpraStep))) {
     return <View style={{ position: 'absolute', inset: 0, zIndex: 10000, backgroundColor: '#FFFFFF', padding: 24, justifyContent: 'center' }}>
       {ahpraLoading ? <Text>Loading AHPRA status...</Text> : <AhpraStatus />}
     </View>;

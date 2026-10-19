@@ -18,6 +18,7 @@ class VerificationBadgeSerializer(serializers.Serializer):
 
 class AhpraStateSerializer(serializers.Serializer):
     state = serializers.ChoiceField(choices=('ok', 'pending', 'suspended', 'not_found'))
+    frozen = serializers.BooleanField(default=False)
     registration_status = serializers.CharField(allow_null=True)
     registration_type = serializers.CharField(allow_null=True)
     expiry_date = serializers.DateField(allow_null=True)
@@ -26,10 +27,14 @@ class AhpraStateSerializer(serializers.Serializer):
     recheck_available_at = serializers.DateTimeField(allow_null=True)
 
     def to_representation(self, instance):
-        from onboarding.verification.state import ahpra_state
+        from onboarding.verification.state import ahpra_frozen, ahpra_state, member_suspension_note
         if isinstance(instance, dict):
             return super().to_representation(instance)
-        return ahpra_state(instance)
+        state = ahpra_state(instance)
+        frozen = ahpra_frozen(instance.user, state)
+        if state['state'] == 'suspended' and not frozen:
+            state['note'] = member_suspension_note(state['registration_status'])
+        return {**state, 'frozen': frozen}
 
 
 class VerificationSummarySerializer(serializers.Serializer):

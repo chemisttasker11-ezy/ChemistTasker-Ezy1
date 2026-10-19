@@ -11,6 +11,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from client_profile.characterization_support import client_for, make_assignment, make_owner_with_pharmacy, make_user
+from memberships.models import Membership
 from onboarding.admin import AhpraCheckAdmin
 from onboarding.models import AhpraCheck, OtherStaffOnboarding, OwnerOnboarding
 from onboarding.serializers import OtherStaffOnboardingV2Serializer, PharmacistOnboardingV2Serializer
@@ -79,6 +80,7 @@ class AhpraAccessTests(TestCase):
 
     def test_frozen_owner_can_read_ahpra_onboarding_and_recheck_but_not_pharmacy(self):
         owner, pharmacy = make_owner_with_pharmacy()
+        Membership.objects.create(user=owner, pharmacy=pharmacy, role='PHARMACIST', employment_type='FULL_TIME')
         owner.is_otp_verified = owner.is_mobile_verified = True
         owner.save(update_fields=['is_otp_verified', 'is_mobile_verified'])
         profile = OwnerOnboarding.objects.get(user=owner)
@@ -98,7 +100,7 @@ class AhpraAccessTests(TestCase):
         for prefix in ('/api/v1/',):
             response = client.get(prefix + 'owner/onboarding/me/')
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()['ahpra'], ahpra_state(profile))
+            self.assertEqual(response.json()['ahpra'], {**ahpra_state(profile), 'frozen': True})
         response = client.post('/api/v1/onboarding/ahpra/recheck/')
         self.assertEqual((response.status_code, response.json()), (202, {'queued': True}))
         self.assertTrue(AhpraCheck.objects.filter(model_name='OwnerOnboarding', object_pk=profile.pk,
@@ -115,7 +117,7 @@ class AhpraAccessTests(TestCase):
 
     def test_freeze_covers_views_with_explicit_allow_any_and_permissions(self):
         self.finish(outcome='rejected', status='Suspended')
-        expected = {'code': 'ahpra_suspended', 'detail': ahpra_state(self.profile)['note']}
+        expected = {'code': 'ahpra_suspended', 'detail': ahpra_state(self.profile)['note'], 'frozen': True}
         for path, method in [('/api/v1/public-job-board/', 'get'),
                              ('/api/v1/shift-saved/', 'get'),
                              ('/api/v1/device-tokens/', 'post'),

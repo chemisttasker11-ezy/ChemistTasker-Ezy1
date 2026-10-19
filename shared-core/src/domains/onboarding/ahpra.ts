@@ -1,5 +1,6 @@
 export interface AhpraSummary {
   state: 'ok' | 'pending' | 'suspended' | 'not_found';
+  frozen: boolean;
   registration_status: string | null;
   registration_type: string | null;
   expiry_date: string | null;
@@ -9,7 +10,7 @@ export interface AhpraSummary {
 }
 
 export type AhpraErrorCode = 'ahpra_suspended' | 'ahpra_not_found' | 'ahpra_recheck_cooldown';
-export interface AhpraError { code: AhpraErrorCode; detail?: string; retry_after?: number }
+export interface AhpraError { code: AhpraErrorCode; detail?: string; retry_after?: number; frozen?: boolean }
 const listeners = new Set<(error: AhpraError) => void>();
 export function subscribeAhpraErrors(listener: (error: AhpraError) => void) {
   listeners.add(listener);

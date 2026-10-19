@@ -328,14 +328,14 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
 
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
-        from onboarding.verification.state import require_ahpra_application
-        require_ahpra_application(request.user)
+        from onboarding.verification.state import require_public_ahpra
         from billing.utils import (
             BILLING_STATE_PAYMENT_REQUIRED,
             get_billing_state_for_pharmacy,
         )
 
         offer = self.get_object()
+        require_public_ahpra(request.user, offer.shift)
         if offer.user_id != request.user.id:
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
         if offer.status != ShiftOffer.Status.PENDING:

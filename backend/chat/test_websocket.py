@@ -8,6 +8,7 @@ from django.utils import timezone
 from unittest.mock import patch
 
 from chat.models import Conversation, Message, Participant
+from memberships.models import Membership
 from core.websocket_testing import TIMEOUT, connect, make_actors, new_ticket
 from onboarding.models import AhpraCheck, OtherStaffOnboarding
 from onboarding.test_ahpra_desktop import NUMBER, TEST_CACHES, result
@@ -19,6 +20,8 @@ def suspend_chat_user(user, transition=False):
     profile = OtherStaffOnboarding.objects.get(user=user)
     profile.role_type, profile.ahpra_number = 'INTERN', NUMBER
     profile.save(update_fields=['role_type', 'ahpra_number'])
+    # Members keep internal chat; the freeze applies to users with no active accepted membership.
+    Membership.objects.filter(user=user).update(is_active=False)
     check = AhpraCheck.objects.create(model_name='OtherStaffOnboarding', object_pk=profile.pk,
                                      registration_number=NUMBER, reason='onboarding')
     if transition:

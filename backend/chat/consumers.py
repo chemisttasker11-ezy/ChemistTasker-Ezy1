@@ -119,6 +119,8 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
 
     # ---- channel-layer events ----
     async def ahpra_suspended(self, event):
+        if not await self._ahpra_suspended(self.scope['user']):
+            return
         self._ahpra_frozen = True
         await self.close(code=4403)
 
@@ -171,8 +173,8 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def _ahpra_suspended(self, user):
         # The HTTP freeze (onboarding.middleware) never sees WebSocket handshakes.
-        from onboarding.verification.state import ahpra_profile, ahpra_state
-        return not user.is_staff and ahpra_state(ahpra_profile(user))['state'] == 'suspended'
+        from onboarding.verification.state import ahpra_frozen
+        return not user.is_staff and ahpra_frozen(user)
 
     @database_sync_to_async
     def _get_membership(self, conversation_id: int, user_id: int):
