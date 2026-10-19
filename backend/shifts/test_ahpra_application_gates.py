@@ -116,6 +116,23 @@ class AhpraApplicationGateTests(TestCase):
         self.assertEqual((response.status_code, response.json()['code']), (403, 'ahpra_suspended'))
         self.assertFalse(ShiftInterest.objects.filter(shift=self.shift, user=self.user).exists())
 
+    def test_frozen_user_accepts_pharmacy_admin_invitation_and_unfreezes(self):
+        from organizations.models import PharmacyAdmin
+        self.set_state('suspended')
+        owner, pharmacy = make_owner_with_pharmacy('Admin Invite Pharmacy')
+        invite = Membership.objects.create(user=self.user, pharmacy=pharmacy, invited_by=owner, role='PHARMACIST',
+                                           employment_type='FULL_TIME', status=Membership.Status.PENDING)
+        admin = PharmacyAdmin.objects.create(user=self.user, pharmacy=pharmacy, membership=invite,
+                                             admin_level=PharmacyAdmin.AdminLevel.MANAGER, is_active=False)
+        self.assertTrue(ahpra_frozen(self.user))
+        response = self.client.get('/api/v1/pharmacy-admins/my-pending-invitations/')
+        self.assertEqual((response.status_code, [i['id'] for i in response.json()]), (200, [admin.pk]))
+        response = self.client.post(f'/api/v1/pharmacy-admins/{admin.pk}/accept-invitation/', {}, format='json')
+        self.assertEqual(response.status_code, 200, response.content)
+        invite.refresh_from_db()
+        self.assertEqual((invite.status, invite.is_active), (Membership.Status.ACCEPTED, True))
+        self.assertFalse(ahpra_frozen(self.user))
+
     def test_org_admin_invited_member_counts_but_pharmacyless_membership_does_not(self):
         from client_profile.models import Organization
         from users.models import OrganizationMembership

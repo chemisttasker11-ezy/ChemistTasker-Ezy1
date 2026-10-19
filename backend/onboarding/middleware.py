@@ -38,6 +38,11 @@ class AhpraFreezeMiddleware(MiddlewareMixin):
             return None
         if name in ('my-memberships-accept', 'my-memberships-reject') and request.method == 'POST':
             return None
+        # Pharmacy-admin invitations (same Memberships page); these actions filter by user=request.user.
+        if name == 'pharmacy-admin-my-pending-invitations' and request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return None
+        if name in ('pharmacy-admin-accept-invitation', 'pharmacy-admin-reject-invitation') and request.method == 'POST':
+            return None
         if ahpra_frozen(user):
             state = ahpra_state(ahpra_profile(user))
             return JsonResponse({'code': 'ahpra_suspended', 'detail': state['note'], 'frozen': True}, status=403)

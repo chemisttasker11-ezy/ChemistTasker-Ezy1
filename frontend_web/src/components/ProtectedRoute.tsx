@@ -69,7 +69,10 @@ export default function ProtectedRoute({
 
   if (ahpra.summary?.frozen && onAhpraStep) return children;
 
-  if (isFrozen && !onAhpraStep) {
+  // Invitations are never blocked by AHPRA: the invite email links land here.
+  const onInvitePage = /^\/dashboard\/((pharmacist|otherstaff)\/memberships|admin-invitations)\/?$/.test(location.pathname);
+
+  if (isFrozen && !onAhpraStep && !onInvitePage) {
     return (
       <Container maxWidth="sm" sx={{ py: 6 }}>
         <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid', borderColor: 'divider', textAlign: 'center' }}>
