@@ -6,6 +6,7 @@ import json
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
+from django.utils import timezone
 
 from onboarding.verification.desktop import (
     claim_checks, handle_verifier_result, renew_lease, store_repair_report, valid_result, verifier_seen,
@@ -81,12 +82,19 @@ class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_add(f'ahpra_verifiers_{self.kind}', self.channel_name)
             await self.send_json({'type': 'ready'})
             await self.dispatch_check()
-        elif content.get('type') == 'result' and valid_result(content):
-            if await database_sync_to_async(handle_verifier_result)(content, self.kind):
-                await self.send_json({'type': 'ack', 'check_id': content['check_id']})
-                if self.inflight == content['check_id']:
-                    self.inflight = None
-                    await self.dispatch_check()
+        elif content.get('type') == 'result':
+            check_id = content.get('check_id')
+            inflight = type(check_id) is int and check_id == self.inflight
+            if inflight and not valid_result(content):
+                # A malformed result is a verifier failure for that check, handled by the normal error rules.
+                content = {'type': 'result', 'check_id': check_id, 'outcome': 'error', 'register': None,
+                           'checked_at': timezone.now().isoformat(), 'error': 'Verifier sent a malformed result.'}
+            if valid_result(content) and await database_sync_to_async(handle_verifier_result)(content, self.kind):
+                await self.send_json({'type': 'ack', 'check_id': check_id})
+            if inflight:
+                # Never renew the lease of a check whose result was rejected.
+                self.inflight = None
+                await self.dispatch_check()
         elif content.get('type') in ('pong', 'heartbeat'):
             await database_sync_to_async(verifier_seen)(self.kind)
         elif content.get('type') == 'repair_report' and self.kind == 'bridge':

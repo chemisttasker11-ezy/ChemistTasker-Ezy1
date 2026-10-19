@@ -36,6 +36,17 @@ logging.getLogger("ahpra_verifier").setLevel(logging.CRITICAL)
 class TestCliJsonParsing(unittest.TestCase):
     """Tests parsing of CLI JSON wrappers and inner model responses."""
 
+    def test_found_with_impossible_expiry_is_error(self):
+        for bad in ("2099-02-30", "2099-2-3", "30/11/2026"):
+            cli_output = json.dumps({"result": json.dumps({
+                "outcome": "found",
+                "register": {"name": "Jane", "expiry_date": bad, "conditions": False, "undertakings": False, "reprimands": False},
+            })})
+            res = parse_cli_output(cli_output)
+            self.assertEqual(res["outcome"], "error", bad)
+            self.assertIsNone(res["register"])
+            self.assertIn("expiry date", res["error"])
+
     def test_parse_plain_json_found(self):
         cli_output = json.dumps({
             "result": json.dumps({

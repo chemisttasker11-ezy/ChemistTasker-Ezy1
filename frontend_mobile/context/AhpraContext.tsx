@@ -26,7 +26,7 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
     const version = errorVersion.current;
     const current = generation.current;
     const data = await getOnboardingDetail(role);
-    if (version === errorVersion.current && current === generation.current) { setSummary(data.ahpra ?? null); setError(''); }
+    if (version === errorVersion.current && current === generation.current) { setSummary(data.ahpra ?? null); setError(''); if (!data.ahpra?.frozen) setRefusal(false); }
   }, [role]);
 
   useEffect(() => {
@@ -43,7 +43,8 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
       try {
         const version = errorVersion.current;
         const data = await getOnboardingDetail(role);
-        if (active && version === errorVersion.current) { setSummary(data.ahpra ?? null); setError(''); }
+        // An unfrozen server summary is authoritative, so it ends an earlier runtime refusal.
+        if (active && version === errorVersion.current) { setSummary(data.ahpra ?? null); setError(''); if (!data.ahpra?.frozen) setRefusal(false); }
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : 'Unable to load AHPRA status.');
       } finally {

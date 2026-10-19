@@ -19,16 +19,23 @@ logger = logging.getLogger(__name__)
 @transaction.atomic
 def cancel_upcoming_assignments(user):
     now = timezone.localtime()
-    upcoming = Q(slot_date__gt=now.date()) | Q(slot_date=now.date(), slot__start_time__gt=now.time())
-    upcoming |= Q(slot_date__isnull=True, slot__date__gt=now.date())
-    upcoming |= Q(slot_date__isnull=True, slot__date=now.date(), slot__start_time__gt=now.time())
-    assignments = list(ShiftSlotAssignment.objects.select_for_update().filter(upcoming, user=user, shift__visibility='PLATFORM')
-                       .select_related('shift__pharmacy', 'slot'))
+
+    def upcoming(day, start):
+        return day > now.date() or (day == now.date() and start > now.time())
+
+    # Today's start time is checked below: a negotiated offer can move it away from the slot template.
+    from_today = Q(slot_date__gte=now.date()) | Q(slot_date__isnull=True, slot__date__gte=now.date())
+    assignments = list(ShiftSlotAssignment.objects.select_for_update(of=('self',))
+                       .filter(from_today, user=user, shift__visibility='PLATFORM')
+                       .select_related('shift__pharmacy', 'slot', 'source_offer'))
     cancelled, retained = {}, {}
     for assignment in assignments:
         if is_public_shift_member_access(user, assignment.shift):
             continue
         day = assignment.slot_date or assignment.slot.date
+        offer = assignment.source_offer
+        if not upcoming(day, (offer and offer.offered_start_time) or assignment.slot.start_time):
+            continue
         key = (assignment.shift_id, day)
         try:
             _protect_assignment_history(assignment)
@@ -49,8 +56,7 @@ def cancel_upcoming_assignments(user):
         future = [(entry['slot'], entry['date']) for entry in expand_shift_slots(offer.shift)
                   if (not offer.slot_id or entry['slot'].pk == offer.slot_id)
                   and (not offer.offered_slot_date or entry['date'] == offer.offered_slot_date)]
-        future = [(slot, day) for slot, day in future
-                  if day > now.date() or (day == now.date() and slot.start_time > now.time())]
+        future = [(slot, day) for slot, day in future if upcoming(day, offer.offered_start_time or slot.start_time)]
         if not future:
             continue
         # Keep a partially worked recurring offer as historical evidence.

@@ -7,7 +7,6 @@ from onboarding import models as onboarding_models
 
 class OnboardingModelCodeOwnershipTests(SimpleTestCase):
     model_names = (
-        "AhpraCheck",
         "OnboardingNotification",
         "OwnerOnboarding",
         "PharmacistOnboarding",

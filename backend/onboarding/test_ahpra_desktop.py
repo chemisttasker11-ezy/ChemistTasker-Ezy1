@@ -487,6 +487,26 @@ class VerifierSocketTests(TransactionTestCase):
         finally:
             await socket.disconnect()
 
+    async def test_malformed_result_releases_inflight_and_dispatches_next(self):
+        other = await database_sync_to_async(profile_fixture)()
+        queued = await database_sync_to_async(check_fixture)(other, stage='bridge')
+        socket = self.communicator()
+        try:
+            await socket.connect()
+            await socket.send_json_to({'type': 'hello', 'agent': 'bridge', 'token': TOKEN})
+            self.assertEqual(await socket.receive_json_from(), {'type': 'ready'})
+            self.assertEqual((await socket.receive_json_from())['check_id'], self.check.pk)
+            await socket.send_json_to(result(self.check.pk, expiry_date='2099-02-30'))
+            self.assertEqual(await socket.receive_json_from(), {'type': 'ack', 'check_id': self.check.pk})
+            following = [await socket.receive_json_from(), await socket.receive_json_from()]
+            self.assertIn({'type': 'check', 'check_id': queued.pk, 'registration_number': NUMBER}, following)
+        finally:
+            await socket.disconnect()
+        await database_sync_to_async(self.check.refresh_from_db)()
+        await database_sync_to_async(self.profile.refresh_from_db)()
+        self.assertEqual((self.check.status, self.check.outcome), ('done', 'error'))
+        self.assertFalse(self.profile.ahpra_verified)
+
     async def test_extension_handoff_ack_and_bridge_live_delivery(self):
         await database_sync_to_async(AhpraCheck.objects.filter(pk=self.check.pk).update)(stage='extension')
         # enqueue_check only assigns the extension stage while the extension is present.
@@ -611,7 +631,8 @@ class VerifierSocketTests(TransactionTestCase):
         await socket.receive_json_from()
         await socket.send_json_to(result(999999))
         self.assertTrue(await socket.receive_nothing())
-        await socket.send_json_to({'type': 'result', 'check_id': self.check.pk})
+        # Malformed for the inflight check is a verifier error (see the malformed-result test); an unknown id is ignored.
+        await socket.send_json_to({'type': 'result', 'check_id': str(self.check.pk)})
         self.assertTrue(await socket.receive_nothing())
         await socket.send_json_to(result(self.check.pk))
         self.assertEqual(await socket.receive_json_from(), {'type': 'ack', 'check_id': self.check.pk})

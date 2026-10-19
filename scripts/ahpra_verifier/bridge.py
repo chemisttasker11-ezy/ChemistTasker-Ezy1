@@ -290,6 +290,17 @@ def parse_cli_output(raw_output: str) -> dict[str, Any]:
 
         raw_expiry = reg_source.get("expiry_date")
         expiry_date = str(raw_expiry).strip() if raw_expiry is not None and str(raw_expiry).strip() else None
+        if expiry_date is not None:
+            try:
+                if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", expiry_date):
+                    raise ValueError
+                datetime.strptime(expiry_date, "%Y-%m-%d")
+            except ValueError:
+                return {
+                    "outcome": "error",
+                    "register": None,
+                    "error": f"Register expiry date is not a valid YYYY-MM-DD date: {expiry_date[:40]}",
+                }
 
         raw_req = reg_source.get("registration_requirements")
         if raw_req is None:

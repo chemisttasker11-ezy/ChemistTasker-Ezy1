@@ -99,10 +99,10 @@ Done check (both paths):
 ```bash
 git rev-parse HEAD
 git merge-base --is-ancestor 278f891b HEAD && echo "has AHPRA release"
-ls backend/client_profile/migrations | grep -E '^008[123]_'
+ls backend/client_profile/migrations | grep -E '^008[1234]_'
 ```
 
-You see `has AHPRA release` and the three files `0081_ahpra_check.py`,
+You see `has AHPRA release` and the four files `0081_ahpra_check.py`,
 `0082_ahpra_check_stages.py`, `0083_owner_ahpra_switched_to_manager.py`, `0084_ahpra_check_public_recheck.py`.
 
 ## 6. Migrations
@@ -388,10 +388,7 @@ new column on an existing table, `owneronboarding.ahpra_switched_to_manager`
 (0083), has a database default of `false`, so owner rows inserted by older code
 still save. Keep the env change above as the first step either way.
 
-The migrations stay. Do not roll the code back below this release without the
-owner: migration 0083 adds `owneronboarding.ahpra_switched_to_manager` as
-`NOT NULL` with no database default, so older code would fail to create owner
-onboarding rows. For a full restore, use the `DB_BACKUP` dump from step 8 and
+The migrations stay. For a full restore, use the `DB_BACKUP` dump from step 8 and
 the SHA saved in step 4, only with the owner's approval.
 
 ## 14. Desktop side (done on the owner's PC, not by you)

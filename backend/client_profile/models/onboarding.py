@@ -5,7 +5,6 @@ the models retain `Meta.app_label = "client_profile"`, preserving migration
 state, ContentTypes and physical table names.
 """
 from onboarding.models import (
-    AhpraCheck,
     onboarding_upload_path,
     owner_profile_photo_upload_path,
     owner_gov_id_upload_path,
@@ -32,7 +31,6 @@ from onboarding.models import (
 )
 
 __all__ = [
-    "AhpraCheck",
     "onboarding_upload_path",
     "owner_profile_photo_upload_path",
     "owner_gov_id_upload_path",

@@ -125,6 +125,25 @@ class Review183Repro(TestCase):
         self.assertFalse(deleted and offer.status == ShiftOffer.Status.ACCEPTED,
                          'future occurrence deleted but shift-wide offer still ACCEPTED')
 
+    def test_f7b_negotiated_later_start_today_is_cancelled(self):
+        from datetime import datetime
+        from shifts.cancellation import cancel_upcoming_assignments
+        owner, pharmacy = make_owner_with_pharmacy()
+        today = timezone.localdate()
+        shift, slot, assignment = make_assignment(pharmacy, owner, self.user, today)  # template 09:00
+        offer = ShiftOffer.objects.create(shift=shift, slot=slot, user=self.user, status=ShiftOffer.Status.ACCEPTED,
+                                          offered_slot_date=today, offered_start_time=time(14),
+                                          offered_end_time=time(18))
+        ShiftSlotAssignment.objects.filter(pk=assignment.pk).update(source_offer=offer)
+        noon = timezone.make_aware(datetime.combine(today, time(12)))
+        with patch('shifts.cancellation.timezone', SimpleNamespace(localtime=lambda: noon)), \
+                patch('shifts.cancellation.notify_shift_managers', return_value=[]):
+            outcome = cancel_upcoming_assignments(self.user)
+        offer.refresh_from_db()
+        self.assertFalse(ShiftSlotAssignment.objects.filter(pk=assignment.pk).exists())
+        self.assertEqual(offer.status, ShiftOffer.Status.DECLINED)
+        self.assertEqual([row['date'] for row in outcome['cancelled']], [today.isoformat()])
+
     # 8
     def test_f8_failed_recheck_after_expiry_does_not_suppress_next_recheck(self):
         today = timezone.localdate()
