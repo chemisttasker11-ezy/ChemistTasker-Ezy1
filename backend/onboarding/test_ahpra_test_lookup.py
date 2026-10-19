@@ -172,8 +172,14 @@ class AhpraKeyLookupTests(TestCase):
             self.assertEqual(self.client.get(reverse('api_v1:ahpra-test-key-lookup', args=['short'])).status_code, 404)
         self.assertFalse(AhpraCheck.objects.exists())
 
+    def test_post_without_csrf_token_succeeds_wrong_key_still_404(self):
+        client = Client(enforce_csrf_checks=True)
+        self.assertRedirects(client.post(self.url, self.data), self.url, fetch_redirect_response=False)
+        self.assertEqual(client.post(reverse('api_v1:ahpra-test-key-lookup', args=['x' * 32]), self.data).status_code, 404)
+        self.assertEqual(AhpraCheck.objects.count(), 1)
+
     def test_anonymous_lookup_queues_test_check_only(self):
-        self.assertContains(self.client.get(self.url), 'csrfmiddlewaretoken')
+        self.assertEqual(self.client.get(self.url).status_code, 200)
         profile = PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'), ahpra_number=NUMBER)
         before = PharmacistOnboarding.objects.filter(pk=profile.pk).values().get()
         with self.captureOnCommitCallbacks(execute=True):

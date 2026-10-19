@@ -13,6 +13,7 @@ from django.http import Http404, HttpResponseNotFound
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from onboarding.models import AhpraCheck
@@ -75,6 +76,7 @@ def lookup_page(request, url, template, context, limited=False):
     })
 
 
+@csrf_exempt  # No login or session: the secret key in the URL is the only credential.
 @require_http_methods(['GET', 'POST'])
 def key_lookup_view(request, key):
     expected = settings.AHPRA_TEST_LOOKUP_KEY
