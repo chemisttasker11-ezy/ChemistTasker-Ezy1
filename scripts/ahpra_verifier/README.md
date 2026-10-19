@@ -283,9 +283,12 @@ Register-ScheduledTask `
    - **Bridge:** runs `start_bridge.bat` at logon, restarts on failure every 1 minute
      (Option C above). That restart is only a crash safety net, not polling: checks are
      pushed instantly over the open websocket.
-   - **Chrome watchdog:** runs `keep_chrome_open.ps1` every 1 minute. It starts Chrome
-     minimised on the AHPRA register with the verifier profile when none is running, and
-     never stops anything. Log: `logs/keep_chrome_open.log`.
+   - **Chrome watchdog:** runs `keep_chrome_open.ps1` every 1 minute. If any `chrome.exe`
+     is running it does nothing. Only when no Chrome runs at all does it start Chrome
+     minimised with the verifier profile and no URL (it never opens tabs), and it never
+     stops anything. Log: `logs/keep_chrome_open.log`. Gap: closing only the verifier
+     profile's window while other Chrome windows stay open is not detected; the server's
+     15-minute overdue email covers it.
      ```powershell
      $Action = New-ScheduledTaskAction -Execute "powershell.exe" `
          -Argument '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\path\to\checkout\scripts\ahpra_verifier\keep_chrome_open.ps1" -ProfileDirectory "Default"'
