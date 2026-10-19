@@ -1,5 +1,6 @@
 import datetime
 import logging
+import re
 import time
 
 from bs4 import BeautifulSoup
@@ -220,7 +221,10 @@ def evaluate_ahpra_record(record: dict, *, first_name, last_name, role) -> tuple
     requirements = (record.get("registration_requirements") or "").strip()
     if requirements or record.get("supervised_practice", False):
         if role_norm == "intern":
-            return ("verified", f"Verified intern under supervised practice: {requirements[:150]}")
+            note = f"Verified intern under supervised practice: {requirements[:150]}"
+            if re.search(r"may not practi[sc]e until supervised practice", requirements, re.I):
+                note += " Supervised practice has not started yet."
+            return ("verified", note)
         return ("review", f"Registration requirements present: {requirements[:120]}")
 
     return ("verified", "AHPRA registration is valid and current.")

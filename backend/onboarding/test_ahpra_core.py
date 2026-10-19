@@ -267,6 +267,13 @@ class EvaluateAhpraRecordTests(TestCase):
                         )
                         self.assertEqual(outcome, "review")
 
+    def test_intern_not_yet_in_supervised_practice_note(self):
+        requirements = "The practitioner may not practise until supervised practice arrangements are approved."
+        record = self.base_record(registration_type="Provisional", registration_requirements=requirements)
+        outcome, note = evaluate_ahpra_record(record, first_name="Jane", last_name="Doe", role="intern")
+        self.assertEqual(outcome, "verified")
+        self.assertTrue(note.endswith(" Supervised practice has not started yet."))
+
     def test_everything_fine_returns_verified(self):
         record = self.base_record()
         outcome, note = evaluate_ahpra_record(

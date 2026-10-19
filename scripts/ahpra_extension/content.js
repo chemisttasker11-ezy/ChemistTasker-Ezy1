@@ -6,7 +6,9 @@
   const blocked = () => /just a moment/i.test(document.title) || !!document.querySelector(
     'iframe[src*="challenges.cloudflare.com"], iframe[src*="recaptcha"], iframe[src*="hcaptcha"], .g-recaptcha, .h-captcha, .cf-turnstile, [data-sitekey], [id*="turnstile"], [class*="turnstile"]');
   const pageText = () => document.body?.innerText || '';
-  const noResults = () => /\bno\s+(?:results|matches|practitioners|records)(?:\s+(?:were\s+)?found)?\b|\b0\s+(?:results|matches|practitioners|records)\b|no matching practitioners/i.test(pageText());
+  // AHPRA's live empty page: "We cannot find any matches for 'PHA0001803269'." (tied to the searched number).
+  const noResults = number => /\bno\s+(?:results|matches|practitioners|records)(?:\s+(?:were\s+)?found)?\b|\b0\s+(?:results|matches|practitioners|records)\b|no matching practitioners/i.test(pageText()) ||
+    new RegExp(`cannot find any matches for\\W*${number.replace(/[^A-Za-z0-9]/g, '')}\\b`, 'i').test(pageText());
   function checkChallenge() { if (blocked()) throw new Error('AHPRA challenge requires a human'); }
   async function waitFor(read, milliseconds) {
     const until = Date.now() + milliseconds;
@@ -55,7 +57,7 @@
         await pageClick('#predictiveSearchHomeBtn');
       }
       if (job.step !== 'opened') {
-        const found = await waitFor(() => recordReady() ? 'record' : resultLinks().length ? 'results' : noResults() ? 'none' : null, 20000);
+        const found = await waitFor(() => recordReady() ? 'record' : resultLinks().length ? 'results' : noResults(number) ? 'none' : null, 20000);
         if (!found) throw new Error('AHPRA returned no recognizable search results');
         if (found === 'none') outcome = 'not_found';
         if (found === 'results') {
