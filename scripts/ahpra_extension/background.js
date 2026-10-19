@@ -4,7 +4,7 @@ const NOTICE = 'ahpra-blocked';
 let config = {enabled: false, gap: 30};
 let state = {queue: [], outbox: [], active: null, paused: false, lastStarted: 0, lastResultAt: null, blockedResults: []};
 let socket, authenticated = false, reconnectTimer, heartbeat, queueTimer, jobTimer;
-let backoff = 5000, nextConnectAt = 0, pumping = false;
+let backoff = 5000, nextConnectAt = 0, pumping = false, connectError = '';
 let writes = Promise.resolve();
 function save() {
   const snapshot = JSON.parse(JSON.stringify(state));
@@ -38,7 +38,7 @@ function reconnect() {
 function connect() {
   if (!config.enabled || socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) return;
   clearTimeout(reconnectTimer);
-  try { socket = new WebSocket(config.url); } catch { reconnect(); return; }
+  try { socket = new WebSocket(config.url); } catch (error) { connectError = error.message; reconnect(); return; }
   const current = socket;
   current.onopen = () => {
     if (socket !== current) return;
@@ -51,8 +51,9 @@ function connect() {
     receive(event.data).catch(() => current.close());
   };
   current.onerror = () => current.close();
-  current.onclose = () => {
+  current.onclose = event => {
     if (socket !== current) return;
+    connectError = event.reason || `Connection closed (code ${event.code}); retrying`;
     clearInterval(heartbeat);
     authenticated = false;
     socket = null;
@@ -66,6 +67,7 @@ async function receive(data) {
   if (message.type === 'ping') { transmit({type: 'pong'}); return; }
   if (message.type === 'ready') {
     authenticated = true;
+    connectError = '';
     backoff = 5000;
     flush();
     void pump();
@@ -164,7 +166,8 @@ chrome.action.onClicked.addListener(() => void chrome.runtime.openOptionsPage())
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   (async () => {
     await initialized;
-    if (sender.tab) {
+    // The options page also runs in a tab, so tell content scripts apart by origin.
+    if (sender.origin !== self.location.origin) {
       if (sender.tab.id !== state.active?.tabId || sender.frameId !== 0) return {};
       if (message.type === 'lookup') return state.active;
       if (message.type === 'lookupResult' && message.check_id === state.active.check_id &&
@@ -173,7 +176,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       }
       return {};
     }
-    if (message.type === 'status') return {enabled: config.enabled, connected: authenticated, queueSize: state.queue.length + (state.active ? 1 : 0), lastResultAt: state.lastResultAt, paused: state.paused};
+    if (message.type === 'status') return {enabled: config.enabled, connected: authenticated, queueSize: state.queue.length + (state.active ? 1 : 0), lastResultAt: state.lastResultAt, paused: state.paused, connectError};
     if (message.type === 'resume') await resume();
     if (message.type === 'configure') {
       if (message.enabled) {
@@ -183,6 +186,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
         if (!message.token || !Number.isInteger(message.gap) || message.gap < 1) throw new Error('Token and a positive whole number gap are required');
         config = {enabled: true, url: url.href, token: message.token, gap: message.gap};
       } else config.enabled = false;
+      connectError = '';
       await chrome.storage.local.set({config});
       clearTimeout(reconnectTimer);
       clearInterval(heartbeat);
