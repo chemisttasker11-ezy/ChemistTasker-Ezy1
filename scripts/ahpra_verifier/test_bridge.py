@@ -802,6 +802,70 @@ class TestMessageHandling(unittest.IsolatedAsyncioTestCase):
             except asyncio.CancelledError:
                 pass
 
+    async def test_duplicate_check_delivered_thrice_runs_once(self):
+        runner_calls = []
+        runner_started = asyncio.Event()
+
+        async def fake_runner(reg: str) -> str:
+            runner_calls.append(reg)
+            runner_started.set()
+            await asyncio.sleep(0.01)
+            return json.dumps({
+                "result": json.dumps({
+                    "outcome": "found",
+                    "register": {
+                        "name": "Jane Practitioner",
+                        "profession": "Pharmacist",
+                        "registration_status": "Registered",
+                        "registration_type": "General",
+                        "expiry_date": "2027-11-30",
+                        "conditions": False,
+                        "undertakings": False,
+                        "reprimands": False,
+                    },
+                    "error": "",
+                })
+            })
+
+        bridge = AhpraBridge(
+            url="ws://localhost:9999",
+            token="test-token",
+            min_gap_seconds=0.0,
+            runner=fake_runner,
+        )
+        fake_ws = FakeWebSocket()
+        bridge.ws = fake_ws
+        bridge.running = True
+        worker_task = asyncio.create_task(bridge._worker_loop())
+
+        try:
+            msg = json.dumps({
+                "type": "check",
+                "check_id": 103,
+                "registration_number": "PHA0001234567",
+            })
+            await bridge.handle_message(msg)
+            await bridge.handle_message(msg)
+            await runner_started.wait()
+            await bridge.handle_message(msg)
+
+            await bridge.check_queue.join()
+
+            self.assertEqual(len(runner_calls), 1)
+            sent = fake_ws.get_sent_json()
+            self.assertEqual(len(sent), 1)
+            self.assertEqual(sent[0]["type"], "result")
+            self.assertEqual(sent[0]["check_id"], 103)
+            self.assertEqual(sent[0]["outcome"], "found")
+            self.assertEqual(len(bridge.active_check_ids), 0)
+        finally:
+            bridge.running = False
+            worker_task.cancel()
+            try:
+                await worker_task
+            except asyncio.CancelledError:
+                pass
+
     async def test_send_message_queues_when_disconnected(self):
         bridge = AhpraBridge(url="ws://localhost:9999", token="test-token")
         bridge.ws = None

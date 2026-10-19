@@ -443,6 +443,7 @@ class AhpraBridge:
         self.pause_until: float = 0.0
 
         self.check_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        self.active_check_ids: set[Any] = set()
         self.ws: Any = None
         self.running: bool = False
         self._worker_task: asyncio.Task | None = None
@@ -556,6 +557,7 @@ class AhpraBridge:
         # 5. Send result back to server
         logger.info("Sending result for check id=%s: outcome=%s", check_id, outcome_data["outcome"])
         await self.send_message(result_payload)
+        self.active_check_ids.discard(check_id)
 
         # 6. If permission required or blocked, pause all lookups for blocked_pause_seconds (30 minutes)
         if is_permission_error:
@@ -591,6 +593,8 @@ class AhpraBridge:
                 break
             except Exception as e:
                 logger.exception("Unexpected error processing check: %s", e)
+                if isinstance(check, dict):
+                    self.active_check_ids.discard(check.get("check_id"))
             finally:
                 self.check_queue.task_done()
 
@@ -625,7 +629,11 @@ class AhpraBridge:
         count = 0
         while not self.check_queue.empty():
             try:
-                self.check_queue.get_nowait()
+                check = self.check_queue.get_nowait()
+                if isinstance(check, dict):
+                    check_id = check.get("check_id")
+                    if check_id is not None:
+                        self.active_check_ids.discard(check_id)
                 self.check_queue.task_done()
                 count += 1
             except asyncio.QueueEmpty:
@@ -650,6 +658,10 @@ class AhpraBridge:
             if check_id is None or not reg:
                 logger.warning("Malformed check message received: %s", data)
                 return
+            if check_id in self.active_check_ids:
+                logger.info("Check id=%s is already queued or in progress; skipping duplicate", check_id)
+                return
+            self.active_check_ids.add(check_id)
             await self.check_queue.put(data)
         else:
             logger.debug("Received unhandled message type '%s'", msg_type)

@@ -277,6 +277,12 @@ class DesktopTests(TestCase):
         verify_ahpra_task(*args)
         self.assertFalse(AhpraCheck.objects.exists())
 
+    def test_changed_number_with_stale_status_is_queued(self):
+        self.profile.ahpra_registration_status = 'Registered'  # left over from the previous number's lookup
+        self.profile.save()
+        verify_ahpra_task('PharmacistOnboarding', self.profile.pk, NUMBER, 'Jane', 'Doe', self.profile.user.email)
+        self.assertEqual(AhpraCheck.objects.count(), 1)
+
     @override_settings(AHPRA_SOURCE='scrapingbee')
     @patch('onboarding.tasks.parse_ahpra_html')
     @patch('onboarding.tasks.ahpra_lookup')
@@ -370,8 +376,8 @@ class VerifierSocketTests(TransactionTestCase):
         self.assertTrue(await socket.receive_nothing())
         await socket.send_json_to(result(self.check.pk))
         self.assertEqual(await socket.receive_json_from(), {'type': 'ack', 'check_id': self.check.pk})
-        await socket.send_json_to(result(self.check.pk))
-        self.assertTrue(await socket.receive_nothing())
+        await socket.send_json_to(result(self.check.pk, 'not_found'))
+        self.assertEqual(await socket.receive_json_from(), {'type': 'ack', 'check_id': self.check.pk})
         await socket.disconnect()
         await database_sync_to_async(self.profile.refresh_from_db)()
         self.assertTrue(self.profile.ahpra_verified)

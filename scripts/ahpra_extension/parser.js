@@ -9,12 +9,15 @@ function parseRecordText(text, registrationNumber) {
     return headings.test(value) ? '' : value;
   };
   function present(plural, singular) {
-    return lines.some((line, i) => {
+    let found = false;
+    const restricted = lines.some((line, i) => {
       if (line.toLowerCase() !== plural.toLowerCase()) return false;
+      found = true;
       let j = i + 1;
       if ((lines[j] || '').toLowerCase() === singular.toLowerCase()) j++;
       return !!lines[j] && !/^none\.?$/i.test(lines[j]) && !headings.test(lines[j]);
     });
+    return found ? restricted : null;
   }
   const start = lines.findIndex(s => /^Registration Requirement$/i.test(s));
   const end = lines.findIndex((s, i) => i > start && /^Personal details$/i.test(s));

@@ -79,6 +79,7 @@
         checkChallenge();
         register = parseRecordText(pageText(), number);
         if (!register.name || !register.profession || !register.registration_status) throw new Error('Practitioner record is missing required fields');
+        if ([register.conditions, register.undertakings, register.reprimands].some(value => value === null)) throw new Error('Practitioner restriction sections could not be read');
         outcome = 'found';
       }
     } catch (failure) {

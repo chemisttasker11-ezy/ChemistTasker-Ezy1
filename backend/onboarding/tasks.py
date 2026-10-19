@@ -259,8 +259,7 @@ def _resolve_ahpra_role(obj, model_name="", role_override=None) -> str:
 
 
 def _has_successful_lookup(obj) -> bool:
-    if getattr(obj, "ahpra_registration_status", None):
-        return True
+    # Not ahpra_registration_status: a number change clears verified and the note but keeps the old number's status.
     if getattr(obj, "ahpra_verified", False):
         return True
     note = getattr(obj, "ahpra_verification_note", "") or ""

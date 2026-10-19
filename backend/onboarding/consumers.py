@@ -81,8 +81,9 @@ class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
 
     @staticmethod
     def apply_result(payload):
-        check = AhpraCheck.objects.filter(pk=payload['check_id']).exclude(status='done').first()
-        return check is not None and apply_ahpra_result(check, payload)
+        check = AhpraCheck.objects.filter(pk=payload['check_id']).first()
+        # A replay for a done check was committed before its ACK was lost: ACK it again without re-applying.
+        return check is not None and (check.status == 'done' or apply_ahpra_result(check, payload))
 
     async def ahpra_check(self, event):
         for message in await database_sync_to_async(claim_checks)(event['check_id']):

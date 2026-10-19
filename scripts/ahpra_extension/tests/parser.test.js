@@ -81,8 +81,25 @@ test('condition, undertaking and reprimand present', () => {
 });
 test('missing sections', () => assert.deepEqual(parseRecordText('', number), {
   name: '', profession: '', registration_status: '', registration_type: '', expiry_date: null,
-  conditions: false, undertakings: false, reprimands: false, registration_requirements: '', supervised_practice: false
+  conditions: null, undertakings: null, reprimands: null, registration_requirements: '', supervised_practice: false
 }));
+
+test('otherwise complete record with a missing restriction section', () => {
+  for (const [plural, singular] of [['Conditions', 'Condition'], ['Undertakings', 'Undertaking'], ['Reprimands', 'Reprimand']]) {
+    const text = general.replaceAll(`${plural}\n${singular}\nNone\n`, '');
+    const record = parseRecordText(text, 'PHA0008888888');
+    assert.equal(record[plural.toLowerCase()], null);
+    assert.equal(record.name, 'Mr Alex Synthetic Person');
+    assert.equal(record.registration_status, 'Registered');
+  }
+});
+
+test('restriction sections present with None', () => {
+  const record = parseRecordText('Conditions\nCondition\nNone\nUndertakings\nUndertaking\nNone\nReprimands\nReprimand\nNone', number);
+  assert.equal(record.conditions, false);
+  assert.equal(record.undertakings, false);
+  assert.equal(record.reprimands, false);
+});
 test('empty sections and None requirements', () => {
   const record = parseRecordText('Conditions\nCondition\nUndertakings\nUndertaking\nReprimands\nReprimand\nRegistration Requirements\nRegistration Requirement\nNone\nPersonal details', number);
   assert.equal(record.conditions, false);
