@@ -1,0 +1,30 @@
+{% extends "admin/base_site.html" %}
+{% block extrahead %}{{ block.super }}
+{% if pending %}<meta http-equiv="refresh" content="5">{% endif %}
+{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> &rsaquo; AHPRA test lookup</div>{% endblock %}
+{% block content %}
+<p>Test checks only. No profiles, shifts, emails or notifications are changed. Blank names may produce a name mismatch decision.</p>
+<form method="post">{% csrf_token %}
+  {{ form.as_p }}
+  <input type="submit" value="Look up">
+</form>
+<h2>Last 20 test checks</h2>
+{% if pending %}<p>Waiting for the verifier. Refreshing every 5 seconds.</p>{% endif %}
+<div style="overflow-x:auto">
+<table>
+  <thead><tr><th>Number</th><th>Status</th><th>Stage</th><th>Outcome</th><th>Would-be decision</th><th>Register name</th><th>Register status</th><th>Type</th><th>Expiry</th><th>Conditions</th><th>Supervised practice / requirements</th><th>Note</th><th>Created</th><th>Completed</th></tr></thead>
+  <tbody>{% for check in checks %}<tr>
+    <td>{{ check.registration_number }}</td><td>{{ check.status }}</td><td>{{ check.stage }}</td><td>{{ check.lookup_outcome }}</td>
+    <td>{{ check.decision }}</td>
+    <td>{{ check.register_data.name }}</td><td>{{ check.register_data.registration_status }}</td>
+    <td>{{ check.register_data.registration_type }}</td><td>{{ check.register_data.expiry_date|default_if_none:"" }}</td>
+    <td>{{ check.register_data.conditions|yesno:"Yes,No,Unknown" }}</td>
+    <td>{{ check.register_data.supervised_practice|yesno:"Yes,No,Unknown" }} {{ check.register_data.registration_requirements }}</td>
+    <td>{{ check.note }}{% if check.extension_error %} Extension: {{ check.extension_error }}{% endif %}</td>
+    <td>{{ check.created_at }}</td><td>{{ check.completed_at|default_if_none:"" }}</td>
+  </tr>{% empty %}<tr><td colspan="14">No test checks yet.</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete"><button type="submit">Delete all test checks</button></form>
+{% endblock %}

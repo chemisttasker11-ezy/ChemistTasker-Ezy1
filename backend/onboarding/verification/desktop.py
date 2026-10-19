@@ -69,11 +69,12 @@ def valid_result(payload):
     return True
 
 
-def enqueue_check(profile, number, reason):
+def enqueue_check(profile, number, reason, *, register_data=None):
     check, created = AhpraCheck.objects.get_or_create(
         model_name=profile._meta.object_name, object_pk=profile.pk, registration_number=number,
         status__in=['pending', 'sent'], defaults={
             'reason': reason, 'status': 'pending',
+            'register_data': register_data or {},
             'stage': 'extension' if caches['ahpra'].get('ahpra_verifier_presence_extension') else 'bridge',
         },
     )
@@ -117,6 +118,27 @@ def apply_ahpra_result(check, payload):
     check = AhpraCheck.objects.select_for_update().filter(pk=check.pk).exclude(status='done').first()
     if check is None:
         return False
+    # Non-profile checks are diagnostic only, including after the lookup page is removed.
+    if check.model_name not in PROFILE_MODELS:
+        inputs = check.register_data.get('_test_input', {})
+        record = payload['register'] or {}
+        outcome, note = payload['outcome'], payload['error']
+        # Same pre-checks as the profile path below, so the would-be decision matches.
+        if outcome == 'found' and not record['name'].strip():
+            outcome, note = 'error', 'AHPRA practitioner record incomplete. Please try again later.'
+        elif outcome == 'found' and not record['registration_status'].strip():
+            outcome, note = 'review', 'Needs review: AHPRA registration status is unreadable.'
+        elif outcome == 'found':
+            outcome, note = evaluate_ahpra_record(
+                {**record, 'practitioner_name': record['name'],
+                 'expiry_date': date.fromisoformat(record['expiry_date']) if record['expiry_date'] else None},
+                first_name=inputs.get('first_name', ''), last_name=inputs.get('last_name', ''), role=inputs.get('role', ''),
+            )
+        check.register_data = {**record, '_test_input': inputs, '_test_outcome': payload['outcome']}
+        check.status, check.outcome, check.note = 'done', outcome, note
+        check.completed_at = timezone.now()
+        check.save(update_fields=['register_data', 'status', 'outcome', 'note', 'completed_at'])
+        return True
     profile = check_profile(check)
     from onboarding.verification.state import ahpra_state, apply_state_transition
     previous = ahpra_state(profile)
@@ -185,7 +207,7 @@ def handle_verifier_result(payload, kind):
         return True
     if not apply_ahpra_result(check, payload):
         return False
-    if payload['outcome'] == 'error':
+    if payload['outcome'] == 'error' and check.model_name in PROFILE_MODELS:
         check.refresh_from_db()
         check.needs_attention, check.alerted_at = True, None
         check.save(update_fields=['needs_attention', 'alerted_at'])
@@ -210,7 +232,7 @@ def store_repair_report(payload):
             or not isinstance(payload.get('branch'), str)):
         return False
     check = AhpraCheck.objects.select_for_update().filter(
-        pk=payload['check_id'], needs_attention=True, reviewed_at__isnull=True,
+        pk=payload['check_id'], model_name__in=PROFILE_MODELS, needs_attention=True, reviewed_at__isnull=True,
     ).first()
     if check is None:
         return False

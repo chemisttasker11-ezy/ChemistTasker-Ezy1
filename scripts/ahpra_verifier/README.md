@@ -273,6 +273,43 @@ Register-ScheduledTask `
 
 ---
 
+## Always-on desktop
+
+1. Copy `start_bridge.example.bat` to `start_bridge.bat` (git-ignored), fill in the
+   token, paths and agent name. Run it from a stable checkout, never the repair worktree.
+2. Scheduled tasks (both "Run only when user is logged on", at logon of the verifier user):
+   - **Bridge:** runs `start_bridge.bat` at logon, restarts on failure every 1 minute
+     (Option C above). That restart is only a crash safety net, not polling: checks are
+     pushed instantly over the open websocket.
+   - **Chrome watchdog:** runs `keep_chrome_open.ps1` every 1 minute. It starts Chrome
+     minimised on the AHPRA register with the verifier profile when none is running, and
+     never stops anything. Log: `logs/keep_chrome_open.log`.
+     ```powershell
+     $Action = New-ScheduledTaskAction -Execute "powershell.exe" `
+         -Argument '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\path\to\checkout\scripts\ahpra_verifier\keep_chrome_open.ps1" -ProfileDirectory "Default"'
+     $Trigger = New-ScheduledTaskTrigger -AtLogOn
+     $Trigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)).Repetition
+     Register-ScheduledTask -TaskName "ChemistTasker AHPRA Chrome Watchdog" -Action $Action -Trigger $Trigger `
+         -Settings (New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries)
+     ```
+3. Never sleep or hibernate on AC power (Administrator prompt):
+   ```powershell
+   powercfg /change standby-timeout-ac 0
+   powercfg /change hibernate-timeout-ac 0
+   powercfg /hibernate off
+   ```
+4. Keep Windows signed in: the tasks and Chrome need the interactive session. Lock the
+   screen if needed, but never sign out; after a reboot, sign back in (or set up automatic
+   sign-in) so the logon tasks start.
+
+**Overdue email:** when a check stays pending or sent for 15 minutes, admins get one
+"AHPRA check overdue" email with an admin review link. It means the desktop is not
+answering (asleep, signed out, bridge or Chrome down, or the register is blocking).
+Fix the desktop, or review the check by hand from the link. A check flagged for
+attention with no repair report after 45 minutes sends the same email.
+
+---
+
 ## Logging & Rotation
 
 - Logs are written automatically to `scripts/ahpra_verifier/logs/bridge.log`.

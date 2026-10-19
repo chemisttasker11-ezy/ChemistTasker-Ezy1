@@ -209,3 +209,4 @@ github_guidance.md
 AGENTS.md
 .dsh-code-index/
 .ci-artifacts/
+scripts/ahpra_verifier/start_bridge.bat

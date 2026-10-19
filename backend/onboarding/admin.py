@@ -29,6 +29,9 @@ class AhpraCheckAdmin(admin.ModelAdmin):
 
     @admin.display(description='Profile')
     def profile(self, obj):
+        from onboarding.verification.desktop import PROFILE_MODELS
+        if obj.model_name not in PROFILE_MODELS:
+            return obj.model_name
         from django.urls import reverse
         return format_html('<a href="{}">{} #{}</a>', reverse(
             f'admin:client_profile_{obj.model_name.lower()}_change', args=[obj.object_pk]), obj.model_name, obj.object_pk)

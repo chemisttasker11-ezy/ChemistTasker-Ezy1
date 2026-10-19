@@ -382,14 +382,14 @@ def alert_overdue_ahpra_checks():
     from django.core.mail import mail_admins
     from django.db.models import Q
     from onboarding.models import AhpraCheck
-    from onboarding.verification.desktop import admin_review_url
+    from onboarding.verification.desktop import PROFILE_MODELS, admin_review_url
     with transaction.atomic():
         now = timezone.now()
         checks = AhpraCheck.objects.select_for_update().filter(
             Q(status__in=['pending', 'sent'], created_at__lte=now - datetime.timedelta(minutes=15))
             | Q(needs_attention=True, repair_reported_at__isnull=True,
                 completed_at__lte=now - datetime.timedelta(minutes=45)),
-            alerted_at__isnull=True,
+            alerted_at__isnull=True, model_name__in=PROFILE_MODELS,
         )
         for check in checks:
             detail = 'has no repair report; please review.' if check.needs_attention else 'awaits the desktop verifier or admin review.'
