@@ -6,7 +6,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
 from chat.models import Conversation, Message, Participant
-from chat.realtime import ROOM_GROUP_FMT, participant_can_receive_chat_updates
+from chat.realtime import ROOM_GROUP_FMT, USER_GROUP_FMT, participant_can_receive_chat_updates
 from memberships.models import Membership
 from chat.text import sanitize_chat_text
 
@@ -33,6 +33,10 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             await self.close(code=4401)
             return
 
+        if await self._ahpra_suspended(user):
+            await self.close(code=4403)
+            return
+
         self.membership = await self._get_membership(self.room_id, user.id)
         if not self.membership:
             log.warning("CONNECT denied: no membership for user=%s in room=%s", user.id, self.room_id)
@@ -40,10 +44,16 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             return
 
         if self.channel_layer:
+            self.user_group_name = USER_GROUP_FMT.format(user_id=user.id)
+            await self.channel_layer.group_add(self.user_group_name, self.channel_name)
             await self.channel_layer.group_add(self.group_name, self.channel_name)
         else:
             log.error("No channel_layer on consumer!")
 
+        # Catch a suspension committed between the initial check and joining the user group.
+        if await self._ahpra_suspended(user):
+            await self.close(code=4403)
+            return
         self._last_typing_emit = 0.0
         self._last_typing_state = None
 
@@ -57,8 +67,13 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         log.info("DISCONNECT: code=%s room=%s", code, getattr(self,'room_id',None))
         if self.channel_layer and hasattr(self, "group_name"):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        if self.channel_layer and hasattr(self, "user_group_name"):
+            await self.channel_layer.group_discard(self.user_group_name, self.channel_name)
 
     async def receive_json(self, content, **kwargs):
+        if getattr(self, '_ahpra_frozen', False) or await self._ahpra_suspended(self.scope['user']):
+            await self.ahpra_suspended({})
+            return
         if content.get("type") == "typing":
             if not getattr(self, "membership", None):
                 return
@@ -103,6 +118,10 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         # No immediate send here; signal will broadcast on commit
 
     # ---- channel-layer events ----
+    async def ahpra_suspended(self, event):
+        self._ahpra_frozen = True
+        await self.close(code=4403)
+
     async def message_created(self, event):
         payload = event.get("message") or event
         log.debug("EVENT message.created id=%s", payload.get("id"))
@@ -149,6 +168,12 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         })
 
     # ---- DB helpers ----
+    @database_sync_to_async
+    def _ahpra_suspended(self, user):
+        # The HTTP freeze (onboarding.middleware) never sees WebSocket handshakes.
+        from onboarding.verification.state import ahpra_profile, ahpra_state
+        return not user.is_staff and ahpra_state(ahpra_profile(user))['state'] == 'suspended'
+
     @database_sync_to_async
     def _get_membership(self, conversation_id: int, user_id: int):
         participant = (

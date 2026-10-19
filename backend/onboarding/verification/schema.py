@@ -16,7 +16,24 @@ class VerificationBadgeSerializer(serializers.Serializer):
     state = serializers.ChoiceField(choices=STATES)
 
 
+class AhpraStateSerializer(serializers.Serializer):
+    state = serializers.ChoiceField(choices=('ok', 'pending', 'suspended', 'not_found'))
+    registration_status = serializers.CharField(allow_null=True)
+    registration_type = serializers.CharField(allow_null=True)
+    expiry_date = serializers.DateField(allow_null=True)
+    note = serializers.CharField(allow_blank=True)
+    checked_at = serializers.DateTimeField(allow_null=True)
+    recheck_available_at = serializers.DateTimeField(allow_null=True)
+
+    def to_representation(self, instance):
+        from onboarding.verification.state import ahpra_state
+        if isinstance(instance, dict):
+            return super().to_representation(instance)
+        return ahpra_state(instance)
+
+
 class VerificationSummarySerializer(serializers.Serializer):
+    ahpra = AhpraStateSerializer()
     verified = serializers.BooleanField()
     missing = serializers.ListField(child=serializers.ChoiceField(choices=REQUIREMENTS))
     outstanding = serializers.ListField(child=serializers.ChoiceField(choices=REQUIREMENTS))

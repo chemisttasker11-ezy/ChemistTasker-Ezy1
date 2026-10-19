@@ -1,3 +1,4 @@
+import { reportAhpraError } from '@chemisttasker/shared-core';
 // src/utils/apiClient.ts
 import {csrfToken,loginHref} from '../../landing_next/shared/browser-session';
 import axios, { AxiosError, AxiosResponse } from 'axios';
@@ -53,6 +54,7 @@ apiClient.interceptors.response.use(
   },
   async (error: AxiosError) => {
     const originalRequest: any = error.config || {};
+    reportAhpraError(error.response?.data);
 
     // Attempt refresh once on 401
     if (error.response?.status === 401 && !originalRequest._retry) {

@@ -1,3 +1,5 @@
+import AhpraStatus from '../../../components/AhpraStatus';
+import { useAhpra } from '../../../contexts/AhpraContext';
 // Role & qualifications (Pharmacy team). Required: the role, its classification or year, and an intern's AHPRA number.
 // Every document is optional evidence: it earns a badge once checked and never blocks saving.
 // Server: tab="regulatory"; fields as on the model (role_type, classification_level, student_year,
@@ -96,6 +98,7 @@ function EvidenceRow({ title, purpose, field, form, badge, onPick }: {
 }
 
 export default function RegulatoryV2() {
+  const ahpra = useAhpra();
   const roleKey = "otherstaff";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -113,7 +116,7 @@ export default function RegulatoryV2() {
     setSavedRole(next.role_type);
     setData(next);
     unsaved.markClean(next);
-    setBadges(verificationRows(normalizeVerification(d.verification), "worker"));
+    setBadges(verificationRows(normalizeVerification(d.verification, d.ahpra), "worker"));
   };
 
   useEffect(() => {
@@ -152,6 +155,7 @@ export default function RegulatoryV2() {
       const response = await updateOnboardingForm(roleKey, form);
       announceOnboardingSaved(response);
       accept(response || {});
+      void ahpra.refresh().catch(() => {});
       setSaved(true);
     } catch (err: any) {
       const body = err.response?.data;
@@ -207,12 +211,13 @@ export default function RegulatoryV2() {
 
         {role === "INTERN" && (
           <Stack spacing={1}>
-            <TextField fullWidth required label="AHPRA number" value={data.ahpra_number} onChange={event => set({ ahpra_number: event.target.value })} disabled={data.ahpra_verified}
+            <AhpraStatus />
+            <TextField fullWidth required label="AHPRA number" value={data.ahpra_number} onChange={event => set({ ahpra_number: event.target.value })} disabled={data.ahpra_verified && (!ahpra.summary || ahpra.summary.state === 'ok')}
               inputProps={{ autoComplete: "off", spellCheck: false }} error={Boolean(fieldErrors.ahpra_number)}
               helperText={fieldErrors.ahpra_number || (data.ahpra_verified
                 ? "Checked by our team. Your AHPRA number stays with you for life, through to general registration; contact support to correct it."
                 : "Your provisional (intern) registration. Our team checks it on the AHPRA register; nothing else is needed from interns.")} />
-            {badge("AHPRA_PROVISIONAL") && data.ahpra_number && (
+            {!ahpra.summary && badge("AHPRA_PROVISIONAL") && data.ahpra_number && (
               <Box><EvidencePill code="AHPRA_PROVISIONAL" label="AHPRA provisional registration" state={badge("AHPRA_PROVISIONAL")!.state} explainer={badge("AHPRA_PROVISIONAL")!.explainer} /></Box>
             )}
           </Stack>

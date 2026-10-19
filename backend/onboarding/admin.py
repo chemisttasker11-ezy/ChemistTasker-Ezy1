@@ -49,6 +49,8 @@ class AhpraCheckAdmin(admin.ModelAdmin):
                 profile = check_profile(check)
                 if profile is None or full_registration_number(profile.ahpra_number) != check.registration_number:
                     continue
+                from onboarding.verification.state import ahpra_state, apply_state_transition
+                previous = ahpra_state(profile)
                 note = f'Manually {"verified" if verified else "rejected"} by {request.user}'
                 _update_ahpra_fields(check.model_name, check.object_pk, verified, note)
                 check.outcome = 'verified' if verified else 'rejected'
@@ -57,6 +59,7 @@ class AhpraCheckAdmin(admin.ModelAdmin):
                 check.reviewed_by = request.user
                 check.reviewed_at = check.completed_at = timezone.now()
                 check.save()
+                apply_state_transition(profile, previous)
 
     @admin.action(description='Mark verified')
     def mark_verified(self, request, queryset):

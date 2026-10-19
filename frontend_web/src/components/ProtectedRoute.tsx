@@ -1,3 +1,5 @@
+import { useAhpra } from '../contexts/AhpraContext';
+import AhpraStatus from './AhpraStatus';
 import {loginHref} from '../../landing_next/shared/browser-session';
 // src/components/ProtectedRoute.tsx
 import React from "react";
@@ -32,6 +34,14 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, isLoading, isAdminUser, hasCapability } = useAuth();
   const location = useLocation();
+  const ahpra = useAhpra();
+  const roleKey = user?.role === 'OWNER' ? 'owner' : user?.role === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
+  const ahpraStep = roleKey === 'pharmacist' ? 'basic' : 'regulatory docs';
+  const recoveryPath = roleKey === 'owner' ? '/onboarding/owner' : `/onboarding/${roleKey}?step=${encodeURIComponent(ahpraStep)}`;
+  const onAhpraStep = location.pathname === `/onboarding/${roleKey}` && (roleKey === 'owner' || new URLSearchParams(location.search).get('step') === ahpraStep);
+  React.useEffect(() => {
+    if (onAhpraStep && ahpra.refusal) ahpra.clearRefusal();
+  }, [onAhpraStep, ahpra.refusal, ahpra.clearRefusal]);
 
   if (isLoading) {
     return <div>Loading authentication...</div>;
@@ -41,6 +51,13 @@ export default function ProtectedRoute({
     window.location.replace(loginHref(location.pathname+location.search+location.hash));
     return <div role="status">Opening sign in…</div>;
   }
+
+  if (location.pathname.endsWith('/logout')) return children;
+  if (ahpra.loading) return <div role="status">Loading AHPRA status...</div>;
+  if ((ahpra.summary?.state === 'suspended' || ahpra.refusal) && !onAhpraStep) {
+    return <><AhpraStatus /><Navigate to={recoveryPath} replace /></>;
+  }
+  if (ahpra.summary?.state === 'suspended' && onAhpraStep) return children;
 
   const hasOrgRole = hasOrganizationAccess(user);
 

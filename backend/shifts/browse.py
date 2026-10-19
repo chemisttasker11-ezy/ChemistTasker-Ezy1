@@ -244,6 +244,8 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         A refusal returns a stable `detail` and `code`; the internal reason is logged.
         """
 
+        from onboarding.verification.state import require_ahpra_application
+        require_ahpra_application(request.user)
         try:
             shift = self.get_object()
         except (Http404, DRFPermissionDenied, DjangoPermissionDenied):

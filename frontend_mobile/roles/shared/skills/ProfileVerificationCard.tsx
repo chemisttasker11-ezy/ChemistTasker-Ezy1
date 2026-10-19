@@ -24,7 +24,7 @@ export function ProfileVerificationCard({ roleKey, role, routes }: {
     getOnboardingDetail(roleKey)
       .then((detail: any) => {
         if (!live) return;
-        setSummary(normalizeVerification(detail?.verification));
+        setSummary(normalizeVerification(detail?.verification, detail?.ahpra));
         setSkillRole(role ?? detail?.role_type ?? null);
         setFailed(false);
       })

@@ -1,3 +1,5 @@
+import AhpraStatus from '../../../components/AhpraStatus';
+import { useAhpra } from '../../../context/AhpraContext';
 // Role & qualifications (Pharmacy team). Required: the role, its classification or year, and an intern's AHPRA number.
 // Every document is optional evidence: it earns a badge once checked and never blocks saving.
 import React, { useEffect, useState } from 'react';
@@ -47,6 +49,7 @@ const fromServer = (res: any) => ({
 });
 
 export default function OtherStaffRegulatoryScreen() {
+  const ahpra = useAhpra();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -64,7 +67,7 @@ export default function OtherStaffRegulatoryScreen() {
     setSavedRole(next.role_type || '');
     setData(next);
     setFiles({});
-    setBadges(verificationRows(normalizeVerification(res?.verification), 'worker'));
+    setBadges(verificationRows(normalizeVerification(res?.verification, res?.ahpra), 'worker'));
     unsaved.markClean({ data: next, files: {} });
   };
 
@@ -81,7 +84,7 @@ export default function OtherStaffRegulatoryScreen() {
   const role: Role = data.role_type;
   const isLevelled = role === 'ASSISTANT' || role === 'TECHNICIAN';
   const badge = (code: string) => badges.find(row => row.code === code);
-  const ahpraChecked = badge('AHPRA_PROVISIONAL')?.state === 'verified';
+  const ahpraChecked = badge('AHPRA_PROVISIONAL')?.state === 'verified' && (!ahpra.summary || ahpra.summary.state === 'ok');
   const set = (patch: any) => setData((prev: any) => ({ ...prev, ...patch }));
 
   const pick = async (field: FileField) => {
@@ -107,6 +110,7 @@ export default function OtherStaffRegulatoryScreen() {
       if (role === 'INTERN') form.append('ahpra_number', String(data.ahpra_number || '').trim());
       FIELDS.forEach(field => { if (files[field]) form.append(field, toRNFile(files[field])); });
       accept(await updateOnboardingForm(roleKey, form as any));
+      void ahpra.refresh().catch(() => {});
       Alert.alert('Saved', 'Role and qualifications saved.');
     } catch (err: any) {
       const body = err?.response?.data;
@@ -180,6 +184,7 @@ export default function OtherStaffRegulatoryScreen() {
 
         {role === 'INTERN' ? (
           <View style={{ gap: 6 }}>
+            <AhpraStatus />
             <TextInput mode="outlined" label="AHPRA number" value={data.ahpra_number} onChangeText={value => set({ ahpra_number: value })}
               autoCapitalize="characters" autoCorrect={false} error={Boolean(fieldErrors.ahpra_number)} editable={!ahpraChecked} />
             <HelperText type={fieldErrors.ahpra_number ? 'error' : 'info'} visible>
@@ -187,7 +192,7 @@ export default function OtherStaffRegulatoryScreen() {
                 ? 'Checked by our team. Your AHPRA number stays with you for life, through to general registration; contact support to correct it.'
                 : 'Your provisional (intern) registration. Our team checks it on the AHPRA register; nothing else is needed from interns.')}
             </HelperText>
-            {badge('AHPRA_PROVISIONAL') && data.ahpra_number ? <EvidenceStatus code="AHPRA_PROVISIONAL" label="AHPRA provisional registration" state={badge('AHPRA_PROVISIONAL')!.state} explainer={badge('AHPRA_PROVISIONAL')!.explainer} /> : null}
+            {!ahpra.summary && badge('AHPRA_PROVISIONAL') && data.ahpra_number ? <EvidenceStatus code="AHPRA_PROVISIONAL" label="AHPRA provisional registration" state={badge('AHPRA_PROVISIONAL')!.state} explainer={badge('AHPRA_PROVISIONAL')!.explainer} /> : null}
           </View>
         ) : null}
 

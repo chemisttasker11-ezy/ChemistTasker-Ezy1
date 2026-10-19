@@ -1,3 +1,5 @@
+import AhpraStatus from '../../components/AhpraStatus';
+import { useAhpra } from '../../context/AhpraContext';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -66,6 +68,8 @@ export default function OwnerProfileDetailScreen({
   onCancelPath,
 }: Props) {
   const router = useRouter();
+  const ahpra = useAhpra();
+  const recovering = ahpra.summary?.state === 'suspended' || ahpra.summary?.state === 'not_found';
   const { user, refreshUser } = useAuth();
   const imageMediaTypes = (ImagePicker as any).MediaType?.Images ?? ImagePicker.MediaTypeOptions.Images;
 
@@ -121,8 +125,8 @@ export default function OwnerProfileDetailScreen({
     const name = [form.first_name, form.last_name].filter(Boolean).join(' ').trim();
     return name || form.username || 'Owner setup';
   }, [form.first_name, form.last_name, form.username]);
-  const showAhpra = form.role === 'PHARMACIST' || Boolean(form.ahpra_number);
-  const isAhpraVerified = form.ahpra_verified === true;
+  const showAhpra = form.role === 'PHARMACIST' || Boolean(form.ahpra_number) || recovering;
+  const isAhpraVerified = form.ahpra_verified === true && (!ahpra.summary || ahpra.summary.state === 'ok');
 
   const buildFormFromResponse = (data: any): OwnerFormData => ({
     username: data?.username || '',
@@ -221,6 +225,7 @@ export default function OwnerProfileDetailScreen({
     setSaving(true);
     try {
       await updateOnboardingForm('owner', payload);
+      await ahpra.refresh();
       await refreshUser();
       unsaved.markClean({
         form,
@@ -228,7 +233,9 @@ export default function OwnerProfileDetailScreen({
         profilePhotoUri: null,
       });
       setProfilePhotoAsset(null);
-      if (standalone && onSuccessPath) {
+      if (recovering) {
+        Alert.alert('Saved', 'AHPRA number submitted.');
+      } else if (standalone && onSuccessPath) {
         router.replace(onSuccessPath as any);
       } else {
         Alert.alert('Saved', 'Owner profile detail updated.');
@@ -258,6 +265,7 @@ export default function OwnerProfileDetailScreen({
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
+        <AhpraStatus />
         {error ? <HelperText type="error">{error}</HelperText> : null}
 
         <Card style={styles.heroCard} mode="contained">
@@ -483,7 +491,7 @@ export default function OwnerProfileDetailScreen({
                 style={styles.input}
               />
 
-              <Chip
+              {!ahpra.summary && <Chip
                 mode="outlined"
                 icon={form.ahpra_verified === true ? 'check-circle-outline' : form.ahpra_verified === false ? 'close-circle-outline' : 'clock-outline'}
                 style={[
@@ -495,8 +503,8 @@ export default function OwnerProfileDetailScreen({
                 }
               >
                 {form.ahpra_verified === true ? 'AHPRA Verified' : form.ahpra_verified === false ? 'AHPRA Not Verified' : 'AHPRA Pending'}
-              </Chip>
-              {form.ahpra_verification_note ? <HelperText type="info">{form.ahpra_verification_note}</HelperText> : null}
+              </Chip>}
+              {!ahpra.summary && form.ahpra_verification_note ? <HelperText type="info">{form.ahpra_verification_note}</HelperText> : null}
             </>
           ) : null}
 
@@ -524,7 +532,7 @@ export default function OwnerProfileDetailScreen({
               buttonColor="#7C8CF8"
               textColor="#FFFFFF"
             >
-              {saving ? 'Saving...' : standalone ? 'Continue' : 'Submit'}
+              {saving ? 'Saving...' : recovering ? 'Submit' : standalone ? 'Continue' : 'Submit'}
             </Button>
           </View>
         </View>

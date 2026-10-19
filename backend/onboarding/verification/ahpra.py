@@ -254,5 +254,8 @@ def _update_ahpra_fields(model_name, object_pk, verified, note, reg_type=None, r
     if model_field_names is not None:
         update_fields = [f for f in update_fields if f in model_field_names]
     obj.save(update_fields=update_fields)
+    if verified and model_field_names is not None:
+        from onboarding.verification.policy import refresh_verified
+        refresh_verified(obj)
     logger.info("[AHPRA TASK] Saved verification result for %s pk=%s verified=%s", model_name, object_pk, verified)
 

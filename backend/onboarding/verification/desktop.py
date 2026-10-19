@@ -118,6 +118,8 @@ def apply_ahpra_result(check, payload):
     if check is None:
         return False
     profile = check_profile(check)
+    from onboarding.verification.state import ahpra_state, apply_state_transition
+    previous = ahpra_state(profile)
     outcome = payload['outcome']
     record = payload['register']
     note = payload['error']
@@ -145,6 +147,8 @@ def apply_ahpra_result(check, payload):
     check.register_data = record or {}
     check.completed_at = timezone.now()
     check.save()
+    if profile is not None and full_registration_number(profile.ahpra_number) == check.registration_number:
+        apply_state_transition(profile, previous)
     return True
 
 

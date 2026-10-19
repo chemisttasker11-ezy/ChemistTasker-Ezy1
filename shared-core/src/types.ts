@@ -693,6 +693,7 @@ export interface ShiftUserApi {
 export type ShiftUser = CamelCasedPropertiesDeep<ShiftUserApi>;
 
 export interface VerificationSummaryApi {
+    ahpra?: import('./domains/onboarding/ahpra').AhpraSummary | null;
     verified: boolean;
     missing?: ('email' | 'mobile' | 'ahpra' | 'gov_id' | 'referees' | 'role')[];
     badges: { code: 'AHPRA' | 'AHPRA_PROVISIONAL' | 'QUALIFICATION' | 'DISPENSING' | 'ENROLMENT' | 'ID' | 'REFERENCES' | 'ABN'; state: 'verified' | 'pending' | 'not_supplied' | 'failed' }[];
@@ -706,6 +707,7 @@ export interface VerificationSummaryApi {
 }
 
 export interface ShiftWorkProfileApi extends ShiftUserApi {
+    ahpra?: import('./domains/onboarding/ahpra').AhpraSummary | null;
     skill_role?: 'PHARMACIST' | 'INTERN' | 'TECHNICIAN' | 'ASSISTANT' | 'STUDENT';
     verified_skills?: string[];
     verification?: VerificationSummaryApi | null;

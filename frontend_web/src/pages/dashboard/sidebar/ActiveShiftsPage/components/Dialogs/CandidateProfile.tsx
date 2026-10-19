@@ -31,7 +31,7 @@ function Fact({ icon, children }: { icon: React.ReactNode; children: React.React
 export function CandidateProfile({ name, bio, profile }: { name: string; bio?: string; profile?: ShiftWorkProfile | null }) {
     const p: Partial<ShiftWorkProfile> = profile || {};
     const role = [p.roleLabel, p.classification].filter(Boolean).join(' · ');
-    const verification = normalizeVerification(p.verification);
+    const verification = normalizeVerification(p.verification, p.ahpra);
     const place = [p.suburb, p.state].filter(Boolean).join(', ');
     const travel = p.openToTravel
         ? `Open to travel${p.coverageRadiusKm ? ` up to ${p.coverageRadiusKm} km` : ''}${p.travelStates?.length ? ` · ${p.travelStates.join(', ')}` : ''}`

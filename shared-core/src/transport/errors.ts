@@ -1,8 +1,14 @@
+import { reportAhpraError } from '../domains/onboarding/ahpra';
 /** Keep public API errors useful without exposing unexpected server internals. */
 export class ApiError extends Error {
+    readonly code?: string;
+    readonly retry_after?: number;
     constructor(message: string, public readonly status: number, public readonly payload: unknown) {
         super(message);
         this.name = 'ApiError';
+        const ahpra = reportAhpraError(payload);
+        this.code = ahpra?.code;
+        this.retry_after = ahpra?.retry_after;
     }
 }
 function firstMessage(value: unknown, depth = 0): string | undefined {
@@ -34,7 +40,8 @@ export async function responseError(response: Response): Promise<ApiError> {
     const payload: unknown = await response.json().catch(() => null);
     const object = payload && typeof payload === 'object' && !Array.isArray(payload)
         ? payload as Record<string, unknown> : undefined;
-    const message = firstMessage(object?.detail) ?? firstMessage(object?.error) ??
+    const message = (object?.code === 'ahpra_recheck_cooldown' && !object.detail
+        ? 'Please wait before re-checking your AHPRA registration.' : undefined) ?? firstMessage(object?.detail) ?? firstMessage(object?.error) ??
         firstMessage(object?.message) ?? firstMessage(payload) ?? fallback;
     return new ApiError(message, response.status, payload);
 }

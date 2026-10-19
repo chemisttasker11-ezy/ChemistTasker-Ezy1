@@ -141,7 +141,7 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
     const onSaved = (event: Event) => {
       const detail = (event as CustomEvent).detail as any;
       if (!detail?.verification) return;
-      setSummary(normalizeVerification(detail.verification));
+      setSummary(normalizeVerification(detail.verification, detail.ahpra));
       if (Number.isFinite(detail.progress_percent)) setProgress(detail.progress_percent);
       onDetail?.(detail);
     };
@@ -156,7 +156,7 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
     getOnboardingDetail(roleKey)
       .then((detail: any) => {
         if (!live) return;
-        setSummary(normalizeVerification(detail?.verification));
+        setSummary(normalizeVerification(detail?.verification, detail?.ahpra));
         setProgress(Number.isFinite(detail?.progress_percent) ? detail.progress_percent : null);
         onDetail?.(detail);
       })

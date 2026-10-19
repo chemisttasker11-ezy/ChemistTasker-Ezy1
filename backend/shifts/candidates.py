@@ -158,6 +158,8 @@ def work_profile(candidate, *, build_absolute_uri):
         # verified_skills stays for app builds released before the badge summary.
         'verified_skills': [code for code, state in summary['skill_evidence'].items() if state == VERIFIED],
         'verification': summary,
+        'ahpra': summary['ahpra'],
+        'ahpra_registration_status': summary['ahpra']['registration_status'],
         'suburb': profile.suburb or None,
         'state': profile.state or None,
         'open_to_travel': bool(profile.open_to_travel),

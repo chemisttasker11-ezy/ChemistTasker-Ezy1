@@ -298,6 +298,9 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get', 'post'], url_path='counter-offers')
     def counter_offers(self, request, pk=None):
+        if request.method == 'POST':
+            from onboarding.verification.state import require_ahpra_application
+            require_ahpra_application(request.user)
         shift = self.get_object()
 
         if request.method == 'GET':

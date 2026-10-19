@@ -328,6 +328,8 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
 
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
+        from onboarding.verification.state import require_ahpra_application
+        require_ahpra_application(request.user)
         from billing.utils import (
             BILLING_STATE_PAYMENT_REQUIRED,
             get_billing_state_for_pharmacy,

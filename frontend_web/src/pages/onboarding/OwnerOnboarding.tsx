@@ -1,3 +1,5 @@
+import AhpraStatus from '../../components/AhpraStatus';
+import { useAhpra } from '../../contexts/AhpraContext';
 // src/pages/onboarding/OwnerOnboarding.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -80,6 +82,8 @@ function OwnerOnboardingContent({
   onSuccessPath,
 }: OwnerOnboardingProps) {
   const roleKey = 'owner';
+  const ahpra = useAhpra();
+  const recovering = ahpra.summary?.state === 'suspended' || ahpra.summary?.state === 'not_found';
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
   const [isUpdate, setIsUpdate] = useState(false);
@@ -127,8 +131,8 @@ function OwnerOnboardingContent({
     return name || data.username || 'Owner setup';
   }, [data.first_name, data.last_name, data.username]);
   const roleLabel = ROLE_OPTIONS.find((option) => option.value === data.role)?.label ?? 'Owner';
-  const showAhpra = data.role === 'PHARMACIST' || Boolean(data.ahpra_number);
-  const isAhpraVerified = data.ahpra_verified === true;
+  const showAhpra = data.role === 'PHARMACIST' || Boolean(data.ahpra_number) || recovering;
+  const isAhpraVerified = data.ahpra_verified === true && (!ahpra.summary || ahpra.summary.state === 'ok');
   const sectionCardSx = {
     p: { xs: 2, md: 3 },
     borderRadius: 4,
@@ -227,7 +231,7 @@ function OwnerOnboardingContent({
   }, [roleKey]);
 
   useEffect(() => {
-    if (standalone) {
+    if (standalone || recovering) {
       return;
     }
     apiClient
@@ -243,7 +247,7 @@ function OwnerOnboardingContent({
       .catch(() => {
         setSubscriptionSummary(null);
       });
-  }, [standalone]);
+  }, [standalone, recovering]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -291,6 +295,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     }
 
     const saved = await updateOnboardingForm(roleKey, payload);
+    void ahpra.refresh().catch(() => {});
     const nextData = (saved as any) || {};
     const nextPhoto =
       nextData?.profile_photo_url ||
@@ -346,7 +351,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
-    navigate(onSuccessPath || '/dashboard/owner/overview');
+    if (!recovering) navigate(onSuccessPath || '/dashboard/owner/overview');
   };
 
   const handleCopyFriendReferral = async () => {
@@ -389,6 +394,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       {() => (
     <Box sx={{ bgcolor: LIGHT_PAGE_BG, minHeight: standalone ? 'calc(100vh - 72px)' : 'auto', py: { xs: 2, md: standalone ? 3 : 0 } }}>
     <Container maxWidth="xl">
+      <AhpraStatus />
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       <Snackbar
@@ -700,8 +706,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                 sx={inputSx}
               />
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mt: 1 }}>
-                <VerifiedChip ok={data.ahpra_verified} label="AHPRA" />
-                {typeof data.ahpra_verified === 'boolean' && (
+                {!ahpra.summary && <VerifiedChip ok={data.ahpra_verified} label="AHPRA" />}
+                {!ahpra.summary && typeof data.ahpra_verified === 'boolean' && (
                   <Typography
                     variant="body2"
                     title={data.ahpra_verification_note || (data.ahpra_verified ? 'Verified' : 'Pending/Not verified')}
@@ -757,7 +763,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               disabled={loading}
               sx={{ px: 3, minWidth: 160 }}
             >
-              {loading ? 'Saving…' : isUpdate ? 'Save Changes' : 'Submit'}
+              {loading ? 'Saving…' : recovering ? 'Submit' : isUpdate ? 'Save Changes' : 'Submit'}
             </Button>
               </Box>
             </Stack>
@@ -765,7 +771,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           </Box>
         </Paper>
 
-        {!standalone && (
+        {!standalone && !recovering && (
         <Paper id="marketplace-identity" sx={{ ...sectionCardSx, scrollMarginTop: '96px' }} elevation={0}>
           <Typography variant="h5" sx={{ fontWeight: 800, color: '#111827', mb: 1 }}>
             Marketplace identity verification
@@ -777,7 +783,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         </Paper>
         )}
 
-        {!standalone && (
+        {!standalone && !recovering && (
         <Paper sx={sectionCardSx} elevation={0}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
             <Box>
@@ -798,7 +804,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         </Paper>
         )}
 
-        {!standalone && (
+        {!standalone && !recovering && (
         <Paper sx={sectionCardSx} elevation={0}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
             <Box>
