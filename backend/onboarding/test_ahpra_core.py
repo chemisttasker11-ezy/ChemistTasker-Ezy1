@@ -245,6 +245,28 @@ class EvaluateAhpraRecordTests(TestCase):
         self.assertEqual(outcome, "review")
         self.assertIn("expired", note.lower())
 
+    def test_registration_requirements_by_role(self):
+        requirements = "Practise only under supervisor Jane Smith at Example Pharmacy. " * 4
+        for fields in ({"registration_requirements": requirements}, {"supervised_practice": True},
+                       {"registration_requirements": requirements, "supervised_practice": True}):
+            for role, reg_type, expected, prefix, limit in (
+                ("intern", "Provisional", "verified", "Verified intern under supervised practice: ", 150),
+                ("pharmacist", "General", "review", "Registration requirements present: ", 120),
+            ):
+                with self.subTest(fields=fields, role=role):
+                    record = self.base_record(registration_type=reg_type, **fields)
+                    outcome, note = evaluate_ahpra_record(
+                        record, first_name="Jane", last_name="Doe", role=role
+                    )
+                    self.assertEqual(outcome, expected)
+                    self.assertEqual(note, prefix + fields.get("registration_requirements", "").strip()[:limit])
+                    if role == "intern":
+                        record["conditions"] = True
+                        outcome, _ = evaluate_ahpra_record(
+                            record, first_name="Jane", last_name="Doe", role=role
+                        )
+                        self.assertEqual(outcome, "review")
+
     def test_everything_fine_returns_verified(self):
         record = self.base_record()
         outcome, note = evaluate_ahpra_record(
@@ -255,6 +277,28 @@ class EvaluateAhpraRecordTests(TestCase):
 
 
 class ParseAhpraHtmlTests(TestCase):
+    def test_registration_requirements_section(self):
+        requirements = "Practise under Board-approved supervisor Jane Smith at Example Pharmacy."
+        for text in (requirements, requirements + " x" * 600):
+            with self.subTest(length=len(text)):
+                html = (
+                    '<div class="practitioner-detail-body">'
+                    '<div class="practitioner-detail-section">'
+                    '<h3>Registration Requirements</h3>'
+                    f'<p>  {text}\n </p></div>'
+                    '<div class="practitioner-detail-section"><h3>Conditions</h3>'
+                    '<p>None</p></div></div>'
+                )
+                with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".html", delete=False) as f:
+                    f.write(html)
+                try:
+                    parsed = parse_ahpra_html(f.name)
+                    self.assertEqual(parsed["registration_requirements"], text[:1000])
+                    self.assertTrue(parsed["supervised_practice"])
+                    self.assertFalse(parsed["conditions"])
+                finally:
+                    os.remove(f.name)
+
     def test_parse_ahpra_html_with_condition_row(self):
         sample_html = (
             '<html><body>'
@@ -307,6 +351,8 @@ class ParseAhpraHtmlTests(TestCase):
             self.assertTrue(parsed["conditions"])
             self.assertFalse(parsed["undertakings"])
             self.assertFalse(parsed["reprimands"])
+            self.assertEqual(parsed["registration_requirements"], "")
+            self.assertFalse(parsed["supervised_practice"])
         finally:
             if os.path.exists(path):
                 os.remove(path)

@@ -106,8 +106,15 @@ def parse_ahpra_html(html_file_path):
     conditions = False
     undertakings = False
     reprimands = False
+    registration_requirements = ""
 
     for section in sections:
+        heading = section.select_one('h1, h2, h3, h4, h5, h6, .section-title, .section-heading')
+        if heading and "registration requirement" in heading.get_text(" ", strip=True).lower():
+            section_text = section.get_text(" ", strip=True)
+            registration_requirements = " ".join(
+                section_text.removeprefix(heading.get_text(" ", strip=True)).split()
+            )[:1000]
         rows = section.find_all('div', class_='section-row')
         for row in rows:
             label = row.find('div', class_='field-title')
@@ -142,6 +149,8 @@ def parse_ahpra_html(html_file_path):
         "conditions": conditions,
         "undertakings": undertakings,
         "reprimands": reprimands,
+        "registration_requirements": registration_requirements,
+        "supervised_practice": "supervis" in registration_requirements.lower(),
     }
 
 
@@ -207,6 +216,12 @@ def evaluate_ahpra_record(record: dict, *, first_name, last_name, role) -> tuple
     today = timezone.now().date()
     if expiry_date and expiry_date < today:
         return ("review", f"Registration expired on {expiry_date.strftime('%d/%m/%Y')}")
+
+    requirements = (record.get("registration_requirements") or "").strip()
+    if requirements or record.get("supervised_practice", False):
+        if role_norm == "intern":
+            return ("verified", f"Verified intern under supervised practice: {requirements[:150]}")
+        return ("review", f"Registration requirements present: {requirements[:120]}")
 
     return ("verified", "AHPRA registration is valid and current.")
 

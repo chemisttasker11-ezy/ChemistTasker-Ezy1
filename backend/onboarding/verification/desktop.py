@@ -25,6 +25,8 @@ class RegisterSerializer(serializers.Serializer):
     conditions = serializers.BooleanField()
     undertakings = serializers.BooleanField()
     reprimands = serializers.BooleanField()
+    registration_requirements = serializers.CharField(allow_blank=True, required=False, default='')
+    supervised_practice = serializers.BooleanField(required=False, default=False)
 
 
 def valid_result(payload):
@@ -41,11 +43,13 @@ def valid_result(payload):
     record = payload['register']
     if record is None:
         return payload['outcome'] != 'found'
-    if not isinstance(record, dict) or set(record) != set(RegisterSerializer().fields):
+    fields = RegisterSerializer().fields
+    if (not isinstance(record, dict) or not set(record) <= set(fields)
+            or not {key for key, field in fields.items() if field.required} <= set(record)):
         return False
-    if any(type(record[k]) is not bool for k in ('conditions', 'undertakings', 'reprimands')):
+    if any(type(record.get(k, False)) is not bool for k in ('conditions', 'undertakings', 'reprimands', 'supervised_practice')):
         return False
-    if any(not isinstance(record[k], str) for k in ('name', 'profession', 'registration_status', 'registration_type')):
+    if any(not isinstance(record.get(k, ''), str) for k in ('name', 'profession', 'registration_status', 'registration_type', 'registration_requirements')):
         return False
     if not RegisterSerializer(data=record).is_valid():
         return False

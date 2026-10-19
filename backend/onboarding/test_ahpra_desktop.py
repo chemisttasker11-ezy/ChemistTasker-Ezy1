@@ -18,7 +18,7 @@ from onboarding.admin import AhpraCheckAdmin
 from onboarding.models import AhpraCheck, OtherStaffOnboarding, PharmacistOnboarding
 from onboarding.routing import websocket_urlpatterns
 from onboarding.tasks import alert_overdue_ahpra_checks, recheck_ahpra_registrations, verify_ahpra_task
-from onboarding.verification.desktop import apply_ahpra_result, claim_checks, enqueue_check, valid_result
+from onboarding.verification.desktop import RegisterSerializer, apply_ahpra_result, claim_checks, enqueue_check, valid_result
 from users.jwt_ws import JWTAuthMiddlewareStack
 
 NUMBER = 'PHA0001234567'
@@ -97,13 +97,35 @@ class DesktopTests(TestCase):
                     self.assertEqual(check.outcome, 'error')
                     self.assertEqual(PharmacistOnboarding.objects.filter(pk=self.profile.pk).values().get(), before)
 
+    def test_registration_requirements_persist_and_render_in_admin(self):
+        for fields in ({}, {'registration_requirements': 'Only practise under supervisor Jane Smith at Example Pharmacy.',
+                           'supervised_practice': True}):
+            with self.subTest(fields=fields):
+                check = check_fixture(self.profile)
+                payload = result(check.pk, **fields)
+                self.assertTrue(apply_ahpra_result(check, payload))
+                check.refresh_from_db()
+                self.assertEqual(check.register_data, payload['register'])
+                self.assertEqual(check.outcome, 'review' if fields else 'verified')
+                rendered = AhpraCheckAdmin(AhpraCheck, AdminSite()).register_rendering(check)
+                for key in fields:
+                    self.assertIn(key, rendered)
+
     def test_shape_validation(self):
         good = result(1)
         self.assertTrue(valid_result(good))
+        serializer = RegisterSerializer(data=good['register'])
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(serializer.validated_data['registration_requirements'], '')
+        self.assertFalse(serializer.validated_data['supervised_practice'])
+        for fields in ({'registration_requirements': ''}, {'supervised_practice': False}):
+            self.assertTrue(valid_result(result(1, **fields)))
         for key, value in [('check_id', True), ('checked_at', 'bad'), ('outcome', 'verified'), ('register', None)]:
             bad = dict(good, **{key: value})
             self.assertFalse(valid_result(bad))
-        for key, value in [('conditions', 'false'), ('expiry_date', '2099-02-30'), ('name', 123)]:
+        for key, value in [('conditions', 'false'), ('expiry_date', '2099-02-30'), ('name', 123),
+                           ('registration_requirements', 123), ('registration_requirements', None),
+                           ('supervised_practice', 'false'), ('supervised_practice', 1), ('unexpected', True)]:
             bad = copy.deepcopy(good)
             bad['register'][key] = value
             self.assertFalse(valid_result(bad))
