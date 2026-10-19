@@ -1,0 +1,307 @@
+{
+ "edit": {
+  "ON-Q02": {
+   "context": "Anyone signed in can browse shift boards. Verified and, with PR #183, the latest AHPRA result are checked only on public shift actions (ON-01).",
+   "current": "Login needs an email code. Signed-in workers browse every board; public applying needs Verified, staff and favourites skip it. (with PR #183) Suspended, not-found or unreadable AHPRA results also block public applying; suspended non-members are locked out entirely."
+  },
+  "ON-Q03": {
+   "context": "With PR #183, public apply, accept and counter-offer check Verified plus the latest AHPRA result. Members (staff and favourites), other audiences and internal rostering skip it (ON-01).",
+   "options": [
+    {
+     "key": "KEEP",
+     "label": "Keep current logic",
+     "detail": "Public apply, accept and counter-offer checked; members and internal shifts exempt."
+    },
+    {
+     "key": "B",
+     "label": "Every outside booking",
+     "detail": "Also check non-members on chain, organisation and Talent Board bookings."
+    },
+    {
+     "key": "C",
+     "label": "B plus internal rostering",
+     "detail": "Also check registered roles before assignment."
+    }
+   ],
+   "rec": "B",
+   "recWhy": "PR #183 already gates public apply, accept and counter-offer, and encodes the owner rule that members never need AHPRA. Extend the same gate to non-members on other audiences; who counts as a member is ON-P01.",
+   "current": "Public applications check Verified. (with PR #183) Public offer acceptance and counter-offers also check Verified, and all three check the latest AHPRA result. Pharmacy members, including favourites, are exempt; other audiences and internal assignments stay unchecked."
+  },
+  "ON-Q06": {
+   "context": "With PR #183 and the desktop verifier on, workers can press Re-check, and a public apply or accept queues a check once the stored expiry passes. No scheduled scan (ON-02).",
+   "options": [
+    {
+     "key": "KEEP",
+     "label": "Keep current logic",
+     "detail": "Re-check button, plus a recheck after expiry on public apply or accept."
+    },
+    {
+     "key": "A",
+     "label": "Daily scan plus acceptance",
+     "detail": "Rescan workers with upcoming bookings daily; check again at acceptance."
+    },
+    {
+     "key": "B",
+     "label": "Acceptance check only",
+     "detail": "Current when booked; no early warning."
+    },
+    {
+     "key": "C",
+     "label": "Weekly register scan",
+     "detail": "Cheaper, but changes may be a week late."
+    }
+   ],
+   "recWhy": "PR #183 rechecks only after the stored expiry, so a mid-year suspension goes unseen until the worker presses Re-check. AHPRA calls the public register the accurate source; a daily scan of booked workers catches changes early.",
+   "current": "One lookup at sign-up stores status, type and expiry. (with PR #183, desktop source only) Workers can press Re-check hourly; a public apply or accept after the stored expiry queues a recheck afterwards. No scheduled scan exists."
+  },
+  "ON-Q07": {
+   "context": "With PR #183, not-found or unreadable results block new public applications but keep existing bookings, and nobody else is told. Suspension is ON-P02 (ON-02).",
+   "options": [
+    {
+     "key": "KEEP",
+     "label": "Keep current logic",
+     "detail": "Block new public applications; keep bookings; warn nobody."
+    },
+    {
+     "key": "A",
+     "label": "Keep bookings, warn both",
+     "detail": "Worker must resolve it before starting."
+    },
+    {
+     "key": "B",
+     "label": "Cancel automatically",
+     "detail": "Fast, but risks cancelling during renewal."
+    },
+    {
+     "key": "C",
+     "label": "Block new; review booked",
+     "detail": "Support verifies status and helps both sides."
+    }
+   ],
+   "recWhy": "PR #183 already blocks new commitments, the first half of C. A stored expiry or unreadable page alone is not a lapse, so review existing bookings and warn both sides rather than cancelling.",
+   "current": "(with PR #183) Not-found, unreadable or rejected AHPRA results revoke Verified and block new public applications; existing bookings stay and the pharmacy is not told. Suspended or non-General results cancel future public bookings (ON-P02)."
+  },
+  "ON-R01": {
+   "current": "Verification files are stored, but no evidence-specific retention or deletion schedule is defined. (with PR #183) Each AHPRA lookup also keeps a register snapshot with no deletion date."
+  },
+  "BK-Q04": {
+   "current": "Before reveal: photo, bio, role, skills, Verified/AHPRA badges, suburb, travel and rate preference. Reveal adds the name; contact and CV come after booking. No reviews or reliability. (with PR #183) Both apps show the AHPRA register status."
+  },
+  "LA-Q01": {
+   "context": "A saved flag drives Verified. With PR #183 and the desktop source, gates read the latest register check, but no fresh lookup runs before booking (ON-02).",
+   "recWhy": "AHPRA calls its public register the authoritative source. PR #183 supplies the lookup and state handling; turning on the desktop source plus a fresh check before registered-role bookings closes this (ON-Q06, ON-P03).",
+   "current": "A saved AHPRA flag drives Verified. (with PR #183, desktop source only) Public gates read the latest stored register check and queue a recheck after expiry; nothing looks up the register before booking. The default source is still ScrapingBee."
+  },
+  "LA-Q13": {
+   "current": "Feed visibility hides moderated or past-dated posts, but list/detail reads bypass it. Revoked Verified or lapsed AHPRA doesn't hide posts. (with PR #183) Cards show the register status, and paused workers' posts stay listed."
+  }
+ },
+ "add": [
+  {
+   "area": "onboarding",
+   "step": "Worker tracks and gates",
+   "after": "ON-Q03",
+   "question": {
+    "id": "ON-P01",
+    "q": "Who is exempt from AHPRA gates on public shifts?",
+    "context": "PR #183 skips AHPRA for anyone with an accepted membership at the posting pharmacy, including favourite locums, and never pauses them. Invitations never need AHPRA.",
+    "gap": "",
+    "type": "decision",
+    "options": [
+     {
+      "key": "KEEP",
+      "label": "Keep current logic",
+      "detail": "All members, including favourite locums, are exempt at their own pharmacy."
+     },
+     {
+      "key": "A",
+      "label": "Employees exempt; favourites checked",
+      "detail": "Favourite locums are outside contractors; they pass AHPRA like public workers."
+     },
+     {
+      "key": "B",
+      "label": "Nobody exempt",
+      "detail": "Members are checked too; suspended members lose all pharmacist shifts."
+     }
+    ],
+    "rec": "A",
+    "recWhy": "Employers check their own staff, but a favourite locum is an outside contractor the platform books. Today a suspended favourite keeps booking that pharmacy's shifts; AHPRA tells employers to check the public register.",
+    "sources": [
+     {
+      "name": "AHPRA employer obligations",
+      "url": "https://www.ahpra.gov.au/News/2015-12-31-obligations-for-employers.aspx"
+     }
+    ],
+    "current": "(with PR #183) Staff and favourites (locum, Shift Hero) of the posting pharmacy skip AHPRA on its public shifts. A suspended member keeps internal access, is never paused, and only loses other pharmacies' public shifts."
+   }
+  },
+  {
+   "area": "onboarding",
+   "step": "Credentials and expiry",
+   "after": "ON-Q06",
+   "question": {
+    "id": "ON-P03",
+    "q": "Which AHPRA lookup should run at launch?",
+    "context": "PR #183 adds a desktop verifier: a Chrome extension on an office PC reads the register, with an AI repair fallback. The default and staging still use ScrapingBee.",
+    "gap": "",
+    "type": "decision",
+    "options": [
+     {
+      "key": "KEEP",
+      "label": "Keep current logic",
+      "detail": "ScrapingBee, one lookup at sign-up; PR #183's suspension handling stays inactive."
+     },
+     {
+      "key": "A",
+      "label": "Desktop verifier",
+      "detail": "Office PC must stay on; new sign-ups wait for it."
+     }
+    ],
+    "rec": "A",
+    "recWhy": "Only the desktop source feeds PR #183's suspension, not-found and Re-check handling; under ScrapingBee those gates stay inert. Run it on staging first, since the deploy guide still leaves staging on ScrapingBee.",
+    "sources": [],
+    "current": "ScrapingBee looks up the register once at sign-up. (with PR #183) Setting the desktop source enables Re-check, suspension and not-found handling; checks wait for the office PC, and admins are emailed after 15 minutes."
+   }
+  },
+  {
+   "area": "onboarding",
+   "step": "Credentials and expiry",
+   "after": "ON-Q07",
+   "question": {
+    "id": "ON-P02",
+    "q": "When the register shows Suspended or Cancelled, what happens?",
+    "context": "PR #183 acts automatically on the register status. Pharmacist owners become Pharmacy Managers; bookings with leave, attendance or invoice history are kept for admins.",
+    "gap": "",
+    "type": "decision",
+    "options": [
+     {
+      "key": "KEEP",
+      "label": "Keep current logic",
+      "detail": "Auto-cancel future public bookings, pause non-members, notify pharmacies and admins."
+     },
+     {
+      "key": "A",
+      "label": "Admin confirms, then cancel",
+      "detail": "Block new bookings at once; cancel only after a person checks."
+     }
+    ],
+    "rec": "KEEP",
+    "recWhy": "Working while suspended is unlawful, and an exact register status rarely misreads; fast cancellation gives pharmacies time to refill. Settle any paid booking fee under CX-Q20.",
+    "sources": [
+     {
+      "name": "AHPRA employer obligations",
+      "url": "https://www.ahpra.gov.au/News/2015-12-31-obligations-for-employers.aspx"
+     }
+    ],
+    "current": "(with PR #183) Future public bookings are cancelled and pharmacies told; non-member workers are paused account-wide; admins are emailed. Owners become Pharmacy Managers. A non-General pharmacist result cancels bookings without pausing. No fee or refund rule runs."
+   }
+  },
+  {
+   "area": "launch",
+   "step": "Shift and billing fixes",
+   "after": null,
+   "question": {
+    "id": "LA-P01",
+    "q": "Fix before launch? AHPRA cancellation leaves a shift stuck as waiting for payment.",
+    "context": "Found when checking PR #182 and PR #183 together.",
+    "current": "With PR #183, an AHPRA cancellation declines a reservation awaiting payment but skips the shift lock and payment reset from PR #182.",
+    "gap": "",
+    "type": "code",
+    "options": [
+     {
+      "key": "A",
+      "label": "Before launch",
+      "detail": "Fix as part of merging both PRs."
+     },
+     {
+      "key": "B",
+      "label": "Soon after launch",
+      "detail": "Ship first, fix in the next release."
+     },
+     {
+      "key": "C",
+      "label": "Not needed",
+      "detail": "Leave as it is."
+     }
+    ],
+    "rec": "A",
+    "recWhy": "A shift stuck as pending payment cannot be booked again, and the money state is wrong.",
+    "sources": []
+   }
+  },
+  {
+   "area": "launch",
+   "step": "Shift and billing fixes",
+   "after": "LA-P01",
+   "question": {
+    "id": "LA-P02",
+    "q": "Fix before launch? AHPRA cancellations bypass the cancellation policy and notices.",
+    "context": "Found when checking PR #182 and PR #183 together.",
+    "current": "PR #183 has its own cancellation path; it skips the fee, refund and notice rules in PR #182.",
+    "gap": "",
+    "type": "code",
+    "options": [
+     {
+      "key": "A",
+      "label": "Before launch",
+      "detail": "Fix as part of merging both PRs."
+     },
+     {
+      "key": "B",
+      "label": "Soon after launch",
+      "detail": "Ship first, fix in the next release."
+     },
+     {
+      "key": "C",
+      "label": "Not needed",
+      "detail": "Leave as it is."
+     }
+    ],
+    "rec": "A",
+    "recWhy": "Two cancellation paths give different outcomes for the same booking and break the agreed policy.",
+    "sources": []
+   }
+  },
+  {
+   "area": "launch",
+   "step": "Shift and billing fixes",
+   "after": "LA-P02",
+   "question": {
+    "id": "LA-P03",
+    "q": "Fix before launch? Chain and organisation shifts skip the AHPRA gate.",
+    "context": "Found when checking PR #182 and PR #183 together.",
+    "current": "PR #182 shows chain and organisation shifts on community boards; PR #183 checks AHPRA only on public shifts.",
+    "gap": "",
+    "type": "code",
+    "options": [
+     {
+      "key": "A",
+      "label": "Before launch",
+      "detail": "Fix as part of merging both PRs."
+     },
+     {
+      "key": "B",
+      "label": "Soon after launch",
+      "detail": "Ship first, fix in the next release."
+     },
+     {
+      "key": "C",
+      "label": "Not needed",
+      "detail": "Leave as it is."
+     }
+    ],
+    "rec": "A",
+    "recWhy": "External workers could book unverified through the chain or organisation tier.",
+    "sources": []
+   }
+  }
+ ],
+ "remove": [],
+ "carried_fix": {},
+ "conflicts": [
+  "all files: git merge-tree of #182 (b4cefdce) and #183 (506f2ab0) is clean; both touch backend/core/settings.py, backend/core/test_task_contracts.py, backend/shifts/base.py, browse.py, offers.py, shared-core/src/api.ts.",
+  "backend/shifts/offers.py + #183 backend/shifts/cancellation.py: AHPRA cancellation sets ACCEPTED_AWAITING_PAYMENT reservations to DECLINED without #182's Shift row lock or payment_status reset, so the shift can stay marked PENDING payment.",
+  "backend/shifts/cancellation.py (#183) vs backend/shifts/cancellation_policy.py (#182): AHPRA cancellations bypass #182's cancellation policy, fees and notices; two separate cancellation paths.",
+  "backend/shifts/browse.py: #182 widens community audiences to chain/org visibilities; #183's AHPRA gate covers only PLATFORM shifts, so chain/org shifts skip AHPRA."
+ ]
+}
