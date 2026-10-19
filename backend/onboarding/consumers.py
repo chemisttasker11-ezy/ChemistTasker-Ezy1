@@ -8,7 +8,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
 
 from onboarding.verification.desktop import (
-    claim_checks, handle_verifier_result, store_repair_report, valid_result, verifier_seen,
+    claim_checks, handle_verifier_result, renew_lease, store_repair_report, valid_result, verifier_seen,
 )
 
 
@@ -24,6 +24,8 @@ class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
 
     async def connect(self):
         self.timer = None
+        self.inflight = None
+        self.dispatching = False
         if not settings.AHPRA_VERIFIER_TOKEN_SHA256:
             await self.close(code=4401)
             return
@@ -44,8 +46,10 @@ class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
             return
         while True:
             await self.send_json({'type': 'ping'})
-            for message in await database_sync_to_async(claim_checks)(stage=self.kind):
-                await self.send_json(message)
+            if self.inflight is not None:
+                if not await database_sync_to_async(renew_lease)(self.inflight, self.kind):
+                    self.inflight = None
+            await self.dispatch_check()
             await asyncio.sleep(30)
 
     async def disconnect(self, code):
@@ -76,11 +80,13 @@ class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
             await database_sync_to_async(verifier_seen)(self.kind)
             await self.channel_layer.group_add(f'ahpra_verifiers_{self.kind}', self.channel_name)
             await self.send_json({'type': 'ready'})
-            for message in await database_sync_to_async(claim_checks)(stage=self.kind):
-                await self.send_json(message)
+            await self.dispatch_check()
         elif content.get('type') == 'result' and valid_result(content):
             if await database_sync_to_async(handle_verifier_result)(content, self.kind):
                 await self.send_json({'type': 'ack', 'check_id': content['check_id']})
+                if self.inflight == content['check_id']:
+                    self.inflight = None
+                    await self.dispatch_check()
         elif content.get('type') in ('pong', 'heartbeat'):
             await database_sync_to_async(verifier_seen)(self.kind)
         elif content.get('type') == 'repair_report' and self.kind == 'bridge':
@@ -88,8 +94,18 @@ class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
         # pong and unknown message types require no response.
 
     async def ahpra_check(self, event):
-        for message in await database_sync_to_async(claim_checks)(event['check_id'], stage=self.kind):
-            await self.send_json(message)
+        await self.dispatch_check()
+
+    async def dispatch_check(self):
+        if self.inflight is not None or self.dispatching:
+            return
+        self.dispatching = True
+        try:
+            for message in await database_sync_to_async(claim_checks)(stage=self.kind, limit=1):
+                self.inflight = message['check_id']
+                await self.send_json(message)
+        finally:
+            self.dispatching = False
 
     async def ahpra_repair(self, event):
         if self.kind == 'bridge':

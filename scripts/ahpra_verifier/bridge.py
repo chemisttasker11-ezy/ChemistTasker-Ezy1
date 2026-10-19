@@ -303,15 +303,22 @@ def parse_cli_output(raw_output: str) -> dict[str, Any]:
         else:
             supervised_practice = bool(raw_sup)
 
+        # A missing flag must never read as "clear": refuse the whole result so the server changes nothing.
+        flags = {k: reg_source.get(k) for k in ("conditions", "undertakings", "reprimands")}
+        if not all(isinstance(v, bool) for v in flags.values()):
+            return {
+                "outcome": "error",
+                "register": None,
+                "error": "Register restriction sections unreadable (conditions, undertakings, reprimands must be true/false)",
+            }
+
         register = {
             "name": str(reg_source.get("name", "") or "").strip(),
             "profession": str(reg_source.get("profession", "") or "").strip(),
             "registration_status": str(reg_source.get("registration_status", "") or "").strip(),
             "registration_type": str(reg_source.get("registration_type", "") or "").strip(),
             "expiry_date": expiry_date,
-            "conditions": bool(reg_source.get("conditions", False)),
-            "undertakings": bool(reg_source.get("undertakings", False)),
-            "reprimands": bool(reg_source.get("reprimands", False)),
+            **flags,
             "registration_requirements": registration_requirements,
             "supervised_practice": supervised_practice,
         }

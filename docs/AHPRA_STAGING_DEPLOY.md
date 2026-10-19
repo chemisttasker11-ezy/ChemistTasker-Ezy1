@@ -17,7 +17,7 @@ the extension when it breaks. Both connect to
 `wss://staging.chemisttasker.com.au/ws/ahpra-verifier/` with one shared token.
 The server stores only the token's SHA-256 hash. Members of pharmacies or
 organisations never need AHPRA. The release adds three additive migrations:
-`client_profile` 0081, 0082 and 0083.
+`client_profile` 0081, 0082, 0083 and 0084.
 
 ## 2. Owner decisions (already made, do not reopen)
 
@@ -103,7 +103,7 @@ ls backend/client_profile/migrations | grep -E '^008[123]_'
 ```
 
 You see `has AHPRA release` and the three files `0081_ahpra_check.py`,
-`0082_ahpra_check_stages.py`, `0083_owner_ahpra_switched_to_manager.py`.
+`0082_ahpra_check_stages.py`, `0083_owner_ahpra_switched_to_manager.py`, `0084_ahpra_check_public_recheck.py`.
 
 ## 6. Migrations
 
@@ -132,7 +132,7 @@ docker exec chemisttasker_postgres_staging dropdb -U chemisttasker_staging ahpra
 ```
 
 Done check: `migrate` exits 0 and `showmigrations` shows `[X]` for 0081, 0082
-and 0083. Then **stop and report to the owner**. Change
+0083 and 0084. Then **stop and report to the owner**. Change
 `STAGING_RUN_MIGRATIONS` to `1` in `env/staging.runtime.env` only when the
 owner approves. If the rehearsal fails, report the error lines and stop.
 
@@ -196,7 +196,7 @@ git rev-parse HEAD | tee /opt/apps/chemisttasker-staging-ops/ahpra-deployed-sha.
 compose exec -T web python manage.py showmigrations client_profile | tail -4
 ```
 
-`showmigrations` shows `[X]` for 0081, 0082 and 0083.
+`showmigrations` shows `[X]` for 0081, 0082, 0083 and 0084.
 
 ## 9. Confirm the settings inside the containers
 
@@ -382,7 +382,7 @@ bash scripts/smoke-staging.sh https://staging.chemisttasker.com.au
 Done check: the step 9 loop shows `source=scrapingbee`.
 
 Rolling the code back to the release before this one is also safe without
-reversing migrations 0081-0083. Older code never reads or writes the
+reversing migrations 0081-0084 (0084 only adds a choice value). Older code never reads or writes the
 `AhpraCheck` table (0081 creates it, 0082 only adds columns to it), and the one
 new column on an existing table, `owneronboarding.ahpra_switched_to_manager`
 (0083), has a database default of `false`, so owner rows inserted by older code
@@ -422,7 +422,7 @@ The owner does these. Details: `scripts/ahpra_verifier/README.md`, section
 - [ ] SHA before and after (step 4 and step 8), and which path (A or B)
 - [ ] `STAGING_RUN_MIGRATIONS` value; rehearsal result if it was `0`
 - [ ] `DB_BACKUP` path printed by the deploy
-- [ ] 0081, 0082, 0083 shown as applied
+- [ ] 0081, 0082, 0083, 0084 shown as applied
 - [ ] Whether `ADMIN_EMAILS` (plain) was found in any env file
 - [ ] Smoke test result after each deploy
 - [ ] Step 9 output for all three containers (lengths and yes/no only)

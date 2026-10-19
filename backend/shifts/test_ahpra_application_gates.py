@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from client_profile.characterization_support import client_for, make_assignment, make_owner_with_pharmacy, make_user
 from memberships.models import Membership
-from onboarding.models import AhpraCheck
+from onboarding.models import AhpraCheck, PharmacistOnboarding
 from onboarding.test_ahpra_desktop import TEST_CACHES, check_fixture, profile_fixture
 from onboarding.verification.state import (
     ahpra_frozen, ahpra_state, apply_state_transition, member_suspension_note, require_public_ahpra,
@@ -129,10 +129,11 @@ class AhpraApplicationGateTests(TestCase):
         AhpraCheck.objects.filter(pk=self.check.pk).update(
             outcome='verified', register_data={'registration_status': 'Registered'},
             completed_at=timezone.now() - timedelta(days=800))
+        PharmacistOnboarding.objects.filter(pk=self.profile.pk).update(verified=True, ahpra_verified=True)
         with self.captureOnCommitCallbacks(execute=True):
             require_public_ahpra(self.user, self.shift)
             require_public_ahpra(self.user, self.shift)
-        self.assertEqual(AhpraCheck.objects.filter(status='pending', reason='recheck').count(), 1)
+        self.assertEqual(AhpraCheck.objects.filter(status='pending', reason='public_recheck').count(), 1)
         self.member(self.shift.pharmacy)
         with patch('onboarding.verification.desktop.enqueue_check') as enqueue:
             with self.captureOnCommitCallbacks(execute=True):

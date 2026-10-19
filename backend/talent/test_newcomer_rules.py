@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from unittest import mock
 
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -21,7 +21,7 @@ def register(**extra):
     cache.clear()  # throttle counters
     data = {"email": "new@example.test", "password": "NewcomerPassword123!", "confirm_password": "NewcomerPassword123!",
             "role": "EXPLORER", "accepted_terms": True, "captcha_token": "t", **extra}
-    with mock.patch("users.api_auth.verify_recaptcha", return_value=True), mock.patch("celery.app.base.Celery.send_task"):
+    with override_settings(CELERY_TASK_ALWAYS_EAGER=False), mock.patch("users.api_auth.verify_recaptcha", return_value=True), mock.patch("celery.app.base.Celery.send_task"):
         return APIClient().post(f"{BASE}users/register/", data, format="json")
 
 

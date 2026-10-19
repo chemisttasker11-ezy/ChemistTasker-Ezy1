@@ -76,7 +76,7 @@ def captured_work():
         else:
             work["tasks"].append((name, tuple(args or ()), dict(kwargs)))
 
-    with mock.patch("celery.app.base.Celery.send_task", side_effect=record):
+    with override_settings(CELERY_TASK_ALWAYS_EAGER=False), mock.patch("celery.app.base.Celery.send_task", side_effect=record):
         yield work
 
 

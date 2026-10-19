@@ -17,7 +17,7 @@ describe('AHPRA recovery contract', () => {
     await expect(recheckAhpra()).resolves.toEqual({ queued: true });
   });
 
-  it.each(['ahpra_suspended', 'ahpra_not_found', 'ahpra_unreadable', 'ahpra_recheck_cooldown'])('preserves %s and notifies recovery listeners', async code => {
+  it.each(['ahpra_suspended', 'ahpra_not_found', 'ahpra_rejected', 'ahpra_unreadable', 'ahpra_recheck_cooldown'])('preserves %s and notifies recovery listeners', async code => {
     const listener = vi.fn();
     const unsubscribe = subscribeAhpraErrors(listener);
     try {

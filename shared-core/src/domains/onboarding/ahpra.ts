@@ -1,7 +1,7 @@
 export const AHPRA_UNREADABLE_MESSAGE = "We couldn't read your AHPRA registration. Please check your number is correct and press Re-check.";
 
 export interface AhpraSummary {
-  state: 'ok' | 'pending' | 'suspended' | 'not_found' | 'unreadable';
+  state: 'ok' | 'pending' | 'suspended' | 'not_found' | 'unreadable' | 'rejected';
   frozen: boolean;
   attempts: number;
   contact_support: boolean;
@@ -13,7 +13,7 @@ export interface AhpraSummary {
   recheck_available_at: string | null;
 }
 
-export type AhpraErrorCode = 'ahpra_suspended' | 'ahpra_not_found' | 'ahpra_unreadable' | 'ahpra_recheck_cooldown';
+export type AhpraErrorCode = 'ahpra_suspended' | 'ahpra_not_found' | 'ahpra_rejected' | 'ahpra_unreadable' | 'ahpra_recheck_cooldown';
 export interface AhpraError { code: AhpraErrorCode; detail?: string; retry_after?: number; frozen?: boolean }
 const listeners = new Set<(error: AhpraError) => void>();
 export function subscribeAhpraErrors(listener: (error: AhpraError) => void) {
@@ -25,7 +25,7 @@ export function subscribeAhpraErrors(listener: (error: AhpraError) => void) {
 export function reportAhpraError(payload: unknown): AhpraError | null {
   if (!payload || typeof payload !== 'object') return null;
   const value = payload as AhpraError;
-  if (!['ahpra_suspended', 'ahpra_not_found', 'ahpra_unreadable', 'ahpra_recheck_cooldown'].includes(value.code)) return null;
+  if (!['ahpra_suspended', 'ahpra_not_found', 'ahpra_rejected', 'ahpra_unreadable', 'ahpra_recheck_cooldown'].includes(value.code)) return null;
   for (const listener of listeners) listener(value);
   return value;
 }

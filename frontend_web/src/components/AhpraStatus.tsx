@@ -10,9 +10,9 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
   const { summary, error, busy, seconds, recheck } = useAhpra();
   if (!summary) return null;
   const message = ahpraStatusMessage(summary);
-  const label = summary.registration_status || ({ ok: 'Verified', pending: 'Check pending', suspended: summary.frozen ? 'Account paused' : 'Registration suspended', not_found: 'Not found', unreadable: 'Not verified' } as const)[summary.state];
+  const label = (summary.state !== 'rejected' && summary.registration_status) || ({ ok: 'Verified', pending: 'Check pending', suspended: summary.frozen ? 'Account paused' : 'Registration suspended', not_found: 'Not found', unreadable: 'Not verified', rejected: 'Rejected' } as const)[summary.state];
   const attemptsExhausted = summary.state === 'unreadable' && summary.attempts >= 3;
-  const isBlocked = summary.state === 'suspended' || summary.state === 'not_found';
+  const isBlocked = summary.state === 'suspended' || summary.state === 'not_found' || summary.state === 'rejected';
 
   let hint = '';
   if (summary.state === 'not_found') {
@@ -20,9 +20,8 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
       ? `Fix the number above, press "${submitLabel}", then Re-check.`
       : 'Fix the number above, submit it, then Re-check.';
   } else if (summary.state === 'suspended') {
-    hint = submitLabel
-      ? `Contact AHPRA to resolve status, or update your number above and press "${submitLabel}".`
-      : 'Contact AHPRA to resolve status, or update your number and submit.';
+    // The number is locked while suspended.
+    hint = 'Contact AHPRA to resolve your status, then press Re-check.';
   }
 
   return (

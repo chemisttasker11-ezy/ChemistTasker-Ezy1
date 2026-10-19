@@ -52,6 +52,7 @@ Follow these steps in exact sequence:
      * conditions: Boolean (true if conditions are present, false otherwise).
      * undertakings: Boolean (true if undertakings are present, false otherwise).
      * reprimands: Boolean (true if reprimands or disciplinary notations are present, false otherwise).
+     * conditions, undertakings and reprimands MUST each be an explicit JSON true or false, never null or omitted. If you cannot read any of these sections, return outcome "error" with error "restriction sections unreadable" instead of guessing.
      * registration_requirements: The text of the Registration Requirements section, or "" if absent or "None"; keep it short, at most 600 characters.
      * supervised_practice: Boolean (true if that text mentions supervision, else false).
 

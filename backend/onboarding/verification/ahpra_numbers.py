@@ -89,6 +89,7 @@ def guard_ahpra_number(profile, new_number) -> bool:
     from django.contrib.auth import get_user_model
     from onboarding.models import AhpraRegistration
     from onboarding.verification.policy import revoke_for_changed_evidence
+    from onboarding.verification.state import ahpra_state
 
     with transaction.atomic():
         get_user_model().objects.select_for_update().filter(pk=profile.user_id).first()  # one change at a time per person
@@ -97,7 +98,7 @@ def guard_ahpra_number(profile, new_number) -> bool:
         old, new = normalize(getattr(profile, 'ahpra_number', None)), normalize(new_number)
         if new == old:
             return False
-        if getattr(profile, 'ahpra_verified', False):
+        if getattr(profile, 'ahpra_verified', False) or ahpra_state(profile)['state'] == 'suspended':
             raise serializers.ValidationError({'ahpra_number': [LOCKED]})
         if new:
             if ahpra_number_owner_conflict(profile.user_id, new):

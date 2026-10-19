@@ -2,6 +2,7 @@
 import math
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.cache import caches
 from django.db import transaction
 from django.utils import timezone
@@ -19,6 +20,8 @@ class AhpraRecheckView(APIView):
 
     @transaction.atomic
     def post(self, request):
+        if settings.AHPRA_SOURCE != 'desktop':
+            return Response({'code': 'ahpra_desktop_disabled', 'detail': 'Desktop verification is disabled.'}, status=409)
         profile = ahpra_profile(request.user)
         number = full_registration_number(getattr(profile, 'ahpra_number', None))
         if not number:

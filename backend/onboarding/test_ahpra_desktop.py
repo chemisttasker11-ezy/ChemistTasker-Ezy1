@@ -334,7 +334,7 @@ class DesktopTests(TestCase):
                     caches['ahpra'].set('ahpra_verifier_presence_extension', present)
                     check = check_fixture(self.profile, stage='extension', status=status,
                                           sent_at=now - timedelta(minutes=age) if age else None)
-                    expected = status != 'done' and (not present or (status == 'sent' and age > 5))
+                    expected = status != 'done' and not present
                     with patch('onboarding.verification.desktop.timezone.now', return_value=now):
                         messages = claim_checks(check.pk, stage='bridge')
                     self.assertEqual(messages, [
@@ -422,7 +422,7 @@ class DesktopTests(TestCase):
         self.assertFalse(AhpraCheck.objects.exists())
 
 
-@override_settings(AHPRA_VERIFIER_TOKEN_SHA256=DIGEST, CACHES=TEST_CACHES,
+@override_settings(AHPRA_SOURCE='desktop', AHPRA_VERIFIER_TOKEN_SHA256=DIGEST, CACHES=TEST_CACHES,
                    CHANNEL_LAYERS={'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}},
                    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', ADMINS=[('Admin', 'admin@example.test')])
 class VerifierSocketTests(TransactionTestCase):
@@ -465,6 +465,25 @@ class VerifierSocketTests(TransactionTestCase):
             self.assertEqual((await socket.receive_json_from())['check_id'], self.check.pk)
             self.assertTrue(await database_sync_to_async(caches['ahpra'].get)('ahpra_verifier_presence_bridge'))
             self.assertIsNone(await database_sync_to_async(caches['ahpra'].get)('ahpra_verifier_presence_extension'))
+        finally:
+            await socket.disconnect()
+
+    async def test_socket_dispatches_one_check_then_next_after_ack(self):
+        other = await database_sync_to_async(profile_fixture)()
+        queued = await database_sync_to_async(check_fixture)(other, stage='bridge')
+        socket = self.communicator()
+        try:
+            await socket.connect()
+            await socket.send_json_to({'type': 'hello', 'agent': 'bridge', 'token': TOKEN})
+            self.assertEqual(await socket.receive_json_from(), {'type': 'ready'})
+            self.assertEqual((await socket.receive_json_from())['check_id'], self.check.pk)
+            self.assertTrue(await socket.receive_nothing())
+            await database_sync_to_async(queued.refresh_from_db)()
+            self.assertEqual(queued.status, 'pending')
+            self.assertIsNone(queued.sent_at)
+            await socket.send_json_to(result(self.check.pk))
+            self.assertEqual(await socket.receive_json_from(), {'type': 'ack', 'check_id': self.check.pk})
+            self.assertEqual((await socket.receive_json_from())['check_id'], queued.pk)
         finally:
             await socket.disconnect()
 
@@ -615,6 +634,9 @@ class VerifierSocketTests(TransactionTestCase):
             ('found', {'registration_status': 'Cancelled'}, 'rejected'),
             ('not_found', {}, 'not_found'), ('blocked', {}, 'blocked'), ('error', {}, 'error'),
         ]:
+            # This test exercises result outcomes; failed attempts have a separate 24-hour retry gate.
+            await database_sync_to_async(AhpraCheck.objects.filter(outcome__in=['error', 'blocked']).update)(
+                completed_at=timezone.now() - timedelta(hours=25))
             check = await database_sync_to_async(enqueue_check)(self.profile, NUMBER, 'recheck')
             self.assertEqual(await socket.receive_json_from(), {'type': 'check', 'check_id': check.pk, 'registration_number': NUMBER})
             await socket.send_json_to(result(check.pk, outcome, **record))

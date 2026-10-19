@@ -100,7 +100,7 @@ class AhpraCheck(models.Model):
     model_name = models.CharField(max_length=64)
     object_pk = models.PositiveBigIntegerField()
     registration_number = models.CharField(max_length=13)
-    reason = models.CharField(max_length=16, choices=[(v, v) for v in ('onboarding', 'recheck')])
+    reason = models.CharField(max_length=16, choices=[(v, v) for v in ('onboarding', 'recheck', 'public_recheck')])
     status = models.CharField(max_length=8, default='pending', choices=[(v, v) for v in ('pending', 'sent', 'done')])
     stage = models.CharField(max_length=9, default='extension', choices=[(v, v) for v in ('extension', 'bridge')])
     needs_attention = models.BooleanField(default=False)

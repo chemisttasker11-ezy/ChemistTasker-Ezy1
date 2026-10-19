@@ -10,7 +10,7 @@ from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
@@ -35,7 +35,7 @@ def captured_work(test):
         else:
             work["tasks"].append((name, tuple(args or ())))
 
-    with mock.patch("celery.app.base.Celery.send_task", side_effect=record), \
+    with override_settings(CELERY_TASK_ALWAYS_EAGER=False), mock.patch("celery.app.base.Celery.send_task", side_effect=record), \
             test.captureOnCommitCallbacks(execute=True):
         yield work
 

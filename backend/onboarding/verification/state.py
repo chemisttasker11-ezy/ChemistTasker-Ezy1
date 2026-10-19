@@ -1,5 +1,6 @@
 """Current-number AHPRA state shared by onboarding, access checks and employers."""
 from datetime import date, timedelta
+import logging
 
 from django.core.cache import caches
 from django.db import transaction
@@ -12,6 +13,8 @@ from onboarding.verification.ahpra_numbers import full_registration_number
 ADVERSE_STATUSES = {'suspended', 'cancelled', 'surrendered'}
 # Lookups with no real register record: they never change anyone's AHPRA state.
 VERIFIER_FAILURES = ('error', 'blocked')
+logger = logging.getLogger(__name__)
+_cooldown_cache_failed = False
 
 
 def ahpra_profile(user):
@@ -49,13 +52,27 @@ def ahpra_state(profile):
             state = 'not_found'
         elif normalized_status in ADVERSE_STATUSES:
             state = 'suspended'
+        elif AhpraCheck.objects.filter(
+            model_name=profile._meta.object_name, object_pk=profile.pk, registration_number=number,
+            status='done', reviewed_at__isnull=False,
+        ).order_by('-reviewed_at', '-pk').values_list('outcome', flat=True).first() == 'rejected':
+            # An admin rejection outlasts later automatic and user re-checks until an admin verifies.
+            state = 'rejected'
         elif normalized_status == 'registered' and check.outcome == 'verified':
             state = 'ok'
         elif normalized_status != 'registered' and not (check.outcome == 'verified' and check.reviewed_at):
             # An admin's manual verify carries no readable register status.
             state = 'unreadable'
     user_id = getattr(profile, 'user_id', None)
-    requested = caches['ahpra'].get(recheck_key(user_id)) if user_id and number else None
+    requested = None
+    if user_id and number:
+        global _cooldown_cache_failed
+        try:
+            requested = caches['ahpra'].get(recheck_key(user_id))
+        except Exception:
+            if not _cooldown_cache_failed:
+                logger.warning('AHPRA cooldown cache unavailable; omitting cooldown information', exc_info=True)
+                _cooldown_cache_failed = True
     available = requested + timedelta(hours=1) if requested else None
     attempts, contact_support = 0, False
     if state == 'unreadable':
@@ -71,7 +88,9 @@ def ahpra_state(profile):
             not in ADVERSE_STATUSES | {'registered', 'not registered'} for row in last_two
         )
     note = check.note if check else ''
-    if state == 'suspended':
+    if state == 'rejected':
+        note = 'Your AHPRA check was rejected. Contact support before applying for public shifts.'
+    elif state == 'suspended':
         note = (member_suspension_note(status) + ' Your owner profile is now a Pharmacy Manager.') if isinstance(profile, OwnerOnboarding) else (
             f'Your AHPRA registration shows as {status}. Your ChemistTasker account is paused until this changes. '
             'Please contact AHPRA. When your registration is restored, open your AHPRA step and press Re-check.'
@@ -108,10 +127,13 @@ def require_ahpra_application(user):
     state = ahpra_state(profile)
     if state['state'] == 'suspended' and not ahpra_frozen(user, state):
         state['note'] = member_suspension_note(state['registration_status'])
-    if state['state'] in ('not_found', 'suspended', 'unreadable'):
+    if state['state'] in ('not_found', 'suspended', 'unreadable', 'rejected'):
         raise ShiftActionRefused({'code': f"ahpra_{state['state']}", 'detail': state['note']}, 403)
     if isinstance(profile, OwnerOnboarding) and profile.role != 'PHARMACIST':
         raise ShiftActionRefused({'code': 'pharmacist_required', 'detail': 'Pharmacy managers cannot apply as pharmacists.'}, 403)
+    # Workers are held to verified onboarding by _require_public_shift_onboarding; owners have no such gate.
+    if isinstance(profile, OwnerOnboarding) and not profile.ahpra_verified:
+        raise ShiftActionRefused({'code': 'ahpra_pending', 'detail': 'Verify your AHPRA registration before applying for public shifts.'}, 403)
 
 
 def require_public_ahpra(user, shift):
@@ -120,6 +142,8 @@ def require_public_ahpra(user, shift):
 
     if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(user, shift):
         require_ahpra_application(user)
+        from shifts.interest import _require_public_shift_onboarding
+        _require_public_shift_onboarding(user)
         transaction.on_commit(lambda: queue_public_recheck(user), robust=True)
 
 
@@ -134,7 +158,7 @@ def queue_public_recheck(user):
     today = timezone.localdate()
     last = AhpraCheck.objects.filter(
         model_name=profile._meta.object_name, object_pk=profile.pk, registration_number=number, status='done',
-    ).order_by('-completed_at', '-pk').first()
+    ).exclude(outcome__in=VERIFIER_FAILURES).order_by('-completed_at', '-pk').first()
     checked = timezone.localtime(last.completed_at).date() if last and last.completed_at else None
     data = last.register_data if last and isinstance(last.register_data, dict) else {}
     # Other-staff (intern) profiles have no expiry column; the finished check stores it.
@@ -145,18 +169,18 @@ def queue_public_recheck(user):
     else:
         due = checked is None or checked < date(today.year if today.month == 12 else today.year - 1, 12, 1)
     if due:
-        enqueue_check(profile, number, 'recheck')
+        enqueue_check(profile, number, 'public_recheck')
 
 
 def ahpra_frozen(user, state=None):
     from memberships.models import Membership
+    from users.models import OrganizationMembership
 
     state = state or ahpra_state(ahpra_profile(user))
-    # Owner- and organisation-admin invites both create pharmacy Memberships; OrganizationMembership is admin access.
     return state['state'] == 'suspended' and str(user.role).upper() != 'OWNER' and (
         not Membership.objects.filter(
             user=user, pharmacy__isnull=False, is_active=True, status=Membership.Status.ACCEPTED).exists()
-    )
+    ) and not OrganizationMembership.objects.filter(user=user).exists()
 
 
 def apply_state_transition(profile, previous):
@@ -164,9 +188,9 @@ def apply_state_transition(profile, previous):
     from onboarding.verification.policy import refresh_verified, revoke_for_changed_evidence
     profile.refresh_from_db()
     current = ahpra_state(profile)
-    if current['state'] in ('suspended', 'not_found', 'unreadable'):
+    if current['state'] in ('suspended', 'not_found', 'unreadable', 'rejected'):
         revoked = revoke_for_changed_evidence(profile, 'ahpra')
-        if current['state'] in ('suspended', 'unreadable'):
+        if current['state'] in ('suspended', 'unreadable', 'rejected'):
             profile.ahpra_verified = False
             profile.verified = False
             profile.save(update_fields=['ahpra_verified', 'verified'])

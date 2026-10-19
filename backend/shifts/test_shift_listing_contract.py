@@ -8,7 +8,7 @@ the visibility rules exactly while the views move.
 from datetime import date, time, timedelta
 from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from memberships.models import Membership
@@ -164,7 +164,7 @@ class ShiftListingFixture(TestCase):
         cls.labels = {shift.id: label for label, shift in cls.shifts.items()}
 
     def visible(self, endpoint, user):
-        with mock.patch("celery.app.base.Celery.send_task"):
+        with override_settings(CELERY_TASK_ALWAYS_EAGER=False), mock.patch("celery.app.base.Celery.send_task"):
             response = client_for(user).get(f"{API}{endpoint}")
         if response.status_code != 200:
             return None

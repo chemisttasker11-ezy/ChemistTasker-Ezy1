@@ -10,7 +10,8 @@ from core.task_queue import async_task
 from shifts.interest import is_public_shift_member_access
 from shifts.models import ShiftOffer, ShiftSlotAssignment
 from shifts.notifications import notify_shift_managers
-from workforce.roster.edit_guards import _protect_assignment_history
+from shifts.history import _protect_assignment_history
+from shifts.pricing import expand_shift_slots
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +46,9 @@ def cancel_upcoming_assignments(user):
     for offer in offers:
         if is_public_shift_member_access(user, offer.shift):
             continue
-        slots = [offer.slot] if offer.slot_id else offer.shift.slots.all()
-        future = [(slot, offer.offered_slot_date or slot.date) for slot in slots]
+        future = [(entry['slot'], entry['date']) for entry in expand_shift_slots(offer.shift)
+                  if (not offer.slot_id or entry['slot'].pk == offer.slot_id)
+                  and (not offer.offered_slot_date or entry['date'] == offer.offered_slot_date)]
         future = [(slot, day) for slot, day in future
                   if day > now.date() or (day == now.date() and slot.start_time > now.time())]
         if not future:

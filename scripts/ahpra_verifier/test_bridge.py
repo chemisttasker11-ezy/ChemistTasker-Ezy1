@@ -622,6 +622,9 @@ FOUND_OUTPUT = json.dumps({
             "registration_status": "Registered",
             "registration_type": "General",
             "expiry_date": "2026-10-10",
+            "conditions": False,
+            "undertakings": False,
+            "reprimands": False,
         },
     })
 })

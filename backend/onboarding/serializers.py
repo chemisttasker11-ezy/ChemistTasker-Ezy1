@@ -54,6 +54,7 @@ class AhpraSummaryMixin:
         return fields
 
     def save(self, **kwargs):
+        from django.conf import settings
         from onboarding.models import AhpraCheck
         from onboarding.verification.ahpra_numbers import full_registration_number
         from onboarding.verification.desktop import enqueue_check
@@ -62,7 +63,7 @@ class AhpraSummaryMixin:
         tab = str(self.initial_data.get('tab') or 'basic').lower().strip()
         number = full_registration_number(getattr(instance, 'ahpra_number', None))
         number_tab = 'regulatory' if isinstance(instance, OtherStaffOnboarding) else 'basic'
-        if submit_requested(self.initial_data) and tab == number_tab and number:
+        if settings.AHPRA_SOURCE == 'desktop' and submit_requested(self.initial_data) and tab == number_tab and number:
             checks = AhpraCheck.objects.filter(model_name=instance._meta.object_name,
                                                object_pk=instance.pk, registration_number=number)
             if previous != number or not checks.exists():
