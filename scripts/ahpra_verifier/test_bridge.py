@@ -22,6 +22,7 @@ from scripts.ahpra_verifier.bridge import (
     load_config,
     parse_cli_output,
     strip_code_fences,
+    usage_limit_wait,
 )
 
 # Silence informational log outputs during test execution
@@ -606,6 +607,77 @@ class TestBlockedPauseLogic(unittest.IsolatedAsyncioTestCase):
                 await worker_task
             except asyncio.CancelledError:
                 pass
+
+
+FOUND_OUTPUT = json.dumps({
+    "result": json.dumps({
+        "outcome": "found",
+        "register": {
+            "name": "Normal User",
+            "profession": "Pharmacist",
+            "registration_status": "Registered",
+            "registration_type": "General",
+            "expiry_date": "2026-10-10",
+        },
+    })
+})
+
+
+class TestUsageLimitRetry(unittest.IsolatedAsyncioTestCase):
+    """A Claude usage limit pauses and retries the same check; it is never sent as a result."""
+
+    async def _run_with_first_output(self, first_output: str) -> tuple[list[float], list[dict]]:
+        outputs = [first_output, FOUND_OUTPUT]
+        call_times = []
+
+        def fake_runner(reg: str) -> str:
+            call_times.append(time.monotonic())
+            return outputs.pop(0)
+
+        bridge = AhpraBridge(
+            url="ws://localhost:9999",
+            token="test-token",
+            min_gap_seconds=0.0,
+            blocked_pause_seconds=0.1,
+            runner=fake_runner,
+        )
+        fake_ws = FakeWebSocket()
+        bridge.ws = fake_ws
+        await bridge._process_single_check({"check_id": 40, "registration_number": "PHA0001429"})
+        return call_times, fake_ws.get_sent_json()
+
+    async def test_limit_note_retries_and_sends_only_found(self):
+        limited = json.dumps({
+            "result": json.dumps({
+                "outcome": "error",
+                "error": "rate limit error (HTTP 429, five_hour window, resets at 2020-01-01T02:20:00+00:00)",
+            })
+        })
+        call_times, sent = await self._run_with_first_output(limited)
+        self.assertEqual(len(call_times), 2)
+        self.assertGreaterEqual(call_times[1] - call_times[0], 0.1 * 0.95)
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0]["check_id"], 40)
+        self.assertEqual(sent[0]["outcome"], "found")
+
+    async def test_non_json_limit_text_retries(self):
+        call_times, sent = await self._run_with_first_output("5-hour limit reached ∙ resets 2pm")
+        self.assertEqual(len(call_times), 2)
+        self.assertEqual([s["outcome"] for s in sent], ["found"])
+
+    async def test_cli_wrapper_limit_result_retries(self):
+        limited = json.dumps({"is_error": True, "result": "Claude AI usage limit reached|1000000000"})
+        call_times, sent = await self._run_with_first_output(limited)
+        self.assertEqual(len(call_times), 2)
+        self.assertEqual([s["outcome"] for s in sent], ["found"])
+
+    def test_wait_uses_reset_time_capped(self):
+        future = int(time.time()) + 600
+        self.assertAlmostEqual(usage_limit_wait(f"Claude AI usage limit reached|{future}", 1800), 600, delta=5)
+        far = datetime.fromtimestamp(time.time() + 86400).astimezone().isoformat()
+        self.assertEqual(usage_limit_wait(f"resets at {far}", 1800), 5 * 3600)
+        self.assertEqual(usage_limit_wait("Usage limit reached", 1800), 1800)
+        self.assertIsNone(usage_limit_wait("Page did not load for PHA0001429", 1800))
 
 
 class TestMessageHandling(unittest.IsolatedAsyncioTestCase):

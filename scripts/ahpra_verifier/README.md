@@ -263,3 +263,65 @@ Register-ScheduledTask `
   - Maximum file size: **1 MB** (`1,000,000` bytes)
   - Backup files kept: **3** (`bridge.log.1`, `bridge.log.2`, `bridge.log.3`)
 - **Security:** `AHPRA_VERIFIER_TOKEN` is strictly excluded from all log messages. Connection logs only record the target URL and agent hostname.
+
+## End-to-end test (local)
+
+Use three PowerShell terminals. The settings below replace the dev database with a
+disposable SQLite file and use Redis database 9 for Channels. No Celery worker is
+needed. Start a local Redis server on `127.0.0.1:6379` first (for example,
+`docker run --rm --name ahpra-e2e-redis -p 127.0.0.1:6379:6379 redis:7-alpine`
+in a separate terminal if that port is free). Never point `AHPRA_E2E_DB` at an
+existing application database; its default is `$env:TEMP\ahpra_e2e.sqlite3`.
+
+In **each** terminal, run this setup (use the same randomly generated token in all
+three; generate it once with `[guid]::NewGuid().ToString('N')`):
+
+```powershell
+Set-Location C:\dev\worktrees\chemisttasker-a2
+$python = 'C:\ChemistTasker_Ezy\chemisttasker-ezy\.venv\Scripts\python.exe'
+$env:DJANGO_SETTINGS_MODULE = 'core.ahpra_e2e_settings'
+$env:DJANGO_ENV_FILE = 'C:\ChemistTasker_Ezy\chemisttasker-ezy\env\backend.dev.env'
+$env:AHPRA_E2E_TOKEN = '<random token generated once; same in all terminals>'
+$env:AHPRA_E2E_REDIS = 'redis://127.0.0.1:6379/9'
+```
+
+Terminal 1: migrate the isolated database, then serve the real ASGI backend:
+
+```powershell
+Set-Location backend
+& $python manage.py migrate
+& $python -m daphne -b 127.0.0.1 -p 8765 core.asgi:application
+```
+
+Terminal 2: use the bridge prerequisites above (authenticated Claude CLI and
+Chrome extension). Install bridge dependencies if needed, then connect locally:
+
+```powershell
+& $python -m pip install -r scripts/ahpra_verifier/requirements.txt
+$env:AHPRA_VERIFIER_URL = 'ws://127.0.0.1:8765/ws/ahpra-verifier/'
+$env:AHPRA_VERIFIER_TOKEN = $env:AHPRA_E2E_TOKEN
+& $python scripts/ahpra_verifier/bridge.py
+```
+
+Terminal 3: keep the private cases JSON outside the repository. It must be a list
+of objects with string keys `first_name`, `last_name`, `role` (`pharmacist` or
+`intern`), and `registration_number`. Names and numbers are read only from that
+file; duplicate ownership is reported as skipped. Seed through the real task,
+wait about a minute per case (longer if the register challenges the browser),
+then report:
+
+```powershell
+& $python backend/manage.py ahpra_e2e seed --cases C:\private\ahpra-cases.json
+# Wait about a minute per case before reporting; repeat report as needed.
+& $python backend/manage.py ahpra_e2e report
+```
+
+After testing, stop the bridge and Daphne with Ctrl+C before clearing the fixtures:
+
+```powershell
+& $python backend/manage.py ahpra_e2e reset
+```
+
+Reset removes users with `@example.invalid` emails, their profiles and matching
+checks, only under the e2e settings with SQLite. A future verifier extension can
+use the same local WebSocket endpoint and token without changing this harness.

@@ -15,6 +15,7 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -137,6 +138,36 @@ def _format_permission_error(err: str = "") -> str:
     if err:
         return f"permission_required: {err}"
     return "permission_required: Claude in Chrome requires permission"
+
+
+# Claude CLI usage/rate limit texts, e.g. "Claude AI usage limit reached|1760840400",
+# "5-hour limit reached ∙ resets 2pm", "rate limit error (HTTP 429, five_hour window, resets at <iso>)"
+_LIMIT_RE = re.compile(
+    r"\b429\b|rate[ _]limit|usage limit|five_hour|resets at|limit reached|hit your limit",
+    re.IGNORECASE,
+)
+_MAX_LIMIT_WAIT = 5 * 3600.0
+
+
+def usage_limit_wait(text: str, default_wait: float) -> float | None:
+    """Returns seconds to wait if text shows a Claude usage/rate limit, else None."""
+    if not text or not _LIMIT_RE.search(text):
+        return None
+    reset_at = None
+    epoch = re.search(r"\|(\d{10})\b", text)
+    iso = re.search(r"resets at (\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)", text, re.IGNORECASE)
+    try:
+        if epoch:
+            reset_at = float(epoch.group(1))
+        elif iso:
+            dt = datetime.fromisoformat(iso.group(1).replace("Z", "+00:00"))
+            reset_at = (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).timestamp()
+    except ValueError:
+        reset_at = None
+    # shortcut: "resets 2pm" style local times are not parsed, they fall back to default_wait
+    if reset_at is None or reset_at <= time.time():
+        return default_wait
+    return min(reset_at - time.time(), _MAX_LIMIT_WAIT)
 
 
 def parse_cli_output(raw_output: str) -> dict[str, Any]:
@@ -356,6 +387,8 @@ def default_runner(registration_number: str, prompt_template: str, timeout: floa
         text=True,
         timeout=timeout,
         shell=False,
+        # load MCP tools upfront: a deferred Chrome tool made headless sessions refuse to start
+        env={**os.environ, "ENABLE_TOOL_SEARCH": "false"},
     )
     if proc.returncode != 0 and not proc.stdout.strip():
         raise RuntimeError(
@@ -429,6 +462,10 @@ class AhpraBridge:
                 parsed["outcome"] = "error"
                 parsed["register"] = None
                 parsed["error"] = _format_permission_error(err)
+            elif parsed["outcome"] == "error":
+                wait = usage_limit_wait(f"{raw_str}\n{parsed['error']}", self.blocked_pause_seconds)
+                if wait is not None:
+                    parsed["limit_wait"] = wait
             return parsed
         except subprocess.TimeoutExpired:
             logger.error("Lookup subprocess timed out after %ss for %s", self.lookup_timeout, reg_number)
@@ -446,11 +483,15 @@ class AhpraBridge:
                     "register": None,
                     "error": _format_permission_error(err_msg),
                 }
-            return {
+            result = {
                 "outcome": "error",
                 "register": None,
                 "error": err_msg,
             }
+            wait = usage_limit_wait(err_msg, self.blocked_pause_seconds)
+            if wait is not None:
+                result["limit_wait"] = wait
+            return result
 
     async def _process_single_check(self, check: dict[str, Any]):
         """Processes one check: enforces pause/gap, runs lookup, and sends result."""
@@ -478,9 +519,21 @@ class AhpraBridge:
                 logger.info("Enforcing min gap. Sleeping %.1fs before check id=%s", remaining_gap, check_id)
                 await asyncio.sleep(remaining_gap)
 
-        # 3. Perform lookup
-        outcome_data = await self._execute_runner(reg_number)
-        self.last_lookup_finished_at = time.monotonic()
+        # 3. Perform lookup; a Claude usage limit is never sent as a result, wait it out and retry this check
+        while True:
+            outcome_data = await self._execute_runner(reg_number)
+            self.last_lookup_finished_at = time.monotonic()
+            limit_wait = outcome_data.pop("limit_wait", None)
+            if limit_wait is None:
+                break
+            logger.warning(
+                "Claude usage limit hit on check id=%s (%s). Pausing %.0fs, then retrying the same check.",
+                check_id,
+                outcome_data["error"],
+                limit_wait,
+            )
+            self.pause_until = time.monotonic() + limit_wait
+            await asyncio.sleep(limit_wait)
 
         err_text = str(outcome_data.get("error", "") or "")
         is_permission_error = err_text.startswith("permission_required")
