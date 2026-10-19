@@ -6,6 +6,64 @@ from django.db import transaction
 from onboarding.verification.ahpra_numbers import _user_numbers
 from onboarding.verification.ahpra_numbers import ahpra_number_owner_conflict, normalize, sync_ahpra_registrations
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding, RefereeResponse
+from onboarding.models import AhpraCheck
+from django.utils import timezone
+from django.utils.html import format_html
+import json
+
+
+@admin.register(AhpraCheck)
+class AhpraCheckAdmin(admin.ModelAdmin):
+    list_display = ('number', 'profile', 'reason', 'status', 'outcome', 'created_at', 'completed_at')
+    list_filter = ('status', 'outcome', 'reason')
+    readonly_fields = tuple(f.name for f in AhpraCheck._meta.fields if f.name != 'register_data') + ('register_rendering', 'open_register')
+    exclude = ('register_data',)
+    actions = ('mark_verified', 'mark_rejected')
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(description='Number')
+    def number(self, obj):
+        return obj.registration_number
+
+    @admin.display(description='Profile')
+    def profile(self, obj):
+        from django.urls import reverse
+        return format_html('<a href="{}">{} #{}</a>', reverse(
+            f'admin:client_profile_{obj.model_name.lower()}_change', args=[obj.object_pk]), obj.model_name, obj.object_pk)
+
+    def register_rendering(self, obj):
+        return format_html('<pre>{}</pre>', json.dumps(obj.register_data, indent=2))
+
+    def open_register(self, obj):
+        return format_html('<a href="{}">Open AHPRA register</a>',
+                           'https://www.ahpra.gov.au/Registration/Registers-of-Practitioners.aspx')
+
+    def _mark(self, request, queryset, verified):
+        from onboarding.verification.desktop import check_profile
+        from onboarding.verification.ahpra import _update_ahpra_fields
+        from onboarding.verification.ahpra_numbers import full_registration_number
+        with transaction.atomic():
+            for check in queryset.select_for_update():
+                profile = check_profile(check)
+                if profile is None or full_registration_number(profile.ahpra_number) != check.registration_number:
+                    continue
+                note = f'Manually {"verified" if verified else "rejected"} by {request.user}'
+                _update_ahpra_fields(check.model_name, check.object_pk, verified, note)
+                check.outcome = 'verified' if verified else 'rejected'
+                check.status, check.note = 'done', note
+                check.reviewed_by = request.user
+                check.reviewed_at = check.completed_at = timezone.now()
+                check.save()
+
+    @admin.action(description='Mark verified')
+    def mark_verified(self, request, queryset):
+        self._mark(request, queryset, True)
+
+    @admin.action(description='Mark rejected')
+    def mark_rejected(self, request, queryset):
+        self._mark(request, queryset, False)
 
 
 class RoleScopedOnboardingAdminMixin:

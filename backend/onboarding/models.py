@@ -96,6 +96,28 @@ def explorer_secondary_id_upload_path(instance, filename):
     return onboarding_upload_path(instance, filename, "gov_ids_secondary")
 
 
+class AhpraCheck(models.Model):
+    model_name = models.CharField(max_length=64)
+    object_pk = models.PositiveBigIntegerField()
+    registration_number = models.CharField(max_length=13)
+    reason = models.CharField(max_length=16, choices=[(v, v) for v in ('onboarding', 'recheck')])
+    status = models.CharField(max_length=8, default='pending', choices=[(v, v) for v in ('pending', 'sent', 'done')])
+    outcome = models.CharField(max_length=16, blank=True, choices=[(v, v) for v in ('verified', 'review', 'rejected', 'not_found', 'blocked', 'error')])
+    register_data = models.JSONField(default=dict, blank=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    alerted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        app_label = 'client_profile'
+        indexes = [models.Index(fields=['status', 'created_at'], name='ahpra_status_created_idx')]
+        constraints = [models.UniqueConstraint(fields=['model_name', 'object_pk', 'registration_number'], condition=models.Q(status__in=['pending', 'sent']), name='ahpra_one_active_check')]
+
+
 class OnboardingNotification(models.Model):
     # Links to any onboarding model (PharmacistOnboarding, OtherStaffOnboarding, etc.)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)

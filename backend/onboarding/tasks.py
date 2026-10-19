@@ -299,6 +299,11 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
         logger.info("[AHPRA TASK] SKIPPING: verification for pk=%s already has a result for this number.", object_pk)
         return
 
+    if settings.AHPRA_SOURCE == 'desktop':
+        from onboarding.verification.desktop import enqueue_check
+        enqueue_check(obj, full_ahpra_number, 'onboarding')
+        return
+
     # Clear old results before starting (new number or retry of failed attempt)
     obj.ahpra_verified = False
     obj.ahpra_verification_note = ""
@@ -365,6 +370,44 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
         model_name, object_pk, is_verified, final_note,
         reg_type=registration_type, reg_status=registration_status, expiry_date=expiry_date
     )
+
+
+@shared_task
+def recheck_ahpra_registrations():
+    if settings.AHPRA_SOURCE != 'desktop':
+        return
+    from onboarding.models import AhpraCheck
+    from onboarding.verification.desktop import PROFILE_MODELS, enqueue_check
+    now = timezone.now()
+    for model_name in PROFILE_MODELS:
+        Model = apps.get_model('client_profile', model_name)
+        for profile in Model.objects.filter(ahpra_verified=True).iterator():
+            number = full_registration_number(profile.ahpra_number)
+            if not number:
+                continue
+            last = AhpraCheck.objects.filter(model_name=model_name, object_pk=profile.pk,
+                                            registration_number=number, status='done').order_by('-completed_at').first()
+            expiry = profile.ahpra_expiry_date
+            if (expiry and expiry <= now.date() + datetime.timedelta(days=30)) or (
+                    last is None or last.completed_at is None or
+                    last.completed_at < now - datetime.timedelta(days=settings.AHPRA_RECHECK_DAYS)):
+                enqueue_check(profile, number, 'recheck')
+
+
+@shared_task
+def alert_overdue_ahpra_checks():
+    if settings.AHPRA_SOURCE != 'desktop' or not settings.ADMINS:
+        return
+    from django.core.mail import mail_admins
+    from onboarding.models import AhpraCheck
+    with transaction.atomic():
+        checks = AhpraCheck.objects.select_for_update().exclude(status='done').filter(
+            created_at__lte=timezone.now() - datetime.timedelta(minutes=15), alerted_at__isnull=True,
+        )
+        for check in checks:
+            mail_admins('AHPRA check overdue', f'Check {check.pk} ({check.registration_number}) awaits the desktop verifier or admin review.')
+            check.alerted_at = timezone.now()
+            check.save(update_fields=['alerted_at'])
 
 
 @shared_task(name="client_profile.tasks.run_referee_reminder", queue="notifications")

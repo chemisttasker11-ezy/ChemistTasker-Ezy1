@@ -252,6 +252,14 @@ CELERY_TASK_ROUTES = {
     "onboarding.tasks.verify_skill_certificate_task": {"queue": "ocr"},
 }
 CELERY_BEAT_SCHEDULE = {
+    'ahpra-recheck-daily': {
+        'task': 'onboarding.tasks.recheck_ahpra_registrations',
+        'schedule': crontab(hour=2, minute=30),
+    },
+    'ahpra-overdue-alerts': {
+        'task': 'onboarding.tasks.alert_overdue_ahpra_checks',
+        'schedule': crontab(minute='*/15'),
+    },
     'publish-editorial-revisions': {
         'task': 'public_hub.tasks.publish_scheduled_content',
         'schedule': 60.0,
@@ -606,6 +614,8 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+ADMINS = [(email, email) for email in env.list('ADMIN_EMAILS', default=[])]
 SUPPORT_EMAIL = env('SUPPORT_EMAIL', default=DEFAULT_FROM_EMAIL)
 
 
@@ -616,6 +626,9 @@ AZURE_OCR_ENDPOINT=env('AZURE_OCR_ENDPOINT')
 AZURE_OCR_KEY=env('AZURE_OCR_KEY')
 
 SCRAPINGBEE_API_KEY=env('SCRAPINGBEE_API_KEY')
+AHPRA_SOURCE = env('AHPRA_SOURCE', default='scrapingbee')
+AHPRA_VERIFIER_TOKEN_SHA256 = env('AHPRA_VERIFIER_TOKEN_SHA256', default='')
+AHPRA_RECHECK_DAYS = env.int('AHPRA_RECHECK_DAYS', default=30)
 
 
 # MobileMessage SMS Settings
