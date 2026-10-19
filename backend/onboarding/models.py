@@ -191,7 +191,8 @@ class OwnerOnboarding(models.Model):
     # Verification Fields
     ahpra_verified = models.BooleanField(default=False, db_index=True)
     # Set when an adverse AHPRA result switched this owner to MANAGER, so a later Registered result switches back.
-    ahpra_switched_to_manager = models.BooleanField(default=False)
+    # db_default keeps inserts from older code (unaware of this column) working after a code rollback.
+    ahpra_switched_to_manager = models.BooleanField(default=False, db_default=False)
     ahpra_registration_status = models.CharField(max_length=100, blank=True, null=True)
     ahpra_registration_type = models.CharField(max_length=100, blank=True, null=True)
     ahpra_expiry_date = models.DateField(blank=True, null=True)

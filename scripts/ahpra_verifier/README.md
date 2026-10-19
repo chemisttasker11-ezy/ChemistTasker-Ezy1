@@ -1,5 +1,7 @@
 # AHPRA Verifier Desktop Bridge
 
+Staging server deployment: see [docs/AHPRA_STAGING_DEPLOY.md](../../docs/AHPRA_STAGING_DEPLOY.md).
+
 The AHPRA Verifier Desktop Bridge is a lightweight Python service designed to run 24/7 on a Windows desktop. Connect it alongside the Chrome extension: the server sends checks to the extension first, and this bridge is the fallback and repairer. It receives practitioner verification requests from the server via a secure WebSocket connection, performs automated lookups on the official AHPRA Register of Practitioners using a headless Claude Code session driving Google Chrome (via the Claude in Chrome extension), and returns structured verification results.
 
 ---
