@@ -224,13 +224,13 @@ export default function PharmacistBasicInfoScreen() {
           <TextInput style={styles.flex} mode="outlined" label="Postcode" value={form.postcode || ''} onChangeText={(v) => setField('postcode', v)} />
         </View>
 
+        <AhpraStatus submitLabel="Submit & Verify Basic" />
         <TextInput
           mode="outlined"
           label="AHPRA Number"
           value={form.ahpra_number || ''}
           onChangeText={(v) => setField('ahpra_number', v)}
           editable={!isAhpraVerified}
-          left={<TextInput.Affix text="PHA" />}
         />
         <HelperText type="info">{isAhpraVerified ? 'AHPRA number is locked after verification.' : AHPRA_CONSENT_TEXT}</HelperText>
         <TextInput
@@ -242,7 +242,6 @@ export default function PharmacistBasicInfoScreen() {
         {!ahpra.summary && <Chip mode="outlined" icon={ahpraChip.icon} textStyle={{ color: ahpraChip.color }}>
           AHPRA {ahpraChip.text}
         </Chip>}
-        <AhpraStatus />
         {!ahpra.summary && form.ahpra_verification_note ? <HelperText type="info">{form.ahpra_verification_note}</HelperText> : null}
         {error ? <HelperText type="error">{error}</HelperText> : null}
 

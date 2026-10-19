@@ -5,7 +5,7 @@ import * as React from 'react';
 import {
   Box, Button, Chip, MenuItem, TextField, Typography, Dialog, DialogTitle, DialogContent, DialogActions,
 
-  InputAdornment, Alert, Snackbar
+  Alert, Snackbar
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
@@ -545,7 +545,7 @@ export default function BasicInfoV2() {
 
 
 
-      <AhpraStatus />
+      <AhpraStatus submitLabel="Submit & Verify Basic" />
       {/* AHPRA row — chip + note stay aligned, wrap nicely on small */}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 2 }}>
         <TextField
@@ -553,7 +553,6 @@ export default function BasicInfoV2() {
           value={data.ahpra_number || ''}
           onChange={e => setField('ahpra_number', e.target.value)}
           disabled={isAhpraVerified}
-          InputProps={{ startAdornment: <InputAdornment position="start">PHA</InputAdornment> }}
           helperText={isAhpraVerified ? 'Checked by our team. Your AHPRA number stays with you for life; contact support to correct it.' : AHPRA_CONSENT_TEXT}
           sx={{ flex: '1 1 320px', minWidth: 240, maxWidth: 420 }}
         />

@@ -211,7 +211,7 @@ export default function RegulatoryV2() {
 
         {role === "INTERN" && (
           <Stack spacing={1}>
-            <AhpraStatus />
+            <AhpraStatus submitLabel="Save role & qualifications" />
             <TextField fullWidth required label="AHPRA number" value={data.ahpra_number} onChange={event => set({ ahpra_number: event.target.value })} disabled={data.ahpra_verified && (!ahpra.summary || ahpra.summary.state === 'ok')}
               inputProps={{ autoComplete: "off", spellCheck: false }} error={Boolean(fieldErrors.ahpra_number)}
               helperText={fieldErrors.ahpra_number || (data.ahpra_verified

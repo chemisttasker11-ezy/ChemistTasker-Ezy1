@@ -3,7 +3,8 @@ import AhpraStatus from './AhpraStatus';
 import {loginHref} from '../../landing_next/shared/browser-session';
 // src/components/ProtectedRoute.tsx
 import React from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, Link } from "react-router-dom";
+import { Box, Button, CircularProgress, Container, Paper, Typography } from "@mui/material";
 import { useAuth } from "../contexts/AuthContext";
 import { hasOrganizationAccess } from "@chemisttasker/shared-core";
 import { resolveDashboardPath } from "../utils/dashboardPath";
@@ -53,11 +54,41 @@ export default function ProtectedRoute({
   }
 
   if (location.pathname.endsWith('/logout')) return children;
-  if (ahpra.loading) return <div role="status">Loading AHPRA status...</div>;
-  if ((ahpra.summary?.frozen || ahpra.refusal) && !onAhpraStep) {
-    return <><AhpraStatus /><Navigate to={recoveryPath} replace /></>;
+
+  const isAhpraRole = user.role === 'PHARMACIST' || user.role === 'OTHER_STAFF' || user.role === 'OWNER';
+  const isFrozen = isAhpraRole && Boolean(ahpra.summary?.frozen || ahpra.refusal);
+
+  if (isAhpraRole && ahpra.loading) {
+    return (
+      <Box sx={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 3, textAlign: 'center' }}>
+        <CircularProgress size={32} sx={{ mb: 2 }} />
+        <Typography variant="body1" color="text.secondary">Verifying account registration…</Typography>
+      </Box>
+    );
   }
+
   if (ahpra.summary?.frozen && onAhpraStep) return children;
+
+  if (isFrozen && !onAhpraStep) {
+    return (
+      <Container maxWidth="sm" sx={{ py: 6 }}>
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid', borderColor: 'divider', textAlign: 'center' }}>
+          <Typography variant="h5" fontWeight={600} gutterBottom>
+            Account Access Paused
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Your account is temporarily paused pending AHPRA registration review. Please review and update your registration details to restore access.
+          </Typography>
+          <AhpraStatus submitLabel={roleKey === 'pharmacist' ? 'Submit & Verify Basic' : roleKey === 'owner' ? 'Submit' : 'Save role & qualifications'} />
+          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 2 }}>
+            <Button variant="contained" component={Link} to={recoveryPath}>
+              Go to Account Details
+            </Button>
+          </Box>
+        </Paper>
+      </Container>
+    );
+  }
 
   const hasOrgRole = hasOrganizationAccess(user);
 

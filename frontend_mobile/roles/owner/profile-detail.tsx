@@ -265,7 +265,6 @@ export default function OwnerProfileDetailScreen({
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <AhpraStatus />
         {error ? <HelperText type="error">{error}</HelperText> : null}
 
         <Card style={styles.heroCard} mode="contained">
@@ -470,13 +469,13 @@ export default function OwnerProfileDetailScreen({
 
           {showAhpra ? (
             <>
+              <AhpraStatus submitLabel="Submit" />
               <TextInput
                 mode="outlined"
                 label="AHPRA Number"
                 value={form.ahpra_number}
                 onChangeText={(value) => setForm((prev) => ({ ...prev, ahpra_number: value }))}
                 editable={!isAhpraVerified}
-                left={<TextInput.Affix text="PHA" />}
                 theme={inputTheme}
                 style={styles.input}
               />

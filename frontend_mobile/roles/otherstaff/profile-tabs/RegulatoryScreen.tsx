@@ -184,7 +184,7 @@ export default function OtherStaffRegulatoryScreen() {
 
         {role === 'INTERN' ? (
           <View style={{ gap: 6 }}>
-            <AhpraStatus />
+            <AhpraStatus submitLabel="Save role & qualifications" />
             <TextInput mode="outlined" label="AHPRA number" value={data.ahpra_number} onChangeText={value => set({ ahpra_number: value })}
               autoCapitalize="characters" autoCorrect={false} error={Boolean(fieldErrors.ahpra_number)} editable={!ahpraChecked} />
             <HelperText type={fieldErrors.ahpra_number ? 'error' : 'info'} visible>

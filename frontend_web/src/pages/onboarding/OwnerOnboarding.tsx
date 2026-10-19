@@ -394,7 +394,6 @@ const handleSubmit = async (e: React.FormEvent) => {
       {() => (
     <Box sx={{ bgcolor: LIGHT_PAGE_BG, minHeight: standalone ? 'calc(100vh - 72px)' : 'auto', py: { xs: 2, md: standalone ? 3 : 0 } }}>
     <Container maxWidth="xl">
-      <AhpraStatus />
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       <Snackbar
@@ -678,6 +677,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
           {showAhpra && (
             <>
+              <AhpraStatus submitLabel="Submit" />
               <TextField
                 fullWidth
                 margin="normal"
@@ -688,9 +688,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                 disabled={isAhpraVerified}
                 required={data.role === 'PHARMACIST'}
                 helperText={isAhpraVerified ? 'AHPRA number is locked after verification.' : AHPRA_CONSENT_TEXT}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">PHA</InputAdornment>,
-                }}
                 sx={inputSx}
               />
               <TextField

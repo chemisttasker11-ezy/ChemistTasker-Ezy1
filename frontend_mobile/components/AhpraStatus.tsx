@@ -1,20 +1,133 @@
 import { ahpraStatusMessage } from '@chemisttasker/shared-core';
 import React from 'react';
-import { View } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Button, HelperText, Text } from 'react-native-paper';
 import { useAhpra } from '../context/AhpraContext';
 
-export default function AhpraStatus() {
+export interface AhpraStatusProps {
+  submitLabel?: string;
+}
+
+export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
   const { summary, error, busy, seconds, recheck } = useAhpra();
   if (!summary) return null;
   const message = ahpraStatusMessage(summary);
   const label = summary.registration_status || ({ ok: 'Verified', pending: 'Check pending', suspended: 'Account paused', not_found: 'Not found' } as const)[summary.state];
-  return <View style={{ gap: 10, paddingVertical: 12 }} accessibilityLiveRegion="polite">
-    <Text variant="titleSmall">AHPRA: {label}</Text>
-    {message ? <Text>{message}</Text> : null}
-    {error ? <HelperText type="error">{error}</HelperText> : null}
-    <Button mode="outlined" loading={busy} disabled={busy || seconds > 0} onPress={() => void recheck()}>
-      {busy ? 'Queuing check...' : seconds > 0 ? `Re-check in ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : 'Re-check'}
-    </Button>
-  </View>;
+  const isBlocked = summary.state === 'suspended' || summary.state === 'not_found';
+
+  let hint = '';
+  if (summary.state === 'not_found') {
+    hint = submitLabel
+      ? `Fix the number above, press "${submitLabel}", then Re-check.`
+      : 'Fix the number above, submit it, then Re-check.';
+  } else if (summary.state === 'suspended') {
+    hint = submitLabel
+      ? `Contact AHPRA to resolve status, or update your number above and press "${submitLabel}".`
+      : 'Contact AHPRA to resolve status, or update your number and submit.';
+  }
+
+  return (
+    <View
+      style={[
+        styles.container,
+        isBlocked ? styles.blockedContainer : styles.infoContainer,
+      ]}
+      accessibilityLiveRegion="polite"
+    >
+      <Text variant="titleSmall" style={[styles.title, isBlocked ? styles.blockedTitle : styles.infoTitle]}>
+        AHPRA: {label}
+      </Text>
+      {message ? <Text style={styles.message}>{message}</Text> : null}
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {error ? <HelperText type="error">{error}</HelperText> : null}
+
+      <View style={styles.actionRow}>
+        {seconds > 0 ? (
+          <View style={styles.cooldownBadge}>
+            <Text style={styles.cooldownText}>
+              Re-check in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+            </Text>
+          </View>
+        ) : (
+          <Button
+            mode={isBlocked ? 'contained' : 'outlined'}
+            loading={busy}
+            disabled={busy}
+            onPress={() => void recheck()}
+            style={styles.button}
+            contentStyle={styles.buttonContent}
+          >
+            {busy ? 'Queuing check...' : 'Re-check'}
+          </Button>
+        )}
+      </View>
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginVertical: 10,
+    gap: 8,
+  },
+  blockedContainer: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  infoContainer: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#BAE6FD',
+  },
+  title: {
+    fontWeight: '700',
+  },
+  blockedTitle: {
+    color: '#991B1B',
+  },
+  infoTitle: {
+    color: '#075985',
+  },
+  message: {
+    color: '#1F2937',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  hint: {
+    color: '#374151',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  actionRow: {
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  cooldownBadge: {
+    minHeight: 44,
+    backgroundColor: 'rgba(51, 65, 85, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(51, 65, 85, 0.25)',
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  cooldownText: {
+    color: '#334155',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  button: {
+    minHeight: 44,
+    justifyContent: 'center',
+    borderRadius: 6,
+  },
+  buttonContent: {
+    height: 44,
+  },
+});
