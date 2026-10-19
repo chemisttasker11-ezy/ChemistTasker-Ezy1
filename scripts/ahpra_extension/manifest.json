@@ -1,0 +1,1 @@
+﻿{"manifest_version":3,"name":"ChemistTasker AHPRA Verifier","version":"1.0.0","minimum_chrome_version":"116","permissions":["tabs","scripting","storage","alarms","notifications"],"host_permissions":["https://www.ahpra.gov.au/*"],"background":{"service_worker":"background.js"},"options_page":"options.html","action":{"default_title":"AHPRA verifier settings"}}
