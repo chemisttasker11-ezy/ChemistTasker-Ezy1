@@ -12,13 +12,17 @@ import io
 import json
 import logging
 import os
+import subprocess
+import threading
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from scripts.ahpra_verifier.bridge import (
     AhpraBridge,
     default_runner,
+    default_repair_runner,
     load_config,
     parse_cli_output,
     strip_code_fences,
@@ -889,6 +893,201 @@ class TestMessageHandling(unittest.IsolatedAsyncioTestCase):
         sent = fake_ws.get_sent_json()
         self.assertEqual(len(sent), 1)
         self.assertEqual(sent[0]["check_id"], 55)
+
+
+class TestRepairHandling(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.message = {"type": "repair", "check_id": 123,
+                        "registration_number": "PHA0001234567",
+                        "errors": ["extension parse failed", "bridge parse failed"]}
+
+    async def test_hello_identifies_bridge(self):
+        bridge = AhpraBridge(url="ws://localhost", token="test-token", agent="desktop")
+
+        class Connection(FakeWebSocket):
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def __aiter__(self):
+                bridge.running = False
+                if False:
+                    yield ""
+
+        ws = Connection()
+        fake_websockets = SimpleNamespace(
+            connect=lambda *args, **kwargs: ws,
+            exceptions=SimpleNamespace(WebSocketException=OSError),
+        )
+        with patch("scripts.ahpra_verifier.bridge.websockets", fake_websockets):
+            await bridge.run()
+        self.assertEqual(ws.get_sent_json()[0], {
+            "type": "hello", "token": "test-token", "agent": "desktop", "kind": "bridge",
+        })
+
+    async def test_repair_is_single_flight_and_does_not_block_messages(self):
+        started, release = threading.Event(), threading.Event()
+        calls = []
+
+        def runner(reg, errors, worktree):
+            calls.append((reg, errors, worktree))
+            started.set()
+            release.wait(5)
+            return "Fixed selectors; tests passed."
+
+        bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=runner)
+        bridge.ws = FakeWebSocket()
+        with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": "repair-worktree"}), \
+                patch("scripts.ahpra_verifier.bridge.repair_branch",
+                      side_effect=["main", "ahpra-repair/20261019-1200"]):
+            try:
+                await bridge.handle_message(json.dumps(self.message))
+                self.assertTrue(await asyncio.to_thread(started.wait, 2))
+                await bridge.handle_message(json.dumps({**self.message, "check_id": 124}))
+                await bridge.handle_message('{"type":"ping"}')
+                await bridge.handle_message(json.dumps({"type": "check", "check_id": 125,
+                                                       "registration_number": "PHA0001234567"}))
+                self.assertEqual(bridge.check_queue.qsize(), 1)
+                self.assertEqual(bridge.ws.get_sent_json(), [{"type": "pong"}])
+            finally:
+                release.set()
+                await bridge._repair_task
+        self.assertEqual(calls, [(self.message["registration_number"], self.message["errors"], "repair-worktree")])
+        self.assertEqual(bridge.ws.get_sent_json()[1:], [{
+            "type": "repair_report", "check_id": 123,
+            "summary": "Fixed selectors; tests passed.", "branch": "ahpra-repair/20261019-1200",
+        }])
+
+    async def test_missing_worktree_reports_not_configured(self):
+        def runner(*args):
+            self.fail("Unconfigured repairs must not run")
+
+        bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=runner)
+        bridge.ws = FakeWebSocket()
+        with patch.dict(os.environ, {}, clear=True):
+            await bridge.handle_message(json.dumps(self.message))
+            await bridge._repair_task
+        report, = bridge.ws.get_sent_json()
+        self.assertEqual(report["type"], "repair_report")
+        self.assertIn("not configured", report["summary"])
+        self.assertEqual(report["branch"], "")
+
+    async def test_timeout_reports_branch_and_queues_until_reconnect(self):
+        def runner(*args):
+            raise subprocess.TimeoutExpired("claude", 1800)
+
+        bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=runner)
+        with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": "repair-worktree"}), \
+                patch("scripts.ahpra_verifier.bridge.repair_branch",
+                      side_effect=["main", "ahpra-repair/test"]):
+            await bridge.handle_message(json.dumps(self.message))
+            await bridge._repair_task
+        bridge.ws = FakeWebSocket()
+        await bridge._flush_pending_results()
+        report, = bridge.ws.get_sent_json()
+        self.assertIn("timed out", report["summary"])
+        self.assertEqual(report["branch"], "ahpra-repair/test")
+
+    async def test_only_new_repair_branches_are_reported(self):
+        for before, after in [("main", "main"), ("main", "other"),
+                              ("ahpra-repair/old", "ahpra-repair/old"),
+                              ("main", ""), ("ahpra-repair/old", "ahpra-repair/new")]:
+            with self.subTest(before=before, after=after):
+                def runner(*args):
+                    self.assertEqual(branch.call_count, 1)
+                    return "No change."
+
+                bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=runner)
+                bridge.ws = FakeWebSocket()
+                with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": "repair-worktree"}), \
+                        patch("scripts.ahpra_verifier.bridge.repair_branch",
+                              side_effect=[before, after]) as branch:
+                    await bridge.handle_message(json.dumps(self.message))
+                    await bridge._repair_task
+                expected = "ahpra-repair/new" if after == "ahpra-repair/new" else ""
+                self.assertEqual(bridge.ws.get_sent_json()[0]["branch"], expected)
+
+    async def test_summary_is_bounded(self):
+        bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=lambda *args: "x" * 5000)
+        bridge.ws = FakeWebSocket()
+        with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": "repair-worktree"}), \
+                patch("scripts.ahpra_verifier.bridge.repair_branch", return_value=""):
+            await bridge.handle_message(json.dumps(self.message))
+            await bridge._repair_task
+        self.assertEqual(len(bridge.ws.get_sent_json()[0]["summary"]), 4000)
+
+
+class TestRepairRunner(unittest.TestCase):
+    def test_cli_configuration(self):
+        with patch.dict(os.environ, {"AHPRA_CLAUDE_CMD": "custom-claude.cmd",
+                                    "AHPRA_REPAIR_TIMEOUT_SECONDS": "75",
+                                    "AHPRA_REPAIR_CLAUDE_CONFIG_DIR": "repair-config"}), \
+                patch("scripts.ahpra_verifier.bridge.shutil.which", return_value="resolved-claude.cmd"), \
+                patch("scripts.ahpra_verifier.bridge.subprocess.Popen") as popen:
+            proc = popen.return_value
+            proc.returncode = 0
+            proc.communicate.return_value = ("Summary", "")
+            self.assertEqual(default_repair_runner("PHA0001234567", ["selector failed"], "repair-tree"), "Summary")
+        command = popen.call_args.args[0]
+        options = popen.call_args.kwargs
+        self.assertEqual(command[0], "resolved-claude.cmd")
+        self.assertIn("--chrome", command)
+        self.assertEqual(command[command.index("--model") + 1], "opus")
+        self.assertEqual(command[command.index("--permission-mode") + 1], "auto")
+        self.assertEqual(command[command.index("--allowedTools") + 1],
+                         "Read,Edit,Write,Grep,Glob,Bash,mcp__claude-in-chrome__*")
+        self.assertEqual(command[command.index("--disallowedTools") + 1:], [
+            "Bash(git push:*)", "Bash(git merge:*)", "Bash(git checkout main*)",
+            "Bash(git reset:*)", "Bash(git rebase:*)", "Bash(git remote:*)",
+        ])
+        self.assertEqual(options["cwd"], "repair-tree")
+        self.assertEqual(proc.communicate.call_args.kwargs["timeout"], 75)
+        self.assertEqual(options["env"]["ENABLE_TOOL_SEARCH"], "false")
+        self.assertEqual(options["env"]["CLAUDE_CONFIG_DIR"], "repair-config")
+        prompt = proc.communicate.call_args.kwargs["input"]
+        self.assertIn("PHA0001234567", prompt)
+        self.assertIn('["selector failed"]', prompt)
+        self.assertIn("Never create a repair branch from an earlier ahpra-repair/* branch", prompt)
+        self.assertIn("the base branch used", prompt)
+
+    def test_nonzero_exit_does_not_echo_output(self):
+        with patch("scripts.ahpra_verifier.bridge.subprocess.Popen") as popen:
+            popen.return_value.returncode = 7
+            popen.return_value.communicate.return_value = ("Practitioner name", "Private diagnostics")
+            self.assertEqual(default_repair_runner("PHA123", [], "repair-tree"),
+                             "Repair CLI exited with code 7.")
+
+    def test_timeout_kills_process_tree_for_both_runners_on_windows(self):
+        for runner, args in [(default_runner, ("PHA123", "Lookup {registration_number}", 12)),
+                             (default_repair_runner, ("PHA123", [], "repair-tree"))]:
+            with self.subTest(runner=runner.__name__), \
+                    patch("scripts.ahpra_verifier.bridge.subprocess.Popen") as popen, \
+                    patch("scripts.ahpra_verifier.bridge.subprocess.run") as run, \
+                    patch("scripts.ahpra_verifier.bridge.os.name", "nt"), \
+                    patch("scripts.ahpra_verifier.bridge.shutil.which", return_value="claude.cmd"):
+                proc = popen.return_value
+                proc.pid = 4321
+                timeout = subprocess.TimeoutExpired("claude", 12)
+                proc.communicate.side_effect = [timeout, ("", "")]
+                with self.assertRaises(subprocess.TimeoutExpired) as raised:
+                    runner(*args)
+                self.assertIs(raised.exception, timeout)
+                run.assert_called_once_with(
+                    ["taskkill", "/T", "/F", "/PID", "4321"],
+                    capture_output=True, timeout=10, check=True,
+                )
+                proc.communicate.assert_called_with(timeout=10)
+                proc.kill.assert_not_called()
+
+    def test_default_runner_returns_stdout(self):
+        with patch("scripts.ahpra_verifier.bridge.subprocess.Popen") as popen:
+            popen.return_value.returncode = 0
+            popen.return_value.communicate.return_value = ("Lookup result", "")
+            self.assertEqual(default_runner("PHA123", "Lookup {registration_number}", 12),
+                             "Lookup result")
+            popen.return_value.communicate.assert_called_once_with(input="Lookup PHA123", timeout=12)
 
 
 class TestConfigValidation(unittest.TestCase):

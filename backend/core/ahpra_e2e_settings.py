@@ -17,6 +17,10 @@ CHANNEL_LAYERS = {"default": {
     "BACKEND": "channels_redis.core.RedisChannelLayer",
     "CONFIG": {"hosts": [os.environ.get("AHPRA_E2E_REDIS", "redis://127.0.0.1:6379/9")]},
 }}
+CACHES = {**CACHES, "ahpra": {
+    "BACKEND": "django.core.cache.backends.redis.RedisCache",
+    "LOCATION": os.environ.get("AHPRA_E2E_REDIS", "redis://127.0.0.1:6379/9"),
+}}
 AHPRA_SOURCE = "desktop"
 if not os.environ.get("AHPRA_E2E_TOKEN"):
     raise ImproperlyConfigured("AHPRA_E2E_TOKEN is required for local AHPRA e2e")

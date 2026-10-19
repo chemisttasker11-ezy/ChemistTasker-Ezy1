@@ -4,9 +4,13 @@ from datetime import date, timedelta
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.apps import apps
+from django.conf import settings
+from django.core.cache import caches
+from django.core.mail import mail_admins
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.urls import reverse
 from rest_framework import serializers
 
 from onboarding.models import AhpraCheck
@@ -14,6 +18,10 @@ from onboarding.verification.ahpra import _update_ahpra_fields, evaluate_ahpra_r
 from onboarding.verification.ahpra_numbers import full_registration_number
 
 PROFILE_MODELS = ('PharmacistOnboarding', 'OwnerOnboarding', 'OtherStaffOnboarding')
+
+
+def verifier_seen(kind):
+    caches['ahpra'].set(f'ahpra_verifier_presence_{kind}', True, timeout=120)
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -64,24 +72,34 @@ def valid_result(payload):
 def enqueue_check(profile, number, reason):
     check, created = AhpraCheck.objects.get_or_create(
         model_name=profile._meta.object_name, object_pk=profile.pk, registration_number=number,
-        status__in=['pending', 'sent'], defaults={'reason': reason, 'status': 'pending'},
+        status__in=['pending', 'sent'], defaults={
+            'reason': reason, 'status': 'pending',
+            'stage': 'extension' if caches['ahpra'].get('ahpra_verifier_presence_extension') else 'bridge',
+        },
     )
     if created:
         transaction.on_commit(lambda: async_to_sync(get_channel_layer().group_send)(
-            'ahpra_verifiers', {'type': 'ahpra.check', 'check_id': check.pk},
+            f'ahpra_verifiers_{check.stage}', {'type': 'ahpra.check', 'check_id': check.pk},
         ))
     return check
 
 
-def claim_checks(check_id=None):
+def claim_checks(check_id=None, stage='extension'):
     now = timezone.now()
-    eligible = Q(status='pending') | Q(status='sent', sent_at__lt=now - timedelta(minutes=5))
-    checks = AhpraCheck.objects.filter(eligible).order_by('created_at')
+    stale = Q(status='sent', sent_at__lt=now - timedelta(minutes=5))
+    eligible = Q(status='pending') | stale
+    if stage == 'bridge':
+        fallback = stale if caches['ahpra'].get('ahpra_verifier_presence_extension') else Q(status__in=['pending', 'sent'])
+        abandoned = AhpraCheck.objects.filter(fallback, stage='extension')
+        if check_id is not None:
+            abandoned = abandoned.filter(pk=check_id)
+        abandoned.update(stage='bridge', status='pending', sent_at=None)
+    checks = AhpraCheck.objects.filter(eligible, stage=stage).order_by('created_at')
     if check_id is not None:
         checks = checks.filter(pk=check_id)
     messages = []
     for check in checks:
-        if AhpraCheck.objects.filter(eligible, pk=check.pk).update(status='sent', sent_at=now):
+        if AhpraCheck.objects.filter(eligible, pk=check.pk, stage=stage).update(status='sent', sent_at=now):
             messages.append({'type': 'check', 'check_id': check.pk, 'registration_number': check.registration_number})
     return messages
 
@@ -127,4 +145,73 @@ def apply_ahpra_result(check, payload):
     check.register_data = record or {}
     check.completed_at = timezone.now()
     check.save()
+    return True
+
+
+def admin_review_url(check):
+    return settings.BACKEND_BASE_URL.rstrip('/') + reverse('admin:client_profile_ahpracheck_change', args=[check.pk])
+
+
+@transaction.atomic
+def handle_verifier_result(payload, kind):
+    if not valid_result(payload):
+        return False
+    check = AhpraCheck.objects.select_for_update().filter(pk=payload['check_id']).first()
+    if check is None:
+        return False
+    # ACK a lost terminal ACK or extension hand-off ACK without applying it again.
+    if check.status == 'done' or (kind == 'extension' and check.stage == 'bridge'):
+        return True
+    if check.stage != kind:
+        return False
+    if payload['outcome'] == 'error' and kind == 'extension':
+        check.stage, check.status = 'bridge', 'pending'
+        check.extension_error = payload['error']
+        check.sent_at = None
+        check.save(update_fields=['stage', 'status', 'extension_error', 'sent_at'])
+        transaction.on_commit(lambda: async_to_sync(get_channel_layer().group_send)(
+            'ahpra_verifiers_bridge', {'type': 'ahpra.check', 'check_id': check.pk},
+        ))
+        return True
+    if not apply_ahpra_result(check, payload):
+        return False
+    if payload['outcome'] == 'error':
+        check.refresh_from_db()
+        check.needs_attention, check.alerted_at = True, None
+        check.save(update_fields=['needs_attention', 'alerted_at'])
+        message = {
+            'type': 'repair', 'check_id': check.pk, 'registration_number': check.registration_number,
+            'errors': [check.extension_error, payload['error']],
+        }
+        transaction.on_commit(lambda: async_to_sync(get_channel_layer().group_send)(
+            'ahpra_verifiers_bridge', {'type': 'ahpra.repair', 'message': message},
+        ))
+        transaction.on_commit(lambda: mail_admins('AHPRA check needs your input',
+                    f'Check {check.pk} ({check.registration_number})\n'
+                    f'Extension error: {check.extension_error}\nBridge error: {payload["error"]}\n'
+                    f'Claude repair has started\nAdmin review: {admin_review_url(check)}', fail_silently=True))
+    return True
+
+
+@transaction.atomic
+def store_repair_report(payload):
+    if (type(payload.get('check_id')) is not int or payload['check_id'] <= 0
+            or not isinstance(payload.get('summary'), str) or not payload['summary'].strip()
+            or not isinstance(payload.get('branch'), str)):
+        return False
+    check = AhpraCheck.objects.select_for_update().filter(
+        pk=payload['check_id'], needs_attention=True, reviewed_at__isnull=True,
+    ).first()
+    if check is None:
+        return False
+    if check.repair_reported_at is not None:
+        return True
+    check.repair_summary = payload['summary'][:4000]
+    check.repair_branch = payload['branch'][:255]
+    check.repair_reported_at = timezone.now()
+    check.save(update_fields=['repair_summary', 'repair_branch', 'repair_reported_at'])
+    transaction.on_commit(lambda: mail_admins('AHPRA repair report: your decision needed',
+                f'Check {check.pk} ({check.registration_number})\n{check.repair_summary}\n'
+                f'Branch: {check.repair_branch}\nPlease decide whether to approve or reject this check.\n'
+                f'Admin review: {admin_review_url(check)}', fail_silently=True))
     return True

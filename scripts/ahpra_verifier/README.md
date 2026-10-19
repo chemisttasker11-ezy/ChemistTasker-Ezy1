@@ -12,7 +12,7 @@ The bridge adheres to a fixed bidirectional WebSocket protocol:
    - Connects to `AHPRA_VERIFIER_URL` with the HTTP header `Authorization: Bearer <AHPRA_VERIFIER_TOKEN>`.
    - On opening the connection, sends an identification greeting:
      ```json
-     {"type": "hello", "agent": "<AHPRA_VERIFIER_AGENT or hostname>"}
+     {"type": "hello", "token": "<AHPRA_VERIFIER_TOKEN>", "agent": "<AHPRA_VERIFIER_AGENT or hostname>", "kind": "bridge"}
      ```
    - The production server acknowledges and dispatches all pending checks for this agent.
 
@@ -57,6 +57,20 @@ The bridge adheres to a fixed bidirectional WebSocket protocol:
    - **Auto-reconnect:** If the WebSocket connection drops, the bridge reconnects using exponential backoff (starting at 5 seconds, doubling up to a maximum of 5 minutes: 5s, 10s, 20s, 40s, 80s, 160s, 300s).
 
 ---
+
+## Optional Repairs
+
+Optional repair requests run one Opus Claude CLI subprocess at a time, independently
+of lookups; additional repair requests while busy are ignored. Set
+`AHPRA_REPAIR_WORKTREE` to a dedicated clean repair worktree (required for repairs;
+otherwise the bridge reports "not configured"). `AHPRA_REPAIR_CLAUDE_CONFIG_DIR`
+optionally sets that subprocess's `CLAUDE_CONFIG_DIR`.
+`AHPRA_REPAIR_TIMEOUT_SECONDS` defaults to `1800` (30 minutes).
+The runner uses `AHPRA_CLAUDE_CMD` (default `claude.cmd`) and `repair_prompt.md`.
+It returns `repair_report` with the check ID, a summary capped at 4000 characters,
+and the current worktree branch. Reports wait for reconnect if disconnected.
+Repairs may commit only on a new `ahpra-repair/<yyyymmdd-hhmm>` branch; an admin
+must review it. They never push, merge, deploy, or solve CAPTCHAs.
 
 ## Directory Structure
 

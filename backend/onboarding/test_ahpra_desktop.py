@@ -3,27 +3,37 @@ import copy
 import hashlib
 from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from channels.db import database_sync_to_async
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
 from django.contrib.admin.sites import AdminSite
 from django.core import mail
+from django.core.cache import caches
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
+from django.urls import reverse
 
 from client_profile.characterization_support import make_user
 from onboarding.admin import AhpraCheckAdmin
 from onboarding.models import AhpraCheck, OtherStaffOnboarding, PharmacistOnboarding
 from onboarding.routing import websocket_urlpatterns
 from onboarding.tasks import alert_overdue_ahpra_checks, recheck_ahpra_registrations, verify_ahpra_task
-from onboarding.verification.desktop import RegisterSerializer, apply_ahpra_result, claim_checks, enqueue_check, valid_result
+from onboarding.verification.desktop import (
+    RegisterSerializer, apply_ahpra_result, claim_checks, enqueue_check, handle_verifier_result,
+    store_repair_report, valid_result, verifier_seen,
+)
 from users.jwt_ws import JWTAuthMiddlewareStack
 
 NUMBER = 'PHA0001234567'
 TOKEN = 'test-desktop-secret'
 DIGEST = hashlib.sha256(TOKEN.encode()).hexdigest()
+TEST_CACHES = {
+    'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'},
+    'security': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', 'LOCATION': 'security-tests'},
+    'ahpra': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', 'LOCATION': 'ahpra-tests'},
+}
 
 
 def profile_fixture():
@@ -44,11 +54,12 @@ def result(check_id, outcome='found', **record):
                              undertakings=False, reprimands=False) | record if outcome == 'found' else None}
 
 
-@override_settings(AHPRA_SOURCE='desktop', AHPRA_RECHECK_DAYS=30,
+@override_settings(AHPRA_SOURCE='desktop', AHPRA_RECHECK_DAYS=30, CACHES=TEST_CACHES,
                    CHANNEL_LAYERS={'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}},
                    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', ADMINS=[('Admin', 'admin@example.test')])
 class DesktopTests(TestCase):
     def setUp(self):
+        caches['ahpra'].delete_many(['ahpra_verifier_presence_extension', 'ahpra_verifier_presence_bridge'])
         self.profile = profile_fixture()
 
     def test_found_outcomes_and_duplicate_result(self):
@@ -143,13 +154,149 @@ class DesktopTests(TestCase):
 
     def test_enqueue_deduplicates_and_pushes_after_commit(self):
         with patch('onboarding.verification.desktop.get_channel_layer') as layer:
-            from unittest.mock import AsyncMock
             layer.return_value.group_send = AsyncMock()
             with self.captureOnCommitCallbacks(execute=True):
                 one = enqueue_check(self.profile, NUMBER, 'onboarding')
                 two = enqueue_check(self.profile, NUMBER, 'recheck')
             self.assertEqual(one.pk, two.pk)
-            layer.return_value.group_send.assert_awaited_once_with('ahpra_verifiers', {'type': 'ahpra.check', 'check_id': one.pk})
+            layer.return_value.group_send.assert_awaited_once_with('ahpra_verifiers_bridge', {'type': 'ahpra.check', 'check_id': one.pk})
+
+    def test_routing_by_extension_presence(self):
+        with patch('onboarding.verification.desktop.get_channel_layer') as layer:
+            layer.return_value.group_send = AsyncMock()
+            for present, stage in [(False, 'bridge'), (True, 'extension')]:
+                if present:
+                    verifier_seen('extension')
+                with self.captureOnCommitCallbacks(execute=True):
+                    check = enqueue_check(self.profile, NUMBER, 'onboarding')
+                self.assertEqual(check.stage, stage)
+                layer.return_value.group_send.assert_awaited_with(
+                    f'ahpra_verifiers_{stage}', {'type': 'ahpra.check', 'check_id': check.pk},
+                )
+                check.delete()
+        with patch.object(caches['ahpra'], 'set') as set_presence:
+            verifier_seen('bridge')
+        set_presence.assert_called_once_with('ahpra_verifier_presence_bridge', True, timeout=120)
+
+    def test_extension_error_hands_off_once_without_applying(self):
+        check = check_fixture(self.profile, status='sent', sent_at=timezone.now())
+        error = dict(result(check.pk, 'error'), error='extension failed')
+        before = PharmacistOnboarding.objects.filter(pk=self.profile.pk).values().get()
+        with patch('onboarding.verification.desktop.get_channel_layer') as layer:
+            layer.return_value.group_send = AsyncMock()
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertTrue(handle_verifier_result(error, 'extension'))
+                self.assertTrue(handle_verifier_result(error, 'extension'))
+            layer.return_value.group_send.assert_awaited_once_with(
+                'ahpra_verifiers_bridge', {'type': 'ahpra.check', 'check_id': check.pk},
+            )
+        check.refresh_from_db()
+        self.assertEqual((check.stage, check.status, check.extension_error), ('bridge', 'pending', 'extension failed'))
+        self.assertIsNone(check.sent_at)
+        self.assertEqual(PharmacistOnboarding.objects.filter(pk=self.profile.pk).values().get(), before)
+        self.assertFalse(mail.outbox)
+        self.assertEqual(claim_checks(stage='extension'), [])
+        self.assertEqual(claim_checks(stage='bridge'), [
+            {'type': 'check', 'check_id': check.pk, 'registration_number': NUMBER},
+        ])
+        self.assertTrue(handle_verifier_result(result(check.pk), 'bridge'))
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.ahpra_verified)
+
+    def test_bridge_error_needs_attention_sends_repair_and_private_email_once(self):
+        check = check_fixture(self.profile, stage='bridge', extension_error='extension failed')
+        error = dict(result(check.pk, 'error'), error='bridge failed')
+        with patch('onboarding.verification.desktop.get_channel_layer') as layer:
+            layer.return_value.group_send = AsyncMock()
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertTrue(handle_verifier_result(error, 'bridge'))
+                self.assertTrue(handle_verifier_result(error, 'bridge'))
+                self.assertFalse(mail.outbox)
+            layer.return_value.group_send.assert_awaited_once_with('ahpra_verifiers_bridge', {
+                'type': 'ahpra.repair', 'message': {
+                    'type': 'repair', 'check_id': check.pk, 'registration_number': NUMBER,
+                    'errors': ['extension failed', 'bridge failed'],
+                },
+            })
+        check.refresh_from_db()
+        self.profile.refresh_from_db()
+        self.assertEqual((check.status, check.outcome, check.needs_attention), ('done', 'error', True))
+        self.assertFalse(self.profile.ahpra_verified)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('AHPRA check needs your input', mail.outbox[0].subject)
+        self.assertEqual(mail.outbox[0].to, ['admin@example.test'])
+        for text in [str(check.pk), NUMBER, 'extension failed', 'bridge failed', 'Claude repair has started',
+                     reverse('admin:client_profile_ahpracheck_change', args=[check.pk])]:
+            self.assertIn(text, mail.outbox[0].body)
+        for text in ['Jane', 'Doe', self.profile.user.email]:
+            self.assertNotIn(text, mail.outbox[0].body)
+
+    def test_repair_report_stores_caps_and_emails_once(self):
+        check = check_fixture(self.profile, stage='bridge', status='done', needs_attention=True)
+        report = {'check_id': check.pk, 'summary': 's' * 4001, 'branch': 'repair/' + 'b' * 300}
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertTrue(store_repair_report(report))
+            self.assertTrue(store_repair_report(report))
+            self.assertFalse(mail.outbox)
+        check.refresh_from_db()
+        self.assertEqual(check.repair_summary, report['summary'][:4000])
+        self.assertEqual(check.repair_branch, report['branch'][:255])
+        self.assertIsNotNone(check.repair_reported_at)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(check.repair_summary, mail.outbox[0].body)
+        self.assertIn(check.repair_branch, mail.outbox[0].body)
+        self.assertIn('Please decide', mail.outbox[0].body)
+
+    def test_repair_report_rejects_unknown_non_attention_and_invalid_fields(self):
+        check = check_fixture(self.profile)
+        report = {'check_id': check.pk, 'summary': 'Fixed selector', 'branch': ''}
+        self.assertFalse(store_repair_report(report))
+        AhpraCheck.objects.filter(pk=check.pk).update(needs_attention=True)
+        for invalid in [dict(report, check_id=999999), dict(report, check_id=True),
+                        dict(report, summary=[]), dict(report, branch=None), dict(report, summary='')]:
+            self.assertFalse(store_repair_report(invalid))
+        self.assertFalse(mail.outbox)
+
+    def test_admin_emails_are_deferred_and_fail_silently(self):
+        check = check_fixture(self.profile, stage='bridge')
+        with patch('onboarding.verification.desktop.mail_admins') as notify:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertTrue(handle_verifier_result(result(check.pk, 'error'), 'bridge'))
+                notify.assert_not_called()
+            notify.assert_called_once()
+            self.assertIs(notify.call_args.kwargs['fail_silently'], True)
+            notify.reset_mock()
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertTrue(store_repair_report({'check_id': check.pk, 'summary': 'Fixed', 'branch': ''}))
+                notify.assert_not_called()
+            notify.assert_called_once()
+            self.assertIs(notify.call_args.kwargs['fail_silently'], True)
+
+    def test_attention_reminder_after_45_minutes_once_without_report(self):
+        check = check_fixture(self.profile, status='done', stage='bridge', needs_attention=True,
+                              completed_at=timezone.now() - timedelta(minutes=44))
+        alert_overdue_ahpra_checks()
+        self.assertFalse(mail.outbox)
+        AhpraCheck.objects.filter(pk=check.pk).update(completed_at=timezone.now() - timedelta(minutes=46))
+        alert_overdue_ahpra_checks()
+        alert_overdue_ahpra_checks()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('no repair report', mail.outbox[0].body)
+        AhpraCheck.objects.filter(pk=check.pk).update(alerted_at=None, repair_reported_at=timezone.now())
+        alert_overdue_ahpra_checks()
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_extension_real_answers_do_not_hand_off(self):
+        for outcome, fields in [('not_found', {}), ('blocked', {}),
+                                ('found', {'registration_status': 'Suspended'})]:
+            with self.subTest(outcome=outcome):
+                check = check_fixture(self.profile)
+                self.assertTrue(handle_verifier_result(result(check.pk, outcome, **fields), 'extension'))
+                check.refresh_from_db()
+                self.assertEqual(check.stage, 'extension')
+                self.assertEqual(check.status, 'done')
+                self.assertFalse(check.needs_attention)
+        self.assertFalse(mail.outbox)
 
     def test_claim_pending_and_stale_sent_only(self):
         check = check_fixture(self.profile)
@@ -159,6 +306,27 @@ class DesktopTests(TestCase):
         self.assertEqual(len(claim_checks()), 1)
         AhpraCheck.objects.filter(pk=check.pk).update(status='done')
         self.assertEqual(claim_checks(), [])
+
+    def test_bridge_claims_abandoned_extension_checks(self):
+        now = timezone.now()
+        for present in (False, True):
+            for status, age in [('pending', None), ('sent', 1), ('sent', 5), ('sent', 6), ('done', 6)]:
+                with self.subTest(present=present, status=status, age=age):
+                    caches['ahpra'].set('ahpra_verifier_presence_extension', present)
+                    check = check_fixture(self.profile, stage='extension', status=status,
+                                          sent_at=now - timedelta(minutes=age) if age else None)
+                    expected = status != 'done' and (not present or (status == 'sent' and age > 5))
+                    with patch('onboarding.verification.desktop.timezone.now', return_value=now):
+                        messages = claim_checks(check.pk, stage='bridge')
+                    self.assertEqual(messages, [
+                        {'type': 'check', 'check_id': check.pk, 'registration_number': NUMBER},
+                    ] if expected else [])
+                    check.refresh_from_db()
+                    self.assertEqual(check.stage, 'bridge' if expected else 'extension')
+                    if expected:
+                        self.assertEqual((check.status, check.sent_at), ('sent', now))
+                        self.assertEqual(claim_checks(check.pk, stage='bridge'), [])
+                    check.delete()
 
     def test_admin_actions(self):
         check = check_fixture(self.profile)
@@ -293,16 +461,107 @@ class DesktopTests(TestCase):
         self.assertFalse(AhpraCheck.objects.exists())
 
 
-@override_settings(AHPRA_VERIFIER_TOKEN_SHA256=DIGEST,
-                   CHANNEL_LAYERS={'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}})
+@override_settings(AHPRA_VERIFIER_TOKEN_SHA256=DIGEST, CACHES=TEST_CACHES,
+                   CHANNEL_LAYERS={'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}},
+                   EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', ADMINS=[('Admin', 'admin@example.test')])
 class VerifierSocketTests(TransactionTestCase):
     def setUp(self):
+        caches['ahpra'].delete_many(['ahpra_verifier_presence_extension', 'ahpra_verifier_presence_bridge'])
         self.profile = profile_fixture()
-        self.check = check_fixture(self.profile)
+        self.check = check_fixture(self.profile, stage='bridge')
 
     def communicator(self, headers=None):
         return WebsocketCommunicator(JWTAuthMiddlewareStack(URLRouter(websocket_urlpatterns)),
                                      '/ws/ahpra-verifier/', headers=headers or [])
+
+    async def test_kind_replays_only_own_stage_and_refreshes_presence(self):
+        extension_profile = await database_sync_to_async(profile_fixture)()
+        extension_check = await database_sync_to_async(check_fixture)(extension_profile)
+        for kind, expected in [('extension', extension_check), ('bridge', self.check)]:
+            socket = self.communicator()
+            try:
+                await socket.connect()
+                await socket.send_json_to({'type': 'hello', 'agent': 'verifier', 'token': TOKEN, 'kind': kind})
+                self.assertEqual(await socket.receive_json_from(), {'type': 'ready'})
+                self.assertEqual(await socket.receive_json_from(), {
+                    'type': 'check', 'check_id': expected.pk, 'registration_number': NUMBER,
+                })
+                self.assertTrue(await socket.receive_nothing())
+                self.assertTrue(await database_sync_to_async(caches['ahpra'].get)(f'ahpra_verifier_presence_{kind}'))
+                await database_sync_to_async(caches['ahpra'].delete)(f'ahpra_verifier_presence_{kind}')
+                await socket.send_json_to({'type': 'pong'})
+                self.assertTrue(await socket.receive_nothing())
+                self.assertTrue(await database_sync_to_async(caches['ahpra'].get)(f'ahpra_verifier_presence_{kind}'))
+            finally:
+                await socket.disconnect()
+
+    async def test_old_bridge_without_kind_records_bridge_presence(self):
+        socket = self.communicator()
+        try:
+            await socket.connect()
+            await socket.send_json_to({'type': 'hello', 'agent': 'old bridge', 'token': TOKEN})
+            self.assertEqual(await socket.receive_json_from(), {'type': 'ready'})
+            self.assertEqual((await socket.receive_json_from())['check_id'], self.check.pk)
+            self.assertTrue(await database_sync_to_async(caches['ahpra'].get)('ahpra_verifier_presence_bridge'))
+            self.assertIsNone(await database_sync_to_async(caches['ahpra'].get)('ahpra_verifier_presence_extension'))
+        finally:
+            await socket.disconnect()
+
+    async def test_extension_handoff_ack_and_bridge_live_delivery(self):
+        await database_sync_to_async(AhpraCheck.objects.filter(pk=self.check.pk).update)(stage='extension')
+        # enqueue_check only assigns the extension stage while the extension is present.
+        await database_sync_to_async(verifier_seen)('extension')
+        extension, bridge = self.communicator(), self.communicator()
+        try:
+            for socket, kind in [(bridge, 'bridge'), (extension, 'extension')]:
+                await socket.connect()
+                await socket.send_json_to({'type': 'hello', 'agent': kind, 'token': TOKEN, 'kind': kind})
+                self.assertEqual(await socket.receive_json_from(), {'type': 'ready'})
+            self.assertEqual((await extension.receive_json_from())['check_id'], self.check.pk)
+            error = dict(result(self.check.pk, 'error'), error='extension failed')
+            await extension.send_json_to(error)
+            self.assertEqual(await extension.receive_json_from(), {'type': 'ack', 'check_id': self.check.pk})
+            self.assertEqual(await bridge.receive_json_from(), {
+                'type': 'check', 'check_id': self.check.pk, 'registration_number': NUMBER,
+            })
+            await extension.send_json_to(error)
+            self.assertEqual(await extension.receive_json_from(), {'type': 'ack', 'check_id': self.check.pk})
+            self.assertTrue(await bridge.receive_nothing())
+            await bridge.send_json_to(dict(result(self.check.pk, 'error'), error='bridge failed'))
+            self.assertEqual(await bridge.receive_json_from(), {'type': 'ack', 'check_id': self.check.pk})
+            self.assertEqual(await bridge.receive_json_from(), {
+                'type': 'repair', 'check_id': self.check.pk, 'registration_number': NUMBER,
+                'errors': ['extension failed', 'bridge failed'],
+            })
+            self.assertTrue(await extension.receive_nothing())
+        finally:
+            await extension.disconnect()
+            await bridge.disconnect()
+
+    async def test_repair_report_only_accepted_from_bridge(self):
+        await database_sync_to_async(AhpraCheck.objects.filter(pk=self.check.pk).update)(
+            status='done', needs_attention=True,
+        )
+        report = {'type': 'repair_report', 'check_id': self.check.pk, 'summary': 'Repaired selector', 'branch': ''}
+        for kind in ('extension', 'bridge'):
+            socket = self.communicator()
+            try:
+                await socket.connect()
+                await socket.send_json_to({'type': 'hello', 'agent': 'verifier', 'token': TOKEN, 'kind': kind})
+                await socket.receive_json_from()
+                await socket.send_json_to(report)
+                self.assertTrue(await socket.receive_nothing())
+                await database_sync_to_async(self.check.refresh_from_db)()
+                self.assertEqual(self.check.repair_summary, 'Repaired selector' if kind == 'bridge' else '')
+            finally:
+                await socket.disconnect()
+
+    async def test_invalid_kind_rejected(self):
+        socket = self.communicator()
+        await socket.connect()
+        await socket.send_json_to({'type': 'hello', 'agent': 'verifier', 'token': TOKEN, 'kind': 'unknown'})
+        self.assertEqual((await socket.receive_output())['code'], 4401)
+        await socket.disconnect()
 
     async def test_header_and_hello_auth_replay_without_names(self):
         for headers in ([], [(b'authorization', f'Bearer {TOKEN}'.encode())]):
@@ -401,6 +660,10 @@ class VerifierSocketTests(TransactionTestCase):
             self.assertEqual(await socket.receive_json_from(), {'type': 'ack', 'check_id': check.pk})
             await database_sync_to_async(check.refresh_from_db)()
             self.assertEqual(check.outcome, expected)
+            if outcome == 'error':
+                self.assertEqual(await socket.receive_json_from(), {
+                    'type': 'repair', 'check_id': check.pk, 'registration_number': NUMBER, 'errors': ['', ''],
+                })
         await socket.send_json_to({'type': 'pong'})
         self.assertTrue(await socket.receive_nothing())
         await socket.disconnect()

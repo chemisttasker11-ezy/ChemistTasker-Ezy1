@@ -406,13 +406,20 @@ def alert_overdue_ahpra_checks():
     if settings.AHPRA_SOURCE != 'desktop' or not settings.ADMINS:
         return
     from django.core.mail import mail_admins
+    from django.db.models import Q
     from onboarding.models import AhpraCheck
+    from onboarding.verification.desktop import admin_review_url
     with transaction.atomic():
-        checks = AhpraCheck.objects.select_for_update().exclude(status='done').filter(
-            created_at__lte=timezone.now() - datetime.timedelta(minutes=15), alerted_at__isnull=True,
+        now = timezone.now()
+        checks = AhpraCheck.objects.select_for_update().filter(
+            Q(status__in=['pending', 'sent'], created_at__lte=now - datetime.timedelta(minutes=15))
+            | Q(needs_attention=True, repair_reported_at__isnull=True,
+                completed_at__lte=now - datetime.timedelta(minutes=45)),
+            alerted_at__isnull=True,
         )
         for check in checks:
-            mail_admins('AHPRA check overdue', f'Check {check.pk} ({check.registration_number}) awaits the desktop verifier or admin review.')
+            detail = 'has no repair report; please review.' if check.needs_attention else 'awaits the desktop verifier or admin review.'
+            mail_admins('AHPRA check overdue', f'Check {check.pk} ({check.registration_number}) {detail}\nAdmin review: {admin_review_url(check)}')
             check.alerted_at = timezone.now()
             check.save(update_fields=['alerted_at'])
 

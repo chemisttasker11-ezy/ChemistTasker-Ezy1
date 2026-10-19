@@ -7,8 +7,9 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
 
-from onboarding.models import AhpraCheck
-from onboarding.verification.desktop import apply_ahpra_result, claim_checks, valid_result
+from onboarding.verification.desktop import (
+    claim_checks, handle_verifier_result, store_repair_report, valid_result, verifier_seen,
+)
 
 
 class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
@@ -43,7 +44,7 @@ class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
             return
         while True:
             await self.send_json({'type': 'ping'})
-            for message in await database_sync_to_async(claim_checks)():
+            for message in await database_sync_to_async(claim_checks)(stage=self.kind):
                 await self.send_json(message)
             await asyncio.sleep(30)
 
@@ -51,7 +52,7 @@ class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
         if self.timer:
             self.timer.cancel()
         if self.ready:
-            await self.channel_layer.group_discard('ahpra_verifiers', self.channel_name)
+            await self.channel_layer.group_discard(f'ahpra_verifiers_{self.kind}', self.channel_name)
 
     async def receive(self, text_data=None, bytes_data=None, **kwargs):
         try:
@@ -66,25 +67,30 @@ class AhpraVerifierConsumer(AsyncJsonWebsocketConsumer):
     async def receive_json(self, content, **kwargs):
         if not self.ready:
             if (content.get('type') != 'hello' or not isinstance(content.get('agent'), str)
+                    or content.get('kind', 'bridge') not in ('extension', 'bridge')
                     or not (self.authenticated or self.token_valid(content.get('token')))):
                 await self.close(code=4401)
                 return
             self.authenticated = self.ready = True
-            await self.channel_layer.group_add('ahpra_verifiers', self.channel_name)
+            self.kind = content.get('kind', 'bridge')
+            await database_sync_to_async(verifier_seen)(self.kind)
+            await self.channel_layer.group_add(f'ahpra_verifiers_{self.kind}', self.channel_name)
             await self.send_json({'type': 'ready'})
-            for message in await database_sync_to_async(claim_checks)():
+            for message in await database_sync_to_async(claim_checks)(stage=self.kind):
                 await self.send_json(message)
         elif content.get('type') == 'result' and valid_result(content):
-            if await database_sync_to_async(self.apply_result)(content):
+            if await database_sync_to_async(handle_verifier_result)(content, self.kind):
                 await self.send_json({'type': 'ack', 'check_id': content['check_id']})
+        elif content.get('type') in ('pong', 'heartbeat'):
+            await database_sync_to_async(verifier_seen)(self.kind)
+        elif content.get('type') == 'repair_report' and self.kind == 'bridge':
+            await database_sync_to_async(store_repair_report)(content)
         # pong and unknown message types require no response.
 
-    @staticmethod
-    def apply_result(payload):
-        check = AhpraCheck.objects.filter(pk=payload['check_id']).first()
-        # A replay for a done check was committed before its ACK was lost: ACK it again without re-applying.
-        return check is not None and (check.status == 'done' or apply_ahpra_result(check, payload))
-
     async def ahpra_check(self, event):
-        for message in await database_sync_to_async(claim_checks)(event['check_id']):
+        for message in await database_sync_to_async(claim_checks)(event['check_id'], stage=self.kind):
             await self.send_json(message)
+
+    async def ahpra_repair(self, event):
+        if self.kind == 'bridge':
+            await self.send_json(event['message'])

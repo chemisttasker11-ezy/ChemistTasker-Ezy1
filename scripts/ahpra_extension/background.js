@@ -42,7 +42,7 @@ function connect() {
   const current = socket;
   current.onopen = () => {
     if (socket !== current) return;
-    transmit({type: 'hello', agent: 'chrome-extension', token: config.token});
+    transmit({type: 'hello', agent: 'chrome-extension', token: config.token, kind: 'extension'});
     // Websocket traffic keeps Chrome 116+ service workers alive. No applicant data.
     heartbeat = setInterval(() => transmit({type: 'pong'}), 20000);
   };

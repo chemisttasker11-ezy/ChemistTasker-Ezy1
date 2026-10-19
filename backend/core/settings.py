@@ -192,6 +192,10 @@ if os.environ.get("APP_ENV", "local").lower() not in {"local", "dev", "developme
     raise RuntimeError("DJANGO_CACHE_URL is required for shared security attempt limits")
 CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "ahpra": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": CHANNEL_REDIS_URL,
+    },
     "security": (
         {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": _security_cache_url}
         if _security_cache_url

@@ -14,8 +14,8 @@ import json
 
 @admin.register(AhpraCheck)
 class AhpraCheckAdmin(admin.ModelAdmin):
-    list_display = ('number', 'profile', 'reason', 'status', 'outcome', 'created_at', 'completed_at')
-    list_filter = ('status', 'outcome', 'reason')
+    list_display = ('number', 'profile', 'reason', 'stage', 'status', 'needs_attention', 'outcome', 'created_at', 'completed_at')
+    list_filter = ('status', 'stage', 'needs_attention', 'outcome', 'reason')
     readonly_fields = tuple(f.name for f in AhpraCheck._meta.fields if f.name != 'register_data') + ('register_rendering', 'open_register')
     exclude = ('register_data',)
     actions = ('mark_verified', 'mark_rejected')
@@ -53,6 +53,7 @@ class AhpraCheckAdmin(admin.ModelAdmin):
                 _update_ahpra_fields(check.model_name, check.object_pk, verified, note)
                 check.outcome = 'verified' if verified else 'rejected'
                 check.status, check.note = 'done', note
+                check.needs_attention = False
                 check.reviewed_by = request.user
                 check.reviewed_at = check.completed_at = timezone.now()
                 check.save()
