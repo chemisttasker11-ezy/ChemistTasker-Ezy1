@@ -224,56 +224,43 @@
          "detail": "Strictest. Many workers leave before finishing."
         }
        ],
-       "rec": "B",
-       "recWhy": "Email is already checked at login but mobile is not, so throwaway accounts can browse. CareRev unlocks browsing after sign-up screening and gates claiming; the mobile check is cheap and already part of Verified.",
-       "sources": [
-        {
-         "name": "CareRev",
-         "url": "https://www.carerev.com/professionals/faq"
-        },
-        {
-         "name": "Locumate",
-         "url": "https://support.locumate.com.au/portal/en/kb/articles/how-to-sign-up-as-a-job-seeker-shift-work-inc-ft-pt"
-        }
-       ],
+       "rec": "A",
+       "recWhy": "Browsing creates little safety risk. Gate every apply, offer acceptance and booking request with role-appropriate checks, while showing an actionable verification checklist.",
+       "sources": [],
        "current": "Login needs an email code. Any signed-in worker can browse every board; only applying to public shifts needs Verified, and the pharmacy's own staff and favourites skip even that."
       },
       {
        "id": "ON-Q03",
-       "q": "Where must Verified plus a current AHPRA registration be enforced?",
-       "context": "Only public-shift applications check Verified. Offer accept, dedicated offers, chain, organisation and favourite interest, and Talent Board booking requests all skip it (ON-01).",
+       "q": "Where must role-appropriate verification be enforced?",
+       "context": "Only public applications check Verified. Direct offers, other audiences, Talent Board requests and internal rostering bypass some or all checks (ON-01).",
        "gap": "ON-01",
        "type": "decision",
        "options": [
         {
          "key": "KEEP",
          "label": "Keep current logic",
-         "detail": "Only public applications check Verified; direct and chain bookings unchecked."
+         "detail": "Only public applications require Verified."
         },
         {
          "key": "B",
-         "label": "Every outside acceptance",
-         "detail": "Offer accept, claim, dedicated offer and talent board request."
+         "label": "Every outside booking",
+         "detail": "Check applying, accepting and booking requests."
         },
         {
          "key": "C",
-         "label": "B plus rostering pharmacist roles",
-         "detail": "Also blocks rostering an unregistered pharmacist or intern."
+         "label": "B plus internal rostering",
+         "detail": "Also check registered roles before assignment."
         }
        ],
        "rec": "C",
-       "recWhy": "Today an unregistered 'pharmacist' can be booked through a direct offer or chain tier. CareRev and Locate a Locum check credentials on every booking path, and a favourite or employee must still be registered.",
+       "recWhy": "A favourite or employee still needs role-appropriate credentials. For pharmacists and interns, check the current public register before any outside booking or internal assignment.",
        "sources": [
         {
-         "name": "CareRev",
-         "url": "https://www.carerev.com/professionals/faq"
-        },
-        {
-         "name": "Locate a Locum",
-         "url": "https://help.locatealocum.com/en/articles/15014361-how-to-renew-and-update-my-credentials-on-my-locate-a-locum-app"
+         "name": "AHPRA employer obligations",
+         "url": "https://www.ahpra.gov.au/News/2015-12-31-obligations-for-employers.aspx"
         }
        ],
-       "current": "Only applying to a public shift checks Verified, and the pharmacy's own staff and favourites skip it there too. Offer accept, dedicated offers, chain/organisation tiers and Talent Board requests never check Verified or AHPRA."
+       "current": "Only public applications check Verified. Staff and favourites bypass it; direct offers, other audiences, Talent Board requests and internal assignments lack one consistent role-appropriate gate."
       },
       {
        "id": "ON-Q04",
@@ -369,82 +356,82 @@
       {
        "id": "ON-Q06",
        "q": "How should AHPRA be re-checked after sign-up?",
-       "context": "The expiry date is saved but never checked at apply or accept. No scheduled re-check runs, so Verified stays true after a lapse (ON-02).",
+       "context": "AHPRA status and expiry are copied at verification, then never refreshed for booking. The public register is the authoritative current source (ON-02).",
        "gap": "ON-02",
        "type": "decision",
        "options": [
         {
          "key": "KEEP",
          "label": "Keep current logic",
-         "detail": "No re-check; Verified survives an AHPRA lapse."
+         "detail": "Trust the saved check indefinitely."
         },
         {
          "key": "A",
-         "label": "Daily scan plus check at accept",
-         "detail": "Lapsed workers lose Verified next day; reminders 30 and 7 days before expiry."
+         "label": "Daily scan plus acceptance",
+         "detail": "Refresh from the register and check again before acceptance."
         },
         {
          "key": "B",
-         "label": "Only on the expiry date",
-         "detail": "One check a year; misses suspensions and conditions."
+         "label": "Acceptance check only",
+         "detail": "Current when booked; no early warning."
         },
         {
          "key": "C",
-         "label": "Weekly scan",
-         "detail": "Cheaper, but up to a week late."
+         "label": "Weekly register scan",
+         "detail": "Cheaper, but changes may be a week late."
         }
        ],
        "rec": "A",
-       "recWhy": "Today a lapsed pharmacist stays Verified and bookable. ShiftKey sends renewal notices and Locate a Locum blocks booking once a credential expires; a daily scan plus a live check at accept catches lapses fast.",
+       "recWhy": "AHPRA says the public register is the accurate source; a displayed expiry can pass during renewal while registration remains current. Refresh status, conditions and type from the register.",
        "sources": [
         {
-         "name": "ShiftKey",
-         "url": "https://www.shiftkey.com/resources/blog/essential-tips-for-professionals-using-shiftkey"
+         "name": "AHPRA employer obligations",
+         "url": "https://www.ahpra.gov.au/News/2015-12-31-obligations-for-employers.aspx"
         },
         {
-         "name": "Locate a Locum",
-         "url": "https://help.locatealocum.com/en/articles/15014361-how-to-renew-and-update-my-credentials-on-my-locate-a-locum-app"
+         "name": "AHPRA renewal",
+         "url": "https://www.ahpra.gov.au/Registration/Renewal.aspx"
         }
        ],
-       "current": "The AHPRA expiry date is saved when checked but never re-checked at apply or accept, and no scheduled job re-checks it, so Verified stays true after a lapse."
+       "current": "AHPRA status, type and expiry are stored after one lookup. Verified uses the saved flag, and no scheduled or booking-time refresh checks the public register."
       },
       {
        "id": "ON-Q07",
-       "q": "If AHPRA lapses, what happens to the worker's future bookings?",
-       "context": "Nothing today. Bookings stay and Verified stays true (ON-02).",
+       "q": "If current registration cannot be confirmed, what happens to future bookings?",
+       "context": "Nothing happens today because booking paths do not refresh the public register (ON-02).",
        "gap": "ON-02",
        "type": "decision",
        "options": [
         {
          "key": "KEEP",
          "label": "Keep current logic",
-         "detail": "Lapsed workers keep bookings with no warning to anyone."
+         "detail": "Keep bookings and warn nobody."
         },
         {
          "key": "A",
-         "label": "Keep bookings, warn both sides",
-         "detail": "Relies on the worker renewing in time."
+         "label": "Keep bookings, warn both",
+         "detail": "Worker must resolve it before starting."
         },
         {
          "key": "B",
-         "label": "Auto-cancel bookings after lapse",
-         "detail": "Fast, but cancels workers whose renewal is only pending."
+         "label": "Cancel automatically",
+         "detail": "Fast, but risks cancelling during renewal."
         },
         {
          "key": "C",
-         "label": "Block new; support reviews booked",
-         "detail": "Warn both sides; support confirms renewal or helps cancel."
+         "label": "Block new; review booked",
+         "detail": "Support verifies status and helps both sides."
         }
        ],
        "rec": "C",
-       "recWhy": "Today nobody is warned, so an unregistered worker can turn up. Locate a Locum checks renewals while the old document is current, then blocks booking; support review avoids cancelling someone mid-renewal.",
+       "recWhy": "Do not treat a stored expiry alone as a lapse. Block new commitments when the live register cannot confirm eligibility, then review existing bookings and notify both sides.",
        "sources": [
         {
-         "name": "Locate a Locum",
-         "url": "https://help.locatealocum.com/en/articles/15014361-how-to-renew-and-update-my-credentials-on-my-locate-a-locum-app"
+         "name": "AHPRA employer obligations",
+         "url": "https://www.ahpra.gov.au/News/2015-12-31-obligations-for-employers.aspx"
         }
        ],
-       "current": "Nothing happens: future bookings stay and Verified stays true when AHPRA lapses."
+       "current": "Future bookings remain and Verified stays true because no booking-time or scheduled public-register refresh occurs."
       },
       {
        "id": "ON-Q08",
@@ -486,6 +473,39 @@
         }
        ],
        "current": "ID is only required for overseas Explorers who skip the mobile check. A setting can add ID to Verified for everyone, but it is off by default; OCR works for all."
+      },
+      {
+       "id": "ON-R01",
+       "q": "How long should verification evidence be kept?",
+       "context": "Identity and qualification files are collected, but no evidence-specific deletion schedule is documented.",
+       "gap": "ON-12",
+       "type": "decision",
+       "options": [
+        {
+         "key": "KEEP",
+         "label": "Keep current logic",
+         "detail": "Retain files without a defined deletion trigger."
+        },
+        {
+         "key": "A",
+         "label": "Delete after verification",
+         "detail": "Keep result, source and audit dates only."
+        },
+        {
+         "key": "B",
+         "label": "Keep seven years",
+         "detail": "Higher breach impact; needs legal basis."
+        }
+       ],
+       "rec": "A",
+       "recWhy": "APP 11 requires destruction or de-identification when information is no longer needed. Set evidence-class schedules and retain only the verification audit record unless law requires more.",
+       "sources": [
+        {
+         "name": "OAIC APP 11",
+         "url": "https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-11-app-11-security-of-personal-information"
+        }
+       ],
+       "current": "Verification files are stored, but the reviewed code and launch materials define no evidence-specific retention or deletion schedule."
       }
      ]
     },
@@ -496,45 +516,41 @@
      "questions": [
       {
        "id": "ON-Q09",
-       "q": "Is professional indemnity insurance required?",
-       "context": "No field or upload exists anywhere (ON-03).",
+       "q": "Which workers must prove professional indemnity cover?",
+       "context": "No insurance field, evidence or expiry gate exists (ON-03).",
        "gap": "ON-03",
        "type": "decision",
        "options": [
         {
+         "key": "KEEP",
+         "label": "Keep current logic",
+         "detail": "Collect no insurance evidence."
+        },
+        {
          "key": "A",
-         "label": "Not required",
-         "detail": "The pharmacy's responsibility."
+         "label": "ABN pharmacists only",
+         "detail": "Misses practising employee and provisional registrants."
         },
         {
          "key": "B",
-         "label": "Required for ABN pharmacists",
-         "detail": "Upload with expiry date; blocks acceptance when missing or expired."
+         "label": "All practising pharmacists",
+         "detail": "General, limited or provisional; own or third-party cover."
         },
         {
          "key": "C",
-         "label": "Required for every ABN worker",
-         "detail": "Also technicians and assistants on ABN."
-        },
-        {
-         "key": "D",
          "label": "Badge only",
-         "detail": "Shown on the profile, never a gate."
+         "detail": "Show cover but never gate bookings."
         }
        ],
        "rec": "B",
-       "recWhy": "Locate a Locum lists indemnity insurance on its pharmacist checklist and Locumate collects insurance. Employees are covered by their employer, so ABN pharmacists are the gap.",
+       "recWhy": "The Pharmacy Board standard applies to practising pharmacists with general, limited or provisional registration, whether cover is personal or provided by an employer. ABN status is not the test.",
        "sources": [
         {
-         "name": "Locate a Locum",
-         "url": "https://locatealocum.com/document-checklist"
-        },
-        {
-         "name": "Locumate",
-         "url": "https://support.locumate.com.au/portal/en/kb/articles/why-do-i-need-to-provide-so-many-details-and-documents"
+         "name": "Pharmacy Board PII standard",
+         "url": "https://www.pharmacyboard.gov.au/documents/default.aspx?chksum=VYWldu%2FPTLuLnEzS1inDaQ%3D%3D&dbid=AP&record=WD15%2F19184"
         }
        ],
-       "current": "Not built yet."
+       "current": "No professional indemnity insurance field, evidence, expiry or booking gate exists."
       },
       {
        "id": "ON-Q10",
@@ -821,6 +837,39 @@
        "current": "Each shift has optional workload tags (duties) and staff-on-shift counts (shows solo work), entered per shift on web and mobile. Breaks and parking have no field; the pharmacy holds software, services and script volume."
       },
       {
+       "id": "PO-R01",
+       "q": "Must TFN shifts pass Pharmacy Award checks before posting?",
+       "context": "Marketplace posting does not enforce minimum engagement, breaks or all overtime conditions for TFN shifts.",
+       "gap": "SH-12",
+       "type": "decision",
+       "options": [
+        {
+         "key": "KEEP",
+         "label": "Keep current logic",
+         "detail": "Post first and rely on later review."
+        },
+        {
+         "key": "A",
+         "label": "Block non-compliant posts",
+         "detail": "Validate engagement, breaks, penalties and overtime."
+        },
+        {
+         "key": "B",
+         "label": "Warn owner only",
+         "detail": "Owner can continue despite the warning."
+        }
+       ],
+       "rec": "A",
+       "recWhy": "The Pharmacy Award includes minimum engagement, breaks, ordinary-hour limits, penalties and overtime. Validate applicable TFN terms before a worker accepts them.",
+       "sources": [
+        {
+         "name": "Pharmacy Industry Award",
+         "url": "https://awards.fairwork.gov.au/MA000012.html"
+        }
+       ],
+       "current": "Posting accepts independent slot durations without a complete Pharmacy Award gate. Engagement calculations flag some rates and long days, but do not cover every applicable rule."
+      },
+      {
        "id": "PO-Q02",
        "q": "Must every shift state the break length and whether it is paid?",
        "context": "No break field exists. Frozen terms do not mention breaks.",
@@ -858,7 +907,7 @@
       {
        "id": "PO-Q03",
        "q": "How should pay show to workers?",
-       "context": "Rates are entered per shift. ABN terms carry no GST or super line.",
+       "context": "Rates are entered per shift. Super can be flagged, but workers see no GST treatment or whole-shift total.",
        "gap": "",
        "type": "decision",
        "options": [
@@ -879,7 +928,7 @@
         }
        ],
        "rec": "A",
-       "recWhy": "Super is already flagged, but GST and a shift total are missing, so ABN workers cannot see what they will invoice. Locumate shows super separately from the base rate.",
+       "recWhy": "Super is already shown when selected. Add an estimated total and clearly state whether GST is included, added or not applicable; confirm tax treatment before launch.",
        "sources": [
         {
          "name": "Locumate",
@@ -907,14 +956,14 @@
         }
        ],
        "rec": "A",
-       "recWhy": "Today the fee is a surprise at checkout. Instawork shows an all-inclusive bill rate and Locumate states its per-shift fee up front.",
+       "recWhy": "The booking fee first appears at checkout. Show wages, super, platform fee, GST treatment and the payable total prominently before posting and again before payment.",
        "sources": [
         {
-         "name": "Instawork",
-         "url": "https://help.instawork.com/en/articles/5854747-instawork-business-pricing"
+         "name": "ACCC price displays",
+         "url": "https://www.accc.gov.au/business/pricing/price-displays"
         },
         {
-         "name": "Locumate",
+         "name": "Locumate pricing",
          "url": "https://support.locumate.com.au/portal/en/kb/articles/locumate-pricing-information"
         }
        ],
@@ -1610,7 +1659,7 @@
       {
        "id": "BK-Q07",
        "q": "Can a pharmacy offer one shift to several workers at once?",
-       "context": "Offers go one by one today.",
+       "context": "The backend already permits several offers for one slot; first acceptance reserves it and later acceptances fail.",
        "gap": "",
        "type": "decision",
        "options": [
@@ -1833,39 +1882,30 @@
      "questions": [
       {
        "id": "BK-Q13",
-       "q": "What do both sides see while a reservation waits for payment?",
-       "context": "D01 says a reservation is not confirmed. The screen wording is not set.",
+       "q": "Should reservations show a live payment countdown?",
+       "context": "Both sides already see reserved-not-confirmed wording and the pay-by time; neither sees a live countdown.",
        "gap": "",
        "type": "decision",
        "options": [
         {
          "key": "KEEP",
          "label": "Keep current logic",
-         "detail": "Distinct reserved and confirmed states; deadline on manager card."
+         "detail": "Show the state and exact deadline."
         },
         {
          "key": "A",
-         "label": "'Reserved: payment needed' plus countdown",
-         "detail": "'Confirmed' only after payment."
+         "label": "Add live countdown",
+         "detail": "Show remaining time to both sides."
         },
         {
          "key": "B",
-         "label": "Shows as booked",
+         "label": "Show as booked",
          "detail": "Misleading if payment fails."
         }
        ],
        "rec": "A",
-       "recWhy": "States are already distinct, but the worker card shows no deadline and nobody sees a live countdown. Research best practice shows 'Reserved: payment required' and the deadline to both sides.",
-       "sources": [
-        {
-         "name": "Qwick",
-         "url": "https://support.qwick.com/en/articles/5561345"
-        },
-        {
-         "name": "Locate a Locum",
-         "url": "https://help.locatealocum.com/en/articles/4799126-how-to-negotiate-a-shift-rate-in-the-app"
-        }
-       ],
+       "recWhy": "The existing wording and deadline are accurate. A countdown makes urgency easier to scan, but it is a local usability choice rather than verified competitor practice.",
+       "sources": [],
        "current": "Worker's slot shows 'Waiting for owner payment' and the notice says 'reserved, not yet confirmed' with the pay-by time. Managers see 'Awaiting payment' and 'Reservation expires <time>'. 'Confirmed' only after payment."
       },
       {
@@ -1905,6 +1945,34 @@
         }
        ],
        "current": "No worker withdraw action exists for a reservation; it only ends when the pharmacy pays or the reservation expires (D03)."
+      },
+      {
+       "id": "BK-R01",
+       "q": "What happens after booking payment fails?",
+       "context": "The reservation remains until its deadline; no explicit retry, extension or immediate-release rule is stated.",
+       "gap": "SH-13",
+       "type": "decision",
+       "options": [
+        {
+         "key": "KEEP",
+         "label": "Retry until deadline",
+         "detail": "Same reservation and original deadline."
+        },
+        {
+         "key": "A",
+         "label": "Release immediately",
+         "detail": "One failed attempt loses the worker."
+        },
+        {
+         "key": "B",
+         "label": "Extend once",
+         "detail": "Failure grants extra reservation time."
+        }
+       ],
+       "rec": "KEEP",
+       "recWhy": "Keep D02 and D03 deterministic: payment failure does not confirm or extend the booking, but the pharmacy may retry before the existing deadline.",
+       "sources": [],
+       "current": "A failed or cancelled checkout does not confirm the assignment. The reservation remains available for another checkout attempt until its original payment deadline."
       }
      ]
     }
@@ -2021,36 +2089,33 @@
      "questions": [
       {
        "id": "AG-Q04",
-       "q": "Who picks TFN casual or ABN contract for a shift?",
-       "context": "Terms are built per offer as TFN casual (Award floor) or ABN contractor, from the shift's payment preference.",
+       "q": "How is employee versus contractor status decided?",
+       "context": "The pharmacy currently labels each locum shift TFN employee or ABN contractor, and the worker must match.",
        "gap": "",
        "type": "decision",
        "options": [
         {
          "key": "KEEP",
          "label": "Keep current logic",
-         "detail": "Pharmacy picks ABN or TFN per shift; worker must match."
+         "detail": "Pharmacy chooses ABN or TFN."
+        },
+        {
+         "key": "A",
+         "label": "Both parties attest",
+         "detail": "Still risks choosing the wrong legal status."
         },
         {
          "key": "B",
-         "label": "Worker picks from allowed types",
-         "detail": "More choice, harder to explain."
+         "label": "Relationship test first",
+         "detail": "Assess the real relationship; ABN never decides alone."
         }
        ],
-       "rec": "KEEP",
-       "recWhy": "Today is already one clear model per shift, like Nursa and Hireup, and the mismatch block stops a worker choosing a type the pharmacy did not offer.",
+       "rec": "B",
+       "recWhy": "Fair Work applies a whole-of-relationship test for many businesses. An ABN or contract label does not decide status, and sham contracting creates serious risk.",
        "sources": [
         {
-         "name": "Nursa",
-         "url": "https://app.nursa.com/settings/terms/terms-of-service"
-        },
-        {
-         "name": "Hireup",
-         "url": "https://help.hireup.com.au/hc/en-us/articles/360015743411-Information-about-Salary-Pay-and-Taxes"
-        },
-        {
-         "name": "Fair Work",
-         "url": "https://www.fairwork.gov.au/find-help-for/independent-contractors/whole-of-relationship-test"
+         "name": "Fair Work independent contractors",
+         "url": "https://www.fairwork.gov.au/find-help-for/independent-contractors/independent-contractors"
         }
        ],
        "current": "The pharmacy picks 'Paid as' Contractor (ABN) or Employee (TFN) per locum shift on web and mobile. Terms follow it, and acceptance is blocked if the worker's profile type differs."
@@ -2641,37 +2706,37 @@
       },
       {
        "id": "CX-Q09",
-       "q": "What proof waives a worker's illness or emergency cancel?",
-       "context": "P11 allows exemptions; proof is pending.",
+       "q": "What evidence may support an illness or emergency exemption?",
+       "context": "P11 permits exemptions. No evidence intake, retention or restricted review process exists.",
        "gap": "",
        "type": "decision",
        "options": [
         {
          "key": "A",
-         "label": "Evidence within 48h; support reviews",
-         "detail": "Medical certificate or similar."
+         "label": "Reason first; evidence if disputed",
+         "detail": "Support requests only the minimum needed."
         },
         {
          "key": "B",
-         "label": "Self-declared, once per 6 months",
-         "detail": "No paperwork; easy to abuse."
+         "label": "Evidence within 48 hours",
+         "detail": "Medical certificate or similar for every claim."
         },
         {
          "key": "C",
-         "label": "No proof needed",
-         "detail": "Every cancel can claim it."
+         "label": "No evidence ever",
+         "detail": "Platform cannot resolve contested exemptions."
         }
        ],
        "rec": "A",
-       "recWhy": "No emergency-evidence intake or waiver review workflow exists. Locate a Locum and Qwick support individual emergency review; evidence within 48 hours is a proposed operating deadline, with sensitive evidence restricted to reviewers.",
+       "recWhy": "Health evidence is sensitive information. Collect only what is reasonably necessary, restrict it to support, and destroy or de-identify it when no longer needed.",
        "sources": [
         {
-         "name": "Locate a Locum",
-         "url": "https://help.locatealocum.com/en/articles/3815156-locate-a-locum-cancellation-policy-locums"
+         "name": "OAIC APP 3",
+         "url": "https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-3-app-3-collection-of-solicited-personal-information"
         },
         {
-         "name": "Qwick",
-         "url": "https://support.qwick.com/en/articles/5560641"
+         "name": "OAIC APP 11",
+         "url": "https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-11-app-11-security-of-personal-information"
         }
        ],
        "current": "Not built yet."
@@ -3030,18 +3095,18 @@
        "options": [
         {
          "key": "A",
-         "label": "Pharmacy picks refund or credit",
-         "detail": "Like F04."
+         "label": "Pharmacy picks remedy",
+         "detail": "Refund or credit after each failure."
         },
         {
          "key": "B",
          "label": "Credit only",
-         "detail": "Usable on the replacement."
+         "detail": "Use it on a replacement booking."
         },
         {
          "key": "C",
-         "label": "Kept if replaced",
-         "detail": "Fee covers the replacement."
+         "label": "Keep only if replaced",
+         "detail": "Otherwise pharmacy chooses refund or credit."
         }
        ],
        "rec": "C",
@@ -3183,28 +3248,33 @@
       },
       {
        "id": "CX-Q25",
-       "q": "Who can see a dispute case?",
-       "context": "No case record exists (D11).",
+       "q": "Who can see each part of a dispute?",
+       "context": "No dispute case, evidence classes or access policy exists (D11).",
        "gap": "",
        "type": "decision",
        "options": [
         {
          "key": "A",
-         "label": "Worker, that shift's managers, platform",
-         "detail": "Plus the owner of that pharmacy."
+         "label": "Summary to both sides",
+         "detail": "Support alone sees sensitive evidence."
         },
         {
          "key": "B",
-         "label": "Worker and platform only",
-         "detail": "Pharmacy just reports."
+         "label": "Everything to both sides",
+         "detail": "Exposes medical and identity evidence."
+        },
+        {
+         "key": "C",
+         "label": "Platform only",
+         "detail": "Parties cannot answer the case."
         }
        ],
        "rec": "A",
-       "recWhy": "There is no cancellation dispute case or case-access policy. Give the affected worker, authorised pharmacy managers/owner and platform access to relevant case material; Clipboard supports relationship-scoped sharing, not unrestricted access to private emergency documents.",
+       "recWhy": "Give each party the allegation, relevant facts and outcome. Limit medical, identity and third-party evidence to authorised support unless disclosure is necessary and lawful.",
        "sources": [
         {
-         "name": "Clipboard",
-         "url": "https://www.clipboard.com/privacy-policy"
+         "name": "OAIC APP 6",
+         "url": "https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-6-app-6-use-or-disclosure-of-personal-information"
         }
        ],
        "current": "Not built yet."
@@ -3320,65 +3390,61 @@
       },
       {
        "id": "CX-Q29",
-       "q": "How long does the reliability badge stay visible?",
-       "context": "P10 adds a badge at incident 3. No expiry is set.",
+       "q": "When should the reliability badge disappear?",
+       "context": "P10 adds a badge at incident three. The incident lookback is decided separately in CX-Q28.",
        "gap": "",
        "type": "decision",
        "options": [
         {
          "key": "A",
-         "label": "12 months after last incident",
-         "detail": "Then removed."
+         "label": "After three clear months",
+         "detail": "Badge clears before older incidents expire."
         },
         {
          "key": "B",
-         "label": "Until the ladder resets",
-         "detail": "Tied to lookback."
+         "label": "Below three active incidents",
+         "detail": "Badge follows the rolling lookback."
         },
         {
          "key": "C",
          "label": "Permanent",
-         "detail": "No way back."
+         "detail": "No rehabilitation."
         }
        ],
-       "rec": "A",
-       "recWhy": "No reliability incident badge or expiry exists. A 12-month expiry after the last incident is a proposed default informed by ShiftKey freshness; its score window does not establish an identical badge-expiry policy.",
-       "sources": [
-        {
-         "name": "ShiftKey",
-         "url": "https://help.shiftkey.com/s/article/Reliability-Score-FAQ-for-Facilities"
-        }
-       ],
+       "rec": "B",
+       "recWhy": "Tie the badge to the active incident count so it has one understandable rule and disappears automatically when fewer than three incidents remain in the chosen window.",
+       "sources": [],
        "current": "Not built yet."
       },
       {
        "id": "CX-Q30",
-       "q": "Who signs off a permanent (5th incident) suspension?",
-       "context": "P10 allows permanent after the 5th, but only after human review, notice, appeal and legal check.",
+       "q": "What process applies before permanent suspension?",
+       "context": "P10 requires human review, notice, appeal and legal review, but no workflow exists.",
        "gap": "",
        "type": "decision",
        "options": [
         {
          "key": "A",
-         "label": "Two reviewers plus legal check",
-         "detail": "Worker notified and can appeal first."
+         "label": "Code-compliant process",
+         "detail": "Reasons, notice, review, response and appeal."
         },
         {
          "key": "B",
+         "label": "Two reviewers plus legal",
+         "detail": "Useful controls, but not the full process."
+        },
+        {
+         "key": "C",
          "label": "One platform admin",
-         "detail": "Faster, higher legal risk."
+         "detail": "Fast, one-sided and high risk."
         }
        ],
        "rec": "A",
-       "recWhy": "No permanent-suspension review workflow implements P10. Two reviewers, notice, appeal and legal review are proposed safeguards before irreversible sanctions; researched Qwick/Nursa bans do not establish that exact approval structure.",
+       "recWhy": "Where a worker is protected, the Digital Labour Platform Deactivation Code requires a fair process. Design to it before permanent or material account restrictions go live.",
        "sources": [
         {
-         "name": "Qwick",
-         "url": "https://support.qwick.com/en/articles/5560641"
-        },
-        {
-         "name": "Nursa",
-         "url": "https://community.nursa.com/help-center/clinician/own-your-shift/cancelation-ncns/"
+         "name": "Fair Work employee-like workers",
+         "url": "https://www.fairwork.gov.au/find-help-for/regulated-workers/employee-like-workers"
         }
        ],
        "current": "Not built yet."
@@ -3506,6 +3572,39 @@
         }
        ],
        "current": "Managers can correct attendance with a reason; workers can comment on timesheets and request missing punches. There is no implemented escalation of an hours disagreement to platform support; both apps share this backend."
+      },
+      {
+       "id": "CX-R01",
+       "q": "How are early finishes and extra hours paid?",
+       "context": "Timesheets capture actual hours, but no marketplace rule says when scheduled or actual hours control payment.",
+       "gap": "SH-14",
+       "type": "decision",
+       "options": [
+        {
+         "key": "KEEP",
+         "label": "Keep current logic",
+         "detail": "Managers approve actual hours without a marketplace rule."
+        },
+        {
+         "key": "A",
+         "label": "Approved actual hours",
+         "detail": "Apply minimum engagement, penalties and overtime."
+        },
+        {
+         "key": "B",
+         "label": "Scheduled hours only",
+         "detail": "Ignores authorised overtime and early release."
+        }
+       ],
+       "rec": "A",
+       "recWhy": "Use approved actual hours, preserve any legal minimum engagement, and calculate authorised overtime and penalties. Record who requested an early finish or extension.",
+       "sources": [
+        {
+         "name": "Pharmacy Industry Award",
+         "url": "https://awards.fairwork.gov.au/MA000012.html"
+        }
+       ],
+       "current": "Timesheets compare actual and planned hours and allow manager correction, but no marketplace policy resolves early release, authorised extra hours or the resulting minimum payment."
       }
      ]
     },
@@ -3636,29 +3735,25 @@
         {
          "key": "KEEP",
          "label": "Keep current logic",
-         "detail": "Allow all signed-in users plus public cards; retain current identity exposure."
+         "detail": "All accounts see identities; public sees masked cards."
         },
         {
          "key": "A",
-         "label": "Employers only, plus own post",
-         "detail": "Owners, admins, organisations."
+         "label": "Employers and own post",
+         "detail": "Owners, managers, organisations; authors see their post."
         },
         {
          "key": "B",
-         "label": "Employers plus public anonymous cards",
-         "detail": "Public cards attract sign-ups."
+         "label": "A plus public masked",
+         "detail": "Public discovery never reveals identity."
         }
        ],
        "rec": "B",
-       "recWhy": "Worker-to-worker authenticated access currently defeats anonymous posting. Employer access plus anonymous public discovery fits Upwork audience controls and Mable identity protection, provided the API enforces masking.",
+       "recWhy": "Worker-to-worker access defeats anonymity. Restrict authenticated discovery to authorised hiring roles and each author; keep public discovery only if masking is enforced server-side.",
        "sources": [
         {
-         "name": "Upwork",
+         "name": "Upwork visibility controls",
          "url": "https://support.upwork.com/hc/en-us/articles/211060298-How-to-control-who-sees-your-Upwork-profile"
-        },
-        {
-         "name": "Mable",
-         "url": "https://mable.com.au/newsroom/most-frequently-asked-questions-by-mable-clients/"
         }
        ],
        "current": "Any signed-in account can read talent posts, including other workers. Logged-out visitors can read public cards; anonymous posts have identity redacted only on the public API, not authenticated reads used by both apps."
@@ -3703,32 +3798,33 @@
       },
       {
        "id": "TB-Q03",
-       "q": "What is always hidden on a talent card?",
-       "context": "Cards show name, badges, availability and pitch. Under-18s show first name only.",
+       "q": "What stays hidden before identity reveal?",
+       "context": "Authenticated cards expose adult full names. Contact fields are omitted, but free-text pitches are not scrubbed.",
        "gap": "",
        "type": "decision",
        "options": [
         {
          "key": "KEEP",
          "label": "Keep current logic",
-         "detail": "Keep structured contact fields hidden while exposing adult full names to signed-in users."
+         "detail": "Expose adult full names to signed-in users."
         },
         {
          "key": "A",
-         "label": "Surname, contact, address, documents",
-         "detail": "Show suburb, role, badges, pitch."
+         "label": "Identity and contact details",
+         "detail": "Hide surname, contacts, address and documents."
+        },
+        {
+         "key": "B",
+         "label": "Contact details only",
+         "detail": "Show full name before a booking request."
         }
        ],
        "rec": "A",
-       "recWhy": "Adult surnames still escape through authenticated reads, and free text needs the same privacy rule. Mable profile guidance protects surnames/contact details; retain professional badges and approximate location.",
+       "recWhy": "Hide direct identity, contact details, street address and documents until the separate reveal point. Scan free text so the structured-field rule cannot be bypassed.",
        "sources": [
         {
-         "name": "Mable",
+         "name": "Mable profile guidance",
          "url": "https://mable.com.au/help_centre/create-winning-profile/"
-        },
-        {
-         "name": "Clipboard",
-         "url": "https://www.clipboard.com/privacy-policy"
         }
        ],
        "current": "Structured cards omit contact details, street addresses and documents, but authenticated APIs return adults' full names; under-18s get first names. Both apps use this API, and free-text pitches are not a contact-masking guarantee."
@@ -4137,29 +4233,25 @@
         {
          "key": "KEEP",
          "label": "Keep current logic",
-         "detail": "Keep raw availability private and expose only copied talent-post dates to pharmacies."
+         "detail": "Raw calendar private; posts hold copied dates."
         },
         {
          "key": "B",
-         "label": "Pharmacies where staff or favourite",
-         "detail": "Trusted relationships only."
+         "label": "Opt-in trusted pharmacies",
+         "detail": "Worker chooses staff and favourite visibility."
         },
         {
          "key": "C",
-         "label": "On the talent card, opt-in",
-         "detail": "Wider reach."
+         "label": "Opt-in talent card",
+         "detail": "Broader employer visibility."
         }
        ],
        "rec": "B",
-       "recWhy": "Trusted pharmacies cannot see the live availability used for planning. Add scoped access for accepted staff/favourite relationships, preserving worker control; Clipboard and Instawork support relationship-based availability sharing.",
+       "recWhy": "Offer an explicit worker opt-in for accepted staff and favourite pharmacies. Relationship alone should not silently disclose a private calendar or notes.",
        "sources": [
         {
-         "name": "Clipboard",
-         "url": "https://www.clipboard.com/privacy-policy"
-        },
-        {
-         "name": "Instawork",
-         "url": "https://help.instawork.com/en/articles/5511147-how-can-i-create-and-manage-my-roster"
+         "name": "OAIC APP 6",
+         "url": "https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-6-app-6-use-or-disclosure-of-personal-information"
         }
        ],
        "current": "Only workers can read or edit their raw availability through the API; it drives alerts, recommendations and roster warnings. Pharmacies see copied talent-post dates rather than a live calendar on either app."
@@ -4286,14 +4378,9 @@
          "detail": "For shifts starting within 24h."
         }
        ],
-       "rec": "A",
-       "recWhy": "A single switch cannot express willingness for urgent outreach. Add a separate urgent opt-in; Mable targets short-notice work to available locals, while this exact 24-hour consent window is a proposed local design.",
-       "sources": [
-        {
-         "name": "Mable",
-         "url": "https://mable.com.au/newsroom/most-frequently-asked-questions-by-mable-clients/"
-        }
-       ],
+       "rec": "KEEP",
+       "recWhy": "Urgency does not change the notification purpose. Keep one matching-shift consent at launch, label urgent messages clearly, and add frequency controls only if volume proves necessary.",
+       "sources": [],
        "current": "Both apps show one matching-public-shift notification switch saved on availability rows. There is no separate urgent-shift consent or urgency-based availability-alert audience."
       },
       {
@@ -4344,8 +4431,8 @@
      "questions": [
       {
        "id": "LA-Q01",
-       "q": "Fix before launch? AHPRA expiry is never checked and Verified never lapses.",
-       "context": "Expiry is saved but only checked for talent posts and ops tasks; no scheduled re-check (ON-02).",
+       "q": "Fix before launch? Booking never refreshes AHPRA registration from the public register.",
+       "context": "A saved flag drives Verified; booking paths do not refresh registration status, type or conditions (ON-02).",
        "gap": "ON-02",
        "type": "code",
        "options": [
@@ -4366,18 +4453,14 @@
         }
        ],
        "rec": "A",
-       "recWhy": "Current booking paths can accept lapsed registration. Fix before launch: Locate a Locum blocks expired mandatory credentials and ShiftKey sends renewal notices; isolated talent/operations checks do not protect every booking.",
+       "recWhy": "AHPRA calls its public register the authoritative source. Add a current register check before registered-role bookings rather than treating the copied expiry date alone as status.",
        "sources": [
         {
-         "name": "Locate a Locum",
-         "url": "https://help.locatealocum.com/en/articles/15014361-how-to-renew-and-update-my-credentials-on-my-locate-a-locum-app"
-        },
-        {
-         "name": "ShiftKey",
-         "url": "https://www.shiftkey.com/resources/blog/essential-tips-for-professionals-using-shiftkey"
+         "name": "AHPRA employer obligations",
+         "url": "https://www.ahpra.gov.au/News/2015-12-31-obligations-for-employers.aspx"
         }
        ],
-       "current": "AHPRA expiry is stored but not enforced in shift apply/accept paths or the Verified calculation. Talent publication and operations rules check it separately; neither app gets a consistent booking-time expiry gate."
+       "current": "A saved AHPRA flag drives Verified. Booking paths do not refresh status, registration type or conditions from the public register; only separate talent and operations checks inspect expiry."
       },
       {
        "id": "LA-Q02",
@@ -4414,8 +4497,8 @@
       },
       {
        "id": "LA-Q03",
-       "q": "Fix before launch? Dead and half-built mobile and web screens.",
-       "context": "Unused owner steps, a hidden create route posting a wrong field, an Explorer 'Shifts' text page, 'coming soon' hubs, an unrouted web org page (ON-05).",
+       "q": "Fix before launch? Reachable mobile screens can dead-end or send unsupported fields.",
+       "context": "Manager profile upgrades can lose data or route to not-found; some reachable hubs are placeholders (ON-04, ON-05).",
        "gap": "ON-05",
        "type": "code",
        "options": [
@@ -4436,9 +4519,9 @@
         }
        ],
        "rec": "A",
-       "recWhy": "Reachable placeholders and unsupported payloads can strand launch users; remove or repair their entry points before launch. Research supports complete onboarding/booking paths but does not prove that competitors never ship placeholder screens.",
+       "recWhy": "Repair or remove reachable dead ends and unsupported submissions before launch. An unreferenced web organisation page can be deleted or deferred separately.",
        "sources": [],
-       "current": "Mobile retains unused owner onboarding steps, a legacy create screen posting hourly_rate, an Explorer Shifts placeholder and coming-soon hubs. Web has an unreferenced organisation-create page."
+       "current": "Mobile profile upgrades can post unsupported fields or reach a missing route. Explorer Shifts and some hubs are placeholders; an unreferenced organisation-create page also exists on web."
       },
       {
        "id": "LA-Q04",
@@ -4541,8 +4624,17 @@
         }
        ],
        "rec": "A",
-       "recWhy": "An externally callable legacy money path remains despite the preview-only approved direction. Suspend it before launch; absence of a UI caller does not prevent an authorised API call from creating the checkout.",
-       "sources": [],
+       "recWhy": "Disable the callable legacy charge route before launch. Do not introduce replacement cancellation charges until Australian counsel reviews classification, proportionality, disclosure and unfair-contract-term risk.",
+       "sources": [
+        {
+         "name": "ACCC contract terms",
+         "url": "https://www.accc.gov.au/consumers/buying-products-and-services/contracts"
+        },
+        {
+         "name": "ACCC unfair terms penalties",
+         "url": "https://www.accc.gov.au/media-release/businesses-urged-to-remove-unfair-contract-terms-ahead-of-law-changes"
+        }
+       ],
        "current": "The authenticated charge-penalty route still creates legacy 10%/20% checkouts for eligible outside shifts and is exported by shared-core. Internal employee/roster shifts are guarded; neither app currently calls it from a screen."
       },
       {
@@ -4572,6 +4664,43 @@
        "recWhy": "The subscriber discount is not applied and environments cannot select independent prices. Fix before live checkout so paying subscribers are not charged the standard tier; competitor pricing cannot justify this internal mismatch.",
        "sources": [],
        "current": "Checkout computes subscriber status but always selects the standard locum or permanent Stripe price ID. Those IDs are hard-coded; web and mobile use the same billing endpoint."
+      },
+      {
+       "id": "LA-R01",
+       "q": "Fix before launch? Booking fees lack explicit GST and tax-invoice treatment.",
+       "context": "Checkout uses fixed Stripe prices, but the reviewed flow does not state GST inclusion or issue a platform tax invoice.",
+       "gap": "SH-15",
+       "type": "code",
+       "options": [
+        {
+         "key": "A",
+         "label": "Before launch",
+         "detail": "Confirm tax treatment, display it and issue compliant records."
+        },
+        {
+         "key": "B",
+         "label": "Soon after launch",
+         "detail": "Take payments while tax treatment is unclear."
+        },
+        {
+         "key": "C",
+         "label": "Not needed",
+         "detail": "Leave Stripe receipts as the only record."
+        }
+       ],
+       "rec": "A",
+       "recWhy": "Obtain Australian tax advice, configure the correct GST treatment, show the total before payment and issue the required invoice or receipt from the correct supplier.",
+       "sources": [
+        {
+         "name": "ATO GST registration",
+         "url": "https://www.ato.gov.au/businesses-and-organisations/gst-excise-and-indirect-taxes/gst/registering-for-gst"
+        },
+        {
+         "name": "ACCC price displays",
+         "url": "https://www.accc.gov.au/business/pricing/price-displays"
+        }
+       ],
+       "current": "Booking checkout selects fixed Stripe prices and stores the amount, but no reviewed field or flow states GST treatment or creates a platform tax invoice."
       },
       {
        "id": "LA-Q08",
@@ -4646,7 +4775,7 @@
       {
        "id": "LA-Q10",
        "q": "Fix before launch? Accepted terms don't include the cancellation table or terms version.",
-       "context": "The terms snapshot lacks the band table, platform terms version and pharmacy acceptance (SH-09).",
+       "context": "The accepted snapshot omits the cancellation table, platform terms version and pharmacy acceptance; no Australian unfair-terms review is recorded (SH-09).",
        "gap": "SH-09",
        "type": "code",
        "options": [
@@ -4667,14 +4796,55 @@
         }
        ],
        "rec": "A",
-       "recWhy": "The existing schema version is not evidence of agreeing to cancellation policy. Record and disclose versioned policy acceptance before launch; Relief Buddy includes cancellation terms in its shift agreement.",
+       "recWhy": "Record versioned, pre-contract acceptance by both sides and obtain Australian legal review. Disclosure alone does not make a one-sided or disproportionate term fair.",
        "sources": [
         {
-         "name": "Relief Buddy",
-         "url": "https://knowledgebase.reliefbuddy.com/what-is-a-shift-agreement"
+         "name": "ACCC contract terms",
+         "url": "https://www.accc.gov.au/consumers/buying-products-and-services/contracts"
+        },
+        {
+         "name": "ACCC unfair terms penalties",
+         "url": "https://www.accc.gov.au/media-release/businesses-urged-to-remove-unfair-contract-terms-ahead-of-law-changes"
         }
        ],
        "current": "Accepted engagement snapshots include a schema version and worker acceptance, but omit the cancellation matrix, platform terms version and pharmacy-side policy acceptance. Both apps use this shared backend record."
+      },
+      {
+       "id": "LA-R02",
+       "q": "May cancellation charges launch before Australian legal review?",
+       "context": "P08 and P09 define percentage charges. No review establishes classification, proportionality or unfair-contract-term compliance.",
+       "gap": "SH-16",
+       "type": "decision",
+       "options": [
+        {
+         "key": "A",
+         "label": "Legal review before launch",
+         "detail": "Review every charge and remedy before enforcement."
+        },
+        {
+         "key": "B",
+         "label": "Disclosure is enough",
+         "detail": "Launch after showing the table."
+        },
+        {
+         "key": "C",
+         "label": "Never charge",
+         "detail": "Use non-money reliability controls only."
+        }
+       ],
+       "rec": "A",
+       "recWhy": "Since November 2023, proposing, using or relying on unfair standard-form terms can attract major penalties. Clear wording alone does not cure unfairness.",
+       "sources": [
+        {
+         "name": "ACCC contract terms",
+         "url": "https://www.accc.gov.au/consumers/buying-products-and-services/contracts"
+        },
+        {
+         "name": "ACCC unfair terms penalties",
+         "url": "https://www.accc.gov.au/media-release/businesses-urged-to-remove-unfair-contract-terms-ahead-of-law-changes"
+        }
+       ],
+       "current": "The approved charge table is not implemented. A separate legacy 10% or 20% checkout remains callable, without evidence of Australian legal review."
       },
       {
        "id": "LA-Q11",
@@ -4812,8 +4982,8 @@
       },
       {
        "id": "LA-Q15",
-       "q": "Fix before launch? Web and mobile disagree on who can request bookings, plus duplicate code and unlimited view counts.",
-       "context": "Mobile lets pharmacy managers request bookings; web doesn't. Wrong post-shift route, two copies of a hook, view count unthrottled (TB-07).",
+       "q": "Fix before launch? Web and mobile disagree on Talent Board booking permissions.",
+       "context": "Mobile allows any non-worker role; web uses a narrower allow-list. The backend must be the authority (TB-07).",
        "gap": "TB-07",
        "type": "code",
        "options": [
@@ -4834,9 +5004,9 @@
         }
        ],
        "rec": "A",
-       "recWhy": "Client permission gates disagree and the route/hook drift is real. Align authorised booking actions before launch and deduplicate view counting; a generic API throttle, if enabled, does not make views unique.",
+       "recWhy": "Set one backend hiring-role policy and mirror it in both clients before launch. Track the wrong route, duplicate hook and view-count inflation as separate engineering cleanup.",
        "sources": [],
-       "current": "Mobile permits booking requests from non-worker roles; web uses a narrower role allow-list plus admin status. Mobile retains an owner booking route and duplicate feed hooks; authenticated view increments lack per-post deduplication."
+       "current": "Mobile permits every non-worker role to request bookings; web limits roles and admin status. The shared backend must enforce the final policy regardless of client gates."
       }
      ]
     },
@@ -4868,14 +5038,9 @@
          "detail": "Accept the risk or drop it."
         }
        ],
-       "rec": "B",
-       "recWhy": "Posts can advertise dates the worker has removed. Soon-after-launch deferral is acceptable only with explicit snapshot disclosure and freshness controls first; the proposed inactivity hiding is not live today. Relief Buddy uses calendar availability consistently.",
-       "sources": [
-        {
-         "name": "Relief Buddy",
-         "url": "https://knowledgebase.reliefbuddy.com/available-days-to-work"
-        }
-       ],
+       "rec": "A",
+       "recWhy": "A post can advertise dates the worker removed from the live calendar. Fix or clearly eliminate the copied calendar before launch; a silent stale snapshot is misleading.",
+       "sources": [],
        "current": "Both apps copy availability into the pitch form when composing a talent post and save separate post dates. Later calendar edits do not automatically update that saved snapshot."
       },
       {
