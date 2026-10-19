@@ -33,6 +33,11 @@ class AhpraFreezeMiddleware(MiddlewareMixin):
             return None
         if name == 'notification-mark-read' and request.method == 'POST':
             return None
+        # Invitations are never blocked by AHPRA; these views only see request.user's own memberships.
+        if name in ('my-memberships-list', 'my-memberships-detail') and request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return None
+        if name in ('my-memberships-accept', 'my-memberships-reject') and request.method == 'POST':
+            return None
         if ahpra_frozen(user):
             state = ahpra_state(ahpra_profile(user))
             return JsonResponse({'code': 'ahpra_suspended', 'detail': state['note'], 'frozen': True}, status=403)

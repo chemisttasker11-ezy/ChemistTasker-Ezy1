@@ -87,6 +87,34 @@ class AhpraApplicationGateTests(TestCase):
             with self.subTest(status=status, active=active):
                 Membership.objects.filter(pk=membership.pk).update(status=status, is_active=active)
                 self.assertTrue(ahpra_frozen(self.user))
+                self.assertEqual(self.client.get('/api/v1/shift-saved/').status_code, 403)
+                self.assertEqual(self.client.get('/api/v1/my-memberships/').status_code, 200)
+
+    def test_frozen_user_accepts_invitation_and_works_internally_but_not_publicly(self):
+        self.set_state('suspended')
+        self.user.is_otp_verified = self.user.is_mobile_verified = True
+        self.user.save(update_fields=['is_otp_verified', 'is_mobile_verified'])
+        owner, pharmacy = make_owner_with_pharmacy('Inviting Pharmacy')
+        invite = Membership.objects.create(user=self.user, pharmacy=pharmacy, invited_by=owner, role='PHARMACIST',
+                                           employment_type='FULL_TIME', status=Membership.Status.PENDING)
+        self.assertTrue(ahpra_frozen(self.user))
+        self.assertEqual(self.client.get(f'/api/v1/my-memberships/{invite.pk}/').status_code, 200)
+        response = self.client.post(f'/api/v1/my-memberships/{invite.pk}/accept/', {}, format='json')
+        self.assertEqual(response.status_code, 200, response.content)
+        invite.refresh_from_db()
+        self.assertEqual((invite.status, invite.is_active), (Membership.Status.ACCEPTED, True))
+        self.assertFalse(ahpra_frozen(self.user))
+        shift, _, assignment = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=5))
+        assignment.delete()
+        shift.role_needed, shift.visibility = 'PHARMACIST', 'FULL_PART_TIME'
+        shift.save(update_fields=['role_needed', 'visibility'])
+        with patch('shifts.interest.async_task'), patch('shifts.browse.async_task'):
+            response = self.client.post(f'/api/v1/community-shifts/{shift.pk}/claim-shift/', {}, format='json')
+            self.assertIn(response.status_code, (200, 201), response.content)
+            self.assertTrue(ShiftSlotAssignment.objects.filter(shift=shift, user=self.user).exists())
+            response = self.client.post(f'/api/v1/shifts/{self.shift.pk}/express_interest/', {}, format='json')
+        self.assertEqual((response.status_code, response.json()['code']), (403, 'ahpra_suspended'))
+        self.assertFalse(ShiftInterest.objects.filter(shift=self.shift, user=self.user).exists())
 
     def test_org_admin_invited_member_counts_but_pharmacyless_membership_does_not(self):
         from client_profile.models import Organization
