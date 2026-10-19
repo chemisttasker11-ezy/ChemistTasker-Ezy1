@@ -1,13 +1,17 @@
-"""AHPRA register lookup (ScrapingBee), parsing and persistence of the AHPRA verification result."""
+import datetime
 import logging
 import time
 
 from bs4 import BeautifulSoup
+import dateutil.parser
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.db import models
+from django.utils import timezone
 from scrapingbee import ScrapingBeeClient
 
+from onboarding.emails import simple_name_match
 from onboarding.verification.support import fetch_instance_with_retries
 
 logger = logging.getLogger(__name__)
@@ -98,6 +102,11 @@ def parse_ahpra_html(html_file_path):
 
     reg_status = ""
     expiry_date = ""
+    profession = ""
+    conditions = False
+    undertakings = False
+    reprimands = False
+
     for section in sections:
         rows = section.find_all('div', class_='section-row')
         for row in rows:
@@ -105,17 +114,98 @@ def parse_ahpra_html(html_file_path):
             value = row.find('div', class_='field-entry')
             label_text = label.get_text(strip=True) if label else ""
             value_text = value.get_text(strip=True) if value else ""
-            if "Registration status" in label_text:
+
+            label_lower = label_text.lower()
+            val_lower = value_text.lower()
+
+            if "registration status" in label_lower:
                 reg_status = value_text
-            if "Expiry Date" in label_text and not expiry_date:
+            if "expiry date" in label_lower and not expiry_date:
                 expiry_date = value_text
+            if "profession" in label_lower and not profession:
+                profession = value_text
+
+            has_value = bool(val_lower) and val_lower not in ("none", "nil", "n/a")
+            if "condition" in label_lower and has_value:
+                conditions = True
+            if "undertaking" in label_lower and has_value:
+                undertakings = True
+            if "reprimand" in label_lower and has_value:
+                reprimands = True
 
     return {
         "practitioner_name": name,
         "registration_type": reg_type,
         "registration_status": reg_status,
-        "expiry_date": expiry_date
+        "expiry_date": expiry_date,
+        "profession": profession,
+        "conditions": conditions,
+        "undertakings": undertakings,
+        "reprimands": reprimands,
     }
+
+
+def evaluate_ahpra_record(record: dict, *, first_name, last_name, role) -> tuple[str, str]:
+    """Pure evaluation of an AHPRA record against user details and role.
+
+    Returns (outcome, note) where outcome is in {"verified", "review", "rejected"}.
+    """
+    practitioner_name = (record.get("practitioner_name") or "").strip()
+    if not simple_name_match(practitioner_name, first_name, last_name):
+        return ("review", f"Name mismatch: '{first_name} {last_name}' vs '{practitioner_name}'")
+
+    profession = (record.get("profession") or "").strip()
+    if profession:
+        p_lower = profession.lower()
+        if "pharmac" not in p_lower:
+            return ("rejected", f"Profession is '{profession}' (expected Pharmacy or Pharmacist)")
+
+    status = (record.get("registration_status") or "").strip()
+    status_lower = status.lower()
+    if any(s in status_lower for s in ("suspended", "cancelled", "surrendered", "not registered")):
+        return ("rejected", f"Registration status is '{status}'")
+    if status_lower != "registered":
+        return ("review", f"Registration status is '{status}' (not 'Registered')")
+
+    role_norm = (role or "").strip().lower()
+    reg_type = (record.get("registration_type") or "").strip()
+    reg_type_norm = reg_type.lower()
+    if role_norm in ("pharmacist", "pharmacy"):
+        if reg_type_norm != "general":
+            return ("review", f"Registration type is '{reg_type}' (expected 'General')")
+    elif role_norm == "intern":
+        if reg_type_norm not in ("provisional", "general"):
+            return ("review", f"Registration type is '{reg_type}' (expected 'Provisional' or 'General')")
+    else:
+        return ("review", f"Registration type '{reg_type}' requires review for role '{role}'")
+
+    flags = []
+    if record.get("conditions"):
+        flags.append("conditions")
+    if record.get("undertakings"):
+        flags.append("undertakings")
+    if record.get("reprimands"):
+        flags.append("reprimands")
+    if flags:
+        return ("review", f"Registration has {', '.join(flags)} recorded")
+
+    expiry_val = record.get("expiry_date")
+    expiry_date = None
+    if isinstance(expiry_val, datetime.datetime):
+        expiry_date = expiry_val.date()
+    elif isinstance(expiry_val, datetime.date):
+        expiry_date = expiry_val
+    elif isinstance(expiry_val, str) and expiry_val.strip():
+        try:
+            expiry_date = dateutil.parser.parse(expiry_val.strip(), dayfirst=True).date()
+        except Exception:
+            return ("review", f"Could not parse expiry date: '{expiry_val}'")
+
+    today = timezone.now().date()
+    if expiry_date and expiry_date < today:
+        return ("review", f"Registration expired on {expiry_date.strftime('%d/%m/%Y')}")
+
+    return ("verified", "AHPRA registration is valid and current.")
 
 
 def _update_ahpra_fields(model_name, object_pk, verified, note, reg_type=None, reg_status=None, expiry_date=None):
@@ -128,14 +218,19 @@ def _update_ahpra_fields(model_name, object_pk, verified, note, reg_type=None, r
         return
     obj.ahpra_verified = verified
     obj.ahpra_verification_note = note
-    if reg_type is not None:
+    model_field_names = {f.name for f in Model._meta.get_fields()} if (isinstance(Model, type) and issubclass(Model, models.Model)) else None
+    update_fields = ["ahpra_verified", "ahpra_verification_note"]
+    if reg_type is not None and (model_field_names is None or "ahpra_registration_type" in model_field_names):
         obj.ahpra_registration_type = reg_type
-    if reg_status is not None:
+        update_fields.append("ahpra_registration_type")
+    if reg_status is not None and (model_field_names is None or "ahpra_registration_status" in model_field_names):
         obj.ahpra_registration_status = reg_status
-    if expiry_date is not None:
+        update_fields.append("ahpra_registration_status")
+    if expiry_date is not None and (model_field_names is None or "ahpra_expiry_date" in model_field_names):
         obj.ahpra_expiry_date = expiry_date
-    obj.save(update_fields=[
-        "ahpra_verified", "ahpra_verification_note",
-        "ahpra_registration_type", "ahpra_registration_status", "ahpra_expiry_date"
-    ])
+        update_fields.append("ahpra_expiry_date")
+    if model_field_names is not None:
+        update_fields = [f for f in update_fields if f in model_field_names]
+    obj.save(update_fields=update_fields)
     logger.info("[AHPRA TASK] Saved verification result for %s pk=%s verified=%s", model_name, object_pk, verified)
+

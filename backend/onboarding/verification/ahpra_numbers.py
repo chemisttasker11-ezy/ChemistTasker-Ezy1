@@ -158,3 +158,19 @@ def sync_ahpra_registrations(user_id, *, grandfathered_numbers=frozenset()) -> N
             if owner_id != user_id and number not in grandfathered_numbers:
                 raise IntegrityError('This AHPRA number belongs to another account.')
         _release_or_transfer_unused_registrations(user_id)
+
+
+def full_registration_number(raw) -> str | None:
+    """Format an AHPRA registration number for register lookup.
+
+    Strips spaces and dashes, uppercases.
+    Accepts 'PHA' + 10 digits, or 7-10 digits (left-padded to 10 with zeros).
+    Returns 'PHA' + 10 digits, or None for anything else.
+    """
+    clean = re.sub(r'[\s\-]+', '', str(raw or '')).upper()
+    if re.fullmatch(r'PHA\d{10}', clean):
+        return clean
+    if re.fullmatch(r'\d{7,10}', clean):
+        return f"PHA{clean.zfill(10)}"
+    return None
+

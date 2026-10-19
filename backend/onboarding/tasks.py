@@ -4,6 +4,7 @@ Every task keeps its deployed name (`client_profile.tasks.*`), queue and signatu
 messages address tasks by these names. `client_profile.tasks` re-exports these objects; it does not register them
 again.
 """
+import datetime
 import logging
 import os
 import tempfile
@@ -24,7 +25,13 @@ from core.integrations.abr import _parse_abn_html_fields, abn_lookup
 from core.task_queue import async_task
 from onboarding.emails import get_candidate_role, simple_name_match
 from onboarding.services.work_profile import referee_profile_target
-from onboarding.verification.ahpra import _update_ahpra_fields, ahpra_lookup, parse_ahpra_html
+from onboarding.verification.ahpra import (
+    _update_ahpra_fields,
+    ahpra_lookup,
+    evaluate_ahpra_record,
+    parse_ahpra_html,
+)
+from onboarding.verification.ahpra_numbers import full_registration_number
 from onboarding.verification.documents import azure_ocr, get_local_file_or_download, ocr_input_path_for_file
 from onboarding.verification.orchestration import mark_notification_sent, notification_already_sent
 from onboarding.verification.reminders import (
@@ -236,35 +243,77 @@ def verify_abn_task(model_name, object_pk, abn_number, first_name, last_name, em
         obj.save(update_fields=list({field for field in updates if hasattr(obj, field)}))
 
 
+def _resolve_ahpra_role(obj, model_name="", role_override=None) -> str:
+    if role_override:
+        return str(role_override).strip().lower()
+    if hasattr(obj, "role_type") and obj.role_type:
+        return str(obj.role_type).strip().lower()
+    if hasattr(obj, "role") and obj.role:
+        return str(obj.role).strip().lower()
+    m = (model_name or (obj._meta.model_name if hasattr(obj, "_meta") else "")).lower()
+    if "pharmacist" in m:
+        return "pharmacist"
+    if hasattr(obj, "user") and getattr(obj.user, "role", None):
+        return str(obj.user.role).strip().lower()
+    return ""
+
+
+def _has_successful_lookup(obj) -> bool:
+    if getattr(obj, "ahpra_registration_status", None):
+        return True
+    if getattr(obj, "ahpra_verified", False):
+        return True
+    note = getattr(obj, "ahpra_verification_note", "") or ""
+    if note and (note.startswith("Needs review:") or note.startswith("Rejected:")):
+        return True
+    return False
+
+
 @shared_task(name="client_profile.tasks.verify_ahpra_task", queue="ocr")
 def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name, email, **kwargs):
-    full_ahpra_number = f"PHA000{ahpra_number}"
     logger.info("[AHPRA TASK] Starting AHPRA lookup model=%s pk=%s", model_name, object_pk)
 
     Model = apps.get_model("client_profile", model_name)
     obj = fetch_instance_with_retries(Model, object_pk)
 
-    # This logic correctly compares the incoming numeric-only `ahpra_number` 
-    # with the numeric-only number stored on the object, so it doesn't need to change.
-    if (obj.ahpra_number or '').strip().lower() == ahpra_number.strip().lower() and obj.ahpra_verification_note:
-        logger.info("[AHPRA TASK] SKIPPING: verification for pk=%s already has a result for this number.", object_pk)
-        return # Exit immediately
+    # 1. Students: register is confidential; verified through education provider
+    role = _resolve_ahpra_role(obj, model_name=model_name, role_override=kwargs.get("role"))
+    if "student" in role:
+        logger.info("[AHPRA TASK] Student role pk=%s: register lookup not applicable", object_pk)
+        note = "Students are verified through their education provider."
+        _update_ahpra_fields(model_name, object_pk, False, note)
+        return
 
-    # If we are here, it means it's a new AHPRA number or the first attempt.
-    # We must clear the old result before starting.
+    # 2. Number format: validate full registration number
+    full_ahpra_number = full_registration_number(ahpra_number)
+    if not full_ahpra_number:
+        logger.info("[AHPRA TASK] Invalid AHPRA registration number format pk=%s", object_pk)
+        note = "Invalid AHPRA registration number format."
+        _update_ahpra_fields(model_name, object_pk, False, note)
+        return
+
+    # 3. Skip only when a SUCCESSFUL lookup result is already stored for this same number
+    stored_number = (getattr(obj, "ahpra_number", None) or "").strip().lower()
+    incoming_number = (ahpra_number or "").strip().lower()
+    if stored_number == incoming_number and _has_successful_lookup(obj):
+        logger.info("[AHPRA TASK] SKIPPING: verification for pk=%s already has a result for this number.", object_pk)
+        return
+
+    # Clear old results before starting (new number or retry of failed attempt)
     obj.ahpra_verified = False
     obj.ahpra_verification_note = ""
-    obj.save(update_fields=['ahpra_verified', 'ahpra_verification_note'])
+    clear_fields = ["ahpra_verified", "ahpra_verification_note"]
+    if hasattr(obj, "ahpra_registration_status"):
+        obj.ahpra_registration_status = None
+        clear_fields.append("ahpra_registration_status")
+    obj.save(update_fields=clear_fields)
 
-    # The provider page is only needed between the fetch and the parse: a temporary file, removed in every case.
     handle, output_html = tempfile.mkstemp(prefix="ahpra_", suffix=".html")
     os.close(handle)
     try:
         try:
-            # Use the newly constructed full AHPRA number for the lookup
             ahpra_lookup(full_ahpra_number, output_html, api_key=settings.SCRAPINGBEE_API_KEY)
         except Exception as exc:
-            # Keep traceback frames and the exception type, but redact the value because it can contain the service URL/key.
             logger.error("[verify_ahpra_task] AHPRA lookup failed for pk=%s error_type=%s", object_pk, type(exc).__name__, exc_info=(RuntimeError, RuntimeError(f"{type(exc).__name__} (details redacted)"), exc.__traceback__))
             _update_ahpra_fields(model_name, object_pk, False, "AHPRA lookup failed. Please try again later.")
             return
@@ -273,60 +322,47 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     finally:
         if os.path.exists(output_html):
             os.remove(output_html)
+
     logger.info(
         "[verify_ahpra_task] Parsed register page pk=%s type=%s status=%s has_expiry=%s", object_pk,
         ahpra_data.get("registration_type"), ahpra_data.get("registration_status"), bool(ahpra_data.get("expiry_date")),
     )
 
-    practitioner_name = ahpra_data.get("practitioner_name", "")
-    registration_type = (ahpra_data.get("registration_type") or "").strip()
-    registration_status = (ahpra_data.get("registration_status") or "").strip()
-    expiry_date_str = ahpra_data.get("expiry_date", "")
+    outcome, eval_note = evaluate_ahpra_record(
+        ahpra_data,
+        first_name=first_name,
+        last_name=last_name,
+        role=role,
+    )
+    logger.info("[verify_ahpra_task] Evaluation outcome: %s pk=%s", outcome, object_pk)
 
-    is_name_match = simple_name_match(practitioner_name, first_name, last_name)
-    logger.info("[verify_ahpra_task] Name match: %s pk=%s", is_name_match, object_pk)
-
-    note = ""
-    expiry_date = None
-    if not is_name_match:
-        note = f"AHPRA name mismatch: '{first_name} {last_name}' vs '{practitioner_name}'"
-        _update_ahpra_fields(
-            model_name, object_pk, False, note,
-            reg_type=registration_type, reg_status=registration_status, expiry_date=None
-        )
-        return
-
-    if expiry_date_str:
-        try:
-            expiry_date = dateutil.parser.parse(expiry_date_str, dayfirst=True).date()
-        except Exception:
-            note = f"Could not parse expiry date: {expiry_date_str}"
-
-    today = timezone.now().date()
-    is_valid_type = registration_type.strip().lower() == "general"
-    is_valid_status = registration_status.strip().lower() == "registered"
-    expiry_ok = expiry_date and expiry_date > today
-
-    is_verified = False
-    fail_reasons = []
-    
-    if not expiry_ok:
-        fail_reasons.append("Registration expired.")
-    if not is_valid_type:
-        fail_reasons.append(f"Registration type is '{registration_type}' (not 'General').")
-    if not is_valid_status:
-        fail_reasons.append(f"Registration status is '{registration_status}' (not 'Registered').")
-
-    if expiry_ok and is_valid_type and is_valid_status:
+    if outcome == "verified":
         is_verified = True
-        note = "AHPRA registration is valid and current."
+        final_note = eval_note
+    elif outcome == "review":
+        is_verified = False
+        final_note = f"Needs review: {eval_note}"
+    elif outcome == "rejected":
+        is_verified = False
+        final_note = f"Rejected: {eval_note}"
     else:
         is_verified = False
-        note = " / ".join(fail_reasons) or "AHPRA registration not valid."
+        final_note = f"Needs review: {eval_note}"
 
-    note = (note or "")[:255]
+    registration_type = (ahpra_data.get("registration_type") or "").strip()
+    registration_status = (ahpra_data.get("registration_status") or "").strip()
+    expiry_date_val = ahpra_data.get("expiry_date")
+    expiry_date = None
+    if isinstance(expiry_date_val, datetime.date):
+        expiry_date = expiry_date_val
+    elif isinstance(expiry_date_val, str) and expiry_date_val.strip():
+        try:
+            expiry_date = dateutil.parser.parse(expiry_date_val.strip(), dayfirst=True).date()
+        except Exception:
+            pass
+
     _update_ahpra_fields(
-        model_name, object_pk, is_verified, note,
+        model_name, object_pk, is_verified, final_note,
         reg_type=registration_type, reg_status=registration_status, expiry_date=expiry_date
     )
 
