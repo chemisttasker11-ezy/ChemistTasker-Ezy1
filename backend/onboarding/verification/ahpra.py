@@ -2,6 +2,7 @@ import datetime
 import logging
 import re
 import time
+import unicodedata
 
 from bs4 import BeautifulSoup
 import dateutil.parser
@@ -12,7 +13,6 @@ from django.db import models
 from django.utils import timezone
 from scrapingbee import ScrapingBeeClient
 
-from onboarding.emails import simple_name_match
 from onboarding.verification.support import fetch_instance_with_retries
 
 logger = logging.getLogger(__name__)
@@ -169,13 +169,38 @@ def registration_type_note(reg_type):
     )
 
 
+_NAME_TITLES = {"mr", "mrs", "ms", "miss", "dr", "mx"}
+
+
+def _name_words(name):
+    folded = "".join(c for c in unicodedata.normalize("NFKD", name or "") if not unicodedata.combining(c))
+    folded = re.sub(r"['’]", "", folded.casefold())
+    return re.sub(r"[-–—]", " ", folded).split()
+
+
+def ahpra_name_match(register_name, first_name, last_name) -> bool:
+    """Owner-approved rule: same first given name, and the last name sits in the register's surname tail."""
+    register = _name_words(register_name)
+    while register and register[0] in _NAME_TITLES:
+        register.pop(0)
+    first, last = _name_words(first_name), _name_words(last_name)
+    if not first or not last or len(register) < 2 or first[0] != register[0]:
+        return False
+    rest = register[1:]
+    if all(w in rest for w in last) and any(w in rest[-2:] for w in last):
+        return True
+    # "O Brien" vs "OBrien": compare without spaces against runs of the register that reach a surname candidate
+    joined, n = "".join(last), len(rest)
+    return any("".join(rest[i:j]) == joined for i in range(n) for j in range(max(i + 1, n - 1), n + 1))
+
+
 def evaluate_ahpra_record(record: dict, *, first_name, last_name, role) -> tuple[str, str]:
     """Pure evaluation of an AHPRA record against user details and role.
 
     Returns (outcome, note): verified, review, rejected or type_not_accepted.
     """
     practitioner_name = (record.get("practitioner_name") or "").strip()
-    if not simple_name_match(practitioner_name, first_name, last_name):
+    if not ahpra_name_match(practitioner_name, first_name, last_name):
         return ("review", f"Name mismatch: '{first_name} {last_name}' vs '{practitioner_name}'")
 
     profession = (record.get("profession") or "").strip()
