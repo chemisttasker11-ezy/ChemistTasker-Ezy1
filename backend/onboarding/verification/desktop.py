@@ -191,7 +191,7 @@ def apply_ahpra_result(check, payload):
             role=_resolve_ahpra_role(profile, model_name=check.model_name,
                                      role_override='pharmacist' if getattr(profile, 'ahpra_switched_to_manager', False) else None),
         )
-        if outcome != 'verified':
+        if outcome in ('review', 'rejected'):
             note = ('Rejected: ' if outcome == 'rejected' else 'Needs review: ') + note
         _update_ahpra_fields(check.model_name, check.object_pk, outcome == 'verified', note,
                              reg_type=record['registration_type'], reg_status=record['registration_status'],

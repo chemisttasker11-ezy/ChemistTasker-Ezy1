@@ -344,8 +344,8 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
     )
     logger.info("[verify_ahpra_task] Evaluation outcome: %s pk=%s", outcome, object_pk)
 
-    if outcome == "verified":
-        is_verified = True
+    if outcome in ("verified", "type_not_accepted"):
+        is_verified = outcome == "verified"
         final_note = eval_note
     elif outcome == "review":
         is_verified = False

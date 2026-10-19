@@ -150,7 +150,7 @@ class Review183Repro(TestCase):
         self.profile.ahpra_expiry_date = today - timedelta(days=10)
         self.profile.save(update_fields=['ahpra_expiry_date'])
         check_fixture(self.profile, status='done', outcome='verified', completed_at=timezone.now() - timedelta(days=40),
-                      register_data={'registration_status': 'Registered'})
+                      register_data={'registration_status': 'Registered', 'registration_type': 'General'})
         AhpraCheck.objects.create(model_name='PharmacistOnboarding', object_pk=self.profile.pk, registration_number=NUMBER,
                                   reason='recheck', status='done', outcome='error', completed_at=timezone.now())
         queue_public_recheck(self.user)

@@ -63,6 +63,25 @@ class AhpraApplicationGateTests(TestCase):
     def test_not_found_does_not_freeze_other_endpoints(self):
         self.assertEqual(self.client.get('/api/v1/shift-saved/').status_code, 200)
 
+    def test_type_not_accepted_blocks_public_actions_without_freezing(self):
+        self.set_state('type_not_accepted')
+        apply_state_transition(self.profile, {'state': 'pending'})
+        for path in (f'shifts/{self.shift.pk}/express_interest/',
+                     f'shifts/{self.shift.pk}/counter-offers/', f'shift-offers/{self.offer.pk}/accept/'):
+            with self.subTest(path=path):
+                response = self.client.post(f'/api/v1/{path}', {}, format='json')
+                self.assertEqual(response.status_code, 403, response.content)
+                self.assertEqual(response.json(), {
+                    'code': 'ahpra_type_not_accepted', 'detail': ahpra_state(self.profile)['note'],
+                })
+        self.assertFalse(ahpra_frozen(self.user))
+        self.assertEqual(self.client.get('/api/v1/shift-saved/').status_code, 200)
+        self.assertFalse(ShiftInterest.objects.filter(user=self.user).exists())
+        self.assertFalse(ShiftCounterOffer.objects.filter(user=self.user).exists())
+        self.assertFalse(ShiftSlotAssignment.objects.filter(user=self.user).exists())
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, ShiftOffer.Status.PENDING)
+
     def test_unreadable_public_apply_refused_without_freeze_or_cancellation(self):
         AhpraCheck.objects.filter(pk=self.check.pk).update(
             outcome='review', register_data={'registration_status': 'Unknown'})
@@ -86,7 +105,7 @@ class AhpraApplicationGateTests(TestCase):
         self.profile.ahpra_expiry_date = timezone.localdate() - timedelta(days=1)
         self.profile.save()
         AhpraCheck.objects.filter(pk=self.check.pk).update(
-            outcome='verified', register_data={'registration_status': 'Registered'},
+            outcome='verified', register_data={'registration_status': 'Registered', 'registration_type': 'General'},
             completed_at=timezone.now() - timedelta(days=30))
         with patch('onboarding.verification.desktop.enqueue_check') as enqueue, patch('shifts.interest.async_task'):
             with self.captureOnCommitCallbacks(execute=True):
@@ -104,7 +123,7 @@ class AhpraApplicationGateTests(TestCase):
                 profile.save(update_fields=['ahpra_expiry_date'])
             AhpraCheck.objects.filter(pk=self.check.pk).update(
                 model_name=profile._meta.object_name, object_pk=profile.pk, outcome='verified',
-                register_data={'registration_status': 'Registered', 'expiry_date': register_expiry},
+                register_data={'registration_status': 'Registered', 'registration_type': 'General', 'expiry_date': register_expiry},
                 completed_at=timezone.make_aware(datetime.combine(checked, datetime.min.time().replace(hour=12))))
             with patch('onboarding.verification.desktop.enqueue_check') as enqueue, \
                     patch('django.utils.timezone.localdate', return_value=today):
@@ -127,7 +146,7 @@ class AhpraApplicationGateTests(TestCase):
 
     def test_public_gate_recheck_deduplicates_and_never_checks_internal_member_work(self):
         AhpraCheck.objects.filter(pk=self.check.pk).update(
-            outcome='verified', register_data={'registration_status': 'Registered'},
+            outcome='verified', register_data={'registration_status': 'Registered', 'registration_type': 'General'},
             completed_at=timezone.now() - timedelta(days=800))
         PharmacistOnboarding.objects.filter(pk=self.profile.pk).update(verified=True, ahpra_verified=True)
         with self.captureOnCommitCallbacks(execute=True):
@@ -157,7 +176,7 @@ class AhpraApplicationGateTests(TestCase):
 
     def test_registered_needing_review_does_not_get_not_found_error(self):
         AhpraCheck.objects.filter(pk=self.check.pk).update(
-            outcome='review', register_data={'registration_status': 'Registered'})
+            outcome='review', register_data={'registration_status': 'Registered', 'registration_type': 'General'})
         from onboarding.verification.state import require_ahpra_application
         require_ahpra_application(self.user)
 
@@ -244,6 +263,11 @@ class AhpraApplicationGateTests(TestCase):
         require_public_ahpra(self.user, self.shift)  # member access on the org's public shift
 
     def set_state(self, state):
+        if state == 'type_not_accepted':
+            AhpraCheck.objects.filter(pk=self.check.pk).update(
+                outcome=state, register_data={'registration_status': 'Registered', 'registration_type': 'Non Practising'},
+            )
+            return
         AhpraCheck.objects.filter(pk=self.check.pk).update(
             outcome='not_found' if state == 'not_found' else 'rejected',
             register_data={'registration_status': 'Suspended'} if state == 'suspended' else {},
@@ -253,7 +277,7 @@ class AhpraApplicationGateTests(TestCase):
         self.member(self.shift.pharmacy)
         self.user.is_otp_verified = self.user.is_mobile_verified = True
         self.user.save(update_fields=['is_otp_verified', 'is_mobile_verified'])
-        for state in ('suspended', 'not_found', 'unreadable'):
+        for state in ('suspended', 'not_found', 'unreadable', 'type_not_accepted'):
             self.set_state(state)
             for action in ('express_interest', 'claim', 'accept'):
                 with self.subTest(state=state, action=action):
@@ -290,7 +314,7 @@ class AhpraApplicationGateTests(TestCase):
     def test_member_adverse_ahpra_still_refuses_public_applications(self):
         _, internal_pharmacy = make_owner_with_pharmacy('Internal Pharmacy')
         self.member(internal_pharmacy)
-        for state in ('suspended', 'not_found'):
+        for state in ('suspended', 'not_found', 'type_not_accepted'):
             self.set_state(state)
             for path in (f'shifts/{self.shift.pk}/express_interest/',
                          f'shifts/{self.shift.pk}/counter-offers/', f'shift-offers/{self.offer.pk}/accept/'):

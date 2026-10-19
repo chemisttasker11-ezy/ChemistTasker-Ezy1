@@ -56,6 +56,126 @@ class AhpraAccessTests(TestCase):
         self.assertEqual(ahpra_state(self.profile)['state'], 'pending')
         self.assertIsNone(ahpra_state(self.profile)['registration_status'])
 
+    def test_pharmacist_registration_type_messages_and_hourly_recheck(self):
+        messages = {
+            'Non Practising': "Your AHPRA registration type is Non Practising. Pharmacist shifts on ChemistTasker need General registration, so you can't apply for them at the moment. When your registration changes, open your AHPRA step and press Re-check. If this looks wrong, contact us.",
+            'Provisional': 'Your AHPRA registration type is Provisional, which means you can only practise under supervision. Pharmacist shifts on ChemistTasker need General registration. When your registration changes to General, open your AHPRA step and press Re-check. If this looks wrong, contact us.',
+        }
+        from onboarding.verification.policy import refresh_verified
+        from onboarding.verification.schema import AhpraStateSerializer
+        from onboarding.verification.state import ahpra_frozen
+        for registration_type, message in messages.items():
+            with self.subTest(registration_type=registration_type):
+                check = check_fixture(self.profile)
+                apply_ahpra_result(check, result(check.pk, registration_type=registration_type))
+                check.refresh_from_db()
+                self.profile.refresh_from_db()
+                self.assertEqual((check.outcome, check.note), ('type_not_accepted', message))
+                self.assertFalse(self.profile.ahpra_verified)
+                self.assertFalse(self.profile.verified)
+                self.assertFalse(ahpra_frozen(self.user))
+                # Later verification refreshes and manual approval cannot reinstate the badge.
+                admin = AhpraCheckAdmin(AhpraCheck, AdminSite())
+                admin.mark_verified(SimpleNamespace(user=self.user), AhpraCheck.objects.filter(pk=check.pk))
+                self.profile.refresh_from_db()
+                self.assertFalse(self.profile.ahpra_verified)
+                self.assertFalse(refresh_verified(self.profile))
+                response = self.client.get('/api/v1/pharmacist/onboarding/me/')
+                self.assertEqual(response.status_code, 200, response.content)
+                summary = response.json()['ahpra']
+                self.assertEqual((summary['state'], summary['note'], summary['registration_type']),
+                                 ('type_not_accepted', message, registration_type))
+                self.assertFalse(summary['frozen'])
+                serializer = AhpraStateSerializer(data=summary)
+                self.assertTrue(serializer.is_valid(), serializer.errors)
+        with patch('onboarding.recheck.enqueue_check') as enqueue:
+            self.assertEqual(self.client.post('/api/v1/onboarding/ahpra/recheck/').status_code, 202)
+            self.assertEqual(self.client.post('/api/v1/onboarding/ahpra/recheck/').status_code, 429)
+            enqueue.assert_called_once()
+
+    def test_intern_provisional_remains_verified(self):
+        user = make_user('OTHER_STAFF', first_name='Jane', last_name='Doe')
+        profile = OtherStaffOnboarding.objects.create(user=user, role_type='INTERN', ahpra_number=NUMBER)
+        check = AhpraCheck.objects.create(model_name='OtherStaffOnboarding', object_pk=profile.pk,
+                                         registration_number=NUMBER, reason='onboarding')
+        apply_ahpra_result(check, result(check.pk, registration_type='Provisional'))
+        check.refresh_from_db()
+        profile.refresh_from_db()
+        self.assertEqual(check.outcome, 'verified')
+        self.assertTrue(profile.ahpra_verified)
+        self.assertEqual(ahpra_state(profile)['state'], 'ok')
+
+    def test_owner_registration_type_switches_to_manager_and_back(self):
+        owner, _ = make_owner_with_pharmacy()
+        profile = OwnerOnboarding.objects.get(user=owner)
+        profile.role, profile.ahpra_number = 'PHARMACIST', NUMBER
+        profile.save()
+        with patch('onboarding.verification.state.announce_suspension') as announce, \
+                patch('onboarding.verification.state.close_chat_sockets') as close:
+            for registration_type, role in (('General', 'PHARMACIST'), ('Non Practising', 'MANAGER'),
+                                            ('Non Practising', 'MANAGER'), ('General', 'PHARMACIST')):
+                with self.subTest(registration_type=registration_type), self.captureOnCommitCallbacks(execute=True):
+                    check = AhpraCheck.objects.create(model_name='OwnerOnboarding', object_pk=profile.pk,
+                                                     registration_number=NUMBER, reason='recheck')
+                    apply_ahpra_result(check, result(check.pk, name=f'{owner.first_name} {owner.last_name}',
+                                                     registration_type=registration_type))
+                    profile.refresh_from_db()
+                    self.assertEqual(profile.role, role)
+                    self.assertEqual(profile.ahpra_switched_to_manager, role == 'MANAGER')
+                    self.assertEqual(profile.ahpra_verified, registration_type == 'General')
+                    self.assertEqual(ahpra_state(profile)['state'],
+                                     'ok' if registration_type == 'General' else 'type_not_accepted')
+            announce.assert_called_once()
+            close.assert_not_called()
+
+    def test_registration_type_transition_cancels_public_once_keeps_internal_after_commit(self):
+        self.finish()
+        self.profile.verified = self.profile.ahpra_verified = True
+        self.profile.save(update_fields=['verified', 'ahpra_verified'])
+        owner, pharmacy = make_owner_with_pharmacy()
+        shift, _, public = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
+        shift.post_anonymously = True
+        shift.save(update_fields=['post_anonymously'])
+        Membership.objects.create(user=self.user, pharmacy=pharmacy, role='PHARMACIST', employment_type='FULL_TIME',
+                                  is_active=True, status=Membership.Status.ACCEPTED)
+        internal_shift, _, internal = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
+        internal_shift.visibility = 'FULL_PART_TIME'
+        internal_shift.save(update_fields=['visibility'])
+        with patch('notifications.services.notify_users') as notify, \
+                patch('shifts.cancellation.notify_shift_managers', return_value=[owner]) as managers, \
+                patch('core.task_queue.async_task') as email, patch('shifts.cancellation.async_task', new=email), \
+                patch('onboarding.verification.state.close_chat_sockets') as close:
+            with self.captureOnCommitCallbacks(execute=True):
+                check = check_fixture(self.profile)
+                payload = result(check.pk, registration_type='Non Practising')
+                self.assertTrue(apply_ahpra_result(check, payload))
+                self.assertFalse(apply_ahpra_result(check, payload))
+                self.assertTrue(ShiftSlotAssignment.objects.filter(pk=public.pk).exists())
+                notify.assert_not_called()
+            self.assertFalse(ShiftSlotAssignment.objects.filter(pk=public.pk).exists())
+            self.assertTrue(ShiftSlotAssignment.objects.filter(pk=internal.pk).exists())
+            with self.captureOnCommitCallbacks(execute=True):
+                repeat = check_fixture(self.profile)
+                apply_ahpra_result(repeat, result(repeat.pk, registration_type='Non Practising'))
+            notify.assert_called_once()
+            self.assertEqual(notify.call_args.kwargs['payload']['code'], 'ahpra_type_not_accepted')
+            managers.assert_called_once()
+            self.assertIn('registration type is not accepted', managers.call_args.kwargs['body'])
+            self.assertEqual(len(email.call_args_list), 2)
+            self.assertEqual(len(mail.outbox), 1)
+            self.assertIn('Type: Non Practising', mail.outbox[0].body)
+            close.assert_not_called()
+
+    def test_registration_type_transition_rollback_never_cancels_or_notifies(self):
+        self.finish()
+        with patch('onboarding.verification.state.announce_suspension') as announce:
+            with self.captureOnCommitCallbacks(execute=True):
+                with self.assertRaises(ValueError), transaction.atomic():
+                    check = check_fixture(self.profile)
+                    apply_ahpra_result(check, result(check.pk, registration_type='Non Practising'))
+                    raise ValueError('roll back')
+            announce.assert_not_called()
+
     def test_unknown_or_unreadable_status_needs_review_without_freeze_or_cancellation(self):
         self.profile.verified = self.profile.ahpra_verified = True
         self.profile.save(update_fields=['verified', 'ahpra_verified'])
@@ -141,7 +261,7 @@ class AhpraAccessTests(TestCase):
         self.assertEqual(ahpra_state(self.profile)['state'], 'suspended')
         AhpraCheck.objects.filter(status='pending').update(status='done', outcome='review',
                                                          completed_at=timezone.now(), register_data={
-                                                             'registration_status': 'Registered'})
+                                                             'registration_status': 'Registered', 'registration_type': 'General'})
         self.assertEqual(ahpra_state(self.profile)['state'], 'pending')
 
     def test_unreadable_three_instant_rechecks_then_24_hour_cooldown(self):

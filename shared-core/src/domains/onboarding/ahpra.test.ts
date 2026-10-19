@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getOnboardingDetail, updateOnboardingForm, recheckAhpra } from './api';
+import { acceptShiftOfferService, expressInterestInPublicShiftService, submitShiftCounterOfferService } from '../shifts/api';
 import { configureApi } from '../../transport/application';
 import { responseError } from '../../transport/errors';
 import { AHPRA_UNREADABLE_MESSAGE, ahpraCooldownSeconds, ahpraStatusMessage, subscribeAhpraErrors, type AhpraSummary } from './ahpra';
@@ -17,7 +18,7 @@ describe('AHPRA recovery contract', () => {
     await expect(recheckAhpra()).resolves.toEqual({ queued: true });
   });
 
-  it.each(['ahpra_suspended', 'ahpra_not_found', 'ahpra_rejected', 'ahpra_unreadable', 'ahpra_recheck_cooldown'])('preserves %s and notifies recovery listeners', async code => {
+  it.each(['ahpra_suspended', 'ahpra_not_found', 'ahpra_rejected', 'ahpra_type_not_accepted', 'ahpra_unreadable', 'ahpra_recheck_cooldown'])('preserves %s and notifies recovery listeners', async code => {
     const listener = vi.fn();
     const unsubscribe = subscribeAhpraErrors(listener);
     try {
@@ -71,6 +72,28 @@ describe('AHPRA recovery contract', () => {
     const fields = { state: 'unreadable', frozen: false, attempts: 2, contact_support: true };
     expect(normalizeVerification({}, fields)?.ahpra).toMatchObject(fields);
     expect(normalizeVerification({}, { ...fields, contact_support: undefined, contactSupport: true })?.ahpra).toMatchObject(fields);
+  });
+
+  it.each(['Non Practising', 'Limited', 'Provisional'])('preserves the backend note and normal cooldown for %s registration', registration_type => {
+    const fields = {
+      state: 'type_not_accepted', frozen: false, registration_status: 'Registered', registration_type,
+      note: `Backend message for ${registration_type}.`, recheck_available_at: '2026-10-19T01:00:00Z',
+    };
+    const summary = normalizeVerification({}, fields)!.ahpra!;
+    expect(summary).toMatchObject(fields);
+    expect(ahpraStatusMessage(summary)).toBe(fields.note);
+    expect(ahpraCooldownSeconds(summary.recheck_available_at, Date.parse('2026-10-19T00:00:00Z'))).toBe(3600);
+  });
+
+  it.each([
+    ['interest', () => expressInterestInPublicShiftService({ shiftId: 1, slotId: null })],
+    ['counter-offer', () => submitShiftCounterOfferService({ shiftId: 1, slots: [] })],
+    ['accept', () => acceptShiftOfferService(1)],
+  ] as const)('preserves the registration type refusal detail for public %s', async (_action, submit) => {
+    const payload = { code: 'ahpra_type_not_accepted', detail: 'Exact registration type refusal.' };
+    configureApi({ baseURL: 'https://example.test/api/v1/', getToken: () => 'session', fetchImpl: (async () =>
+      new Response(JSON.stringify(payload), { status: 403 })) as typeof fetch });
+    await expect(submit()).rejects.toMatchObject({ status: 403, code: payload.code, message: payload.detail });
   });
 
   it('counts down without allowing a check early', () => {

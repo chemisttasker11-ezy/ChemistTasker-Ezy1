@@ -74,7 +74,7 @@ class Review183FixTests(TestCase):
                 caches['ahpra'].clear()
                 AhpraCheck.objects.all().delete()
                 check_fixture(self.profile, status='done', outcome='verified', completed_at=timezone.now() - timedelta(days=1),
-                              register_data={'registration_status': status})
+                              register_data={'registration_status': status, 'registration_type': 'General'})
                 check_fixture(self.profile, status='done', outcome='blocked', completed_at=timezone.now())
                 self.assertEqual(client.post('/api/v1/onboarding/ahpra/recheck/').status_code, 202)
                 self.assertEqual(len(claim_checks(stage='bridge')), 1)
@@ -85,7 +85,7 @@ class Review183FixTests(TestCase):
         self.profile.ahpra_expiry_date = timezone.localdate() - timedelta(days=10)
         self.profile.save(update_fields=['ahpra_expiry_date'])
         check_fixture(self.profile, status='done', outcome='verified', completed_at=timezone.now() - timedelta(days=40),
-                      register_data={'registration_status': 'Registered'})
+                      register_data={'registration_status': 'Registered', 'registration_type': 'General'})
         check_fixture(self.profile, status='done', outcome='error', completed_at=timezone.now())
         queue_public_recheck(self.profile.user)
         self.assertEqual(claim_checks(stage='bridge'), [])
@@ -96,7 +96,7 @@ class Review183FixTests(TestCase):
 
     def reject(self):
         check = check_fixture(self.profile, status='done', outcome='verified', completed_at=timezone.now(),
-                              register_data={'registration_status': 'Registered'})
+                              register_data={'registration_status': 'Registered', 'registration_type': 'General'})
         AhpraCheckAdmin(AhpraCheck, AdminSite()).mark_rejected(
             SimpleNamespace(user=self.profile.user), AhpraCheck.objects.filter(pk=check.pk))
 

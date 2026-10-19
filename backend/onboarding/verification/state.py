@@ -6,8 +6,9 @@ from django.core.cache import caches
 from django.db import transaction
 from django.utils import timezone
 
-from onboarding.models import AhpraCheck, OwnerOnboarding
+from onboarding.models import AhpraCheck, OwnerOnboarding, PharmacistOnboarding
 from onboarding.services.work_profile import current_worker_profile
+from onboarding.verification.ahpra import registration_type_note
 from onboarding.verification.ahpra_numbers import full_registration_number
 
 ADVERSE_STATUSES = {'suspended', 'cancelled', 'surrendered'}
@@ -46,12 +47,19 @@ def ahpra_state(profile):
     raw_status = data.get('registration_status')
     status = (raw_status.strip() or None) if isinstance(raw_status, str) else None
     normalized_status = (status or '').lower()
+    raw_type = data.get('registration_type')
+    registration_type = raw_type.strip() if isinstance(raw_type, str) else ''
+    pharmacist = isinstance(profile, PharmacistOnboarding) or (
+        isinstance(profile, OwnerOnboarding) and (profile.role == 'PHARMACIST' or profile.ahpra_switched_to_manager)
+    )
     state = 'pending'
     if check:
         if check.outcome == 'not_found' or normalized_status == 'not registered':
             state = 'not_found'
         elif normalized_status in ADVERSE_STATUSES:
             state = 'suspended'
+        elif normalized_status == 'registered' and pharmacist and registration_type.lower() != 'general':
+            state = 'type_not_accepted'
         elif AhpraCheck.objects.filter(
             model_name=profile._meta.object_name, object_pk=profile.pk, registration_number=number,
             status='done', reviewed_at__isnull=False,
@@ -95,6 +103,8 @@ def ahpra_state(profile):
             f'Your AHPRA registration shows as {status}. Your ChemistTasker account is paused until this changes. '
             'Please contact AHPRA. When your registration is restored, open your AHPRA step and press Re-check.'
         )
+    elif state == 'type_not_accepted':
+        note = registration_type_note(registration_type)
     elif state == 'not_found':
         note = (
             f"We couldn't find registration number {number} on the AHPRA public register. "
@@ -106,7 +116,7 @@ def ahpra_state(profile):
             note += ' Still not working? Contact us now.'
     return {
         'state': state, 'registration_status': status,
-        'registration_type': data.get('registration_type') or None,
+        'registration_type': registration_type or None,
         'expiry_date': data.get('expiry_date') or None, 'note': note,
         'checked_at': check.completed_at.isoformat() if check and check.completed_at else None,
         'recheck_available_at': available.isoformat() if available else None,
@@ -127,7 +137,7 @@ def require_ahpra_application(user):
     state = ahpra_state(profile)
     if state['state'] == 'suspended' and not ahpra_frozen(user, state):
         state['note'] = member_suspension_note(state['registration_status'])
-    if state['state'] in ('not_found', 'suspended', 'unreadable', 'rejected'):
+    if state['state'] in ('not_found', 'suspended', 'unreadable', 'rejected', 'type_not_accepted'):
         raise ShiftActionRefused({'code': f"ahpra_{state['state']}", 'detail': state['note']}, 403)
     if isinstance(profile, OwnerOnboarding) and profile.role != 'PHARMACIST':
         raise ShiftActionRefused({'code': 'pharmacist_required', 'detail': 'Pharmacy managers cannot apply as pharmacists.'}, 403)
@@ -188,13 +198,13 @@ def apply_state_transition(profile, previous):
     from onboarding.verification.policy import refresh_verified, revoke_for_changed_evidence
     profile.refresh_from_db()
     current = ahpra_state(profile)
-    if current['state'] in ('suspended', 'not_found', 'unreadable', 'rejected'):
+    if current['state'] in ('suspended', 'not_found', 'unreadable', 'rejected', 'type_not_accepted'):
         revoked = revoke_for_changed_evidence(profile, 'ahpra')
-        if current['state'] in ('suspended', 'unreadable', 'rejected'):
+        if current['state'] in ('suspended', 'unreadable', 'rejected', 'type_not_accepted'):
             profile.ahpra_verified = False
             profile.verified = False
             profile.save(update_fields=['ahpra_verified', 'verified'])
-            if current['state'] == 'suspended' and isinstance(profile, OwnerOnboarding) and profile.role != 'MANAGER':
+            if current['state'] in ('suspended', 'type_not_accepted') and isinstance(profile, OwnerOnboarding) and profile.role != 'MANAGER':
                 profile.role, profile.ahpra_switched_to_manager = 'MANAGER', True
                 profile.save(update_fields=['role', 'ahpra_switched_to_manager'])
         elif revoked:
@@ -207,6 +217,8 @@ def apply_state_transition(profile, previous):
     if current['state'] == 'suspended' and previous['state'] != 'suspended':
         if not profile.user.is_staff and ahpra_frozen(profile.user):
             transaction.on_commit(lambda: close_chat_sockets(profile.user_id), robust=True)
+        transaction.on_commit(lambda: announce_suspension(profile, current), robust=True)
+    elif current['state'] == 'type_not_accepted' and previous['state'] == 'ok':
         transaction.on_commit(lambda: announce_suspension(profile, current), robust=True)
 
 
@@ -227,9 +239,12 @@ def announce_suspension(profile, state):
     from notifications.services import notify_users
     from shifts.cancellation import cancel_upcoming_assignments
 
-    bookings = cancel_upcoming_assignments(profile.user)
-    notify_users([profile.user_id], title='AHPRA registration paused', body=state['note'],
-                 payload={'code': 'ahpra_suspended'})
+    type_not_accepted = state['state'] == 'type_not_accepted'
+    reason = ('their AHPRA registration type is not accepted for pharmacist shifts' if type_not_accepted
+              else 'their AHPRA registration is paused')
+    bookings = cancel_upcoming_assignments(profile.user, reason=reason)
+    notify_users([profile.user_id], title='AHPRA registration type not accepted' if type_not_accepted else 'AHPRA registration paused',
+                 body=state['note'], payload={'code': f"ahpra_{state['state']}"})
     async_task('users.tasks.send_async_email', subject='Your AHPRA registration',
                recipient_list=[profile.user.email], template_name='emails/ahpra_status.html',
                text_template='emails/ahpra_status.txt', context={'message': state['note']},
@@ -239,8 +254,10 @@ def announce_suspension(profile, state):
         rows = '\n'.join(f"Shift {row['id']}: {row['date']} - {row['pharmacy']}" for row in bookings['cancelled'])
         retained = '\n'.join(f"Shift {row['id']}: {row['date']} - {row['pharmacy']} - kept, needs manual action"
                              for row in bookings['retained'])
-        send_mail('AHPRA owner switched to Pharmacy Manager' if isinstance(profile, OwnerOnboarding) else 'AHPRA account paused',
+        subject = ('AHPRA owner switched to Pharmacy Manager' if isinstance(profile, OwnerOnboarding) else
+                   'AHPRA registration type not accepted' if type_not_accepted else 'AHPRA account paused')
+        send_mail(subject,
                   f'User id: {profile.user_id}\nNumber: {full_registration_number(profile.ahpra_number)}\n'
-                  f"Status: {state['registration_status']}\nCancelled shifts:\n{rows or 'None'}\n"
+                  f"Status: {state['registration_status']}\nType: {state['registration_type']}\nCancelled shifts:\n{rows or 'None'}\n"
                   f"Retained bookings:\n{retained or 'None'}",
                   settings.DEFAULT_FROM_EMAIL, recipients)

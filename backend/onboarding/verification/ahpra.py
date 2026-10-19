@@ -155,10 +155,24 @@ def parse_ahpra_html(html_file_path):
     }
 
 
+def registration_type_note(reg_type):
+    if reg_type.lower() == 'provisional':
+        return (
+            'Your AHPRA registration type is Provisional, which means you can only practise under supervision. '
+            'Pharmacist shifts on ChemistTasker need General registration. When your registration changes to General, '
+            'open your AHPRA step and press Re-check. If this looks wrong, contact us.'
+        )
+    return (
+        f'Your AHPRA registration type is {reg_type}. Pharmacist shifts on ChemistTasker need General registration, '
+        "so you can't apply for them at the moment. When your registration changes, open your AHPRA step and press "
+        'Re-check. If this looks wrong, contact us.'
+    )
+
+
 def evaluate_ahpra_record(record: dict, *, first_name, last_name, role) -> tuple[str, str]:
     """Pure evaluation of an AHPRA record against user details and role.
 
-    Returns (outcome, note) where outcome is in {"verified", "review", "rejected"}.
+    Returns (outcome, note): verified, review, rejected or type_not_accepted.
     """
     practitioner_name = (record.get("practitioner_name") or "").strip()
     if not simple_name_match(practitioner_name, first_name, last_name):
@@ -182,7 +196,7 @@ def evaluate_ahpra_record(record: dict, *, first_name, last_name, role) -> tuple
     reg_type_norm = reg_type.lower()
     if role_norm in ("pharmacist", "pharmacy"):
         if reg_type_norm != "general":
-            return ("review", f"Registration type is '{reg_type}' (expected 'General')")
+            return ("type_not_accepted", registration_type_note(reg_type))
     elif role_norm == "intern":
         if reg_type_norm not in ("provisional", "general"):
             return ("review", f"Registration type is '{reg_type}' (expected 'Provisional' or 'General')")

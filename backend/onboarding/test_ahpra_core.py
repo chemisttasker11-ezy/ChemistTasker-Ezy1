@@ -176,20 +176,20 @@ class EvaluateAhpraRecordTests(TestCase):
         )
         self.assertEqual(outcome, "verified")
 
-        # Pharmacist with Provisional -> review
+        # Pharmacist with Provisional cannot apply for public pharmacist shifts.
         record_prov = self.base_record(registration_type="Provisional")
         outcome, note = evaluate_ahpra_record(
             record_prov, first_name="Jane", last_name="Doe", role="pharmacist"
         )
-        self.assertEqual(outcome, "review")
+        self.assertEqual(outcome, "type_not_accepted")
         self.assertIn("General", note)
 
-        # Pharmacist with Limited/other -> review
+        # Pharmacist with Limited/other cannot apply either.
         record_ltd = self.base_record(registration_type="Limited")
         outcome, _ = evaluate_ahpra_record(
             record_ltd, first_name="Jane", last_name="Doe", role="pharmacist"
         )
-        self.assertEqual(outcome, "review")
+        self.assertEqual(outcome, "type_not_accepted")
 
     def test_role_intern_branches(self):
         # Intern with Provisional -> verified

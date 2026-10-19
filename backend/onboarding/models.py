@@ -108,7 +108,7 @@ class AhpraCheck(models.Model):
     repair_summary = models.TextField(blank=True)
     repair_branch = models.CharField(max_length=255, blank=True)
     repair_reported_at = models.DateTimeField(null=True, blank=True)
-    outcome = models.CharField(max_length=16, blank=True, choices=[(v, v) for v in ('verified', 'review', 'rejected', 'not_found', 'blocked', 'error')])
+    outcome = models.CharField(max_length=32, blank=True, choices=[(v, v) for v in ('verified', 'review', 'rejected', 'not_found', 'blocked', 'error', 'type_not_accepted')])
     register_data = models.JSONField(default=dict, blank=True)
     note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

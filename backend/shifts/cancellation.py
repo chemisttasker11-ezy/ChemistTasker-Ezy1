@@ -1,4 +1,4 @@
-"""Remove future bookings after a registration suspension; retain worked assignments."""
+"""Remove future public bookings after an AHPRA restriction; retain worked assignments."""
 import logging
 
 from django.core.exceptions import ValidationError
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @transaction.atomic
-def cancel_upcoming_assignments(user):
+def cancel_upcoming_assignments(user, *, reason='their AHPRA registration is paused'):
     now = timezone.localtime()
 
     def upcoming(day, start):
@@ -44,7 +44,7 @@ def cancel_upcoming_assignments(user):
             retained[key] = (assignment.shift, day)
             continue
         cancelled[key] = (assignment.shift, day)
-        # A safety suspension must also remove published roster bookings. QuerySet.delete keeps deletion signals.
+        # An AHPRA restriction must also remove published roster bookings. QuerySet.delete keeps deletion signals.
         ShiftSlotAssignment.objects.filter(pk=assignment.pk).delete()
     offers = ShiftOffer.objects.select_for_update(of=('self',)).filter(
         user=user, shift__visibility='PLATFORM',
@@ -72,15 +72,15 @@ def cancel_upcoming_assignments(user):
             continue  # The booking still exists; managers must not be told it was cancelled.
         row = {'id': shift.pk, 'date': day.isoformat(), 'pharmacy': shift.pharmacy.name}
         rows.append(row)
-        transaction.on_commit(lambda shift=shift, row=row: _announce_cancellation(shift, row), robust=True)
+        transaction.on_commit(lambda shift=shift, row=row: _announce_cancellation(shift, row, reason), robust=True)
     return {'cancelled': rows, 'retained': [
         {'id': shift.pk, 'date': day.isoformat(), 'pharmacy': shift.pharmacy.name}
         for shift, day in retained.values()
     ]}
 
 
-def _announce_cancellation(shift, row):
-    message = f"A worker's booking for shift {shift.pk} on {row['date']} at {row['pharmacy']} was cancelled because their AHPRA registration is paused."
+def _announce_cancellation(shift, row, reason):
+    message = f"A worker's booking for shift {shift.pk} on {row['date']} at {row['pharmacy']} was cancelled because {reason}."
     recipients = notify_shift_managers(shift, title='Shift booking cancelled', body=message,
                                        kind='shift_cancelled', payload={'date': row['date']})
     emails = sorted({recipient.email for recipient in recipients if recipient.email})
