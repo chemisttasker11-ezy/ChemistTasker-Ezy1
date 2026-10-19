@@ -1,14 +1,17 @@
 """Current-number AHPRA state shared by onboarding, access checks and employers."""
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.core.cache import caches
 from django.db import transaction
+from django.utils import timezone
 
 from onboarding.models import AhpraCheck, OwnerOnboarding
 from onboarding.services.work_profile import current_worker_profile
 from onboarding.verification.ahpra_numbers import full_registration_number
 
 ADVERSE_STATUSES = {'suspended', 'cancelled', 'surrendered'}
+# Lookups with no real register record: they never change anyone's AHPRA state.
+VERIFIER_FAILURES = ('error', 'blocked')
 
 
 def ahpra_profile(user):
@@ -21,6 +24,13 @@ def recheck_key(user_id):
     return f'ahpra_recheck_requested_{user_id}'
 
 
+def recent_rechecks(profile):
+    return AhpraCheck.objects.filter(
+        model_name=profile._meta.object_name, object_pk=profile.pk, reason='recheck',
+        registration_number=full_registration_number(profile.ahpra_number), created_at__gt=timezone.now() - timedelta(hours=24),
+    ).order_by('created_at', 'pk')
+
+
 def ahpra_state(profile):
     number = full_registration_number(getattr(profile, 'ahpra_number', None))
     check = None
@@ -28,7 +38,7 @@ def ahpra_state(profile):
         check = AhpraCheck.objects.filter(
             model_name=profile._meta.object_name, object_pk=profile.pk,
             registration_number=number, status='done',
-        ).order_by('-completed_at', '-pk').first()
+        ).exclude(outcome__in=VERIFIER_FAILURES).order_by('-completed_at', '-pk').first()
     data = check.register_data if check and isinstance(check.register_data, dict) else {}
     raw_status = data.get('registration_status')
     status = (raw_status.strip() or None) if isinstance(raw_status, str) else None
@@ -41,12 +51,28 @@ def ahpra_state(profile):
             state = 'suspended'
         elif normalized_status == 'registered' and check.outcome == 'verified':
             state = 'ok'
+        elif normalized_status != 'registered' and not (check.outcome == 'verified' and check.reviewed_at):
+            # An admin's manual verify carries no readable register status.
+            state = 'unreadable'
     user_id = getattr(profile, 'user_id', None)
     requested = caches['ahpra'].get(recheck_key(user_id)) if user_id and number else None
     available = requested + timedelta(hours=1) if requested else None
+    attempts, contact_support = 0, False
+    if state == 'unreadable':
+        retries = list(recent_rechecks(profile))
+        attempts = len(retries)
+        available = retries[0].created_at + timedelta(hours=24) if attempts >= 3 else None
+        last_two = list(AhpraCheck.objects.filter(
+            model_name=profile._meta.object_name, object_pk=profile.pk,
+            registration_number=number, status='done',
+        ).exclude(outcome__in=VERIFIER_FAILURES).order_by('-completed_at', '-pk')[:2])
+        contact_support = len(last_two) == 2 and all(
+            row.outcome != 'not_found' and str((row.register_data or {}).get('registration_status') or '').strip().lower()
+            not in ADVERSE_STATUSES | {'registered', 'not registered'} for row in last_two
+        )
     note = check.note if check else ''
     if state == 'suspended':
-        note = (
+        note = (member_suspension_note(status) + ' Your owner profile is now a Pharmacy Manager.') if isinstance(profile, OwnerOnboarding) else (
             f'Your AHPRA registration shows as {status}. Your ChemistTasker account is paused until this changes. '
             'Please contact AHPRA. When your registration is restored, open your AHPRA step and press Re-check.'
         )
@@ -55,14 +81,17 @@ def ahpra_state(profile):
             f"We couldn't find registration number {number} on the AHPRA public register. "
             'Check the number (fix it if it was a typo) or contact AHPRA, then press Re-check.'
         )
-    elif check and state == 'pending' and normalized_status != 'registered':
-        note = f'Needs review by an admin: AHPRA registration status is {status or "unreadable"}.'
+    elif state == 'unreadable':
+        note = "We couldn't read your AHPRA registration. Please check your number is correct and press Re-check."
+        if contact_support:
+            note += ' Still not working? Contact us now.'
     return {
         'state': state, 'registration_status': status,
         'registration_type': data.get('registration_type') or None,
         'expiry_date': data.get('expiry_date') or None, 'note': note,
         'checked_at': check.completed_at.isoformat() if check and check.completed_at else None,
         'recheck_available_at': available.isoformat() if available else None,
+        'attempts': attempts, 'contact_support': contact_support,
     }
 
 
@@ -75,11 +104,14 @@ def member_suspension_note(status):
 
 def require_ahpra_application(user):
     from shifts.access import ShiftActionRefused
-    state = ahpra_state(ahpra_profile(user))
+    profile = ahpra_profile(user)
+    state = ahpra_state(profile)
     if state['state'] == 'suspended' and not ahpra_frozen(user, state):
         state['note'] = member_suspension_note(state['registration_status'])
-    if state['state'] in ('not_found', 'suspended'):
+    if state['state'] in ('not_found', 'suspended', 'unreadable'):
         raise ShiftActionRefused({'code': f"ahpra_{state['state']}", 'detail': state['note']}, 403)
+    if isinstance(profile, OwnerOnboarding) and profile.role != 'PHARMACIST':
+        raise ShiftActionRefused({'code': 'pharmacist_required', 'detail': 'Pharmacy managers cannot apply as pharmacists.'}, 403)
 
 
 def require_public_ahpra(user, shift):
@@ -88,6 +120,32 @@ def require_public_ahpra(user, shift):
 
     if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(user, shift):
         require_ahpra_application(user)
+        transaction.on_commit(lambda: queue_public_recheck(user), robust=True)
+
+
+def queue_public_recheck(user):
+    from django.conf import settings
+    from onboarding.verification.desktop import enqueue_check
+
+    profile = ahpra_profile(user)
+    number = full_registration_number(getattr(profile, 'ahpra_number', None))
+    if settings.AHPRA_SOURCE != 'desktop' or not number:
+        return
+    today = timezone.localdate()
+    last = AhpraCheck.objects.filter(
+        model_name=profile._meta.object_name, object_pk=profile.pk, registration_number=number, status='done',
+    ).order_by('-completed_at', '-pk').first()
+    checked = timezone.localtime(last.completed_at).date() if last and last.completed_at else None
+    data = last.register_data if last and isinstance(last.register_data, dict) else {}
+    # Other-staff (intern) profiles have no expiry column; the finished check stores it.
+    expiry = getattr(profile, 'ahpra_expiry_date', None) or (
+        date.fromisoformat(data['expiry_date']) if data.get('expiry_date') else None)
+    if expiry:
+        due = expiry < today and (checked is None or checked <= expiry)
+    else:
+        due = checked is None or checked < date(today.year if today.month == 12 else today.year - 1, 12, 1)
+    if due:
+        enqueue_check(profile, number, 'recheck')
 
 
 def ahpra_frozen(user, state=None):
@@ -95,8 +153,8 @@ def ahpra_frozen(user, state=None):
 
     state = state or ahpra_state(ahpra_profile(user))
     # Owner- and organisation-admin invites both create pharmacy Memberships; OrganizationMembership is admin access.
-    return state['state'] == 'suspended' and (
-        str(user.role).upper() == 'OWNER' or not Membership.objects.filter(
+    return state['state'] == 'suspended' and str(user.role).upper() != 'OWNER' and (
+        not Membership.objects.filter(
             user=user, pharmacy__isnull=False, is_active=True, status=Membership.Status.ACCEPTED).exists()
     )
 
@@ -106,16 +164,21 @@ def apply_state_transition(profile, previous):
     from onboarding.verification.policy import refresh_verified, revoke_for_changed_evidence
     profile.refresh_from_db()
     current = ahpra_state(profile)
-    # Pending/needs-review never revokes Verified (owner decision 2026-10-14).
-    if current['state'] in ('suspended', 'not_found'):
+    if current['state'] in ('suspended', 'not_found', 'unreadable'):
         revoked = revoke_for_changed_evidence(profile, 'ahpra')
-        if current['state'] == 'suspended':
+        if current['state'] in ('suspended', 'unreadable'):
             profile.ahpra_verified = False
             profile.verified = False
             profile.save(update_fields=['ahpra_verified', 'verified'])
+            if current['state'] == 'suspended' and isinstance(profile, OwnerOnboarding) and profile.role != 'MANAGER':
+                profile.role, profile.ahpra_switched_to_manager = 'MANAGER', True
+                profile.save(update_fields=['role', 'ahpra_switched_to_manager'])
         elif revoked:
             profile.save(update_fields=['verified'])
     elif current['state'] == 'ok':
+        if isinstance(profile, OwnerOnboarding) and profile.ahpra_switched_to_manager:
+            profile.role, profile.ahpra_switched_to_manager = 'PHARMACIST', False
+            profile.save(update_fields=['role', 'ahpra_switched_to_manager'])
         refresh_verified(profile)
     if current['state'] == 'suspended' and previous['state'] != 'suspended':
         if not profile.user.is_staff and ahpra_frozen(profile.user):
@@ -152,7 +215,7 @@ def announce_suspension(profile, state):
         rows = '\n'.join(f"Shift {row['id']}: {row['date']} - {row['pharmacy']}" for row in bookings['cancelled'])
         retained = '\n'.join(f"Shift {row['id']}: {row['date']} - {row['pharmacy']} - kept, needs manual action"
                              for row in bookings['retained'])
-        send_mail('AHPRA account paused',
+        send_mail('AHPRA owner switched to Pharmacy Manager' if isinstance(profile, OwnerOnboarding) else 'AHPRA account paused',
                   f'User id: {profile.user_id}\nNumber: {full_registration_number(profile.ahpra_number)}\n'
                   f"Status: {state['registration_status']}\nCancelled shifts:\n{rows or 'None'}\n"
                   f"Retained bookings:\n{retained or 'None'}",

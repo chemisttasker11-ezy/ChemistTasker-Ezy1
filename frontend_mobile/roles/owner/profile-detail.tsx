@@ -69,7 +69,6 @@ export default function OwnerProfileDetailScreen({
 }: Props) {
   const router = useRouter();
   const ahpra = useAhpra();
-  const recovering = ahpra.summary?.state === 'suspended' || ahpra.summary?.state === 'not_found';
   const { user, refreshUser } = useAuth();
   const imageMediaTypes = (ImagePicker as any).MediaType?.Images ?? ImagePicker.MediaTypeOptions.Images;
 
@@ -125,7 +124,7 @@ export default function OwnerProfileDetailScreen({
     const name = [form.first_name, form.last_name].filter(Boolean).join(' ').trim();
     return name || form.username || 'Owner setup';
   }, [form.first_name, form.last_name, form.username]);
-  const showAhpra = form.role === 'PHARMACIST' || Boolean(form.ahpra_number) || recovering;
+  const showAhpra = form.role === 'PHARMACIST' || Boolean(form.ahpra_number);
   const isAhpraVerified = form.ahpra_verified === true && (!ahpra.summary || ahpra.summary.state === 'ok');
 
   const buildFormFromResponse = (data: any): OwnerFormData => ({
@@ -233,9 +232,7 @@ export default function OwnerProfileDetailScreen({
         profilePhotoUri: null,
       });
       setProfilePhotoAsset(null);
-      if (recovering) {
-        Alert.alert('Saved', 'AHPRA number submitted.');
-      } else if (standalone && onSuccessPath) {
+      if (standalone && onSuccessPath) {
         router.replace(onSuccessPath as any);
       } else {
         Alert.alert('Saved', 'Owner profile detail updated.');
@@ -467,9 +464,9 @@ export default function OwnerProfileDetailScreen({
             ))}
           </Menu>
 
+          <AhpraStatus submitLabel="Submit" />
           {showAhpra ? (
             <>
-              <AhpraStatus submitLabel="Submit" />
               <TextInput
                 mode="outlined"
                 label="AHPRA Number"
@@ -531,7 +528,7 @@ export default function OwnerProfileDetailScreen({
               buttonColor="#7C8CF8"
               textColor="#FFFFFF"
             >
-              {saving ? 'Saving...' : recovering ? 'Submit' : standalone ? 'Continue' : 'Submit'}
+              {saving ? 'Saving...' : standalone ? 'Continue' : 'Submit'}
             </Button>
           </View>
         </View>

@@ -17,7 +17,9 @@ class VerificationBadgeSerializer(serializers.Serializer):
 
 
 class AhpraStateSerializer(serializers.Serializer):
-    state = serializers.ChoiceField(choices=('ok', 'pending', 'suspended', 'not_found'))
+    state = serializers.ChoiceField(choices=('ok', 'pending', 'suspended', 'not_found', 'unreadable'))
+    attempts = serializers.IntegerField(default=0)
+    contact_support = serializers.BooleanField(default=False)
     frozen = serializers.BooleanField(default=False)
     registration_status = serializers.CharField(allow_null=True)
     registration_type = serializers.CharField(allow_null=True)
@@ -32,7 +34,7 @@ class AhpraStateSerializer(serializers.Serializer):
             return super().to_representation(instance)
         state = ahpra_state(instance)
         frozen = ahpra_frozen(instance.user, state)
-        if state['state'] == 'suspended' and not frozen:
+        if state['state'] == 'suspended' and not frozen and str(instance.user.role).upper() != 'OWNER':
             state['note'] = member_suspension_note(state['registration_status'])
         return {**state, 'frozen': frozen}
 

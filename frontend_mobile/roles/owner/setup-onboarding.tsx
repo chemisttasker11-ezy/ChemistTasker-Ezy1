@@ -1,4 +1,3 @@
-import { useAhpra } from '../../context/AhpraContext';
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { ActivityIndicator, HelperText } from 'react-native-paper';
@@ -11,14 +10,11 @@ import { useAuth } from '@/context/AuthContext';
 export default function OwnerSetupOnboardingScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { summary, refusal } = useAhpra();
-  const recovering = summary?.state === 'suspended' || summary?.state === 'not_found' || refusal;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    if (recovering) { setLoading(false); setError(''); return; }
     void getOwnerSetupStatus(user)
       .then((status) => {
         if (!active) return;
@@ -41,7 +37,7 @@ export default function OwnerSetupOnboardingScreen() {
     return () => {
       active = false;
     };
-  }, [router, user, recovering]);
+  }, [router, user]);
 
   if (loading) {
     return (

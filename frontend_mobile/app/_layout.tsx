@@ -233,14 +233,14 @@ function AuthGate() {
   const { user, isLoading, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
   const { summary: ahpraSummary, loading: ahpraLoading, refusal: ahpraRefusal, clearRefusal } = useAhpra();
-  const ahpraPath = user?.role === 'OWNER' ? '/setup/owner/onboarding' : user?.role === 'PHARMACIST' ? '/pharmacist/profile-basic-info' : '/otherstaff/profile-regulatory';
+  const ahpraPath = user?.role === 'PHARMACIST' ? '/pharmacist/profile-basic-info' : '/otherstaff/profile-regulatory';
   const onAhpraStep = `/${segments.join('/')}` === ahpraPath;
   // Invitations are never blocked by AHPRA.
   const onInvitePage = ['/pharmacist/memberships', '/otherstaff/memberships', '/admin-invitations'].includes(`/${segments.join('/')}`);
 
   useEffect(() => {
     if (isLoading || ahpraLoading) return;
-    if (user && (ahpraSummary?.frozen || ahpraRefusal)) {
+    if (user && user.role !== 'OWNER' && (ahpraSummary?.frozen || ahpraRefusal)) {
       if (!onAhpraStep && !onInvitePage) router.replace(ahpraPath as any);
       else if (ahpraRefusal) clearRefusal();
       return;
@@ -417,7 +417,7 @@ function AuthGate() {
     };
   }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user, ahpraLoading, ahpraSummary?.frozen, ahpraRefusal, clearRefusal, ahpraPath, onAhpraStep, onInvitePage]);
 
-  if (user && (ahpraLoading || ((ahpraSummary?.frozen || ahpraRefusal) && !onAhpraStep && !onInvitePage))) {
+  if (user && (ahpraLoading || (user.role !== 'OWNER' && (ahpraSummary?.frozen || ahpraRefusal) && !onAhpraStep && !onInvitePage))) {
     return <View style={{ position: 'absolute', inset: 0, zIndex: 10000, backgroundColor: '#FFFFFF', padding: 24, justifyContent: 'center' }}>
       {ahpraLoading ? <Text>Loading AHPRA status...</Text> : <AhpraStatus />}
     </View>;

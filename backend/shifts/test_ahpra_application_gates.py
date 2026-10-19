@@ -1,12 +1,12 @@
 """AHPRA gates public applications while preserving internal member access."""
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
 from django.core.cache import caches
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from client_profile.characterization_support import client_for, make_assignment, make_owner_with_pharmacy
+from client_profile.characterization_support import client_for, make_assignment, make_owner_with_pharmacy, make_user
 from memberships.models import Membership
 from onboarding.models import AhpraCheck
 from onboarding.test_ahpra_desktop import TEST_CACHES, check_fixture, profile_fixture
@@ -17,7 +17,8 @@ from shifts.access import ShiftActionRefused
 from shifts.models import ShiftCounterOffer, ShiftInterest, ShiftOffer, ShiftSlotAssignment
 
 
-@override_settings(CACHES=TEST_CACHES)
+@override_settings(AHPRA_SOURCE='desktop', CACHES=TEST_CACHES,
+                   CHANNEL_LAYERS={'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}})
 class AhpraApplicationGateTests(TestCase):
     def setUp(self):
         caches['ahpra'].clear()
@@ -62,6 +63,91 @@ class AhpraApplicationGateTests(TestCase):
     def test_not_found_does_not_freeze_other_endpoints(self):
         self.assertEqual(self.client.get('/api/v1/shift-saved/').status_code, 200)
 
+    def test_unreadable_public_apply_refused_without_freeze_or_cancellation(self):
+        AhpraCheck.objects.filter(pk=self.check.pk).update(
+            outcome='review', register_data={'registration_status': 'Unknown'})
+        with patch('onboarding.verification.state.announce_suspension') as announce:
+            with self.captureOnCommitCallbacks(execute=True):
+                apply_state_transition(self.profile, {'state': 'ok'})
+            for path in (f'shifts/{self.shift.pk}/express_interest/', f'shift-offers/{self.offer.pk}/accept/'):
+                response = self.client.post(f'/api/v1/{path}', {}, format='json')
+                self.assertEqual(response.status_code, 403, response.content)
+                self.assertEqual(response.json()['code'], 'ahpra_unreadable')
+            announce.assert_not_called()
+        self.assertFalse(ahpra_frozen(self.user))
+        self.assertFalse(ShiftInterest.objects.filter(user=self.user).exists())
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, ShiftOffer.Status.PENDING)
+
+    def test_public_pickup_queues_expiry_recheck_and_still_201(self):
+        self.user.is_otp_verified = self.user.is_mobile_verified = True
+        self.user.save(update_fields=['is_otp_verified', 'is_mobile_verified'])
+        self.profile.verified = self.profile.ahpra_verified = True
+        self.profile.ahpra_expiry_date = timezone.localdate() - timedelta(days=1)
+        self.profile.save()
+        AhpraCheck.objects.filter(pk=self.check.pk).update(
+            outcome='verified', register_data={'registration_status': 'Registered'},
+            completed_at=timezone.now() - timedelta(days=30))
+        with patch('onboarding.verification.desktop.enqueue_check') as enqueue, patch('shifts.interest.async_task'):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(f'/api/v1/shifts/{self.shift.pk}/express_interest/', {}, format='json')
+        self.assertEqual(response.status_code, 201, response.content)
+        enqueue.assert_called_once()
+
+    def test_recheck_due_from_stored_expiry_or_last_december(self):
+        from onboarding.models import OtherStaffOnboarding
+        from onboarding.verification.state import queue_public_recheck
+
+        def due(checked, today, expiry=None, register_expiry=None, profile=self.profile):
+            if hasattr(profile, 'ahpra_expiry_date'):
+                profile.ahpra_expiry_date = expiry
+                profile.save(update_fields=['ahpra_expiry_date'])
+            AhpraCheck.objects.filter(pk=self.check.pk).update(
+                model_name=profile._meta.object_name, object_pk=profile.pk, outcome='verified',
+                register_data={'registration_status': 'Registered', 'expiry_date': register_expiry},
+                completed_at=timezone.make_aware(datetime.combine(checked, datetime.min.time().replace(hour=12))))
+            with patch('onboarding.verification.desktop.enqueue_check') as enqueue, \
+                    patch('django.utils.timezone.localdate', return_value=today):
+                queue_public_recheck(profile.user)
+            return enqueue.called
+
+        d = date
+        self.assertFalse(due(d(2026, 10, 15), d(2026, 12, 2), d(2027, 11, 30)))
+        self.assertTrue(due(d(2026, 10, 15), d(2027, 12, 1), d(2027, 11, 30)))
+        self.assertTrue(due(d(2026, 10, 15), d(2026, 12, 1), d(2026, 11, 30)))
+        self.assertFalse(due(d(2026, 12, 1), d(2026, 12, 3), d(2026, 11, 30)))  # that check already ran
+        self.assertFalse(due(d(2026, 12, 1), d(2027, 6, 1)))  # no expiry: checked since last 1 December
+        self.assertTrue(due(d(2026, 11, 30), d(2026, 12, 1)))
+        intern = OtherStaffOnboarding.objects.create(user=make_user('OTHER_STAFF'), role_type='INTERN',
+                                                     ahpra_number=self.profile.ahpra_number)
+        self.assertFalse(due(d(2026, 10, 15), d(2027, 4, 4), register_expiry='2027-04-04', profile=intern))
+        self.assertTrue(due(d(2026, 10, 15), d(2027, 4, 5), register_expiry='2027-04-04', profile=intern))
+        with override_settings(AHPRA_SOURCE='scrapingbee'):
+            self.assertFalse(due(d(2026, 10, 15), d(2027, 12, 1), d(2027, 11, 30)))
+
+    def test_public_gate_recheck_deduplicates_and_never_checks_internal_member_work(self):
+        AhpraCheck.objects.filter(pk=self.check.pk).update(
+            outcome='verified', register_data={'registration_status': 'Registered'},
+            completed_at=timezone.now() - timedelta(days=800))
+        with self.captureOnCommitCallbacks(execute=True):
+            require_public_ahpra(self.user, self.shift)
+            require_public_ahpra(self.user, self.shift)
+        self.assertEqual(AhpraCheck.objects.filter(status='pending', reason='recheck').count(), 1)
+        self.member(self.shift.pharmacy)
+        with patch('onboarding.verification.desktop.enqueue_check') as enqueue:
+            with self.captureOnCommitCallbacks(execute=True):
+                require_public_ahpra(self.user, self.shift)
+                self.shift.visibility = 'FULL_PART_TIME'
+                require_public_ahpra(self.user, self.shift)
+            enqueue.assert_not_called()
+
+    def test_no_periodic_registration_recheck(self):
+        from django.conf import settings
+        from onboarding import tasks
+        self.assertFalse(hasattr(tasks, 'recheck_ahpra_registrations'))
+        self.assertFalse(any(row['task'].endswith('.recheck_ahpra_registrations')
+                             for row in settings.CELERY_BEAT_SCHEDULE.values()))
+
     def test_old_number_not_found_does_not_block_corrected_number(self):
         self.profile.ahpra_number = 'PHA0007654321'
         self.profile.save(update_fields=['ahpra_number'])
@@ -104,6 +190,9 @@ class AhpraApplicationGateTests(TestCase):
         invite.refresh_from_db()
         self.assertEqual((invite.status, invite.is_active), (Membership.Status.ACCEPTED, True))
         self.assertFalse(ahpra_frozen(self.user))
+        summary = self.client.get('/api/v1/pharmacist/onboarding/me/').json()['ahpra']
+        self.assertEqual((summary['state'], summary['registration_status'], summary['frozen']),
+                         ('suspended', 'Suspended', False))
         shift, _, assignment = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=5))
         assignment.delete()
         shift.role_needed, shift.visibility = 'PHARMACIST', 'FULL_PART_TIME'
@@ -163,7 +252,7 @@ class AhpraApplicationGateTests(TestCase):
         self.member(self.shift.pharmacy)
         self.user.is_otp_verified = self.user.is_mobile_verified = True
         self.user.save(update_fields=['is_otp_verified', 'is_mobile_verified'])
-        for state in ('suspended', 'not_found'):
+        for state in ('suspended', 'not_found', 'unreadable'):
             self.set_state(state)
             for action in ('express_interest', 'claim', 'accept'):
                 with self.subTest(state=state, action=action):

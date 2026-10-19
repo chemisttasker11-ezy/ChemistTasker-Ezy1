@@ -68,10 +68,10 @@ def express_interest(*, shift, user, slot_ids=None, slot_id=None):
 
     Returns `(interests, created_interests)`.
     """
-    from onboarding.verification.state import require_ahpra_application
+    from onboarding.verification.state import require_public_ahpra
     # 1) Onboarding required
     if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(user, shift):
-        require_ahpra_application(user)
+        require_public_ahpra(user, shift)
         _require_public_shift_onboarding(user)
 
     # 2) Interest logic

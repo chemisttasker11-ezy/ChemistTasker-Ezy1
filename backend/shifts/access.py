@@ -104,4 +104,10 @@ def _shift_roles_visible_to_user(user):
 
 
 def _user_can_perform_shift_role(user, shift_role):
-    return _normalized_role_code(shift_role) in _shift_roles_visible_to_user(user)
+    role = _normalized_role_code(shift_role)
+    if role == "PHARMACIST" and _normalized_role_code(getattr(user, "role", None)) == "OWNER":
+        from onboarding.models import OwnerOnboarding
+        # Pharmacy managers (including AHPRA-suspended owners) still see their shifts but can't work as pharmacists.
+        if OwnerOnboarding.objects.filter(user=user, role="MANAGER").exists():
+            return False
+    return role in _shift_roles_visible_to_user(user)

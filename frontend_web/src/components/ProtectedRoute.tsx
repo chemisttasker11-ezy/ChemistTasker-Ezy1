@@ -36,10 +36,10 @@ export default function ProtectedRoute({
   const { user, isLoading, isAdminUser, hasCapability } = useAuth();
   const location = useLocation();
   const ahpra = useAhpra();
-  const roleKey = user?.role === 'OWNER' ? 'owner' : user?.role === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
+  const roleKey = user?.role === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
   const ahpraStep = roleKey === 'pharmacist' ? 'basic' : 'regulatory docs';
-  const recoveryPath = roleKey === 'owner' ? '/onboarding/owner' : `/onboarding/${roleKey}?step=${encodeURIComponent(ahpraStep)}`;
-  const onAhpraStep = location.pathname === `/onboarding/${roleKey}` && (roleKey === 'owner' || new URLSearchParams(location.search).get('step') === ahpraStep);
+  const recoveryPath = `/onboarding/${roleKey}?step=${encodeURIComponent(ahpraStep)}`;
+  const onAhpraStep = location.pathname === `/onboarding/${roleKey}` && new URLSearchParams(location.search).get('step') === ahpraStep;
   React.useEffect(() => {
     if (onAhpraStep && ahpra.refusal) ahpra.clearRefusal();
   }, [onAhpraStep, ahpra.refusal, ahpra.clearRefusal]);
@@ -55,7 +55,7 @@ export default function ProtectedRoute({
 
   if (location.pathname.endsWith('/logout')) return children;
 
-  const isAhpraRole = user.role === 'PHARMACIST' || user.role === 'OTHER_STAFF' || user.role === 'OWNER';
+  const isAhpraRole = user.role === 'PHARMACIST' || user.role === 'OTHER_STAFF';
   const isFrozen = isAhpraRole && Boolean(ahpra.summary?.frozen || ahpra.refusal);
 
   if (isAhpraRole && ahpra.loading) {
@@ -67,7 +67,7 @@ export default function ProtectedRoute({
     );
   }
 
-  if (ahpra.summary?.frozen && onAhpraStep) return children;
+  if (isFrozen && onAhpraStep) return children;
 
   // Invitations are never blocked by AHPRA: the invite email links land here.
   const onInvitePage = /^\/dashboard\/((pharmacist|otherstaff)\/memberships|admin-invitations)\/?$/.test(location.pathname);
@@ -82,7 +82,7 @@ export default function ProtectedRoute({
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             Your account is temporarily paused pending AHPRA registration review. Please review and update your registration details to restore access.
           </Typography>
-          <AhpraStatus submitLabel={roleKey === 'pharmacist' ? 'Submit & Verify Basic' : roleKey === 'owner' ? 'Submit' : 'Save role & qualifications'} />
+          <AhpraStatus submitLabel={roleKey === 'pharmacist' ? 'Submit & Verify Basic' : 'Save role & qualifications'} />
           <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 2 }}>
             <Button variant="contained" component={Link} to={recoveryPath}>
               Go to Account Details

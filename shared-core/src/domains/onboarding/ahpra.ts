@@ -1,6 +1,10 @@
+export const AHPRA_UNREADABLE_MESSAGE = "We couldn't read your AHPRA registration. Please check your number is correct and press Re-check.";
+
 export interface AhpraSummary {
-  state: 'ok' | 'pending' | 'suspended' | 'not_found';
+  state: 'ok' | 'pending' | 'suspended' | 'not_found' | 'unreadable';
   frozen: boolean;
+  attempts: number;
+  contact_support: boolean;
   registration_status: string | null;
   registration_type: string | null;
   expiry_date: string | null;
@@ -9,7 +13,7 @@ export interface AhpraSummary {
   recheck_available_at: string | null;
 }
 
-export type AhpraErrorCode = 'ahpra_suspended' | 'ahpra_not_found' | 'ahpra_recheck_cooldown';
+export type AhpraErrorCode = 'ahpra_suspended' | 'ahpra_not_found' | 'ahpra_unreadable' | 'ahpra_recheck_cooldown';
 export interface AhpraError { code: AhpraErrorCode; detail?: string; retry_after?: number; frozen?: boolean }
 const listeners = new Set<(error: AhpraError) => void>();
 export function subscribeAhpraErrors(listener: (error: AhpraError) => void) {
@@ -21,7 +25,7 @@ export function subscribeAhpraErrors(listener: (error: AhpraError) => void) {
 export function reportAhpraError(payload: unknown): AhpraError | null {
   if (!payload || typeof payload !== 'object') return null;
   const value = payload as AhpraError;
-  if (!['ahpra_suspended', 'ahpra_not_found', 'ahpra_recheck_cooldown'].includes(value.code)) return null;
+  if (!['ahpra_suspended', 'ahpra_not_found', 'ahpra_unreadable', 'ahpra_recheck_cooldown'].includes(value.code)) return null;
   for (const listener of listeners) listener(value);
   return value;
 }
@@ -32,8 +36,9 @@ export function ahpraCooldownSeconds(availableAt: string | null | undefined, now
 }
 
 export function ahpraStatusMessage(summary: AhpraSummary) {
+  if (summary.state === 'unreadable') return AHPRA_UNREADABLE_MESSAGE;
   return summary.note || (summary.state === 'suspended'
-    ? 'Your AHPRA registration is suspended. Your account is paused. Re-check once your registration is restored.'
+    ? (summary.frozen ? 'Your AHPRA registration is suspended. Your account is paused. Re-check once your registration is restored.' : 'Your AHPRA registration is suspended. You cannot work public shifts as a pharmacist. Re-check once your registration is restored.')
     : summary.state === 'not_found'
       ? 'Your AHPRA registration was not found. Check your number, submit it, then re-check.'
       : '');

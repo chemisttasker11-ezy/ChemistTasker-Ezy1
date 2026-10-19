@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { getOnboardingDetail, updateOnboardingForm, recheckAhpra } from './api';
 import { configureApi } from '../../transport/application';
 import { responseError } from '../../transport/errors';
-import { ahpraCooldownSeconds, ahpraStatusMessage, subscribeAhpraErrors, type AhpraSummary } from './ahpra';
+import { AHPRA_UNREADABLE_MESSAGE, ahpraCooldownSeconds, ahpraStatusMessage, subscribeAhpraErrors, type AhpraSummary } from './ahpra';
 import { evidenceExplainer, normalizeVerification, verificationRows } from './verification';
 
 describe('AHPRA recovery contract', () => {
@@ -17,13 +17,13 @@ describe('AHPRA recovery contract', () => {
     await expect(recheckAhpra()).resolves.toEqual({ queued: true });
   });
 
-  it.each(['ahpra_suspended', 'ahpra_not_found', 'ahpra_recheck_cooldown'])('preserves %s and notifies recovery listeners', async code => {
+  it.each(['ahpra_suspended', 'ahpra_not_found', 'ahpra_unreadable', 'ahpra_recheck_cooldown'])('preserves %s and notifies recovery listeners', async code => {
     const listener = vi.fn();
     const unsubscribe = subscribeAhpraErrors(listener);
     try {
       const payload = { code, detail: 'Exact backend message.', retry_after: 52 };
       const error = await responseError(new Response(JSON.stringify(payload), { status: code.endsWith('cooldown') ? 429 : 403 }));
-      expect(error.message).toBe(payload.detail);
+      expect(error.message).toBe(code === 'ahpra_unreadable' ? AHPRA_UNREADABLE_MESSAGE : payload.detail);
       expect(error.code).toBe(code);
       expect(error.retry_after).toBe(52);
       expect(listener).toHaveBeenCalledWith(payload);
@@ -50,12 +50,27 @@ describe('AHPRA recovery contract', () => {
   });
 
   it('always explains suspension and missing registration, preserving the backend message', () => {
-    const summary: AhpraSummary = { state: 'suspended', frozen: true, note: '', registration_status: null,
+    const summary: AhpraSummary = { state: 'suspended', frozen: true, attempts: 0, contact_support: false, note: '', registration_status: null,
       registration_type: null, expiry_date: null, checked_at: null, recheck_available_at: null };
     expect(ahpraStatusMessage(summary)).toContain('Your account is paused');
+    expect(ahpraStatusMessage({ ...summary, frozen: false })).not.toContain('Your account is paused');
+    expect(ahpraStatusMessage({ ...summary, state: 'unreadable', note: 'Unknown register result.' })).toBe(AHPRA_UNREADABLE_MESSAGE);
     expect(ahpraStatusMessage({ ...summary, state: 'not_found' })).toContain('Check your number');
     expect(ahpraStatusMessage({ ...summary, note: 'Exact owner refusal.' })).toBe('Exact owner refusal.');
     expect(ahpraStatusMessage({ ...summary, state: 'ok' })).toBe('');
+  });
+
+  it('explains a code-only unreadable public refusal without freezing the user', async () => {
+    const error = await responseError(new Response(JSON.stringify({ code: 'ahpra_unreadable' }), { status: 403 }));
+    expect(error.code).toBe('ahpra_unreadable');
+    expect(error.message).toBe(AHPRA_UNREADABLE_MESSAGE);
+    expect(error.payload).toEqual({ code: 'ahpra_unreadable' });
+  });
+
+  it('preserves unreadable retry and support fields through API projections', () => {
+    const fields = { state: 'unreadable', frozen: false, attempts: 2, contact_support: true };
+    expect(normalizeVerification({}, fields)?.ahpra).toMatchObject(fields);
+    expect(normalizeVerification({}, { ...fields, contact_support: undefined, contactSupport: true })?.ahpra).toMatchObject(fields);
   });
 
   it('counts down without allowing a check early', () => {

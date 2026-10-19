@@ -256,10 +256,6 @@ CELERY_TASK_ROUTES = {
     "onboarding.tasks.verify_skill_certificate_task": {"queue": "ocr"},
 }
 CELERY_BEAT_SCHEDULE = {
-    'ahpra-recheck-daily': {
-        'task': 'onboarding.tasks.recheck_ahpra_registrations',
-        'schedule': crontab(hour=2, minute=30),
-    },
     'ahpra-overdue-alerts': {
         'task': 'onboarding.tasks.alert_overdue_ahpra_checks',
         'schedule': crontab(minute='*/15'),
@@ -633,7 +629,6 @@ AZURE_OCR_KEY=env('AZURE_OCR_KEY')
 SCRAPINGBEE_API_KEY=env('SCRAPINGBEE_API_KEY')
 AHPRA_SOURCE = env('AHPRA_SOURCE', default='scrapingbee')
 AHPRA_VERIFIER_TOKEN_SHA256 = env('AHPRA_VERIFIER_TOKEN_SHA256', default='')
-AHPRA_RECHECK_DAYS = env.int('AHPRA_RECHECK_DAYS', default=30)
 
 
 # MobileMessage SMS Settings

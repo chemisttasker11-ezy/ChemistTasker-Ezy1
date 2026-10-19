@@ -1,4 +1,4 @@
-import { reportAhpraError } from '../domains/onboarding/ahpra';
+import { AHPRA_UNREADABLE_MESSAGE, reportAhpraError } from '../domains/onboarding/ahpra';
 /** Keep public API errors useful without exposing unexpected server internals. */
 export class ApiError extends Error {
     readonly code?: string;
@@ -40,7 +40,7 @@ export async function responseError(response: Response): Promise<ApiError> {
     const payload: unknown = await response.json().catch(() => null);
     const object = payload && typeof payload === 'object' && !Array.isArray(payload)
         ? payload as Record<string, unknown> : undefined;
-    const message = (object?.code === 'ahpra_recheck_cooldown' && !object.detail
+    const message = (object?.code === 'ahpra_unreadable' ? AHPRA_UNREADABLE_MESSAGE : undefined) ?? (object?.code === 'ahpra_recheck_cooldown' && !object.detail
         ? 'Please wait before re-checking your AHPRA registration.' : undefined) ?? firstMessage(object?.detail) ?? firstMessage(object?.error) ??
         firstMessage(object?.message) ?? firstMessage(payload) ?? fallback;
     return new ApiError(message, response.status, payload);

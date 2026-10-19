@@ -17,6 +17,7 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState(false);
+  const [queuedUntil, setQueuedUntil] = useState(0);
   const [now, setNow] = useState(Date.now());
   const clearRefusal = useCallback(() => setRefusal(false), []);
   const refresh = useCallback(async () => {
@@ -31,6 +32,7 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
     let active = true;
     generation.current += 1;
     setSummary(null);
+    setQueuedUntil(0);
     setError('');
     setRefusal(false);
     setBusy(false);
@@ -56,31 +58,32 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
         return;
       }
       setSummary(previous => ({
-        registration_status: null, registration_type: null, expiry_date: null, checked_at: null, recheck_available_at: null,
-        ...previous, state: value.code === 'ahpra_suspended' ? 'suspended' : 'not_found', note: value.detail || '', frozen: Boolean(value.frozen),
+        attempts: 0, contact_support: false, registration_status: null, registration_type: null, expiry_date: null, checked_at: null, recheck_available_at: null,
+        ...previous, state: value.code === 'ahpra_unreadable' ? 'unreadable' : value.code === 'ahpra_suspended' ? 'suspended' : 'not_found', note: value.detail || '', frozen: role !== 'owner' && value.code !== 'ahpra_unreadable' && Boolean(value.frozen),
       }));
       // Only the account freeze sends frozen; a member refused on a public shift stays where they are.
-      setRefusal(Boolean(value.frozen));
+      setRefusal(role !== 'owner' && value.code !== 'ahpra_unreadable' && Boolean(value.frozen));
+      if (value.code === 'ahpra_unreadable') void load();
     });
     void load();
     return () => { active = false; generation.current += 1; unsubscribe(); };
   }, [role, user?.id]);
 
   useEffect(() => {
-    // Poll only while a requested re-check is in flight; the 1-hour cooldown bounds it.
-    const until = Date.parse(summary?.recheck_available_at ?? '');
-    if ((summary?.state !== 'suspended' && summary?.state !== 'not_found') || !(until > Date.now())) return;
+    // Poll only after a requested check; unreadable retries have no cooldown.
+    const until = Math.max(Date.parse(summary?.recheck_available_at ?? '') || 0, queuedUntil);
+    if ((summary?.state !== 'suspended' && summary?.state !== 'not_found' && summary?.state !== 'unreadable') || !(until > Date.now())) return;
     const timer = setInterval(() => {
       // The last tick still refreshes so a lookup that finished near expiry shows up.
       void refresh().catch(() => {});
       if (Date.now() >= until) clearInterval(timer);
     }, 15000);
     return () => clearInterval(timer);
-  }, [summary?.state, summary?.recheck_available_at, refresh]);
+  }, [summary?.state, summary?.recheck_available_at, queuedUntil, refresh]);
 
   useEffect(() => {
     // Hidden tabs throttle timers; refresh on return so a finished lookup is not missed.
-    if (summary?.state !== 'suspended' && summary?.state !== 'not_found') return;
+    if (summary?.state !== 'suspended' && summary?.state !== 'not_found' && summary?.state !== 'unreadable') return;
     const onVisible = () => { if (document.visibilityState === 'visible') void refresh().catch(() => {}); };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
@@ -98,14 +101,15 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
     setError('');
     try {
       await recheckAhpra();
+      setQueuedUntil(Date.now() + 3600000);
       // Keep a suspension visible until the backend reports the finished lookup.
-      setSummary(previous => previous ? { ...previous, recheck_available_at: new Date(Date.now() + 3600000).toISOString() } : previous);
+      setSummary(previous => previous && previous.state !== 'unreadable' ? { ...previous, recheck_available_at: new Date(Date.now() + 3600000).toISOString() } : previous);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to queue AHPRA check.');
     } finally { setBusy(false); }
   };
-  return <Context.Provider value={{ summary, loading, error, busy, seconds: ahpraCooldownSeconds(summary?.recheck_available_at, now), refusal, clearRefusal, refresh, recheck }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ summary, loading, error, busy, seconds: summary?.state === 'unreadable' && summary.attempts < 3 ? 0 : ahpraCooldownSeconds(summary?.recheck_available_at, now), refusal, clearRefusal, refresh, recheck }}>{children}</Context.Provider>;
 }
 
 export function useAhpra() {

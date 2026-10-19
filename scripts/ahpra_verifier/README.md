@@ -1,6 +1,6 @@
 # AHPRA Verifier Desktop Bridge
 
-The AHPRA Verifier Desktop Bridge is a lightweight Python service designed to run 24/7 on a Windows desktop. It receives practitioner verification requests from production via a secure WebSocket connection, performs automated lookups on the official AHPRA Register of Practitioners using a headless Claude Code session driving Google Chrome (via the Claude in Chrome extension), and returns structured verification results.
+The AHPRA Verifier Desktop Bridge is a lightweight Python service designed to run 24/7 on a Windows desktop. Connect it alongside the Chrome extension: the server sends checks to the extension first, and this bridge is the fallback and repairer. It receives practitioner verification requests from the server via a secure WebSocket connection, performs automated lookups on the official AHPRA Register of Practitioners using a headless Claude Code session driving Google Chrome (via the Claude in Chrome extension), and returns structured verification results.
 
 ---
 
@@ -62,8 +62,10 @@ The bridge adheres to a fixed bidirectional WebSocket protocol:
 
 Optional repair requests run one Opus Claude CLI subprocess at a time, independently
 of lookups; additional repair requests while busy are ignored. Set
-`AHPRA_REPAIR_WORKTREE` to a dedicated clean repair worktree (required for repairs;
-otherwise the bridge reports "not configured"). `AHPRA_REPAIR_CLAUDE_CONFIG_DIR`
+`AHPRA_REPAIR_WORKTREE` to a separate, clean git worktree used only for repairs (e.g.
+`git worktree add C:\dev\worktrees\chemisttasker-ahpra-repair`), never the worktree the
+bridge runs from or one you edit (required for repairs; otherwise the bridge reports
+"not configured"). `AHPRA_REPAIR_CLAUDE_CONFIG_DIR`
 optionally sets that subprocess's `CLAUDE_CONFIG_DIR`.
 `AHPRA_REPAIR_TIMEOUT_SECONDS` defaults to `1800` (30 minutes).
 The runner uses `AHPRA_CLAUDE_CMD` (default `claude.cmd`) and `repair_prompt.md`.
@@ -121,13 +123,14 @@ All settings are configured exclusively through environment variables. The servi
 
 | Variable | Required | Default | Description |
 | :--- | :---: | :---: | :--- |
-| `AHPRA_VERIFIER_URL` | **Yes** | — | Production WebSocket endpoint (e.g. `wss://api.chemisttasker.com/ws/ahpra-verifier/`). |
+| `AHPRA_VERIFIER_URL` | **Yes** | — | Server WebSocket endpoint (staging: `wss://staging.chemisttasker.com.au/ws/ahpra-verifier/`; production uses its own domain). |
 | `AHPRA_VERIFIER_TOKEN` | **Yes** | — | Bearer authentication token. **Never logged.** |
 | `AHPRA_VERIFIER_AGENT` | No | Hostname | Unique name identifying this desktop bridge agent. Defaults to `socket.gethostname()`. |
 | `AHPRA_MIN_GAP_SECONDS` | No | `30` | Minimum cooldown in seconds between consecutive AHPRA lookups. |
 | `AHPRA_BLOCKED_PAUSE_SECONDS` | No | `1800` | Cooldown period in seconds (30 minutes) when bot detection / CAPTCHA is encountered. |
 | `AHPRA_LOOKUP_TIMEOUT` | No | `180` | Subprocess execution timeout in seconds per check. |
 | `AHPRA_CLAUDE_CMD` | No | `claude.cmd` | Command or path to the Claude CLI executable. |
+| `AHPRA_REPAIR_WORKTREE` | No | — | Separate clean git worktree used only for repairs (see Optional Repairs). |
 
 ---
 
@@ -136,8 +139,8 @@ All settings are configured exclusively through environment variables. The servi
 ### PowerShell
 
 ```powershell
-$env:AHPRA_VERIFIER_URL = "wss://api.example.com/ws/ahpra-verifier/"
-$env:AHPRA_VERIFIER_TOKEN = "your-secure-production-token"
+$env:AHPRA_VERIFIER_URL = "wss://staging.chemisttasker.com.au/ws/ahpra-verifier/"
+$env:AHPRA_VERIFIER_TOKEN = "your-verifier-token"
 $env:AHPRA_VERIFIER_AGENT = "chemisttasker-desktop-01"
 
 python scripts/ahpra_verifier/bridge.py
@@ -146,8 +149,8 @@ python scripts/ahpra_verifier/bridge.py
 ### Command Prompt (`cmd.exe`)
 
 ```cmd
-set AHPRA_VERIFIER_URL=wss://api.example.com/ws/ahpra-verifier/
-set AHPRA_VERIFIER_TOKEN=your-secure-production-token
+set AHPRA_VERIFIER_URL=wss://staging.chemisttasker.com.au/ws/ahpra-verifier/
+set AHPRA_VERIFIER_TOKEN=your-verifier-token
 set AHPRA_VERIFIER_AGENT=chemisttasker-desktop-01
 
 python scripts\ahpra_verifier\bridge.py
@@ -225,8 +228,8 @@ Create `scripts/ahpra_verifier/start_bridge.bat` (not tracked in Git):
 cd /d "C:\dev\worktrees\chemisttasker-g3"
 
 :: Set environment variables
-set "AHPRA_VERIFIER_URL=wss://api.example.com/ws/ahpra-verifier/"
-set "AHPRA_VERIFIER_TOKEN=your-production-token"
+set "AHPRA_VERIFIER_URL=wss://staging.chemisttasker.com.au/ws/ahpra-verifier/"
+set "AHPRA_VERIFIER_TOKEN=your-verifier-token"
 set "AHPRA_VERIFIER_AGENT=chemisttasker-desktop-01"
 set "AHPRA_MIN_GAP_SECONDS=30"
 set "AHPRA_BLOCKED_PAUSE_SECONDS=1800"

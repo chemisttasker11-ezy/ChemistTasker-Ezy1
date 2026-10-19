@@ -125,15 +125,20 @@ def apply_ahpra_result(check, payload):
     note = payload['error']
     if profile is None or full_registration_number(profile.ahpra_number) != check.registration_number:
         outcome, note = 'error', 'Profile missing or registration number changed; manual review required.'
-    elif outcome == 'found' and not all(record[field].strip() for field in ('name', 'registration_status')):
+    elif outcome == 'found' and not record['name'].strip():
         outcome, note = 'error', 'AHPRA practitioner record incomplete. Please try again later.'
+    elif outcome == 'found' and not record['registration_status'].strip():
+        # A found record with no status is "unreadable" (state.py), not a verifier error.
+        outcome, note = 'review', 'Needs review: AHPRA registration status is unreadable.'
     elif outcome == 'found':
         from onboarding.tasks import _resolve_ahpra_role
         outcome, note = evaluate_ahpra_record(
             {**record, 'practitioner_name': record['name'],
              'expiry_date': date.fromisoformat(record['expiry_date']) if record['expiry_date'] else None},
             first_name=profile.user.first_name, last_name=profile.user.last_name,
-            role=_resolve_ahpra_role(profile, model_name=check.model_name),
+            # An owner AHPRA switched to MANAGER is still checked as the pharmacist they were.
+            role=_resolve_ahpra_role(profile, model_name=check.model_name,
+                                     role_override='pharmacist' if getattr(profile, 'ahpra_switched_to_manager', False) else None),
         )
         if outcome != 'verified':
             note = ('Rejected: ' if outcome == 'rejected' else 'Needs review: ') + note
@@ -147,7 +152,8 @@ def apply_ahpra_result(check, payload):
     check.register_data = record or {}
     check.completed_at = timezone.now()
     check.save()
-    if profile is not None and full_registration_number(profile.ahpra_number) == check.registration_number:
+    if (outcome not in ('error', 'blocked') and profile is not None
+            and full_registration_number(profile.ahpra_number) == check.registration_number):
         apply_state_transition(profile, previous)
     return True
 

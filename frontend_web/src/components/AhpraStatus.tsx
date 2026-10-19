@@ -10,7 +10,8 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
   const { summary, error, busy, seconds, recheck } = useAhpra();
   if (!summary) return null;
   const message = ahpraStatusMessage(summary);
-  const label = summary.registration_status || ({ ok: 'Verified', pending: 'Check pending', suspended: 'Account paused', not_found: 'Not found' } as const)[summary.state];
+  const label = summary.registration_status || ({ ok: 'Verified', pending: 'Check pending', suspended: summary.frozen ? 'Account paused' : 'Registration suspended', not_found: 'Not found', unreadable: 'Not verified' } as const)[summary.state];
+  const attemptsExhausted = summary.state === 'unreadable' && summary.attempts >= 3;
   const isBlocked = summary.state === 'suspended' || summary.state === 'not_found';
 
   let hint = '';
@@ -36,6 +37,9 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
       >
         <Typography fontWeight={600}>AHPRA: {label}</Typography>
         {message && <Typography variant="body2" sx={{ mt: 0.5 }}>{message}</Typography>}
+        {summary.state === 'unreadable' && summary.contact_support && (
+          <Typography variant="body2" sx={{ mt: 0.5 }}>Still not working?</Typography>
+        )}
         {hint && (
           <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 500, color: 'text.primary' }}>
             {hint}
@@ -79,7 +83,7 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
             <Button
               variant={isBlocked ? 'contained' : 'outlined'}
               color={isBlocked ? 'primary' : 'inherit'}
-              disabled={busy}
+              disabled={busy || attemptsExhausted}
               onClick={() => void recheck()}
               sx={{
                 minHeight: 44,
@@ -89,6 +93,9 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
             >
               {busy ? 'Queuing check...' : 'Re-check'}
             </Button>
+          )}
+          {summary.state === 'unreadable' && summary.contact_support && (
+            <Button href="/#contact"sx={{ minHeight: 44 }}>Contact us now</Button>
           )}
         </Box>
       </Alert>

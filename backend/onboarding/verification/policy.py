@@ -99,7 +99,7 @@ def evaluate(profile) -> dict:
         verified = was_verified
     if getattr(profile, 'ahpra_number', None) and hasattr(profile, '_meta'):
         from onboarding.verification.state import ahpra_state
-        if ahpra_state(profile)['state'] == 'suspended':
+        if ahpra_state(profile)['state'] in ('suspended', 'unreadable'):
             verified = False
     return {'verified': verified, 'missing': missing, 'grace': grace,
             'grace_until': getattr(settings, 'VERIFICATION_GRACE_UNTIL', None) if grace else None}

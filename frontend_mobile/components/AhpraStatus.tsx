@@ -1,5 +1,6 @@
 import { ahpraStatusMessage } from '@chemisttasker/shared-core';
 import React from 'react';
+import { router } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { Button, HelperText, Text } from 'react-native-paper';
 import { useAhpra } from '../context/AhpraContext';
@@ -12,7 +13,8 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
   const { summary, error, busy, seconds, recheck } = useAhpra();
   if (!summary) return null;
   const message = ahpraStatusMessage(summary);
-  const label = summary.registration_status || ({ ok: 'Verified', pending: 'Check pending', suspended: 'Account paused', not_found: 'Not found' } as const)[summary.state];
+  const label = summary.registration_status || ({ ok: 'Verified', pending: 'Check pending', suspended: summary.frozen ? 'Account paused' : 'Registration suspended', not_found: 'Not found', unreadable: 'Not verified' } as const)[summary.state];
+  const attemptsExhausted = summary.state === 'unreadable' && summary.attempts >= 3;
   const isBlocked = summary.state === 'suspended' || summary.state === 'not_found';
 
   let hint = '';
@@ -38,6 +40,7 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
         AHPRA: {label}
       </Text>
       {message ? <Text style={styles.message}>{message}</Text> : null}
+      {summary.state === 'unreadable' && summary.contact_support ? <Text style={styles.message}>Still not working?</Text> : null}
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       {error ? <HelperText type="error">{error}</HelperText> : null}
 
@@ -52,7 +55,7 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
           <Button
             mode={isBlocked ? 'contained' : 'outlined'}
             loading={busy}
-            disabled={busy}
+            disabled={busy || attemptsExhausted}
             onPress={() => void recheck()}
             style={styles.button}
             contentStyle={styles.buttonContent}
@@ -60,6 +63,9 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
             {busy ? 'Queuing check...' : 'Re-check'}
           </Button>
         )}
+        {summary.state === 'unreadable' && summary.contact_support ? (
+          <Button onPress={() => router.push('/contact')} contentStyle={styles.buttonContent}>Contact us now</Button>
+        ) : null}
       </View>
     </View>
   );

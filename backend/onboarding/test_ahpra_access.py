@@ -70,15 +70,16 @@ class AhpraAccessTests(TestCase):
                         check = self.finish(status=status)
                         apply_state_transition(self.profile, {'state': 'ok'})
                 state = ahpra_state(self.profile)
-                self.assertEqual(state['state'], 'pending')
-                self.assertIn('Needs review by an admin', state['note'])
+                self.assertEqual(state['state'], 'unreadable')
+                self.assertIn("We couldn't read your AHPRA registration", state['note'])
                 self.assertEqual(self.client.get('/api/v1/public-job-board/').status_code, 200)
                 self.profile.refresh_from_db()
-                self.assertTrue(self.profile.verified)
+                self.assertFalse(self.profile.verified)
+                self.assertFalse(self.profile.ahpra_verified)
                 announce.assert_not_called()
                 check.delete()
 
-    def test_frozen_owner_can_read_ahpra_onboarding_and_recheck_but_not_pharmacy(self):
+    def test_suspended_owner_becomes_manager_keeps_pharmacy_and_chat(self):
         owner, pharmacy = make_owner_with_pharmacy()
         Membership.objects.create(user=owner, pharmacy=pharmacy, role='PHARMACIST', employment_type='FULL_TIME')
         owner.is_otp_verified = owner.is_mobile_verified = True
@@ -96,15 +97,43 @@ class AhpraAccessTests(TestCase):
         self.assertFalse(profile.ahpra_verified)
         client = client_for(owner)
         response = client.get(f'/api/v1/pharmacies/{pharmacy.pk}/')
-        self.assertEqual((response.status_code, response.json()['code']), (403, 'ahpra_suspended'))
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(profile.role, 'MANAGER')
+        from asgiref.sync import async_to_sync
+        from chat.consumers import RoomConsumer
+        from onboarding.verification.state import ahpra_frozen, require_ahpra_application
+        from shifts.access import ShiftActionRefused, _user_can_perform_shift_role
+        self.assertFalse(ahpra_frozen(owner))
+        self.assertFalse(async_to_sync(RoomConsumer()._ahpra_suspended)(owner))
+        self.assertFalse(_user_can_perform_shift_role(owner, 'PHARMACIST'))
+        with self.assertRaises(ShiftActionRefused):
+            require_ahpra_application(owner)
         for prefix in ('/api/v1/',):
             response = client.get(prefix + 'owner/onboarding/me/')
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()['ahpra'], {**ahpra_state(profile), 'frozen': True})
+            self.assertEqual(response.json()['ahpra'], {**ahpra_state(profile), 'frozen': False})
         response = client.post('/api/v1/onboarding/ahpra/recheck/')
         self.assertEqual((response.status_code, response.json()), (202, {'queued': True}))
         self.assertTrue(AhpraCheck.objects.filter(model_name='OwnerOnboarding', object_pk=profile.pk,
                                                  status='pending', reason='recheck').exists())
+
+    def test_owner_switched_by_ahpra_returns_to_pharmacist_but_chosen_manager_stays(self):
+        for role in ('PHARMACIST', 'MANAGER'):
+            with self.subTest(role=role), patch('onboarding.verification.state.announce_suspension'), \
+                    self.captureOnCommitCallbacks(execute=True):
+                owner, _ = make_owner_with_pharmacy()
+                profile = OwnerOnboarding.objects.get(user=owner)
+                profile.role, profile.ahpra_number = role, NUMBER
+                profile.save()
+                for status in ('Suspended', 'Registered'):
+                    check = AhpraCheck.objects.create(model_name='OwnerOnboarding', object_pk=profile.pk,
+                                                     registration_number=NUMBER, reason='recheck')
+                    apply_ahpra_result(check, result(check.pk, name=f'{owner.first_name} {owner.last_name}',
+                                                     registration_status=status))
+                    profile.refresh_from_db()
+                    self.assertEqual(profile.role, 'MANAGER' if status == 'Suspended' else role)
+                self.assertEqual(ahpra_state(profile)['state'], 'ok' if role == 'PHARMACIST' else 'pending')
+                self.assertFalse(profile.ahpra_switched_to_manager)
 
     def test_pending_recheck_retains_suspension_and_review_is_pending(self):
         self.finish(outcome='rejected', status='Suspended')
@@ -114,6 +143,45 @@ class AhpraAccessTests(TestCase):
                                                          completed_at=timezone.now(), register_data={
                                                              'registration_status': 'Registered'})
         self.assertEqual(ahpra_state(self.profile)['state'], 'pending')
+
+    def test_unreadable_three_instant_rechecks_then_24_hour_cooldown(self):
+        self.finish(outcome='review', status='Unknown')
+        self.assertEqual(ahpra_state(self.profile)['attempts'], 0)
+        self.assertFalse(ahpra_state(self.profile)['contact_support'])
+        for attempt in range(1, 4):
+            response = self.client.post('/api/v1/onboarding/ahpra/recheck/')
+            self.assertEqual(response.status_code, 202, response.content)
+            check = AhpraCheck.objects.get(status='pending')
+            with patch('onboarding.verification.state.announce_suspension') as announce:
+                with self.captureOnCommitCallbacks(execute=True):
+                    apply_ahpra_result(check, result(check.pk, registration_status='Unknown'))
+                announce.assert_not_called()
+            state = ahpra_state(self.profile)
+            self.assertEqual(state['attempts'], attempt)
+            self.assertTrue(state['contact_support'])
+            self.assertIn('Still not working? Contact us now.', state['note'])
+        response = self.client.post('/api/v1/onboarding/ahpra/recheck/')
+        self.assertEqual(response.status_code, 429)
+        self.assertTrue(86390 <= response.json()['retry_after'] <= 86400)
+        AhpraCheck.objects.filter(reason='recheck').update(created_at=timezone.now() - timedelta(hours=25))
+        self.assertEqual(self.client.post('/api/v1/onboarding/ahpra/recheck/').status_code, 202)
+
+    def test_owner_adverse_notifies_once_without_closing_chat(self):
+        owner, _ = make_owner_with_pharmacy()
+        profile = OwnerOnboarding.objects.get(user=owner)
+        profile.role, profile.ahpra_number = 'PHARMACIST', NUMBER
+        profile.save()
+        with patch('notifications.services.notify_users') as notify, \
+                patch('core.task_queue.async_task'), \
+                patch('onboarding.verification.state.close_chat_sockets') as close:
+            with self.captureOnCommitCallbacks(execute=True):
+                for _ in range(2):
+                    check = AhpraCheck.objects.create(model_name='OwnerOnboarding', object_pk=profile.pk,
+                                                     registration_number=NUMBER, reason='onboarding')
+                    apply_ahpra_result(check, result(check.pk, registration_status='Suspended'))
+            self.assertEqual(notify.call_count, 1)
+            self.assertEqual(len(mail.outbox), 1)
+            close.assert_not_called()
 
     def test_freeze_covers_views_with_explicit_allow_any_and_permissions(self):
         self.finish(outcome='rejected', status='Suspended')

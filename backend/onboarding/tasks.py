@@ -376,32 +376,6 @@ def verify_ahpra_task(model_name, object_pk, ahpra_number, first_name, last_name
 
 
 @shared_task
-def recheck_ahpra_registrations():
-    if settings.AHPRA_SOURCE != 'desktop':
-        return
-    from onboarding.models import AhpraCheck
-    from onboarding.verification.desktop import PROFILE_MODELS, enqueue_check
-    now = timezone.now()
-    for model_name in PROFILE_MODELS:
-        Model = apps.get_model('client_profile', model_name)
-        for profile in Model.objects.filter(ahpra_verified=True).iterator():
-            try:
-                number = full_registration_number(profile.ahpra_number)
-                if not number:
-                    continue
-                last = AhpraCheck.objects.filter(model_name=model_name, object_pk=profile.pk,
-                                                registration_number=number, status='done').order_by('-completed_at').first()
-                expiry = getattr(profile, 'ahpra_expiry_date', None)
-                if (expiry and expiry <= now.date() + datetime.timedelta(days=30)) or (
-                        last is None or last.completed_at is None or
-                        last.completed_at < now - datetime.timedelta(days=settings.AHPRA_RECHECK_DAYS)):
-                    enqueue_check(profile, number, 'recheck')
-            except Exception as exc:
-                logger.error('[recheck_ahpra_registrations] Failed model=%s pk=%s error_type=%s',
-                             model_name, profile.pk, type(exc).__name__)
-
-
-@shared_task
 def alert_overdue_ahpra_checks():
     if settings.AHPRA_SOURCE != 'desktop' or not settings.ADMINS:
         return

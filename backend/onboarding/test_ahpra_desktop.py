@@ -19,11 +19,12 @@ from client_profile.characterization_support import make_user
 from onboarding.admin import AhpraCheckAdmin
 from onboarding.models import AhpraCheck, OtherStaffOnboarding, PharmacistOnboarding
 from onboarding.routing import websocket_urlpatterns
-from onboarding.tasks import alert_overdue_ahpra_checks, recheck_ahpra_registrations, verify_ahpra_task
+from onboarding.tasks import alert_overdue_ahpra_checks, verify_ahpra_task
 from onboarding.verification.desktop import (
     RegisterSerializer, apply_ahpra_result, claim_checks, enqueue_check, handle_verifier_result,
     store_repair_report, valid_result, verifier_seen,
 )
+from onboarding.verification.state import ahpra_state
 from users.jwt_ws import JWTAuthMiddlewareStack
 
 NUMBER = 'PHA0001234567'
@@ -54,7 +55,7 @@ def result(check_id, outcome='found', **record):
                              undertakings=False, reprimands=False) | record if outcome == 'found' else None}
 
 
-@override_settings(AHPRA_SOURCE='desktop', AHPRA_RECHECK_DAYS=30, CACHES=TEST_CACHES,
+@override_settings(AHPRA_SOURCE='desktop', CACHES=TEST_CACHES,
                    CHANNEL_LAYERS={'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}},
                    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', ADMINS=[('Admin', 'admin@example.test')])
 class DesktopTests(TestCase):
@@ -93,6 +94,19 @@ class DesktopTests(TestCase):
                 else:
                     self.assertEqual(self.profile.ahpra_verification_note, 'Previously verified')
 
+    def test_verifier_error_keeps_verified_user_verified(self):
+        check = check_fixture(self.profile)
+        self.assertTrue(apply_ahpra_result(check, result(check.pk)))
+        PharmacistOnboarding.objects.filter(pk=self.profile.pk).update(verified=True)
+        before = PharmacistOnboarding.objects.filter(pk=self.profile.pk).values().get()
+        self.assertTrue(before['ahpra_verified'])
+        for outcome in ('error', 'blocked'):
+            with self.subTest(outcome=outcome):
+                check = check_fixture(self.profile)
+                self.assertTrue(apply_ahpra_result(check, result(check.pk, outcome)))
+                self.assertEqual(PharmacistOnboarding.objects.filter(pk=self.profile.pk).values().get(), before)
+                self.assertEqual(ahpra_state(self.profile)['state'], 'ok')
+
     def test_found_without_name_or_status_is_error_and_leaves_profile_unchanged(self):
         self.profile.ahpra_verified = True
         self.profile.ahpra_verification_note = 'Previously verified'
@@ -105,8 +119,13 @@ class DesktopTests(TestCase):
                     check = check_fixture(self.profile)
                     self.assertTrue(apply_ahpra_result(check, result(check.pk, **{field: blank})))
                     check.refresh_from_db()
-                    self.assertEqual(check.outcome, 'error')
-                    self.assertEqual(PharmacistOnboarding.objects.filter(pk=self.profile.pk).values().get(), before)
+                    self.assertEqual(check.outcome, 'error' if field == 'name' else 'review')
+                    # A found record with a blank status is unreadable: not verified (owner decision B, 2026-10-19);
+                    # a blank name is a verifier error and changes nothing.
+                    unreadable = {'ahpra_verified': False, 'verified': False} if field == 'registration_status' else {}
+                    self.assertEqual(PharmacistOnboarding.objects.filter(pk=self.profile.pk).values().get(),
+                                     before | unreadable)
+                    PharmacistOnboarding.objects.filter(pk=self.profile.pk).update(**{k: before[k] for k in unreadable})
 
     def test_registration_requirements_persist_and_render_in_admin(self):
         for fields in ({}, {'registration_requirements': 'Only practise under supervisor Jane Smith at Example Pharmacy.',
@@ -343,63 +362,6 @@ class DesktopTests(TestCase):
             self.assertIn('Manually ', self.profile.ahpra_verification_note)
         self.assertIn('Open AHPRA register', admin.open_register(check))
 
-    def test_recheck_due_and_no_duplicates(self):
-        self.profile.ahpra_verified = True
-        self.profile.save()
-        recheck_ahpra_registrations()
-        recheck_ahpra_registrations()
-        self.assertEqual(AhpraCheck.objects.count(), 1)
-        check = AhpraCheck.objects.get()
-        self.assertEqual(check.reason, 'recheck')
-        check.status, check.completed_at = 'done', timezone.now()
-        check.save()
-        recheck_ahpra_registrations()
-        self.assertEqual(AhpraCheck.objects.count(), 1)
-        self.profile.ahpra_expiry_date = timezone.now().date() + timedelta(days=20)
-        self.profile.save()
-        recheck_ahpra_registrations()
-        self.assertEqual(AhpraCheck.objects.count(), 2)
-
-    def test_recheck_last_done_old(self):
-        self.profile.ahpra_verified = True
-        self.profile.save()
-        check_fixture(self.profile, status='done', completed_at=timezone.now() - timedelta(days=31))
-        recheck_ahpra_registrations()
-        self.assertEqual(AhpraCheck.objects.filter(status='pending').count(), 1)
-
-    @patch('onboarding.verification.desktop.PROFILE_MODELS', ('OtherStaffOnboarding', 'PharmacistOnboarding'))
-    def test_recheck_intern_by_age_then_pharmacist(self):
-        intern = OtherStaffOnboarding.objects.create(
-            user=make_user(), role_type='INTERN', ahpra_number='PHA0007654321', ahpra_verified=True,
-        )
-        self.profile.ahpra_verified = True
-        self.profile.save()
-        completed = AhpraCheck.objects.create(
-            model_name='OtherStaffOnboarding', object_pk=intern.pk,
-            registration_number=intern.ahpra_number, reason='onboarding',
-            status='done', completed_at=timezone.now(),
-        )
-        recheck_ahpra_registrations()
-        self.assertFalse(AhpraCheck.objects.filter(model_name='OtherStaffOnboarding', status='pending').exists())
-        AhpraCheck.objects.filter(pk=completed.pk).update(completed_at=timezone.now() - timedelta(days=31))
-        AhpraCheck.objects.filter(model_name='PharmacistOnboarding').delete()
-        recheck_ahpra_registrations()
-        self.assertSetEqual(
-            set(AhpraCheck.objects.filter(status='pending').values_list('model_name', 'object_pk', 'reason')),
-            {('OtherStaffOnboarding', intern.pk, 'recheck'), ('PharmacistOnboarding', self.profile.pk, 'recheck')},
-        )
-
-    @patch('onboarding.verification.desktop.enqueue_check', side_effect=[ValueError('bad profile'), None])
-    def test_recheck_logs_bad_profile_and_continues(self, enqueue):
-        later = profile_fixture()
-        PharmacistOnboarding.objects.filter(pk__in=[self.profile.pk, later.pk]).update(ahpra_verified=True)
-        with self.assertLogs('onboarding.tasks', level='ERROR') as logs:
-            recheck_ahpra_registrations()
-        self.assertEqual(len(logs.output), 1)
-        self.assertIn('ValueError', logs.output[0])
-        self.assertEqual(enqueue.call_count, 2)
-        self.assertSetEqual({call.args[0].pk for call in enqueue.call_args_list}, {self.profile.pk, later.pk})
-
     def test_overdue_once_and_excludes_done_and_fresh(self):
         check = check_fixture(self.profile)
         alert_overdue_ahpra_checks()
@@ -417,7 +379,6 @@ class DesktopTests(TestCase):
     @override_settings(AHPRA_SOURCE='scrapingbee')
     def test_beat_noop_for_scrapingbee(self):
         check_fixture(self.profile)
-        recheck_ahpra_registrations()
         alert_overdue_ahpra_checks()
         self.assertEqual(AhpraCheck.objects.count(), 1)
         self.assertEqual(len(mail.outbox), 0)

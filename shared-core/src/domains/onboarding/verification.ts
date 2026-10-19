@@ -87,6 +87,8 @@ export function normalizeVerification(value: unknown, ahpra?: unknown): Verifica
   return {
     ahpra: check ? {
       frozen: Boolean(check.frozen),
+      attempts: check.attempts ?? 0,
+      contact_support: Boolean(check.contact_support ?? check.contactSupport),
       state: check.state, registration_status: check.registration_status ?? check.registrationStatus ?? null,
       registration_type: check.registration_type ?? check.registrationType ?? null,
       expiry_date: check.expiry_date ?? check.expiryDate ?? null, note: check.note || '',
