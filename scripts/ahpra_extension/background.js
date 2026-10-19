@@ -100,7 +100,7 @@ async function pump() {
   pumping = true;
   const job = state.queue.shift();
   state.lastStarted = Date.now();
-  state.active = {...job, tabId: null, deadline: Date.now() + 60000};
+  state.active = {...job, tabId: null, step: 'search', deadline: Date.now() + 60000};
   try {
     await save();
     // Create blank first so the tab belongs to this job before navigation completes.
@@ -170,6 +170,9 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     if (sender.origin !== self.location.origin) {
       if (sender.tab.id !== state.active?.tabId || sender.frameId !== 0) return {};
       if (message.type === 'lookup') return state.active;
+      // Steps only move forward, so a page reload never repeats the search for this check.
+      if (message.type === 'step' && message.check_id === state.active.check_id &&
+          ['submitted', 'opened'].includes(message.step)) { state.active.step = message.step; await save(); }
       if (message.type === 'lookupResult' && message.check_id === state.active.check_id &&
           ['found', 'not_found', 'blocked', 'error'].includes(message.outcome)) {
         await finish(message.check_id, message.outcome, message.outcome === 'found' ? message.register : null, String(message.error || '').slice(0, 1000));
