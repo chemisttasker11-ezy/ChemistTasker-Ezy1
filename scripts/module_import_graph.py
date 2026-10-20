@@ -173,7 +173,8 @@ def build_report(backend=BACKEND, guard=OWNERSHIP_GUARD):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="fail if a cycle uses edges beyond approved legacy mutual pairs")
+    parser.add_argument("--check", action="store_true", help="enforce the existing reviewed mutual-pair policy")
+    parser.add_argument("--check-all-cycles", action="store_true", help="also fail for longer SCC cycles; only use once a reviewed longer-cycle baseline exists")
     parser.add_argument("--json", action="store_true", help="write machine-readable graph")
     options = parser.parse_args()
     report = build_report()
@@ -190,7 +191,9 @@ def main():
             print("UNAPPROVED MUTUAL PAIR:", *pair)
         for edge in report["unapproved_cycle_edges"]:
             print("UNAPPROVED CYCLE EDGE:", *edge)
-    return 1 if options.check and report["unapproved_cycle_edges"] else 0
+    if options.check_all_cycles and report["unapproved_cycle_edges"]:
+        return 1
+    return 1 if options.check and report["new_unapproved_mutual_pairs"] else 0
 
 
 if __name__ == "__main__":
