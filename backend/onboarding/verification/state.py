@@ -71,6 +71,10 @@ def ahpra_state(profile):
             state = 'not_found'
         elif normalized_status in ADVERSE_STATUSES:
             state = 'suspended'
+        elif check.outcome == 'rejected' and normalized_status in ('', 'registered'):
+            # A rejection not explained by the status (wrong profession, admin) blocks public work;
+            # an unreadable status stays unreadable.
+            state = 'rejected'
         elif normalized_status == 'registered' and pharmacist and registration_type.lower() != 'general':
             state = 'type_not_accepted'
         elif AhpraCheck.objects.filter(

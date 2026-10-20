@@ -25,7 +25,9 @@ def suspend_chat_user(user, transition=False):
     check = AhpraCheck.objects.create(model_name='OtherStaffOnboarding', object_pk=profile.pk,
                                      registration_number=NUMBER, reason='onboarding')
     if transition:
-        apply_ahpra_result(check, result(check.pk, registration_status='Suspended'))
+        # The register record must name this worker, or the name mismatch makes it a review, not a suspension.
+        apply_ahpra_result(check, result(check.pk, name=f'{user.first_name} {user.last_name}',
+                                         registration_status='Suspended'))
     else:
         # Bypass the transition event to prove receive checks the current DB state itself.
         check.status, check.outcome, check.completed_at = 'done', 'rejected', timezone.now()
@@ -135,6 +137,23 @@ class AhpraRoomSocketTests(TransactionTestCase):
                 self.assertEqual(await message_count(), 0)
                 await comm.disconnect()
 
+    async def test_outbound_event_to_frozen_user_closes_socket_without_delivery(self):
+        alice, alice_m, bob, bob_m, _ = await make_actors()
+        room = await make_room_with([(alice, alice_m), (bob, bob_m)])
+        await new_ticket(alice, 'ahpra-send-a')
+        await new_ticket(bob, 'ahpra-send-b')
+        a, _, _ = await connect(f'/ws/chat/rooms/{room}/', '?ticket=ahpra-send-a')
+        b, _, _ = await connect(f'/ws/chat/rooms/{room}/', '?ticket=ahpra-send-b')
+        await a.receive_json_from(timeout=TIMEOUT)
+        await b.receive_json_from(timeout=TIMEOUT)
+        await suspend_chat_user(alice)  # no ahpra.suspended event: only the send-side check can catch it
+        with patch('chat.consumers.RoomConsumer.AHPRA_RECHECK_SECONDS', 0):
+            await b.send_json_to({'type': 'typing', 'is_typing': True})
+            self.assertEqual(await a.receive_output(timeout=TIMEOUT), {'type': 'websocket.close', 'code': 4403})
+            self.assertEqual((await b.receive_json_from(timeout=TIMEOUT))['type'], 'typing')
+        await a.disconnect()
+        await b.disconnect()
+
     async def test_suspension_transition_closes_all_user_rooms_only_after_commit(self):
         alice, alice_m, bob, bob_m, _ = await make_actors()
         rooms = [await make_room_with([(alice, alice_m), (bob, bob_m)]) for _ in range(2)]
@@ -156,4 +175,6 @@ class AhpraRoomSocketTests(TransactionTestCase):
                              {'type': 'websocket.close', 'code': 4403})
             await comm.disconnect()
         self.assertTrue(await other.receive_nothing(timeout=0.1))
+        await other.send_json_to({'type': 'typing', 'is_typing': True})
+        self.assertEqual((await other.receive_json_from(timeout=TIMEOUT))['type'], 'typing')  # still connected
         await other.disconnect()

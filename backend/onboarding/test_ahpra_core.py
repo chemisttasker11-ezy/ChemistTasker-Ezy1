@@ -145,12 +145,12 @@ class EvaluateAhpraRecordTests(TestCase):
         )
         self.assertEqual(outcome, "verified")
 
-        # Missing profession is accepted
+        # Missing profession needs a human review, never auto-verifies
         record_none = self.base_record(profession="")
         outcome, _ = evaluate_ahpra_record(
             record_none, first_name="Jane", last_name="Doe", role="pharmacist"
         )
-        self.assertEqual(outcome, "verified")
+        self.assertEqual(outcome, "review")
 
     def test_status_suspended_cancelled_surrendered_not_registered_returns_rejected(self):
         for bad_status in ("Suspended", "Cancelled", "Surrendered", "Not registered"):
@@ -414,6 +414,10 @@ class VerifyAhpraTaskIntegrationTests(TestCase):
             f'<div class="practitioner-detail-body">'
             f'  <div class="practitioner-detail-section">'
             f'    <div class="section-row">'
+            f'      <div class="field-title">Profession</div>'
+            f'      <div class="field-entry">Pharmacy</div>'
+            f'    </div>'
+            f'    <div class="section-row">'
             f'      <div class="field-title">Registration status</div>'
             f'      <div class="field-entry">{status}</div>'
             f'    </div>'
@@ -480,6 +484,10 @@ class VerifyAhpraTaskIntegrationTests(TestCase):
                 f'</div>'
                 f'<div class="practitioner-detail-body">'
                 f'  <div class="practitioner-detail-section">'
+                f'    <div class="section-row">'
+                f'      <div class="field-title">Profession</div>'
+                f'      <div class="field-entry">Pharmacy</div>'
+                f'    </div>'
                 f'    <div class="section-row">'
                 f'      <div class="field-title">Registration status</div>'
                 f'      <div class="field-entry">Registered</div>'

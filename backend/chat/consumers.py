@@ -15,6 +15,7 @@ log = logging.getLogger(__name__)
 
 class RoomConsumer(AsyncJsonWebsocketConsumer):
     TYPING_COOLDOWN_SECONDS = 1.0
+    AHPRA_RECHECK_SECONDS = 10.0
 
     async def connect(self):
         try:
@@ -56,6 +57,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             return
         self._last_typing_emit = 0.0
         self._last_typing_state = None
+        self._ahpra_checked_at = time.monotonic()
 
         await self.accept()
         await self.send_json({"type": "ready", "membership": self.membership.id})
@@ -116,6 +118,18 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         log.debug("Created message id=%s", msg.id)
         print(f"[WS] CREATED message id={msg.id}", flush=True)
         # No immediate send here; signal will broadcast on commit
+
+    async def send_json(self, content, close=False):
+        # Backstop for a missed ahpra.suspended event: never deliver to a frozen user.
+        now = time.monotonic()
+        if now - getattr(self, '_ahpra_checked_at', 0.0) >= self.AHPRA_RECHECK_SECONDS:
+            self._ahpra_checked_at = now
+            if await self._ahpra_suspended(self.scope['user']):
+                self._ahpra_frozen = True
+        if getattr(self, '_ahpra_frozen', False):
+            await self.close(code=4403)
+            return
+        await super().send_json(content, close)
 
     # ---- channel-layer events ----
     async def ahpra_suspended(self, event):

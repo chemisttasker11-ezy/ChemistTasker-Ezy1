@@ -204,10 +204,10 @@ def evaluate_ahpra_record(record: dict, *, first_name, last_name, role) -> tuple
         return ("review", f"Name mismatch: '{first_name} {last_name}' vs '{practitioner_name}'")
 
     profession = (record.get("profession") or "").strip()
-    if profession:
-        p_lower = profession.lower()
-        if "pharmac" not in p_lower:
-            return ("rejected", f"Profession is '{profession}' (expected Pharmacy or Pharmacist)")
+    if not profession:
+        return ("review", "Profession is missing from the register record")
+    if "pharmac" not in profession.lower():
+        return ("rejected", f"Profession is '{profession}' (expected Pharmacy or Pharmacist)")
 
     status = (record.get("registration_status") or "").strip()
     status_lower = status.lower()

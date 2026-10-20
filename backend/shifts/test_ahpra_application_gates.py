@@ -271,15 +271,44 @@ class AhpraApplicationGateTests(TestCase):
             )
             return
         AhpraCheck.objects.filter(pk=self.check.pk).update(
-            outcome='not_found' if state == 'not_found' else 'rejected',
-            register_data={'registration_status': 'Suspended'} if state == 'suspended' else {},
+            outcome={'not_found': 'not_found', 'unreadable': 'review'}.get(state, 'rejected'),
+            register_data={'suspended': {'registration_status': 'Suspended'},
+                           'unreadable': {'registration_status': 'Unknown'},
+                           'rejected': {'registration_status': 'Registered', 'registration_type': 'General',
+                                        'profession': 'Nursing'}}.get(state, {}),
         )
+
+    @override_settings(ADMINS=[], ADMIN_EMAILS=[])
+    def test_wrong_profession_record_revokes_verified_user_and_refuses_public_work(self):
+        from onboarding.verification.desktop import apply_ahpra_result, enqueue_check
+        from onboarding.test_ahpra_desktop import NUMBER, result
+        self.profile.ahpra_verified = self.profile.verified = True
+        self.profile.save(update_fields=['ahpra_verified', 'verified'])
+        _, _, assignment = make_assignment(self.shift.pharmacy, self.shift.created_by, self.user, self.slot.date)
+        check = enqueue_check(self.profile, NUMBER, 'recheck')
+        with patch('shifts.cancellation.cancel_upcoming_assignments') as cancel, \
+                patch('onboarding.verification.state.announce_suspension') as announce:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertTrue(apply_ahpra_result(check, result(check.pk, profession='Nursing')))
+        cancel.assert_not_called()
+        announce.assert_not_called()
+        self.profile.refresh_from_db()
+        self.assertEqual(ahpra_state(self.profile)['state'], 'rejected')
+        self.assertFalse(self.profile.ahpra_verified or self.profile.verified)
+        for path in (f'shifts/{self.shift.pk}/express_interest/', f'shift-offers/{self.offer.pk}/accept/'):
+            with self.subTest(path=path):
+                response = self.client.post(f'/api/v1/{path}', {}, format='json')
+                self.assertEqual(response.status_code, 403, response.content)
+                self.assertEqual(response.json()['code'], 'ahpra_rejected')
+        self.assertFalse(ahpra_frozen(self.user))
+        self.assertTrue(ShiftSlotAssignment.objects.filter(pk=assignment.pk).exists())
+        self.assertFalse(ShiftInterest.objects.filter(user=self.user).exists())
 
     def test_member_adverse_ahpra_allows_internal_interest_claim_and_accept(self):
         self.member(self.shift.pharmacy)
         self.user.is_otp_verified = self.user.is_mobile_verified = True
         self.user.save(update_fields=['is_otp_verified', 'is_mobile_verified'])
-        for state in ('suspended', 'not_found', 'unreadable', 'type_not_accepted'):
+        for state in ('suspended', 'not_found', 'unreadable', 'type_not_accepted', 'rejected'):
             self.set_state(state)
             for action in ('express_interest', 'claim', 'accept'):
                 with self.subTest(state=state, action=action):
