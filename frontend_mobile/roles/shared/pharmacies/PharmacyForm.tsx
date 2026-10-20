@@ -570,6 +570,7 @@ export default function PharmacyForm({
 
             const hasFiles = Boolean(files.approval || files.sops || files.induction || files.sump);
             const targetPharmacyId = currentPharmacyId ?? (mode === 'edit' ? pharmacyId ?? null : null);
+            let persistedPharmacyId = targetPharmacyId ? String(targetPharmacyId) : null;
 
             if (hasFiles) {
                 const formData = new FormData();
@@ -587,7 +588,8 @@ export default function PharmacyForm({
                 } else {
                     const created = await createPharmacy(formData as any);
                     if (created?.id != null) {
-                        setCurrentPharmacyId(String(created.id));
+                        persistedPharmacyId = String(created.id);
+                        setCurrentPharmacyId(persistedPharmacyId);
                     }
                 }
             } else {
@@ -596,11 +598,46 @@ export default function PharmacyForm({
                 } else {
                     const created = await createPharmacy(payload as any);
                     if (created?.id != null) {
-                        setCurrentPharmacyId(String(created.id));
+                        persistedPharmacyId = String(created.id);
+                        setCurrentPharmacyId(persistedPharmacyId);
                     }
                 }
             }
 
+            // Do not announce success until the saved object is readable.
+            // A server-accepted multipart request can still fail persistence or
+            // return a different stored document reference after validation.
+            if (!persistedPharmacyId) throw new Error('Pharmacy save did not return an ID.');
+            const persisted = (await getPharmacyById(persistedPharmacyId)) as any;
+            if (!persisted || String(persisted.id) !== persistedPharmacyId) {
+                throw new Error('Saved pharmacy could not be verified. Refresh before retrying.');
+            }
+            if (hasFiles) {
+                for (const [chosen, backendField] of [
+                    ['approval', 'methadone_s8_protocols'],
+                    ['sops', 'sops'],
+                    ['induction', 'induction_guides'],
+                    ['sump', 'qld_sump_docs'],
+                ] as const) {
+                    if (files[chosen] && !persisted[backendField]) {
+                        throw new Error(`Saved document ${backendField} was not returned by the server.`);
+                    }
+                }
+                for (const key of ['employment_types', 'roles_needed', 'software', 'services'] as const) {
+                    const expected = payload[key];
+                    if (Array.isArray(expected) && JSON.stringify(persisted[key]) !== JSON.stringify(expected)) {
+                        throw new Error(`Saved pharmacy ${key} did not match the submitted selection.`);
+                    }
+                }
+            }
+            const verifiedFiles = {
+                approval: persisted.methadone_s8_protocols ?? null,
+                sops: persisted.sops ?? null,
+                induction: persisted.induction_guides ?? null,
+                sump: persisted.qld_sump_docs ?? null,
+            };
+            setExistingFiles(verifiedFiles);
+            setFiles({ approval: null, sops: null, induction: null, sump: null });
             unsaved.markClean({
                 form,
                 employmentTypes,
@@ -611,7 +648,7 @@ export default function PharmacyForm({
             });
             initialStateRef.current = {
                 employmentTypes,
-                existingFiles,
+                existingFiles: verifiedFiles,
                 form,
                 rolesNeeded,
                 software,
