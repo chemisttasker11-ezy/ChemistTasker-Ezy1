@@ -23,6 +23,8 @@ export type DashboardContentStateProps = {
   /** Use a different existing MUI icon when appropriate to the state. */
   icon?: ReactNode;
   compact?: boolean;
+  /** Extra content (e.g. secondary actions) rendered inside the block. */
+  children?: ReactNode;
 };
 
 /**
@@ -39,6 +41,7 @@ export default function DashboardContentState({
   onAction,
   icon,
   compact = false,
+  children,
 }: DashboardContentStateProps) {
   if (kind === "loading") {
     return (
@@ -138,6 +141,7 @@ export default function DashboardContentState({
             {actionLabel}
           </Button>
         )}
+        {children}
       </Stack>
     </Paper>
   );

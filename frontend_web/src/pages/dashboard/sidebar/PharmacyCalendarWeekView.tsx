@@ -39,9 +39,12 @@ export default function PharmacyCalendarWeekView({ day, setDay, items, manager, 
         </Stack>
         {loading ? <CircularProgress aria-label="Loading tasks" /> : tasks.length === 0 ? <>
             <DashboardContentState kind="empty" title="No tasks this week."
-                description={manager ? "Add a task or copy last week. Save a task as reusable in More options to use it again." : "Your assigned tasks will appear here."}
-                actionLabel={manager ? "Add task" : undefined} onAction={() => onAdd(day)} />
-            {manager && <Button disabled={busy} onClick={() => onCopy("previous", monday)}>Copy last week</Button>}
+                description={manager ? "Add a task or copy last week. Save a task as reusable in More options to use it again." : "Your assigned tasks will appear here."}>
+                {manager && <Stack direction="row" flexWrap="wrap" justifyContent="center" useFlexGap gap={1} mt={1}>
+                    <Button variant="outlined" onClick={() => onAdd(day)}>Add task</Button>
+                    <Button disabled={busy} onClick={() => onCopy("previous", monday)}>Copy last week</Button>
+                </Stack>}
+            </DashboardContentState>
         </> : <>
             <Box sx={{ display: "grid", gridTemplateColumns: phone ? "minmax(0, 1fr)" : "repeat(7, minmax(0, 1fr))", gap: 1 }}>
                 {days.map(date => <Box component="section" aria-label={format(date, "EEEE d MMMM")} key={format(date, "yyyy-MM-dd")} sx={{ minWidth: 0 }}>
@@ -50,16 +53,17 @@ export default function PharmacyCalendarWeekView({ day, setDay, items, manager, 
                         {manager && <Tooltip title="Day actions"><IconButton aria-label={`Day actions for ${format(date, "EEEE d MMMM")}`} aria-haspopup="menu" aria-expanded={menu?.date?.getTime() === date.getTime()} onClick={event => setMenu({ anchor: event.currentTarget, date })}><MoreVert /></IconButton></Tooltip>}
                     </Stack>
                     <Stack spacing={1} mt={1}>
-                        {tasks.filter(item => isSameDay(item.date, date)).map(item => { const state = calendarTaskState(item.noteData, manager, userId); return <Card component="article" aria-label={item.title} key={item.id} variant="outlined" sx={{ borderRadius: "var(--ct-card-radius)", overflowWrap: "anywhere", minWidth: 0 }}>
-                            {manager && <Box sx={{ display: "flex", justifyContent: "flex-end" }}><Tooltip title="More actions"><IconButton aria-label={`More actions for ${item.title}`} aria-haspopup="menu" aria-expanded={menu?.task?.id === item.id} disabled={busy} onClick={event => setMenu({ anchor: event.currentTarget, task: item })}><MoreVert /></IconButton></Tooltip></Box>}
-                            <CardActionArea component={state.canEdit ? "button" : "div"} disabled={busy} role={state.canEdit ? "button" : "presentation"} tabIndex={state.canEdit ? 0 : -1} aria-label={state.canEdit ? `Edit ${item.title}` : undefined} onClick={state.canEdit ? () => onEdit(item) : undefined} sx={{ p: 1.5, pt: manager ? 0 : 1.5 }}>
+                        {tasks.filter(item => isSameDay(item.date, date)).map(item => { const state = calendarTaskState(item.noteData, manager, userId); return <Card component="article" aria-label={item.title} key={item.id} variant="outlined" sx={{ borderRadius: "var(--ct-card-radius)", overflowWrap: "anywhere", minWidth: 0, position: "relative" }}>
+                            {/* Positioned over the title row rather than nested: a button cannot sit inside the edit button. */}
+                            {manager && <Tooltip title="More actions"><IconButton aria-label={`More actions for ${item.title}`} aria-haspopup="menu" aria-expanded={menu?.task?.id === item.id} disabled={busy} onClick={event => setMenu({ anchor: event.currentTarget, task: item })} sx={{ position: "absolute", top: 0, right: 0, zIndex: 1 }}><MoreVert /></IconButton></Tooltip>}
+                            <CardActionArea component={state.canEdit ? "button" : "div"} disabled={busy} role={state.canEdit ? "button" : "presentation"} tabIndex={state.canEdit ? 0 : -1} aria-label={state.canEdit ? `Edit ${item.title}` : undefined} onClick={state.canEdit ? () => onEdit(item) : undefined} sx={{ p: 1.5 }}>
                                 <Stack spacing={1}>
-                                    <Typography fontWeight={600}>{item.title}</Typography>
+                                    <Typography fontWeight={600} sx={{ pr: manager ? 4 : 0 }}>{item.title}</Typography>
                                     {item.noteData.body && <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{item.noteData.body}</Typography>}
                                     {item.time && <Typography variant="body2" color="text.secondary">{item.time}</Typography>}
                                     <Stack direction="row" flexWrap="wrap" useFlexGap gap={0.5}>
                                         {item.noteData.is_clinical && <Chip size="small" label="Clinical" color="primary" variant="outlined" />}
-                                        <Chip size="small" label={state.label} color={item.status === "DONE" ? "success" : "default"} />
+                                        {state.label && <Chip size="small" label={state.label} color={item.status === "DONE" ? "success" : "default"} />}
                                     </Stack>
                                     <Stack direction="row" flexWrap="wrap" useFlexGap gap={0.5}>
                                         {item.assignees?.length ? item.assignees.map((name, index) => <Chip key={index} size="small" label={name} sx={{ maxWidth: "100%", "& .MuiChip-label": { whiteSpace: "normal" }, height: "auto", minHeight: 24 }} />) : <Typography variant="caption" color="text.secondary">Unassigned</Typography>}

@@ -52,7 +52,8 @@ test('saved tasks fill details without changing the day, people or repeats',()=>
 test('copy feedback reports copied, skipped repeating and dropped people once by name',()=>{
  assert.equal(model.copyResultMessage({created:3,task_ids:[1,2,3],skipped_series:2,dropped_assignees:[{task_id:1,membership_id:9,name:'Alex'},{task_id:2,membership_id:9,name:'Alex'}]}),
   '3 copied; 2 repeating skipped; 2 people dropped: Alex.');
- assert.equal(model.copyResultMessage({created:0,task_ids:[],skipped_series:0,dropped_assignees:[]}),'0 copied; 0 repeating skipped; 0 people dropped.');
+ assert.equal(model.copyResultMessage({created:0,task_ids:[],skipped_series:0,dropped_assignees:[]}),'0 copied.');
+ assert.equal(model.copyResultMessage({created:2,task_ids:[1,2],skipped_series:0,dropped_assignees:[{task_id:1,membership_id:9,name:'Alex'}]}),'2 copied; 1 people dropped: Alex.');
 });
 
 test('duplicate stays on the same day; day and week copies use the atomic API offsets', () => {
@@ -85,7 +86,7 @@ test('staff see their own To do / Done state; managers see completion counts', (
   assert.equal(taskStatusLabel(note, false), 'To do');
   assert.equal(taskStatusLabel({ ...note, status: 'done' }, false), 'Done');
   assert.equal(taskStatusLabel(note, true), '2 of 3 done');
-  assert.equal(taskStatusLabel({ status: 'open', assignees: [] }, true), '0 of 0 done');
+  assert.equal(taskStatusLabel({ status: 'open', assignees: [] }, true), '');
 });
 
 

@@ -691,7 +691,7 @@ export default function SharedCalendarScreen() {
                     ? 'No tasks this week. Add a task or copy last week.' : 'No tasks assigned this week.'
                   : 'No items scheduled for this day'}</Text>
                 {view === 'plan' && canManagePlanner && <>
-                  <Button mode="contained" contentStyle={styles.touch} onPress={() => handleOpenNoteModal()}>Add task</Button>
+                  <Button mode="outlined" contentStyle={styles.touch} onPress={() => handleOpenNoteModal()}>Add task</Button>
                   <Text style={styles.emptyStateText}>Save a task as reusable in More options to use it again.</Text>
                 </>}
               </View>
@@ -718,7 +718,7 @@ export default function SharedCalendarScreen() {
                         <View style={styles.itemHeaderContent}>
                           <Text style={styles.itemTitle}>{item.title}</Text>
                           <Text style={styles.itemMeta}>{item.allDay ? 'All day' : item.time || ''}</Text>
-                          {item.type === 'note' && item.status && <Text style={styles.itemMeta}>
+                          {item.type === 'note' && item.status && (!item.noteData?.is_planner_task || taskState?.label) && <Text style={styles.itemMeta}>
                             {item.noteData?.is_planner_task ? taskState?.label : item.status}
                           </Text>}
                         </View>

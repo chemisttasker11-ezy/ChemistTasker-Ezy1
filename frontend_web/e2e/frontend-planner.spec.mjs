@@ -107,7 +107,8 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 
     expect(new URL(page.url()).searchParams.get('date')).toBe('2026-12-28');
     let task = page.getByRole('article', { name: 'Opening task', exact: true });
     await expect(task).toHaveCount(1);
-    await expect(task.getByText('0 of 0 done')).toBeVisible();
+    await expect(task.getByText('Unassigned', { exact: true })).toBeVisible();
+    await expect(task.getByText('0 of 0 done')).toHaveCount(0);
     await task.getByRole('button', { name: 'More actions for Opening task', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Duplicate', exact: true }).click();
     await expect(task).toHaveCount(2);

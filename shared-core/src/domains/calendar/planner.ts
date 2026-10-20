@@ -57,7 +57,8 @@ export function notePayload(form: CalendarNoteForm, pharmacy: number) {
 
 export function copyResultMessage(result: PlannerCopyResult) {
     const dropped = [...new Set(result.dropped_assignees.map(person => person.name))];
-    return `${result.created} copied; ${result.skipped_series} repeating skipped; ${result.dropped_assignees.length} people dropped${dropped.length ? `: ${dropped.join(", ")}` : ""}.`;
+    return [`${result.created} copied`, result.skipped_series && `${result.skipped_series} repeating skipped`,
+        dropped.length && `${result.dropped_assignees.length} people dropped: ${dropped.join(", ")}`].filter(Boolean).join("; ") + ".";
 }
 
 export function applySavedTask(form: CalendarNoteForm, task: SavedTaskApi): CalendarNoteForm {
@@ -81,8 +82,9 @@ export const plannerCopyRequest = (pharmacy: number, day: Date, mode: 'task' | '
   return { ...source, request_key: `planner-${Date.now()}-${Math.random().toString(36).slice(2)}` };
 };
 
+// Empty for an unassigned task on the manager view: the card already says "Unassigned".
 export const taskStatusLabel = (note: WorkNoteApi, manager: boolean) => manager
-  ? `${note.completed_count ?? note.completed_by?.length ?? 0} of ${note.assignees.length} done`
+  ? note.assignees.length ? `${note.completed_count ?? note.completed_by?.length ?? 0} of ${note.assignees.length} done` : ''
   : note.status.toLowerCase() === 'done' ? 'Done' : 'To do';
 
 export const canEditTaskSchedule = (note: WorkNoteApi, completedCount = 0) =>

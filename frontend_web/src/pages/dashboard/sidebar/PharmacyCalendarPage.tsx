@@ -923,9 +923,9 @@ export default function PharmacyCalendarPage() {
                                                     </Stack>
                                                 )}
 
-                                                {item.status && (
+                                                {item.status && (!item.noteData?.is_planner_task || calendarTaskState(item.noteData, canManage, user?.id).label) && (
                                                     <Chip
-                                                        label={item.noteData?.is_planner_task ? canManage ? `${item.noteData.completed_count ?? 0} of ${item.assignees?.length ?? 0} done` : item.status === "DONE" ? "Done" : "To do" : item.status}
+                                                        label={item.noteData?.is_planner_task ? calendarTaskState(item.noteData, canManage, user?.id).label : item.status}
                                                         size="small"
                                                         sx={{
                                                             height: 22,
