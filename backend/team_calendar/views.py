@@ -10,9 +10,9 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
-from rest_framework import mixins, permissions, status, viewsets
+from rest_framework import mixins, permissions, serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from users.org_roles import (
@@ -32,6 +32,8 @@ from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee, Work
 from team_calendar.serializers import CalendarEventSerializer, CalendarFeedSerializer, WorkNoteSerializer
 from organizations.access import managed_pharmacies
 from team_calendar.recurrence import expand_recurrence_dates
+from team_calendar.operations_views import require_manager
+from team_calendar.operations_models import OperationAudit
 
 
 def _query_id(request, name):
@@ -333,16 +335,15 @@ class WorkNoteViewSet(
             'pharmacy', 'created_by'
         ).prefetch_related('assignees__membership__user')
         
-        # Scope by pharmacy or user's accessible pharmacies
+        accessible = self.get_accessible_pharmacy_ids(user)
+        manager_ids = managed_pharmacies(user).values_list('id', flat=True)
+        queryset = queryset.filter(
+            Q(is_planner_task=False, pharmacy_id__in=accessible)
+            | Q(is_planner_task=True, pharmacy_id__in=set(accessible) | set(manager_ids))
+        )
         if pharmacy_id is not None:
-            accessible = self.get_accessible_pharmacy_ids(user)
-            if pharmacy_id not in accessible:
-                return WorkNote.objects.none()
             queryset = queryset.filter(pharmacy_id=pharmacy_id)
-        else:
-            pharmacy_ids = self.get_accessible_pharmacy_ids(user)
-            queryset = queryset.filter(pharmacy_id__in=pharmacy_ids)
-        
+
         # Date range filter
         if date_from:
             queryset = queryset.filter(date__gte=date_from)
@@ -363,46 +364,93 @@ class WorkNoteViewSet(
                 Q(assignees__membership_id__in=my_membership_ids) | Q(is_general=True)
             ).distinct()
         
-        # Published operations are targeted. Legacy informal notes retain their old visibility.
+        # Informal notes retain their existing visibility.
         managed_ids = managed_pharmacies(user).values_list("id", flat=True)
         queryset = queryset.filter(
-            Q(operation_item__isnull=True)
+            Q(is_planner_task=False)
             | Q(pharmacy_id__in=managed_ids)
-            | Q(operation_item__isnull=False, assignees__membership__user=user,
-                assignees__membership__is_active=True)
+            | Q(is_planner_task=True, assignees__membership__user=user,
+                assignees__membership__is_active=True,
+                assignees__membership__status=Membership.Status.ACCEPTED)
         ).distinct()
         return queryset.order_by('-date', '-created_at')
     
+    @transaction.atomic
     def perform_create(self, serializer):
-        pharmacy_id = self.request.data.get('pharmacy')
-        
-        if not pharmacy_id:
-            raise ValidationError({"pharmacy": "This field is required."})
-        
-        if not self.can_create_work_notes(self.request.user, int(pharmacy_id)):
+        pharmacy = serializer.validated_data['pharmacy']
+        if serializer.validated_data.get('is_planner_task', False):
+            require_manager(self.request.user, pharmacy.pk)
+        elif not self.can_create_work_notes(self.request.user, pharmacy.pk):
             raise PermissionDenied("You don't have permission to create work notes for this pharmacy.")
-        
         serializer.save()
-    
-    def perform_update(self, serializer):
+
+    def _check_token(self, note):
+        token = serializers.DateTimeField().run_validation(self.request.data.get('updated_at'))
+        if token != note.updated_at:
+            error = APIException('This task changed. Reload it before trying again.')
+            error.status_code = status.HTTP_409_CONFLICT
+            raise error
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
         note = self.get_object()
-        if hasattr(note, "operation_item"):
-            raise PermissionDenied("Published operations must be changed through the operations workflow.")
-        
-        if not self.can_create_work_notes(self.request.user, note.pharmacy_id):
+        note = get_object_or_404(WorkNote.objects.select_for_update(), pk=note.pk)
+        if note.is_planner_task:
+            require_manager(request.user, note.pharmacy_id)
+            self._check_token(note)
+        elif not self.can_create_work_notes(request.user, note.pharmacy_id):
             raise PermissionDenied("You don't have permission to edit this work note.")
-        
+        serializer = self.get_serializer(note, data=request.data, partial=kwargs.pop('partial', False))
+        serializer.is_valid(raise_exception=True)
+        if note.is_planner_task and note.completions.exists():
+            attrs = serializer.validated_data
+            if (attrs.get('date', note.date) != note.date
+                    or attrs.get('recurrence', note.recurrence) != note.recurrence
+                    or set(attrs.get('assignee_membership_ids', note.assignees.values_list('membership_id', flat=True)))
+                    != set(note.assignees.values_list('membership_id', flat=True))):
+                raise ValidationError('Date, recurrence and assignees cannot change after completion.')
         serializer.save()
-    
-    def perform_destroy(self, instance):
-        if hasattr(instance, "operation_item"):
-            raise PermissionDenied("Published operations cannot be deleted as informal notes.")
-        if not self.can_create_work_notes(self.request.user, instance.pharmacy_id):
+        return Response(serializer.data)
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        note = self.get_object()
+        note = get_object_or_404(WorkNote.objects.select_for_update(), pk=note.pk)
+        if note.is_planner_task:
+            require_manager(request.user, note.pharmacy_id)
+            self._check_token(note)
+            OperationAudit.objects.create(
+                pharmacy_id=note.pharmacy_id, work_note=note, actor=request.user, action='DELETED',
+                details={'task': dict(self.get_serializer(note).data),
+                         'completions': [
+                             {'membership_id': c.membership_id, 'occurrence_date': c.occurrence_date.isoformat()}
+                             for c in note.completions.all()]},
+            )
+        elif not self.can_create_work_notes(request.user, note.pharmacy_id):
             raise PermissionDenied("You don't have permission to delete this work note.")
-        
-        instance.delete()
+        note.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def _lock_completion(self, request):
+        note = self.get_object()
+        note = get_object_or_404(WorkNote.objects.select_for_update(), pk=note.pk)
+        if note.is_planner_task:
+            self._check_token(note)
+        return note
+
+    def _validate_planner_completion(self, note, membership, occurrence_date):
+        if not note.is_planner_task:
+            return
+        if membership.status != Membership.Status.ACCEPTED or not note.assignees.filter(membership=membership).exists():
+            raise PermissionDenied('Only an assigned, active worker can complete or reopen this task.')
+        dates = expand_recurrence_dates(note.date, note.recurrence, occurrence_date, occurrence_date)
+        if (note.recurrence and occurrence_date not in dates) or (not note.recurrence and occurrence_date != note.date):
+            raise ValidationError({'occurrence_date': 'This date is not an occurrence of the task.'})
 
     def _get_occurrence_date(self, request, note):
+        if note.is_planner_task:
+            value = request.data.get('occurrence_date', request.query_params.get('occurrence_date'))
+            return serializers.DateField().run_validation(value) if value is not None else note.date
         date_str = request.data.get("occurrence_date") or request.query_params.get("occurrence_date")
         if date_str:
             try:
@@ -422,7 +470,7 @@ class WorkNoteViewSet(
     @transaction.atomic
     def mark_done(self, request, pk=None):
         """Mark a work note as done."""
-        note = self.get_object()
+        note = self._lock_completion(request)
         membership = self._get_user_membership(request.user, note.pharmacy_id)
         if not membership:
             raise PermissionDenied("You don't have an active membership for this pharmacy.")
@@ -434,25 +482,7 @@ class WorkNoteViewSet(
             raise PermissionDenied("You can only mark notes assigned to you as done.")
 
         occurrence_date = self._get_occurrence_date(request, note)
-        operation = getattr(note, "operation_item", None)
-        if operation:
-            from team_calendar.operations_models import OperationTask, OperationVerification
-            operation = OperationTask.objects.select_for_update().get(pk=operation.pk)
-            if OperationVerification.objects.filter(task=operation).exists():
-                raise PermissionDenied("Verified work needs an authorised manager correction.")
-            if membership.status != Membership.Status.ACCEPTED or not WorkNoteAssignee.objects.filter(
-                work_note=note, membership=membership,
-            ).exists():
-                raise PermissionDenied("Published tasks can only be completed by an assigned, active worker.")
-            if occurrence_date != operation.date:
-                raise ValidationError({"occurrence_date": "Operational tasks belong to one published date."})
-            from team_calendar.operations_models import OperationStep
-            required = {entry["id"] for entry in operation.checklist if entry.get("required", True)}
-            checked = set(OperationStep.objects.filter(
-                task=operation, membership=membership
-            ).values_list("step_id", flat=True))
-            if required - checked:
-                raise ValidationError({"checklist": "Complete required steps before submitting work."})
+        self._validate_planner_completion(note, membership, occurrence_date)
         WorkNoteCompletion.objects.update_or_create(
             work_note=note,
             membership=membership,
@@ -462,36 +492,28 @@ class WorkNoteViewSet(
                 "completed_by": request.user,
             },
         )
+        if note.is_planner_task:
+            note.save(update_fields=['updated_at'])
         return Response(self.get_serializer(note).data)
     
     @action(detail=True, methods=['post'])
     @transaction.atomic
     def mark_open(self, request, pk=None):
         """Mark a work note as open."""
-        note = self.get_object()
+        note = self._lock_completion(request)
         membership = self._get_user_membership(request.user, note.pharmacy_id)
         if not membership:
             raise PermissionDenied("You don't have an active membership for this pharmacy.")
 
         occurrence_date = self._get_occurrence_date(request, note)
-        operation = getattr(note, "operation_item", None)
-        if operation:
-            from team_calendar.operations_models import OperationTask
-            operation = OperationTask.objects.select_for_update().get(pk=operation.pk)
-            if membership.status != Membership.Status.ACCEPTED or not WorkNoteAssignee.objects.filter(
-                work_note=note, membership=membership,
-            ).exists():
-                raise PermissionDenied("Published tasks can only be reopened by an assigned, active worker.")
-            if occurrence_date != operation.date:
-                raise ValidationError({"occurrence_date": "Operational tasks belong to one published date."})
-            from team_calendar.operations_models import OperationVerification
-            if OperationVerification.objects.filter(task=operation).exists():
-                raise PermissionDenied("A verified task must be reopened by an authorised manager.")
+        self._validate_planner_completion(note, membership, occurrence_date)
         WorkNoteCompletion.objects.filter(
             work_note=note,
             membership=membership,
             occurrence_date=occurrence_date,
         ).delete()
+        if note.is_planner_task:
+            note.save(update_fields=['updated_at'])
         return Response(self.get_serializer(note).data)
 
 
@@ -517,7 +539,9 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
             date_to = next_month - timedelta(days=next_month.day)
         
         # Get accessible IDs
-        accessible_pharmacy_ids = self.get_accessible_pharmacy_ids(user)
+        legacy_pharmacy_ids = self.get_accessible_pharmacy_ids(user)
+        manager_ids = set(managed_pharmacies(user).values_list('pk', flat=True))
+        accessible_pharmacy_ids = legacy_pharmacy_ids | manager_ids
         accessible_org_ids = self.get_accessible_organization_ids(user)
         
         # Build event query
@@ -530,10 +554,15 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
             'pharmacy', 'created_by'
         ).prefetch_related('assignees__membership__user')
         
+        work_note_query = work_note_query.filter(
+            Q(is_planner_task=False, pharmacy_id__in=legacy_pharmacy_ids)
+            | Q(is_planner_task=True, pharmacy_id__in=accessible_pharmacy_ids)
+        )
         if pharmacy_id is not None:
             if pharmacy_id not in accessible_pharmacy_ids:
                 return Response({"error": "Access denied"}, status=status.HTTP_403_FORBIDDEN)
-            event_query = event_query.filter(pharmacy_id=pharmacy_id)
+            event_query = (event_query.filter(pharmacy_id=pharmacy_id)
+                           if pharmacy_id in legacy_pharmacy_ids else event_query.none())
             work_note_query = work_note_query.filter(pharmacy_id=pharmacy_id)
             
             # Filter birthdays based on permissions
@@ -552,7 +581,7 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
             work_note_query = work_note_query.filter(pharmacy_id__in=org_pharmacy_ids)
         else:
             event_query = event_query.filter(
-                Q(pharmacy_id__in=accessible_pharmacy_ids) | 
+                Q(pharmacy_id__in=legacy_pharmacy_ids) |
                 Q(organization_id__in=accessible_org_ids)
             )
             work_note_query = work_note_query.filter(pharmacy_id__in=accessible_pharmacy_ids)
@@ -588,14 +617,14 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
             | recurring_note_q
         )
 
-        # Explicitly targeted operations are only returned to assigned workers
-        # or authorised managers. Avoid broadening legacy note permissions.
+        # Informal-note visibility is unchanged; planner tasks are targeted.
         manager_pharmacy_ids = managed_pharmacies(user).values_list("id", flat=True)
         work_note_query = work_note_query.filter(
-            Q(operation_item__isnull=True)
+            Q(is_planner_task=False)
             | Q(pharmacy_id__in=manager_pharmacy_ids)
-            | Q(operation_item__isnull=False, assignees__membership__user=user,
-                assignees__membership__is_active=True)
+            | Q(is_planner_task=True, assignees__membership__user=user,
+                assignees__membership__is_active=True,
+                assignees__membership__status=Membership.Status.ACCEPTED)
         ).distinct()
         events = list(event_query.order_by('date', 'start_time'))
         work_notes = list(work_note_query.order_by('date'))
@@ -615,7 +644,7 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
         admin_pharmacy_ids = {
             pharmacy_id
             for pharmacy_id in note_pharmacy_ids
-            if self.can_manage_calendar(user, pharmacy_id)
+            if self.can_manage_calendar(user, pharmacy_id) or pharmacy_id in manager_ids
         }
 
         completion_set = set()
@@ -670,8 +699,11 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
         serialized_notes = []
         for note in work_notes:
             base_data = WorkNoteSerializer(note, many=False, context={'request': request}).data
+            base_data['series_date'] = note.date.isoformat()
             membership_id = membership_map.get(note.pharmacy_id)
             rec_dates = expand_recurrence_dates(note.date, note.recurrence, date_from, date_to)
+            if note.is_planner_task and note.recurrence and not rec_dates:
+                continue
             if not rec_dates:
                 if membership_id:
                     base_data['status'] = (
@@ -684,6 +716,8 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
                         (note.id, note.date),
                         [],
                     )
+                if note.pharmacy_id in admin_pharmacy_ids:
+                    base_data['completed_count'] = len(completion_by_map.get((note.id, note.date), []))
                 base_data['is_occurrence'] = False
                 serialized_notes.append(base_data)
             else:
@@ -700,6 +734,8 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
                             (note.id, occurrence),
                             [],
                         )
+                    if note.pharmacy_id in admin_pharmacy_ids:
+                        occurrence_data['completed_count'] = len(completion_by_map.get((note.id, occurrence), []))
                     occurrence_data['occurrence_date'] = occurrence.isoformat()
                     occurrence_data['series_id'] = base_data['id']
                     occurrence_data['is_occurrence'] = True

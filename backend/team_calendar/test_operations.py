@@ -1,473 +1,421 @@
-"""High-value contracts for calendar-authoritative pharmacy operations.
-
-All cases run through /api/v1/ using the real authentication and scope code.
-The existing calendar characterization suite stays unchanged.
-"""
-from datetime import date, time
+"""Planner contracts through the real API; informal-note characterization stays unchanged."""
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, time, datetime, timedelta, timezone as dt_timezone
+from threading import Barrier
+from unittest.mock import patch
 import uuid
 
-from django.test import TestCase
+from django.db import close_old_connections
+from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.utils import timezone
 
-from client_profile.characterization_support import (
-    client_for, make_owner_with_pharmacy, make_staff_member,
-)
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_staff_member, make_user
+from memberships.models import Membership
+from onboarding.models import PharmacistOnboarding
+from organizations.access import managed_pharmacies, user_can_manage_pharmacy
+from organizations.models import Organization, PharmacyAdmin
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
+from users.models import OrganizationMembership
 from workforce.models import RosterPeriod
-from team_calendar.models import WorkNote, WorkNoteCompletion
-from team_calendar.operations_models import (
-    OperationPlan, OperationTask, OperationTemplate, OperationVerification,
-    OperationKpiRecord, OperationStep, OperationAudit,
-)
-from team_calendar.operations_rules import template_dates
+from team_calendar.models import WorkNote, WorkNoteAssignee, WorkNoteCompletion
+from team_calendar.operations_models import SavedTask, OperationAudit
+from team_calendar.operations_rules import copy_tasks
+from team_calendar import tasks
 
-BASE = "/api/v1/"
-PLAN = BASE + "operation-plans/"
-ITEM = BASE + "operation-items/"
-TEMPLATE = BASE + "operation-templates/"
-CATALOG = BASE + "operation-catalog/"
-CONTEXT = BASE + "operation-context/"
+BASE = '/api/v1/'
+NOTES = BASE + 'work-notes/'
+COPY = BASE + 'planner-copy/'
+SAVED = BASE + 'saved-tasks/'
+CONTEXT = BASE + 'operation-context/'
+ROSTER = BASE + 'planner-roster-fill/'
+DAY = date(2026, 10, 19)
 
 
-class PharmacyOperationsContracts(TestCase):
+class PlannerFixtures:
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy()
         self.worker, self.membership = make_staff_member(self.pharmacy)
-        self.other_worker, self.other_membership = make_staff_member(self.pharmacy)
-        self.foreign_owner, self.foreign_pharmacy = make_owner_with_pharmacy("Foreign store")
-        self.stranger, self.stranger_membership = make_staff_member(self.foreign_pharmacy)
-        self.day = "2026-10-19"
+        self.other, self.other_membership = make_staff_member(self.pharmacy)
+        self.foreign_owner, self.foreign_pharmacy = make_owner_with_pharmacy('Foreign pharmacy')
+        self.stranger, self.foreign_membership = make_staff_member(self.foreign_pharmacy)
+        self.client = client_for(self.owner)
 
-    def new_plan(self, user=None):
-        res = client_for(user or self.owner).post(PLAN, {
-            "pharmacy": self.pharmacy.id, "name": "Monday pharmacy run",
-            "period": "daily", "starts_on": self.day, "ends_on": self.day,
-        }, format="json")
+    def payload(self, **changes):
+        return {'pharmacy': self.pharmacy.pk, 'date': DAY.isoformat(), 'title': 'Open dispensary',
+                'is_planner_task': True, **changes}
+
+    def create(self, **changes):
+        res = self.client.post(NOTES, self.payload(**changes), format='json')
         self.assertEqual(res.status_code, 201, res.content)
         return res.json()
 
-    def new_item(self, plan, **changes):
-        data = {
-            "plan": plan["id"], "title": "Daily opening", "description": "Check dispensary readiness",
-            "date": self.day, "area": "dispensary", "audience": "NAMED",
-            "membership_ids": [self.membership.id], "role_codes": ["ASSISTANT"],
-            "checklist": [{"id": "s1", "label": "Check workstation", "required": True}],
-            "requires_verification": True,
-        }
-        data.update(changes)
-        res = client_for(self.owner).post(ITEM, data, format="json")
-        self.assertEqual(res.status_code, 201, res.content)
-        return res.json()
+    def copy(self, **changes):
+        return self.client.post(COPY, {
+            'pharmacy': self.pharmacy.pk, 'source_from': DAY.isoformat(), 'source_to': DAY.isoformat(),
+            'day_offset': 1, 'request_key': str(uuid.uuid4()), **changes,
+        }, format='json')
 
-    def revision(self, plan):
-        return client_for(self.owner).get(PLAN + str(plan["id"]) + "/").json()["revision"]
+    def edit(self, note, **changes):
+        return self.client.patch(NOTES + str(note['id']) + '/', {
+            'updated_at': note['updated_at'], **changes,
+        }, format='json')
 
-    def publish(self, plan, revision=None):
-        return client_for(self.owner).post(PLAN + str(plan["id"]) + "/publish/", {
-            "revision": revision if revision is not None else self.revision(plan),
-        }, format="json")
+    def complete(self, note, user=None, **changes):
+        return client_for(user or self.worker).post(NOTES + str(note['id']) + '/mark_done/', {
+            'updated_at': note['updated_at'], 'occurrence_date': DAY.isoformat(), **changes,
+        }, format='json')
 
-    def publish_named(self, **changes):
-        plan = self.new_plan()
-        item = self.new_item(plan, **changes)
-        res = self.publish(plan)
-        self.assertEqual(res.status_code, 200, res.content)
-        note_id = res.json()["plan"]["items"][0]["calendar_note_id"]
-        self.assertIsInstance(note_id, int)
-        return plan, item, note_id
+    def rows(self, response):
+        self.assertEqual(response.status_code, 200, response.content)
+        data = response.json()
+        return data.get('results', []) if isinstance(data, dict) else data
 
-    def published_roster_for_worker(self, *, user=None):
-        person = user or self.worker
+    def roster(self, user=None, day=DAY, start=time(9), end=time(17), published=True):
         period = RosterPeriod.objects.create(
-            pharmacy=self.pharmacy, week_start=date(2026, 10, 19),
-            status=RosterPeriod.Status.DRAFT, created_by=self.owner,
+            pharmacy=self.pharmacy, week_start=day - timedelta(days=day.weekday()),
+            created_by=self.owner, status='DRAFT',
         )
-        shift = Shift.objects.create(
-            pharmacy=self.pharmacy, created_by=self.owner,
-            role_needed="ASSISTANT", employment_type="LOCUM",
-        )
-        slot = ShiftSlot.objects.create(
-            shift=shift, roster_period=period,
-            date=date(2026, 10, 19), start_time=time(9, 0), end_time=time(17, 0),
-        )
-        ShiftSlotAssignment.objects.create(
-            shift=shift, slot=slot, user=person, slot_date=date(2026, 10, 19),
-            is_rostered=True,
-        )
-        period.status = RosterPeriod.Status.PUBLISHED
-        period.published_at = timezone.now()
-        period.save(update_fields=["status", "published_at"])
+        shift = Shift.objects.create(pharmacy=self.pharmacy, created_by=self.owner,
+                                     role_needed='ASSISTANT', employment_type='LOCUM')
+        slot = ShiftSlot.objects.create(shift=shift, roster_period=period, date=day, start_time=start, end_time=end)
+        ShiftSlotAssignment.objects.create(shift=shift, slot=slot, slot_date=day,
+                                           user=user or self.worker, is_rostered=True)
+        if published:
+            period.status = 'PUBLISHED'
+            period.published_at = timezone.now()
+            period.save(update_fields=['status', 'published_at'])
         return period
 
-    def test_context_restricts_managed_pharmacies_and_catalog(self):
-        data = client_for(self.owner).get(CONTEXT).json()
-        self.assertEqual([p["id"] for p in data["pharmacies"]], [self.pharmacy.id])
-        self.assertGreater(len(client_for(self.owner).get(CATALOG).json()["templates"]), 20)
-        self.assertIn(client_for().get(CATALOG).status_code, [401, 403])
-        self.assertEqual(client_for(self.worker).get(CATALOG).status_code, 403)
 
-    def test_staff_cannot_create_or_publish_manager_plans(self):
-        payload = {
-            "pharmacy": self.pharmacy.id, "name": "Unapproved",
-            "starts_on": self.day, "ends_on": self.day,
-        }
-        self.assertEqual(client_for(self.worker).post(PLAN, payload, format="json").status_code, 403)
-        plan = self.new_plan()
-        self.assertEqual(client_for(self.worker).post(
-            PLAN + str(plan["id"]) + "/publish/", {"revision": 1}, format="json",
-        ).status_code, 404)
+class PlannerContracts(PlannerFixtures, TestCase):
+    def test_direct_add_starts_unassigned_live_and_notifications_off(self):
+        note = self.create()
+        self.assertTrue(note['is_planner_task'])
+        self.assertFalse(note['notify_on_shift_start'])
+        self.assertEqual(note['assignees'], [])
+        self.assertEqual(len(self.rows(self.client.get(NOTES))), 1)
+        self.assertEqual(self.rows(client_for(self.worker).get(NOTES)), [])
+        self.assertEqual(client_for(self.worker).get(CONTEXT).json(), {'pharmacies': []})
 
-    def test_planner_drafts_never_appear_on_calendar(self):
-        plan = self.new_plan()
-        self.new_item(plan)
-        note_ids = list(WorkNote.objects.filter(pharmacy=self.pharmacy).values_list("id", flat=True))
-        self.assertEqual(note_ids, [])
-        feed = client_for(self.worker).get(
-            BASE + "calendar-feed/?pharmacy_id=" + str(self.pharmacy.id) +
-            "&date_from=2026-10-19&date_to=2026-10-19",
-        )
-        self.assertEqual(feed.status_code, 200)
-        self.assertEqual(feed.json()["work_notes"], [])
+    def test_staff_cannot_create_edit_delete_or_convert_planner_tasks(self):
+        staff = client_for(self.worker)
+        self.assertEqual(staff.post(NOTES, self.payload(), format='json').status_code, 403)
+        note = self.create(assignee_membership_ids=[self.membership.pk])
+        url = NOTES + str(note['id']) + '/'
+        for body in [{'title': 'x'}, {'is_planner_task': False}, {'pharmacy': self.foreign_pharmacy.pk}]:
+            self.assertEqual(staff.patch(url, {**body, 'updated_at': note['updated_at']}, format='json').status_code, 403)
+        self.assertEqual(staff.delete(url, {'updated_at': note['updated_at']}, format='json').status_code, 403)
+        informal = staff.post(NOTES, self.payload(is_planner_task=False), format='json').json()
+        self.assertEqual(staff.patch(NOTES + str(informal['id']) + '/', {
+            'is_planner_task': True,
+        }, format='json').status_code, 400)
+        self.assertEqual(self.edit(note, is_planner_task=False).status_code, 400)
+        self.assertEqual(self.edit(note, pharmacy=self.foreign_pharmacy.pk).status_code, 400)
+        self.assertEqual(self.edit(note, is_general=True).status_code, 400)
 
-    def test_named_publication_creates_exactly_one_authoritative_work_note(self):
-        plan, task, note_id = self.publish_named()
-        task_obj = OperationTask.objects.get(pk=task["id"])
-        self.assertEqual(task_obj.calendar_note_id, note_id)
-        self.assertEqual(task_obj.calendar_note.assignees.first().membership_id, self.membership.id)
-        self.assertEqual(WorkNote.objects.filter(pharmacy=self.pharmacy).count(), 1)
-        self.assertEqual(OperationAudit.objects.filter(plan_id=plan["id"], action="PUBLISHED").count(), 1)
-        second = self.publish(plan)
-        self.assertEqual(second.status_code, 200, second.content)
-        self.assertEqual(WorkNote.objects.filter(pharmacy=self.pharmacy).count(), 1)
+    def test_staff_visibility_assigned_only_in_list_and_cross_year_feed(self):
+        note = self.create(date='2026-12-31', assignee_membership_ids=[self.membership.pk],
+                           recurrence={'freq': 'DAILY', 'until_date': '2027-01-03'})
+        self.create(date='2027-01-01')
+        query = f'?pharmacy_id={self.pharmacy.pk}&date_from=2026-12-28&date_to=2027-01-03'
+        feed = client_for(self.worker).get(BASE + 'calendar-feed/' + query)
+        rows = feed.json()['work_notes']
+        self.assertEqual([r['date'] for r in rows], ['2026-12-31', '2027-01-01', '2027-01-02', '2027-01-03'])
+        self.assertEqual(rows[-1]['series_id'], note['id'])
+        self.assertEqual(rows[-1]['series_date'], '2026-12-31')
+        self.assertEqual(rows[-1]['updated_at'], note['updated_at'])
+        self.assertEqual(client_for(self.other).get(BASE + 'calendar-feed/' + query).json()['work_notes'], [])
+        self.assertEqual(self.rows(client_for(self.stranger).get(NOTES)), [])
+        self.assertEqual(client_for(self.stranger).get(NOTES + str(note['id']) + '/').status_code, 404)
+        self.membership.status = Membership.Status.PENDING
+        self.membership.save(update_fields=['status'])
+        self.assertEqual(self.rows(client_for(self.worker).get(NOTES)), [])
 
-    def test_stale_revision_does_not_publish(self):
-        plan = self.new_plan()
-        self.new_item(plan)
-        res = self.publish(plan, revision=1)
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(WorkNote.objects.count(), 0)
+    def test_org_regional_and_roster_admins_use_identical_list_and_write_scope(self):
+        org = Organization.objects.create(name='Group')
+        self.pharmacy.organization = org
+        self.pharmacy.save(update_fields=['organization'])
+        self.foreign_pharmacy.organization = org
+        self.foreign_pharmacy.save(update_fields=['organization'])
+        regional = make_user('ORG_ADMIN')
+        scope = OrganizationMembership.objects.create(user=regional, organization=org, role='REGION_ADMIN')
+        scope.pharmacies.add(self.pharmacy)
+        admin = make_user('ORG_ADMIN')
+        OrganizationMembership.objects.create(user=admin, organization=org, role='ORG_ADMIN')
+        roster_admin = make_user()
+        PharmacyAdmin.objects.create(user=roster_admin, pharmacy=self.pharmacy, admin_level='ROSTER_MANAGER')
+        comms_admin = make_user()
+        PharmacyAdmin.objects.create(user=comms_admin, pharmacy=self.pharmacy, admin_level='COMMUNICATION_MANAGER')
+        for user, ids in [(regional, {self.pharmacy.pk}), (admin, {self.pharmacy.pk, self.foreign_pharmacy.pk}),
+                          (roster_admin, {self.pharmacy.pk}), (comms_admin, set())]:
+            with self.subTest(user=user.pk):
+                client = client_for(user)
+                self.assertEqual(set(managed_pharmacies(user).values_list('pk', flat=True)), ids)
+                self.assertEqual({p['id'] for p in client.get(CONTEXT).json()['pharmacies']}, ids)
+                for pharmacy in [self.pharmacy, self.foreign_pharmacy]:
+                    allowed = pharmacy.pk in ids
+                    self.assertEqual(user_can_manage_pharmacy(user, pharmacy), allowed)
+                    res = client.post(NOTES, self.payload(pharmacy=pharmacy.pk), format='json')
+                    self.assertEqual(res.status_code, 201 if allowed else 403, res.content)
+                    if allowed:
+                        self.assertIn(res.json()['id'], [r['id'] for r in self.rows(client.get(NOTES))])
+                        token = res.json()['updated_at']
+                        self.assertEqual(client.patch(NOTES + str(res.json()['id']) + '/', {
+                            'title': 'Managed', 'updated_at': token,
+                        }, format='json').status_code, 200)
 
-    def test_invalid_foreign_member_blocks_all_writes(self):
-        plan = self.new_plan()
-        self.new_item(plan, membership_ids=[self.stranger_membership.id])
-        res = self.publish(plan)
-        self.assertEqual(res.status_code, 400, res.content)
-        self.assertEqual(WorkNote.objects.count(), 0)
-        self.assertEqual(OperationPlan.objects.get(pk=plan["id"]).status, "DRAFT")
-
-    def test_roster_rule_blocks_unpublished_and_publishes_after_valid_coverage(self):
-        plan = self.new_plan()
-        self.new_item(plan, audience="ROLE_ON_DUTY", membership_ids=[],
-                      start_time="10:00", end_time="11:00")
-        no_roster = client_for(self.owner).get(
-            PLAN + str(plan["id"]) + "/preview/"
-        ).json()
-        self.assertFalse(no_roster["ready"])
-        self.assertEqual(WorkNote.objects.count(), 0)
-        self.published_roster_for_worker()
-        ready = client_for(self.owner).get(PLAN + str(plan["id"]) + "/preview/").json()
-        self.assertTrue(ready["ready"], ready)
-        self.assertEqual(ready["assignments"][0]["membership_ids"], [self.membership.id])
-        res = self.publish(plan)
-        self.assertEqual(res.status_code, 200, res.content)
-
-    def test_published_work_hidden_from_unassigned_pharmacy_member(self):
-        _, _, note_id = self.publish_named()
-        feed = BASE + "calendar-feed/?pharmacy_id=" + str(self.pharmacy.id) + (
-            "&date_from=2026-10-19&date_to=2026-10-19"
-        )
-        self.assertEqual([n["id"] for n in client_for(self.worker).get(feed).json()["work_notes"]], [note_id])
-        self.assertEqual(client_for(self.other_worker).get(feed).json()["work_notes"], [])
-        self.assertEqual(client_for(self.stranger).get(
-            BASE + "work-notes/" + str(note_id) + "/"
-        ).status_code, 404)
-        self.assertEqual(client_for(self.stranger).get(feed).status_code, 403)
-
-    def test_published_note_cannot_be_edited_or_deleted_as_informal_note(self):
-        _, _, note_id = self.publish_named()
-        note = BASE + "work-notes/" + str(note_id) + "/"
-        self.assertEqual(client_for(self.worker).patch(note, {"title": "Changed"}, format="json").status_code, 403)
-        self.assertEqual(client_for(self.owner).delete(note).status_code, 403)
-        self.assertTrue(WorkNote.objects.filter(pk=note_id).exists())
-
-    def test_required_steps_gate_calendar_completion_and_supervisor_signoff(self):
-        _, task, note_id = self.publish_named()
-        finish = BASE + "work-notes/" + str(note_id) + "/mark_done/"
-        self.assertEqual(client_for(self.worker).post(
-            finish, {"occurrence_date": self.day}, format="json",
-        ).status_code, 400)
-        step = client_for(self.worker).post(
-            ITEM + str(task["id"]) + "/step/",
-            {"step_id": "s1", "done": True, "evidence_note": "Workstation ready"},
-            format="json",
-        )
-        self.assertEqual(step.status_code, 200, step.content)
-        self.assertEqual(OperationStep.objects.filter(task_id=task["id"]).count(), 1)
-        self.assertEqual(client_for(self.worker).post(
-            finish, {"occurrence_date": self.day}, format="json",
-        ).status_code, 200)
-        self.assertEqual(WorkNoteCompletion.objects.count(), 1)
-        self.assertEqual(client_for(self.worker).post(
-            ITEM + str(task["id"]) + "/step/", {"step_id": "s1", "done": False},
-            format="json",
-        ).status_code, 400)
-        verified = client_for(self.owner).post(
-            ITEM + str(task["id"]) + "/verify/", {"note": "Independent check completed"},
-            format="json",
-        )
-        self.assertEqual(verified.status_code, 200, verified.content)
-        self.assertTrue(OperationVerification.objects.filter(task_id=task["id"]).exists())
-        self.assertEqual(client_for(self.worker).post(
-            BASE + "work-notes/" + str(note_id) + "/mark_open/",
-            {"occurrence_date": self.day}, format="json",
-        ).status_code, 403)
-
-    def test_nonassignee_cannot_record_or_claim_operations(self):
-        _, task, note_id = self.publish_named()
-        for action, payload in (
-            ("step", {"step_id": "s1", "done": True}),
-            ("record_kpi", {"value": 1, "key": str(uuid.uuid4())}),
-        ):
-            self.assertEqual(client_for(self.other_worker).post(
-                ITEM + str(task["id"]) + "/" + action + "/", payload, format="json",
-            ).status_code, 404)
-        self.assertEqual(client_for(self.other_worker).post(
-            BASE + "work-notes/" + str(note_id) + "/mark_done/",
-            {"occurrence_date": self.day}, format="json",
-        ).status_code, 404)
-
-    def test_kpi_idempotency_preserves_single_actual_value(self):
-        _, task, _ = self.publish_named(target_value=20, target_unit="contacts")
-        key = str(uuid.uuid4())
-        uri = ITEM + str(task["id"]) + "/record_kpi/"
-        first = client_for(self.worker).post(uri, {"key": key, "value": 7}, format="json")
-        self.assertEqual(first.status_code, 201, first.content)
-        again = client_for(self.worker).post(uri, {"key": key, "value": 7}, format="json")
-        self.assertEqual(again.status_code, 200)
-        mismatched = client_for(self.worker).post(uri, {"key": key, "value": 15}, format="json")
-        self.assertEqual(mismatched.status_code, 400)
-        self.assertEqual(OperationKpiRecord.objects.filter(task_id=task["id"]).count(), 1)
-        self.assertEqual(OperationKpiRecord.objects.get(task_id=task["id"]).value, 7)
-
-    def test_org_and_foreign_pharmacy_templates_are_not_usable_cross_tenant(self):
-        plan = self.new_plan()
-        foreign = OperationTemplate.objects.create(pharmacy=self.foreign_pharmacy, name="Foreign")
-        res = client_for(self.owner).post(
-            PLAN + str(plan["id"]) + "/apply_template/",
-            {"template_id": foreign.id}, format="json",
-        )
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(OperationTask.objects.filter(plan_id=plan["id"]).count(), 0)
-
-    def test_inactive_membership_is_not_eligible(self):
+    def test_invalid_members_and_times_rejected_without_writes(self):
+        for ids in [[self.foreign_membership.pk], [self.membership.pk, self.membership.pk]]:
+            self.assertEqual(self.client.post(NOTES, self.payload(assignee_membership_ids=ids), format='json').status_code, 400)
         self.membership.is_active = False
-        self.membership.save(update_fields=["is_active"])
-        plan = self.new_plan()
-        self.new_item(plan)
-        self.assertEqual(self.publish(plan).status_code, 400)
-        self.assertEqual(WorkNote.objects.count(), 0)
+        self.membership.save(update_fields=['is_active'])
+        self.assertEqual(self.client.post(NOTES, self.payload(assignee_membership_ids=[self.membership.pk]), format='json').status_code, 400)
+        for status in [Membership.Status.PENDING, Membership.Status.REJECTED]:
+            self.other_membership.status = status
+            self.other_membership.save(update_fields=['status'])
+            self.assertEqual(self.client.post(NOTES, self.payload(assignee_membership_ids=[self.other_membership.pk]), format='json').status_code, 400)
+        self.assertEqual(self.client.post(NOTES, self.payload(start_time='23:00', end_time='01:00'), format='json').status_code, 400)
+        self.assertFalse(WorkNote.objects.exists())
 
-    def test_overnight_roster_presence(self):
-        """Shift beginning the previous evening may cover today's early task."""
-        from unittest.mock import Mock
-        from team_calendar.operations_rules import _rostered_user_ids
-        p = self.pharmacy
-        period = RosterPeriod.objects.create(
-            pharmacy=p, week_start=date(2026, 10, 19),
-            status=RosterPeriod.Status.DRAFT, created_by=self.owner,
-        )
-        shift = Shift.objects.create(
-            pharmacy=p, created_by=self.owner,
-            role_needed="ASSISTANT", employment_type="LOCUM",
-        )
-        slot = ShiftSlot.objects.create(
-            shift=shift, roster_period=period,
-            date=date(2026, 10, 19), start_time=time(22, 0), end_time=time(6, 0),
-        )
-        ShiftSlotAssignment.objects.create(
-            shift=shift, slot=slot, user=self.worker,
-            slot_date=date(2026, 10, 19), is_rostered=True,
-        )
-        period.status = RosterPeriod.Status.PUBLISHED
+    def test_roster_fill_is_explicit_optional_and_accepts_empty_roster(self):
+        payload = {'pharmacy': self.pharmacy.pk, 'date': DAY.isoformat()}
+        self.assertEqual(self.client.post(ROSTER, payload, format='json').json()['assignee_membership_ids'], [])
+        period = self.roster(published=False)
+        self.assertEqual(self.client.post(ROSTER, payload, format='json').json()['assignee_membership_ids'], [])
+        period.status = 'PUBLISHED'
         period.published_at = timezone.now()
-        period.save(update_fields=["status", "published_at"])
-        task = Mock(date=date(2026, 10, 20), start_time=time(3), end_time=time(4))
-        task.plan.pharmacy_id = p.id
-        self.assertEqual(_rostered_user_ids(task), {self.worker.id})
-        task.start_time = time(14)
-        task.end_time = time(15)
-        self.assertEqual(_rostered_user_ids(task), set())
+        period.save(update_fields=['status', 'published_at'])
+        self.assertEqual(self.client.post(ROSTER, payload, format='json').json()['assignee_membership_ids'], [self.membership.pk])
+        self.assertEqual(self.client.post(ROSTER, {**payload, 'role': 'PHARMACIST'}, format='json').json()['assignee_membership_ids'], [])
+        self.assertEqual(client_for(self.worker).post(ROSTER, payload, format='json').status_code, 403)
+        self.assertEqual(self.create()['assignees'], [])
 
-    def test_unassigned_manager_cannot_sign_off_worker_completion(self):
-        """A manager cannot impersonate a target worker in calendar completion."""
-        manager_worker, manager_membership = make_staff_member(self.pharmacy)
-        _, item, note_id = self.publish_named()
-        uri = BASE + "work-notes/" + str(note_id) + "/mark_done/"
-        self.assertEqual(client_for(manager_worker).post(
-            uri, {"occurrence_date": self.day}, format="json",
-        ).status_code, 404)
-        self.assertEqual(WorkNoteCompletion.objects.count(), 0)
+    def test_clinical_requires_registration_expiry_and_on_duty_including_overnight(self):
+        pharmacist = make_user('PHARMACIST')
+        member = Membership.objects.create(user=pharmacist, pharmacy=self.pharmacy,
+                                           role='PHARMACIST', status=Membership.Status.ACCEPTED)
+        data = self.payload(is_clinical=True, assignee_membership_ids=[member.pk])
+        self.assertEqual(self.client.post(NOTES, data, format='json').status_code, 400)
+        profile = PharmacistOnboarding.objects.create(user=pharmacist, ahpra_verified=True,
+                                                       ahpra_expiry_date=date(2099, 1, 1))
+        self.assertEqual(self.client.post(NOTES, data, format='json').status_code, 400)
+        self.roster(user=pharmacist, day=DAY - timedelta(days=1), start=time(22), end=time(6))
+        res = self.client.post(NOTES, {**data, 'start_time': '03:00', 'end_time': '04:00'}, format='json')
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertEqual(self.client.post(NOTES, {**data, 'start_time': '14:00', 'end_time': '15:00'}, format='json').status_code, 400)
+        copied = self.copy(task_id=res.json()['id']).json()
+        self.assertEqual(copied['dropped_assignees'][0]['membership_id'], member.pk)
+        profile.ahpra_expiry_date = DAY - timedelta(days=1)
+        profile.save(update_fields=['ahpra_expiry_date'])
+        self.assertEqual(self.client.post(NOTES, {**data, 'start_time': '03:00', 'end_time': '04:00'}, format='json').status_code, 400)
+        self.create(is_clinical=True)
 
-    def test_clinical_work_blocks_noncredentialed_and_unrostered_pharmacist(self):
-        from client_profile.characterization_support import make_user
-        from memberships.models import Membership
-        pharmacist = make_user("PHARMACIST")
-        pharmacist_membership = Membership.objects.create(
-            user=pharmacist, pharmacy=self.pharmacy, role="PHARMACIST",
-            status=Membership.Status.ACCEPTED,
-        )
-        plan = self.new_plan()
-        self.new_item(
-            plan, title="Clinical service", target_kind="clinical",
-            membership_ids=[pharmacist_membership.id], role_codes=["PHARMACIST"],
-        )
-        response = self.publish(plan)
-        self.assertEqual(response.status_code, 400, response.content)
-        self.assertEqual(WorkNote.objects.count(), 0)
-        self.assertIn("preflight", response.json())
-
-    def test_day_copy_is_atomic_and_retry_idempotent(self):
-        plan = self.new_plan()
-        updated = client_for(self.owner).patch(
-            PLAN + str(plan["id"]) + "/", {"ends_on": "2026-10-21"}, format="json",
-        )
-        self.assertEqual(updated.status_code, 200, updated.content)
-        self.new_item(plan)
-        self.new_item(plan, title="Independent second task")
-        original_revision = self.revision(plan)
+    def test_copy_duplicate_day_week_and_retries_have_fresh_state(self):
+        note = self.create(assignee_membership_ids=[self.membership.pk], notify_on_shift_start=True)
+        WorkNoteAssignee.objects.filter(work_note_id=note['id']).update(notified_at=timezone.now())
+        self.assertEqual(self.complete(note).status_code, 200)
         key = str(uuid.uuid4())
-        uri = PLAN + str(plan["id"]) + "/copy_day/"
-        body = {"source_date": self.day, "destination_date": "2026-10-20",
-                "revision": original_revision, "request_key": key}
-        first = client_for(self.owner).post(uri, body, format="json")
-        self.assertEqual(first.status_code, 201, first.content)
-        self.assertEqual(first.json()["created"], 2)
-        again = client_for(self.owner).post(uri, body, format="json")
-        self.assertEqual(again.status_code, 200, again.content)
-        self.assertTrue(again.json()["already_copied"])
-        self.assertEqual(OperationTask.objects.filter(plan_id=plan["id"]).count(), 4)
-        self.assertEqual(OperationAudit.objects.filter(
-            plan_id=plan["id"], action="DAY_COPIED"
-        ).count(), 1)
-        self.assertEqual(client_for(self.other_worker).post(uri, body, format="json").status_code, 404)
-        conflict = client_for(self.owner).post(
-            uri, {**body, "request_key": str(uuid.uuid4())}, format="json",
-        )
-        self.assertEqual(conflict.status_code, 400)
+        first = self.copy(task_id=note['id'], day_offset=0, request_key=key)
+        self.assertEqual(first.status_code, 200, first.content)
+        replica = WorkNote.objects.get(pk=first.json()['task_ids'][0])
+        self.assertEqual(replica.date, DAY)
+        self.assertEqual(replica.status, 'open')
+        self.assertFalse(replica.completions.exists())
+        self.assertIsNone(replica.assignees.get().notified_at)
+        self.assertEqual(replica.assignees.get().membership_id, self.membership.pk)
+        self.assertIsNone(replica.recurrence)
+        WorkNote.objects.filter(pk=note['id']).update(title='Changed after copy')
+        self.assertEqual(self.copy(task_id=note['id'], day_offset=0, request_key=key).json(), first.json())
+        self.assertEqual(self.copy(task_id=note['id'], day_offset=1, request_key=key).status_code, 400)
+        self.assertEqual(self.copy().json()['created'], 2)
+        week = self.copy(source_to='2026-10-25', day_offset=7).json()
+        self.assertEqual(week['created'], 4)
+        self.assertEqual(set(WorkNote.objects.filter(pk__in=week['task_ids']).values_list('date', flat=True)),
+                         {DAY + timedelta(days=7), DAY + timedelta(days=8)})
 
-    def test_day_copy_rolls_back_if_one_item_is_invalid(self):
-        plan = self.new_plan()
-        self.assertEqual(client_for(self.owner).patch(
-            PLAN + str(plan["id"]) + "/", {"ends_on": "2026-10-21"}, format="json",
-        ).status_code, 200)
-        self.new_item(plan)
-        invalid = self.new_item(plan, title="A deliberately corrupted historical draft")
-        OperationTask.objects.filter(pk=invalid["id"]).update(role_codes=["NONEXISTENT"])
-        revision = self.revision(plan)
-        response = client_for(self.owner).post(
-            PLAN + str(plan["id"]) + "/copy_day/",
-            {"source_date": self.day, "destination_date": "2026-10-20",
-             "revision": revision, "request_key": str(uuid.uuid4())}, format="json",
-        )
-        self.assertEqual(response.status_code, 400, response.content)
-        self.assertEqual(OperationTask.objects.filter(
-            plan_id=plan["id"], date="2026-10-20",
-        ).count(), 0)
-        self.assertEqual(self.revision(plan), revision)
-        self.assertFalse(OperationAudit.objects.filter(plan_id=plan["id"], action="DAY_COPIED").exists())
+    def test_repeating_duplicate_is_single_and_range_copy_skips_series(self):
+        series = self.create(recurrence={'freq': 'WEEKLY', 'byweekday': [0], 'until_date': '2026-11-30'})
+        single = self.create()
+        copied = self.copy(task_id=series['id'], day_offset=0).json()
+        self.assertEqual(copied['created'], 1)
+        self.assertIsNone(WorkNote.objects.get(pk=copied['task_ids'][0]).recurrence)
+        copied = self.copy(source_from='2026-10-26', source_to='2026-10-26', task_id=series['id'], day_offset=0).json()
+        self.assertEqual(WorkNote.objects.get(pk=copied['task_ids'][0]).date, date(2026, 10, 26))
+        result = self.copy().json()
+        self.assertEqual((result['created'], result['skipped_series']), (2, 1))
+        week = self.copy(source_from='2026-11-02', source_to='2026-11-08', day_offset=7).json()
+        self.assertEqual((week['created'], week['skipped_series']), (0, 1))
+        self.assertEqual(self.copy(task_id=single['id'], source_from='2026-10-20', source_to='2026-10-20').status_code, 400)
 
-    def test_verified_task_is_locked_until_audited_manager_correction(self):
-        _, item, note_id = self.publish_named(target_value=10, target_unit="items")
-        task_url = ITEM + str(item["id"]) + "/"
-        finish = BASE + "work-notes/" + str(note_id) + "/mark_done/"
-        worker = client_for(self.worker)
-        self.assertEqual(worker.post(
-            task_url + "step/", {"step_id": "s1", "done": True}, format="json",
-        ).status_code, 200)
-        self.assertEqual(worker.post(finish, {"occurrence_date": self.day}, format="json").status_code, 200)
-        self.assertEqual(client_for(self.owner).post(task_url + "verify/", {}, format="json").status_code, 200)
-        self.assertEqual(worker.post(
-            task_url + "step/", {"step_id": "s1", "done": False}, format="json",
-        ).status_code, 400)
-        self.assertEqual(worker.post(
-            task_url + "record_kpi/", {"key": str(uuid.uuid4()), "value": 2}, format="json",
-        ).status_code, 400)
-        self.assertEqual(worker.post(finish, {"occurrence_date": self.day}, format="json").status_code, 403)
-        self.assertEqual(client_for(self.other_worker).post(
-            task_url + "manager_reopen/", {"reason": "Fix reported task error"}, format="json",
-        ).status_code, 404)
-        self.assertEqual(client_for(self.owner).post(
-            task_url + "manager_reopen/", {"reason": "short"}, format="json",
-        ).status_code, 400)
-        reopened = client_for(self.owner).post(
-            task_url + "manager_reopen/",
-            {"reason": "Incorrect checklist entry; authorise worker correction"},
-            format="json",
-        )
-        self.assertEqual(reopened.status_code, 200, reopened.content)
-        self.assertEqual(reopened.json()["reset_submissions"], 1)
-        self.assertFalse(OperationVerification.objects.filter(task_id=item["id"]).exists())
-        self.assertEqual(WorkNoteCompletion.objects.filter(work_note_id=note_id).count(), 0)
-        self.assertEqual(worker.post(
-            task_url + "step/", {"step_id": "s1", "done": False}, format="json",
-        ).status_code, 200)
-        self.assertEqual(worker.post(
-            task_url + "record_kpi/", {"key": str(uuid.uuid4()), "value": 2}, format="json",
-        ).status_code, 201)
-        audit = OperationAudit.objects.get(task_id=item["id"], action="MANAGER_REOPENED")
-        self.assertIn("Incorrect checklist", audit.details["reason"])
-        self.assertEqual(len(audit.details["prior_submissions"]), 1)
+    def test_copy_scope_and_dropped_assignees(self):
+        note = self.create(assignee_membership_ids=[self.membership.pk, self.other_membership.pk])
+        self.membership.is_active = False
+        self.membership.save(update_fields=['is_active'])
+        result = self.copy().json()
+        self.assertEqual(result['dropped_assignees'], [{'task_id': note['id'], 'membership_id': self.membership.pk,
+                                                       'name': self.worker.get_full_name()}])
+        self.assertEqual(list(WorkNote.objects.get(pk=result['task_ids'][0]).assignees.values_list('membership_id', flat=True)),
+                         [self.other_membership.pk])
+        self.assertEqual(self.copy(pharmacy=self.foreign_pharmacy.pk, task_id=note['id']).status_code, 403)
+        self.assertEqual(client_for(self.worker).post(COPY, {
+            'pharmacy': self.pharmacy.pk, 'source_from': DAY.isoformat(), 'source_to': DAY.isoformat(),
+            'day_offset': 1, 'request_key': 'staff-copy',
+        }, format='json').status_code, 403)
+        self.assertEqual(self.copy(task_id=999999).status_code, 400)
 
-    def test_daa_final_check_requires_verified_pharmacist(self):
-        from team_calendar.operations_catalog import catalog
-        final = next(x for x in catalog() if x["name"] == "DAA final check")
-        self.assertEqual(final["target_kind"], "clinical")
-        self.assertEqual(final["role_codes"], ["PHARMACIST"])
-        self.assertTrue(final["requires_verification"])
+    def test_copy_cap_accepts_400_and_rejects_401_atomically(self):
+        WorkNote.objects.bulk_create([WorkNote(pharmacy=self.pharmacy, date=DAY, title=str(i), is_planner_task=True)
+                                      for i in range(400)])
+        self.assertEqual(self.copy().json()['created'], 400)
+        self.create()
+        count, audits = WorkNote.objects.count(), OperationAudit.objects.count()
+        self.assertEqual(self.copy().status_code, 400)
+        self.assertEqual((WorkNote.objects.count(), OperationAudit.objects.count()), (count, audits))
 
-    def test_roster_slot_boundary_is_not_an_overlap(self):
-        from unittest.mock import Mock
-        from team_calendar.operations_rules import _rostered_user_ids
-        self.published_roster_for_worker()
-        task = Mock(date=date(2026, 10, 19), start_time=time(17), end_time=time(18))
-        task.plan.pharmacy_id = self.pharmacy.pk
-        self.assertEqual(_rostered_user_ids(task), set())
-        task.start_time = time(8)
-        task.end_time = time(9)
-        self.assertEqual(_rostered_user_ids(task), set())
-        task.start_time = time(9)
-        task.end_time = time(10)
-        self.assertEqual(_rostered_user_ids(task), {self.worker.pk})
+    def test_copy_rolls_back_partial_work_and_receipt(self):
+        self.create()
+        self.create()
+        count = WorkNote.objects.count()
+        original = WorkNote.save
+        calls = []
+
+        def failing_save(note, *args, **kwargs):
+            calls.append(note)
+            if len(calls) == 2:
+                raise RuntimeError('injected failure')
+            return original(note, *args, **kwargs)
+
+        with patch.object(WorkNote, 'save', failing_save):
+            with self.assertRaisesRegex(RuntimeError, 'injected failure'):
+                self.copy(request_key='rollback')
+        self.assertEqual(WorkNote.objects.count(), count)
+        self.assertFalse(OperationAudit.objects.filter(request_key='rollback').exists())
+        self.assertEqual(self.copy(request_key='rollback').json()['created'], 2)
+
+    def test_stale_tokens_completion_locks_and_wording_keeps_progress(self):
+        note = self.create(assignee_membership_ids=[self.membership.pk, self.other_membership.pk])
+        changed = self.edit(note, title='Reworded')
+        self.assertEqual(changed.status_code, 200)
+        self.assertEqual(self.edit(note, title='Stale').status_code, 409)
+        self.assertEqual(self.complete(note).status_code, 409)
+        done = self.complete(changed.json())
+        self.assertEqual(done.status_code, 200, done.content)
+        note = done.json()
+        for change in [{'date': '2026-10-20'}, {'assignee_membership_ids': []}, {'recurrence': {'freq': 'DAILY'}}]:
+            self.assertEqual(self.edit(note, **change).status_code, 400)
+        wording = self.edit(note, body='New instructions')
+        self.assertEqual(wording.status_code, 200)
+        self.assertEqual(WorkNoteCompletion.objects.count(), 1)
+        self.assertEqual(self.complete(wording.json(), user=self.other).status_code, 200)
+        feed = self.client.get(BASE + 'calendar-feed/', {'pharmacy_id': self.pharmacy.pk,
+                                                       'date_from': DAY.isoformat(), 'date_to': DAY.isoformat()})
+        self.assertEqual(feed.json()['work_notes'][0]['completed_count'], 2)
+
+    def test_own_completion_only_valid_occurrences_and_delete_snapshot_survives(self):
+        note = self.create(assignee_membership_ids=[self.membership.pk],
+                           recurrence={'freq': 'WEEKLY', 'byweekday': [0], 'until_date': '2026-11-30'})
+        self.assertEqual(self.complete(note, user=self.other).status_code, 404)
+        self.assertEqual(self.complete(note, occurrence_date='2026-10-20').status_code, 400)
+        self.assertEqual(self.complete(note, occurrence_date=42).status_code, 400)
+        done = self.complete(note).json()
+        self.assertEqual(self.client.delete(NOTES + str(note['id']) + '/', {'updated_at': note['updated_at']}, format='json').status_code, 409)
+        self.assertEqual(self.client.delete(NOTES + str(note['id']) + '/', {'updated_at': done['updated_at']}, format='json').status_code, 204)
+        audit = OperationAudit.objects.get(action='DELETED')
+        self.assertIsNone(audit.work_note_id)
+        self.assertEqual(audit.details['task']['id'], note['id'])
+        self.assertEqual(audit.details['completions'][0]['membership_id'], self.membership.pk)
+        self.assertFalse(WorkNoteCompletion.objects.exists())
+
+    def test_editing_series_retains_original_anchor_weekday_rule_and_individual_reopen(self):
+        note = self.create(assignee_membership_ids=[self.membership.pk],
+                           recurrence={'freq': 'WEEKLY', 'byweekday': [0, 2], 'until_date': '2026-11-30'})
+        done = self.complete(note, occurrence_date='2026-10-21').json()
+        edited = self.edit(done, title='New wording').json()
+        self.assertEqual(edited['date'], DAY.isoformat())
+        self.assertEqual(edited['recurrence']['byweekday'], [0, 2])
+        reopened = client_for(self.worker).post(NOTES + str(note['id']) + '/mark_open/', {
+            'updated_at': edited['updated_at'], 'occurrence_date': '2026-10-21',
+        }, format='json')
+        self.assertEqual(reopened.status_code, 200)
+        self.assertFalse(WorkNoteCompletion.objects.exists())
+
+    def test_saved_tasks_have_only_defaults_and_placed_tasks_are_independent(self):
+        saved = self.client.post(SAVED, {'pharmacy': self.pharmacy.pk, 'title': 'Reusable', 'details': 'Instructions',
+                                         'start_time': '09:00', 'end_time': '10:00', 'is_clinical': False}, format='json')
+        self.assertEqual(saved.status_code, 201, saved.content)
+        self.assertEqual(set(saved.json()), {'id', 'pharmacy', 'title', 'details', 'start_time', 'end_time', 'is_clinical'})
+        note = self.create(title=saved.json()['title'], body=saved.json()['details'])
+        url = SAVED + str(saved.json()['id']) + '/'
+        self.assertEqual(self.client.patch(url, {'title': 'Changed default'}, format='json').status_code, 200)
+        self.assertEqual(self.client.patch(url, {'pharmacy': self.foreign_pharmacy.pk}, format='json').status_code, 400)
+        self.assertEqual(client_for(self.worker).delete(url).status_code, 404)
+        self.assertEqual(self.rows(client_for(self.worker).get(SAVED)), [])
+        self.assertEqual(client_for(self.stranger).get(url).status_code, 404)
+        self.assertEqual(self.client.delete(url).status_code, 204)
+        placed = WorkNote.objects.get(pk=note['id'])
+        self.assertEqual((placed.title, placed.body), ('Reusable', 'Instructions'))
+        self.assertFalse(SavedTask.objects.exists())
+
+    def test_removed_endpoints_are_gone_and_new_endpoints_require_auth(self):
+        for endpoint in ['operation-catalog/', 'operation-plans/', 'operation-items/', 'operation-templates/']:
+            self.assertEqual(self.client.get(BASE + endpoint).status_code, 404)
+        for endpoint in [NOTES, SAVED, CONTEXT, COPY, ROSTER]:
+            self.assertIn(client_for().get(endpoint).status_code, [401, 403])
+
+    def test_recurring_notifications_ignore_old_notified_at_and_deduplicate_per_day(self):
+        self.roster(day=DAY + timedelta(days=1))
+        self.pharmacy.timezone = 'UTC'
+        self.pharmacy.save(update_fields=['timezone'])
+        note = self.create(assignee_membership_ids=[self.membership.pk], notify_on_shift_start=True,
+                           recurrence={'freq': 'DAILY', 'until_date': '2026-10-21'})
+        WorkNoteAssignee.objects.filter(work_note_id=note['id']).update(notified_at=timezone.now())
+        now = datetime(2026, 10, 20, 9, tzinfo=dt_timezone.utc)
+        for task in [tasks.send_shift_start_work_note_notifications, tasks.send_9am_work_note_fallback]:
+            with patch.object(tasks.timezone, 'now', return_value=now), \
+                 patch.object(tasks, '_users_already_notified', side_effect=[set(), {self.worker.pk}]), \
+                 patch.object(tasks, '_send_work_note_notifications', return_value=1) as send:
+                self.assertEqual(task(), 1)
+                self.assertEqual(task(), 0)
+                self.assertEqual(send.call_args.kwargs['target_date'], date(2026, 10, 20))
+                self.assertEqual(send.call_count, 1)
 
 
-class OperationsTemplateDates(TestCase):
-    def test_weekly_dates_and_month_boundaries(self):
-        dates = template_dates(
-            {"freq": "WEEKLY", "byweekday": [0, 4]},
-            date(2026, 10, 19), date(2026, 11, 1),
-        )
-        self.assertEqual(dates, [
-            date(2026, 10, 19), date(2026, 10, 23),
-            date(2026, 10, 26), date(2026, 10, 30),
-        ])
+class PlannerConcurrencyContracts(PlannerFixtures, TransactionTestCase):
+    @skipUnlessDBFeature('has_select_for_update')
+    def test_concurrent_first_requests_replay_one_receipt(self):
+        self.create()
+        barrier = Barrier(2)
 
-    def test_first_weekday_does_not_pretend_holidays_are_business_days(self):
-        dates = template_dates(
-            {"freq": "FIRST_WEEKDAY_MONTH"},
-            date(2026, 10, 29), date(2026, 12, 5),
-        )
-        self.assertEqual(dates, [date(2026, 11, 2), date(2026, 12, 1)])
+        def run():
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                return copy_tasks(pharmacy_id=self.pharmacy.pk, actor=self.owner, source_from=DAY,
+                                  source_to=DAY, day_offset=1, request_key='concurrent')
+            finally:
+                close_old_connections()
 
-    def test_last_weekday_and_28th(self):
-        dates = template_dates(
-            {"freq": "LAST_WEEKDAY_MONTH"},
-            date(2026, 10, 19), date(2026, 11, 30),
-        )
-        self.assertEqual(dates, [date(2026, 10, 30), date(2026, 11, 30)])
-        dates28 = template_dates({"freq": "MONTHLY_28"}, date(2026, 10, 19), date(2026, 11, 30))
-        self.assertEqual(dates28, [date(2026, 10, 28), date(2026, 11, 28)])
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _: run(), range(2)))
+        self.assertEqual(results[0], results[1])
+        self.assertEqual(WorkNote.objects.count(), 2)
+        self.assertEqual(OperationAudit.objects.filter(request_key='concurrent').count(), 1)
 
-    def test_bounded_expansion_rejects_unbounded_plans(self):
-        from rest_framework.exceptions import ValidationError
-        with self.assertRaises(ValidationError):
-            template_dates({"freq": "DAILY"}, date(2026, 1, 1), date(2026, 12, 31))
+    @skipUnlessDBFeature('has_select_for_update')
+    def test_concurrent_edits_cannot_both_accept_same_timestamp(self):
+        note = self.create()
+        barrier = Barrier(2)
+
+        def run(title):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                return client_for(self.owner).patch(NOTES + str(note['id']) + '/', {
+                    'title': title, 'updated_at': note['updated_at'],
+                }, format='json').status_code
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(run, ['One', 'Two']))
+        self.assertEqual(sorted(results), [200, 409])

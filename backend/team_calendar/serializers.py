@@ -47,7 +47,6 @@ class WorkNoteAssigneeSerializer(serializers.ModelSerializer):
 class WorkNoteSerializer(serializers.ModelSerializer):
     """Serializer for work notes."""
     assignees = WorkNoteAssigneeSerializer(many=True, read_only=True)
-    operation = serializers.SerializerMethodField()
     assignee_membership_ids = serializers.ListField(
         child=serializers.IntegerField(),
         write_only=True,
@@ -60,7 +59,8 @@ class WorkNoteSerializer(serializers.ModelSerializer):
         model = WorkNote
         fields = [
             'id', 'pharmacy', 'date', 'title', 'body', 'status',
-            'notify_on_shift_start', 'is_general', 'recurrence', 'operation',
+            'notify_on_shift_start', 'is_general', 'recurrence',
+            'is_planner_task', 'is_clinical', 'start_time', 'end_time',
             'assignees', 'assignee_membership_ids',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
         ]
@@ -71,20 +71,40 @@ class WorkNoteSerializer(serializers.ModelSerializer):
             return obj.created_by.get_full_name() or obj.created_by.email
         return None
 
-    def get_operation(self, obj):
-        item = getattr(obj, "operation_item", None)
-        if not item:
-            return None
-        from team_calendar.operations_serializers import OperationTaskSerializer
-        return {
-            "task_id": item.id, "plan_id": item.plan_id, "area": item.area,
-            "progress": OperationTaskSerializer(item).data["progress"],
-            "start_time": str(item.start_time) if item.start_time else None,
-            "end_time": str(item.end_time) if item.end_time else None,
-            "requires_verification": item.requires_verification,
-            "target_value": item.target_value, "target_unit": item.target_unit,
-            "target_kind": item.target_kind, "training_url": item.training_url,
-        }
+    def validate(self, attrs):
+        note = self.instance
+        planner = note.is_planner_task if note else attrs.get('is_planner_task', False)
+        if note and attrs.get('is_planner_task', note.is_planner_task) != note.is_planner_task:
+            raise serializers.ValidationError({'is_planner_task': 'A note cannot change kind.'})
+        if not planner:
+            return attrs
+        if note and attrs.get('pharmacy', note.pharmacy) != note.pharmacy:
+            raise serializers.ValidationError({'pharmacy': 'Planner tasks cannot move between pharmacies.'})
+        if attrs.get('is_general', False) or attrs.get('status', 'open') != 'open':
+            raise serializers.ValidationError('Planner tasks use explicit assignees and per-person completion.')
+        from team_calendar.operations_rules import validate_assignees
+        sample = WorkNote()
+        for field in ['pharmacy', 'date', 'is_clinical', 'start_time', 'end_time']:
+            setattr(sample, field, attrs.get(field, getattr(note, field, None)))
+        ids = attrs.get('assignee_membership_ids',
+                        list(note.assignees.values_list('membership_id', flat=True)) if note else [])
+        validate_assignees(sample, ids)
+        recurrence = attrs.get('recurrence', note.recurrence if note else None)
+        if recurrence is not None:
+            if not isinstance(recurrence, dict) or recurrence.get('freq') not in ['DAILY', 'WEEKLY', 'MONTHLY']:
+                raise serializers.ValidationError({'recurrence': 'Use DAILY, WEEKLY or MONTHLY.'})
+            interval = recurrence.get('interval', 1)
+            weekdays = recurrence.get('byweekday', [])
+            if type(interval) is not int or interval < 1:
+                raise serializers.ValidationError({'recurrence': 'Interval must be a positive integer.'})
+            if not isinstance(weekdays, list) or any(type(d) is not int or d not in range(7) for d in weekdays):
+                raise serializers.ValidationError({'recurrence': 'Weekdays must be integers from 0 to 6.'})
+            until = recurrence.get('until_date')
+            if until is not None and until != '':
+                until_date = serializers.DateField().run_validation(until)
+                if until_date < sample.date:
+                    raise serializers.ValidationError({'recurrence': 'Until date must be on or after the start.'})
+        return attrs
 
     def validate_assignee_membership_ids(self, value):
         """Validate that all membership IDs are valid and belong to the pharmacy."""

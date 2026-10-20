@@ -1,4 +1,4 @@
-import type { CalendarEventApi, WorkNoteApi, CalendarFeedApi } from '../../contracts/calendar';
+import type { CalendarEventApi, WorkNoteApi, CalendarFeedApi, CalendarRecurrence } from '../../contracts/calendar';
 import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
 import { fetchApi } from '../../transport/application';
@@ -48,6 +48,7 @@ export function createCalendarEvent(payload: {
     startTime?: string;
     endTime?: string;
     allDay?: boolean;
+    recurrence?: CalendarRecurrence | null;
 }) {
     return fetchApi<CalendarEventApi>('/calendar-events/', {
         method: 'POST',
@@ -60,6 +61,7 @@ export function createCalendarEvent(payload: {
             start_time: payload.startTime,
             end_time: payload.endTime,
             all_day: payload.allDay ?? true,
+            recurrence: payload.recurrence,
         }),
     });
 }
@@ -77,6 +79,7 @@ export function updateCalendarEvent(id: number | string, payload: Partial<Parame
             start_time: payload.startTime,
             end_time: payload.endTime,
             all_day: payload.allDay,
+            recurrence: payload.recurrence,
         }),
     });
 }
@@ -120,6 +123,11 @@ export function createWorkNote(payload: {
     notifyOnShiftStart?: boolean;
     isGeneral?: boolean;
     assigneeMembershipIds?: number[];
+    recurrence?: CalendarRecurrence | null;
+    isPlannerTask?: boolean;
+    isClinical?: boolean;
+    startTime?: string | null;
+    endTime?: string | null;
 }) {
     return fetchApi<WorkNoteApi>('/work-notes/', {
         method: 'POST',
@@ -132,6 +140,11 @@ export function createWorkNote(payload: {
             notify_on_shift_start: payload.notifyOnShiftStart ?? false,
             is_general: payload.isGeneral ?? false,
             assignee_membership_ids: payload.assigneeMembershipIds ?? [],
+            recurrence: payload.recurrence,
+            is_planner_task: payload.isPlannerTask ?? false,
+            is_clinical: payload.isClinical ?? false,
+            start_time: payload.startTime,
+            end_time: payload.endTime,
         }),
     });
 }
@@ -139,7 +152,7 @@ export async function createWorkNoteService(payload: Parameters<typeof createWor
     const data = await createWorkNote(payload);
     return mapWorkNote(data);
 }
-export function updateWorkNote(id: number | string, payload: Partial<Parameters<typeof createWorkNote>[0]>) {
+export function updateWorkNote(id: number | string, payload: Partial<Parameters<typeof createWorkNote>[0]> & { updatedAt?: string }) {
     return fetchApi<WorkNoteApi>(`/work-notes/${id}/`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -149,6 +162,13 @@ export function updateWorkNote(id: number | string, payload: Partial<Parameters<
             notify_on_shift_start: payload.notifyOnShiftStart,
             is_general: payload.isGeneral,
             assignee_membership_ids: payload.assigneeMembershipIds,
+            date: payload.date,
+            recurrence: payload.recurrence,
+            is_planner_task: payload.isPlannerTask,
+            is_clinical: payload.isClinical,
+            start_time: payload.startTime,
+            end_time: payload.endTime,
+            updated_at: payload.updatedAt,
         }),
     });
 }
@@ -156,24 +176,30 @@ export async function updateWorkNoteService(id: number | string, payload: Parame
     const data = await updateWorkNote(id, payload);
     return mapWorkNote(data);
 }
-export function deleteWorkNote(id: number | string) {
-    return fetchApi(`/work-notes/${id}/`, { method: 'DELETE' });
+export function deleteWorkNote(id: number | string, updatedAt?: string) {
+    return fetchApi<void>(`/work-notes/${id}/`, {
+        method: 'DELETE', body: updatedAt === undefined ? undefined : JSON.stringify({ updated_at: updatedAt }),
+    });
 }
-export async function deleteWorkNoteService(id: number | string) {
-    await deleteWorkNote(id);
+export async function deleteWorkNoteService(id: number | string, updatedAt?: string) {
+    await deleteWorkNote(id, updatedAt);
 }
-export function markWorkNoteDone(id: number | string) {
-    return fetchApi<WorkNoteApi>(`/work-notes/${id}/mark_done/`, { method: 'POST' });
+export function markWorkNoteDone(id: number | string, occurrenceDate?: string, updatedAt?: string) {
+    return fetchApi<WorkNoteApi>(`/work-notes/${id}/mark_done/`, {
+        method: 'POST', body: JSON.stringify({ occurrence_date: occurrenceDate, updated_at: updatedAt }),
+    });
 }
-export async function markWorkNoteDoneService(id: number | string) {
-    const data = await markWorkNoteDone(id);
+export async function markWorkNoteDoneService(id: number | string, occurrenceDate?: string, updatedAt?: string) {
+    const data = await markWorkNoteDone(id, occurrenceDate, updatedAt);
     return mapWorkNote(data);
 }
-export function markWorkNoteOpen(id: number | string) {
-    return fetchApi<WorkNoteApi>(`/work-notes/${id}/mark_open/`, { method: 'POST' });
+export function markWorkNoteOpen(id: number | string, occurrenceDate?: string, updatedAt?: string) {
+    return fetchApi<WorkNoteApi>(`/work-notes/${id}/mark_open/`, {
+        method: 'POST', body: JSON.stringify({ occurrence_date: occurrenceDate, updated_at: updatedAt }),
+    });
 }
-export async function markWorkNoteOpenService(id: number | string) {
-    const data = await markWorkNoteOpen(id);
+export async function markWorkNoteOpenService(id: number | string, occurrenceDate?: string, updatedAt?: string) {
+    const data = await markWorkNoteOpen(id, occurrenceDate, updatedAt);
     return mapWorkNote(data);
 }
 export function getCalendarFeed(params: CalendarEventFilters) {

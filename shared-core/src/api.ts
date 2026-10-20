@@ -479,5 +479,6 @@ export {
   chargeShiftPenalty,
 } from './domains/billing/api';
 
-// Calendar-owned pharmacy operations planner. Reused by web and native.
+export type { CalendarRecurrence, WorkNoteApi, CalendarEventApi, CalendarFeedApi } from './contracts/calendar';
+// Calendar-owned planner actions shared by web and native.
 export * from './domains/calendar/operations';
