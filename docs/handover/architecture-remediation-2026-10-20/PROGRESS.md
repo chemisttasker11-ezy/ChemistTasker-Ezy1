@@ -118,3 +118,10 @@ Then verify emulator/device multipart uploads against isolated seeded Django/Pos
 - Commits `0512a5b` onward: characterized legacy manager PATCH 403 without altering policy; expanded import-graph AST traversal to recognize import-time control flow and class body imports; exclude type-checking guards. Added fixtures. This change is in PR191 only.
 - No claim of completed A04/A06/A07/A08/A11. **Do not merge** or deploy this draft.
 - The Windows kiosk is intentionally **outside** shared-core, Vite/Next/Expo migration and PR191's refactor completion criteria. Keep its separate existing CI gate.
+
+## Audit controls added in this continuation
+
+- `scripts/inventory-client-api-boundaries.mjs --strict` is a **true whole-tree classification gate** separate from the preexisting added-line ratchet. Each stable callsite needs a reviewed manifest decision with owner and rationale. An empty manifest is deliberately not considered acceptable when candidate calls remain. No existing callsite is auto-approved.
+- `docs/handover/architecture-remediation-2026-10-20/CLIENT_BOUNDARY_MANIFEST.json` is initially empty; classifying existing calls is still required. `client-boundary-inventory.json` is now an explicit GitHub Action review artifact, with detailed callsites in the CI log. `--strict` is not called by the release gate while this legacy debt is outstanding; this is intentional, not completion.
+- `scripts/audit-generated-skill-icons.mjs` compares registry codes, generated native require mappings and PNG asset names without changing the drawings or kiosk. Added as a dedicated architecture CI step.
+- This is still a **draft** until every classification, domain migration, policy approval and full acceptance is complete. The full-isolated QA workflow has been **skipped**, not passed, on prior commits.
