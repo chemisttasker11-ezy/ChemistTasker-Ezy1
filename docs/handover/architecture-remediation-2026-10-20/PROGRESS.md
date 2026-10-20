@@ -76,3 +76,9 @@ Then verify emulator/device multipart uploads against isolated seeded Django/Pos
 - Commit `ebf952b`: preserved the Expo `platform: mobile` checkout redirect parameter that the earlier shared-core checkout function dropped. Added typed billing snapshot/checkout response and migrated the Vite + Expo subscription reads and extra-seat requests to the existing shared-core billing domain. Added five Vitest wire-contract tests. No shift penalty, cancellation, payment authority or pricing logic changed; PR #182 untouched.
 - The CI checks at this commit and on final head remain authoritative, not checks from a prior commit. Native payment-return URL acceptance remains outstanding.
 - Full architecture remediation (A01 permission write policy, A06-A09 UI/backend decomposition and A11 native/staging acceptance) is not complete.
+
+## A09 backend cycle graph (current continuation)
+
+- Commit `9304d08`: added `scripts/module_import_graph.py` (machine-readable and CLI check of module-level versus delayed runtime Django-app import edges), five standard-library regression tests, and the existing architecture CI job invokes both. The authoritative eight-pair allowlist is **read from** `backend/core/test_backend_ownership_boundaries.py` using Python AST, rather than duplicated or widened.
+- No Django runtime imports, model labels, migration files, Celery tasks or Windows kiosk code were modified. The graph baseline is an inspection tool and explicitly does not assert zero existing cycles.
+- Tests and exact-head CI remain pending; do not claim 100% completion before real execution and A01 authorization resolution.
