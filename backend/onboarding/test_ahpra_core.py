@@ -155,12 +155,12 @@ class EvaluateAhpraRecordTests(TestCase):
         )
         self.assertEqual(outcome, "verified")
 
-        # Missing profession needs a human review, never auto-verifies
+        # A valid PHA registration may omit the separate profession label.
         record_none = self.base_record(profession="")
         outcome, _ = evaluate_ahpra_record(
             record_none, first_name="Jane", last_name="Doe", role="pharmacist"
         )
-        self.assertEqual(outcome, "review")
+        self.assertEqual(outcome, "verified")
 
     def test_status_suspended_cancelled_surrendered_not_registered_returns_rejected(self):
         for bad_status in ("Suspended", "Cancelled", "Surrendered", "Not registered"):

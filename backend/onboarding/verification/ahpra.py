@@ -209,10 +209,10 @@ def evaluate_ahpra_record(record: dict, *, first_name, last_name, role) -> tuple
     if any(s in status_lower for s in ("suspended", "cancelled", "surrendered")):
         return ("rejected", f"Registration status is '{status}'")
 
+    # The PHA registration-number prefix establishes pharmacy registration even when
+    # the provider page omits its separate profession label. Reject contradictory data.
     profession = (record.get("profession") or "").strip()
-    if not profession:
-        return ("review", "Profession is missing from the register record")
-    if "pharmac" not in profession.lower():
+    if profession and "pharmac" not in profession.lower():
         return ("rejected", f"Profession is '{profession}' (expected Pharmacy or Pharmacist)")
 
     if "not registered" in status_lower:
