@@ -77,7 +77,6 @@ class ModuleImportGraphTests(unittest.TestCase):
                 "if True:\n    import delta.models\n"
                 "class Registry:\n    from epsilon.models import Model\n"
                 "def later():\n    from beta.tasks import queue\n"
-            .replace("\\\n", "\n"))
             direct, delayed, evidence = extract_edges(root)
             self.assertEqual(direct, {
                 ("alpha", "beta"), ("alpha", "gamma"), ("alpha", "delta"), ("alpha", "epsilon"),
@@ -97,7 +96,6 @@ class ModuleImportGraphTests(unittest.TestCase):
                 "import typing\n"
                 "if TYPE_CHECKING:\n    import beta.models\nelse:\n    import gamma.models\n"
                 "if not typing.TYPE_CHECKING:\n    import delta.models\n"
-            .replace("\\\n", "\n"))
             direct, delayed, _ = extract_edges(root)
             self.assertEqual(direct, {("alpha", "gamma"), ("alpha", "delta")})
             self.assertFalse(delayed)
