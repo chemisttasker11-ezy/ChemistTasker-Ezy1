@@ -7,7 +7,8 @@ import pixelmatch from 'pixelmatch';
 // solely from current geometry: moving or resizing an input must fail as well.
 export const dateGeometry = {
   invoices: [{ x: 1033, y: 594, width: 170, height: 40.125 }, { x: 1215, y: 594, width: 170, height: 40.125 }],
-  'shift-filters': [{ x: 386, y: 832.140625, width: 278, height: 40 }, { x: 386, y: 882.140625, width: 278, height: 40 }],
+  // 7f3787e0 (PR171 Shift Centre redesign) added the section tab row above the filters: +90px.
+  'shift-filters': [{ x: 386, y: 922.140625, width: 278, height: 40 }, { x: 386, y: 972.140625, width: 278, height: 40 }],
 };
 export function compareOutsideDateText(actualBuffer, expectedBuffer, boxes) {
   const actual = PNG.sync.read(actualBuffer);
@@ -17,7 +18,8 @@ export function compareOutsideDateText(actualBuffer, expectedBuffer, boxes) {
     // Exclude native locale placeholder glyphs only; keep borders, padding,
     // calendar icon, surrounding label and every other screen pixel compared.
     const left = Math.round(box.x + 14), top = Math.round(box.y + 10);
-    for (let y = top; y < top + 20; y++) for (let x = left; x < left + 106; x++) {
+    // An input below the viewport fold has no pixels to mask.
+    for (let y = top; y < Math.min(top + 20, actual.height); y++) for (let x = left; x < left + 106; x++) {
       const offset = (y * actual.width + x) * 4;
       actual.data.fill(0, offset, offset + 4);
       expected.data.fill(0, offset, offset + 4);
