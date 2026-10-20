@@ -164,6 +164,30 @@ class PlannerContracts(PlannerFixtures, TestCase):
                             'title': 'Managed', 'updated_at': token,
                         }, format='json').status_code, 200)
 
+    def test_foreign_org_scope_removed_scope_and_deactivated_assignee_lose_access(self):
+        home, away = Organization.objects.create(name='Home'), Organization.objects.create(name='Away')
+        self.pharmacy.organization = home
+        self.pharmacy.save(update_fields=['organization'])
+        self.foreign_pharmacy.organization = away
+        self.foreign_pharmacy.save(update_fields=['organization'])
+        regional = make_user('ORG_ADMIN')
+        scope = OrganizationMembership.objects.create(user=regional, organization=home, role='REGION_ADMIN')
+        scope.pharmacies.add(self.pharmacy, self.foreign_pharmacy)
+        client = client_for(regional)
+        self.assertEqual(set(planner_pharmacies(regional).values_list('pk', flat=True)), {self.pharmacy.pk})
+        self.assertFalse(user_can_manage_pharmacy(regional, self.foreign_pharmacy))
+        self.assertEqual(client.post(NOTES, self.payload(pharmacy=self.foreign_pharmacy.pk), format='json').status_code, 403)
+        scope.pharmacies.remove(self.pharmacy)
+        self.assertFalse(user_can_manage_pharmacy(regional, self.pharmacy))
+        self.assertEqual(client.get(CONTEXT).json(), {'pharmacies': []})
+        self.assertEqual(client.post(NOTES, self.payload(), format='json').status_code, 403)
+        note = self.create(assignee_membership_ids=[self.membership.pk])
+        self.assertEqual(len(self.rows(client_for(self.worker).get(NOTES))), 1)
+        self.membership.is_active = False
+        self.membership.save(update_fields=['is_active'])
+        self.assertEqual(self.rows(client_for(self.worker).get(NOTES)), [])
+        self.assertEqual(client_for(self.worker).get(NOTES + str(note['id']) + '/').status_code, 404)
+
     def test_invalid_members_and_times_rejected_without_writes(self):
         for ids in [[self.foreign_membership.pk], [self.membership.pk, self.membership.pk]]:
             self.assertEqual(self.client.post(NOTES, self.payload(assignee_membership_ids=ids), format='json').status_code, 400)
@@ -307,7 +331,7 @@ class PlannerContracts(PlannerFixtures, TestCase):
         self.assertEqual(wording.status_code, 200)
         self.assertEqual(WorkNoteCompletion.objects.count(), 1)
         self.assertEqual(self.complete(changed.json(), user=self.other).status_code, 200)
-        feed =self.client.get(BASE + 'calendar-feed/', {'pharmacy_id': self.pharmacy.pk,
+        feed = self.client.get(BASE + 'calendar-feed/', {'pharmacy_id': self.pharmacy.pk,
                                                        'date_from': DAY.isoformat(), 'date_to': DAY.isoformat()})
         self.assertEqual(feed.json()['work_notes'][0]['completed_count'], 2)
 
@@ -321,6 +345,26 @@ class PlannerContracts(PlannerFixtures, TestCase):
         added = self.edit(note, assignee_membership_ids=[self.membership.pk, self.foreign_membership.pk])
         self.assertEqual(added.status_code, 400)
         self.assertEqual(self.edit(note, is_clinical=True).status_code, 400)
+
+    def test_clinical_date_or_time_change_rechecks_every_assignee(self):
+        pharmacist = make_user('PHARMACIST')
+        member = Membership.objects.create(user=pharmacist, pharmacy=self.pharmacy,
+                                           role='PHARMACIST', status=Membership.Status.ACCEPTED)
+        PharmacistOnboarding.objects.create(user=pharmacist, ahpra_verified=True, ahpra_expiry_date=date(2099, 1, 1))
+        self.roster(user=pharmacist)
+        note = self.create(is_clinical=True, start_time='10:00', end_time='11:00', assignee_membership_ids=[member.pk])
+        for change in [{'start_time': '18:00', 'end_time': '19:00'}, {'date': '2026-10-20'}]:
+            self.assertEqual(self.edit(note, **change).status_code, 400)
+        self.assertEqual(self.edit(note, title='Reworded').status_code, 200)
+
+    def test_informal_note_move_rechecks_every_assignee_at_destination(self):
+        note = self.create(is_planner_task=False, assignee_membership_ids=[self.membership.pk])
+        for body in [{}, {'assignee_membership_ids': [self.membership.pk]}]:
+            res = self.client.patch(NOTES + str(note['id']) + '/', {'pharmacy': self.foreign_pharmacy.pk, **body},
+                                    format='json')
+            self.assertEqual(res.status_code, 400)
+            self.assertIn('assignee_membership_ids', res.json())
+        self.assertEqual(WorkNote.objects.get(pk=note['id']).pharmacy_id, self.pharmacy.pk)
 
     def test_own_completion_only_valid_occurrences_and_delete_snapshot_survives(self):
         note = self.create(assignee_membership_ids=[self.membership.pk],
@@ -430,3 +474,21 @@ class PlannerConcurrencyContracts(PlannerFixtures, TransactionTestCase):
         with ThreadPoolExecutor(max_workers=2) as pool:
             results = list(pool.map(run, ['One', 'Two']))
         self.assertEqual(sorted(results), [200, 409])
+
+    @skipUnlessDBFeature('has_select_for_update')
+    def test_concurrent_completions_by_two_assignees_both_succeed(self):
+        note = self.create(assignee_membership_ids=[self.membership.pk, self.other_membership.pk])
+        barrier = Barrier(2)
+
+        def run(user):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                return self.complete(note, user=user).status_code
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(run, [self.worker, self.other]))
+        self.assertEqual(results, [200, 200])
+        self.assertEqual(WorkNoteCompletion.objects.count(), 2)

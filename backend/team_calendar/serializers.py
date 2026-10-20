@@ -77,6 +77,13 @@ class WorkNoteSerializer(serializers.ModelSerializer):
         if note and attrs.get('is_planner_task', note.is_planner_task) != note.is_planner_task:
             raise serializers.ValidationError({'is_planner_task': 'A note cannot change kind.'})
         if not planner:
+            if note and attrs.get('pharmacy', note.pharmacy) != note.pharmacy:
+                # A move re-checks every assignee, kept or added, against the destination pharmacy.
+                ids = set(attrs.get('assignee_membership_ids',
+                                    note.assignees.values_list('membership_id', flat=True)))
+                if Membership.objects.filter(id__in=ids, pharmacy=attrs['pharmacy'], is_active=True).count() != len(ids):
+                    raise serializers.ValidationError(
+                        {'assignee_membership_ids': 'Every assignee must be an active member of the new pharmacy.'})
             return attrs
         if note and attrs.get('pharmacy', note.pharmacy) != note.pharmacy:
             raise serializers.ValidationError({'pharmacy': 'Planner tasks cannot move between pharmacies.'})
@@ -88,8 +95,10 @@ class WorkNoteSerializer(serializers.ModelSerializer):
             setattr(sample, field, attrs.get(field, getattr(note, field, None)))
         current = list(note.assignees.values_list('membership_id', flat=True)) if note else []
         ids = attrs.get('assignee_membership_ids', current)
-        # Only added people are re-checked, so wording edits save; turning clinical on re-checks everyone.
-        recheck_all = not note or (sample.is_clinical and not note.is_clinical)
+        # Only added people are re-checked, so wording edits save; a clinical task whose kind, date or times
+        # change re-checks everyone.
+        recheck_all = not note or (sample.is_clinical and any(
+            getattr(sample, f) != getattr(note, f) for f in ['is_clinical', 'date', 'start_time', 'end_time']))
         validate_assignees(sample, ids, ids if recheck_all else [i for i in ids if i not in current])
         recurrence = attrs.get('recurrence', note.recurrence if note else None)
         if recurrence is not None:
