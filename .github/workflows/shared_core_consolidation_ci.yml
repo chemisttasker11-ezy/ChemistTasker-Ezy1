@@ -106,6 +106,9 @@ jobs:
       - name: WebSocket URL tests
         run: node --test scripts/ws-url.test.mjs
         working-directory: frontend_web
+      - name: Calendar planner tests
+        run: node --test scripts/calendar-planner.test.mjs
+        working-directory: frontend_web
       - name: Build Vite app
         run: npx vite build
         working-directory: frontend_web
@@ -183,6 +186,9 @@ jobs:
       - run: npm run lint
         working-directory: frontend_mobile
       - run: npx tsc --noEmit
+        working-directory: frontend_mobile
+      - name: Calendar planner tests
+        run: node --test scripts/calendar-model.test.cjs
         working-directory: frontend_mobile
       - name: Mobile dependency exploit and compatibility regressions
         run: npm run test:security
