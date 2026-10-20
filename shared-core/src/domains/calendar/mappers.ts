@@ -143,6 +143,5 @@ export function projectCalendarFeed(feed: CalendarFeedApi): CalendarItem[] {
         };
     });
 
-    const combined = [...mappedEvents, ...mappedNotes];
-    return combined;
+    return [...mappedEvents, ...mappedNotes];
 }

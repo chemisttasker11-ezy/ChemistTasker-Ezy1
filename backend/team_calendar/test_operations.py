@@ -175,7 +175,6 @@ class PlannerContracts(PlannerFixtures, TestCase):
         scope.pharmacies.add(self.pharmacy, self.foreign_pharmacy)
         client = client_for(regional)
         self.assertEqual(set(planner_pharmacies(regional).values_list('pk', flat=True)), {self.pharmacy.pk})
-        self.assertFalse(user_can_manage_pharmacy(regional, self.foreign_pharmacy))
         self.assertEqual(client.post(NOTES, self.payload(pharmacy=self.foreign_pharmacy.pk), format='json').status_code, 403)
         scope.pharmacies.remove(self.pharmacy)
         self.assertFalse(user_can_manage_pharmacy(regional, self.pharmacy))

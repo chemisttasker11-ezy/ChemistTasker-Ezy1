@@ -1,7 +1,3 @@
-import {
-  emptyNoteForm, editNoteForm, notePayload, applySavedTask,
-  plannerRosterInput, mergeRosterAssignees, savedTaskInput,
-} from '@chemisttasker/shared-core';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Chip, Dialog, HelperText, IconButton, Menu, Portal, Switch, Text, TextInput } from 'react-native-paper';
@@ -11,6 +7,8 @@ import {
   createSavedTask, createWorkNoteService, deleteSavedTask, deleteWorkNoteService,
   getWorkNoteDetail, fillPlannerFromRoster, listSavedTasks, updateWorkNoteService,
   type SavedTaskApi, type WorkNoteApi,
+  emptyNoteForm, editNoteForm, notePayload, applySavedTask,
+  plannerRosterInput, mergeRosterAssignees, savedTaskInput,
 } from '@chemisttasker/shared-core';
 import { formatTime, parseTime, toDate } from './calendarModel';
 
@@ -28,7 +26,7 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, deleteReque
   onSaved: () => void;
   onMessage: (text: string) => void;
 }) {
-  const [form, setForm] = useState(() => ({ ...(note ? editNoteForm(note) : emptyNoteForm(new Date(`${date}T00:00:00`), isPlannerTask)), isPlannerTask: note?.is_planner_task ?? isPlannerTask }));
+  const [form, setForm] = useState(() => note ? editNoteForm(note) : emptyNoteForm(new Date(`${date}T00:00:00`), isPlannerTask));
   const [original, setOriginal] = useState(note);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);

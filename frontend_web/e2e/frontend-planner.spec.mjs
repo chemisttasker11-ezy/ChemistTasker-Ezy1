@@ -1,8 +1,7 @@
-import { mkdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-const screenshots = fileURLToPath(new URL('../../docs/planner/screenshots/after/', import.meta.url));
-mkdirSync(screenshots, { recursive: true });
 import { test, expect } from '@playwright/test';
+
+// Test runs must not rewrite the committed docs/planner screenshots.
+const screenshots = 'test-results';
 import { installApiFixture, json, roleUsers } from './support/apiFixture.mjs';
 
 async function plannerFixture(page, user = roleUsers.owner) {

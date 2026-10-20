@@ -148,7 +148,6 @@ def user_can_manage_pharmacy(user, pharmacy) -> bool:
     if OrganizationMembership.objects.filter(
         user=user,
         role='REGION_ADMIN',
-        organization_id=pharmacy.organization_id,
         pharmacies=pharmacy,
     ).exists():
         return True

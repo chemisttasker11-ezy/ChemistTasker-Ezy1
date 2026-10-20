@@ -1,6 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type { SavedTaskApi } from "@chemisttasker/shared-core";
-import { applySavedTask, type CalendarNoteForm } from "@chemisttasker/shared-core";
+import { applySavedTask, type CalendarNoteForm, type SavedTaskApi } from "@chemisttasker/shared-core";
 import {
   Alert,
   Button,

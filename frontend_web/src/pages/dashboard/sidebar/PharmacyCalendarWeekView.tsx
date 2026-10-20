@@ -1,10 +1,9 @@
-import { calendarTaskState, taskRepeatLabel, weekRange } from "@chemisttasker/shared-core";
+import { calendarTaskState, taskRepeatLabel, weekRange, type CalendarItem } from "@chemisttasker/shared-core";
 import DashboardContentState from "../../../components/dashboard/DashboardContentState";
 import { useState } from "react";
 import { Box, Button, Card, CardActionArea, Chip, CircularProgress, IconButton, Menu, MenuItem, Stack, TextField, Tooltip, Typography, useMediaQuery, useTheme } from "@mui/material";
 import { ChevronLeft, ChevronRight, ContentCopy, MoreVert, RepeatRounded } from "@mui/icons-material";
 import { addDays, format, isSameDay } from "date-fns";
-import type { CalendarItem } from "@chemisttasker/shared-core";
 
 type Props = {
     day: Date;
