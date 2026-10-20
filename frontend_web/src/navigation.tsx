@@ -124,11 +124,10 @@ export function getOrganizationNav(hasUnreadMessages: boolean, capabilities: unk
         action: hasUnreadMessages ? <NewMessagesChip /> : null,
       },
       { segment: "dashboard/pharmacy-hub", title: "Pharmacy Hub", icon: <MessageSquareText /> },
-      { segment: "dashboard/organization/calendar", title: "Calendar", icon: <Calendar /> },
     );
   }
 
-  if (canManageRoster) navigation.push({ segment: "dashboard/organization/operations", title: "Operations Planner", icon: <ClipboardCheck /> });
+  if (canManageComms || canManageRoster) navigation.push({ segment: "dashboard/organization/calendar", title: "Calendar", icon: <Calendar /> });
 
   if (canManagePharmacies || canManageRoster) {
     navigation.push(
@@ -215,7 +214,6 @@ export function getOwnerNav(progressPercent: number, hasUnreadMessages: boolean)
     },
     { segment: "dashboard/pharmacy-hub", title: "Pharmacy Hub", icon: <MessageSquareText /> },
     { segment: "dashboard/owner/calendar", title: "Calendar", icon: <Calendar /> },
-    { segment: "dashboard/owner/operations", title: "Operations Planner", icon: <ClipboardCheck /> },
     { kind: "divider" as const },
     { kind: "header" as const, title: "Manage Pharmacies and Shifts" },
     {
@@ -316,11 +314,10 @@ export function getAdminNav({
   if (canManageComms) {
     navigation.push(
       { segment: "dashboard/pharmacy-hub", title: "Pharmacy Hub", icon: <MessageSquareText /> },
-      { segment: buildPath("calendar"), title: "Calendar", icon: <Calendar /> }
     );
   }
 
-  if (canManageRoster) navigation.push({ segment: buildPath("operations"), title: "Operations Planner", icon: <ClipboardCheck /> });
+  if (canManageComms || canManageRoster) navigation.push({ segment: buildPath("calendar"), title: "Calendar", icon: <Calendar /> });
 
   navigation.push({ kind: "divider" as const });
 

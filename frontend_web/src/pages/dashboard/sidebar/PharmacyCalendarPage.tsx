@@ -7,12 +7,8 @@ import {
     CardContent,
     Chip,
     CircularProgress,
-    FormControl,
     IconButton,
-    InputLabel,
-    MenuItem,
     Paper,
-    Select,
     Stack,
     Tab,
     Tabs,
@@ -27,7 +23,6 @@ import {
     ChevronLeft,
     ChevronRight,
     Add as AddIcon,
-    CalendarMonth as CalendarIcon,
     InfoOutlined,
 } from "@mui/icons-material";
 import {
@@ -43,23 +38,32 @@ import {
     startOfWeek,
     subMonths,
 } from "date-fns";
-import { fetchMembershipsByPharmacy, fetchMyMemberships, getOperationsContext } from "@chemisttasker/shared-core";
+import { fetchMembershipsByPharmacy, getOperationsContext, getCalendarFeed, getWorkNoteDetail,
+    createWorkNoteService, updateWorkNoteService, deleteWorkNoteService, markWorkNoteDone, markWorkNoteOpen,
+    copyPlannerTasks, listSavedTasks, createSavedTask, deleteSavedTask, fillPlannerFromRoster,
+    type SavedTaskApi, type PlannerCopyInput,
+} from "@chemisttasker/shared-core";
 import { useSearchParams } from "react-router-dom";
 import {
     type ItemType,
     type CalendarItem,
     WEEKDAYS,
     normalizeList,
-    fetchJson,
     postJson,
     toDate,
     formatTimeRange,
     ROLE_LABELS,
     EMPLOYMENT_TYPE_LABELS,
     formatChoiceLabel,
+    emptyNoteForm, editNoteForm, notePayload, weekRange, copyResultMessage,
 } from "./PharmacyCalendarPage.model";
 import PharmacyCalendarDialogs from "./PharmacyCalendarDialogs";
-import OperationTaskDialog from "./OperationTaskDialog";
+import PharmacyCalendarWeekView from "./PharmacyCalendarWeekView";
+import PageHeader from "../../../components/ui/PageHeader";
+import SegmentTabs, { tabPanelProps } from "../../../components/ui/SegmentTabs";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
+import { useWorkspace } from "../../../contexts/WorkspaceContext";
+import { useAuth } from "../../../contexts/AuthContext";
 
 export default function PharmacyCalendarPage() {
     const theme = useTheme();
@@ -70,11 +74,19 @@ export default function PharmacyCalendarPage() {
     const hoverBg = isDarkMode ? alpha(theme.palette.primary.light, 0.12) : alpha(theme.palette.primary.main, 0.08);
     const borderColor = isDarkMode ? alpha(theme.palette.common.white, 0.12) : "rgba(15, 23, 42, 0.10)";
     const [searchParams, setSearchParams] = useSearchParams();
-    const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+    const [currentMonth, setCurrentMonth] = useState(() => toDate(searchParams.get("date")) ?? new Date());
+    const [selectedDay, setSelectedDay] = useState<Date>(() => toDate(searchParams.get("date")) ?? new Date());
     const [filterType, setFilterType] = useState<ItemType>("all");
-    const [memberships, setMemberships] = useState<any[]>([]);
-    const [selectedPharmacyId, setSelectedPharmacyId] = useState<number | null>(null);
+    const { selectedPharmacyId } = useWorkspace();
+    const { user } = useAuth();
+    const [managerPharmacies, setManagerPharmacies] = useState<number[]>([]);
+    const canManage = selectedPharmacyId !== null && managerPharmacies.includes(selectedPharmacyId);
+    const [view, setView] = useState<"month" | "plan">("month");
+    const [notice, setNotice] = useState("");
+    const [actionBusy, setActionBusy] = useState(false);
+    const [savedTasks, setSavedTasks] = useState<SavedTaskApi[]>([]);
+    const [deleteTarget, setDeleteTarget] = useState<CalendarItem | SavedTaskApi | null>(null);
+    const pendingCopy = useRef<PlannerCopyInput | null>(null);
     const [pharmacyMembers, setPharmacyMembers] = useState<any[]>([]);
     const [membersLoading, setMembersLoading] = useState(false);
     const [items, setItems] = useState<CalendarItem[]>([]);
@@ -89,7 +101,7 @@ export default function PharmacyCalendarPage() {
     const [editingEventId, setEditingEventId] = useState<number | null>(null);
     const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
     const [expandedId, setExpandedId] = useState<number | string | null>(null);
-    const [activeOperationTask, setActiveOperationTask] = useState<number | null>(null);
+    const feedRequest = useRef(0);
     const selectedDayRef = useRef(selectedDay);
     const currentMonthRef = useRef(currentMonth);
   const [eventForm, setEventForm] = useState({
@@ -105,44 +117,28 @@ export default function PharmacyCalendarPage() {
       until: "",
     },
   });
-  const [noteForm, setNoteForm] = useState({
-    title: "",
-    body: "",
-    date: format(new Date(), "yyyy-MM-dd"),
-    notify: false,
-    isGeneral: false,
-    assigneeIds: [] as number[],
-    recurrence: {
-      freq: "NONE",
-      interval: 1,
-      until: "",
-    },
-  });
+    const [noteForm, setNoteForm] = useState(() => emptyNoteForm(new Date()));
 
     useEffect(() => {
-        const loadMemberships = async () => {
-            try {
-                const [staffResult, managerResult] = await Promise.allSettled([
-                    fetchMyMemberships({ page_size: 200 }), getOperationsContext(),
-                ]);
-                const staff = staffResult.status === "fulfilled" ? normalizeList(staffResult.value) : [];
-                const manager = managerResult.status === "fulfilled"
-                    ? managerResult.value.pharmacies.map(p => ({ id: "managed-" + p.id, pharmacyId: p.id, pharmacyName: p.name }))
-                    : [];
-                const staffedIds = new Set(staff.map((m: any) => Number(getPharmacyId(m))));
-                const data = [...staff, ...manager.filter(p => !staffedIds.has(p.pharmacyId))];
-                setMemberships(data);
-                if (data.length > 0 && selectedPharmacyId === null) {
-                    const queryId = Number(searchParams.get("pharmacy_id"));
-                    const candidate = data.find(m => Number(getPharmacyId(m)) === queryId);
-                    setSelectedPharmacyId(getPharmacyId(candidate ?? data[0]));
-                }
-            } catch (e) {
-                setError("Unable to load your pharmacy memberships.");
-            }
-        };
-        void loadMemberships();
+        let active = true;
+        getOperationsContext().then(context => { if (active) setManagerPharmacies(context.pharmacies.map(p => p.id)); })
+            .catch(() => { if (active) setManagerPharmacies([]); });
+        return () => { active = false; };
     }, []);
+
+    useEffect(() => {
+        setNoteModalOpen(false);
+        setEditingNoteId(null);
+        setDeleteTarget(null);
+        setSavedTasks([]);
+        pendingCopy.current = null;
+        setNotice("");
+        if (!selectedPharmacyId || !canManage) return;
+        let active = true;
+        listSavedTasks(selectedPharmacyId).then(tasks => { if (active) setSavedTasks(tasks); })
+            .catch(() => { if (active) setError("Unable to load saved tasks."); });
+        return () => { active = false; };
+    }, [selectedPharmacyId, canManage]);
 
     useEffect(() => {
         if (!selectedPharmacyId) {
@@ -155,7 +151,7 @@ export default function PharmacyCalendarPage() {
                 const data = await fetchMembershipsByPharmacy(selectedPharmacyId);
                 setPharmacyMembers(data);
             } catch (e) {
-                // keep previous members list if fetch fails
+                setPharmacyMembers([]);
             } finally {
                 setMembersLoading(false);
             }
@@ -182,7 +178,6 @@ export default function PharmacyCalendarPage() {
         }
 
         setEventForm(prev => ({ ...prev, date: newDate }));
-        setNoteForm(prev => ({ ...prev, date: newDate }));
     }, [selectedDay, selectedPharmacyId, setSearchParams]);
 
     useEffect(() => {
@@ -191,27 +186,25 @@ export default function PharmacyCalendarPage() {
     }, [selectedDay, currentMonth]);
 
     const dateRange = useMemo(() => {
+        if (view === "plan") return weekRange(selectedDay);
         const start = startOfMonth(currentMonth);
         const end = endOfMonth(start);
         return {
             from: format(start, "yyyy-MM-dd"),
             to: format(end, "yyyy-MM-dd"),
         };
-    }, [currentMonth]);
+    }, [currentMonth, selectedDay, view]);
 
     const loadFeed = useCallback(async () => {
         if (!selectedPharmacyId) {
             setItems([]);
             return;
         }
+        const request = ++feedRequest.current;
         setLoading(true);
         setError(null);
         try {
-            const feed = await fetchJson("/calendar-feed/", {
-                pharmacy_id: selectedPharmacyId,
-                date_from: dateRange.from,
-                date_to: dateRange.to,
-            });
+            const feed = await getCalendarFeed({ pharmacyId: selectedPharmacyId, dateFrom: dateRange.from, dateTo: dateRange.to });
             const eventsRaw = normalizeList(feed?.events);
             const notesRaw = normalizeList(feed?.work_notes);
 
@@ -258,28 +251,30 @@ export default function PharmacyCalendarPage() {
                     type: "note",
                     title: note.title,
                     date: dateObj,
-                    allDay: true,
+                    allDay: !note.start_time,
+                    time: formatTimeRange(note.start_time, note.end_time),
                     source: "work_note",
                     assignees: assigneeNames,
                     completedBy: Array.isArray(note.completed_by) ? note.completed_by : [],
                     assigneeMembershipIds: (note.assignees ?? []).map((a: any) => a.membershipId ?? a.membership_id),
-                    status: (note.operation?.progress?.status ?? note.status ?? "").toString().toUpperCase(),
+                    status: (note.status ?? "").toString().toUpperCase(),
                     noteData: note,
                 };
             });
 
             const combined = [...mappedEvents, ...mappedNotes];
-            setItems(combined);
+            if (request === feedRequest.current) setItems(combined);
         } catch (e) {
-            setError("Unable to load calendar data.");
-            setItems([]);
+            if (request === feedRequest.current) { setError("Unable to load calendar data."); setItems([]); }
         } finally {
-            setLoading(false);
+            if (request === feedRequest.current) setLoading(false);
         }
     }, [selectedPharmacyId, dateRange.from, dateRange.to]);
 
     useEffect(() => {
+        setItems([]);
         void loadFeed();
+        return () => { feedRequest.current += 1; };
     }, [loadFeed]);
 
     useEffect(() => {
@@ -378,22 +373,12 @@ export default function PharmacyCalendarPage() {
         setEventModalOpen(true);
     };
 
-    const handleOpenNoteModal = () => {
+    const handleOpenNoteModal = (day = selectedDay, planner = false) => {
+        if (planner && !canManage) return;
+        setSelectedDay(day);
         setNoteError(null);
         setEditingNoteId(null);
-        setNoteForm({
-            title: "",
-            body: "",
-            date: format(selectedDay, "yyyy-MM-dd"),
-            notify: false,
-            isGeneral: false,
-            assigneeIds: [],
-            recurrence: {
-                freq: "NONE",
-                interval: 1,
-                until: "",
-            },
-        });
+        setNoteForm(emptyNoteForm(day, planner));
         setNoteModalOpen(true);
     };
 
@@ -463,70 +448,115 @@ export default function PharmacyCalendarPage() {
         }
     };
 
-  const handleEditNote = (item: CalendarItem) => {
-    if (!item.noteData) return;
-    const note = item.noteData;
-    const baseId = getBaseItemId(item);
-    if (!baseId) return;
-    setEditingNoteId(baseId);
-    setNoteError(null);
-    const rec = note.recurrence || {};
-    setNoteForm({
-      title: note.title || "",
-      body: note.body || "",
-      date: note.date || format(selectedDay, "yyyy-MM-dd"),
-      notify: Boolean(note.notify_on_shift_start),
-      isGeneral: Boolean(note.is_general),
-      assigneeIds: item.assigneeMembershipIds?.filter((id) => Number.isFinite(id)) ?? [],
-      recurrence: {
-        freq: (rec.freq || "NONE").toString().toUpperCase(),
-        interval: Number(rec.interval || 1),
-        until: rec.until_date || "",
-      },
-    });
-    setNoteModalOpen(true);
-  };
+    const handleEditNote = async (item: CalendarItem) => {
+        if (item.noteData?.is_planner_task && !canManage) return;
+        const id = getBaseItemId(item);
+        if (!id) return;
+        try {
+            // Fetch the original series, rather than editing an expanded occurrence.
+            const note = await getWorkNoteDetail(id);
+            setEditingNoteId(id);
+            setNoteError(null);
+            setNoteForm(editNoteForm(note, item.noteData?.completed_count ?? 0));
+            setNoteModalOpen(true);
+        } catch (err) { setError(err instanceof Error ? err.message : "Unable to open task."); }
+    };
 
     const handleCreateOrUpdateNote = async () => {
-        if (!selectedPharmacyId) return;
-        if (!noteForm.title.trim()) {
-            setNoteError("Title is required.");
-            return;
+        if (!selectedPharmacyId || (noteForm.isPlannerTask && !canManage)) return;
+        if (!noteForm.title.trim()) { setNoteError("Title is required."); return; }
+        if (noteForm.endTime && (!noteForm.startTime || noteForm.endTime <= noteForm.startTime)) {
+            setNoteError("End time must be after start time on the same day."); return;
         }
         setNoteSaving(true);
         setNoteError(null);
         try {
-      const recurrence =
-        noteForm.recurrence.freq !== "NONE"
-          ? {
-              freq: noteForm.recurrence.freq,
-              interval: noteForm.recurrence.interval || 1,
-              until_date: noteForm.recurrence.until || null,
-            }
-          : null;
-      const payload = {
-        pharmacy: selectedPharmacyId,
-        title: noteForm.title,
-        body: noteForm.body,
-        date: noteForm.date,
-        notify_on_shift_start: noteForm.notify,
-        is_general: noteForm.isGeneral,
-        assignee_membership_ids: noteForm.isGeneral ? [] : noteForm.assigneeIds,
-        recurrence,
-      };
-            if (editingNoteId) {
-                await postJson(`/work-notes/${editingNoteId}/`, payload, "PATCH");
-            } else {
-                await postJson("/work-notes/", payload);
-            }
+            const payload = notePayload(noteForm, selectedPharmacyId);
+            if (editingNoteId) await updateWorkNoteService(editingNoteId, payload);
+            else await createWorkNoteService(payload);
             setNoteModalOpen(false);
             setEditingNoteId(null);
-            void loadFeed();
-        } catch (e: any) {
-            setNoteError(e.message || "Failed to save work note.");
-        } finally {
-            setNoteSaving(false);
-        }
+            await loadFeed();
+        } catch (err) { setNoteError(err instanceof Error ? err.message : "Failed to save task."); }
+        finally { setNoteSaving(false); }
+    };
+
+    const handleCopy = async (mode: "day" | "week" | "previous" | "task", day: Date, item?: CalendarItem) => {
+        if (!selectedPharmacyId || !canManage || actionBusy) return;
+        const range = mode === "week" || mode === "previous" ? weekRange(mode === "previous" ? addDays(day, -7) : day)
+            : { from: format(day, "yyyy-MM-dd"), to: format(day, "yyyy-MM-dd") };
+        const input = { pharmacy: selectedPharmacyId, source_from: range.from, source_to: range.to,
+            day_offset: mode === "task" ? 0 : mode === "day" ? 1 : 7,
+            ...(item ? { task_id: getBaseItemId(item) } : {}) };
+        const { request_key: previousKey, ...previousInput } = pendingCopy.current ?? {};
+        // Retain the key after a lost response so retrying cannot duplicate writes.
+        const request = { ...input, request_key: previousKey && JSON.stringify(previousInput) === JSON.stringify(input) ? previousKey : crypto.randomUUID() };
+        pendingCopy.current = request;
+        setActionBusy(true);
+        setError(null);
+        try {
+            const result = await copyPlannerTasks(request);
+            pendingCopy.current = null;
+            setNotice(copyResultMessage(result));
+            await loadFeed();
+        } catch (err) { setError(err instanceof Error ? err.message : "Copy failed. Retry the same action."); }
+        finally { setActionBusy(false); }
+    };
+
+    const handleComplete = async (item: CalendarItem) => {
+        const id = getBaseItemId(item);
+        if (!id || actionBusy) return;
+        setActionBusy(true);
+        try {
+            const action = item.status === "DONE" ? markWorkNoteOpen : markWorkNoteDone;
+            await action(id, format(item.date, "yyyy-MM-dd"), item.noteData?.updated_at);
+            await loadFeed();
+        } catch (err) { setError(err instanceof Error ? err.message : "Unable to update completion."); }
+        finally { setActionBusy(false); }
+    };
+
+    const handleDelete = async () => {
+        if (!deleteTarget) return;
+        setActionBusy(true);
+        try {
+            if ("type" in deleteTarget) {
+                const id = getBaseItemId(deleteTarget);
+                if (!id) return;
+                await deleteWorkNoteService(id, deleteTarget.noteData?.updated_at);
+                setNoteModalOpen(false);
+                await loadFeed();
+            } else {
+                await deleteSavedTask(deleteTarget.id);
+                setSavedTasks(tasks => tasks.filter(task => task.id !== deleteTarget.id));
+            }
+            setDeleteTarget(null);
+        } catch (err) { setError(err instanceof Error ? err.message : "Unable to delete. Reload and try again."); setDeleteTarget(null); }
+        finally { setActionBusy(false); }
+    };
+
+    const handleSaveReusable = async () => {
+        if (!selectedPharmacyId || !canManage || !noteForm.title.trim()) return;
+        setNoteSaving(true);
+        setNoteError(null);
+        try {
+            const saved = await createSavedTask({ pharmacy: selectedPharmacyId, title: noteForm.title.trim(), details: noteForm.body,
+                start_time: noteForm.startTime || null, end_time: noteForm.endTime || null, is_clinical: noteForm.isClinical });
+            setSavedTasks(tasks => [...tasks, saved]);
+            setNotice("Saved as a reusable task.");
+        } catch (err) { setNoteError(err instanceof Error ? err.message : "Unable to save reusable task."); }
+        finally { setNoteSaving(false); }
+    };
+
+    const handleFillRoster = async () => {
+        if (!selectedPharmacyId || !canManage) return;
+        setNoteSaving(true);
+        setNoteError(null);
+        try {
+            const result = await fillPlannerFromRoster({ pharmacy: selectedPharmacyId, date: noteForm.date,
+                start_time: noteForm.startTime || null, end_time: noteForm.endTime || null, is_clinical: noteForm.isClinical });
+            setNoteForm(form => ({ ...form, assigneeIds: [...new Set([...form.assigneeIds, ...result.assignee_membership_ids])] }));
+        } catch (err) { setNoteError(err instanceof Error ? err.message : "Unable to fill from roster."); }
+        finally { setNoteSaving(false); }
     };
 
     const getBaseItemId = (item: CalendarItem) => {
@@ -578,147 +608,34 @@ export default function PharmacyCalendarPage() {
         return [name, ...details].join(" | ");
     };
 
-    const getPharmacyId = (m: any) =>
-        m?.pharmacyId ?? m?.pharmacyDetail?.id ?? m?.pharmacy?.id ?? null;
-
-    const getPharmacyLabel = (m: any) =>
-        m?.pharmacyName ||
-        m?.pharmacyDetail?.name ||
-        m?.pharmacy?.name ||
-        (getPharmacyId(m) !== null
-            ? `Pharmacy ${getPharmacyId(m)}`
-            : `Pharmacy ${m?.id ?? ""}`);
-
-    const noPharmacies = memberships.length === 0;
-
     return (
         <Box sx={{ p: { xs: 2, md: 4 }, minHeight: "100vh", bgcolor: pageBg, color: "text.primary" }}>
-            <Paper
-                elevation={0}
-                sx={{
-                    p: 3,
-                    mb: 3,
-                    borderRadius: 3,
-                    background: cardBg,
-                    border: "1px solid",
-                    borderColor,
-                }}
-            >
-                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                        <Box
-                            sx={{
-                                width: 48,
-                                height: 48,
-                                borderRadius: 2,
-                                background: theme.palette.primary.main,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "white",
-                            }}
-                        >
-                            <CalendarIcon />
-                        </Box>
-                        <Box>
-                            <Typography
-                                variant="h5"
-                                component="h1"
-                                sx={{
-                                    fontWeight: 700,
-                                    fontFamily: '"Inter", "Roboto", sans-serif',
-                                    letterSpacing: "-0.02em",
-                                }}
-                            >
-                                Pharmacy Calendar
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Inter", sans-serif' }}>
-                                View pharmacy events, work notes, and birthdays
-                            </Typography>
-                        </Box>
-                    </Box>
-                    <Stack direction="row" spacing={1.5}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<AddIcon />}
-                            disabled={!selectedPharmacyId}
-                            onClick={handleOpenEventModal}
-                            sx={{
-                                borderRadius: 2,
-                                textTransform: "none",
-                                fontWeight: 600,
-                                fontFamily: '"Inter", sans-serif',
-                                px: 2.5,
-                            }}
-                        >
-                            Add Event
-                        </Button>
-                        <Button
-                            variant="contained"
-                            startIcon={<AssignmentIcon />}
-                            disabled={!selectedPharmacyId}
-                            onClick={handleOpenNoteModal}
-                            sx={{
-                                borderRadius: 2,
-                                textTransform: "none",
-                                fontWeight: 600,
-                                fontFamily: '"Inter", sans-serif',
-                                px: 2.5,
-                                background: theme.palette.primary.main,
-                                boxShadow: `0 4px 14px 0 ${alpha(theme.palette.primary.main, 0.4)}`,
-                                "&:hover": {
-                                    background: theme.palette.primary.dark,
-                                },
-                            }}
-                        >
-                            Add Work Note
-                        </Button>
-                    </Stack>
-                </Stack>
-
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mt={2} alignItems={{ xs: "flex-start", sm: "center" }}>
-                    <FormControl size="small" sx={{ minWidth: 220 }}>
-                        <InputLabel id="pharmacy-select-label">Pharmacy</InputLabel>
-                        <Select
-                            labelId="pharmacy-select-label"
-                            value={selectedPharmacyId ?? ""}
-                            label="Pharmacy"
-                            onChange={(e) => {
-                                const raw = e.target.value;
-                                if (typeof raw === "string" && raw === "") {
-                                    setSelectedPharmacyId(null);
-                                    return;
-                                }
-                                const nextId = Number(raw);
-                                setSelectedPharmacyId(Number.isFinite(nextId) ? nextId : null);
-                            }}
-                            disabled={memberships.length === 0}
-                        >
-                            {memberships.map((m) => (
-                                <MenuItem key={m.id} value={getPharmacyId(m) ?? ""}>
-                                    {getPharmacyLabel(m)}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Inter", sans-serif' }}>
-                        Showing items for the selected pharmacy. Org-wide events not included yet.
-                    </Typography>
-                </Stack>
-            </Paper>
-
+            <PageHeader title="Pharmacy Calendar" subtitle="Events, work notes and tasks for the selected pharmacy" actions={<>
+                {view === "month" && <Button sx={{ minHeight: 44 }} variant="outlined" startIcon={<AddIcon />} disabled={!selectedPharmacyId} onClick={handleOpenEventModal}>Add Event</Button>}
+                {view === "month" && <Button sx={{ minHeight: 44 }} variant="outlined" disabled={!selectedPharmacyId} onClick={() => handleOpenNoteModal()}>Add Work Note</Button>}
+                {canManage && <Button sx={{ minHeight: 44 }} variant="contained" startIcon={<AddIcon />} disabled={loading} onClick={() => handleOpenNoteModal(selectedDay, true)}>Add task</Button>}
+            </>}>
+                <SegmentTabs tabs={[{ value: "month", label: "Month" }, { value: "plan", label: "Plan" }]} value={view} onChange={setView} label="Calendar views" idPrefix="calendar-view" />
+            </PageHeader>
+            {notice && <Alert severity="success" onClose={() => setNotice("")} sx={{ mb: 2 }}>{notice}</Alert>}
             {error && (
                 <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
                     {error}
                 </Alert>
             )}
 
-            {noPharmacies ? (
+            {!selectedPharmacyId ? (
                 <Alert severity="info" sx={{ borderRadius: 2 }}>
-                    You don't have any active pharmacy memberships, so the calendar is empty for now.
+                    Select a pharmacy in the dashboard to view its calendar.
                 </Alert>
+            ) : view === "plan" ? (
+                <Box {...tabPanelProps("calendar-view", view)}>
+                    <PharmacyCalendarWeekView day={selectedDay} setDay={setSelectedDay} items={items} manager={canManage} userId={user?.id}
+                        busy={actionBusy} loading={loading} onAdd={day => handleOpenNoteModal(day, true)} onEdit={handleEditNote}
+                        onDuplicate={item => handleCopy("task", item.date, item)} onCopy={handleCopy} onComplete={handleComplete} />
+                </Box>
             ) : (
-                <Stack direction={{ xs: "column", lg: "row" }} spacing={3}>
+                <Stack {...tabPanelProps("calendar-view", view)} direction={{ xs: "column", lg: "row" }} spacing={3}>
                     <Paper
                         elevation={0}
                         sx={{
@@ -1073,7 +990,7 @@ export default function PharmacyCalendarPage() {
 
                                                 {item.status && (
                                                     <Chip
-                                                        label={item.status}
+                                                        label={item.noteData?.is_planner_task ? canManage ? `${item.noteData.completed_count ?? 0} of ${item.assignees?.length ?? 0} done` : item.status === "DONE" ? "Done" : "To do" : item.status}
                                                         size="small"
                                                         sx={{
                                                             height: 22,
@@ -1161,68 +1078,14 @@ export default function PharmacyCalendarPage() {
                                                             </Button>
                                                         </>
                                                     )}
-                                                    {item.type === "note" && (
-                                                        <>
-                                                            {!item.noteData?.operation && <Button
-                                                                size="small"
-                                                                variant="text"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleEditNote(item);
-                                                                }}
-                                                            >
-                                                                Edit
-                                                            </Button>}
-                                                            {!item.noteData?.operation && <Button
-                                                                size="small"
-                                                                variant="text"
-                                                                color="error"
-                                                                onClick={async (e) => {
-                                                                    e.stopPropagation();
-                                                                    if (!window.confirm("Delete this work note?")) return;
-                                                                    try {
-                                                                        const baseId = getBaseItemId(item);
-                                                                        if (!baseId) return;
-                                                                        await postJson(`/work-notes/${baseId}/`, {}, "DELETE" as any);
-                                                                        void loadFeed();
-                                                                    } catch (e) {
-                                                                        // swallow errors for now
-                                                                    }
-                                                                }}
-                                                            >
-                                                                Delete
-                                                            </Button>}
-                                                            {item.noteData?.operation?.task_id && <Button size="small" variant="contained"
-                                                                onClick={(e) => { e.stopPropagation(); setActiveOperationTask(Number(item.noteData.operation.task_id)); }}>
-                                                                Checklist &amp; progress
-                                                            </Button>}
-                                                            {item.status && !item.noteData?.operation && (
-                                                                <Button
-                                                                    size="small"
-                                                                    variant="outlined"
-                                                                    onClick={async (e) => {
-                                                                        e.stopPropagation();
-                                                                        try {
-                                                                            const action = item.status === "DONE" ? "mark_open" : "mark_done";
-                                                                            const baseId = getBaseItemId(item);
-                                                                            if (!baseId) return;
-                                                                            const occurrenceDate = format(item.date, "yyyy-MM-dd");
-                                                                            await postJson(
-                                                                                `/work-notes/${baseId}/${action}/`,
-                                                                                { occurrence_date: occurrenceDate },
-                                                                                "POST"
-                                                                            );
-                                                                            void loadFeed();
-                                                                        } catch (e) {
-                                                                            // swallow errors for now
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    {item.status === "DONE" ? "Mark Open" : "Mark Done"}
-                                                                </Button>
-                                                            )}
-                                                        </>
-                                                    )}
+                                                    {item.type === "note" && <>
+                                                        {(!item.noteData?.is_planner_task || canManage) && <>
+                                                            <Button sx={{ minHeight: 44 }} onClick={e => { e.stopPropagation(); void handleEditNote(item); }}>Edit</Button>
+                                                            <Button sx={{ minHeight: 44 }} color="error" onClick={e => { e.stopPropagation(); setDeleteTarget(item); }}>Delete</Button>
+                                                        </>}
+                                                        {item.noteData?.is_planner_task && canManage && <Button sx={{ minHeight: 44 }} disabled={actionBusy} onClick={e => { e.stopPropagation(); void handleCopy("task", item.date, item); }}>Duplicate</Button>}
+                                                        {(!item.noteData?.is_planner_task || !canManage || item.noteData.assignees.some((a: { user_id: number | null }) => a.user_id === user?.id)) && <Button sx={{ minHeight: 44 }} disabled={actionBusy} onClick={e => { e.stopPropagation(); void handleComplete(item); }}>{item.status === "DONE" ? "Mark to do" : "Mark done"}</Button>}
+                                                    </>}
                                                 </Stack>
                                             </Box>
                                         </Stack>
@@ -1270,7 +1133,9 @@ export default function PharmacyCalendarPage() {
                 </Stack>
             )}
 
-            <OperationTaskDialog taskId={activeOperationTask} onClose={() => setActiveOperationTask(null)} onUpdated={() => { void loadFeed(); }} />
+            <ConfirmDialog open={Boolean(deleteTarget)} title={`Delete ${deleteTarget && "type" in deleteTarget ? "task" : "saved task"}?`}
+                body={<>Delete "{deleteTarget?.title}"? {deleteTarget && !("type" in deleteTarget) ? "Placed tasks will stay." : "This cannot be undone."}</>}
+                confirmLabel="Delete" busyLabel="Deleting..." busy={actionBusy} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} />
             <PharmacyCalendarDialogs
                 eventModalOpen={eventModalOpen}
                 setEventModalOpen={setEventModalOpen}
@@ -1292,6 +1157,12 @@ export default function PharmacyCalendarPage() {
                 pharmacyMembers={pharmacyMembers}
                 membersLoading={membersLoading}
                 getMemberLabel={getMemberLabel}
+                canManage={canManage}
+                savedTasks={savedTasks}
+                onFillRoster={handleFillRoster}
+                onSaveReusable={handleSaveReusable}
+                onDeleteSaved={setDeleteTarget}
+                onDeleteNote={() => { if (editingNoteId) setDeleteTarget({ id: editingNoteId, type: "note", title: noteForm.title, date: selectedDay, source: "work_note", noteData: { updated_at: noteForm.updatedAt } }); }}
             />
         </Box>
     );
