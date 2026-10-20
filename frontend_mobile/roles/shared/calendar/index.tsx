@@ -1,6 +1,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import {
   ActivityIndicator,
   Button,
@@ -9,17 +9,23 @@ import {
   Dialog,
   Divider,
   HelperText,
+  Icon,
   IconButton,
   Menu,
   Portal,
   Switch,
+  SegmentedButtons,
+  Snackbar,
   Text,
   TextInput,
+  ThemeProvider,
   useTheme,
 } from 'react-native-paper';
 import { DatePickerModal, TimePickerModal } from 'react-native-paper-dates';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { useWorkspace } from '@/context/WorkspaceContext';
 import {
   addDays,
   addMonths,
@@ -34,32 +40,54 @@ import {
   startOfWeek,
   subMonths,
 } from 'date-fns';
-import { fetchMembershipsByPharmacy, fetchMyMemberships, getOperationsContext } from '@chemisttasker/shared-core';
+import {
+  fetchMembershipsByPharmacy, fetchMyMemberships, getOperationsContext, getCalendarFeed,
+  copyPlannerTasks, markWorkNoteDone, markWorkNoteOpen,
+  type PlannerCopyInput, type WorkNoteApi,
+} from '@chemisttasker/shared-core';
 import {
   type ItemType,
   type CalendarItem,
   WEEKDAYS,
   normalizeList,
-  fetchJson,
   postJson,
   toDate,
   formatTimeRange,
   ROLE_LABELS,
+  plannerWeek,
+  plannerCopyRequest,
+  copyResultMessage,
+  taskStatusLabel,
   EMPLOYMENT_TYPE_LABELS,
   formatChoiceLabel,
   parseTime,
   formatTime,
 } from './calendarModel';
-import OperationTaskDialogNative from './OperationTaskDialog';
+import CalendarTaskDialog from './CalendarTaskDialog';
 
 export default function SharedCalendarScreen() {
   const theme = useTheme();
-  const router = useRouter();
+  const { user } = useAuth();
+  const { selectedPharmacyId: workspacePharmacyId } = useWorkspace();
   const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{ date?: string; pharmacy_id?: string; note_id?: string }>();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+  const [view, setView] = useState('month');
+  const [managedPharmacyIds, setManagedPharmacyIds] = useState<number[]>([]);
+  const [message, setMessage] = useState('');
+  const [copying, setCopying] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const copyBusy = useRef(false);
+  const copyRetry = useRef<PlannerCopyInput | null>(null);
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const appliedLink = useRef('');
+  const expandedLink = useRef('');
+  const feedRequest = useRef(0);
+  const activeFeedScope = useRef('');
+  const [editingNote, setEditingNote] = useState<WorkNoteApi | undefined>();
+  const [newPlannerTask, setNewPlannerTask] = useState(true);
   const [filterType, setFilterType] = useState<ItemType>('all');
   const [memberships, setMemberships] = useState<any[]>([]);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<number | null>(null);
@@ -72,24 +100,16 @@ export default function SharedCalendarScreen() {
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [eventSaving, setEventSaving] = useState(false);
-  const [noteSaving, setNoteSaving] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
-  const [noteError, setNoteError] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
-  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
-  const [activeOperationTask, setActiveOperationTask] = useState<number | null>(null);
-  const [pharmacyMenuVisible, setPharmacyMenuVisible] = useState(false);
   const [eventRepeatMenuVisible, setEventRepeatMenuVisible] = useState(false);
-  const [noteRepeatMenuVisible, setNoteRepeatMenuVisible] = useState(false);
   const [eventDatePickerOpen, setEventDatePickerOpen] = useState(false);
-  const [noteDatePickerOpen, setNoteDatePickerOpen] = useState(false);
   const [eventUntilPickerOpen, setEventUntilPickerOpen] = useState(false);
-  const [noteUntilPickerOpen, setNoteUntilPickerOpen] = useState(false);
   const [eventStartTimeOpen, setEventStartTimeOpen] = useState(false);
   const [eventEndTimeOpen, setEventEndTimeOpen] = useState(false);
-  const [assigneeMenuVisible, setAssigneeMenuVisible] = useState(false);
-  const isWide = Platform.OS === 'web' ? true : width >= 900;
+  const isWide = width >= 900;
+  const canManagePlanner = selectedPharmacyId !== null && managedPharmacyIds.includes(selectedPharmacyId);
 
   const selectedDayRef = useRef(selectedDay);
   const currentMonthRef = useRef(currentMonth);
@@ -108,19 +128,6 @@ export default function SharedCalendarScreen() {
     },
   });
 
-  const [noteForm, setNoteForm] = useState({
-    title: '',
-    body: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    notify: false,
-    isGeneral: false,
-    assigneeIds: [] as number[],
-    recurrence: {
-      freq: 'NONE',
-      interval: 1,
-      until: '',
-    },
-  });
   const getParamString = (value?: string | string[] | null) =>
     Array.isArray(value) ? value[0] : value ?? null;
 
@@ -131,6 +138,7 @@ export default function SharedCalendarScreen() {
           fetchMyMemberships({ page_size: 200 } as any), getOperationsContext(),
         ]);
         const staff = membersResult.status === 'fulfilled' ? normalizeList(membersResult.value) : [];
+        setManagedPharmacyIds(managersResult.status === 'fulfilled' ? managersResult.value.pharmacies.map(p => p.id) : []);
         const managers = managersResult.status === 'fulfilled'
           ? managersResult.value.pharmacies.map(p => ({ id: 'managed-' + p.id, pharmacyId: p.id, pharmacyName: p.name }))
           : [];
@@ -139,8 +147,8 @@ export default function SharedCalendarScreen() {
         setMemberships(list);
         if (list.length > 0 && selectedPharmacyId === null) {
           const paramPharmacy = getParamString(params?.pharmacy_id);
-          const parsed = paramPharmacy ? Number(paramPharmacy) : null;
-          const initialId = Number.isFinite(parsed as number) ? (parsed as number) : getPharmacyId(list[0]);
+          const parsed = paramPharmacy ? Number(paramPharmacy) : workspacePharmacyId;
+          const initialId = parsed && list.some(m => Number(getPharmacyId(m)) === parsed) ? parsed : getPharmacyId(list[0]);
           setSelectedPharmacyId(Number.isFinite(initialId) ? initialId : getPharmacyId(list[0]));
         }
       } catch {
@@ -155,24 +163,26 @@ export default function SharedCalendarScreen() {
       setPharmacyMembers([]);
       return;
     }
+    let active = true;
+    setPharmacyMembers([]);
     const loadMembers = async () => {
       try {
         setMembersLoading(true);
         const data = await fetchMembershipsByPharmacy(selectedPharmacyId);
-        setPharmacyMembers(data as any);
+        if (active) setPharmacyMembers(data as any);
       } catch {
-        // keep previous members list if fetch fails
+        if (active) setPharmacyMembers([]);
       } finally {
-        setMembersLoading(false);
+        if (active) setMembersLoading(false);
       }
     };
     void loadMembers();
+    return () => { active = false; };
   }, [selectedPharmacyId]);
 
   useEffect(() => {
     const newDate = format(selectedDay, 'yyyy-MM-dd');
     setEventForm((prev) => ({ ...prev, date: newDate }));
-    setNoteForm((prev) => ({ ...prev, date: newDate }));
   }, [selectedDay]);
 
   useEffect(() => {
@@ -181,26 +191,37 @@ export default function SharedCalendarScreen() {
   }, [selectedDay, currentMonth]);
 
   const dateRange = useMemo(() => {
+    if (view === 'plan') return plannerWeek(selectedDay);
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(start);
     return {
       from: format(start, 'yyyy-MM-dd'),
       to: format(end, 'yyyy-MM-dd'),
     };
-  }, [currentMonth]);
+  }, [currentMonth, selectedDay, view]);
 
+  useEffect(() => {
+    if (workspacePharmacyId && memberships.some(m => Number(getPharmacyId(m)) === workspacePharmacyId)) {
+      setSelectedPharmacyId(workspacePharmacyId);
+    }
+  }, [workspacePharmacyId, memberships]);
+
+  const feedScope = `${selectedPharmacyId}:${dateRange.from}:${dateRange.to}`;
   const loadFeed = useCallback(async () => {
+    if (activeFeedScope.current !== feedScope) return;
+    const request = ++feedRequest.current;
     if (!selectedPharmacyId) {
       setItems([]);
+      setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const feed = await fetchJson('/calendar-feed/', {
-        pharmacy_id: selectedPharmacyId,
-        date_from: dateRange.from,
-        date_to: dateRange.to,
+      const feed = await getCalendarFeed({
+        pharmacyId: selectedPharmacyId,
+        dateFrom: dateRange.from,
+        dateTo: dateRange.to,
       });
       const eventsRaw = normalizeList(feed?.events);
       const notesRaw = normalizeList(feed?.work_notes);
@@ -248,33 +269,42 @@ export default function SharedCalendarScreen() {
           type: 'note',
           title: note.title,
           date: dateObj,
-          allDay: true,
+          allDay: !note.start_time,
+          time: formatTimeRange(note.start_time, note.end_time),
           source: 'work_note',
           assignees: assigneeNames,
           completedBy: Array.isArray(note.completed_by) ? note.completed_by : [],
           assigneeMembershipIds: (note.assignees ?? []).map((a: any) => a.membershipId ?? a.membership_id),
-          status: (note.operation?.progress?.status ?? note.status ?? '').toString().toUpperCase(),
+          status: (note.status ?? '').toString().toUpperCase(),
           noteData: note,
         };
       });
 
       const combined = [...mappedEvents, ...mappedNotes];
-      setItems(combined);
+      if (request === feedRequest.current && activeFeedScope.current === feedScope) setItems(combined);
     } catch {
-      setError('Unable to load calendar data.');
-      setItems([]);
+      if (request === feedRequest.current && activeFeedScope.current === feedScope) {
+        setError('Unable to load calendar data.');
+        setItems([]);
+      }
     } finally {
-      setLoading(false);
+      if (request === feedRequest.current && activeFeedScope.current === feedScope) setLoading(false);
     }
-  }, [selectedPharmacyId, dateRange.from, dateRange.to]);
+  }, [selectedPharmacyId, dateRange.from, dateRange.to, feedScope]);
 
   useEffect(() => {
+    activeFeedScope.current = feedScope;
+    setItems([]);
     void loadFeed();
-  }, [loadFeed]);
+    return () => { activeFeedScope.current = ''; };
+  }, [loadFeed, feedScope]);
 
   useEffect(() => {
+    const link = `${params?.date ?? ''}:${params?.pharmacy_id ?? ''}:${params?.note_id ?? ''}`;
+    const freshLink = appliedLink.current !== link;
+    appliedLink.current = link;
     const dateParam = getParamString(params?.date);
-    if (dateParam) {
+    if (dateParam && freshLink) {
       const parsed = toDate(String(dateParam));
       if (parsed && isValid(parsed)) {
         const current = selectedDayRef.current;
@@ -289,13 +319,15 @@ export default function SharedCalendarScreen() {
     }
 
     const noteParam = getParamString(params?.note_id);
-    if (noteParam) {
+    if (noteParam && expandedLink.current !== link) {
       const noteId = Number(noteParam);
       if (Number.isFinite(noteId)) {
         const target = items.find(
           (itm) => itm.type === 'note' && (itm.seriesId === noteId || itm.id === noteId)
+            && (!dateParam || format(itm.date, 'yyyy-MM-dd') === dateParam)
         );
         if (target) {
+          expandedLink.current = link;
           setExpandedId(target.id);
           if (!isSameDay(target.date, selectedDayRef.current)) {
             setSelectedDay(target.date);
@@ -307,13 +339,15 @@ export default function SharedCalendarScreen() {
       }
     }
     const pharmacyParam = getParamString(params?.pharmacy_id);
-    if (pharmacyParam) {
+    if (pharmacyParam && freshLink) {
       const nextPharmacyId = Number(pharmacyParam);
       if (Number.isFinite(nextPharmacyId) && nextPharmacyId !== selectedPharmacyId) {
         setSelectedPharmacyId(nextPharmacyId);
       }
     }
   }, [params, items, selectedPharmacyId]);
+
+  useEffect(() => { setNoteModalOpen(false); setExpandedId(null); }, [selectedPharmacyId]);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -337,13 +371,14 @@ export default function SharedCalendarScreen() {
     return items
       .filter((item) => isSameDay(item.date, selectedDay))
       .filter((item) => {
+        if (view === 'plan') return item.type === 'note' && item.noteData?.is_planner_task;
         if (filterType === 'all') return true;
         if (filterType === 'events') return item.type === 'event';
         if (filterType === 'notes') return item.type === 'note';
         if (filterType === 'birthdays') return item.type === 'birthday';
         return true;
       });
-  }, [selectedDay, items, filterType]);
+  }, [selectedDay, items, filterType, view]);
   const handlePrevMonth = () => {
     setCurrentMonth((prev) => subMonths(prev, 1));
     setSelectedDay((prev) => subMonths(prev, 1));
@@ -380,23 +415,34 @@ export default function SharedCalendarScreen() {
     setEventModalOpen(true);
   };
 
-  const handleOpenNoteModal = () => {
-    setNoteError(null);
-    setEditingNoteId(null);
-    setNoteForm({
-      title: '',
-      body: '',
-      date: format(selectedDay, 'yyyy-MM-dd'),
-      notify: false,
-      isGeneral: false,
-      assigneeIds: [],
-      recurrence: {
-        freq: 'NONE',
-        interval: 1,
-        until: '',
-      },
-    });
+  const handleOpenNoteModal = (planner = true) => {
+    if (planner && !canManagePlanner) return;
+    setEditingNote(undefined);
+    setNewPlannerTask(planner);
     setNoteModalOpen(true);
+  };
+
+  const selectDay = (day: Date) => {
+    setSelectedDay(day);
+    setCurrentMonth(day);
+  };
+
+  const handleCopy = async (mode: 'task' | 'day' | 'week', item?: CalendarItem) => {
+    if (!selectedPharmacyId || !canManagePlanner || copyBusy.current) return;
+    if (mode === 'task' && (!item || !getBaseItemId(item))) {
+      setMessage('Unable to identify this task. Reload the calendar.');
+      return;
+    }
+    const request = plannerCopyRequest(selectedPharmacyId, selectedDay, mode, copyRetry.current, item ? getBaseItemId(item) : undefined);
+    copyRetry.current = request;
+    copyBusy.current = true; setCopying(true);
+    try {
+      const result = await copyPlannerTasks(request);
+      copyRetry.current = null;
+      setMessage(copyResultMessage(result));
+      await loadFeed();
+    } catch (e) { setMessage(e instanceof Error ? e.message : 'Copy failed. Tap the same action to retry safely.'); }
+    finally { copyBusy.current = false; setCopying(false); }
   };
 
   const handleEditEvent = (item: CalendarItem) => {
@@ -466,69 +512,9 @@ export default function SharedCalendarScreen() {
   };
 
   const handleEditNote = (item: CalendarItem) => {
-    if (!item.noteData) return;
-    const note = item.noteData;
-    const baseId = getBaseItemId(item);
-    if (!baseId) return;
-    setEditingNoteId(baseId);
-    setNoteError(null);
-    const rec = note.recurrence || {};
-    setNoteForm({
-      title: note.title || '',
-      body: note.body || '',
-      date: note.date || format(selectedDay, 'yyyy-MM-dd'),
-      notify: Boolean(note.notify_on_shift_start),
-      isGeneral: Boolean(note.is_general),
-      assigneeIds: item.assigneeMembershipIds?.filter((id) => Number.isFinite(id)) ?? [],
-      recurrence: {
-        freq: (rec.freq || 'NONE').toString().toUpperCase(),
-        interval: Number(rec.interval || 1),
-        until: rec.until_date || '',
-      },
-    });
+    if (item.noteData?.is_planner_task && !canManagePlanner) return;
+    setEditingNote(item.noteData);
     setNoteModalOpen(true);
-  };
-
-  const handleCreateOrUpdateNote = async () => {
-    if (!selectedPharmacyId) return;
-    if (!noteForm.title.trim()) {
-      setNoteError('Title is required.');
-      return;
-    }
-    setNoteSaving(true);
-    setNoteError(null);
-    try {
-      const recurrence =
-        noteForm.recurrence.freq !== 'NONE'
-          ? {
-              freq: noteForm.recurrence.freq,
-              interval: noteForm.recurrence.interval || 1,
-              until_date: noteForm.recurrence.until || null,
-            }
-          : null;
-      const payload = {
-        pharmacy: selectedPharmacyId,
-        title: noteForm.title,
-        body: noteForm.body,
-        date: noteForm.date,
-        notify_on_shift_start: noteForm.notify,
-        is_general: noteForm.isGeneral,
-        assignee_membership_ids: noteForm.isGeneral ? [] : noteForm.assigneeIds,
-        recurrence,
-      };
-      if (editingNoteId) {
-        await postJson(`/work-notes/${editingNoteId}/`, payload, 'PATCH');
-      } else {
-        await postJson('/work-notes/', payload);
-      }
-      setNoteModalOpen(false);
-      setEditingNoteId(null);
-      void loadFeed();
-    } catch (e: any) {
-      setNoteError(e?.message || 'Failed to save work note.');
-    } finally {
-      setNoteSaving(false);
-    }
   };
 
   const getBaseItemId = (item: CalendarItem) => {
@@ -598,76 +584,46 @@ export default function SharedCalendarScreen() {
     m?.pharmacy?.name ||
     (getPharmacyId(m) !== null ? `Pharmacy ${getPharmacyId(m)}` : `Pharmacy ${m?.id ?? ''}`);
 
-  const selectedAssigneeNames = useMemo(() => {
-    if (!noteForm.assigneeIds.length) return '';
-    const selected = new Set(noteForm.assigneeIds);
-    return pharmacyMembers
-      .filter((m) => selected.has(Number(m.id)))
-      .map(getMemberLabel)
-      .join(', ');
-  }, [noteForm.assigneeIds, pharmacyMembers]);
-
   const noPharmacies = memberships.length === 0;
 
   const safeSelectedDay = isValid(selectedDay) ? selectedDay : new Date();
 
   return (
+    <ThemeProvider theme={{ ...theme, colors: { ...theme.colors, primary: theme.colors.onPrimaryContainer } }}>
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerCard}>
           <View style={styles.headerRow}>
-            <View style={styles.headerIcon}>
-              <IconButton icon="calendar" size={24} iconColor="#FFFFFF" />
-            </View>
-            <View>
+            <View style={styles.dayLabel}>
               <Text variant="titleLarge" style={styles.headerTitle}>
                 Pharmacy Calendar
               </Text>
               <Text variant="bodySmall" style={styles.headerSubtitle}>
-                Track events, work notes, and birthdays in one place.
+                Tasks, events, work notes, and birthdays.
               </Text>
             </View>
           </View>
         </View>
 
-        <View style={[styles.mainGrid, isWide ? styles.mainGridWide : null]}>
+        <Text style={styles.selectorLabel}>{selectedPharmacyId
+          ? getPharmacyLabel(memberships.find(m => Number(getPharmacyId(m)) === selectedPharmacyId) || {})
+          : 'Select a pharmacy in your workspace'}</Text>
+        <SegmentedButtons style={styles.selectorRow} value={view} onValueChange={setView} buttons={[
+          { value: 'month', label: 'Month', style: styles.touch }, { value: 'plan', label: 'Plan', style: styles.touch },
+        ]} />
+        <View style={[styles.mainGrid, isWide && view === 'month' ? styles.mainGridWide : null]}>
+          {view === 'month' && <>
           <Card style={[styles.card, isWide ? styles.calendarCardWide : null]}>
             <Card.Content>
             <View style={styles.toolbarRow}>
               <View style={styles.monthNav}>
-                <IconButton icon="chevron-left" onPress={handlePrevMonth} />
+                <IconButton icon="chevron-left" style={styles.iconTouch} accessibilityLabel="Previous month" onPress={handlePrevMonth} />
                 <Text style={styles.monthLabel}>{format(currentMonth, 'MMMM yyyy')}</Text>
-                <IconButton icon="chevron-right" onPress={handleNextMonth} />
+                <IconButton icon="chevron-right" style={styles.iconTouch} accessibilityLabel="Next month" onPress={handleNextMonth} />
               </View>
-              <Button mode="outlined" onPress={handleToday}>
+              <Button mode="outlined" contentStyle={styles.touch} onPress={handleToday}>
                 Today
               </Button>
-            </View>
-
-            <View style={styles.selectorRow}>
-              <Text style={styles.selectorLabel}>Pharmacy</Text>
-              <Menu
-                visible={pharmacyMenuVisible}
-                onDismiss={() => setPharmacyMenuVisible(false)}
-                anchor={
-                  <Button mode="outlined" onPress={() => setPharmacyMenuVisible(true)}>
-                    {selectedPharmacyId
-                      ? getPharmacyLabel(memberships.find((m) => getPharmacyId(m) === selectedPharmacyId) || {})
-                      : 'Select pharmacy'}
-                  </Button>
-                }
-              >
-                {memberships.map((m) => (
-                  <Menu.Item
-                    key={m.id}
-                    title={getPharmacyLabel(m)}
-                    onPress={() => {
-                      setSelectedPharmacyId(getPharmacyId(m));
-                      setPharmacyMenuVisible(false);
-                    }}
-                  />
-                ))}
-              </Menu>
             </View>
 
             {noPharmacies && (
@@ -729,30 +685,39 @@ export default function SharedCalendarScreen() {
             <Divider style={styles.sectionDivider} />
 
             <View style={styles.actionsRow}>
-              <Button mode="contained" onPress={handleOpenEventModal} disabled={!selectedPharmacyId}>
+              <Button mode="text" contentStyle={styles.touch} onPress={handleOpenEventModal} disabled={!selectedPharmacyId}>
                 Add Event
               </Button>
-              <Button mode="contained" onPress={handleOpenNoteModal} disabled={!selectedPharmacyId}>
+              <Button mode="text" contentStyle={styles.touch} onPress={() => handleOpenNoteModal(false)} disabled={!selectedPharmacyId}>
                 Add Work Note
               </Button>
             </View>
             </Card.Content>
           </Card>
+          </>}
 
-          <Card style={[styles.card, isWide ? styles.summaryCardWide : null]}>
+          <Card style={[styles.card, isWide && view === 'month' ? styles.summaryCardWide : null]}>
             <Card.Content>
-            <View style={styles.dayHeader}>
-              <Text variant="titleMedium" style={styles.dayHeaderTitle}>
-                {format(safeSelectedDay, 'EEEE, MMM d')}
-              </Text>
-              <Text style={styles.dayHeaderSubtitle}>Items for selected day</Text>
+            <View style={styles.dayNavigation}>
+              <IconButton icon="chevron-left" size={24} style={styles.iconTouch} accessibilityLabel="Previous day" onPress={() => selectDay(addDays(selectedDay, -1))} />
+              <Button style={styles.dayLabel} contentStyle={styles.touch} onPress={() => setDayPickerOpen(true)}>
+                {format(safeSelectedDay, 'EEE, d MMM')}
+              </Button>
+              <IconButton icon="chevron-right" size={24} style={styles.iconTouch} accessibilityLabel="Next day" onPress={() => selectDay(addDays(selectedDay, 1))} />
             </View>
+            {canManagePlanner && <Button mode="contained" contentStyle={styles.touch} icon="plus" onPress={() => handleOpenNoteModal()}>Add task</Button>}
+            {view === 'plan' && canManagePlanner && <View style={styles.copyActions}>
+              <Button contentStyle={styles.touch} disabled={copying || loading} onPress={() => handleCopy('day')}>Copy day to tomorrow</Button>
+              <Button contentStyle={styles.touch} disabled={copying || loading} onPress={() => handleCopy('week')}>Copy week to next week</Button>
+            </View>}
+            {view === 'plan' && <Text style={styles.itemMeta}>Week: {plannerWeek(selectedDay).from} to {plannerWeek(selectedDay).to}</Text>}
+            {view === 'plan' && !selectedPharmacyId && <HelperText type="info">Select a pharmacy in your workspace to view its plan.</HelperText>}
 
-            <View style={styles.filterRow}>
+            {view === 'month' && <View style={styles.filterRow}>
               {(['all', 'events', 'notes', 'birthdays'] as ItemType[]).map((type) => (
                 <Chip
                   key={type}
-                  style={[styles.filterChip, filterType === type && styles.filterChipActive]}
+                  style={[styles.filterChip, filterType === type && { backgroundColor: theme.colors.onPrimaryContainer }]}
                   textStyle={filterType === type ? styles.filterChipTextActive : undefined}
                   onPress={() => setFilterType(type)}
                 >
@@ -765,7 +730,7 @@ export default function SharedCalendarScreen() {
                         : 'Birthdays'}
                 </Chip>
               ))}
-            </View>
+            </View>}
 
             {loading && (
               <View style={styles.loadingRow}>
@@ -778,13 +743,16 @@ export default function SharedCalendarScreen() {
 
             {!loading && filteredItems.length === 0 && (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>No items scheduled for this day</Text>
+                <Text style={styles.emptyStateText}>{view === 'plan'
+                  ? items.some(item => item.noteData?.is_planner_task) ? 'No tasks for this day.' : canManagePlanner
+                    ? 'No tasks this week. Add a task or copy last week.' : 'No tasks assigned this week.'
+                  : 'No items scheduled for this day'}</Text>
               </View>
             )}
 
             {filteredItems.map((item) => {
               const isExpanded = expandedId === item.id;
-              const typeColor = getTypeColor(item.type);
+              const typeColor = item.noteData?.is_planner_task ? theme.colors.primary : getTypeColor(item.type);
 
               return (
                 <TouchableOpacity
@@ -795,20 +763,20 @@ export default function SharedCalendarScreen() {
                   <Card style={styles.itemCard}>
                     <Card.Content>
                       <View style={styles.itemHeader}>
-                        <View style={[styles.itemIcon, { backgroundColor: `${typeColor}22` }]}>
-                          <IconButton icon={getTypeIcon(item.type)} size={18} iconColor={typeColor} />
+                        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.itemIcon, { backgroundColor: `${typeColor}22` }]}>
+                          <Icon source={getTypeIcon(item.type)} size={20} color={typeColor} />
                         </View>
                         <View style={styles.itemHeaderContent}>
                           <Text style={styles.itemTitle}>{item.title}</Text>
-                          <Text style={styles.itemMeta}>
-                            {item.allDay ? 'All day' : item.time || ''}
-                          </Text>
+                          <Text style={styles.itemMeta}>{item.allDay ? 'All day' : item.time || ''}</Text>
+                          {item.type === 'note' && item.status && <Text style={styles.itemMeta}>
+                            {item.noteData?.is_planner_task ? taskStatusLabel(item.noteData, canManagePlanner) : item.status}
+                          </Text>}
                         </View>
-                        {item.type === 'note' && item.status && (
-                          <Chip style={styles.statusChip}>{item.status}</Chip>
-                        )}
                       </View>
 
+                      {item.noteData?.is_planner_task && canManagePlanner && <Button contentStyle={styles.touch} icon="content-copy"
+                        disabled={copying || loading} onPress={() => handleCopy('task', item)}>Duplicate</Button>}
                       {isExpanded && (
                         <View style={styles.itemDetails}>
                           {item.type === 'note' && item.noteData?.body ? (
@@ -830,13 +798,14 @@ export default function SharedCalendarScreen() {
 
                           <View style={styles.itemActions}>
                             {item.type === 'event' && !item.readOnly && (
-                              <Button mode="text" onPress={() => handleEditEvent(item)}>
+                              <Button mode="text" contentStyle={styles.touch} onPress={() => handleEditEvent(item)}>
                                 Edit
                               </Button>
                             )}
 
                             {item.type === 'event' && !item.readOnly && (
                               <Button
+                                contentStyle={styles.touch}
                                 mode="text"
                                 textColor={theme.colors.error}
                                 onPress={() => {
@@ -863,69 +832,25 @@ export default function SharedCalendarScreen() {
                               </Button>
                             )}
 
-                            {item.type === 'note' && !item.noteData?.operation && (
-                              <Button mode="text" onPress={() => handleEditNote(item)}>
+                            {item.type === 'note' && (!item.noteData?.is_planner_task || canManagePlanner) && (
+                              <Button mode="text" contentStyle={styles.touch} onPress={() => handleEditNote(item)}>
                                 Edit
                               </Button>
                             )}
 
-                            {item.type === 'note' && !item.noteData?.operation && (
-                              <Button
-                                mode="text"
-                                textColor={theme.colors.error}
-                                onPress={() => {
-                                  Alert.alert('Delete work note', 'Delete this work note?', [
-                                    { text: 'Cancel', style: 'cancel' },
-                                    {
-                                      text: 'Delete',
-                                      style: 'destructive',
-                                      onPress: async () => {
-                                        try {
-                                          const baseId = getBaseItemId(item);
-                                          if (!baseId) return;
-                                          await postJson(`/work-notes/${baseId}/`, {}, 'DELETE');
-                                          void loadFeed();
-                                        } catch {
-                                          // ignore
-                                        }
-                                      },
-                                    },
-                                  ]);
-                                }}
-                              >
-                                Delete
-                              </Button>
-                            )}
-
-                            {item.type === 'note' && item.noteData?.operation?.task_id && (
-                              <Button mode="contained-tonal"
-                                onPress={() => setActiveOperationTask(Number(item.noteData.operation.task_id))}>
-                                Checklist &amp; progress
-                              </Button>
-                            )}
-
-                            {item.type === 'note' && item.status && !item.noteData?.operation && (
-                              <Button
-                                mode="outlined"
-                                onPress={async () => {
-                                  try {
-                                    const action = item.status === 'DONE' ? 'mark_open' : 'mark_done';
-                                    const baseId = getBaseItemId(item);
-                                    if (!baseId) return;
-                                    const occurrenceDate = format(item.date, 'yyyy-MM-dd');
-                                    await postJson(
-                                      `/work-notes/${baseId}/${action}/`,
-                                      { occurrence_date: occurrenceDate },
-                                      'POST'
-                                    );
-                                    void loadFeed();
-                                  } catch {
-                                    // ignore
-                                  }
-                                }}
-                              >
-                                {item.status === 'DONE' ? 'Mark Open' : 'Mark Done'}
-                              </Button>
+                            {item.type === 'note' && (!item.noteData?.is_planner_task ||
+                              item.noteData.assignees.some((person: { user_id: number }) => person.user_id === user?.id)) && (
+                              <Button contentStyle={styles.touch} mode="outlined" disabled={completing || loading} onPress={async () => {
+                                const baseId = getBaseItemId(item);
+                                if (!baseId) return;
+                                setCompleting(true);
+                                try {
+                                  const action = item.status === 'DONE' ? markWorkNoteOpen : markWorkNoteDone;
+                                  await action(baseId, format(item.date, 'yyyy-MM-dd'), item.noteData.updated_at);
+                                  await loadFeed();
+                                } catch (e) { setMessage(e instanceof Error ? e.message : 'Unable to update completion.'); }
+                                finally { setCompleting(false); }
+                              }}>{item.status === 'DONE' ? 'Mark to do' : 'Mark done'}</Button>
                             )}
                           </View>
                         </View>
@@ -939,7 +864,12 @@ export default function SharedCalendarScreen() {
           </Card>
         </View>
       </ScrollView>
-      <OperationTaskDialogNative taskId={activeOperationTask} onDismiss={() => setActiveOperationTask(null)} onUpdated={() => { void loadFeed(); }} />
+      {noteModalOpen && selectedPharmacyId && <CalendarTaskDialog
+        pharmacyId={selectedPharmacyId} date={format(selectedDay, 'yyyy-MM-dd')} note={editingNote} isPlannerTask={newPlannerTask}
+        members={pharmacyMembers.map(member => ({ id: Number(member.id), label: getMemberLabel(member) }))} membersLoading={membersLoading}
+        onDismiss={() => setNoteModalOpen(false)} onSaved={() => { setNoteModalOpen(false); void loadFeed(); }} onMessage={setMessage} />}
+      {message ? <Portal><Snackbar visible onDismiss={() => setMessage('')} duration={8000}
+        action={{ label: 'Dismiss', onPress: () => setMessage('') }}>{message}</Snackbar></Portal> : null}
       <Portal>
         <Dialog visible={eventModalOpen} onDismiss={() => setEventModalOpen(false)} style={styles.dialog}>
           <Dialog.Title>{editingEventId ? 'Update Event' : 'Create Event'}</Dialog.Title>
@@ -1070,180 +1000,11 @@ export default function SharedCalendarScreen() {
           </Dialog.Actions>
         </Dialog>
 
-        <Dialog visible={noteModalOpen} onDismiss={() => setNoteModalOpen(false)} style={styles.dialog}>
-          <Dialog.Title>{editingNoteId ? 'Update Work Note' : 'Create Work Note'}</Dialog.Title>
-          <Dialog.ScrollArea style={styles.dialogScroll}>
-            <ScrollView>
-              <TextInput
-                label="Title"
-                value={noteForm.title}
-                onChangeText={(text) => setNoteForm((prev) => ({ ...prev, title: text }))}
-                mode="outlined"
-              />
-              <TextInput
-                label="Date"
-                value={noteForm.date}
-                onChangeText={(text) => setNoteForm((prev) => ({ ...prev, date: text }))}
-                mode="outlined"
-                style={styles.dialogInput}
-                right={<TextInput.Icon icon="calendar" onPress={() => setNoteDatePickerOpen(true)} />}
-              />
-              <TextInput
-                label="Details"
-                value={noteForm.body}
-                onChangeText={(text) => setNoteForm((prev) => ({ ...prev, body: text }))}
-                mode="outlined"
-                multiline
-                style={styles.dialogInput}
-              />
-              <View style={styles.switchRow}>
-                <Text>Notify assignees at shift start</Text>
-                <Switch
-                  value={noteForm.notify}
-                  onValueChange={(value) => setNoteForm((prev) => ({ ...prev, notify: value }))}
-                />
-              </View>
-              <View style={styles.switchRow}>
-                <Text>Applies to all staff (general note)</Text>
-                <Switch
-                  value={noteForm.isGeneral}
-                  onValueChange={(value) =>
-                    setNoteForm((prev) => ({ ...prev, isGeneral: value, assigneeIds: [] }))
-                  }
-                />
-              </View>
-
-              <View style={styles.menuRow}>
-                <Text style={styles.menuLabel}>Repeats</Text>
-                <Menu
-                  visible={noteRepeatMenuVisible}
-                  onDismiss={() => setNoteRepeatMenuVisible(false)}
-                  anchor={
-                    <Button mode="outlined" onPress={() => setNoteRepeatMenuVisible(true)}>
-                      {noteForm.recurrence.freq === 'NONE'
-                        ? 'Does not repeat'
-                        : noteForm.recurrence.freq}
-                    </Button>
-                  }
-                >
-                  {['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'].map((freq) => (
-                    <Menu.Item
-                      key={freq}
-                      title={freq === 'NONE' ? 'Does not repeat' : freq}
-                      onPress={() => {
-                        setNoteForm((prev) => ({
-                          ...prev,
-                          recurrence: { ...prev.recurrence, freq },
-                        }));
-                        setNoteRepeatMenuVisible(false);
-                      }}
-                    />
-                  ))}
-                </Menu>
-              </View>
-
-              {noteForm.recurrence.freq !== 'NONE' && (
-                <TextInput
-                  label="Interval"
-                  value={String(noteForm.recurrence.interval)}
-                  onChangeText={(text) =>
-                    setNoteForm((prev) => ({
-                      ...prev,
-                      recurrence: {
-                        ...prev.recurrence,
-                        interval: Number(text) || 1,
-                      },
-                    }))
-                  }
-                  mode="outlined"
-                  keyboardType="numeric"
-                  style={styles.dialogInput}
-                />
-              )}
-
-              {noteForm.recurrence.freq !== 'NONE' && (
-                <TextInput
-                  label="Repeat until (optional)"
-                  value={noteForm.recurrence.until}
-                  onChangeText={(text) =>
-                    setNoteForm((prev) => ({
-                      ...prev,
-                      recurrence: { ...prev.recurrence, until: text },
-                    }))
-                  }
-                  mode="outlined"
-                  style={styles.dialogInput}
-                  right={<TextInput.Icon icon="calendar" onPress={() => setNoteUntilPickerOpen(true)} />}
-                />
-              )}
-
-              <View style={styles.assigneeSection}>
-                <Text style={styles.menuLabel}>Assign to</Text>
-                {noteForm.isGeneral ? (
-                  <HelperText type="info">General note applies to all staff.</HelperText>
-                ) : (
-                  <>
-                    <Menu
-                      visible={assigneeMenuVisible}
-                      onDismiss={() => setAssigneeMenuVisible(false)}
-                      anchor={
-                        <TextInput
-                          label="Assign to"
-                          value={selectedAssigneeNames}
-                          mode="outlined"
-                          editable={false}
-                          style={styles.dialogInput}
-                          right={<TextInput.Icon icon="chevron-down" onPress={() => setAssigneeMenuVisible(true)} />}
-                          onPressIn={() => setAssigneeMenuVisible(true)}
-                        />
-                      }
-                    >
-                      {membersLoading && <Menu.Item title="Loading staff..." disabled />}
-                      {!membersLoading && pharmacyMembers.length === 0 && (
-                        <Menu.Item title="No staff found for this pharmacy." disabled />
-                      )}
-                      {pharmacyMembers.map((member) => {
-                        const id = Number(member.id);
-                        const checked = noteForm.assigneeIds.includes(id);
-                        return (
-                          <Menu.Item
-                            key={member.id}
-                            title={getMemberLabel(member)}
-                            leadingIcon={checked ? 'check' : undefined}
-                            onPress={() => {
-                              setNoteForm((prev) => {
-                                const next = new Set(prev.assigneeIds);
-                                if (checked) {
-                                  next.delete(id);
-                                } else {
-                                  next.add(id);
-                                }
-                                return { ...prev, assigneeIds: Array.from(next) };
-                              });
-                            }}
-                          />
-                        );
-                      })}
-                    </Menu>
-                    <HelperText type="info">
-                      {selectedAssigneeNames ? selectedAssigneeNames : 'Select staff to assign.'}
-                    </HelperText>
-                  </>
-                )}
-              </View>
-
-              {noteError && <HelperText type="error">{noteError}</HelperText>}
-            </ScrollView>
-          </Dialog.ScrollArea>
-          <Dialog.Actions>
-            <Button onPress={() => setNoteModalOpen(false)} disabled={noteSaving}>
-              Cancel
-            </Button>
-            <Button onPress={handleCreateOrUpdateNote} disabled={noteSaving || !selectedPharmacyId}>
-              {noteSaving ? 'Saving...' : editingNoteId ? 'Update' : 'Create'}
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
+        <DatePickerModal locale="en" mode="single" visible={dayPickerOpen} date={selectedDay}
+          onDismiss={() => setDayPickerOpen(false)} onConfirm={({ date }) => {
+            if (date) selectDay(date);
+            setDayPickerOpen(false);
+          }} />
 
         <DatePickerModal
           locale="en"
@@ -1262,20 +1023,6 @@ export default function SharedCalendarScreen() {
         <DatePickerModal
           locale="en"
           mode="single"
-          visible={noteDatePickerOpen}
-          onDismiss={() => setNoteDatePickerOpen(false)}
-          date={toDate(noteForm.date) ?? new Date()}
-          onConfirm={({ date }) => {
-            if (date) {
-              setNoteForm((prev) => ({ ...prev, date: format(date, 'yyyy-MM-dd') }));
-            }
-            setNoteDatePickerOpen(false);
-          }}
-        />
-
-        <DatePickerModal
-          locale="en"
-          mode="single"
           visible={eventUntilPickerOpen}
           onDismiss={() => setEventUntilPickerOpen(false)}
           date={toDate(eventForm.recurrence.until) ?? new Date()}
@@ -1287,23 +1034,6 @@ export default function SharedCalendarScreen() {
               }));
             }
             setEventUntilPickerOpen(false);
-          }}
-        />
-
-        <DatePickerModal
-          locale="en"
-          mode="single"
-          visible={noteUntilPickerOpen}
-          onDismiss={() => setNoteUntilPickerOpen(false)}
-          date={toDate(noteForm.recurrence.until) ?? new Date()}
-          onConfirm={({ date }) => {
-            if (date) {
-              setNoteForm((prev) => ({
-                ...prev,
-                recurrence: { ...prev.recurrence, until: format(date, 'yyyy-MM-dd') },
-              }));
-            }
-            setNoteUntilPickerOpen(false);
           }}
         />
 
@@ -1330,6 +1060,7 @@ export default function SharedCalendarScreen() {
         />
       </Portal>
     </SafeAreaView>
+    </ThemeProvider>
   );
 }
 
@@ -1365,14 +1096,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   headerTitle: {
     fontWeight: '700',
@@ -1426,6 +1149,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   dayCell: {
+    minHeight: 44,
     width: '14.28%',
     aspectRatio: 1,
     padding: 6,
@@ -1468,20 +1192,16 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   actionsRow: {
+    flexWrap: 'wrap',
     flexDirection: 'row',
     gap: 12,
     justifyContent: 'space-between',
   },
-  dayHeader: {
-    marginBottom: 12,
-  },
-  dayHeaderTitle: {
-    fontWeight: '700',
-    color: '#111827',
-  },
-  dayHeaderSubtitle: {
-    color: '#6B7280',
-  },
+  touch: { minHeight: 48 },
+  iconTouch: { width: 48, height: 48, margin: 0 },
+  dayNavigation: { flexDirection: 'row', alignItems: 'center' },
+  dayLabel: { flex: 1 },
+  copyActions: { marginVertical: 8 },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1489,10 +1209,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   filterChip: {
+    minHeight: 44,
     borderRadius: 16,
-  },
-  filterChipActive: {
-    backgroundColor: '#6366F1',
   },
   filterChipTextActive: {
     color: '#FFFFFF',
@@ -1538,9 +1256,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontSize: 12,
   },
-  statusChip: {
-    height: 24,
-  },
   itemDetails: {
     marginTop: 12,
     gap: 6,
@@ -1575,16 +1290,5 @@ const styles = StyleSheet.create({
   menuLabel: {
     fontWeight: '600',
     marginBottom: 6,
-  },
-  assigneeSection: {
-    marginTop: 12,
-  },
-  assigneeList: {
-    gap: 8,
-  },
-  assigneeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
 });
