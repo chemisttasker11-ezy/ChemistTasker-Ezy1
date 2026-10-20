@@ -51,15 +51,18 @@ export default function PharmacyCalendarWeekView({ day, setDay, items, manager, 
             {/* Scoped token rules retain accents through the dashboard shell and legacy dark Paper overrides. */}
             <Stack spacing={1}>
                 {days.map(date => { const dayTasks = plannerDayTasks(tasks, date); return <Paper component="section" elevation={0} aria-label={format(date, "EEEE d MMMM")} key={format(date, "yyyy-MM-dd")} sx={{ minWidth: 0, px: { xs: 1.25, md: 1.5 }, py: 1.25, borderRadius: '14px', border: '1px solid var(--ct-border-color)', '&&': { backgroundColor: `${isToday(date) ? 'var(--ct-tone-violet-bg)' : isWeekend(date) ? 'var(--ct-subtle-bg)' : 'var(--ct-surface-bg)'} !important`, borderColor: `${isToday(date) ? 'var(--ct-accent-strong)' : 'var(--ct-border-color)'} !important` }, color: isWeekend(date) && !isToday(date) ? 'var(--ct-text-muted)' : 'var(--ct-text-primary)' }}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ my: -0.75 }}>
+                    <Stack direction="row" alignItems="center" gap={1} sx={{ my: -0.75, minHeight: 32 }}>
                         <Typography component="h3" variant="subtitle2" sx={{ color: isToday(date) ? 'var(--ct-accent-strong)' : 'inherit', fontWeight: 600 }}>{format(date, "EEE d MMM")}</Typography>
-                        {manager && <Tooltip title="Day actions"><IconButton aria-label={`Day actions for ${format(date, "EEEE d MMMM")}`} aria-haspopup="menu" aria-expanded={menu?.date?.getTime() === date.getTime()} onClick={event => setMenu({ anchor: event.currentTarget, date })}><MoreVert /></IconButton></Tooltip>}
+                        {dayTasks.length === 0 && <Typography variant="body2" color="text.secondary">No tasks</Typography>}
+                        {manager && (dayTasks.length
+                            ? <Tooltip title="Day actions"><IconButton sx={{ ml: 'auto' }} aria-label={`Day actions for ${format(date, "EEEE d MMMM")}`} aria-haspopup="menu" aria-expanded={menu?.date?.getTime() === date.getTime()} onClick={event => setMenu({ anchor: event.currentTarget, date })}><MoreVert /></IconButton></Tooltip>
+                            : <Button size="small" startIcon={<Add />} aria-label={`Add task on ${format(date, "EEEE d MMMM")}`} disabled={busy} onClick={() => onAdd(date)} sx={{ ml: 'auto', color: 'var(--ct-text-secondary)' }}>Add</Button>)}
                     </Stack>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 1.25, mt: 0.5 }}>
+                    {dayTasks.length > 0 && <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 1.25, mt: 0.5 }}>
                         {dayTasks.map(item => { const state = calendarTaskState(item.noteData, manager, userId); return <Card component="article" aria-label={item.title} key={item.id} variant="outlined" sx={{ borderRadius: '12px', bgcolor: 'var(--ct-surface-bg)', boxShadow: 'var(--ct-dashboard-card-shadow)', '&:hover': { boxShadow: 'var(--ct-dashboard-card-shadow-hover)' }, border: '1px solid var(--ct-border-color)', borderLeft: '3px solid', '&&': { borderLeftColor: `${item.noteData.is_clinical ? 'var(--ct-tone-cyan-fg)' : 'var(--ct-border-color)'} !important` }, overflowWrap: 'anywhere', minWidth: 0, position: 'relative', '&:focus-within .planner-task-menu': { opacity: 1 } }}>
                             {/* Positioned over the title row rather than nested: a button cannot sit inside the edit button. */}
                             {manager && <Tooltip title="More actions"><IconButton className="planner-task-menu" aria-label={`More actions for ${item.title}`} aria-haspopup="menu" aria-expanded={menu?.task?.id === item.id} disabled={busy} onClick={event => setMenu({ anchor: event.currentTarget, task: item })} sx={{ position: 'absolute', top: 0, right: 0, zIndex: 1, opacity: { xs: 1, md: 0 }, '&:focus-visible, &[aria-expanded="true"], .MuiCard-root:hover &': { opacity: 1 }, '@media (hover: none), (pointer: coarse)': { opacity: 1 }, '&:focus-visible': { outline: '2px solid var(--ct-accent-strong)', outlineOffset: -3 } }}><MoreVert /></IconButton></Tooltip>}
-                            <CardActionArea component={state.canEdit ? "button" : "div"} disabled={busy} role={state.canEdit ? "button" : "presentation"} tabIndex={state.canEdit ? 0 : -1} aria-label={state.canEdit ? `Edit ${item.title}` : undefined} onClick={state.canEdit ? () => onEdit(item) : undefined} sx={{ px: 1.5, py: 1.25 }}>
+                            <CardActionArea component={state.canEdit ? "button" : "div"} disabled={busy} role={state.canEdit ? "button" : "presentation"} tabIndex={state.canEdit ? 0 : -1} aria-label={state.canEdit ? `Edit ${item.title}` : undefined} onClick={state.canEdit ? () => onEdit(item) : undefined} sx={{ px: 1.5, pt: 1.25, pb: 0.75 }}>
                                 <Stack spacing={0.75}>
                                     <Stack direction="row" alignItems="baseline" gap={1} sx={{ pr: manager ? 4 : 0, minHeight: 20, minWidth: 0 }}>
                                         {item.time && <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{item.time}</Typography>}
@@ -67,19 +70,17 @@ export default function PharmacyCalendarWeekView({ day, setDay, items, manager, 
                                     </Stack>
                                     {item.noteData.body && <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{item.noteData.body}</Typography>}
                                     {item.noteData.recurrence && <Stack direction="row" alignItems="center" gap={0.5}><RepeatRounded fontSize="small" /><Typography variant="caption">{taskRepeatLabel(item.noteData.recurrence)}</Typography></Stack>}
-                                    <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap gap={1}>
-                                        {item.noteData.is_clinical && <Pill label="Clinical" tone="cyan" />}
-                                        {state.label && <Pill label={state.label} tone={item.status === "DONE" ? "green" : "amber"} />}
-                                        {item.assignees?.length ? item.assignees.map((name, index) => <Stack key={index} direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0, maxWidth: '100%' }}><InitialsAvatar name={name} size={22} tone="violet" /><Typography variant="caption" sx={{ overflowWrap: 'anywhere' }}>{name}</Typography></Stack>) : <Typography variant="caption" color="text.secondary">Unassigned</Typography>}
-                                    </Stack>
                                 </Stack>
                             </CardActionArea>
-                            {state.canComplete && <Button variant="outlined" sx={{ m: 0.5, minHeight: 44 }} disabled={busy} onClick={() => onComplete(item)}>{item.status === "DONE" ? "Mark to do" : "Mark done"}</Button>}
+                            {/* Meta row sits outside the edit button so Mark done can share it. */}
+                            <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap gap={1} sx={{ px: 1.5, pb: state.canComplete ? 0.5 : 1.25, minHeight: state.canComplete ? 44 : 0 }}>
+                                {item.noteData.is_clinical && <Pill label="Clinical" tone="cyan" />}
+                                {state.label && <Pill label={state.label} tone={item.status === "DONE" ? "green" : "amber"} />}
+                                {item.assignees?.length ? item.assignees.map((name, index) => <Stack key={index} direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0, maxWidth: '100%' }}><InitialsAvatar name={name} size={22} tone="violet" /><Typography variant="caption" sx={{ overflowWrap: 'anywhere' }}>{name}</Typography></Stack>) : <Typography variant="caption" color="text.secondary">Unassigned</Typography>}
+                                {state.canComplete && <Button size="small" variant="outlined" sx={{ ml: 'auto' }} disabled={busy} onClick={() => onComplete(item)}>{item.status === "DONE" ? "Mark to do" : "Mark done"}</Button>}
+                            </Stack>
                         </Card>; })}
-                        {dayTasks.length === 0 && (manager
-                            ? <Button size="small" startIcon={<Add />} aria-label={`Add task on ${format(date, "EEEE d MMMM")}`} disabled={busy} onClick={() => onAdd(date)} sx={{ justifySelf: 'start', color: 'var(--ct-text-secondary)' }}>Add</Button>
-                            : <Typography variant="body2" color="text.secondary">No tasks{phone ? " for this day" : ""}.</Typography>)}
-                    </Box>
+                    </Box>}
                 </Paper>; })}
             </Stack>
         </>}

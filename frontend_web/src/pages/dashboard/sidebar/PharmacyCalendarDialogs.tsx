@@ -246,9 +246,9 @@ export default function PharmacyCalendarDialogs({
                 {pharmacyMembers.map(member => <MenuItem key={member.id} value={member.id}>{getMemberLabel(member)}</MenuItem>)}
               </Select>
             </FormControl>
+            {noteForm.isPlannerTask && <Button size="small" onClick={onFillRoster} disabled={noteSaving || noteForm.locked} sx={{ alignSelf: "flex-start", "&&": { mt: 0.5 } }}>Fill from roster</Button>}
             {membersLoading && <Typography variant="body2" color="text.secondary">Loading staff...</Typography>}
             {noteForm.locked && <Alert severity="info">This task has completions. Its date and assignees cannot change.</Alert>}
-            {noteForm.isPlannerTask && <Button variant="outlined" onClick={onFillRoster} disabled={noteSaving || noteForm.locked}>Fill from roster</Button>}
             {noteForm.isPlannerTask && !editingNoteId && savedTasks.length > 0 && <>
               <FormControl fullWidth>
                 <InputLabel id="saved-task-label">Use a saved task</InputLabel>

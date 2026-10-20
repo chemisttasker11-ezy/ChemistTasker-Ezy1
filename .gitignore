@@ -113,8 +113,6 @@ frontend_mobile/.env.production
 trash/
 screenshots/
 !docs/planner/screenshots/
-docs/planner/screenshots/*
-!docs/planner/screenshots/after/
 frontend_web_old/
 Documents/
 verification_outputs/
