@@ -232,7 +232,7 @@ export default function RosterPlanningToolbar({
 
   // 4. View Staff Acknowledgements
   const handleViewAcknowledgements = async () => {
-    if (!period) return;
+    if (period?.period_id == null) return;
     setActionLoading(true);
     try {
       const res = await rosterV2.getAcknowledgements(period.period_id) as AcknowledgementData;
