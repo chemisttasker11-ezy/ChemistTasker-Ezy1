@@ -86,9 +86,11 @@ class WorkNoteSerializer(serializers.ModelSerializer):
         sample = WorkNote()
         for field in ['pharmacy', 'date', 'is_clinical', 'start_time', 'end_time']:
             setattr(sample, field, attrs.get(field, getattr(note, field, None)))
-        ids = attrs.get('assignee_membership_ids',
-                        list(note.assignees.values_list('membership_id', flat=True)) if note else [])
-        validate_assignees(sample, ids)
+        current = list(note.assignees.values_list('membership_id', flat=True)) if note else []
+        ids = attrs.get('assignee_membership_ids', current)
+        # Only added people are re-checked, so wording edits save; turning clinical on re-checks everyone.
+        recheck_all = not note or (sample.is_clinical and not note.is_clinical)
+        validate_assignees(sample, ids, ids if recheck_all else [i for i in ids if i not in current])
         recurrence = attrs.get('recurrence', note.recurrence if note else None)
         if recurrence is not None:
             if not isinstance(recurrence, dict) or recurrence.get('freq') not in ['DAILY', 'WEEKLY', 'MONTHLY']:
@@ -117,16 +119,20 @@ class WorkNoteSerializer(serializers.ModelSerializer):
         if not pharmacy_id:
             raise serializers.ValidationError("Pharmacy is required to validate assignees")
         
-        # Check that all memberships exist and belong to the pharmacy
+        # Check that added memberships exist and belong to the pharmacy; kept assignees are not re-checked.
+        if self.instance:
+            value_to_check = set(value) - set(self.instance.assignees.values_list('membership_id', flat=True))
+        else:
+            value_to_check = set(value)
         valid_ids = set(
             Membership.objects.filter(
-                id__in=value,
+                id__in=value_to_check,
                 pharmacy_id=pharmacy_id,
                 is_active=True,
             ).values_list('id', flat=True)
         )
-        
-        invalid_ids = set(value) - valid_ids
+
+        invalid_ids = value_to_check - valid_ids
         if invalid_ids:
             raise serializers.ValidationError(
                 f"Invalid or inactive membership IDs for this pharmacy: {list(invalid_ids)}"

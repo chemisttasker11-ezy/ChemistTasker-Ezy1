@@ -68,12 +68,13 @@ def eligible_memberships(note, *, from_roster=False, role=None):
     return eligible
 
 
-def validate_assignees(note, ids):
+def validate_assignees(note, ids, check_ids=None):
     validate_times(note.start_time, note.end_time)
     if len(ids) != len(set(ids)):
         raise ValidationError({"assignee_membership_ids": "Duplicate assignees are not allowed."})
-    valid = set(eligible_memberships(note).filter(pk__in=ids).values_list("id", flat=True))
-    if set(ids) != valid:
+    check_ids = ids if check_ids is None else check_ids
+    valid = set(eligible_memberships(note).filter(pk__in=check_ids).values_list("id", flat=True))
+    if set(check_ids) != valid:
         raise ValidationError({"assignee_membership_ids": "Assignees must be active accepted pharmacy members; clinical tasks require verified, unexpired, on-duty pharmacists."})
 
 
@@ -124,7 +125,6 @@ def copy_tasks(*, pharmacy_id, actor, source_from, source_to, day_offset, reques
             start_time=note.start_time, end_time=note.end_time,
             notify_on_shift_start=note.notify_on_shift_start, created_by=actor,
         )
-        validate_times(replica.start_time, replica.end_time)
         original = list(note.assignees.select_related("membership__user"))
         eligible_ids = set(eligible_memberships(replica).filter(
             pk__in=[a.membership_id for a in original],

@@ -30,7 +30,7 @@ from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Pharmacy
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee, WorkNoteCompletion
 from team_calendar.serializers import CalendarEventSerializer, CalendarFeedSerializer, WorkNoteSerializer
-from organizations.access import managed_pharmacies
+from organizations.access import planner_pharmacies
 from team_calendar.recurrence import expand_recurrence_dates
 from team_calendar.operations_views import require_manager
 from team_calendar.operations_models import OperationAudit
@@ -336,7 +336,7 @@ class WorkNoteViewSet(
         ).prefetch_related('assignees__membership__user')
         
         accessible = self.get_accessible_pharmacy_ids(user)
-        manager_ids = managed_pharmacies(user).values_list('id', flat=True)
+        manager_ids = planner_pharmacies(user).values_list('id', flat=True)
         queryset = queryset.filter(
             Q(is_planner_task=False, pharmacy_id__in=accessible)
             | Q(is_planner_task=True, pharmacy_id__in=set(accessible) | set(manager_ids))
@@ -365,7 +365,7 @@ class WorkNoteViewSet(
             ).distinct()
         
         # Informal notes retain their existing visibility.
-        managed_ids = managed_pharmacies(user).values_list("id", flat=True)
+        managed_ids = planner_pharmacies(user).values_list("id", flat=True)
         queryset = queryset.filter(
             Q(is_planner_task=False)
             | Q(pharmacy_id__in=managed_ids)
@@ -432,11 +432,9 @@ class WorkNoteViewSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _lock_completion(self, request):
+        # Completion is a per-person toggle, so it never needs the stale-edit token.
         note = self.get_object()
-        note = get_object_or_404(WorkNote.objects.select_for_update(), pk=note.pk)
-        if note.is_planner_task:
-            self._check_token(note)
-        return note
+        return get_object_or_404(WorkNote.objects.select_for_update(), pk=note.pk)
 
     def _validate_planner_completion(self, note, membership, occurrence_date):
         if not note.is_planner_task:
@@ -540,7 +538,7 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
         
         # Get accessible IDs
         legacy_pharmacy_ids = self.get_accessible_pharmacy_ids(user)
-        manager_ids = set(managed_pharmacies(user).values_list('pk', flat=True))
+        manager_ids = set(planner_pharmacies(user).values_list('pk', flat=True))
         accessible_pharmacy_ids = legacy_pharmacy_ids | manager_ids
         accessible_org_ids = self.get_accessible_organization_ids(user)
         
@@ -618,7 +616,7 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
         )
 
         # Informal-note visibility is unchanged; planner tasks are targeted.
-        manager_pharmacy_ids = managed_pharmacies(user).values_list("id", flat=True)
+        manager_pharmacy_ids = planner_pharmacies(user).values_list("id", flat=True)
         work_note_query = work_note_query.filter(
             Q(is_planner_task=False)
             | Q(pharmacy_id__in=manager_pharmacy_ids)
@@ -644,7 +642,7 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
         admin_pharmacy_ids = {
             pharmacy_id
             for pharmacy_id in note_pharmacy_ids
-            if self.can_manage_calendar(user, pharmacy_id) or pharmacy_id in manager_ids
+            if self.can_manage_calendar(user, pharmacy_id)
         }
 
         completion_set = set()
@@ -716,8 +714,7 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
                         (note.id, note.date),
                         [],
                     )
-                if note.pharmacy_id in admin_pharmacy_ids:
-                    base_data['completed_count'] = len(completion_by_map.get((note.id, note.date), []))
+                    base_data['completed_count'] = len(base_data['completed_by'])
                 base_data['is_occurrence'] = False
                 serialized_notes.append(base_data)
             else:
@@ -734,8 +731,7 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
                             (note.id, occurrence),
                             [],
                         )
-                    if note.pharmacy_id in admin_pharmacy_ids:
-                        occurrence_data['completed_count'] = len(completion_by_map.get((note.id, occurrence), []))
+                        occurrence_data['completed_count'] = len(occurrence_data['completed_by'])
                     occurrence_data['occurrence_date'] = occurrence.isoformat()
                     occurrence_data['series_id'] = base_data['id']
                     occurrence_data['is_occurrence'] = True

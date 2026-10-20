@@ -1,11 +1,12 @@
-# Operations planner frontend ownership
+# Operations planner ownership
 
-The owner workspace is split into domain-focused modules:
-- PharmacyOperationsPage.tsx: tenant selection, read-only performance summaries, template library, training
-- OperationsPlanBuilder.tsx: date copy, drag, draft orchestration and publication preview
-- OperationsTaskEditor.tsx: controlled draft task fields with no API dependencies
-- operationsDraftModel.ts: draft types, staff labels and audience choices
-- OperationTaskDialog.tsx: user execution and supervisor verification
-- shared-core/src/domains/calendar/operations.ts: typed cross-client adapter
+Planner tasks are calendar WorkNotes with `is_planner_task=True`; there is no separate plan, draft or publication.
+- team_calendar/views.py `WorkNoteViewSet`: create, edit and delete (managers only, `updated_at` stale-edit check -> 409); per-person `mark_done`/`mark_open` (assignees only, no token).
+- team_calendar/serializers.py `WorkNoteSerializer`: planner validation; on edit only added assignees are re-checked (everyone when clinical is turned on). Date, recurrence and assignees lock after any completion.
+- team_calendar/operations_rules.py: assignee eligibility (clinical = verified, unexpired, rostered pharmacist), roster fill and the atomic, idempotent `copy_tasks`.
+- team_calendar/operations_views.py: planner context, optional `SavedTask` defaults library, roster fill and copy endpoints.
+- team_calendar/operations_models.py: `SavedTask` and `OperationAudit` (copy receipts, delete snapshots).
+- organizations/access.py `planner_pharmacies`: the one manager scope for planner reads and writes.
+- shared-core/src/domains/calendar/operations.ts: typed cross-client adapter; web and Expo screens call only this.
 
-The calendar owns all published WorkNotes. Staff completion never writes to a draft or a second completion ledger. No external patient information may be put into task descriptions or evidence.
+Completion lives only in `WorkNoteCompletion`. No external patient information may be put into task titles or descriptions.

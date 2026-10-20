@@ -12,7 +12,7 @@ from django.utils import timezone
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_staff_member, make_user
 from memberships.models import Membership
 from onboarding.models import PharmacistOnboarding
-from organizations.access import managed_pharmacies, user_can_manage_pharmacy
+from organizations.access import planner_pharmacies, user_can_manage_pharmacy
 from organizations.models import Organization, PharmacyAdmin
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 from users.models import OrganizationMembership
@@ -150,7 +150,7 @@ class PlannerContracts(PlannerFixtures, TestCase):
                           (roster_admin, {self.pharmacy.pk}), (comms_admin, set())]:
             with self.subTest(user=user.pk):
                 client = client_for(user)
-                self.assertEqual(set(managed_pharmacies(user).values_list('pk', flat=True)), ids)
+                self.assertEqual(set(planner_pharmacies(user).values_list('pk', flat=True)), ids)
                 self.assertEqual({p['id'] for p in client.get(CONTEXT).json()['pharmacies']}, ids)
                 for pharmacy in [self.pharmacy, self.foreign_pharmacy]:
                     allowed = pharmacy.pk in ids
@@ -297,8 +297,8 @@ class PlannerContracts(PlannerFixtures, TestCase):
         changed = self.edit(note, title='Reworded')
         self.assertEqual(changed.status_code, 200)
         self.assertEqual(self.edit(note, title='Stale').status_code, 409)
-        self.assertEqual(self.complete(note).status_code, 409)
-        done = self.complete(changed.json())
+        # Completion is per person and ignores the stale-edit token.
+        done = self.complete(note)
         self.assertEqual(done.status_code, 200, done.content)
         note = done.json()
         for change in [{'date': '2026-10-20'}, {'assignee_membership_ids': []}, {'recurrence': {'freq': 'DAILY'}}]:
@@ -306,10 +306,21 @@ class PlannerContracts(PlannerFixtures, TestCase):
         wording = self.edit(note, body='New instructions')
         self.assertEqual(wording.status_code, 200)
         self.assertEqual(WorkNoteCompletion.objects.count(), 1)
-        self.assertEqual(self.complete(wording.json(), user=self.other).status_code, 200)
-        feed = self.client.get(BASE + 'calendar-feed/', {'pharmacy_id': self.pharmacy.pk,
+        self.assertEqual(self.complete(changed.json(), user=self.other).status_code, 200)
+        feed =self.client.get(BASE + 'calendar-feed/', {'pharmacy_id': self.pharmacy.pk,
                                                        'date_from': DAY.isoformat(), 'date_to': DAY.isoformat()})
         self.assertEqual(feed.json()['work_notes'][0]['completed_count'], 2)
+
+    def test_manager_edit_rechecks_only_added_assignees(self):
+        note = self.create(assignee_membership_ids=[self.membership.pk])
+        self.membership.is_active = False
+        self.membership.save(update_fields=['is_active'])
+        kept = self.edit(note, title='Reworded', assignee_membership_ids=[self.membership.pk])
+        self.assertEqual(kept.status_code, 200, kept.content)
+        note = kept.json()
+        added = self.edit(note, assignee_membership_ids=[self.membership.pk, self.foreign_membership.pk])
+        self.assertEqual(added.status_code, 400)
+        self.assertEqual(self.edit(note, is_clinical=True).status_code, 400)
 
     def test_own_completion_only_valid_occurrences_and_delete_snapshot_survives(self):
         note = self.create(assignee_membership_ids=[self.membership.pk],

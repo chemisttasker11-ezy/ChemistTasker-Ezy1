@@ -4,7 +4,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from organizations.access import managed_pharmacies
+from organizations.access import planner_pharmacies
 from team_calendar.models import WorkNote
 from team_calendar.operations_models import SavedTask
 from team_calendar.operations_rules import copy_tasks, eligible_memberships
@@ -12,7 +12,7 @@ from team_calendar.operations_serializers import SavedTaskSerializer, CopyTasksS
 
 
 def require_manager(user, pharmacy_id):
-    if not managed_pharmacies(user).filter(pk=pharmacy_id).exists():
+    if not planner_pharmacies(user).filter(pk=pharmacy_id).exists():
         raise PermissionDenied("You cannot manage planner tasks for this pharmacy.")
 
 
@@ -20,7 +20,7 @@ class OperationContextView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        return Response({'pharmacies': list(managed_pharmacies(request.user).order_by('id').values(
+        return Response({'pharmacies': list(planner_pharmacies(request.user).order_by('id').values(
             'id', 'name', 'organization_id',
         ))})
 
@@ -31,7 +31,7 @@ class SavedTaskViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         from team_calendar.views import _query_id
-        qs = SavedTask.objects.filter(pharmacy__in=managed_pharmacies(self.request.user))
+        qs = SavedTask.objects.filter(pharmacy__in=planner_pharmacies(self.request.user))
         pharmacy_id = _query_id(self.request, 'pharmacy_id')
         return qs.filter(pharmacy_id=pharmacy_id) if pharmacy_id is not None else qs
 

@@ -131,13 +131,37 @@ def user_can_manage_pharmacy(user, pharmacy) -> bool:
     if not user or not getattr(user, "is_authenticated", False) or pharmacy is None:
         return False
 
-    return managed_pharmacies(user).filter(pk=pharmacy.pk).exists()
+    owner = getattr(pharmacy, "owner", None)
+    if owner and getattr(owner, "user", None) == user:
+        return True
+
+    from users.models import OrganizationMembership
+    from users.org_roles import ORG_WIDE_ADMIN_ROLES
+
+    if OrganizationMembership.objects.filter(
+        user=user,
+        role__in=ORG_WIDE_ADMIN_ROLES,
+        organization_id=pharmacy.organization_id,
+    ).exists():
+        return True
+
+    if OrganizationMembership.objects.filter(
+        user=user,
+        role='REGION_ADMIN',
+        pharmacies=pharmacy,
+    ).exists():
+        return True
+
+    if has_admin_capability(user, pharmacy, CAPABILITY_MANAGE_ROSTER):
+        return True
+
+    return False
 
 
 def managed_pharmacies(user):
     """
     Pharmacies the user can manage because they own them, are an org admin
-    over them, are scoped regional admins, or hold an active roster-capable PharmacyAdmin assignment.
+    over them, or hold an active PharmacyAdmin assignment.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return Pharmacy.objects.none()
@@ -160,10 +184,6 @@ def managed_pharmacies(user):
             organization_id__in=org_ids
         )
 
-    regional_memberships = OrganizationMembership.objects.filter(user=user, role='REGION_ADMIN')
-    for membership in regional_memberships:
-        pharmacies |= membership.pharmacies.filter(organization_id=membership.organization_id)
-
     if user:
         managed_admin_pharmacies = [
             pharm.id
@@ -174,3 +194,15 @@ def managed_pharmacies(user):
             pharmacies |= Pharmacy.objects.filter(id__in=managed_admin_pharmacies)
 
     return pharmacies.distinct()
+
+
+def planner_pharmacies(user):
+    """The planner's one manager scope: managed_pharmacies plus pharmacies a regional admin is scoped to."""
+    from users.models import OrganizationMembership
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return Pharmacy.objects.none()
+    ids = set(managed_pharmacies(user).values_list("id", flat=True))
+    for membership in OrganizationMembership.objects.filter(user=user, role='REGION_ADMIN'):
+        ids.update(membership.pharmacies.filter(organization_id=membership.organization_id).values_list("id", flat=True))
+    return Pharmacy.objects.filter(id__in=ids)
