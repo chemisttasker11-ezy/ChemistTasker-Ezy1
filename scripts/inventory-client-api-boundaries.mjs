@@ -102,8 +102,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.met
     if (process.argv.includes('--json')) process.stdout.write(JSON.stringify(report, null, 2) + '\n');
     else {
         process.stdout.write(`AST inventory: ${sources.length} runtime Vite, Next and Expo files; ${findings.length} direct or unresolved transports.\n`);
-        if (process.argv.includes('--summary')) return;
-        for (const finding of findings) {
+        if (!process.argv.includes('--summary')) for (const finding of findings) {
             process.stdout.write(`${finding.path}:${finding.line} [${finding.kind}] ${finding.evidence}\n`);
         }
     }
