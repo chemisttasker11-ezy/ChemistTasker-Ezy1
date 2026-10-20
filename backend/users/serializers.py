@@ -13,6 +13,7 @@ from organizations.models import Organization
 from rewards.services import claim_referral_code, RewardError
 from .models import OrganizationMembership, ContactMessage
 import secrets
+from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
 from organizations.models import Pharmacy
 from memberships.models import Membership as PharmacyMembership
@@ -367,7 +368,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         if remember_me is True:
             refresh = RefreshToken(data['refresh'])
             refresh['remember_me'] = True
-            refresh.set_exp(lifetime=settings.JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME)
+            refresh.set_exp(from_time=datetime.fromtimestamp(refresh['iat'], dt_timezone.utc), lifetime=settings.JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME)
             data['refresh'] = str(refresh)
             data['access'] = str(refresh.access_token)
 
