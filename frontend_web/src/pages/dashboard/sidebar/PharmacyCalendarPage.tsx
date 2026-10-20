@@ -552,8 +552,8 @@ export default function PharmacyCalendarPage() {
                 {view === "month" && <Button sx={{ minHeight: 44 }} variant="outlined" startIcon={<AddIcon />} disabled={!selectedPharmacyId} onClick={handleOpenEventModal}>Add Event</Button>}
                 {view === "month" && <Button sx={{ minHeight: 44 }} variant="outlined" disabled={!selectedPharmacyId} onClick={() => handleOpenNoteModal()}>Add Work Note</Button>}
                 {canManage && <Button sx={{ minHeight: 44 }} variant="contained" startIcon={<AddIcon />} disabled={loading} onClick={() => handleOpenNoteModal(selectedDay, true)}>Add task</Button>}
-            </>} />
-            <Stack component="nav" direction="row" alignItems="center" flexWrap="wrap" useFlexGap gap={1.5} sx={{ mb: 2 }}>
+            </>}>
+            <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap gap={1.5}>
                 <Box sx={{ width: '100%', maxWidth: 180 }}>
                     <SegmentTabs tabs={[{ value: "month", label: "Month" }, { value: "plan", label: "Plan" }]} value={view} onChange={setView} label="Calendar views" idPrefix="calendar-view" />
                 </Box>
@@ -562,6 +562,7 @@ export default function PharmacyCalendarPage() {
                     <Typography variant="body2" color="text.secondary">tasks · {planSummary.unassigned} unassigned · {planSummary.done} done</Typography>
                 </Stack>}
             </Stack>
+            </PageHeader>
             <Snackbar open={Boolean(notice)} autoHideDuration={6000} onClose={() => setNotice("")}><Alert severity="success" onClose={() => setNotice("")}>{notice}</Alert></Snackbar>
             {error && (
                 <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
