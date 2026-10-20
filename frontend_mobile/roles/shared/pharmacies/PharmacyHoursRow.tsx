@@ -4,17 +4,30 @@ import { Text, TextInput } from 'react-native-paper';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { styles } from './PharmacyForm.styles';
 
-/** Visual-only extraction: callback and closed-hours behavior unchanged. */
-const HoursRow = ({ label, startKey, endKey, closedKey, form, setForm, setActiveTimeField }: any) => {
+/** The form owns state; this component only renders and forwards actions.
+ * Preserve its original open/closed time reset semantics across weekdays.
+ */
+type HoursRowProps<T extends Record<string, unknown>> = {
+    label: string;
+    startKey: Extract<keyof T, string>;
+    endKey: Extract<keyof T, string>;
+    closedKey?: Extract<keyof T, string>;
+    form: T;
+    setForm?: React.Dispatch<React.SetStateAction<T>>;
+    setActiveTimeField: React.Dispatch<React.SetStateAction<{ key: string; label: string } | null>>;
+};
+function HoursRow<T extends Record<string, unknown>>({
+    label, startKey, endKey, closedKey, form, setForm, setActiveTimeField,
+}: HoursRowProps<T>) {
     const isClosed = Boolean(closedKey && form[closedKey]);
     const toggleClosed = () => {
         if (!closedKey || !setForm) return;
-        setForm((prev: any) => ({
+        setForm((prev) => ({
             ...prev,
             [closedKey]: !Boolean(prev[closedKey]),
             [startKey]: !Boolean(prev[closedKey]) ? '' : prev[startKey],
             [endKey]: !Boolean(prev[closedKey]) ? '' : prev[endKey],
-        }));
+        } as T));
     };
 
     return (
@@ -47,7 +60,7 @@ const HoursRow = ({ label, startKey, endKey, closedKey, form, setForm, setActive
             >
                 <TextInput
                     label="Start"
-                    value={isClosed ? '' : form[startKey]}
+                    value={isClosed ? '' : String(form[startKey] ?? '')}
                     mode="outlined"
                     style={styles.timeInput}
                     placeholder="09:00"
@@ -65,7 +78,7 @@ const HoursRow = ({ label, startKey, endKey, closedKey, form, setForm, setActive
             >
                 <TextInput
                     label="End"
-                    value={isClosed ? '' : form[endKey]}
+                    value={isClosed ? '' : String(form[endKey] ?? '')}
                     mode="outlined"
                     style={styles.timeInput}
                     placeholder="17:00"
@@ -78,6 +91,6 @@ const HoursRow = ({ label, startKey, endKey, closedKey, form, setForm, setActive
         </View>
     </View>
     );
-};
+}
 
 export default HoursRow;
