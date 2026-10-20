@@ -557,7 +557,7 @@ export default function PharmacyCalendarPage() {
                 <Box sx={{ width: '100%', maxWidth: 180 }}>
                     <SegmentTabs tabs={[{ value: "month", label: "Month" }, { value: "plan", label: "Plan" }]} value={view} onChange={setView} label="Calendar views" idPrefix="calendar-view" />
                 </Box>
-                {view === 'plan' && !loading && selectedPharmacyId && <Stack direction="row" alignItems="center" gap={0.75}>
+                {view === 'plan' && !loading && selectedPharmacyId && <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexShrink: 0 }}>
                     <CountBadge value={planSummary.total} label={`${planSummary.total} tasks`} />
                     <Typography variant="body2" color="text.secondary">tasks · {planSummary.unassigned} unassigned · {planSummary.done} done</Typography>
                 </Stack>}

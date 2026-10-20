@@ -125,6 +125,43 @@ def _get_org_pharmacies_queryset(user):
     return qs.distinct()
 
 
+def can_edit_pharmacy_profile(user, pharmacy) -> bool:
+    """Authorize pharmacy profile changes independently of read/roster scope.
+
+    Profile edits are allowed to the owner, active full pharmacy managers,
+    organization-wide administrators and scoped region managers with the
+    MANAGER level. Roster-only/communications-only visibility is not editing
+    authority. Billing permissions are unrelated and stay with billing.
+    """
+    if not user or not getattr(user, "is_authenticated", False) or pharmacy is None:
+        return False
+
+    owner = getattr(pharmacy, "owner", None)
+    if owner is not None and getattr(owner, "user_id", None) == user.pk:
+        return True
+
+    assignment = assignment_for(user, pharmacy)
+    if assignment and assignment.admin_level in (
+        PharmacyAdmin.AdminLevel.OWNER, PharmacyAdmin.AdminLevel.MANAGER,
+    ):
+        return True
+
+    if not pharmacy.organization_id:
+        return False
+    for membership in user.organization_memberships.filter(
+        organization_id=pharmacy.organization_id
+    ).prefetch_related("pharmacies"):
+        if membership.role in ("ORG_ADMIN", "CHIEF_ADMIN"):
+            return True
+        if (
+            membership.role == "REGION_ADMIN"
+            and membership.admin_level == PharmacyAdmin.AdminLevel.MANAGER
+            and pharmacy.pk in membership_visible_pharmacy_ids(membership)
+        ):
+            return True
+    return False
+
+
 def user_can_manage_pharmacy(user, pharmacy) -> bool:
     """Who manages a pharmacy's shifts and sees its full details: the owner, an org admin of its organization, a
     chief/region admin assigned to it, or a pharmacy admin with the roster capability."""

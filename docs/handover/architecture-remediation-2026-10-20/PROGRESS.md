@@ -89,3 +89,9 @@ Then verify emulator/device multipart uploads against isolated seeded Django/Pos
 - AST inventory log correction `b91a3dc` now prints the actual `callee` and `route` fields rather than the removed `evidence` property.
 - `ad161745` explicitly includes new pharmacy-tenant and multipart tests in the backend CI job. Previously they were in source but were not a separately required CI step.
 - The implementation must remain aligned to changing #181 head without silently including #182 decisions. Full native/staging/manual and backend-test evidence is still required. A passing CI job on an older head does not apply to final head.
+
+## Consolidated checkpoint (one implementation commit)
+- Incorporated the latest PR181 planner/UI state as a true second-parent merge, including tracked screenshot assets. PR182/Windows kiosk remain excluded.
+- Added separate pharmacy-profile write-authority check (owner, full manager, authorized org or scoped region manager), not mere read visibility. Added nine negative/positive Django HTTP tests. Requires exact-head CI and policy verification before release.
+- Extracted Expo closed-hours row and Vite roster DTO interfaces without altering logic; ensured brand hex colors are referenced from a shared identity token while retaining identical UI output.
+- Final release tests including native device testing are not represented as complete. This PR remains draft; no merge or deploy.

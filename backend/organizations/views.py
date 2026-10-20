@@ -16,6 +16,7 @@ from organizations.access import (
     CAPABILITY_MANAGE_ADMINS,
     has_admin_capability,
     is_admin_of,
+    can_edit_pharmacy_profile,
     pharmacies_user_admins,
 )
 from django.shortcuts import get_object_or_404
@@ -82,13 +83,22 @@ class PharmacyViewSet(viewsets.ModelViewSet):
         super().check_permissions(request)
         if request.method in permissions.SAFE_METHODS:
             return
-        user = request.user
+        # Profile updates are always authorized against the requested object,
+        # so a delegated pharmacy manager without org membership can edit only
+        # that assignment. Keep the historical global create/destroy entry gate.
+        if self.action in ("update", "partial_update"):
+            return
         if IsOwner().has_permission(request, self) or AuthenticatedOrganizationMember().has_permission(request, self):
             return
         self.permission_denied(request)
 
     def check_object_permissions(self, request, obj):
         user = request.user
+        if request.method not in permissions.SAFE_METHODS:
+            if can_edit_pharmacy_profile(user, obj):
+                return
+            self.permission_denied(request, obj)
+            return
         # Owner-of-this-pharmacy?
         if obj.owner and obj.owner.user == user:
             return

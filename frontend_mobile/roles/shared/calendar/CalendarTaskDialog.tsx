@@ -153,7 +153,7 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, deleteReque
             </ScrollView>
           </Menu>}
           <View style={[styles.row, { flexWrap: 'wrap' }]}>{form.assigneeIds.map(id => <Chip key={id}>{members.find(member => member.id === id)?.label ?? `Member ${id}`}</Chip>)}</View>
-          {form.isPlannerTask && <Button mode="outlined" contentStyle={styles.touch} disabled={blocked || locked} onPress={fillRoster}>Fill from roster</Button>}
+          {form.isPlannerTask && <Button compact style={{ alignSelf: 'flex-start' }} contentStyle={styles.touch} disabled={blocked || locked} onPress={fillRoster}>Fill from roster</Button>}
           {locked && <HelperText type="info">Work has started. Date and assignees are locked; wording changes keep progress.</HelperText>}
           {original?.recurrence && <HelperText type="info">Edits apply to the whole repeating series. Individual dates cannot be excluded.</HelperText>}
           {!original && form.isPlannerTask && savedTasks.length > 0 && <Button contentStyle={styles.touch} disabled={blocked} onPress={() => setSavedOpen(true)}>Use a saved task</Button>}

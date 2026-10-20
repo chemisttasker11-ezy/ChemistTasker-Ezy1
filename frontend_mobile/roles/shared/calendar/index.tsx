@@ -691,10 +691,15 @@ export default function SharedCalendarScreen() {
 
             {error && <HelperText type="error">{error}</HelperText>}
 
-            {!loading && filteredItems.length === 0 && (
+            {!loading && filteredItems.length === 0 && (view === 'plan' && items.some(item => item.noteData?.is_planner_task) ? (
+              <View style={styles.dayNavigation}>
+                <Text variant="bodyMedium" style={{ flex: 1, color: theme.colors.onSurfaceVariant }}>No tasks</Text>
+                {canManagePlanner && <Button compact icon="plus" contentStyle={styles.touch} onPress={() => handleOpenNoteModal()}>Add</Button>}
+              </View>
+            ) : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateText}>{view === 'plan'
-                  ? items.some(item => item.noteData?.is_planner_task) ? 'No tasks for this day.' : canManagePlanner
+                  ? canManagePlanner
                     ? 'No tasks this week. Add a task to start.' : 'No tasks assigned this week.'
                   : 'No items scheduled for this day'}</Text>
                 {view === 'plan' && canManagePlanner && <>
@@ -702,7 +707,7 @@ export default function SharedCalendarScreen() {
                   <Text style={styles.emptyStateText}>Save a task as reusable in More options to use it again.</Text>
                 </>}
               </View>
-            )}
+            ))}
 
             {filteredItems.map((item) => {
               const isExpanded = expandedId === item.id;

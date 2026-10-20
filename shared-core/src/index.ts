@@ -49,6 +49,7 @@ export * from './constants/roles';
 export * from './constants/capabilities';
 export * from './constants/colors';
 export * from './constants/personas';
+export * from './constants/brandIdentity';
 
 // Shared cross-client authorization/persona policy.
 export * from './policy/accessPolicy';
