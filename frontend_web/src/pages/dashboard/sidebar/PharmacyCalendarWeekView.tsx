@@ -4,7 +4,7 @@ import { InitialsAvatar } from "../../../components/ui/InitialsAvatar";
 import DashboardContentState from "../../../components/dashboard/DashboardContentState";
 import { useState } from "react";
 import { Box, Button, Card, CardActionArea, CircularProgress, IconButton, Menu, MenuItem, Paper, Stack, TextField, Tooltip, Typography, useMediaQuery, useTheme } from "@mui/material";
-import { ChevronLeft, ChevronRight, ContentCopy, MoreVert, RepeatRounded } from "@mui/icons-material";
+import { Add, ChevronLeft, ChevronRight, ContentCopy, MoreVert, RepeatRounded } from "@mui/icons-material";
 import { addDays, format, isToday, isWeekend } from "date-fns";
 
 type Props = {
@@ -49,21 +49,21 @@ export default function PharmacyCalendarWeekView({ day, setDay, items, manager, 
             </DashboardContentState>
         </> : <>
             {/* Scoped token rules retain accents through the dashboard shell and legacy dark Paper overrides. */}
-            <Stack spacing={1.5}>
-                {days.map(date => { const dayTasks = plannerDayTasks(tasks, date); return <Paper component="section" elevation={0} aria-label={format(date, "EEEE d MMMM")} key={format(date, "yyyy-MM-dd")} sx={{ minWidth: 0, p: { xs: 1.5, md: 2 }, borderRadius: '14px', border: '1px solid var(--ct-border-color)', '&&': { backgroundColor: `${isToday(date) ? 'var(--ct-tone-violet-bg)' : isWeekend(date) ? 'var(--ct-subtle-bg)' : 'var(--ct-surface-bg)'} !important`, borderColor: `${isToday(date) ? 'var(--ct-accent-strong)' : 'var(--ct-border-color)'} !important` }, color: isWeekend(date) && !isToday(date) ? 'var(--ct-text-muted)' : 'var(--ct-text-primary)' }}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack spacing={1}>
+                {days.map(date => { const dayTasks = plannerDayTasks(tasks, date); return <Paper component="section" elevation={0} aria-label={format(date, "EEEE d MMMM")} key={format(date, "yyyy-MM-dd")} sx={{ minWidth: 0, px: { xs: 1.25, md: 1.5 }, py: 1.25, borderRadius: '14px', border: '1px solid var(--ct-border-color)', '&&': { backgroundColor: `${isToday(date) ? 'var(--ct-tone-violet-bg)' : isWeekend(date) ? 'var(--ct-subtle-bg)' : 'var(--ct-surface-bg)'} !important`, borderColor: `${isToday(date) ? 'var(--ct-accent-strong)' : 'var(--ct-border-color)'} !important` }, color: isWeekend(date) && !isToday(date) ? 'var(--ct-text-muted)' : 'var(--ct-text-primary)' }}>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ my: -0.75 }}>
                         <Typography component="h3" variant="subtitle2" sx={{ color: isToday(date) ? 'var(--ct-accent-strong)' : 'inherit', fontWeight: 600 }}>{format(date, "EEE d MMM")}</Typography>
                         {manager && <Tooltip title="Day actions"><IconButton aria-label={`Day actions for ${format(date, "EEEE d MMMM")}`} aria-haspopup="menu" aria-expanded={menu?.date?.getTime() === date.getTime()} onClick={event => setMenu({ anchor: event.currentTarget, date })}><MoreVert /></IconButton></Tooltip>}
                     </Stack>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 1.5, mt: 1 }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 1.25, mt: 0.5 }}>
                         {dayTasks.map(item => { const state = calendarTaskState(item.noteData, manager, userId); return <Card component="article" aria-label={item.title} key={item.id} variant="outlined" sx={{ borderRadius: '12px', bgcolor: 'var(--ct-surface-bg)', boxShadow: 'var(--ct-dashboard-card-shadow)', '&:hover': { boxShadow: 'var(--ct-dashboard-card-shadow-hover)' }, border: '1px solid var(--ct-border-color)', borderLeft: '3px solid', '&&': { borderLeftColor: `${item.noteData.is_clinical ? 'var(--ct-tone-cyan-fg)' : 'var(--ct-border-color)'} !important` }, overflowWrap: 'anywhere', minWidth: 0, position: 'relative', '&:focus-within .planner-task-menu': { opacity: 1 } }}>
                             {/* Positioned over the title row rather than nested: a button cannot sit inside the edit button. */}
                             {manager && <Tooltip title="More actions"><IconButton className="planner-task-menu" aria-label={`More actions for ${item.title}`} aria-haspopup="menu" aria-expanded={menu?.task?.id === item.id} disabled={busy} onClick={event => setMenu({ anchor: event.currentTarget, task: item })} sx={{ position: 'absolute', top: 0, right: 0, zIndex: 1, opacity: { xs: 1, md: 0 }, '&:focus-visible, &[aria-expanded="true"], .MuiCard-root:hover &': { opacity: 1 }, '@media (hover: none), (pointer: coarse)': { opacity: 1 }, '&:focus-visible': { outline: '2px solid var(--ct-accent-strong)', outlineOffset: -3 } }}><MoreVert /></IconButton></Tooltip>}
-                            <CardActionArea component={state.canEdit ? "button" : "div"} disabled={busy} role={state.canEdit ? "button" : "presentation"} tabIndex={state.canEdit ? 0 : -1} aria-label={state.canEdit ? `Edit ${item.title}` : undefined} onClick={state.canEdit ? () => onEdit(item) : undefined} sx={{ p: 1.5 }}>
-                                <Stack spacing={1}>
-                                    <Stack direction="row" alignItems="center" gap={1} sx={{ pr: manager ? 4 : 0, minHeight: 20, minWidth: 0 }}>
+                            <CardActionArea component={state.canEdit ? "button" : "div"} disabled={busy} role={state.canEdit ? "button" : "presentation"} tabIndex={state.canEdit ? 0 : -1} aria-label={state.canEdit ? `Edit ${item.title}` : undefined} onClick={state.canEdit ? () => onEdit(item) : undefined} sx={{ px: 1.5, py: 1.25 }}>
+                                <Stack spacing={0.75}>
+                                    <Stack direction="row" alignItems="baseline" gap={1} sx={{ pr: manager ? 4 : 0, minHeight: 20, minWidth: 0 }}>
                                         {item.time && <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{item.time}</Typography>}
-                                        <Typography variant="subtitle2" fontWeight={600} noWrap title={item.title} sx={{ minWidth: 0 }}>{item.title}</Typography>
+                                        <Typography variant="subtitle2" fontWeight={600} title={item.title} sx={{ minWidth: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.title}</Typography>
                                     </Stack>
                                     {item.noteData.body && <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{item.noteData.body}</Typography>}
                                     {item.noteData.recurrence && <Stack direction="row" alignItems="center" gap={0.5}><RepeatRounded fontSize="small" /><Typography variant="caption">{taskRepeatLabel(item.noteData.recurrence)}</Typography></Stack>}
@@ -76,7 +76,9 @@ export default function PharmacyCalendarWeekView({ day, setDay, items, manager, 
                             </CardActionArea>
                             {state.canComplete && <Button variant="outlined" sx={{ m: 0.5, minHeight: 44 }} disabled={busy} onClick={() => onComplete(item)}>{item.status === "DONE" ? "Mark to do" : "Mark done"}</Button>}
                         </Card>; })}
-                        {dayTasks.length === 0 && <Typography variant="body2" color="text.secondary">No tasks{phone ? " for this day" : ""}.</Typography>}
+                        {dayTasks.length === 0 && (manager
+                            ? <Button size="small" startIcon={<Add />} aria-label={`Add task on ${format(date, "EEEE d MMMM")}`} disabled={busy} onClick={() => onAdd(date)} sx={{ justifySelf: 'start', color: 'var(--ct-text-secondary)' }}>Add</Button>
+                            : <Typography variant="body2" color="text.secondary">No tasks{phone ? " for this day" : ""}.</Typography>)}
                     </Box>
                 </Paper>; })}
             </Stack>

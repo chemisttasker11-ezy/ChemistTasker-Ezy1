@@ -22,7 +22,7 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { DatePickerModal, TimePickerModal } from 'react-native-paper-dates';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -64,6 +64,7 @@ import { brandColors } from '@/constants/theme';
 
 export default function SharedCalendarScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { selectedPharmacyId: workspacePharmacyId } = useWorkspace();
   const { width } = useWindowDimensions();
@@ -724,7 +725,7 @@ export default function SharedCalendarScreen() {
                         </View>}
                         <View style={[styles.itemHeaderContent, planner && { marginLeft: 0, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }]}>
                           {planner && item.time && <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, fontVariant: ['tabular-nums'] }}>{item.time}</Text>}
-                          <Text numberOfLines={planner ? 1 : undefined} style={[styles.itemTitle, planner && { flex: 1, color: theme.colors.onSurface }]}>{item.title}</Text>
+                          <Text numberOfLines={planner ? 2 : undefined} style={[styles.itemTitle, planner && { flex: 1, color: theme.colors.onSurface }]}>{item.title}</Text>
                           {!planner && <Text style={styles.itemMeta}>{item.allDay ? 'All day' : item.time || ''}</Text>}
                           {item.type === 'note' && item.status && !planner && <Text style={styles.itemMeta}>
                             {item.noteData?.is_planner_task ? taskState?.label : item.status}
@@ -843,7 +844,7 @@ export default function SharedCalendarScreen() {
         pharmacyId={selectedPharmacyId} date={format(selectedDay, 'yyyy-MM-dd')} note={editingNote} deleteRequested={deleteRequested} isPlannerTask={newPlannerTask}
         members={pharmacyMembers.map(member => ({ id: Number(member.id), label: getMemberLabel(member) }))} membersLoading={membersLoading}
         onDismiss={() => setNoteModalOpen(false)} onSaved={() => { setNoteModalOpen(false); void loadFeed(); }} onMessage={setMessage} />}
-      {message ? <Portal><Snackbar visible onDismiss={() => setMessage('')} duration={8000}
+      {message ? <Portal><Snackbar visible onDismiss={() => setMessage('')} duration={8000} wrapperStyle={{ bottom: insets.bottom }}
         action={{ label: 'Dismiss', onPress: () => setMessage('') }}>{message}</Snackbar></Portal> : null}
       <Portal>
         <Dialog visible={eventModalOpen} onDismiss={() => setEventModalOpen(false)} style={styles.dialog}>

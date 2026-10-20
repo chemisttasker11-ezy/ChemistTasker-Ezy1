@@ -563,7 +563,7 @@ export default function PharmacyCalendarPage() {
                 </Stack>}
             </Stack>
             </PageHeader>
-            <Snackbar open={Boolean(notice)} autoHideDuration={6000} onClose={() => setNotice("")}><Alert severity="success" onClose={() => setNotice("")}>{notice}</Alert></Snackbar>
+            <Snackbar open={Boolean(notice)} autoHideDuration={6000} onClose={() => setNotice("")} sx={{ bottom: { xs: "calc(16px + env(safe-area-inset-bottom))", md: 24 } }}><Alert severity="success" onClose={() => setNotice("")}>{notice}</Alert></Snackbar>
             {error && (
                 <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
                     {error}
