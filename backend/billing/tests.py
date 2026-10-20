@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
@@ -322,4 +323,34 @@ class OrganizationBillingScopeTests(TestCase):
             format='json',
         )
         self.assertEqual(response.status_code, 403, response.data)
+
+
+class FinalizePendingOffersAhpraTests(TestCase):
+    def test_suspended_pharmacy_member_is_still_finalized(self):
+        from client_profile.characterization_support import make_assignment, make_owner_with_pharmacy
+        from client_profile.models import ShiftSlotAssignment
+        from memberships.models import Membership
+        from onboarding.test_ahpra_desktop import TEST_CACHES, check_fixture, profile_fixture
+        from onboarding.verification.state import ahpra_state
+        from shifts.models import ShiftOffer
+        from billing.views import _finalize_pending_offers_for_shift
+
+        with self.settings(AHPRA_SOURCE='desktop', CACHES=TEST_CACHES):
+            profile = profile_fixture()
+            check_fixture(profile, status='done', outcome='rejected', completed_at=timezone.now(),
+                          register_data={'registration_status': 'Suspended', 'registration_type': 'General',
+                                         'expiry_date': '2099-01-02'})
+            self.assertEqual(ahpra_state(profile)['state'], 'suspended')
+            owner, pharmacy = make_owner_with_pharmacy()
+            Membership.objects.create(user=profile.user, pharmacy=pharmacy, role='PHARMACIST',
+                                      employment_type='CASUAL', status=Membership.Status.ACCEPTED)
+            shift, slot, assignment = make_assignment(pharmacy, owner, profile.user, timezone.localdate() + timedelta(days=5))
+            shift.role_needed, shift.visibility, shift.payment_status = 'PHARMACIST', 'PLATFORM', 'PENDING'
+            shift.save(update_fields=['role_needed', 'visibility', 'payment_status'])
+            assignment.delete()
+            ShiftOffer.objects.create(shift=shift, user=profile.user, slot=slot,
+                                      status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+            self.assertEqual(_finalize_pending_offers_for_shift(shift), 1)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(user=profile.user, shift=shift).exists())
 

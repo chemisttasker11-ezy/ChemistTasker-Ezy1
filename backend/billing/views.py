@@ -318,13 +318,16 @@ def _normalize_offer_ids(raw_offer_ids=None, raw_offer_id=None):
     return sorted(set(offer_ids))
 
 
-def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None, return_offers=False):
+def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None, return_offers=False, skip_ineligible=False):
     """
     Finalize shift offers waiting on payment.
     If candidate_id/slot_id are provided, narrow the target set.
+    skip_ineligible: skip (instead of raising) offers whose worker fails the public AHPRA check.
     """
     from shifts.models import ShiftOffer
+    from shifts.access import ShiftActionRefused
     from shifts.finalize import finalize_shift_offer
+    from onboarding.verification.state import lock_public_ahpra
 
     offers = ShiftOffer.objects.filter(
         shift=shift,
@@ -344,7 +347,15 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     finalized_offers = []
     selected_slot_ids = set()
     for offer in offers:
-        finalize_shift_offer(offer)
+        try:
+            with transaction.atomic():
+                lock_public_ahpra(offer.user, shift, manager=True)
+                finalize_shift_offer(offer)
+        except ShiftActionRefused:
+            if not skip_ineligible:
+                raise
+            logger.warning('Skipped finalizing AHPRA-ineligible offer %s on shift %s', offer.id, shift.id)
+            continue
         finalized_offers.append(offer)
         if offer.slot_id:
             selected_slot_ids.add(offer.slot_id)
@@ -592,21 +603,22 @@ def charge_shift_fulfillment(request, shift_id):
 
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
-        finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
-            shift,
-            candidate_id=candidate_id,
-            slot_ids=slot_ids,
-            offer_ids=offer_ids,
-            return_offers=True,
-        )
         from shifts.models import ShiftOffer
         from shifts.emails import send_shift_payment_finalized_notifications
-        has_pending_payment = ShiftOffer.objects.filter(
-            shift=shift,
-            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-        ).exists()
-        shift.payment_status = 'PENDING' if has_pending_payment else 'PAID'
-        shift.save(update_fields=['payment_status'])
+        with transaction.atomic():
+            finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
+                shift,
+                candidate_id=candidate_id,
+                slot_ids=slot_ids,
+                offer_ids=offer_ids,
+                return_offers=True,
+            )
+            has_pending_payment = ShiftOffer.objects.filter(
+                shift=shift,
+                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            ).exists()
+            shift.payment_status = 'PENDING' if has_pending_payment else 'PAID'
+            shift.save(update_fields=['payment_status'])
         send_shift_payment_finalized_notifications(
             shift=shift,
             offers=finalized_offers,
@@ -868,6 +880,8 @@ def _process_stripe_event(event):
                             slot_ids=metadata.get('slot_ids'),
                             offer_ids=metadata.get('offer_ids'),
                             return_offers=True,
+                            # Money is taken: raising would make Stripe retry forever and block the other paid offers.
+                            skip_ineligible=True,
                         )
                         from shifts.emails import (
                             send_shift_payment_finalized_notifications,
