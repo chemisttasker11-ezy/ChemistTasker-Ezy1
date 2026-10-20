@@ -688,7 +688,7 @@ export default function SharedCalendarScreen() {
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateText}>{view === 'plan'
                   ? items.some(item => item.noteData?.is_planner_task) ? 'No tasks for this day.' : canManagePlanner
-                    ? 'No tasks this week. Add a task or copy last week.' : 'No tasks assigned this week.'
+                    ? 'No tasks this week. Add a task to start.' : 'No tasks assigned this week.'
                   : 'No items scheduled for this day'}</Text>
                 {view === 'plan' && canManagePlanner && <>
                   <Button mode="outlined" contentStyle={styles.touch} onPress={() => handleOpenNoteModal()}>Add task</Button>

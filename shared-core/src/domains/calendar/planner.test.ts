@@ -53,7 +53,7 @@ test('copy feedback reports copied, skipped repeating and dropped people once by
  assert.equal(model.copyResultMessage({created:3,task_ids:[1,2,3],skipped_series:2,dropped_assignees:[{task_id:1,membership_id:9,name:'Alex'},{task_id:2,membership_id:9,name:'Alex'}]}),
   '3 copied; 2 repeating skipped; 2 people dropped: Alex.');
  assert.equal(model.copyResultMessage({created:0,task_ids:[],skipped_series:0,dropped_assignees:[]}),'0 copied.');
- assert.equal(model.copyResultMessage({created:2,task_ids:[1,2],skipped_series:0,dropped_assignees:[{task_id:1,membership_id:9,name:'Alex'}]}),'2 copied; 1 people dropped: Alex.');
+ assert.equal(model.copyResultMessage({created:2,task_ids:[1,2],skipped_series:0,dropped_assignees:[{task_id:1,membership_id:9,name:'Alex'}]}),'2 copied; 1 person dropped: Alex.');
 });
 
 test('duplicate stays on the same day; day and week copies use the atomic API offsets', () => {

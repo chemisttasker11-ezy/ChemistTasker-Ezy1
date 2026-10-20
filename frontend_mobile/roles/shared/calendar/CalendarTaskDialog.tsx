@@ -37,7 +37,6 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, deleteReque
   const [menu, setMenu] = useState<'assignees' | 'repeat' | null>(null);
   const [savedTasks, setSavedTasks] = useState<SavedTaskApi[]>([]);
   const [savedOpen, setSavedOpen] = useState(false);
-  const [savedLoading, setSavedLoading] = useState(false);
   const [confirmation, setConfirmation] = useState<'task' | SavedTaskApi | null>(deleteRequested ? 'task' : null);
   const locked = form.locked;
   const blocked = busy || loadingOriginal || loadFailed;
@@ -55,6 +54,15 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, deleteReque
     }).finally(() => { if (active) setLoadingOriginal(false); });
     return () => { active = false; };
   }, [date, note]);
+
+  useEffect(() => {
+    if (note || !isPlannerTask) return;
+    let active = true;
+    // Load up front so the saved-task picker hides when there is nothing to pick.
+    listSavedTasks(pharmacyId).then(tasks => { if (active) setSavedTasks(tasks); })
+      .catch(e => { if (active) setError(message(e)); });
+    return () => { active = false; };
+  }, [note, isPlannerTask, pharmacyId]);
 
   function validate() {
     if (!form.title.trim()) { setError('Title is required.'); return false; }
@@ -91,13 +99,6 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, deleteReque
       onMessage(result.assignee_membership_ids.length ? 'Rostered people added.' : 'No eligible people rostered. You can save this task unassigned.');
     } catch (e) { setError(message(e)); }
     finally { setBusy(false); }
-  }
-
-  async function openSaved() {
-    setSavedOpen(true); setSavedLoading(true); setError('');
-    try { setSavedTasks(await listSavedTasks(pharmacyId)); }
-    catch (e) { setError(message(e)); setSavedOpen(false); }
-    finally { setSavedLoading(false); }
   }
 
   async function saveReusable() {
@@ -155,7 +156,7 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, deleteReque
           {form.isPlannerTask && <Button mode="outlined" contentStyle={styles.touch} disabled={blocked || locked} onPress={fillRoster}>Fill from roster</Button>}
           {locked && <HelperText type="info">Work has started. Date and assignees are locked; wording changes keep progress.</HelperText>}
           {original?.recurrence && <HelperText type="info">Edits apply to the whole repeating series. Individual dates cannot be excluded.</HelperText>}
-          {!original && form.isPlannerTask && <Button contentStyle={styles.touch} disabled={blocked} onPress={openSaved}>Use a saved task</Button>}
+          {!original && form.isPlannerTask && savedTasks.length > 0 && <Button contentStyle={styles.touch} disabled={blocked} onPress={() => setSavedOpen(true)}>Use a saved task</Button>}
           <Button contentStyle={styles.touch} icon={more ? 'chevron-up' : 'chevron-down'} onPress={() => setMore(!more)}>
             More options
           </Button>
@@ -215,8 +216,6 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, deleteReque
     <Dialog visible={savedOpen && !confirmation} onDismiss={() => setSavedOpen(false)} style={styles.dialog}>
       <Dialog.Title>Use a saved task</Dialog.Title>
       <Dialog.ScrollArea style={styles.scroll}><ScrollView>
-        {savedLoading && <Text>Loading saved tasks…</Text>}
-        {!savedLoading && !savedTasks.length && <Text>No saved tasks yet. Open More options on a task and choose Save as reusable.</Text>}
         {savedTasks.map(task => <View style={styles.row} key={task.id}>
           <Button contentStyle={styles.touch} style={styles.flex} onPress={() => {
             setForm(prev => applySavedTask(prev, task));

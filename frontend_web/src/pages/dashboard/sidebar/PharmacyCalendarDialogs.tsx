@@ -18,7 +18,11 @@ import {
   Switch,
   TextField,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 type RecurrenceForm = {
   freq: string;
@@ -93,6 +97,8 @@ export default function PharmacyCalendarDialogs({
   canManage, savedTasks, onFillRoster, onSaveReusable, onDeleteSaved, onDeleteNote,
 }: Props) {
   const [moreOptions, setMoreOptions] = useState(false);
+  const theme = useTheme();
+  const phone = useMediaQuery(theme.breakpoints.down("sm"));
   const [savedId, setSavedId] = useState<number | "">("");
   useEffect(() => { if (noteModalOpen) { setMoreOptions(false); setSavedId(""); } }, [noteModalOpen]);
   const selectedSaved = savedTasks.find(task => task.id === savedId);
@@ -226,7 +232,7 @@ export default function PharmacyCalendarDialogs({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={noteModalOpen} onClose={() => !noteSaving && setNoteModalOpen(false)} fullWidth maxWidth="sm" aria-labelledby="calendar-note-title" sx={{ "& button": { minHeight: 44 }, "& .MuiFormControlLabel-root": { minHeight: 44 } }}>
+      <Dialog open={noteModalOpen} onClose={() => !noteSaving && setNoteModalOpen(false)} fullWidth maxWidth="sm" fullScreen={phone} aria-labelledby="calendar-note-title" sx={{ "& button": { minHeight: 44 }, "& .MuiFormControlLabel-root": { minHeight: 44 } }}>
         <DialogTitle id="calendar-note-title">{editingNoteId ? noteForm.isPlannerTask ? "Edit task" : "Edit Work Note" : noteForm.isPlannerTask ? "Add task" : "Create Work Note"}</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} mt={1}>
@@ -243,7 +249,7 @@ export default function PharmacyCalendarDialogs({
             {membersLoading && <Typography variant="body2" color="text.secondary">Loading staff...</Typography>}
             {noteForm.locked && <Alert severity="info">This task has completions. Its date and assignees cannot change.</Alert>}
             {noteForm.isPlannerTask && <Button variant="outlined" onClick={onFillRoster} disabled={noteSaving || noteForm.locked}>Fill from roster</Button>}
-            {noteForm.isPlannerTask && !editingNoteId && <>
+            {noteForm.isPlannerTask && !editingNoteId && savedTasks.length > 0 && <>
               <FormControl fullWidth>
                 <InputLabel id="saved-task-label">Use a saved task</InputLabel>
                 <Select labelId="saved-task-label" label="Use a saved task" value={selectedSaved?.id ?? ""} onChange={e => {
@@ -254,10 +260,9 @@ export default function PharmacyCalendarDialogs({
                   {savedTasks.map(task => <MenuItem key={task.id} value={task.id}>{task.title}</MenuItem>)}
                 </Select>
               </FormControl>
-              {!savedTasks.length && <Typography variant="body2" color="text.secondary">No saved tasks yet. Enter a task, then choose More options and Save as reusable.</Typography>}
               {selectedSaved && <Button color="error" onClick={() => onDeleteSaved(selectedSaved)} disabled={noteSaving}>Delete saved task</Button>}
             </>}
-            <Button aria-expanded={moreOptions} aria-controls="note-more-options" onClick={() => setMoreOptions(open => !open)}>More options</Button>
+            <Button aria-expanded={moreOptions} aria-controls="note-more-options" endIcon={moreOptions ? <ExpandLessIcon /> : <ExpandMoreIcon />} onClick={() => setMoreOptions(open => !open)}>More options</Button>
             <Collapse in={moreOptions} id="note-more-options" unmountOnExit>
               <Stack spacing={2}>
                 {noteForm.isPlannerTask && <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>

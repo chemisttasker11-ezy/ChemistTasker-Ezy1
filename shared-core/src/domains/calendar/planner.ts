@@ -58,7 +58,7 @@ export function notePayload(form: CalendarNoteForm, pharmacy: number) {
 export function copyResultMessage(result: PlannerCopyResult) {
     const dropped = [...new Set(result.dropped_assignees.map(person => person.name))];
     return [`${result.created} copied`, result.skipped_series && `${result.skipped_series} repeating skipped`,
-        dropped.length && `${result.dropped_assignees.length} people dropped: ${dropped.join(", ")}`].filter(Boolean).join("; ") + ".";
+        dropped.length && `${result.dropped_assignees.length} ${result.dropped_assignees.length === 1 ? "person" : "people"} dropped: ${dropped.join(", ")}`].filter(Boolean).join("; ") + ".";
 }
 
 export function applySavedTask(form: CalendarNoteForm, task: SavedTaskApi): CalendarNoteForm {

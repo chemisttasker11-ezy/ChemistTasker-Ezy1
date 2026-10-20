@@ -71,7 +71,7 @@ export default function PharmacyCalendarWeekView({ day, setDay, items, manager, 
                                     {item.noteData.recurrence && <Stack direction="row" alignItems="center" gap={0.5}><RepeatRounded fontSize="small" /><Typography variant="caption">{taskRepeatLabel(item.noteData.recurrence)}</Typography></Stack>}
                                 </Stack>
                             </CardActionArea>
-                            {state.canComplete && <Button sx={{ m: 0.5 }} disabled={busy} onClick={() => onComplete(item)}>{item.status === "DONE" ? "Mark to do" : "Mark done"}</Button>}
+                            {state.canComplete && <Button variant="outlined" sx={{ m: 0.5, minHeight: 44 }} disabled={busy} onClick={() => onComplete(item)}>{item.status === "DONE" ? "Mark to do" : "Mark done"}</Button>}
                         </Card>; })}
                         {tasks.every(item => !isSameDay(item.date, date)) && <Typography variant="body2" color="text.secondary">No tasks{phone ? " for this day" : ""}.</Typography>}
                     </Stack>

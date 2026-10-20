@@ -115,7 +115,7 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 
     expect(state.copies.at(-1)).toMatchObject({ source_from: '2026-12-28', source_to: '2026-12-28', day_offset: 0, task_id: state.notes.find(n => n.title === 'Opening task').id });
     await page.getByRole('button', { name: 'Day actions for Monday 28 December', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Copy day to tomorrow', exact: true }).click();
-    await expect(page.getByRole('alert').filter({ hasText: '2 copied; 1 repeating skipped; 1 people dropped: Former worker.' })).toBeVisible();
+    await expect(page.getByRole('alert').filter({ hasText: '2 copied; 1 repeating skipped; 1 person dropped: Former worker.' })).toBeVisible();
     expect(state.copies.at(-1)).toMatchObject({ source_from: '2026-12-28', source_to: '2026-12-28', day_offset: 1 });
     await page.getByRole('button', { name: 'Copy week to next week', exact: true }).click();
     await expect(page.getByRole('alert').filter({ hasText: '4 copied; 1 repeating skipped' })).toBeVisible();
