@@ -74,7 +74,7 @@ export function inventoryBoundarySources(sources) {
     function capture(node) {
       if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
         const module = node.moduleSpecifier.text;
-        const primary = module === 'axios' ? 'axios' : /(?:^|\\/)apiClient(?:\\.[jt]sx?)?$/.test(module) ? 'apiClient' : null;
+        const primary = module === 'axios' ? 'axios' : module.split('/').at(-1)?.replace(/\.[jt]sx?$/, '') === 'apiClient' ? 'apiClient' : null;
         if (primary && node.importClause?.name) aliases.set(node.importClause.name.text, primary);
       }
       if (ts.isVariableDeclaration(node) && node.initializer) {
