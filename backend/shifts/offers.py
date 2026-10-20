@@ -376,6 +376,8 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         requires_payment = billing_state == BILLING_STATE_PAYMENT_REQUIRED
 
         with transaction.atomic():
+            from onboarding.verification.state import lock_public_ahpra
+            lock_public_ahpra(request.user, shift)
             offer.payment_preference_snapshot = accepted_terms.get("payment_preference", "")
             offer.settlement_channel = accepted_terms.get("settlement_channel", "")
             offer.engagement_kind = accepted_terms.get("engagement_kind", "")

@@ -178,6 +178,22 @@ def require_public_ahpra(user, shift):
         transaction.on_commit(lambda: queue_public_recheck(user), robust=True)
 
 
+def lock_public_ahpra(user, shift, *, manager=False):
+    """Inside the booking transaction: lock the worker's AHPRA profile row (apply_state_transition holds the same
+    lock) and re-check, so a booking cannot commit around a suspension that has not yet cancelled bookings."""
+    from shifts.access import ShiftActionRefused
+    profile = ahpra_profile(user)
+    if profile is not None:
+        type(profile).objects.select_for_update().filter(pk=profile.pk).first()
+    try:
+        require_public_ahpra(user, shift)
+    except ShiftActionRefused:
+        if not manager:
+            raise
+        raise ShiftActionRefused({'code': 'candidate_ahpra_ineligible',
+                                  'detail': "This worker can't be booked for public shifts right now."}, 403)
+
+
 def queue_public_recheck(user):
     from django.conf import settings
     from onboarding.verification.desktop import enqueue_check
@@ -220,6 +236,8 @@ def ahpra_frozen(user, state=None):
 def apply_state_transition(profile, previous):
     """Called under the profile/check locks, after saving the finished check."""
     from onboarding.verification.policy import refresh_verified, revoke_for_changed_evidence
+    # The booking paths take this lock too (lock_public_ahpra); callers normally hold it already.
+    type(profile).objects.select_for_update().filter(pk=profile.pk).first()
     profile.refresh_from_db()
     current = ahpra_state(profile)
     if current['state'] in ('suspended', 'not_found', 'unreadable', 'rejected', 'type_not_accepted', 'review'):
@@ -248,6 +266,12 @@ def apply_state_transition(profile, previous):
                   if current['state'] == 'type_not_accepted' else 'their AHPRA registration is paused')
         bookings = cancel_upcoming_assignments(profile.user, reason=reason)
         transaction.on_commit(lambda: announce_suspension(profile, current, bookings), robust=True)
+    if current['state'] == 'rejected' and previous['state'] != 'rejected':
+        # A rejection keeps bookings: the pharmacy and our team resolve them by hand.
+        from shifts.cancellation import cancel_upcoming_assignments
+        bookings = cancel_upcoming_assignments(profile.user, cancel=False)['retained']
+        if bookings:
+            transaction.on_commit(lambda: announce_rejected_bookings(profile, bookings), robust=True)
     if current['state'] == 'suspended' and previous['state'] != 'suspended':
         if not profile.user.is_staff and ahpra_frozen(profile.user):
             transaction.on_commit(lambda: close_chat_sockets(profile.user_id), robust=True)
@@ -288,6 +312,23 @@ def announce_suspension(profile, state, bookings):
                   f'User id: {profile.user_id}\nNumber: {full_registration_number(profile.ahpra_number)}\n'
                   f"Status: {state['registration_status']}\nType: {state['registration_type']}\nCancelled shifts:\n{rows or 'None'}\n"
                   f"Retained bookings:\n{retained or 'None'}",
+                  settings.DEFAULT_FROM_EMAIL, recipients)
+
+
+def announce_rejected_bookings(profile, bookings):
+    from django.core.mail import send_mail
+    from shifts.cancellation import announce_bookings
+
+    name = profile.user.get_full_name() or profile.user.email
+    announce_bookings(bookings, title='Booking needs immediate resolution',
+                      message=lambda row: (f"{name}'s AHPRA check was rejected. Their booking for shift {row['id']} on "
+                                           f"{row['date']} at {row['pharmacy']} needs immediate resolution."))
+    recipients = getattr(settings, 'ADMIN_EMAILS', None) or [email for _, email in settings.ADMINS]
+    if recipients:
+        rows = '\n'.join(f"Shift {row['id']}: {row['date']} - {row['pharmacy']}" for row in bookings)
+        send_mail('AHPRA rejected: bookings need immediate resolution',
+                  f'User id: {profile.user_id}\nNumber: {full_registration_number(profile.ahpra_number)}\n'
+                  f'Upcoming public bookings (not cancelled):\n{rows}',
                   settings.DEFAULT_FROM_EMAIL, recipients)
 
 

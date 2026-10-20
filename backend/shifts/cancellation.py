@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 @transaction.atomic
-def cancel_upcoming_assignments(user, *, reason='their AHPRA registration is paused'):
+def cancel_upcoming_assignments(user, *, reason='their AHPRA registration is paused', cancel=True):
+    """With cancel=False nothing changes: every upcoming public booking is listed as retained."""
     if not settings.AHPRA_ENFORCEMENT_ENABLED:
         return {'cancelled': [], 'retained': []}
     now = timezone.localtime()
@@ -40,6 +41,9 @@ def cancel_upcoming_assignments(user, *, reason='their AHPRA registration is pau
         if not upcoming(day, (offer and offer.offered_start_time) or assignment.slot.start_time):
             continue
         key = (assignment.shift_id, day)
+        if not cancel:
+            retained[key] = (assignment.shift, day)
+            continue
         try:
             _protect_assignment_history(assignment)
         except ValidationError:
@@ -61,6 +65,9 @@ def cancel_upcoming_assignments(user, *, reason='their AHPRA registration is pau
                   and (not offer.offered_slot_date or entry['date'] == offer.offered_slot_date)]
         future = [(slot, day) for slot, day in future if upcoming(day, offer.offered_start_time or slot.start_time)]
         if not future:
+            continue
+        if not cancel:
+            retained.update({(offer.shift_id, day): (offer.shift, day) for _, day in future})
             continue
         # Keep a partially worked recurring offer as historical evidence.
         if not offer.slot_assignments.exists() and not any((offer.shift_id, day) in retained for _, day in future):
@@ -84,10 +91,21 @@ def cancel_upcoming_assignments(user, *, reason='their AHPRA registration is pau
 
 def _announce_cancellation(shift, row, reason):
     message = f"A worker's booking for shift {shift.pk} on {row['date']} at {row['pharmacy']} was cancelled because {reason}."
-    recipients = notify_shift_managers(shift, title='Shift booking cancelled', body=message,
-                                       kind='shift_cancelled', payload={'date': row['date']})
+    _announce(shift, row, 'Shift booking cancelled', message, 'shift_cancelled')
+
+
+def announce_bookings(rows, *, title, message):
+    """Tell each booking's pharmacy owner/admins (in-app and email) about it; message(row) builds the text."""
+    from shifts.models import Shift
+    shifts = Shift.objects.select_related('pharmacy').in_bulk({row['id'] for row in rows})
+    for row in rows:
+        _announce(shifts[row['id']], row, title, message(row), 'shift_booking_attention')
+
+
+def _announce(shift, row, title, message, kind):
+    recipients = notify_shift_managers(shift, title=title, body=message, kind=kind, payload={'date': row['date']})
     emails = sorted({recipient.email for recipient in recipients if recipient.email})
     if emails:
-        async_task('users.tasks.send_async_email', subject='Shift booking cancelled', recipient_list=emails,
+        async_task('users.tasks.send_async_email', subject=title, recipient_list=emails,
                    template_name='emails/ahpra_status.html', text_template='emails/ahpra_status.txt',
                    context={'message': message}, suppress_auto_notification=True)

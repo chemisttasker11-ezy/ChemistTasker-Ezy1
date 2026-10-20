@@ -434,3 +434,83 @@ class InvoicePostgresConcurrencyTests(TransactionTestCase):
             ).count(),
             1,
         )
+
+
+@POSTGRES_ONLY
+class AhpraSuspensionAcceptRacePostgresTests(TransactionTestCase):
+    """An offer accept racing a suspension must not leave a public booking behind."""
+
+    reset_sequences = True
+
+    def test_accept_waits_for_suspension_and_is_refused(self):
+        from threading import Event
+
+        from client_profile.characterization_support import client_for, make_assignment, make_owner_with_pharmacy
+        from onboarding.models import AhpraCheck
+        from onboarding.test_ahpra_desktop import TEST_CACHES, check_fixture, profile_fixture
+        from onboarding.verification.state import ahpra_state, apply_state_transition
+        from shifts.models import ShiftOffer
+
+        with self.settings(AHPRA_SOURCE="desktop", CACHES=TEST_CACHES):
+            profile = profile_fixture()
+            user = profile.user
+            user.is_otp_verified = user.is_mobile_verified = True
+            user.save(update_fields=["is_otp_verified", "is_mobile_verified"])
+            data = {"registration_status": "Registered", "registration_type": "General", "expiry_date": "2099-01-02"}
+            check_fixture(profile, status="done", outcome="verified", completed_at=timezone.now(), register_data=data)
+            profile.verified = profile.ahpra_verified = True
+            profile.save(update_fields=["verified", "ahpra_verified"])
+            owner, pharmacy = make_owner_with_pharmacy()
+            shift, slot, assignment = make_assignment(pharmacy, owner, user, timezone.localdate() + timedelta(days=5))
+            shift.role_needed = "PHARMACIST"
+            shift.save(update_fields=["role_needed"])
+            assignment.delete()
+            offer = ShiftOffer.objects.create(shift=shift, user=user, slot=slot)
+            locked, results = Event(), Queue()
+
+            def suspend():
+                close_old_connections()
+                try:
+                    with transaction.atomic():
+                        locked_profile = type(profile).objects.select_for_update().get(pk=profile.pk)
+                        previous = ahpra_state(locked_profile)
+                        check_fixture(locked_profile, status="done", outcome="rejected", completed_at=timezone.now(),
+                                      register_data={**data, "registration_status": "Suspended"})
+                        apply_state_transition(locked_profile, previous)
+                        locked.set()
+                        # Hold the lock while the accept request runs into it.
+                        Event().wait(1)
+                    results.put(("suspended", None))
+                except Exception as exc:  # surface unexpected DB/locking failures to the assertion
+                    results.put(("exception", repr(exc)))
+                finally:
+                    close_old_connections()
+
+            def accept():
+                close_old_connections()
+                try:
+                    locked.wait(timeout=10)
+                    response = client_for(user).post(f"/api/v1/shift-offers/{offer.pk}/accept/", {}, format="json")
+                    results.put(("accept", (response.status_code, response.json())))
+                except Exception as exc:
+                    results.put(("exception", repr(exc)))
+                finally:
+                    close_old_connections()
+
+            # Payment/engagement onboarding is out of scope here: only the AHPRA lock decides the race.
+            with mock.patch("onboarding.verification.state.announce_suspension"), \
+                    mock.patch("onboarding.verification.state.announce_member_suspension"), \
+                    mock.patch("shifts.engagement.build_shift_engagement_terms", return_value={}):
+                threads = [Thread(target=suspend), Thread(target=accept)]
+                for thread in threads:
+                    thread.start()
+                for thread in threads:
+                    thread.join(timeout=30)
+            outcomes = dict([results.get(timeout=5), results.get(timeout=5)])
+            self.assertNotIn("exception", outcomes, outcomes)
+            self.assertEqual((outcomes["accept"][0], outcomes["accept"][1].get("code")), (403, "ahpra_suspended"), outcomes)
+            self.assertEqual(ahpra_state(profile)["state"], "suspended")
+            self.assertFalse(ShiftSlotAssignment.objects.filter(user=user).exists())
+            offer.refresh_from_db()
+            self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+            self.assertEqual(AhpraCheck.objects.count(), 2)

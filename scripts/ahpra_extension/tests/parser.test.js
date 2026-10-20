@@ -138,7 +138,7 @@ console.log(`${passed} parser tests passed`);
 
 // Exercise the actual options-message handler without Chrome or a network connection.
 (async () => {
-  const {runInNewContext} = require('node:vm');
+  const {createContext, runInContext} = require('node:vm');
   const {readFileSync} = require('node:fs');
   const event = {addListener() {}};
   let handler;
@@ -150,11 +150,18 @@ console.log(`${passed} parser tests passed`);
     action: {onClicked: event},
     runtime: {onMessage: {addListener(fn) { handler = fn; }}},
   };
-  runInNewContext(readFileSync(require.resolve('../background.js'), 'utf8'), {
+  const context = createContext({
     chrome, self: {location: {origin: 'chrome-extension://test'}}, URL,
     WebSocket: class { static OPEN = 1; static CONNECTING = 0; close() {} },
     clearTimeout, clearInterval,
   });
+  runInContext(readFileSync(require.resolve('../background.js'), 'utf8'), context);
+  const pharmacyNumber = runInContext('PHARMACY_NUMBER', context);
+  for (const value of ['PHA0001234567', 'pha0001234567']) assert.ok(pharmacyNumber.test(value), value);
+  for (const value of ['MED0001234567', 'PHA000123456', 'PHA00012345678', ' PHA0001234567']) {
+    assert.ok(!pharmacyNumber.test(value), value);
+  }
+  console.log('PASS extension accepts only PHA check numbers');
   const configure = url => new Promise(resolve => handler(
     {type: 'configure', enabled: true, url, token: 'test', gap: 30},
     {origin: 'chrome-extension://test'}, resolve,

@@ -4,6 +4,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
+from django.db import transaction
 from rest_framework import permissions, status, viewsets
 from organizations.models import (
     Chain,
@@ -251,7 +252,11 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if isinstance(slot_id, str) and slot_id.isdigit():
             slot_id = int(slot_id)
 
-        return Response(offer_shift(shift=shift, candidate=candidate, slot_id=slot_id), status=status.HTTP_200_OK)
+        from onboarding.verification.state import lock_public_ahpra
+        with transaction.atomic():
+            lock_public_ahpra(candidate, shift, manager=True)
+            body = offer_shift(shift=shift, candidate=candidate, slot_id=slot_id)
+        return Response(body, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='counter-offers-batch')
     def counter_offers_batch(self, request):
@@ -348,10 +353,11 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if isinstance(slot_id, str) and slot_id.isdigit():
             slot_id = int(slot_id)
 
-        return Response(
-            accept_counter_offer(shift=shift, offer=offer, slot_id=slot_id, decided_by=request.user),
-            status=status.HTTP_200_OK,
-        )
+        from onboarding.verification.state import lock_public_ahpra
+        with transaction.atomic():
+            lock_public_ahpra(offer.user, shift, manager=True)
+            body = accept_counter_offer(shift=shift, offer=offer, slot_id=slot_id, decided_by=request.user)
+        return Response(body, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='counter-offers/(?P<offer_id>[^/.]+)/reject')
     def reject_counter_offer(self, request, pk=None, offer_id=None):

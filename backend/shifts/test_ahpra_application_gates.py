@@ -290,7 +290,7 @@ class AhpraApplicationGateTests(TestCase):
                 patch('onboarding.verification.state.announce_suspension') as announce:
             with self.captureOnCommitCallbacks(execute=True):
                 self.assertTrue(apply_ahpra_result(check, result(check.pk, profession='Nursing')))
-        cancel.assert_not_called()
+        cancel.assert_called_once_with(self.user, cancel=False)  # listed for review, never cancelled
         announce.assert_not_called()
         self.profile.refresh_from_db()
         self.assertEqual(ahpra_state(self.profile)['state'], 'rejected')

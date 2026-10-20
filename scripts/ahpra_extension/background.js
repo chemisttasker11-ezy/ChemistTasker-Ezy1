@@ -1,6 +1,7 @@
 ﻿'use strict';
 const REGISTER_URL = 'https://www.ahpra.gov.au/Registration/Registers-of-Practitioners.aspx';
 const NOTICE = 'ahpra-blocked';
+const PHARMACY_NUMBER = /^PHA\d{10}$/i;
 let config = {enabled: false, gap: 30};
 let state = {queue: [], outbox: [], active: null, paused: false, lastStarted: 0, lastResultAt: null, blockedResults: []};
 let socket, authenticated = false, reconnectTimer, heartbeat, queueTimer, jobTimer;
@@ -75,7 +76,7 @@ async function receive(data) {
     state.outbox = state.outbox.filter(item => item.check_id !== message.check_id);
     await save();
   } else if (authenticated && message.type === 'check' && Number.isSafeInteger(message.check_id) &&
-      typeof message.registration_number === 'string' && /^[A-Z]{3}\d{10}$/i.test(message.registration_number)) {
+      typeof message.registration_number === 'string' && PHARMACY_NUMBER.test(message.registration_number)) {
     const blockedResult = state.blockedResults.find(item => item.check_id === message.check_id);
     if (blockedResult) { transmit(blockedResult); return; }
     if (state.outbox.some(item => item.check_id === message.check_id)) { flush(); return; }

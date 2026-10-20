@@ -176,6 +176,36 @@ class AhpraAccessTests(TestCase):
                     raise ValueError('roll back')
             announce.assert_not_called()
 
+    def test_rejection_keeps_public_bookings_and_flags_them_once_after_commit(self):
+        self.finish()
+        owner, pharmacy = make_owner_with_pharmacy()
+        shift, _, public = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
+        shift.post_anonymously = True
+        shift.save(update_fields=['post_anonymously'])
+        Membership.objects.create(user=self.user, pharmacy=pharmacy, role='PHARMACIST', employment_type='FULL_TIME',
+                                  is_active=True, status=Membership.Status.ACCEPTED)
+        internal_shift, _, internal = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
+        internal_shift.visibility = 'FULL_PART_TIME'
+        internal_shift.save(update_fields=['visibility'])
+        with patch('shifts.cancellation.notify_shift_managers', return_value=[owner]) as managers,                 patch('shifts.cancellation.async_task') as email:
+            with self.captureOnCommitCallbacks(execute=True):
+                check = check_fixture(self.profile)
+                apply_ahpra_result(check, result(check.pk, profession='Medicine'))
+                managers.assert_not_called()
+                self.assertEqual(len(mail.outbox), 0)
+            with self.captureOnCommitCallbacks(execute=True):
+                repeat = check_fixture(self.profile)
+                apply_ahpra_result(repeat, result(repeat.pk, profession='Medicine'))
+        self.assertEqual(ahpra_state(self.profile)['state'], 'rejected')
+        self.assertEqual(ShiftSlotAssignment.objects.filter(pk__in=[public.pk, internal.pk]).count(), 2)
+        managers.assert_called_once()
+        self.assertEqual(managers.call_args.args[0], shift)
+        self.assertIn('needs immediate resolution', managers.call_args.kwargs['body'])
+        self.assertEqual(email.call_args.kwargs['recipient_list'], [owner.email])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(f'Shift {shift.pk}: ', mail.outbox[0].body)
+        self.assertNotIn(f'Shift {internal_shift.pk}:', mail.outbox[0].body)
+
     def test_unknown_or_unreadable_status_needs_review_without_freeze_or_cancellation(self):
         self.profile.verified = self.profile.ahpra_verified = True
         self.profile.save(update_fields=['verified', 'ahpra_verified'])

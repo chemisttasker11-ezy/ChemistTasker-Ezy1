@@ -130,6 +130,16 @@ class EvaluateAhpraRecordTests(TestCase):
         self.assertEqual(outcome, "review")
         self.assertIn("Name mismatch", note)
 
+    def test_adverse_status_outranks_blank_profession_but_not_name_mismatch(self):
+        for status in ("Suspended", "Cancelled", "Surrendered"):
+            with self.subTest(status=status):
+                record = self.base_record(profession="", registration_status=status)
+                outcome, note = evaluate_ahpra_record(record, first_name="Jane", last_name="Doe", role="pharmacist")
+                self.assertEqual((outcome, note), ("rejected", f"Registration status is '{status}'"))
+                outcome, note = evaluate_ahpra_record(record, first_name="John", last_name="Smith", role="pharmacist")
+                self.assertEqual(outcome, "review")
+                self.assertIn("Name mismatch", note)
+
     def test_profession_present_and_not_pharmacy_returns_rejected(self):
         record = self.base_record(profession="Medical Practitioner")
         outcome, note = evaluate_ahpra_record(
