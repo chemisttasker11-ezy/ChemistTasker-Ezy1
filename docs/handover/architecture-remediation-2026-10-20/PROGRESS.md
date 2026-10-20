@@ -70,3 +70,9 @@ Then verify emulator/device multipart uploads against isolated seeded Django/Pos
 - `ae72c84`, `2ac5c3`: replaced line-based inventory matcher with TypeScript AST traversal for Vite/Next/Expo runtime. Handles multiline calls, template interpolation, concatenated route strings and generic transport escape hatches; reports unresolved calls honestly. Excludes Windows kiosk source and test fixtures. The scanner is **report-only**, not a zero-debt claim.
 - `e45224f`: connected inventory fixture tests and `--summary` to shared-core CI, after package dependency installation. Check exact final-head CI before claiming PASS.
 - No changes to #181 or #182; #191 remains stacked on #181. Windows Tauri/Rust kiosk unchanged; no merge/deploy.
+
+## Billing SDK continuation (2026-10-20)
+
+- Commit `ebf952b`: preserved the Expo `platform: mobile` checkout redirect parameter that the earlier shared-core checkout function dropped. Added typed billing snapshot/checkout response and migrated the Vite + Expo subscription reads and extra-seat requests to the existing shared-core billing domain. Added five Vitest wire-contract tests. No shift penalty, cancellation, payment authority or pricing logic changed; PR #182 untouched.
+- The CI checks at this commit and on final head remain authoritative, not checks from a prior commit. Native payment-return URL acceptance remains outstanding.
+- Full architecture remediation (A01 permission write policy, A06-A09 UI/backend decomposition and A11 native/staging acceptance) is not complete.
