@@ -2,14 +2,14 @@
 
 **Updated:** 2026-10-20 (Australia/Brisbane)
 **Repository:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
-**Parent:** draft [PR #181](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/181) at `bdc0b698d7848f50b6cc5e8bd8d484d455089426`
+**Parent:** draft [PR #181](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/181) at `216fb05c2b27ec9fd26f612956fb0e389b1cc58c`
 **Remediation PR:** [#191](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/191)
 **Original plan:** `CHEMISTTASKER_EZY_ARCHITECTURE_REMEDIATION_HANDOVER_2026-10-20.md` (available as a separate handover artifact; do not treat this shorter progress ledger as a replacement).
 **Scope:** internal Ezy repository only. No external frontend repository, production deploy, staging deploy or merge.
 
 ## Authoritative current package status (PR #191; 2026-10-20)
 
-**Head used for this checkpoint:** `544acb0f`. Parent PR #181 advanced to `216fb05` after the current stack base `6b6e2f7`; do not silently rebase/cherry-pick unrelated PRs.
+**Head ancestry:** PR #191 incorporates PR #181 through `216fb05` as its second-parent merge `c1e9ef3`. The sync brought four parent-only planner files with no overlap with PR #191 changes.
 
 | Package | Status | Required exit criterion |
 | --- | --- | --- |
@@ -125,3 +125,8 @@ Then verify emulator/device multipart uploads against isolated seeded Django/Pos
 - `docs/handover/architecture-remediation-2026-10-20/CLIENT_BOUNDARY_MANIFEST.json` is initially empty; classifying existing calls is still required. `client-boundary-inventory.json` is now an explicit GitHub Action review artifact, with detailed callsites in the CI log. `--strict` is not called by the release gate while this legacy debt is outstanding; this is intentional, not completion.
 - `scripts/audit-generated-skill-icons.mjs` compares registry codes, generated native require mappings and PNG asset names without changing the drawings or kiosk. Added as a dedicated architecture CI step.
 - This is still a **draft** until every classification, domain migration, policy approval and full acceptance is complete. The full-isolated QA workflow has been **skipped**, not passed, on prior commits.
+
+## Latest parent synchronization
+
+- Merge `c1e9ef3` incorporates precisely four newer PR #181 files: the planner handover, Vite planner E2E test, calendar page and shared-core planner test. Parent merge is recorded as second parent. Compare from former parent `6b6e2f7` confirmed no overlap with the 33 PR #191-specific modified files. PR #182 and #184 are not included.
+- The final exact-head CI remains authoritative. Earlier successful checks and canceled runs are not a pass for this merge.
