@@ -353,6 +353,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
+      - name: Generated mobile skill icon registry integrity
+        run: node scripts/audit-generated-skill-icons.mjs
       - name: Runtime Django app import graph tests
         run: python3 -m unittest discover -s scripts -p 'test_module_import_graph.py' -v
       - name: Reject new unapproved backend module cycles
