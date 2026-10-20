@@ -12,10 +12,11 @@
 | ID | Current state | Evidence / next action |
 | --- | --- | --- |
 | A00 | STARTED | Parent PR verified; branch made directly on #181; stacked #182 and #184 protected |
-| A01 | ASSESSED; POLICY NOT MODIFIED | Django `PharmacyViewSet.check_object_permissions` on unsafe requests can accept visible organizations or pharmacy assignments. Read and write permissions must be separated using role/action test matrix **after authorized policy is confirmed**. Do not silently change current legitimate edit access. |
+| A01 | CHARACTERIZATION TESTS ADDED; POLICY NOT MODIFIED | Django `PharmacyViewSet.check_object_permissions` on unsafe requests can accept visible organizations or pharmacy assignments. Read and write permissions must be separated using role/action test matrix **after authorized policy is confirmed**. Do not silently change current legitimate edit access. |
 | A02 | IMPLEMENTED; QA PENDING | Commit `174c30b`: Expo certificate key corrected from `approval_certificate` to `methadone_s8_protocols` for read and upload; JSON-list multipart serialization replaced with shared `appendPharmacyFormFields`; three Vitest cases and five Django multipart HTTP cases added. |
 | A03 | ALREADY IN DRAFT #181 | `CalendarRecurrence`, occurrence-date and shared calendar methods implemented on parent; do not overwrite |
-| A04–A11 | NOT STARTED | Refer to full plan and unblock per dependency order |
+| A04 | WHOLE-TREE INVENTORY TOOL ADDED; EVIDENCE PENDING | Read-only `node scripts/inventory-client-api-boundaries.mjs --json` plus `node --test scripts/inventory-client-api-boundaries.test.mjs`; existing change-line ratchet is retained. |
+| A05–A11 | NOT STARTED | Refer to full plan and unblock per dependency order |
 
 ## Exact test commands (not yet marked PASS)
 
@@ -29,6 +30,12 @@ python backend/manage.py makemigrations --check --dry-run --settings=core.contra
 ```
 
 Then verify emulator/device multipart uploads against isolated seeded Django/PostgreSQL, and exact-head GitHub Actions. Do not count existing PR #181 checks as #191 evidence. Do not record skipped full-isolated QA as passed.
+
+## Second implementation batch
+
+- `5941a737`: new `backend/organizations/test_pharmacy_access_characterization.py` cross-tenant ownership/scoped visibility tests; read/write authorization implementation intentionally unchanged.
+- `5941a737` plus follow-up corrective commits: new read-only `scripts/inventory-client-api-boundaries.mjs` and Node tests; detects probable direct-route and generic escape-hatch usage across current client trees. Regex/newline escaping corrections pushed.
+- GitHub Actions started automatically. PASS status must be associated with final branch SHA rather than earlier commits.
 
 ## A02 behavioral guardrails
 
