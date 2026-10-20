@@ -8,6 +8,38 @@ const note={id:8,pharmacy:101,date:'2027-01-06',series_date:'2026-12-28',title:'
  start_time:'09:00:00',end_time:'10:00:00',notify_on_shift_start:false,is_general:false,recurrence:{freq:'WEEKLY',interval:2,byweekday:[0,2],until_date:'2027-04-01'},
  assignees:[{id:4,membership_id:702,user_id:2,user_name:'Worker',notified_at:null,created_at:''}],created_by:1,created_by_name:'Owner',created_at:'',updated_at:'2026-12-20T00:00:00.123456Z'};
 
+test('agenda sorts local times stably, leaves untimed tasks last and never changes the feed', () => {
+ const items = projectCalendarFeed({events: [], work_notes: [
+  {...note, id: 1, start_time: null, end_time: null},
+  {...note, id: 2, start_time: '14:00:00'},
+  {...note, id: 3, start_time: '09:00:00'},
+  {...note, id: 4, start_time: null, end_time: null},
+  {...note, id: 5, date: '2027-01-07'},
+  {...note, id: 6, is_planner_task: false},
+ ]});
+ const ids = items.map(item => item.id);
+ assert.deepEqual(model.plannerDayTasks(items, new Date(2027, 0, 6)).map(item => item.id), [3, 2, 1, 4]);
+ assert.deepEqual(items.map(item => item.id), ids);
+ assert.equal(model.plannerTimeLabel(null, null), undefined);
+ assert.equal(model.plannerTimeLabel('09:00:00', '10:30:00'), '09:00 - 10:30');
+ assert.equal(model.plannerTimeLabel('09:00:00'), '09:00');
+ assert.equal(model.plannerTimeLabel(null, '10:30:00'), '10:30');
+ assert.equal(items.find(item => item.id === 1)?.time, undefined);
+});
+
+test('week summary counts only planner occurrences in the selected week across a year boundary', () => {
+ const items = projectCalendarFeed({events: [], work_notes: [
+  {...note, id: 1, date: '2026-12-28', assignees: []},
+  {...note, id: 2, date: '2027-01-03', status: 'done'},
+  {...note, id: 3, date: '2027-01-04', assignees: []},
+  {...note, id: 4, date: '2027-01-01', is_planner_task: false},
+ ]});
+ assert.deepEqual(model.plannerWeekSummary(items, new Date(2027, 0, 1)), {total: 2, unassigned: 1, done: 1});
+ assert.deepEqual(model.plannerWeekSummary([], new Date(2027, 0, 1)), {total: 0, unassigned: 0, done: 0});
+ assert.equal(model.plannerInitials(' Alex Worker '), 'AW');
+ assert.equal(model.plannerInitials(''), '?');
+});
+
 test('Plan fetches the Monday to Sunday week, across month and year ends',()=>{
  for(const [day,from,to] of [['2027-01-01','2026-12-28','2027-01-03'],['2027-01-03','2026-12-28','2027-01-03'],['2027-01-04','2027-01-04','2027-01-10'],
   ['2026-11-01','2026-10-26','2026-11-01'],['2026-10-19','2026-10-19','2026-10-25']])

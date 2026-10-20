@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import {
   ActivityIndicator,
+  Avatar,
   Button,
   Card,
   Chip,
@@ -45,7 +46,7 @@ import {
   type PlannerCopyInput, type WorkNoteApi,
   weekRange, copyResultMessage, plannerCopyRequest, projectCalendarFeed,
   createCalendarEventService, updateCalendarEventService, deleteCalendarEventService, type CalendarItem,
-  calendarTaskState, taskRepeatLabel,
+  calendarTaskState, taskRepeatLabel, plannerDayTasks, plannerWeekSummary, plannerInitials,
 } from '@chemisttasker/shared-core';
 import {
   type ItemType,
@@ -59,6 +60,7 @@ import {
   formatTime,
 } from './calendarModel';
 import CalendarTaskDialog from './CalendarTaskDialog';
+import { brandColors } from '@/constants/theme';
 
 export default function SharedCalendarScreen() {
   const theme = useTheme();
@@ -309,10 +311,10 @@ export default function SharedCalendarScreen() {
 
   const filteredItems = useMemo(() => {
     if (!selectedDay || !isValid(selectedDay)) return [];
+    if (view === 'plan') return plannerDayTasks(items, selectedDay);
     return items
       .filter((item) => isSameDay(item.date, selectedDay))
       .filter((item) => {
-        if (view === 'plan') return item.type === 'note' && item.noteData?.is_planner_task;
         if (filterType === 'all') return true;
         if (filterType === 'events') return item.type === 'event';
         if (filterType === 'notes') return item.type === 'note';
@@ -320,6 +322,7 @@ export default function SharedCalendarScreen() {
         return true;
       });
   }, [selectedDay, items, filterType, view]);
+  const planSummary = plannerWeekSummary(items, selectedDay);
   const handlePrevMonth = () => {
     setCurrentMonth((prev) => subMonths(prev, 1));
     setSelectedDay((prev) => subMonths(prev, 1));
@@ -553,6 +556,9 @@ export default function SharedCalendarScreen() {
         <SegmentedButtons style={styles.selectorRow} value={view} onValueChange={setView} buttons={[
           { value: 'month', label: 'Month', style: styles.touch }, { value: 'plan', label: 'Plan', style: styles.touch },
         ]} />
+        {view === 'plan' && !loading && selectedPharmacyId && <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12 }}>
+          {planSummary.total} tasks · {planSummary.unassigned} unassigned · {planSummary.done} done
+        </Text>}
         <View style={[styles.mainGrid, isWide && view === 'month' ? styles.mainGridWide : null]}>
           {view === 'month' && <>
           <Card style={[styles.card, isWide ? styles.calendarCardWide : null]}>
@@ -638,7 +644,7 @@ export default function SharedCalendarScreen() {
           </Card>
           </>}
 
-          <Card style={[styles.card, isWide && view === 'month' ? styles.summaryCardWide : null]}>
+          <Card style={[styles.card, isWide && view === 'month' ? styles.summaryCardWide : null, view === 'plan' && { borderRadius: 14, borderWidth: 1, borderColor: isToday(selectedDay) ? theme.colors.primary : theme.colors.outline, backgroundColor: isToday(selectedDay) ? theme.colors.primaryContainer : theme.colors.surface }]}>
             <Card.Content>
             <View style={styles.dayNavigation}>
               <IconButton icon="chevron-left" size={24} style={styles.iconTouch} accessibilityLabel="Previous day" onPress={() => selectDay(addDays(selectedDay, -1))} />
@@ -700,6 +706,7 @@ export default function SharedCalendarScreen() {
             {filteredItems.map((item) => {
               const isExpanded = expandedId === item.id;
               const taskState = item.noteData ? calendarTaskState(item.noteData, canManagePlanner, user?.id) : undefined;
+              const planner = Boolean(item.noteData?.is_planner_task);
               const typeColor = item.noteData?.is_planner_task ? theme.colors.primary : getTypeColor(item.type);
 
               return (
@@ -709,16 +716,17 @@ export default function SharedCalendarScreen() {
                   onPress={() => item.noteData?.is_planner_task && taskState?.canEdit ? handleEditNote(item) : setExpandedId(isExpanded ? null : item.id)}
                   activeOpacity={0.8}
                 >
-                  <Card style={styles.itemCard}>
+                  <Card elevation={planner ? 1 : undefined} style={[styles.itemCard, planner && { backgroundColor: theme.colors.surface, borderLeftWidth: 3, borderLeftColor: item.noteData.is_clinical ? brandColors.cyan : theme.colors.outline }]}>
                     <Card.Content>
                       <View style={styles.itemHeader}>
-                        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.itemIcon, { backgroundColor: `${typeColor}22` }]}>
+                        {!planner && <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.itemIcon, { backgroundColor: `${typeColor}22` }]}>
                           <Icon source={getTypeIcon(item.type)} size={20} color={typeColor} />
-                        </View>
-                        <View style={styles.itemHeaderContent}>
-                          <Text style={styles.itemTitle}>{item.title}</Text>
-                          <Text style={styles.itemMeta}>{item.allDay ? 'All day' : item.time || ''}</Text>
-                          {item.type === 'note' && item.status && (!item.noteData?.is_planner_task || taskState?.label) && <Text style={styles.itemMeta}>
+                        </View>}
+                        <View style={[styles.itemHeaderContent, planner && { marginLeft: 0, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }]}>
+                          {planner && item.time && <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, fontVariant: ['tabular-nums'] }}>{item.time}</Text>}
+                          <Text numberOfLines={planner ? 1 : undefined} style={[styles.itemTitle, planner && { flex: 1, color: theme.colors.onSurface }]}>{item.title}</Text>
+                          {!planner && <Text style={styles.itemMeta}>{item.allDay ? 'All day' : item.time || ''}</Text>}
+                          {item.type === 'note' && item.status && !planner && <Text style={styles.itemMeta}>
                             {item.noteData?.is_planner_task ? taskState?.label : item.status}
                           </Text>}
                         </View>
@@ -731,17 +739,23 @@ export default function SharedCalendarScreen() {
                       </View>
 
                       {item.noteData?.is_planner_task && <>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                          {item.noteData.is_clinical && <Chip compact>Clinical</Chip>}
-                          {item.noteData.recurrence && <Chip compact icon="repeat">{taskRepeatLabel(item.noteData.recurrence)}</Chip>}
-                          {item.assignees?.length ? item.assignees.map((name, index) => <Chip compact key={index}>{name}</Chip>) : <Text>Unassigned</Text>}
+                        {(item.noteData.is_clinical || item.noteData.recurrence) && <View style={styles.plannerMeta}>
+                          {item.noteData.is_clinical && <Chip compact style={{ backgroundColor: theme.colors.surfaceVariant }} textStyle={{ color: theme.colors.onSurface }}>Clinical</Chip>}
+                          {item.noteData.recurrence && <Chip compact icon="repeat" style={{ backgroundColor: theme.colors.surfaceVariant }} textStyle={{ color: theme.colors.onSurface }}>{taskRepeatLabel(item.noteData.recurrence)}</Chip>}
+                        </View>}
+                        <View style={styles.plannerMeta}>
+                          {taskState?.label && <Chip compact style={{ backgroundColor: item.status === 'DONE' ? theme.colors.tertiaryContainer : brandColors.warningSoft }} textStyle={{ color: item.status === 'DONE' ? theme.colors.onTertiaryContainer : theme.colors.onSurface }}>{taskState.label}</Chip>}
+                          {item.assignees?.length ? item.assignees.map((name, index) => <View key={index} style={styles.plannerPerson}>
+                            <Avatar.Text label={plannerInitials(name)} size={22} color={theme.colors.onPrimaryContainer} style={{ backgroundColor: theme.colors.primaryContainer }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
+                            <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, flexShrink: 1 }}>{name}</Text>
+                          </View>) : <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>Unassigned</Text>}
                         </View>
 
                       </>}
                       {(isExpanded || item.noteData?.is_planner_task) && (
                         <View style={styles.itemDetails}>
                           {item.type === 'note' && item.noteData?.body ? (
-                            <Text style={styles.itemDetailText}>{item.noteData.body}</Text>
+                            <Text style={[styles.itemDetailText, planner && { color: theme.colors.onSurface }]}>{item.noteData.body}</Text>
                           ) : null}
                           {item.type !== 'note' && item.description ? (
                             <Text style={styles.itemDetailText}>{item.description}</Text>
@@ -752,7 +766,7 @@ export default function SharedCalendarScreen() {
                             </Text>
                           )}
                           {item.completedBy && item.completedBy.length > 0 && (
-                            <Text style={styles.itemDetailText}>
+                            <Text style={[styles.itemDetailText, planner && { color: theme.colors.onSurfaceVariant }]}>
                               Completed by: {item.completedBy.join(', ')}
                             </Text>
                           )}
@@ -1026,6 +1040,8 @@ export default function SharedCalendarScreen() {
 }
 
 const styles = StyleSheet.create({
+  plannerMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 8 },
+  plannerPerson: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%', flexShrink: 1 },
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
