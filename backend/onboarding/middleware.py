@@ -1,4 +1,5 @@
 """Apply the account freeze even to DRF views with their own permission classes."""
+from django.conf import settings
 from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 from rest_framework.exceptions import APIException
@@ -8,6 +9,8 @@ from onboarding.verification.state import ahpra_frozen, ahpra_profile, ahpra_sta
 
 class AhpraFreezeMiddleware(MiddlewareMixin):
     def process_view(self, request, view_func, view_args, view_kwargs):
+        if not settings.AHPRA_ENFORCEMENT_ENABLED:
+            return None
         if not request.path.startswith('/api/'):
             return None
         view_class = getattr(view_func, 'cls', None)

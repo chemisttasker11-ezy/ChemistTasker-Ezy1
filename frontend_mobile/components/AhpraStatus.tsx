@@ -13,7 +13,7 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
   const { summary, error, busy, seconds, recheck } = useAhpra();
   if (!summary) return null;
   const message = ahpraStatusMessage(summary);
-  const label = (summary.state !== 'rejected' && summary.state !== 'type_not_accepted' && summary.registration_status) || ({ ok: 'Verified', pending: 'Check pending', suspended: summary.frozen ? 'Account paused' : 'Registration suspended', not_found: 'Not found', unreadable: 'Not verified', rejected: 'Rejected', type_not_accepted: 'Registration type not accepted' } as const)[summary.state];
+  const label = (summary.state !== 'review' && summary.state !== 'rejected' && summary.state !== 'type_not_accepted' && summary.registration_status) || ({ review: 'Verification requires review', ok: 'Verified', pending: 'Check pending', suspended: summary.frozen ? 'Account paused' : 'Registration suspended', not_found: 'Not found', unreadable: 'Not verified', rejected: 'Rejected', type_not_accepted: 'Registration type not accepted' } as const)[summary.state];
   const attemptsExhausted = summary.state === 'unreadable' && summary.attempts >= 3;
   const isBlocked = summary.state === 'suspended' || summary.state === 'not_found' || summary.state === 'rejected' || summary.state === 'type_not_accepted';
 
@@ -62,8 +62,8 @@ export default function AhpraStatus({ submitLabel }: AhpraStatusProps = {}) {
             {busy ? 'Queuing check...' : 'Re-check'}
           </Button>
         )}
-        {summary.state === 'type_not_accepted' || (summary.state === 'unreadable' && summary.contact_support) ? (
-          <Button onPress={() => router.push('/contact')} contentStyle={styles.buttonContent}>{summary.state === 'type_not_accepted' ? 'Contact us' : 'Contact us now'}</Button>
+        {summary.state === 'review' || summary.state === 'type_not_accepted' || (summary.state === 'unreadable' && summary.contact_support) ? (
+          <Button onPress={() => router.push('/contact')} contentStyle={styles.buttonContent}>{summary.state === 'review' || summary.state === 'type_not_accepted' ? 'Contact us' : 'Contact us now'}</Button>
         ) : null}
       </View>
     </View>

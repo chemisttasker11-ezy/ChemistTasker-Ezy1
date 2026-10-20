@@ -17,7 +17,7 @@ class VerificationBadgeSerializer(serializers.Serializer):
 
 
 class AhpraStateSerializer(serializers.Serializer):
-    state = serializers.ChoiceField(choices=('ok', 'pending', 'suspended', 'not_found', 'unreadable', 'rejected', 'type_not_accepted'))
+    state = serializers.ChoiceField(choices=('ok', 'pending', 'suspended', 'not_found', 'unreadable', 'rejected', 'type_not_accepted', 'review'))
     attempts = serializers.IntegerField(default=0)
     contact_support = serializers.BooleanField(default=False)
     frozen = serializers.BooleanField(default=False)

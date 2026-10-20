@@ -16,8 +16,8 @@ desktop, which drives a Claude Code session, is the fallback and also repairs
 the extension when it breaks. Both connect to
 `wss://staging.chemisttasker.com.au/ws/ahpra-verifier/` with one shared token.
 The server stores only the token's SHA-256 hash. Members of pharmacies or
-organisations never need AHPRA. The release adds three additive migrations:
-`client_profile` 0081, 0082, 0083 and 0084.
+organisations never need AHPRA. The release adds five additive migrations:
+`client_profile` 0081-0085.
 
 ## 2. Owner decisions (already made, do not reopen)
 
@@ -99,11 +99,12 @@ Done check (both paths):
 ```bash
 git rev-parse HEAD
 git merge-base --is-ancestor 278f891b HEAD && echo "has AHPRA release"
-ls backend/client_profile/migrations | grep -E '^008[1234]_'
+ls backend/client_profile/migrations | grep -E '^008[12345]_'
 ```
 
-You see `has AHPRA release` and the four files `0081_ahpra_check.py`,
-`0082_ahpra_check_stages.py`, `0083_owner_ahpra_switched_to_manager.py`, `0084_ahpra_check_public_recheck.py`.
+You see `has AHPRA release` and the five files `0081_ahpra_check.py`,
+`0082_ahpra_check_stages.py`, `0083_owner_ahpra_switched_to_manager.py`,
+`0084_ahpra_check_public_recheck.py` and `0085_ahpra_check_type_not_accepted.py` (0081-0085).
 
 ## 6. Migrations
 
@@ -131,8 +132,8 @@ compose run --rm --no-deps -e LOCAL_DB_NAME=ahpra_rehearsal \
 docker exec chemisttasker_postgres_staging dropdb -U chemisttasker_staging ahpra_rehearsal
 ```
 
-Done check: `migrate` exits 0 and `showmigrations` shows `[X]` for 0081, 0082
-0083 and 0084. Then **stop and report to the owner**. Change
+Done check: `migrate` exits 0 and `showmigrations` shows `[X]` for 0081-0085.
+Then **stop and report to the owner**. Change
 `STAGING_RUN_MIGRATIONS` to `1` in `env/staging.runtime.env` only when the
 owner approves. If the rehearsal fails, report the error lines and stop.
 
@@ -193,10 +194,10 @@ Record the new SHA:
 
 ```bash
 git rev-parse HEAD | tee /opt/apps/chemisttasker-staging-ops/ahpra-deployed-sha.txt
-compose exec -T web python manage.py showmigrations client_profile | tail -4
+compose exec -T web python manage.py showmigrations client_profile | tail -5
 ```
 
-`showmigrations` shows `[X]` for 0081, 0082, 0083 and 0084.
+`showmigrations` shows `[X]` for 0081-0085.
 
 ## 9. Confirm the settings inside the containers
 
@@ -345,6 +346,8 @@ after the web restart).
 
 ## 12. Hidden staff test page
 
+- The staff page and no-login test link stay off in production
+  (`AHPRA_TEST_LOOKUP_ENABLED=0`; no production lookup key).
 - URL: `https://staging.chemisttasker.com.au/admin/ahpra-test-lookup/` (the
   admin path on staging is `admin/`; the URL name is
   `otpadmin:ahpra_test_lookup`). It is not linked anywhere.
@@ -381,6 +384,13 @@ after the web restart).
 
 ## 13. Rollback
 
+**Kill switch:** set `STAGING_AHPRA_ENFORCEMENT_ENABLED=0` in
+`env/staging.runtime.env` and redeploy web/worker/beat with
+`bash scripts/deploy-staging.sh`. Freezes lift immediately on the redeployed
+services; public AHPRA gates, cancellations and owner role switches stop while
+checks and results keep recording. Set it back to `1` and redeploy
+web/worker/beat after the incident. Existing cancellations are not reversed.
+
 Remove the `STAGING_AHPRA_SOURCE=desktop` line from
 `env/staging.runtime.env` (the default is `scrapingbee`, which stays paused),
 then:
@@ -393,7 +403,7 @@ bash scripts/smoke-staging.sh https://staging.chemisttasker.com.au
 Done check: the step 9 loop shows `source=scrapingbee`.
 
 Rolling the code back to the release before this one is also safe without
-reversing migrations 0081-0084 (0084 only adds a choice value). Older code never reads or writes the
+reversing migrations 0081-0085 (0084 and 0085 only add choice values). Older code never reads or writes the
 `AhpraCheck` table (0081 creates it, 0082 only adds columns to it), and the one
 new column on an existing table, `owneronboarding.ahpra_switched_to_manager`
 (0083), has a database default of `false`, so owner rows inserted by older code
@@ -430,7 +440,7 @@ The owner does these. Details: `scripts/ahpra_verifier/README.md`, section
 - [ ] SHA before and after (step 4 and step 8), and which path (A or B)
 - [ ] `STAGING_RUN_MIGRATIONS` value; rehearsal result if it was `0`
 - [ ] `DB_BACKUP` path printed by the deploy
-- [ ] 0081, 0082, 0083, 0084 shown as applied
+- [ ] 0081-0085 shown as applied
 - [ ] Whether `ADMIN_EMAILS` (plain) was found in any env file
 - [ ] Smoke test result after each deploy
 - [ ] Step 9 output for all three containers (lengths and yes/no only)

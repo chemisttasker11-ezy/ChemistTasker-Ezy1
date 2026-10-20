@@ -86,7 +86,7 @@ export function normalizeVerification(value: unknown, ahpra?: unknown): Verifica
   const check = (ahpra ?? raw.ahpra) as Record<string, any> | null | undefined;
   return {
     ahpra: check ? {
-      frozen: Boolean(check.frozen),
+      frozen: check.state !== 'review' && Boolean(check.frozen),
       attempts: check.attempts ?? 0,
       contact_support: Boolean(check.contact_support ?? check.contactSupport),
       state: check.state, registration_status: check.registration_status ?? check.registrationStatus ?? null,

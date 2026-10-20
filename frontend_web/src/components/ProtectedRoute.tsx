@@ -56,7 +56,7 @@ export default function ProtectedRoute({
   if (location.pathname.endsWith('/logout')) return children;
 
   const isAhpraRole = user.role === 'PHARMACIST' || user.role === 'OTHER_STAFF';
-  const isFrozen = isAhpraRole && Boolean(ahpra.summary?.frozen || ahpra.refusal);
+  const isFrozen = isAhpraRole && ahpra.summary?.state !== 'review' && Boolean(ahpra.summary?.frozen || ahpra.refusal);
 
   if (isAhpraRole && ahpra.loading) {
     return (

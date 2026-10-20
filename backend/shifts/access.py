@@ -2,6 +2,7 @@
 
 `client_profile.domains.common.access` and `shifts.base` re-export them at their historical paths.
 """
+from django.conf import settings
 from rest_framework import permissions, status
 from rest_framework.exceptions import APIException
 
@@ -108,6 +109,9 @@ def _user_can_perform_shift_role(user, shift_role):
     if role == "PHARMACIST" and _normalized_role_code(getattr(user, "role", None)) == "OWNER":
         from onboarding.models import OwnerOnboarding
         # Pharmacy managers (including AHPRA-suspended owners) still see their shifts but can't work as pharmacists.
-        if OwnerOnboarding.objects.filter(user=user, role="MANAGER").exists():
+        managers = OwnerOnboarding.objects.filter(user=user, role="MANAGER")
+        if not settings.AHPRA_ENFORCEMENT_ENABLED:
+            managers = managers.filter(ahpra_switched_to_manager=False)
+        if managers.exists():
             return False
     return role in _shift_roles_visible_to_user(user)

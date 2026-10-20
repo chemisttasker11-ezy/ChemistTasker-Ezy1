@@ -2,18 +2,24 @@
 from datetime import date, timedelta
 import logging
 
+from django.conf import settings
 from django.core.cache import caches
 from django.db import transaction
 from django.utils import timezone
 
 from onboarding.models import AhpraCheck, OwnerOnboarding, PharmacistOnboarding
 from onboarding.services.work_profile import current_worker_profile
-from onboarding.verification.ahpra import registration_type_note
+from onboarding.verification.ahpra import ahpra_name_match, registration_type_note
 from onboarding.verification.ahpra_numbers import full_registration_number
 
 ADVERSE_STATUSES = {'suspended', 'cancelled', 'surrendered'}
 # Lookups with no real register record: they never change anyone's AHPRA state.
 VERIFIER_FAILURES = ('error', 'blocked')
+REVIEW_NOTE = (
+    'Your AHPRA registration needs a quick review by our team before you can apply for public '
+    "shifts. We'll let you know when it's done. If something looks wrong, check your name and "
+    'registration number, or contact us.'
+)
 logger = logging.getLogger(__name__)
 _cooldown_cache_failed = False
 
@@ -54,7 +60,14 @@ def ahpra_state(profile):
     )
     state = 'pending'
     if check:
-        if check.outcome == 'not_found' or normalized_status == 'not registered':
+        # A different person's record cannot impose restrictions; an admin's review of the check settles it.
+        mismatch = not check.reviewed_at and bool(data.get('name')) and not ahpra_name_match(
+            data['name'], profile.user.first_name, profile.user.last_name)
+        if mismatch:
+            state = 'review'
+        elif check.outcome == 'review' and normalized_status in ADVERSE_STATUSES | {'registered', 'not registered'}:
+            state = 'review'
+        elif check.outcome == 'not_found' or normalized_status == 'not registered':
             state = 'not_found'
         elif normalized_status in ADVERSE_STATUSES:
             state = 'suspended'
@@ -98,6 +111,8 @@ def ahpra_state(profile):
     note = check.note if check else ''
     if state == 'rejected':
         note = 'Your AHPRA check was rejected. Contact support before applying for public shifts.'
+    elif state == 'review':
+        note = REVIEW_NOTE
     elif state == 'suspended':
         note = (member_suspension_note(status) + ' Your owner profile is now a Pharmacy Manager.') if isinstance(profile, OwnerOnboarding) else (
             f'Your AHPRA registration shows as {status}. Your ChemistTasker account is paused until this changes. '
@@ -132,12 +147,14 @@ def member_suspension_note(status):
 
 
 def require_ahpra_application(user):
+    if not settings.AHPRA_ENFORCEMENT_ENABLED:
+        return
     from shifts.access import ShiftActionRefused
     profile = ahpra_profile(user)
     state = ahpra_state(profile)
     if state['state'] == 'suspended' and not ahpra_frozen(user, state):
         state['note'] = member_suspension_note(state['registration_status'])
-    if state['state'] in ('not_found', 'suspended', 'unreadable', 'rejected', 'type_not_accepted'):
+    if state['state'] in ('not_found', 'suspended', 'unreadable', 'rejected', 'type_not_accepted', 'review'):
         raise ShiftActionRefused({'code': f"ahpra_{state['state']}", 'detail': state['note']}, 403)
     if isinstance(profile, OwnerOnboarding) and profile.role != 'PHARMACIST':
         raise ShiftActionRefused({'code': 'pharmacist_required', 'detail': 'Pharmacy managers cannot apply as pharmacists.'}, 403)
@@ -183,6 +200,8 @@ def queue_public_recheck(user):
 
 
 def ahpra_frozen(user, state=None):
+    if not settings.AHPRA_ENFORCEMENT_ENABLED:
+        return False
     from memberships.models import Membership
     from users.models import OrganizationMembership
 
@@ -193,33 +212,42 @@ def ahpra_frozen(user, state=None):
     ) and not OrganizationMembership.objects.filter(user=user).exists()
 
 
+@transaction.atomic
 def apply_state_transition(profile, previous):
     """Called under the profile/check locks, after saving the finished check."""
     from onboarding.verification.policy import refresh_verified, revoke_for_changed_evidence
     profile.refresh_from_db()
     current = ahpra_state(profile)
-    if current['state'] in ('suspended', 'not_found', 'unreadable', 'rejected', 'type_not_accepted'):
+    if current['state'] in ('suspended', 'not_found', 'unreadable', 'rejected', 'type_not_accepted', 'review'):
         revoked = revoke_for_changed_evidence(profile, 'ahpra')
-        if current['state'] in ('suspended', 'unreadable', 'rejected', 'type_not_accepted'):
+        if current['state'] in ('suspended', 'unreadable', 'rejected', 'type_not_accepted', 'review'):
             profile.ahpra_verified = False
             profile.verified = False
             profile.save(update_fields=['ahpra_verified', 'verified'])
-            if current['state'] in ('suspended', 'type_not_accepted') and isinstance(profile, OwnerOnboarding) and profile.role != 'MANAGER':
+            if (settings.AHPRA_ENFORCEMENT_ENABLED and current['state'] in ('suspended', 'type_not_accepted')
+                    and isinstance(profile, OwnerOnboarding) and profile.role != 'MANAGER'):
                 profile.role, profile.ahpra_switched_to_manager = 'MANAGER', True
                 profile.save(update_fields=['role', 'ahpra_switched_to_manager'])
         elif revoked:
             profile.save(update_fields=['verified'])
     elif current['state'] == 'ok':
-        if isinstance(profile, OwnerOnboarding) and profile.ahpra_switched_to_manager:
+        if settings.AHPRA_ENFORCEMENT_ENABLED and isinstance(profile, OwnerOnboarding) and profile.ahpra_switched_to_manager:
             profile.role, profile.ahpra_switched_to_manager = 'PHARMACIST', False
             profile.save(update_fields=['role', 'ahpra_switched_to_manager'])
         refresh_verified(profile)
+    if not settings.AHPRA_ENFORCEMENT_ENABLED:
+        return
+    adverse_transition = current['state'] in ('suspended', 'type_not_accepted') and previous['state'] != current['state']
+    if adverse_transition:
+        from shifts.cancellation import cancel_upcoming_assignments
+        reason = ('their AHPRA registration type is not accepted for pharmacist shifts'
+                  if current['state'] == 'type_not_accepted' else 'their AHPRA registration is paused')
+        bookings = cancel_upcoming_assignments(profile.user, reason=reason)
+        transaction.on_commit(lambda: announce_suspension(profile, current, bookings), robust=True)
     if current['state'] == 'suspended' and previous['state'] != 'suspended':
         if not profile.user.is_staff and ahpra_frozen(profile.user):
             transaction.on_commit(lambda: close_chat_sockets(profile.user_id), robust=True)
-        transaction.on_commit(lambda: announce_suspension(profile, current), robust=True)
-    elif current['state'] == 'type_not_accepted' and previous['state'] == 'ok':
-        transaction.on_commit(lambda: announce_suspension(profile, current), robust=True)
+        transaction.on_commit(lambda: announce_member_suspension(profile.user, current['registration_status']), robust=True)
 
 
 def close_chat_sockets(user_id):
@@ -232,17 +260,13 @@ def close_chat_sockets(user_id):
         async_to_sync(layer.group_send)(USER_GROUP_FMT.format(user_id=user_id), {'type': 'ahpra.suspended'})
 
 
-def announce_suspension(profile, state):
+def announce_suspension(profile, state, bookings):
     from django.conf import settings
     from django.core.mail import send_mail
     from core.task_queue import async_task
     from notifications.services import notify_users
-    from shifts.cancellation import cancel_upcoming_assignments
 
     type_not_accepted = state['state'] == 'type_not_accepted'
-    reason = ('their AHPRA registration type is not accepted for pharmacist shifts' if type_not_accepted
-              else 'their AHPRA registration is paused')
-    bookings = cancel_upcoming_assignments(profile.user, reason=reason)
     notify_users([profile.user_id], title='AHPRA registration type not accepted' if type_not_accepted else 'AHPRA registration paused',
                  body=state['note'], payload={'code': f"ahpra_{state['state']}"})
     async_task('users.tasks.send_async_email', subject='Your AHPRA registration',
@@ -261,3 +285,34 @@ def announce_suspension(profile, state):
                   f"Status: {state['registration_status']}\nType: {state['registration_type']}\nCancelled shifts:\n{rows or 'None'}\n"
                   f"Retained bookings:\n{retained or 'None'}",
                   settings.DEFAULT_FROM_EMAIL, recipients)
+
+
+def announce_member_suspension(user, status):
+    from core.task_queue import async_task
+    from memberships.models import Membership
+    from notifications.services import notify_users
+    from organizations.models import PharmacyAdmin
+    from users.models import OrganizationMembership, User
+
+    pharmacies = Membership.objects.filter(
+        user=user, pharmacy__isnull=False, is_active=True, status=Membership.Status.ACCEPTED,
+    ).select_related('pharmacy__owner')
+    pharmacy_ids = [membership.pharmacy_id for membership in pharmacies]
+    recipient_ids = {membership.pharmacy.owner.user_id for membership in pharmacies if membership.pharmacy.owner_id}
+    recipient_ids.update(PharmacyAdmin.objects.filter(
+        pharmacy_id__in=pharmacy_ids, is_active=True).values_list('user_id', flat=True))
+    organizations = OrganizationMembership.objects.filter(user=user).values_list('organization_id', flat=True)
+    recipient_ids.update(OrganizationMembership.objects.filter(
+        organization_id__in=organizations, role__in=['ORG_ADMIN', 'CHIEF_ADMIN', 'REGION_ADMIN'],
+    ).values_list('user_id', flat=True))
+    recipients = list(User.objects.filter(pk__in=recipient_ids, is_active=True).exclude(pk=user.pk))
+    if not recipients:
+        return
+    message = f"Your team member {user.get_full_name() or user.email}'s AHPRA registration now shows as {status}"
+    notify_users([recipient.pk for recipient in recipients], title='Team member AHPRA registration', body=message,
+                 payload={'code': 'ahpra_member_suspended'})
+    emails = sorted({recipient.email for recipient in recipients if recipient.email})
+    if emails:
+        async_task('users.tasks.send_async_email', subject='Team member AHPRA registration', recipient_list=emails,
+                   template_name='emails/ahpra_status.html', text_template='emails/ahpra_status.txt',
+                   context={'message': message}, suppress_auto_notification=True)

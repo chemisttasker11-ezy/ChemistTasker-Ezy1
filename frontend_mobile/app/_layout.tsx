@@ -240,7 +240,7 @@ function AuthGate() {
 
   useEffect(() => {
     if (isLoading || ahpraLoading) return;
-    if (user && user.role !== 'OWNER' && (ahpraSummary?.frozen || ahpraRefusal)) {
+    if (user && user.role !== 'OWNER' && ahpraSummary?.state !== 'review' && (ahpraSummary?.frozen || ahpraRefusal)) {
       if (!onAhpraStep && !onInvitePage) router.replace(ahpraPath as any);
       else if (ahpraRefusal) clearRefusal();
       return;
@@ -415,9 +415,9 @@ function AuthGate() {
     return () => {
       active = false;
     };
-  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user, ahpraLoading, ahpraSummary?.frozen, ahpraRefusal, clearRefusal, ahpraPath, onAhpraStep, onInvitePage]);
+  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user, ahpraLoading, ahpraSummary?.frozen, ahpraSummary?.state, ahpraRefusal, clearRefusal, ahpraPath, onAhpraStep, onInvitePage]);
 
-  if (user && (ahpraLoading || (user.role !== 'OWNER' && (ahpraSummary?.frozen || ahpraRefusal) && !onAhpraStep && !onInvitePage))) {
+  if (user && (ahpraLoading || (user.role !== 'OWNER' && ahpraSummary?.state !== 'review' && (ahpraSummary?.frozen || ahpraRefusal) && !onAhpraStep && !onInvitePage))) {
     return <View style={{ position: 'absolute', inset: 0, zIndex: 10000, backgroundColor: '#FFFFFF', padding: 24, justifyContent: 'center' }}>
       {ahpraLoading ? <Text>Loading AHPRA status...</Text> : <AhpraStatus />}
     </View>;

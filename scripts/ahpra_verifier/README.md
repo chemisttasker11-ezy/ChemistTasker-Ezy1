@@ -64,17 +64,29 @@ The bridge adheres to a fixed bidirectional WebSocket protocol:
 
 Optional repair requests run one Opus Claude CLI subprocess at a time, independently
 of lookups; additional repair requests while busy are ignored. Set
-`AHPRA_REPAIR_WORKTREE` to a separate, clean git worktree used only for repairs (e.g.
-`git worktree add C:\dev\worktrees\chemisttasker-ahpra-repair`), never the worktree the
-bridge runs from or one you edit (required for repairs; otherwise the bridge reports
-"not configured"). `AHPRA_REPAIR_CLAUDE_CONFIG_DIR`
-optionally sets that subprocess's `CLAUDE_CONFIG_DIR`.
+`AHPRA_REPAIR_WORKTREE` to a checkout on the non-repair base branch to repair
+(required; otherwise the bridge reports "not configured"). Its files are never
+used as the repair workspace: every run creates a fresh detached git worktree in
+a temporary folder from that base branch, then creates
+`ahpra-repair/<yyyymmdd-hhmm>`. Existing branch names are never reused.
+The temporary worktree is removed with `git worktree remove --force` after every
+run, including failures and timeouts. Uncommitted changes and empty repair
+branches are discarded; committed repair branches are kept and reported.
+A human must review the branch before any merge. Repairs never push, merge,
+deploy, or solve CAPTCHAs.
+
+The repair subprocess receives only PATH, SystemRoot, TEMP/TMP, USERPROFILE,
+APPDATA, LOCALAPPDATA, HOMEDRIVE/HOMEPATH, ENABLE_TOOL_SEARCH=false, and optionally
+CLAUDE_CONFIG_DIR from `AHPRA_REPAIR_CLAUDE_CONFIG_DIR`. No token, secret, key,
+password or other inherited environment variables are passed. File tool grants
+are limited to the disposable worktree. Bash grants allow only the extension
+Node tests, bridge Python unit tests, git status/diff/add/commit/log and creation
+of ahpra-repair branches; the existing deny-list also applies. Unapproved tools
+cannot fall back to automatic permission approval.
 `AHPRA_REPAIR_TIMEOUT_SECONDS` defaults to `1800` (30 minutes).
 The runner uses `AHPRA_CLAUDE_CMD` (default `claude.cmd`) and `repair_prompt.md`.
 It returns `repair_report` with the check ID, a summary capped at 4000 characters,
-and the current worktree branch. Reports wait for reconnect if disconnected.
-Repairs may commit only on a new `ahpra-repair/<yyyymmdd-hhmm>` branch; an admin
-must review it. They never push, merge, deploy, or solve CAPTCHAs.
+and the committed repair branch, if any. Reports wait for reconnect if disconnected.
 
 ## Directory Structure
 
@@ -132,7 +144,7 @@ All settings are configured exclusively through environment variables. The servi
 | `AHPRA_BLOCKED_PAUSE_SECONDS` | No | `1800` | Cooldown period in seconds (30 minutes) when bot detection / CAPTCHA is encountered. |
 | `AHPRA_LOOKUP_TIMEOUT` | No | `180` | Subprocess execution timeout in seconds per check. |
 | `AHPRA_CLAUDE_CMD` | No | `claude.cmd` | Command or path to the Claude CLI executable. |
-| `AHPRA_REPAIR_WORKTREE` | No | — | Separate clean git worktree used only for repairs (see Optional Repairs). |
+| `AHPRA_REPAIR_WORKTREE` | No | — | Checkout whose current non-repair branch is the base for disposable repairs (see Optional Repairs). |
 
 ---
 
@@ -321,7 +333,7 @@ attention with no repair report after 45 minutes sends the same email.
 - Log rotation uses Python's standard `RotatingFileHandler`:
   - Maximum file size: **1 MB** (`1,000,000` bytes)
   - Backup files kept: **3** (`bridge.log.1`, `bridge.log.2`, `bridge.log.3`)
-- **Security:** `AHPRA_VERIFIER_TOKEN` is strictly excluded from all log messages. Connection logs only record the target URL and agent hostname.
+- **Security:** `AHPRA_VERIFIER_TOKEN` and registration numbers are excluded from logs, including exception diagnostics. Check logs identify only the check ID. Connection logs only record the target URL and agent hostname.
 
 ## End-to-end test (local)
 

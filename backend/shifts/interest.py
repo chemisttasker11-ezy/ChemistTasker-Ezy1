@@ -5,6 +5,7 @@ The views translate the request into these calls and serialize the rows they ret
 """
 from datetime import datetime
 
+from django.conf import settings
 from rest_framework import status
 
 from memberships.models import FAVORITE_STAFF_EMPLOYMENT_TYPES, Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
@@ -37,6 +38,14 @@ def is_public_shift_member_access(user, shift):
 
 
 def _require_public_shift_onboarding(user):
+    if not settings.AHPRA_ENFORCEMENT_ENABLED:
+        from onboarding.services.work_profile import current_worker_profile
+        from onboarding.verification.policy import requirements
+        profile = current_worker_profile(user)
+        if profile is not None:
+            checks = requirements(profile)
+            if 'ahpra' in checks and all(met for name, met in checks.items() if name != 'ahpra'):
+                return
     if user.role == 'PHARMACIST':
         po = PharmacistOnboarding.objects.filter(user=user).first()
         if not po:

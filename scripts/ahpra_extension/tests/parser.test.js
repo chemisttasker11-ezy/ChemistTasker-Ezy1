@@ -136,3 +136,36 @@ test('fallback to previous behaviour when no No. header line exists', () => {
 });
 console.log(`${passed} parser tests passed`);
 
+// Exercise the actual options-message handler without Chrome or a network connection.
+(async () => {
+  const {runInNewContext} = require('node:vm');
+  const {readFileSync} = require('node:fs');
+  const event = {addListener() {}};
+  let handler;
+  const chrome = {
+    storage: {local: {async setAccessLevel() {}, async get() { return {}; }, async set() {}}},
+    tabs: {onUpdated: event, onRemoved: event},
+    alarms: {async create() {}, onAlarm: event},
+    notifications: {onButtonClicked: event, onClicked: event},
+    action: {onClicked: event},
+    runtime: {onMessage: {addListener(fn) { handler = fn; }}},
+  };
+  runInNewContext(readFileSync(require.resolve('../background.js'), 'utf8'), {
+    chrome, self: {location: {origin: 'chrome-extension://test'}}, URL,
+    WebSocket: class { static OPEN = 1; static CONNECTING = 0; close() {} },
+    clearTimeout, clearInterval,
+  });
+  const configure = url => new Promise(resolve => handler(
+    {type: 'configure', enabled: true, url, token: 'test', gap: 30},
+    {origin: 'chrome-extension://test'}, resolve,
+  ));
+  for (const url of ['wss://example.test/ws', 'ws://localhost/ws', 'ws://127.0.0.1/ws', 'ws://[::1]/ws']) {
+    assert.equal((await configure(url)).error, undefined, url);
+  }
+  for (const url of ['ws://example.test/ws', 'ws://localhost.example.test/ws', 'http://localhost/ws',
+    'wss://user:password@example.test/ws', 'not a URL']) {
+    assert.match((await configure(url)).error, /wss:\/\/|valid websocket URL/, url);
+  }
+  console.log('PASS extension websocket URL configuration');
+})().catch(error => { console.error(error); process.exitCode = 1; });
+

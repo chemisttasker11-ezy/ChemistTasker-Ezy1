@@ -76,7 +76,7 @@ def lookup_page(request, url, template, context, limited=False):
     })
 
 
-@csrf_exempt  # No login or session: the secret key in the URL is the only credential.
+@csrf_exempt  # Intentional key-only diagnostic endpoint: no login or session authority is used.
 @require_http_methods(['GET', 'POST'])
 def key_lookup_view(request, key):
     expected = settings.AHPRA_TEST_LOOKUP_KEY
@@ -85,7 +85,7 @@ def key_lookup_view(request, key):
         response = HttpResponseNotFound()
         response._has_been_logged = True  # Django would log the path, which may hold the real key.
         return response
-    return lookup_page(request, request.path, 'onboarding/ahpra_test_lookup_public.html', {}, limited=True)
+    return lookup_page(request, reverse('api_v1:ahpra-test-key-lookup', args=[key]), 'onboarding/ahpra_test_lookup_public.html', {}, limited=True)
 
 
 def lookup_urls(admin_site):

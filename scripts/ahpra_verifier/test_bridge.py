@@ -13,6 +13,8 @@ import json
 import logging
 import os
 import subprocess
+import tempfile
+from pathlib import Path
 import threading
 import time
 from types import SimpleNamespace
@@ -23,6 +25,7 @@ from scripts.ahpra_verifier.bridge import (
     AhpraBridge,
     default_runner,
     default_repair_runner,
+    isolated_repair,
     load_config,
     parse_cli_output,
     strip_code_fences,
@@ -941,24 +944,41 @@ class TestRepairHandling(unittest.IsolatedAsyncioTestCase):
             "type": "hello", "token": "test-token", "agent": "desktop", "kind": "bridge",
         })
 
+    def repair_repo(self):
+        folder = tempfile.TemporaryDirectory(prefix="ahpra-test-")
+        self.addCleanup(folder.cleanup)
+        base = folder.name
+        for args in [("init", "-b", "repair-base"), ("config", "user.name", "Test"),
+                     ("config", "user.email", "test@example.test"),
+                     ("commit", "--allow-empty", "-m", "base")]:
+            self.git(base, *args)
+        return base
+
+    def git(self, cwd, *args):
+        return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True,
+                              text=True).stdout.strip()
+
     async def test_repair_is_single_flight_and_does_not_block_messages(self):
+        base = self.repair_repo()
         started, release = threading.Event(), threading.Event()
         calls = []
 
         def runner(reg, errors, worktree):
             calls.append((reg, errors, worktree))
+            self.assertNotEqual(worktree, base)
+            self.assertTrue(Path(worktree).is_dir())
+            self.assertTrue(self.git(worktree, "branch", "--show-current").startswith("ahpra-repair/"))
             started.set()
             release.wait(5)
-            return "Fixed selectors; tests passed."
+            Path(worktree, "discard.txt").write_text("uncommitted")
+            return "No site change."
 
         bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=runner)
         bridge.ws = FakeWebSocket()
-        with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": "repair-worktree"}), \
-                patch("scripts.ahpra_verifier.bridge.repair_branch",
-                      side_effect=["main", "ahpra-repair/20261019-1200"]):
+        with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": base}):
             try:
                 await bridge.handle_message(json.dumps(self.message))
-                self.assertTrue(await asyncio.to_thread(started.wait, 2))
+                self.assertTrue(await asyncio.to_thread(started.wait, 3))
                 await bridge.handle_message(json.dumps({**self.message, "check_id": 124}))
                 await bridge.handle_message('{"type":"ping"}')
                 await bridge.handle_message(json.dumps({"type": "check", "check_id": 125,
@@ -968,76 +988,107 @@ class TestRepairHandling(unittest.IsolatedAsyncioTestCase):
             finally:
                 release.set()
                 await bridge._repair_task
-        self.assertEqual(calls, [(self.message["registration_number"], self.message["errors"], "repair-worktree")])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][:2], (self.message["registration_number"], self.message["errors"]))
+        self.assertFalse(Path(calls[0][2]).exists())
+        self.assertEqual(self.git(base, "branch", "--list", "ahpra-repair/*"), "")
         self.assertEqual(bridge.ws.get_sent_json()[1:], [{
-            "type": "repair_report", "check_id": 123,
-            "summary": "Fixed selectors; tests passed.", "branch": "ahpra-repair/20261019-1200",
+            "type": "repair_report", "check_id": 123, "summary": "No site change.", "branch": "",
         }])
 
     async def test_missing_worktree_reports_not_configured(self):
-        def runner(*args):
-            self.fail("Unconfigured repairs must not run")
-
-        bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=runner)
+        bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=lambda *args: self.fail())
         bridge.ws = FakeWebSocket()
         with patch.dict(os.environ, {}, clear=True):
-            await bridge.handle_message(json.dumps(self.message))
-            await bridge._repair_task
+            await bridge._run_repair(self.message)
         report, = bridge.ws.get_sent_json()
-        self.assertEqual(report["type"], "repair_report")
         self.assertIn("not configured", report["summary"])
         self.assertEqual(report["branch"], "")
 
-    async def test_timeout_reports_branch_and_queues_until_reconnect(self):
-        def runner(*args):
-            raise subprocess.TimeoutExpired("claude", 1800)
+    async def test_commits_survive_cleanup_including_timeout_and_failure(self):
+        for failure in [None, subprocess.TimeoutExpired("claude", 1800), RuntimeError("private")]:
+            with self.subTest(failure=type(failure).__name__):
+                base = self.repair_repo()
+                paths = []
 
-        bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=runner)
-        with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": "repair-worktree"}), \
-                patch("scripts.ahpra_verifier.bridge.repair_branch",
-                      side_effect=["main", "ahpra-repair/test"]):
-            await bridge.handle_message(json.dumps(self.message))
-            await bridge._repair_task
-        bridge.ws = FakeWebSocket()
-        await bridge._flush_pending_results()
-        report, = bridge.ws.get_sent_json()
-        self.assertIn("timed out", report["summary"])
-        self.assertEqual(report["branch"], "ahpra-repair/test")
-
-    async def test_only_new_repair_branches_are_reported(self):
-        for before, after in [("main", "main"), ("main", "other"),
-                              ("ahpra-repair/old", "ahpra-repair/old"),
-                              ("main", ""), ("ahpra-repair/old", "ahpra-repair/new")]:
-            with self.subTest(before=before, after=after):
-                def runner(*args):
-                    self.assertEqual(branch.call_count, 1)
-                    return "No change."
+                def runner(reg, errors, worktree):
+                    paths.append(worktree)
+                    self.git(worktree, "commit", "--allow-empty", "-m", "repair")
+                    if failure:
+                        raise failure
+                    return "Fixed selectors."
 
                 bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=runner)
+                with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": base}):
+                    await bridge._run_repair(self.message)
                 bridge.ws = FakeWebSocket()
-                with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": "repair-worktree"}), \
-                        patch("scripts.ahpra_verifier.bridge.repair_branch",
-                              side_effect=[before, after]) as branch:
-                    await bridge.handle_message(json.dumps(self.message))
-                    await bridge._repair_task
-                expected = "ahpra-repair/new" if after == "ahpra-repair/new" else ""
-                self.assertEqual(bridge.ws.get_sent_json()[0]["branch"], expected)
+                await bridge._flush_pending_results()
+                report, = bridge.ws.get_sent_json()
+                self.assertTrue(report["branch"].startswith("ahpra-repair/"))
+                self.assertFalse(Path(paths[0]).exists())
+                self.assertEqual(self.git(base, "log", "-1", "--format=%s", report["branch"]), "repair")
+                self.assertEqual(self.git(base, "branch", "--show-current"), "repair-base")
+                self.assertEqual(len(self.git(base, "worktree", "list", "--porcelain").split("worktree ")) - 1, 1)
+                self.assertNotIn("private", report["summary"])
+
+    async def test_failed_uncommitted_run_is_discarded_and_next_run_is_fresh(self):
+        base = self.repair_repo()
+        Path(base, "base-only.txt").write_text("existing base checkout changes")
+        paths = []
+
+        def runner(reg, errors, worktree):
+            paths.append(worktree)
+            self.assertFalse(Path(worktree, "discard.txt").exists())
+            self.assertFalse(Path(worktree, "base-only.txt").exists())
+            Path(worktree, "discard.txt").write_text("partial")
+            raise RuntimeError("private")
+
+        for _ in range(2):
+            summary, branch = await asyncio.to_thread(isolated_repair, "PHA123", [], base, runner)
+            self.assertIn("failed", summary)
+            self.assertEqual(branch, "")
+            self.assertFalse(Path(paths[-1]).exists())
+        self.assertNotEqual(*paths)
+        self.assertEqual(Path(base, "base-only.txt").read_text(), "existing base checkout changes")
+        self.assertEqual(self.git(base, "branch", "--list", "ahpra-repair/*"), "")
+
+    async def test_repair_base_branch_is_rejected(self):
+        base = self.repair_repo()
+        self.git(base, "switch", "-c", "ahpra-repair/old")
+        with self.assertRaises(ValueError):
+            isolated_repair("PHA123", [], base, lambda *args: self.fail())
 
     async def test_summary_is_bounded(self):
         bridge = AhpraBridge(url="ws://localhost", token="test", repair_runner=lambda *args: "x" * 5000)
         bridge.ws = FakeWebSocket()
-        with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": "repair-worktree"}), \
-                patch("scripts.ahpra_verifier.bridge.repair_branch", return_value=""):
-            await bridge.handle_message(json.dumps(self.message))
-            await bridge._repair_task
+        with patch.dict(os.environ, {"AHPRA_REPAIR_WORKTREE": self.repair_repo()}):
+            await bridge._run_repair(self.message)
         self.assertEqual(len(bridge.ws.get_sent_json()[0]["summary"]), 4000)
+
+    async def test_logs_and_runner_exception_omit_registration_number(self):
+        reg = "PHA0001234567"
+
+        def runner(number):
+            raise RuntimeError("Lookup failed for " + number)
+
+        bridge = AhpraBridge(url="ws://localhost", token="test", runner=runner)
+        bridge.ws = FakeWebSocket()
+        with self.assertLogs("ahpra_verifier", level=logging.INFO) as logs:
+            await bridge._process_single_check({"check_id": 123, "registration_number": reg})
+            await bridge.handle_message(json.dumps({"type": "check", "registration_number": reg}))
+        self.assertNotIn(reg, "\n".join(logs.output))
+        self.assertIn("check id=123", "\n".join(logs.output))
+        self.assertNotIn(reg, bridge.ws.get_sent_json()[0]["error"])
 
 
 class TestRepairRunner(unittest.TestCase):
     def test_cli_configuration(self):
         with patch.dict(os.environ, {"AHPRA_CLAUDE_CMD": "custom-claude.cmd",
                                     "AHPRA_REPAIR_TIMEOUT_SECONDS": "75",
-                                    "AHPRA_REPAIR_CLAUDE_CONFIG_DIR": "repair-config"}), \
+                                    "AHPRA_REPAIR_CLAUDE_CONFIG_DIR": "repair-config",
+                                    "AHPRA_VERIFIER_TOKEN": "private-token", "API_KEY": "private-key",
+                                    "OTHER_SECRET": "private-secret", "DB_PASSWORD": "private-password",
+                                    "CLAUDE_CONFIG_DIR": "inherited-config", "UNRELATED": "not-allowed"}), \
                 patch("scripts.ahpra_verifier.bridge.shutil.which", return_value="resolved-claude.cmd"), \
                 patch("scripts.ahpra_verifier.bridge.subprocess.Popen") as popen:
             proc = popen.return_value
@@ -1049,9 +1100,17 @@ class TestRepairRunner(unittest.TestCase):
         self.assertEqual(command[0], "resolved-claude.cmd")
         self.assertIn("--chrome", command)
         self.assertEqual(command[command.index("--model") + 1], "opus")
-        self.assertEqual(command[command.index("--permission-mode") + 1], "auto")
-        self.assertEqual(command[command.index("--allowedTools") + 1],
-                         "Read,Edit,Write,Grep,Glob,Bash,mcp__claude-in-chrome__*")
+        self.assertEqual(command[command.index("--permission-mode") + 1], "default")
+        allowed = command[command.index("--allowedTools") + 1].split(",")
+        self.assertEqual(allowed[:5], ["Read(./**)", "Edit(./**)", "Write(./**)", "Grep(./**)", "Glob(./**)"])
+        self.assertNotIn("Bash", allowed)
+        self.assertEqual(allowed[5:-1], [
+            "Bash(node scripts/ahpra_extension/tests/*)",
+            "Bash(python -m unittest scripts.ahpra_verifier.*)",
+            "Bash(git status:*)", "Bash(git diff:*)", "Bash(git add:*)", "Bash(git commit:*)",
+            "Bash(git switch -c ahpra-repair/*)", "Bash(git log:*)",
+        ])
+        self.assertEqual(allowed[-1], "mcp__claude-in-chrome__*")
         self.assertEqual(command[command.index("--disallowedTools") + 1:], [
             "Bash(git push:*)", "Bash(git merge:*)", "Bash(git checkout main*)",
             "Bash(git reset:*)", "Bash(git rebase:*)", "Bash(git remote:*)",
@@ -1063,8 +1122,14 @@ class TestRepairRunner(unittest.TestCase):
         prompt = proc.communicate.call_args.kwargs["input"]
         self.assertIn("PHA0001234567", prompt)
         self.assertIn('["selector failed"]', prompt)
-        self.assertIn("Never create a repair branch from an earlier ahpra-repair/* branch", prompt)
-        self.assertIn("the base branch used", prompt)
+        self.assertIn("A human must review the repair branch before any merge", prompt)
+        self.assertTrue(set(options["env"]).issubset({
+            "PATH", "Path", "SystemRoot", "SYSTEMROOT", "TEMP", "TMP", "USERPROFILE", "APPDATA",
+            "LOCALAPPDATA", "HOMEDRIVE", "HOMEPATH", "CLAUDE_CONFIG_DIR", "ENABLE_TOOL_SEARCH",
+        }))
+        self.assertFalse(any(any(word in key.upper() for word in ("TOKEN", "SECRET", "KEY", "PASSWORD"))
+                             for key in options["env"]))
+        self.assertNotIn("UNRELATED", options["env"])
 
     def test_nonzero_exit_does_not_echo_output(self):
         with patch("scripts.ahpra_verifier.bridge.subprocess.Popen") as popen:

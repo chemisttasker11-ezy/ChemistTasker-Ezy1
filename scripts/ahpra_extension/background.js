@@ -215,7 +215,8 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       if (message.enabled) {
         let url;
         try { url = new URL(message.url); } catch { throw new Error('Enter a valid websocket URL'); }
-        if (!['wss:', 'ws:'].includes(url.protocol) || url.username || url.password) throw new Error('Use a ws:// or wss:// URL without embedded credentials');
+        const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+        if ((url.protocol !== 'wss:' && !(url.protocol === 'ws:' && local)) || url.username || url.password) throw new Error('Use wss:// without embedded credentials; ws:// is allowed only for localhost, 127.0.0.1 or [::1]');
         if (!message.token || !Number.isInteger(message.gap) || message.gap < 1) throw new Error('Token and a positive whole number gap are required');
         config = {enabled: true, url: url.href, token: message.token, gap: message.gap};
       } else config.enabled = false;

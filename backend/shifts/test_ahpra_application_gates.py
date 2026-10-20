@@ -178,7 +178,9 @@ class AhpraApplicationGateTests(TestCase):
         AhpraCheck.objects.filter(pk=self.check.pk).update(
             outcome='review', register_data={'registration_status': 'Registered', 'registration_type': 'General'})
         from onboarding.verification.state import require_ahpra_application
-        require_ahpra_application(self.user)
+        with self.assertRaises(ShiftActionRefused) as refused:
+            require_ahpra_application(self.user)
+        self.assertEqual(refused.exception.detail['code'], 'ahpra_review')
 
     def member(self, pharmacy):
         return Membership.objects.create(

@@ -46,7 +46,7 @@ class AhpraAccessTests(TestCase):
         self.finish(note='Suspended - irrelevant note text')
         self.assertEqual(ahpra_state(self.profile)['state'], 'ok')
         for value in ('Suspended', 'Cancelled', 'Surrendered', ' suspended '):
-            self.finish(outcome='review', status=value)
+            self.finish(outcome='rejected', status=value)
             with self.subTest(status=value):
                 self.assertEqual(ahpra_state(self.profile)['state'], 'suspended')
         self.finish(outcome='rejected', status='Not registered')
@@ -128,7 +128,7 @@ class AhpraAccessTests(TestCase):
             announce.assert_called_once()
             close.assert_not_called()
 
-    def test_registration_type_transition_cancels_public_once_keeps_internal_after_commit(self):
+    def test_registration_type_transition_cancels_public_atomically_notifies_after_commit(self):
         self.finish()
         self.profile.verified = self.profile.ahpra_verified = True
         self.profile.save(update_fields=['verified', 'ahpra_verified'])
@@ -150,7 +150,7 @@ class AhpraAccessTests(TestCase):
                 payload = result(check.pk, registration_type='Non Practising')
                 self.assertTrue(apply_ahpra_result(check, payload))
                 self.assertFalse(apply_ahpra_result(check, payload))
-                self.assertTrue(ShiftSlotAssignment.objects.filter(pk=public.pk).exists())
+                self.assertFalse(ShiftSlotAssignment.objects.filter(pk=public.pk).exists())
                 notify.assert_not_called()
             self.assertFalse(ShiftSlotAssignment.objects.filter(pk=public.pk).exists())
             self.assertTrue(ShiftSlotAssignment.objects.filter(pk=internal.pk).exists())
@@ -211,7 +211,8 @@ class AhpraAccessTests(TestCase):
         check = AhpraCheck.objects.create(model_name='OwnerOnboarding', object_pk=profile.pk,
                                          registration_number=NUMBER, reason='onboarding')
         with patch('onboarding.verification.state.announce_suspension'), self.captureOnCommitCallbacks(execute=True):
-            apply_ahpra_result(check, result(check.pk, registration_status='Suspended'))
+            apply_ahpra_result(check, result(check.pk, name=f'{owner.first_name} {owner.last_name}',
+                                             registration_status='Suspended'))
         profile.refresh_from_db()
         self.assertFalse(profile.verified)
         self.assertFalse(profile.ahpra_verified)
@@ -252,17 +253,17 @@ class AhpraAccessTests(TestCase):
                                                      registration_status=status))
                     profile.refresh_from_db()
                     self.assertEqual(profile.role, 'MANAGER' if status == 'Suspended' else role)
-                self.assertEqual(ahpra_state(profile)['state'], 'ok' if role == 'PHARMACIST' else 'pending')
+                self.assertEqual(ahpra_state(profile)['state'], 'ok' if role == 'PHARMACIST' else 'review')
                 self.assertFalse(profile.ahpra_switched_to_manager)
 
-    def test_pending_recheck_retains_suspension_and_review_is_pending(self):
+    def test_pending_recheck_retains_suspension_until_review_result(self):
         self.finish(outcome='rejected', status='Suspended')
         enqueue_check(self.profile, NUMBER, 'recheck')
         self.assertEqual(ahpra_state(self.profile)['state'], 'suspended')
         AhpraCheck.objects.filter(status='pending').update(status='done', outcome='review',
                                                          completed_at=timezone.now(), register_data={
                                                              'registration_status': 'Registered', 'registration_type': 'General'})
-        self.assertEqual(ahpra_state(self.profile)['state'], 'pending')
+        self.assertEqual(ahpra_state(self.profile)['state'], 'review')
 
     def test_unreadable_three_instant_rechecks_then_24_hour_cooldown(self):
         self.finish(outcome='review', status='Unknown')
@@ -298,7 +299,8 @@ class AhpraAccessTests(TestCase):
                 for _ in range(2):
                     check = AhpraCheck.objects.create(model_name='OwnerOnboarding', object_pk=profile.pk,
                                                      registration_number=NUMBER, reason='onboarding')
-                    apply_ahpra_result(check, result(check.pk, registration_status='Suspended'))
+                    apply_ahpra_result(check, result(check.pk, name=f'{owner.first_name} {owner.last_name}',
+                                                     registration_status='Suspended'))
             self.assertEqual(notify.call_count, 1)
             self.assertEqual(len(mail.outbox), 1)
             close.assert_not_called()
@@ -368,15 +370,20 @@ class AhpraAccessTests(TestCase):
         self.assertIn(client_for().post('/api/v1/onboarding/ahpra/recheck/').status_code, (401, 403))
 
     def test_review_or_failed_lookup_keeps_verified(self):
-        from onboarding.verification.ahpra import _update_ahpra_fields
         self.profile.verified = self.profile.ahpra_verified = True
         self.profile.save(update_fields=['verified', 'ahpra_verified'])
-        _update_ahpra_fields('PharmacistOnboarding', self.profile.pk, False, 'AHPRA lookup failed. Please try again later.')
+        for outcome in ('error', 'blocked'):
+            check = check_fixture(self.profile)
+            apply_ahpra_result(check, result(check.pk, outcome))
+            self.profile.refresh_from_db()
+            self.assertTrue(self.profile.verified)
+            self.assertTrue(self.profile.ahpra_verified)
         check = check_fixture(self.profile)
         apply_ahpra_result(check, result(check.pk, registration_status='Registered', expiry_date='2000-01-01'))
         self.profile.refresh_from_db()
-        self.assertTrue(self.profile.verified)
-        self.assertEqual(ahpra_state(self.profile)['state'], 'pending')
+        self.assertFalse(self.profile.verified)
+        self.assertFalse(self.profile.ahpra_verified)
+        self.assertEqual(ahpra_state(self.profile)['state'], 'review')
 
     def test_frozen_user_cannot_join_chat_socket(self):
         from asgiref.sync import async_to_sync
@@ -437,7 +444,7 @@ class AhpraAccessTests(TestCase):
             with self.captureOnCommitCallbacks(execute=True):
                 self.assertTrue(apply_ahpra_result(check, payload))
                 self.assertFalse(apply_ahpra_result(check, payload))
-                self.assertTrue(ShiftSlotAssignment.objects.filter(pk=future.pk).exists())
+                self.assertFalse(ShiftSlotAssignment.objects.filter(pk=future.pk).exists())
             self.assertFalse(ShiftSlotAssignment.objects.filter(pk=future.pk).exists())
             self.assertTrue(ShiftSlotAssignment.objects.filter(pk=past.pk).exists())
             notify.assert_called_once()

@@ -1,6 +1,7 @@
 """Remove future public bookings after an AHPRA restriction; retain worked assignments."""
 import logging
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -18,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 @transaction.atomic
 def cancel_upcoming_assignments(user, *, reason='their AHPRA registration is paused'):
+    if not settings.AHPRA_ENFORCEMENT_ENABLED:
+        return {'cancelled': [], 'retained': []}
     now = timezone.localtime()
 
     def upcoming(day, start):

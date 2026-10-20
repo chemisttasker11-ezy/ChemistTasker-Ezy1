@@ -26,7 +26,7 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
     const version = errorVersion.current;
     const current = generation.current;
     const data = await getOnboardingDetail(role);
-    if (version === errorVersion.current && current === generation.current) { setSummary(data.ahpra ?? null); setError(''); if (!data.ahpra?.frozen) setRefusal(false); }
+    if (version === errorVersion.current && current === generation.current) { setSummary(data.ahpra ?? null); setError(''); if (data.ahpra?.state === 'review' || !data.ahpra?.frozen) setRefusal(false); }
   }, [role]);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
         const version = errorVersion.current;
         const data = await getOnboardingDetail(role);
         // An unfrozen server summary is authoritative, so it ends an earlier runtime refusal.
-        if (active && version === errorVersion.current) { setSummary(data.ahpra ?? null); setError(''); if (!data.ahpra?.frozen) setRefusal(false); }
+        if (active && version === errorVersion.current) { setSummary(data.ahpra ?? null); setError(''); if (data.ahpra?.state === 'review' || !data.ahpra?.frozen) setRefusal(false); }
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : 'Unable to load AHPRA status.');
       } finally {
@@ -61,10 +61,10 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
       }
       setSummary(previous => ({
         attempts: 0, contact_support: false, registration_status: null, registration_type: null, expiry_date: null, checked_at: null, recheck_available_at: null,
-        ...previous, state: value.code === 'ahpra_type_not_accepted' ? 'type_not_accepted' : value.code === 'ahpra_unreadable' ? 'unreadable' : value.code === 'ahpra_suspended' ? 'suspended' : value.code === 'ahpra_rejected' ? 'rejected' : 'not_found', note: value.detail || '', frozen: role !== 'owner' && value.code !== 'ahpra_unreadable' && value.code !== 'ahpra_type_not_accepted' && Boolean(value.frozen),
+        ...previous, state: value.code === 'ahpra_review' ? 'review' : value.code === 'ahpra_type_not_accepted' ? 'type_not_accepted' : value.code === 'ahpra_unreadable' ? 'unreadable' : value.code === 'ahpra_suspended' ? 'suspended' : value.code === 'ahpra_rejected' ? 'rejected' : 'not_found', note: value.detail || '', frozen: role !== 'owner' && value.code !== 'ahpra_review' && value.code !== 'ahpra_unreadable' && value.code !== 'ahpra_type_not_accepted' && Boolean(value.frozen),
       }));
       // Only the account freeze sends frozen; a member refused on a public shift stays where they are.
-      setRefusal(role !== 'owner' && value.code !== 'ahpra_unreadable' && value.code !== 'ahpra_type_not_accepted' && Boolean(value.frozen));
+      setRefusal(role !== 'owner' && value.code !== 'ahpra_review' && value.code !== 'ahpra_unreadable' && value.code !== 'ahpra_type_not_accepted' && Boolean(value.frozen));
       if (value.code === 'ahpra_unreadable') void load();
     });
     void load();
@@ -74,7 +74,7 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
   useEffect(() => {
     // A first check has no cooldown; give it a bounded five-minute polling window.
     const until = Math.max(Date.parse(summary?.recheck_available_at ?? '') || 0, queuedUntil, summary?.state === 'pending' ? Date.now() + 300000 : 0);
-    if ((summary?.state !== 'pending' && summary?.state !== 'suspended' && summary?.state !== 'not_found' && summary?.state !== 'type_not_accepted' && summary?.state !== 'unreadable') || !(until > Date.now())) return;
+    if ((summary?.state !== 'pending' && summary?.state !== 'suspended' && summary?.state !== 'not_found' && summary?.state !== 'type_not_accepted' && summary?.state !== 'review' && summary?.state !== 'unreadable') || !(until > Date.now())) return;
     const timer = setInterval(() => {
       // The last tick still refreshes so a lookup that finished near expiry shows up.
       void refresh().catch(() => {});
@@ -85,7 +85,7 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
 
   useEffect(() => {
     // Timers pause in the background; refresh on return so a finished lookup is not missed.
-    if (summary?.state !== 'pending' && summary?.state !== 'suspended' && summary?.state !== 'not_found' && summary?.state !== 'type_not_accepted' && summary?.state !== 'unreadable') return;
+    if (summary?.state !== 'pending' && summary?.state !== 'suspended' && summary?.state !== 'not_found' && summary?.state !== 'type_not_accepted' && summary?.state !== 'review' && summary?.state !== 'unreadable') return;
     const subscription = AppState.addEventListener('change', state => { if (state === 'active') void refresh().catch(() => {}); });
     return () => subscription.remove();
   }, [summary?.state, refresh]);

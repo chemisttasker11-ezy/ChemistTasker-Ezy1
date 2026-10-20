@@ -178,6 +178,19 @@ class AhpraKeyLookupTests(TestCase):
         self.assertEqual(client.post(reverse('api_v1:ahpra-test-key-lookup', args=['x' * 32]), self.data).status_code, 404)
         self.assertEqual(AhpraCheck.objects.count(), 1)
 
+    def test_lookup_escapes_reflected_form_and_register_text(self):
+        attack = '<img src=x onerror=alert(1)>'
+        invalid = self.data | {'registration_number': attack, 'first_name': attack}
+        response = self.client.post(self.url, invalid)
+        self.assertContains(response, '&lt;img')
+        self.assertNotContains(response, attack)
+        AhpraCheck.objects.create(model_name=TEST_MODEL, object_pk=1, registration_number=NUMBER,
+                                  reason='onboarding', status='done', outcome='review', note=attack,
+                                  register_data={'name': attack}, extension_error=attack)
+        response = self.client.get(self.url)
+        self.assertContains(response, '&lt;img')
+        self.assertNotContains(response, attack)
+
     def test_anonymous_lookup_queues_test_check_only(self):
         self.assertEqual(self.client.get(self.url).status_code, 200)
         profile = PharmacistOnboarding.objects.create(user=make_user('PHARMACIST'), ahpra_number=NUMBER)
