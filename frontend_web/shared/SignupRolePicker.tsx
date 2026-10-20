@@ -2,8 +2,9 @@
 
 // "I'm joining as": three main account types, then a separate path for people new to pharmacy in Australia, which asks
 // which kind of newcomer they are and their date of birth (minimum age 15). Native radios keep keyboard behaviour.
+import { AuDateField } from '../landing_next/shared-ui/AuDateField';
 import type { ReactNode } from 'react';
-import { Box, Stack, TextField, Typography } from '@mui/material';
+import { Box, Stack, Typography } from '@mui/material';
 import { ArrowRight, Compass, Pill, Store, Users } from 'lucide-react';
 import { NEWCOMER_MINIMUM_AGE, NEWCOMER_TYPES, ageFromBirthDate } from '@chemisttasker/shared-core';
 
@@ -108,9 +109,7 @@ export function SignupRolePicker({ role, onRole, newcomerType, onNewcomerType, d
             </Stack>
             {showErrors && !newcomerType && <Typography role="alert" sx={{ fontSize: 13, color: 'error.main' }}>Tell us which describes you best.</Typography>}
           </Stack>
-          <TextField
-            type="date" label="Date of birth" value={dateOfBirth} onChange={event => onDateOfBirth(event.target.value)} fullWidth
-            InputLabelProps={{ shrink: true }} inputProps={{ max: new Date().toISOString().slice(0, 10) }}
+          <AuDateField label="Date of birth" value={dateOfBirth} onChange={isoValue => onDateOfBirth(isoValue)} fullWidth inputProps={{ max: new Date().toISOString().slice(0, 10) }}
             error={tooYoung || (showErrors && age == null)}
             helperText={tooYoung
               ? `You need to be at least ${NEWCOMER_MINIMUM_AGE} to join ChemistTasker.`

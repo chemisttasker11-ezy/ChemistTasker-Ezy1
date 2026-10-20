@@ -1,4 +1,5 @@
 // src/pages/onboardingV2/IdentityV2.tsx
+import { AuDateField } from '../../../components/AuDateField';
 import * as React from 'react';
 import { Box, Button, Link, TextField, Typography, MenuItem, Alert, Snackbar } from '@mui/material';
 import { API_BASE_URL } from '../../../constants/api';
@@ -197,12 +198,10 @@ return (
           ))}
         </TextField>
 
-        <TextField
-          type="date"
+        <AuDateField
           label="Expiry date"
-          InputLabelProps={{ shrink: true }}
           value={meta.expiry || ''}
-          onChange={(e) => setMeta((m) => ({ ...m, expiry: e.target.value }))}
+          onChange={(isoValue) => setMeta((m) => ({ ...m, expiry: isoValue }))}
           fullWidth
         />
       </Box>
@@ -226,12 +225,10 @@ return (
           onChange={(e) => setMeta((m) => ({ ...m, visa_type_number: e.target.value }))}
           fullWidth
         />
-        <TextField
-          type="date"
+        <AuDateField
           label="Valid to"
-          InputLabelProps={{ shrink: true }}
           value={meta.valid_to || ''}
-          onChange={(e) => setMeta((m) => ({ ...m, valid_to: e.target.value }))}
+          onChange={(isoValue) => setMeta((m) => ({ ...m, valid_to: isoValue }))}
           fullWidth
         />
 
@@ -277,12 +274,10 @@ return (
             </MenuItem>
           ))}
         </TextField>
-        <TextField
-          type="date"
+        <AuDateField
           label="Passport expiry"
-          InputLabelProps={{ shrink: true }}
           value={meta.passport_expiry || ''}
-          onChange={(e) => setMeta((m) => ({ ...m, passport_expiry: e.target.value }))}
+          onChange={(isoValue) => setMeta((m) => ({ ...m, passport_expiry: isoValue }))}
           fullWidth
         />
       </Box>
@@ -301,12 +296,10 @@ return (
         }}
       >
         <TextField label="Country of Issue" value="Australia" InputProps={{ readOnly: true }} fullWidth />
-        <TextField
-          type="date"
+        <AuDateField
           label="Expiry date"
-          InputLabelProps={{ shrink: true }}
           value={meta.expiry || ''}
-          onChange={(e) => setMeta((m) => ({ ...m, expiry: e.target.value }))}
+          onChange={(isoValue) => setMeta((m) => ({ ...m, expiry: isoValue }))}
           fullWidth
         />
       </Box>
@@ -337,12 +330,10 @@ return (
             </MenuItem>
           ))}
         </TextField>
-        <TextField
-          type="date"
+        <AuDateField
           label="Passport expiry"
-          InputLabelProps={{ shrink: true }}
           value={meta.expiry || ''}
-          onChange={(e) => setMeta((m) => ({ ...m, expiry: e.target.value }))}
+          onChange={(isoValue) => setMeta((m) => ({ ...m, expiry: isoValue }))}
           fullWidth
         />
 
@@ -381,12 +372,10 @@ return (
           onChange={(e) => setMeta((m) => ({ ...m, visa_type_number: e.target.value }))}
           fullWidth
         />
-        <TextField
-          type="date"
+        <AuDateField
           label="Valid to"
-          InputLabelProps={{ shrink: true }}
           value={meta.valid_to || ''}
-          onChange={(e) => setMeta((m) => ({ ...m, valid_to: e.target.value }))}
+          onChange={(isoValue) => setMeta((m) => ({ ...m, valid_to: isoValue }))}
           fullWidth
         />
       </Box>
@@ -417,12 +406,10 @@ return (
             </MenuItem>
           ))}
         </TextField>
-        <TextField
-          type="date"
+        <AuDateField
           label="Expiry date"
-          InputLabelProps={{ shrink: true }}
           value={meta.expiry || ''}
-          onChange={(e) => setMeta((m) => ({ ...m, expiry: e.target.value }))}
+          onChange={(isoValue) => setMeta((m) => ({ ...m, expiry: isoValue }))}
           fullWidth
         />
       </Box>

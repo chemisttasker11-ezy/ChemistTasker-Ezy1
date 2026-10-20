@@ -1,3 +1,4 @@
+import { AuDateField } from '../AuDateField';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Alert,
@@ -887,13 +888,11 @@ export default function RosterPlanningToolbar({
               Copies shifts from w/c <strong>{mondayStr}</strong> into a target week as <strong>DRAFT</strong>, protecting against accidental publication.
             </Alert>
 
-            <TextField
+            <AuDateField
               label="Target Week Start (Monday)"
-              type="date"
               value={targetWeekDate}
-              onChange={(e) => setTargetWeekDate(e.target.value)}
+              onChange={(isoValue) => setTargetWeekDate(isoValue)}
               fullWidth
-              InputLabelProps={{ shrink: true }}
               helperText="Must be a Monday."
             />
 

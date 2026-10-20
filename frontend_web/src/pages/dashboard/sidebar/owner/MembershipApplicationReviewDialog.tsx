@@ -1,3 +1,4 @@
+import { AuDateField } from '../../../../components/AuDateField';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -525,8 +526,8 @@ export default function MembershipApplicationReviewDialog({
               {section(3, 'Payroll terms', 'Created together with the membership and included in the approval email.')}
               <Stack spacing={1.5}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                  <TextField type="date" label="Starts" InputLabelProps={{ shrink: true }} value={effectiveFrom} onChange={(event) => setEffectiveFrom(event.target.value)} fullWidth />
-                  <TextField type="date" label="Ends (optional)" InputLabelProps={{ shrink: true }} value={effectiveTo} onChange={(event) => setEffectiveTo(event.target.value)} fullWidth />
+                  <AuDateField label="Starts" value={effectiveFrom} onChange={(isoValue) => setEffectiveFrom(isoValue)} fullWidth />
+                  <AuDateField label="Ends (optional)" value={effectiveTo} onChange={(isoValue) => setEffectiveTo(isoValue)} fullWidth />
                 </Stack>
                 <Box role="radiogroup" aria-label="Pay basis" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1 }}>
                   {([['AWARD', 'Award rate', 'Pay the Award floor for their classification'], ['ABOVE_AWARD', 'Above Award', 'Agree higher rates for some or all days']] as const).map(([value, label, hint]) => {

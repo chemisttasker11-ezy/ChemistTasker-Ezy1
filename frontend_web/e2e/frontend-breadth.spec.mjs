@@ -209,8 +209,8 @@ test('worker leave form validates required fields and submits the established le
   const submit = page.getByRole('button', { name: 'Submit' });
   await expect(submit).toBeDisabled();
 
-  await page.getByLabel('Start').fill('2026-09-28T09:00');
-  await page.getByLabel('End').fill('2026-09-28T17:00');
+  await page.getByLabel('Start').fill('28/09/2026 09:00');
+  await page.getByLabel('End').fill('28/09/2026 17:00');
   await page.getByLabel('Note').fill('Smoke leave request');
   await expect(submit).toBeEnabled();
   await submit.click();

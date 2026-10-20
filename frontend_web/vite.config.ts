@@ -14,7 +14,7 @@ export default defineConfig(({ command }) => {
     plugins: [react()],
     // Shared web UI lives alongside Next. Use this app's React/MUI contexts in Vite too.
     resolve: {
-      dedupe: ['react', 'react-dom', '@mui/material', '@mui/system', '@mui/private-theming', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+      dedupe: ['react', 'react-dom', '@mui/material', '@mui/system', '@mui/private-theming', '@mui/icons-material', '@mui/x-date-pickers', 'dayjs', '@emotion/react', '@emotion/styled'],
       alias: isDev ? [
         { find: /^@chemisttasker\/shared-core$/, replacement: resolve(import.meta.dirname, '../shared-core/dist/index.js') },
         { find: '@chemisttasker/shared-core/skills_registry.json', replacement: resolve(import.meta.dirname, '../shared-core/skills_registry.json') },

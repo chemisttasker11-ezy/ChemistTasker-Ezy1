@@ -1,3 +1,4 @@
+import { AuDateField } from '../../../../../../shared-ui/AuDateField';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog,
@@ -670,21 +671,17 @@ export default function PitchDialog(props: {
               </Box>
             </Box>
             <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-              <TextField
+              <AuDateField
                 label={isRecurring ? "Start Date" : "Date"}
-                type="date"
                 value={currentEntry.date}
-                onChange={(event) => syncSelectedDates(event.target.value ? [event.target.value] : [])}
-                InputLabelProps={{ shrink: true }}
+                onChange={(isoValue) => syncSelectedDates(isoValue ? [isoValue] : [])}
                 fullWidth
               />
               {isRecurring && (
-                <TextField
+                <AuDateField
                   label="End Date"
-                  type="date"
                   value={recurringEndDate}
-                  onChange={(event) => setRecurringEndDate(event.target.value)}
-                  InputLabelProps={{ shrink: true }}
+                  onChange={(isoValue) => setRecurringEndDate(isoValue)}
                   fullWidth
                 />
               )}

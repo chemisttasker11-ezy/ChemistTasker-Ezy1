@@ -1,3 +1,4 @@
+import { AuDateTimeField } from '../../components/AuDateField';
 import { useEffect, useState, useCallback } from "react";
 import {
   Alert,
@@ -559,14 +560,12 @@ export default function ManagerAttendanceReviewPage() {
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
+                      <AuDateTimeField
                         label="Correct date and time"
-                        type="datetime-local"
                         value={correctedTimestamp}
-                        onChange={(e) => setCorrectedTimestamp(e.target.value)}
+                        onChange={(isoValue) => setCorrectedTimestamp(isoValue)}
                         fullWidth
                         size="small"
-                        InputLabelProps={{ shrink: true }}
                       />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>

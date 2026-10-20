@@ -1,3 +1,4 @@
+import { AuDateField } from '../../../components/AuDateField';
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import {
   Box,
@@ -293,7 +294,7 @@ export default function RosterOwnerDialogs({
         <DialogContent dividers>
           {isDialogDataLoading ? ( <Skeleton variant="rectangular" height={150} /> ) : (
             <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-              <TextField label="Date" type="date" value={dialogShiftDate || ''} InputLabelProps={{ shrink: true }} onChange={(e) => setDialogShiftDate(e.target.value)} required fullWidth/>
+              <AuDateField label="Date" value={dialogShiftDate || ''} onChange={(isoValue) => setDialogShiftDate(isoValue)} required fullWidth/>
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <TextField label="Start Time" type="time" value={dialogShiftStartTime || ''} InputLabelProps={{ shrink: true }} onChange={(e) => setDialogShiftStartTime(e.target.value)} required fullWidth/>
                 <TextField label="End Time" type="time" value={dialogShiftEndTime || ''} InputLabelProps={{ shrink: true }} onChange={(e) => setDialogShiftEndTime(e.target.value)} required fullWidth/>
@@ -614,13 +615,11 @@ export default function RosterOwnerDialogs({
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, color: BRAND_COLORS.navy, mb: 0.75 }}>
                   Or pick any date (e.g. next week / fortnight):
                 </Typography>
-                <TextField
-                  type="date"
+                <AuDateField
                   size="small"
                   fullWidth
                   value={duplicateCustomDate}
-                  onChange={(e) => setDuplicateCustomDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
+                  onChange={(isoValue) => setDuplicateCustomDate(isoValue)}
                 />
               </Box>
 
@@ -743,7 +742,7 @@ export default function RosterOwnerDialogs({
           <DialogTitle>Edit Shift</DialogTitle>
           <DialogContent dividers>
               {shiftToEdit && <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-                  <TextField label="Date" type="date" value={moment(shiftToEdit.slots[0].date).format('YYYY-MM-DD')} onChange={e => setShiftToEdit(s => s && ({ ...s, slots: [{ ...s.slots[0], date: e.target.value }] }))} InputLabelProps={{ shrink: true }} fullWidth />
+                  <AuDateField label="Date" value={moment(shiftToEdit.slots[0].date).format('YYYY-MM-DD')} onChange={isoValue => setShiftToEdit(s => s && ({ ...s, slots: [{ ...s.slots[0], date: isoValue }] }))} fullWidth />
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <TextField label="Start Time" type="time" value={(shiftToEdit.slots[0].startTime || '').toString().slice(0,5)} onChange={e => setShiftToEdit(s => s && ({ ...s, slots: [{ ...s.slots[0], startTime: e.target.value }] }))} InputLabelProps={{ shrink: true }} fullWidth />
                     <TextField label="End Time" type="time" value={(shiftToEdit.slots[0].endTime || '').toString().slice(0,5)} onChange={e => setShiftToEdit(s => s && ({ ...s, slots: [{ ...s.slots[0], endTime: e.target.value }] }))} InputLabelProps={{ shrink: true }} fullWidth />

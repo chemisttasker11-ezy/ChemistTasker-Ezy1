@@ -1,3 +1,4 @@
+import { AuDateField } from '../../components/AuDateField';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import {
@@ -579,25 +580,21 @@ export default function EmploymentEngagementsPanel({ pharmacyId, staff }: Props)
             )}
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-              <TextField
+              <AuDateField
                 fullWidth
                 size="small"
-                type="date"
                 label="Effective from"
-                InputLabelProps={{ shrink: true }}
                 value={form.effective_from}
                 disabled={historical}
-                onChange={(event) => setForm((current) => ({ ...current, effective_from: event.target.value }))}
+                onChange={(isoValue) => setForm((current) => ({ ...current, effective_from: isoValue }))}
               />
-              <TextField
+              <AuDateField
                 fullWidth
                 size="small"
-                type="date"
                 label="Effective to (optional)"
-                InputLabelProps={{ shrink: true }}
                 value={form.effective_to}
                 disabled={completedHistorical}
-                onChange={(event) => setForm((current) => ({ ...current, effective_to: event.target.value }))}
+                onChange={(isoValue) => setForm((current) => ({ ...current, effective_to: isoValue }))}
               />
             </Stack>
 

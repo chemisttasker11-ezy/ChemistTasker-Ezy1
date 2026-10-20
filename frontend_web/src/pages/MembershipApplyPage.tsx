@@ -1,3 +1,4 @@
+import { AuDateField } from '../components/AuDateField';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
 import axios from 'axios';
@@ -477,14 +478,12 @@ export default function MembershipApplyPage() {
                 required
               />
 
-              <TextField
+              <AuDateField
                 fullWidth
                 margin="normal"
                 label="Date of birth"
-                type="date"
                 value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                onChange={(isoValue) => setDateOfBirth(isoValue)}
                 inputProps={{ max: new Date().toISOString().slice(0, 10) }}
                 helperText="Used to apply age-dependent Pharmacy Award rates correctly."
                 required

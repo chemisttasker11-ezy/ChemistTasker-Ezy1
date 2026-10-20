@@ -1,3 +1,4 @@
+import { AuDateTimeField } from '../../components/AuDateField';
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import {
   Alert,
@@ -352,12 +353,10 @@ export default function TimesheetDetailDrawer({
             <Typography variant="body2" color="text.secondary">
               This adds a manager-entered time. The worker's original attendance record isn't changed or deleted.
             </Typography>
-            <TextField
-              type="datetime-local"
+            <AuDateTimeField
               label="Actual time"
-              InputLabelProps={{ shrink: true }}
               value={missingPunchAt}
-              onChange={(e) => setMissingPunchAt(e.target.value)}
+              onChange={(isoValue) => setMissingPunchAt(isoValue)}
               disabled={pending === 'punch'}
             />
             <TextField label="Reason" required helperText="Required, e.g. confirmed with the worker by phone." multiline minRows={2} value={missingPunchReason} onChange={(e) => setMissingPunchReason(e.target.value)} disabled={pending === 'punch'} />

@@ -1,3 +1,4 @@
+import { AuDateField } from '../../../components/AuDateField';
 import type { Dispatch, SetStateAction } from "react";
 import {
   Alert,
@@ -106,12 +107,10 @@ export default function PharmacyCalendarDialogs({
               required
             />
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
+              <AuDateField
                 label="Date"
-                type="date"
                 value={eventForm.date}
-                onChange={(e) => setEventForm((prev) => ({ ...prev, date: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
+                onChange={(isoValue) => setEventForm((prev) => ({ ...prev, date: isoValue }))}
                 fullWidth
               />
               <FormControlLabel
@@ -191,17 +190,15 @@ export default function PharmacyCalendarDialogs({
               )}
             </Stack>
             {eventForm.recurrence.freq !== "NONE" && (
-              <TextField
+              <AuDateField
                 label="Repeat until (optional)"
-                type="date"
                 value={eventForm.recurrence.until}
-                onChange={(e) =>
+                onChange={(isoValue) =>
                   setEventForm((prev) => ({
                     ...prev,
-                    recurrence: { ...prev.recurrence, until: e.target.value },
+                    recurrence: { ...prev.recurrence, until: isoValue },
                   }))
                 }
-                InputLabelProps={{ shrink: true }}
                 fullWidth
               />
             )}
@@ -233,12 +230,10 @@ export default function PharmacyCalendarDialogs({
               fullWidth
               required
             />
-            <TextField
+            <AuDateField
               label="Date"
-              type="date"
               value={noteForm.date}
-              onChange={(e) => setNoteForm((prev) => ({ ...prev, date: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
+              onChange={(isoValue) => setNoteForm((prev) => ({ ...prev, date: isoValue }))}
               fullWidth
             />
             <TextField
@@ -312,17 +307,15 @@ export default function PharmacyCalendarDialogs({
               )}
             </Stack>
             {noteForm.recurrence.freq !== "NONE" && (
-              <TextField
+              <AuDateField
                 label="Repeat until (optional)"
-                type="date"
                 value={noteForm.recurrence.until}
-                onChange={(e) =>
+                onChange={(isoValue) =>
                   setNoteForm((prev) => ({
                     ...prev,
-                    recurrence: { ...prev.recurrence, until: e.target.value },
+                    recurrence: { ...prev.recurrence, until: isoValue },
                   }))
                 }
-                InputLabelProps={{ shrink: true }}
                 fullWidth
               />
             )}

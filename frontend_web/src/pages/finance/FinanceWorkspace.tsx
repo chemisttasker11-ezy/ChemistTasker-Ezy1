@@ -1,3 +1,4 @@
+import { AuDateField } from '../../components/AuDateField';
 import { finance, financeStatus, type FinanceCustomer, type FinanceExpense, type FinanceInvoice, type FinanceItem, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import {
   Alert, Box, Button, CircularProgress,
@@ -239,8 +240,8 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
                 <TextField select size="small" label="Customer" value={customerFilter} onChange={event => setCustomerFilter(event.target.value)}>
                   <MenuItem value="all">All customers</MenuItem>{customers.map(customer => <MenuItem key={customer.id} value={String(customer.id)}>{customer.name}</MenuItem>)}
                 </TextField>
-                <TextField size="small" type="date" label="Issued from" InputLabelProps={{ shrink: true }} value={fromDate} onChange={event => setFromDate(event.target.value)} />
-                <TextField size="small" type="date" label="Issued to" InputLabelProps={{ shrink: true }} value={toDate} onChange={event => setToDate(event.target.value)} />
+                <AuDateField size="small" label="Issued from" value={fromDate} onChange={isoValue => setFromDate(isoValue)} />
+                <AuDateField size="small" label="Issued to" value={toDate} onChange={isoValue => setToDate(isoValue)} />
                 {filtersActive ? <Button onClick={resetFilters} startIcon={<X size={15} />} sx={{ justifySelf: 'start' }}>Clear filters</Button> : <span />}
               </Box>
               {visibleInvoices.length
@@ -319,8 +320,8 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
           <Stack spacing={2.5}>
             <Alert severity="warning">A starting point only: not a full BAS, not lodged for you and not tax advice. Older invoices and unsupported adjustments are left out.</Alert>
             <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1.4fr auto' }, alignItems: 'center' }}>
-              <TextField type="date" label="Period start" InputLabelProps={{ shrink: true }} value={periodStart} onChange={event => { setPeriodStart(event.target.value); setWorksheet(null); }} />
-              <TextField type="date" label="Period end" InputLabelProps={{ shrink: true }} value={periodEnd} onChange={event => { setPeriodEnd(event.target.value); setWorksheet(null); }} />
+              <AuDateField label="Period start" value={periodStart} onChange={isoValue => { setPeriodStart(isoValue); setWorksheet(null); }} />
+              <AuDateField label="Period end" value={periodEnd} onChange={isoValue => { setPeriodEnd(isoValue); setWorksheet(null); }} />
               <TextField select label="GST basis" value={basis} onChange={event => { setBasis(event.target.value as 'cash' | 'accrual'); setWorksheet(null); }}><MenuItem value="cash">Cash: payments received</MenuItem><MenuItem value="accrual">Accrual: invoices issued</MenuItem></TextField>
               <Button variant="contained" disabled={busy} startIcon={busy ? <CircularProgress size={15} color="inherit" /> : undefined} onClick={() => void run(async () => setWorksheet(await finance.worksheet(periodStart, periodEnd, basis)))}>Calculate</Button>
             </Box>

@@ -1,4 +1,5 @@
 /// <reference types="@types/google.maps" />
+import { AuDateField } from '../../../components/AuDateField';
 import * as React from 'react';
 import {
   Box, Button, Chip, MenuItem,  TextField, Typography,   Dialog, DialogTitle, DialogContent, DialogActions, 
@@ -468,14 +469,13 @@ return (
         ))}
       </TextField>
 
-      <TextField
+      <AuDateField
         label="Date of birth"
-        type="date"
         value={data.date_of_birth || ''}
         disabled
         helperText="Set when you signed up"
-        InputLabelProps={{ shrink: true }}
         sx={{ flex: '0 1 220px', minWidth: 200, maxWidth: 220 }}
+        onChange={() => {}}
       />
       <TextField
         select

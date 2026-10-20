@@ -1,3 +1,4 @@
+import { AuDateField, AuDateTimeField } from '../../components/AuDateField';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Accordion, AccordionDetails, AccordionSummary, Alert, Autocomplete, Box, Button, Checkbox, CircularProgress, FormControlLabel, IconButton, MenuItem, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import { ArrowLeft, Building2, Calculator, Check, ChevronDown, History, ListChecks, Plus, Trash2, Zap } from 'lucide-react';
@@ -209,8 +210,8 @@ export default function InvoiceComposer({ initial, prefillShiftId, previous, cus
               <Box sx={grid}>
                 <TextField label="Invoice number" value={initial?.number || 'Given when saved'} slotProps={{ input: { readOnly: true } }} />
                 {field('reference', 'Customer PO or reference')}
-                <TextField type="date" required label="Issue date" InputLabelProps={{ shrink: true }} value={value.invoice_date} onChange={event => { const date = event.target.value; setValue(current => ({ ...current, invoice_date: date, due_date: financeDueDate(date, customer?.payment_terms_days ?? 14) })); }} />
-                <TextField type="date" required label="Due date" InputLabelProps={{ shrink: true }} value={value.due_date} helperText={`${customer?.payment_terms_days ?? 14}-day terms`} onChange={event => change('due_date', event.target.value)} />
+                <AuDateField required label="Issue date" value={value.invoice_date} onChange={isoValue => { const date = isoValue; setValue(current => ({ ...current, invoice_date: date, due_date: financeDueDate(date, customer?.payment_terms_days ?? 14) })); }} />
+                <AuDateField required label="Due date" value={value.due_date} helperText={`${customer?.payment_terms_days ?? 14}-day terms`} onChange={isoValue => change('due_date', isoValue)} />
                 <TextField select label="Prices you enter are" value={value.price_mode} sx={{ gridColumn: { sm: '1 / -1' } }} onChange={event => change('price_mode', event.target.value as FinanceDraft['price_mode'])}><MenuItem value="exclusive">Before GST</MenuItem><MenuItem value="inclusive">Including GST</MenuItem></TextField>
               </Box>
             </Box>
@@ -243,7 +244,7 @@ export default function InvoiceComposer({ initial, prefillShiftId, previous, cus
                   </Stack>
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: lineColumns }, gap: 1, alignItems: 'start' }}>
                     <TextField label="Description" sx={{ gridColumn: { xs: '1 / -1', lg: 'auto' } }} value={line.description || ''} onChange={e => changeLine(index, { description: e.target.value })} multiline />
-                    <TextField type="date" label="Work date" InputLabelProps={{ shrink: true }} value={line.worked_on || ''} onChange={e => changeLine(index, { worked_on: e.target.value || null })} />
+                    <AuDateField label="Work date" value={line.worked_on || ''} onChange={isoValue => changeLine(index, { worked_on: isoValue || null })} />
                     <TextField label="Qty" value={line.quantity} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { quantity: e.target.value })} />
                     <TextField label="Unit" value={line.unit || ''} onChange={e => changeLine(index, { unit: e.target.value })} />
                     <TextField label="Unit price" value={line.unit_price} inputProps={{ inputMode: 'decimal' }} onChange={e => changeLine(index, { unit_price: e.target.value })} />
@@ -268,8 +269,8 @@ export default function InvoiceComposer({ initial, prefillShiftId, previous, cus
               <AccordionDetails><Stack spacing={2}>
                 <Typography sx={{ ...muted, fontSize: 12.5 }}>Times are in {Intl.DateTimeFormat().resolvedOptions().timeZone}. Check this for interstate shifts.</Typography>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 180px auto' }, gap: 2, alignItems: 'start' }}>
-                  <TextField type="datetime-local" label="Start" InputLabelProps={{ shrink: true }} value={start} onChange={e => { setStart(e.target.value); setHours(''); }} />
-                  <TextField type="datetime-local" label="Finish" InputLabelProps={{ shrink: true }} value={end} onChange={e => { setEnd(e.target.value); setHours(''); }} />
+                  <AuDateTimeField label="Start" value={start} onChange={isoValue => { setStart(isoValue); setHours(''); }} />
+                  <AuDateTimeField label="Finish" value={end} onChange={isoValue => { setEnd(isoValue); setHours(''); }} />
                   <TextField label="Unpaid break (min)" type="number" inputProps={{ min: 0, max: 1440 }} value={breakMinutes} onChange={e => { setBreak(e.target.value); setHours(''); }} />
                   <Button variant="outlined" disabled={!start || !end || hoursBusy} onClick={() => void calculateHours()} startIcon={hoursBusy ? <CircularProgress size={16} color="inherit" /> : undefined} sx={{ minHeight: 56 }}>{hoursBusy ? 'Working out' : 'Work out hours'}</Button>
                 </Box>

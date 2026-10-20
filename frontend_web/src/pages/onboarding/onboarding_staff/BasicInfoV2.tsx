@@ -1,4 +1,5 @@
 /// <reference types="@types/google.maps" />
+import { AuDateField } from '../../../components/AuDateField';
 import * as React from 'react';
 import {
   Box, Button, Chip, MenuItem, TextField, Typography, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -429,12 +430,10 @@ const resendMobileOtp = async () => {
 
       </Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-        <TextField
+        <AuDateField
           label="Date of Birth"
-          type="date"
           value={data.date_of_birth || ''}
-          onChange={e => setField('date_of_birth', e.target.value)}
-          InputLabelProps={{ shrink: true }}
+          onChange={isoValue => setField('date_of_birth', isoValue)}
           sx={{ flex: '1 1 220px', minWidth: 200, maxWidth: 220 }}
         />
         <TextField
