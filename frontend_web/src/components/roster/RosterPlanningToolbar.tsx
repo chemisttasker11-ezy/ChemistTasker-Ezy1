@@ -44,7 +44,6 @@ import ViewWeekIcon from '@mui/icons-material/ViewWeek';
 import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import moment from 'moment';
-import apiClient from '../../utils/apiClient';
 import { rosterV2 } from '@chemisttasker/shared-core';
 import { BRAND_COLORS, BRAND_FONTS } from '../../constants/brandTheme';
 import RosterGridViews, { StaffMemberSummary, DayStackedBucket } from './RosterGridViews';
@@ -214,9 +213,7 @@ export default function RosterPlanningToolbar({
     }
     setActionLoading(true);
     try {
-      await apiClient.post('/attendance/roster/unpublish/', {
-        period_id: period.period_id,
-      });
+      await rosterV2.unpublish({ period_id: period.period_id });
       setFeedbackMessage({
         type: 'success',
         text: 'Roster reverted to DRAFT. Shifts are hidden from staff.',
@@ -226,7 +223,7 @@ export default function RosterPlanningToolbar({
     } catch (err: any) {
       setFeedbackMessage({
         type: 'error',
-        text: err.response?.data?.error || 'Failed to unpublish.',
+        text: err.response?.data?.error || err?.message || 'Failed to unpublish.',
       });
     } finally {
       setActionLoading(false);
@@ -238,15 +235,13 @@ export default function RosterPlanningToolbar({
     if (!period) return;
     setActionLoading(true);
     try {
-      const res = await apiClient.get(
-        `/attendance/roster/acknowledgements/${period.period_id}/`
-      );
-      setAckData(res.data);
+      const res = await rosterV2.getAcknowledgements(period.period_id) as AcknowledgementData;
+      setAckData(res);
       setAckDialogOpen(true);
     } catch (err: any) {
       setFeedbackMessage({
         type: 'error',
-        text: err.response?.data?.error || 'Failed to load acknowledgements.',
+        text: err.response?.data?.error || err?.message || 'Failed to load acknowledgements.',
       });
     } finally {
       setActionLoading(false);
@@ -258,16 +253,16 @@ export default function RosterPlanningToolbar({
     if (!period) return;
     setActionLoading(true);
     try {
-      const res = await apiClient.post('/attendance/roster/copy-week/', {
+      const res = await rosterV2.copyWeek({
         source_period_id: period.period_id,
         target_week_start: targetWeekDate,
         include_assignments: copyIncludeAssignments,
         overwrite: copyOverwrite,
-      });
+      }) as { target_week_start: string; counts: { slots_copied: number; assignments_copied: number } };
       setCopyDialogOpen(false);
       setFeedbackMessage({
         type: 'success',
-        text: `Week successfully copied to ${res.data.target_week_start} as DRAFT! (${res.data.counts.slots_copied} slots, ${res.data.counts.assignments_copied} assignments)`,
+        text: `Week successfully copied to ${res.target_week_start} as DRAFT! (${res.counts.slots_copied} slots, ${res.counts.assignments_copied} assignments)`,
       });
       // Navigate to target week
       onNavigateWeek?.(moment(targetWeekDate).toDate());
@@ -275,7 +270,7 @@ export default function RosterPlanningToolbar({
     } catch (err: any) {
       setFeedbackMessage({
         type: 'error',
-        text: err.response?.data?.error || 'Failed to copy roster week.',
+        text: err.response?.data?.error || err?.message || 'Failed to copy roster week.',
       });
     } finally {
       setActionLoading(false);
@@ -287,12 +282,10 @@ export default function RosterPlanningToolbar({
     if (!pharmacyId) return;
     setTemplateDialogOpen(true);
     try {
-      const res = await apiClient.get(
-        `/attendance/roster/templates/?pharmacy_id=${pharmacyId}`
-      );
-      setSavedTemplates(res.data);
-      if (res.data.length > 0) {
-        setSelectedTemplateId(res.data[0].id);
+      const res = await rosterV2.getTemplates(pharmacyId) as RosterTemplateItem[];
+      setSavedTemplates(res);
+      if (res.length > 0) {
+        setSelectedTemplateId(res[0].id);
       }
     } catch (err: any) {
       console.error('Failed to load templates', err);
@@ -303,7 +296,7 @@ export default function RosterPlanningToolbar({
     if (!period || !newTemplateName.trim()) return;
     setActionLoading(true);
     try {
-      await apiClient.post('/attendance/roster/templates/', {
+      await rosterV2.createTemplate({
         from_period_id: period.period_id,
         name: newTemplateName.trim(),
         include_users: templateIncludeUsers,
@@ -317,7 +310,7 @@ export default function RosterPlanningToolbar({
     } catch (err: any) {
       setFeedbackMessage({
         type: 'error',
-        text: err.response?.data?.error || 'Failed to save template.',
+        text: err.response?.data?.error || err?.message || 'Failed to save template.',
       });
     } finally {
       setActionLoading(false);
@@ -328,7 +321,7 @@ export default function RosterPlanningToolbar({
     if (!selectedTemplateId) return;
     setActionLoading(true);
     try {
-      const res = await apiClient.post('/attendance/roster/templates/apply/', {
+      const res = await rosterV2.applyTemplate({
         template_id: selectedTemplateId,
         target_week_start: mondayStr,
         include_assignments: templateIncludeUsers,
@@ -336,7 +329,7 @@ export default function RosterPlanningToolbar({
       });
       setFeedbackMessage({
         type: 'success',
-        text: `Template applied to w/c ${mondayStr}! (${res.data.counts.slots_created} shifts created)`,
+        text: `Template applied to w/c ${mondayStr}! (${(res as { counts: { slots_created: number } }).counts.slots_created} shifts created)`,
       });
       setTemplateDialogOpen(false);
       await fetchPeriodData();
@@ -344,7 +337,7 @@ export default function RosterPlanningToolbar({
     } catch (err: any) {
       setFeedbackMessage({
         type: 'error',
-        text: err.response?.data?.error || 'Failed to apply template.',
+        text: err.response?.data?.error || err?.message || 'Failed to apply template.',
       });
     } finally {
       setActionLoading(false);

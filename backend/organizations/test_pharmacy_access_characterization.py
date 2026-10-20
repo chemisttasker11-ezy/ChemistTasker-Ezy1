@@ -66,6 +66,6 @@ class PharmacyAccessCharacterizationTests(TestCase):
         client = APIClient()
         self.assertIn(client.get(f"/api/v1/pharmacies/{self.owned.id}/").status_code, (401, 403))
         self.assertEqual(self.request(self.region_user, "GET", self.unrelated).status_code, 404)
-        self.assertEqual(self.request(self.pharmacy_manager, "PATCH", self.unrelated, {"name": "Blocked"}).status_code, 403)
+        self.assertEqual(self.request(self.pharmacy_manager, "PATCH", self.unrelated, {"name": "Blocked"}).status_code, 404)
         self.unrelated.refresh_from_db()
         self.assertEqual(self.unrelated.name, "Unrelated Pharmacy")

@@ -5,6 +5,7 @@ export {
 export {
   attendance,
 } from './domains/attendance/api';
+export type { KioskPairingPharmacy, KioskPairingPharmaciesResponse, KioskPairingCodeResponse } from './domains/attendance/api';
 export {
   rosterV2,
   getRosterOwner,
