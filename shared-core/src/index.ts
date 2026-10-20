@@ -87,3 +87,5 @@ export * from './domains/onboarding/newcomer';
 export * from './domains/moderation/reports';
 
 export * from './domains/shifts/bookedRate';
+
+export { countOwnedPharmaciesFromUser } from './domains/onboarding/ownerSetup';
