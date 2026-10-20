@@ -71,6 +71,7 @@ export type {InvoiceDetailApi, InvoiceLineItemApi} from './contracts/invoiceDeta
 
 export * from './skills';
 export * from './pharmacyProfile';
+export * from './domains/organizations/pharmacyMultipart';
 export * from './domains/shifts/skillPresets';
 export * from './domains/shifts/visibility';
 export * from './domains/shifts/postingDraft';

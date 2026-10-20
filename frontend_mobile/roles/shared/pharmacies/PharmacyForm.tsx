@@ -38,6 +38,7 @@ import {
     updatePharmacy,
     getPharmacyById,
     lookupPharmacyAbn,
+    appendPharmacyFormFields,
 } from '@chemisttasker/shared-core';
 import { surfaceTokens } from './types';
 import GooglePlacesInput from './GooglePlacesInput';
@@ -319,7 +320,7 @@ export default function PharmacyForm({
                 const nextEmploymentTypes = data.employment_types || [];
                 const nextRolesNeeded = data.roles_needed || [];
                 const nextExistingFiles = {
-                    approval: data.approval_certificate || null,
+                    approval: data.methadone_s8_protocols || null,
                     sops: data.sops || null,
                     induction: data.induction_guides || null,
                     sump: data.qld_sump_docs || null,
@@ -571,22 +572,11 @@ export default function PharmacyForm({
 
             if (hasFiles) {
                 const formData = new FormData();
-                // Text fields
-                Object.entries(payload).forEach(([k, v]) => {
-                    if (v === null || v === undefined) return;
-                    if (k === 'software' || k === 'services') {
-                        formData.append(k, JSON.stringify(v));
-                        return;
-                    }
-                    if (Array.isArray(v)) {
-                        v.forEach(item => formData.append(k, String(item)));
-                        return;
-                    }
-                    formData.append(k, String(v));
-                });
+                // Encode Django JSON-list fields as one JSON array, matching the web client.
+                appendPharmacyFormFields(formData, payload);
 
                 // Files
-                if (files.approval) formData.append('approval_certificate', { uri: files.approval.uri, name: files.approval.name, type: files.approval.mimeType ?? 'application/pdf' } as any);
+                if (files.approval) formData.append('methadone_s8_protocols', { uri: files.approval.uri, name: files.approval.name, type: files.approval.mimeType ?? 'application/pdf' } as any);
                 if (files.sops) formData.append('sops', { uri: files.sops.uri, name: files.sops.name, type: files.sops.mimeType ?? 'application/pdf' } as any);
                 if (files.induction) formData.append('induction_guides', { uri: files.induction.uri, name: files.induction.name, type: files.induction.mimeType ?? 'application/pdf' } as any);
                 if (files.sump) formData.append('qld_sump_docs', { uri: files.sump.uri, name: files.sump.name, type: files.sump.mimeType ?? 'application/pdf' } as any);
