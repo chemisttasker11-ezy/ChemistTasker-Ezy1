@@ -95,3 +95,9 @@ Then verify emulator/device multipart uploads against isolated seeded Django/Pos
 - Added separate pharmacy-profile write-authority check (owner, full manager, authorized org or scoped region manager), not mere read visibility. Added nine negative/positive Django HTTP tests. Requires exact-head CI and policy verification before release.
 - Extracted Expo closed-hours row and Vite roster DTO interfaces without altering logic; ensured brand hex colors are referenced from a shared identity token while retaining identical UI output.
 - Final release tests including native device testing are not represented as complete. This PR remains draft; no merge or deploy.
+
+## Senior review corrective work (20 Oct 2026)
+- Commit `e669c576` repairs Expo syntax, checks the saved hashed file rather than its original filename, restores the original fulfillment payment wire test, and reverts unapproved pharmacy write permissions. The previously added policy test was removed because it asserted an unapproved role matrix. `PHARMACY_WRITE_POLICY_DECISION.md` records the unresolved owner choice and required POST/PUT/PATCH/DELETE tests.
+- The existing permission_denied positional-argument misuse was corrected without changing the previous authorization semantics.
+- Additional import-cycle SCC reporting and tests are being added without altering app model identity or migration paths.
+- PR #182 and Windows kiosk runtime remain untouched. Exact-head CI, full isolated QA and Android/iOS manual acceptance remain required; this is not a 100% completion claim.

@@ -5,7 +5,8 @@ import unittest
 from pathlib import Path
 
 from module_import_graph import (
-    approved_mutual_pairs, build_report, extract_edges, is_runtime, mutual_pairs
+    approved_mutual_pairs, build_report, extract_edges, is_runtime, mutual_pairs,
+    strongly_connected_components, unapproved_internal_cycle_edges
 )
 
 
@@ -51,6 +52,17 @@ class ModuleImportGraphTests(unittest.TestCase):
 
     def test_existing_mutual_pairs_are_not_misrepresented_as_acyclic(self):
         self.assertEqual(mutual_pairs({("x", "y"), ("y", "x"), ("z", "x")}), {("x", "y")})
+
+    def test_three_app_cycle_is_detected_without_direct_mutual_pair(self):
+        edges = {("alpha", "beta"), ("beta", "gamma"), ("gamma", "alpha")}
+        self.assertEqual(mutual_pairs(edges), set())
+        self.assertEqual(strongly_connected_components(edges), [("alpha", "beta", "gamma")])
+        self.assertEqual(unapproved_internal_cycle_edges(edges, set()), sorted(edges))
+
+    def test_existing_approved_two_way_pair_is_not_new_debt(self):
+        edges = {("alpha", "beta"), ("beta", "alpha"), ("beta", "gamma")}
+        allowed = {("alpha", "beta")}
+        self.assertEqual(unapproved_internal_cycle_edges(edges, allowed), [])
 
     def test_real_guard_allowlist_is_parseable_without_django_import(self):
         self.assertGreaterEqual(len(approved_mutual_pairs()), 1)

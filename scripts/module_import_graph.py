@@ -80,6 +80,60 @@ def mutual_pairs(edges):
     }
 
 
+def strongly_connected_components(edges):
+    """Tarjan SCCs for module-level import graph; include only real cycles."""
+    nodes = {node for edge in edges for node in edge}
+    adjacent = {node: set() for node in nodes}
+    for source, destination in edges:
+        adjacent[source].add(destination)
+    position = {}
+    lowlink = {}
+    active = []
+    on_stack = set()
+    result = []
+    index = 0
+
+    def visit(node):
+        nonlocal index
+        position[node] = lowlink[node] = index
+        index += 1
+        active.append(node)
+        on_stack.add(node)
+        for target in sorted(adjacent[node]):
+            if target not in position:
+                visit(target)
+                lowlink[node] = min(lowlink[node], lowlink[target])
+            elif target in on_stack:
+                lowlink[node] = min(lowlink[node], position[target])
+        if lowlink[node] == position[node]:
+            group = set()
+            while True:
+                current = active.pop()
+                on_stack.remove(current)
+                group.add(current)
+                if current == node:
+                    break
+            if len(group) > 1 or (node, node) in edges:
+                result.append(tuple(sorted(group)))
+
+    for node in sorted(nodes):
+        if node not in position:
+            visit(node)
+    return sorted(result)
+
+
+def unapproved_internal_cycle_edges(edges, allowed_pairs):
+    """Only count SCC internal edges not already accepted by the old mutual-pair baseline."""
+    cycles = strongly_connected_components(edges)
+    violations = set()
+    for group in cycles:
+        inside = set(group)
+        for source, target in edges:
+            if source in inside and target in inside and tuple(sorted((source, target))) not in allowed_pairs:
+                violations.add((source, target))
+    return sorted(violations)
+
+
 def approved_mutual_pairs(guard=OWNERSHIP_GUARD):
     """Reuse the ownership guard's actual allowlist without importing Django."""
     tree = ast.parse(guard.read_text(encoding="utf-8"), filename=str(guard))
@@ -104,6 +158,8 @@ def build_report(backend=BACKEND, guard=OWNERSHIP_GUARD):
         "mutual_app_pairs": [list(pair) for pair in sorted(cycles)],
         "allowed_mutual_app_pairs": [list(pair) for pair in sorted(existing)],
         "new_unapproved_mutual_pairs": [list(pair) for pair in sorted(cycles - existing)],
+        "strongly_connected_components": [list(group) for group in strongly_connected_components(direct)],
+        "unapproved_cycle_edges": [list(edge) for edge in unapproved_internal_cycle_edges(direct, existing)],
         "module_edges": [
             {"from": a, "to": b, "sources": evidence[(a, b, "module")]}
             for a, b in sorted(direct)
@@ -117,7 +173,7 @@ def build_report(backend=BACKEND, guard=OWNERSHIP_GUARD):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="fail if an unapproved mutual pair exists")
+    parser.add_argument("--check", action="store_true", help="fail if a cycle uses edges beyond approved legacy mutual pairs")
     parser.add_argument("--json", action="store_true", help="write machine-readable graph")
     options = parser.parse_args()
     report = build_report()
@@ -132,7 +188,9 @@ def main():
         )
         for pair in report["new_unapproved_mutual_pairs"]:
             print("UNAPPROVED MUTUAL PAIR:", *pair)
-    return 1 if options.check and report["new_unapproved_mutual_pairs"] else 0
+        for edge in report["unapproved_cycle_edges"]:
+            print("UNAPPROVED CYCLE EDGE:", *edge)
+    return 1 if options.check and report["unapproved_cycle_edges"] else 0
 
 
 if __name__ == "__main__":
