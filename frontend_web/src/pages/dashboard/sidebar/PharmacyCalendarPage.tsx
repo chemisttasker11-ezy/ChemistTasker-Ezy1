@@ -222,20 +222,22 @@ export default function PharmacyCalendarPage() {
         return () => { feedRequest.current += 1; };
     }, [loadFeed]);
 
+    // Only a changed URL date (deep link, back/forward) moves the day. Re-reading it on every feed
+    // update applied a stale date while React Router's transition lagged, so the week flipped forever.
+    const dateParam = searchParams.get("date");
     useEffect(() => {
-        const dateParam = searchParams.get("date");
-        if (dateParam) {
-            const parsed = toDate(dateParam);
-            if (parsed) {
-                if (!isSameDay(parsed, selectedDayRef.current)) {
-                    setSelectedDay(parsed);
-                }
-                if (!isSameMonth(parsed, currentMonthRef.current)) {
-                    setCurrentMonth(parsed);
-                }
+        const parsed = toDate(dateParam);
+        if (parsed) {
+            if (!isSameDay(parsed, selectedDayRef.current)) {
+                setSelectedDay(parsed);
+            }
+            if (!isSameMonth(parsed, currentMonthRef.current)) {
+                setCurrentMonth(parsed);
             }
         }
+    }, [dateParam]);
 
+    useEffect(() => {
         const noteParam = searchParams.get("note_id");
         if (noteParam) {
             const noteId = Number(noteParam);

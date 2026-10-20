@@ -42,8 +42,12 @@ test('week summary counts only planner occurrences in the selected week across a
 
 test('Plan fetches the Monday to Sunday week, across month and year ends',()=>{
  for(const [day,from,to] of [['2027-01-01','2026-12-28','2027-01-03'],['2027-01-03','2026-12-28','2027-01-03'],['2027-01-04','2027-01-04','2027-01-10'],
-  ['2026-11-01','2026-10-26','2026-11-01'],['2026-10-19','2026-10-19','2026-10-25']])
+  ['2026-11-01','2026-10-26','2026-11-01'],['2026-10-19','2026-10-19','2026-10-25'],['2026-10-20','2026-10-19','2026-10-25'],
+  ['2026-10-25','2026-10-19','2026-10-25'],['2026-12-29','2026-12-28','2027-01-03']]) {
   assert.deepEqual(model.weekRange(new Date(`${day}T00:00:00`)),{from,to},day);
+  // Normalising the week start again must stay in the same week.
+  assert.deepEqual(model.weekRange(new Date(`${from}T00:00:00`)),{from,to},`${day} start`);
+ }
 });
 
 test('new planner tasks are unassigned with notifications off; informal notes keep their defaults',()=>{
