@@ -82,15 +82,53 @@ export function inventoryBoundarySources(sources) {
   return findings.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line || a.column - b.column);
 }
 
+// Stable callsite identity: moving lines must not hide architecture debt.
+// Duplicate identical calls in one file are disambiguated by occurrence count.
+export function classifyBoundaryFindings(findings, manifest = {}) {
+  const seen = new Map();
+  return findings.map(finding => {
+    const signature = [finding.path, finding.kind, finding.callee, finding.route ?? ''].join('|');
+    const count = (seen.get(signature) ?? 0) + 1;
+    seen.set(signature, count);
+    const key = signature + '#' + count;
+    const decision = manifest[key] ?? null;
+    return { ...finding, key, classification: decision?.classification ?? 'unreviewed',
+      owner: decision?.owner ?? null, rationale: decision?.rationale ?? null };
+  });
+}
+
+export function validateBoundaryManifest(classified, manifest = {}) {
+  const allowed = new Set(['approved-adapter', 'legacy-migrate', 'false-positive']);
+  const failures = [];
+  const keys = new Set(classified.map(finding => finding.key));
+  for (const [key, decision] of Object.entries(manifest)) {
+    if (!keys.has(key)) failures.push('stale manifest entry: ' + key);
+    if (!allowed.has(decision?.classification) || !decision?.owner?.trim() || !decision?.rationale?.trim())
+      failures.push('incomplete decision: ' + key);
+  }
+  for (const finding of classified) {
+    if (finding.classification === 'unreviewed') failures.push('unreviewed: ' + finding.key);
+    if (finding.classification === 'legacy-migrate') failures.push('migration still required: ' + finding.key);
+  }
+  return failures;
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {
     const sources = trees.flatMap(tree => visit(path.join(root, tree))).map(filename => ({
         path: path.relative(root, filename).replaceAll('\\', '/'),
         content: fs.readFileSync(filename, 'utf8'),
     }));
-    const findings = inventoryBoundarySources(sources);
+    const manifestPath = path.join(root, 'docs/handover/architecture-remediation-2026-10-20/CLIENT_BOUNDARY_MANIFEST.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const findings = classifyBoundaryFindings(inventoryBoundarySources(sources), manifest);
+    const violations = validateBoundaryManifest(findings, manifest);
+    const strict = process.argv.includes('--strict');
     const report = {
         scope: 'runtime Vite, Next and Expo; Windows kiosk, test fixtures and dependencies excluded',
-        mode: 'AST full-tree inventory, report-only',
+        mode: strict ? 'full-tree review enforcement' : 'AST full-tree inventory, report-only',
+        unreviewed: findings.filter(item => item.classification === 'unreviewed').length,
+        legacyMigrate: findings.filter(item => item.classification === 'legacy-migrate').length,
+        violations,
         limitations: [
             'AST detects multiline calls, but does not fully resolve imported aliases or dynamic route names.',
             'Not an authorization analysis; validate backend and endpoint DTOs separately.',
@@ -105,5 +143,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.met
         if (!process.argv.includes('--summary')) for (const finding of findings) {
             process.stdout.write(`${finding.path}:${finding.line} [${finding.kind}] ${finding.callee} ${finding.route ?? ''}\n`);
         }
+    }
+    if (strict && violations.length) {
+        console.error('Full-tree strict boundary gate failed: ' + violations.length + ' unapproved, unfinished or stale callsites.');
+        for (const item of violations) console.error(item);
+        process.exitCode = 1;
     }
 }
