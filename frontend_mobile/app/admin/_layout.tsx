@@ -41,14 +41,13 @@ function AdminSidebar({
     { label: 'Overview', icon: 'view-dashboard-outline', route: '/admin' },
     { label: 'Pharmacies', icon: 'store-outline', route: '/admin/pharmacies' },
     { label: 'Roster', icon: 'calendar-month-outline', route: '/admin/shifts' },
-    { label: 'Operations Planner', icon: 'clipboard-text-clock-outline', route: '/admin/operations' },
     { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets' },
     { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
     { label: 'Post Shift', icon: 'plus-circle-outline', route: '/admin/post-shift' },
     { label: 'Chat', icon: 'message-text-outline', route: '/admin/chat' },
     { label: 'Pills', icon: 'pill', route: '/admin/pills' },
     { label: 'Pharmacy Hub', icon: 'account-group-outline', route: '/admin/hub', visible: canManageCommunications },
-    { label: 'Calendar', icon: 'calendar-outline', route: '/admin/calendar', visible: canManageCommunications },
+    { label: 'Calendar', icon: 'calendar-outline', route: '/admin/calendar', visible: true },
     { label: 'Notifications', icon: 'bell-outline', route: '/admin/notifications', visible: true },
   ].filter((item) => item.visible !== false);
 
