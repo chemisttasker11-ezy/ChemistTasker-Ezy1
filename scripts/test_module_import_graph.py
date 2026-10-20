@@ -64,6 +64,44 @@ class ModuleImportGraphTests(unittest.TestCase):
         allowed = {("alpha", "beta")}
         self.assertEqual(unapproved_internal_cycle_edges(edges, allowed), [])
 
+
+    def test_module_import_time_in_try_if_and_class_is_not_delayed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for app in ("alpha", "beta", "gamma", "delta", "epsilon"):
+                p = root / app
+                p.mkdir()
+                (p / "__init__.py").touch()
+            (root / "alpha" / "service.py").write_text(
+                "try:\\n    from beta.models import Model\\nexcept ImportError:\\n    import gamma.models\\n"
+                "if True:\\n    import delta.models\\n"
+                "class Registry:\\n    from epsilon.models import Model\\n"
+                "def later():\\n    from beta.tasks import queue\\n"
+            .replace("\\\\n", "\\n"))
+            direct, delayed, evidence = extract_edges(root)
+            self.assertEqual(direct, {
+                ("alpha", "beta"), ("alpha", "gamma"), ("alpha", "delta"), ("alpha", "epsilon"),
+            })
+            self.assertEqual(delayed, {("alpha", "beta")})
+            self.assertEqual(evidence[("alpha", "epsilon", "module")][0]["line"], 7)
+
+    def test_type_checking_imports_excluded_from_runtime_graph(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for app in ("alpha", "beta", "gamma", "delta"):
+                p = root / app
+                p.mkdir()
+                (p / "__init__.py").touch()
+            (root / "alpha" / "service.py").write_text(
+                "from typing import TYPE_CHECKING\\n"
+                "import typing\\n"
+                "if TYPE_CHECKING:\\n    import beta.models\\nelse:\\n    import gamma.models\\n"
+                "if not typing.TYPE_CHECKING:\\n    import delta.models\\n"
+            .replace("\\\\n", "\\n"))
+            direct, delayed, _ = extract_edges(root)
+            self.assertEqual(direct, {("alpha", "gamma"), ("alpha", "delta")})
+            self.assertFalse(delayed)
+
     def test_real_guard_allowlist_is_parseable_without_django_import(self):
         self.assertGreaterEqual(len(approved_mutual_pairs()), 1)
 

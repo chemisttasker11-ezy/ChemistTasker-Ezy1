@@ -66,6 +66,8 @@ class PharmacyAccessCharacterizationTests(TestCase):
         client = APIClient()
         self.assertIn(client.get(f"/api/v1/pharmacies/{self.owned.id}/").status_code, (401, 403))
         self.assertEqual(self.request(self.region_user, "GET", self.unrelated).status_code, 404)
-        self.assertEqual(self.request(self.pharmacy_manager, "PATCH", self.unrelated, {"name": "Blocked"}).status_code, 404)
+        # Existing global unsafe-method gate rejects a non-owner without org membership
+        # before object lookup. This is a 403 (not a 404) on the current deployed policy.
+        self.assertEqual(self.request(self.pharmacy_manager, "PATCH", self.unrelated, {"name": "Blocked"}).status_code, 403)
         self.unrelated.refresh_from_db()
         self.assertEqual(self.unrelated.name, "Unrelated Pharmacy")

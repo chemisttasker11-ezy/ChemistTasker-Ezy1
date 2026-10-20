@@ -50,25 +50,53 @@ def extract_edges(backend=BACKEND):
             continue
         source = relative.parts[0]
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(relative))
-        module_import_nodes = {
-            id(node) for node in tree.body
-            if isinstance(node, (ast.Import, ast.ImportFrom))
-        }
-        for node in ast.walk(tree):
-            modules = direct_imports(node)
-            if not modules:
-                continue
-            for module in modules:
-                target = module.split(".", 1)[0]
-                if target not in apps or target == source:
-                    continue
-                kind = "module" if id(node) in module_import_nodes else "delayed"
-                edge = (source, target)
-                (direct if kind == "module" else delayed).add(edge)
-                evidence[(source, target, kind)].append({
-                    "path": relative.as_posix(), "line": node.lineno,
-                    "import": module,
-                })
+        # A module-level try/except, if, with or class body executes while importing.
+        # Only function/lambda bodies are delayed. TYPE_CHECKING-only branches are
+        # statically skipped; annotations/decorators do not contain import statements.
+        def type_checking_test(test):
+            if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+                return True
+            return (
+                isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"
+                and isinstance(test.value, ast.Name) and test.value.id in {"typing", "t"}
+            )
+
+        def visit(node, delayed=False):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                for module in direct_imports(node):
+                    target = module.split(".", 1)[0]
+                    if target not in apps or target == source:
+                        continue
+                    kind = "delayed" if delayed else "module"
+                    (direct if delayed is False else delayed_edges).add((source, target))
+                    evidence[(source, target, kind)].append({
+                        "path": relative.as_posix(), "line": node.lineno,
+                        "import": module,
+                    })
+                return
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                # Function bodies do not run at import, even under a module-level if.
+                for child in node.body:
+                    visit(child, True)
+                return
+            if isinstance(node, ast.Lambda):
+                visit(node.body, True)
+                return
+            if isinstance(node, ast.If):
+                guard = node.test
+                if type_checking_test(guard):
+                    for child in node.orelse:
+                        visit(child, delayed)
+                    return
+                if isinstance(guard, ast.UnaryOp) and isinstance(guard.op, ast.Not) and type_checking_test(guard.operand):
+                    for child in node.body:
+                        visit(child, delayed)
+                    return
+            for child in ast.iter_child_nodes(node):
+                visit(child, delayed)
+
+        delayed_edges = delayed
+        visit(tree)
     return direct, delayed, evidence
 
 
@@ -191,6 +219,8 @@ def main():
             print("UNAPPROVED MUTUAL PAIR:", *pair)
         for edge in report["unapproved_cycle_edges"]:
             print("UNAPPROVED CYCLE EDGE:", *edge)
+        for group in report["strongly_connected_components"]:
+            print("EXISTING SCC:", ",".join(group))
     if options.check_all_cycles and report["unapproved_cycle_edges"]:
         return 1
     return 1 if options.check and report["new_unapproved_mutual_pairs"] else 0
