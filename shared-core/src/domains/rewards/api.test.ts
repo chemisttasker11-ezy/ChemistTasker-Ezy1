@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureApi } from '../../transport/application';
 import {
   fetchPillBalanceService, fetchPillHistoryService, fetchPillReferralsService,
+  createFriendPillReferralService, createShiftPillReferralService,
 } from './api';
 
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -32,5 +33,19 @@ describe('Pill rewards cross-platform domain read contracts', () => {
     for (const [, options] of fetchMock.mock.calls) {
       expect(options.method ?? 'GET').toBe('GET');
     }
+  });
+});
+
+describe('Pill referral creation wire compatibility', () => {
+  it('keeps POST JSON body and exact friend and shift endpoints', async () => {
+    await createFriendPillReferralService({});
+    await createShiftPillReferralService({ shift_id: 321 });
+    const [friend, shift] = fetchMock.mock.calls.slice(-2);
+    expect((friend[0] as URL).pathname).toBe('/api/v1/pill-rewards/refer-friend/');
+    expect((shift[0] as URL).pathname).toBe('/api/v1/pill-rewards/refer-shift/');
+    expect(friend[1].method).toBe('POST');
+    expect(shift[1].method).toBe('POST');
+    expect(JSON.parse(String(friend[1].body))).toEqual({});
+    expect(JSON.parse(String(shift[1].body))).toEqual({ shift_id: 321 });
   });
 });

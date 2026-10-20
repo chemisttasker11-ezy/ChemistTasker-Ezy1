@@ -1,3 +1,4 @@
+import { createFriendPillReferralService } from '@chemisttasker/shared-core';
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Linking, Share } from 'react-native';
 import { Text, Avatar, List, Button, Surface, Divider, Switch, IconButton, Card, Portal, Dialog, TextInput } from 'react-native-paper';
@@ -158,7 +159,7 @@ export default function OwnerProfileScreen() {
   const shareFriendReferral = async () => {
     setReferralLoading(true);
     try {
-      const { data } = await apiClient.post('/pill-rewards/refer-friend/', {});
+      const data = await createFriendPillReferralService({});
       const code = data?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const baseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || webBaseUrl;
