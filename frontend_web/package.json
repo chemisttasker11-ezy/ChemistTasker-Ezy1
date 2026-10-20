@@ -22,7 +22,10 @@
     "kiosk:build:production": "cross-env KIOSK_BUILD_PROFILE=production npm run kiosk:build",
     "install:all": "npm ci && npm ci --prefix landing_next",
     "build:all": "npm run build && npm run build --prefix landing_next",
-    "preinstall": "node ../scripts/prepare-shared-core.mjs"
+    "preinstall": "node ../scripts/prepare-shared-core.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "lint": "eslint src",
+    "test": "node ../shared-core/node_modules/vitest/vitest.mjs run --config vitest.config.ts"
   },
   "dependencies": {
     "@chemisttasker/shared-core": "file:../shared-core",
