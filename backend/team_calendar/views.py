@@ -30,9 +30,9 @@ from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Pharmacy
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee, WorkNoteCompletion
 from team_calendar.serializers import CalendarEventSerializer, CalendarFeedSerializer, WorkNoteSerializer
-from organizations.access import planner_pharmacies
+from organizations.access import planner_pharmacies, require_manager
 from team_calendar.recurrence import expand_recurrence_dates
-from team_calendar.operations_views import require_manager
+from team_calendar.operations_rules import validate_completed_task_edit, validate_task_occurrence
 from team_calendar.operations_models import OperationAudit
 
 
@@ -402,13 +402,7 @@ class WorkNoteViewSet(
             raise PermissionDenied("You don't have permission to edit this work note.")
         serializer = self.get_serializer(note, data=request.data, partial=kwargs.pop('partial', False))
         serializer.is_valid(raise_exception=True)
-        if note.is_planner_task and note.completions.exists():
-            attrs = serializer.validated_data
-            if (attrs.get('date', note.date) != note.date
-                    or attrs.get('recurrence', note.recurrence) != note.recurrence
-                    or set(attrs.get('assignee_membership_ids', note.assignees.values_list('membership_id', flat=True)))
-                    != set(note.assignees.values_list('membership_id', flat=True))):
-                raise ValidationError('Date, recurrence and assignees cannot change after completion.')
+        validate_completed_task_edit(note, serializer.validated_data)
         serializer.save()
         return Response(serializer.data)
 
@@ -441,9 +435,7 @@ class WorkNoteViewSet(
             return
         if membership.status != Membership.Status.ACCEPTED or not note.assignees.filter(membership=membership).exists():
             raise PermissionDenied('Only an assigned, active worker can complete or reopen this task.')
-        dates = expand_recurrence_dates(note.date, note.recurrence, occurrence_date, occurrence_date)
-        if (note.recurrence and occurrence_date not in dates) or (not note.recurrence and occurrence_date != note.date):
-            raise ValidationError({'occurrence_date': 'This date is not an occurrence of the task.'})
+        validate_task_occurrence(note, occurrence_date)
 
     def _get_occurrence_date(self, request, note):
         if note.is_planner_task:

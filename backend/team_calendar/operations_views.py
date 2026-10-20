@@ -1,19 +1,13 @@
 """Pharmacy-scoped saved tasks and explicit planner copy/roster actions."""
 from rest_framework import permissions, viewsets
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from organizations.access import planner_pharmacies
+from organizations.access import planner_pharmacies, require_manager
 from team_calendar.models import WorkNote
 from team_calendar.operations_models import SavedTask
 from team_calendar.operations_rules import copy_tasks, eligible_memberships
-from team_calendar.operations_serializers import SavedTaskSerializer, CopyTasksSerializer, RosterFillSerializer
-
-
-def require_manager(user, pharmacy_id):
-    if not planner_pharmacies(user).filter(pk=pharmacy_id).exists():
-        raise PermissionDenied("You cannot manage planner tasks for this pharmacy.")
+from team_calendar.operations_serializers import SavedTaskSerializer, CopyTasksSerializer, RosterFillSerializer, SavedTaskQuerySerializer
 
 
 class OperationContextView(APIView):
@@ -30,9 +24,10 @@ class SavedTaskViewSet(viewsets.ModelViewSet):
     serializer_class = SavedTaskSerializer
 
     def get_queryset(self):
-        from team_calendar.views import _query_id
         qs = SavedTask.objects.filter(pharmacy__in=planner_pharmacies(self.request.user))
-        pharmacy_id = _query_id(self.request, 'pharmacy_id')
+        query = SavedTaskQuerySerializer(data=self.request.query_params)
+        query.is_valid(raise_exception=True)
+        pharmacy_id = query.validated_data.get('pharmacy_id')
         return qs.filter(pharmacy_id=pharmacy_id) if pharmacy_id is not None else qs
 
     def perform_create(self, serializer):

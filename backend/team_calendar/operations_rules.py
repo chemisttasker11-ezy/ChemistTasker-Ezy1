@@ -146,3 +146,18 @@ def copy_tasks(*, pharmacy_id, actor, source_from, source_to, day_offset, reques
         details={"input": inputs, "result": result},
     )
     return result
+
+
+def validate_completed_task_edit(note, attrs):
+    if note.is_planner_task and note.completions.exists():
+        if (attrs.get('date', note.date) != note.date
+                or attrs.get('recurrence', note.recurrence) != note.recurrence
+                or set(attrs.get('assignee_membership_ids', note.assignees.values_list('membership_id', flat=True)))
+                != set(note.assignees.values_list('membership_id', flat=True))):
+            raise ValidationError('Date, recurrence and assignees cannot change after completion.')
+
+
+def validate_task_occurrence(note, occurrence_date):
+    dates = expand_recurrence_dates(note.date, note.recurrence, occurrence_date, occurrence_date)
+    if (note.recurrence and occurrence_date not in dates) or (not note.recurrence and occurrence_date != note.date):
+        raise ValidationError({'occurrence_date': 'This date is not an occurrence of the task.'})

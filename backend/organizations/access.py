@@ -207,3 +207,9 @@ def planner_pharmacies(user):
     for membership in OrganizationMembership.objects.filter(user=user, role='REGION_ADMIN'):
         ids.update(membership.pharmacies.filter(organization_id=membership.organization_id).values_list("id", flat=True))
     return Pharmacy.objects.filter(id__in=ids)
+
+
+def require_manager(user, pharmacy_id):
+    from rest_framework.exceptions import PermissionDenied
+    if not planner_pharmacies(user).filter(pk=pharmacy_id).exists():
+        raise PermissionDenied("You cannot manage planner tasks for this pharmacy.")

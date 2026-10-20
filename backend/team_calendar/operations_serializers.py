@@ -47,3 +47,11 @@ class RosterFillSerializer(serializers.Serializer):
     def validate(self, attrs):
         validate_times(attrs.get('start_time'), attrs.get('end_time'))
         return attrs
+
+
+class SavedTaskQuerySerializer(serializers.Serializer):
+    pharmacy_id = serializers.IntegerField(required=False)
+
+    def to_internal_value(self, data):
+        # An empty scope has always meant all of the manager's pharmacies.
+        return super().to_internal_value({key: value for key, value in data.items() if value != ''})

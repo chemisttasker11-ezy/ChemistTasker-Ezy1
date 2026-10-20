@@ -45,8 +45,8 @@ export function createCalendarEvent(payload: {
     title: string;
     description?: string;
     date: string;
-    startTime?: string;
-    endTime?: string;
+    startTime?: string | null;
+    endTime?: string | null;
     allDay?: boolean;
     recurrence?: CalendarRecurrence | null;
 }) {

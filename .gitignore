@@ -112,6 +112,9 @@ frontend_mobile/.env.production
 # Trash / docs folders you don’t want in Git
 trash/
 screenshots/
+!docs/planner/screenshots/
+docs/planner/screenshots/*
+!docs/planner/screenshots/after/
 frontend_web_old/
 Documents/
 verification_outputs/

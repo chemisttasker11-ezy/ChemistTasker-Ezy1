@@ -1,3 +1,7 @@
+import { mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+const screenshots = fileURLToPath(new URL('../../docs/planner/screenshots/after/', import.meta.url));
+mkdirSync(screenshots, { recursive: true });
 import { test, expect } from '@playwright/test';
 import { installApiFixture, json, roleUsers } from './support/apiFixture.mjs';
 
@@ -14,7 +18,7 @@ async function plannerFixture(page, user = roleUsers.owner) {
     notify_on_shift_start: false, is_general: false, recurrence: null, assignees: [], completed_count: 0,
     completed_by: [], created_by: 1, created_by_name: 'Owner', created_at: '2026-12-01T00:00:00Z',
     updated_at: '2026-12-01T00:00:00.123456Z', ...body });
-  state.notes.push(note({ title: 'Repeating opening', recurrence: { freq: 'WEEKLY', byweekday: [0, 2] } }, 1));
+  state.notes.push(note({ title: 'Repeating opening', is_clinical: true, assignees: [{ id: 702, membership_id: 702, user_id: roleUsers.pharmacist.id, user_name: 'Alex Worker' }], recurrence: { freq: 'WEEKLY', byweekday: [0, 2] } }, 1));
   await installApiFixture(page, user, async (route, { path, method, url }) => {
     const body = () => route.request().postDataJSON();
     if (path.endsWith('/pharmacies/')) return json(route, [{ id: 101, name: 'Smoke Pharmacy' }]);
@@ -97,6 +101,7 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 
     await page.getByRole('button', { name: 'Add task', exact: true }).first().click();
     let dialog = page.getByRole('dialog', { name: 'Add task', exact: true });
     await dialog.getByRole('textbox', { name: 'Title', exact: true }).fill('Opening task');
+    await page.screenshot({ path: `${screenshots}/add-task-${viewport.width}.png`, fullPage: true, animations: 'disabled' });
     await dialog.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(dialog).toHaveCount(0);
     expect(state.writes[0]).toMatchObject({ date: '2026-12-28', is_planner_task: true, assignee_membership_ids: [], notify_on_shift_start: false });
@@ -104,10 +109,12 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 
     let task = page.getByRole('article', { name: 'Opening task', exact: true });
     await expect(task).toHaveCount(1);
     await expect(task.getByText('0 of 0 done')).toBeVisible();
-    await task.getByRole('button', { name: 'Duplicate', exact: true }).click();
+    await task.getByRole('button', { name: 'More actions for Opening task', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Duplicate', exact: true }).click();
     await expect(task).toHaveCount(2);
     expect(state.copies.at(-1)).toMatchObject({ source_from: '2026-12-28', source_to: '2026-12-28', day_offset: 0, task_id: state.notes.find(n => n.title === 'Opening task').id });
-    await page.getByRole('button', { name: 'Copy day to tomorrow', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Day actions for Monday 28 December', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Copy day to tomorrow', exact: true }).click();
     await expect(page.getByRole('alert').filter({ hasText: '2 copied; 1 repeating skipped; 1 people dropped: Former worker.' })).toBeVisible();
     expect(state.copies.at(-1)).toMatchObject({ source_from: '2026-12-28', source_to: '2026-12-28', day_offset: 1 });
     await page.getByRole('button', { name: 'Copy week to next week', exact: true }).click();
@@ -116,11 +123,12 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 
     expect(state.notes.filter(n => n.date === '2027-01-04' && n.title === 'Opening task')).toHaveLength(2);
     expect(state.notes.filter(n => n.date === '2027-01-05' && n.title === 'Opening task')).toHaveLength(2);
 
-    await task.first().getByRole('button', { name: 'Edit', exact: true }).click();
+    await task.first().getByRole('button', { name: 'Edit Opening task', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Edit task', exact: true });
     await dialog.getByRole('textbox', { name: 'Title', exact: true }).fill('Edited opening');
     await dialog.getByRole('button', { name: 'More options', exact: true }).click();
     await dialog.getByLabel('Details', { exact: true }).fill('Reusable instructions');
+    await page.screenshot({ path: `${screenshots}/edit-task-${viewport.width}.png`, fullPage: true, animations: 'disabled' });
     await dialog.getByRole('button', { name: 'Save as reusable', exact: true }).click();
     await expect.poll(() => state.saved.length).toBe(1);
     expect(state.saved[0]).not.toHaveProperty('recurrence');
@@ -138,10 +146,11 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 
     await expect(page.getByRole('article', { name: 'Placed reusable', exact: true })).toBeVisible();
     expect(state.writes.at(-1)).toMatchObject({ body: 'Reusable instructions', date: '2026-12-28', assignee_membership_ids: [702], recurrence: null });
 
-    await page.getByRole('article', { name: 'Edited opening', exact: true }).getByRole('button', { name: 'Edit', exact: true }).click();
-    await page.getByRole('dialog', { name: 'Edit task', exact: true }).getByRole('button', { name: 'Delete task', exact: true }).click();
+    await page.getByRole('article', { name: 'Edited opening', exact: true }).getByRole('button', { name: 'More actions for Edited opening', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
     const confirm = page.getByRole('dialog', { name: 'Delete task?', exact: true });
     await expect(confirm).toBeVisible();
+    await expect(confirm).toContainText('Edited opening');
     await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(page.getByRole('article', { name: 'Edited opening', exact: true })).toHaveCount(0);
     await expect(page.getByRole('article', { name: 'Placed reusable', exact: true })).toBeVisible();
@@ -156,7 +165,11 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 
     await expect.poll(() => state.saved.length).toBe(0);
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(page.getByRole('article', { name: 'Placed reusable', exact: true })).toBeVisible();
-    await page.screenshot({ path: `test-results/planner-${viewport.width}.png`, fullPage: true });
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: `${screenshots}/planner-${viewport.width}.png`, fullPage: true, animations: 'disabled' });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const target = await page.getByRole('article', { name: 'Placed reusable', exact: true }).boundingBox();
+    if (viewport.width < 1000) expect(target.y).toBeLessThan(viewport.height);
   });
 }
 
@@ -165,7 +178,7 @@ test('editing an occurrence uses the original series start and preserves weekday
   await page.goto('/dashboard/owner/calendar?workspace=internal&pharmacy_id=101&date=2026-12-30');
   await page.getByRole('tab', { name: 'Plan', exact: true }).click();
   const wednesday = page.getByRole('region', { name: 'Wednesday 30 December', exact: true });
-  await wednesday.getByRole('article', { name: 'Repeating opening', exact: true }).getByRole('button', { name: 'Edit', exact: true }).click();
+  await wednesday.getByRole('article', { name: 'Repeating opening', exact: true }).getByRole('button', { name: 'Edit Repeating opening', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Edit task', exact: true });
   await expect(dialog.getByLabel('Date', { exact: true })).toHaveValue('2026-12-28');
   await dialog.getByRole('textbox', { name: 'Title', exact: true }).fill('Edited series');
@@ -191,3 +204,21 @@ test('staff see To do / Done, can tick their occurrence and have no planner muta
   await task.getByRole('button', { name: 'Mark to do', exact: true }).click();
   await expect(task.getByText('To do', { exact: true })).toBeVisible();
 });
+
+
+for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 }]) {
+  test(`empty week has one empty state at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const state = await plannerFixture(page);
+    state.notes = [];
+    await page.goto('/dashboard/owner/calendar?workspace=internal&pharmacy_id=101&date=2026-12-28');
+    await page.getByRole('tab', { name: 'Plan', exact: true }).click();
+    await expect(page.getByText('No tasks this week.', {exact: true})).toBeVisible();
+    await expect(page.getByRole('region')).toHaveCount(0);
+    await expect(page.getByText(/Save a task as reusable/)).toBeVisible();
+    await page.screenshot({path: `${screenshots}/empty-week-${viewport.width}.png`, fullPage: true, animations: 'disabled'});
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.getByRole('button', {name: 'Add task', exact: true}).last().click();
+    await expect(page.getByRole('dialog', {name: 'Add task', exact: true})).toBeVisible();
+  });
+}

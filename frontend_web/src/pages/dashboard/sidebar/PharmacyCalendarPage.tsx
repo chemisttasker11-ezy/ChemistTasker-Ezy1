@@ -1,3 +1,9 @@
+import {
+  calendarTaskState, weekRange, copyResultMessage, plannerCopyRequest,
+  projectCalendarFeed, createCalendarEventService, updateCalendarEventService, deleteCalendarEventService,
+  type CalendarItem, emptyNoteForm, editNoteForm, notePayload,
+  plannerRosterInput, mergeRosterAssignees, savedTaskInput,
+} from '@chemisttasker/shared-core';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
@@ -10,6 +16,7 @@ import {
     IconButton,
     Paper,
     Stack,
+    Snackbar,
     Tab,
     Tabs,
     Typography,
@@ -46,16 +53,11 @@ import { fetchMembershipsByPharmacy, getOperationsContext, getCalendarFeed, getW
 import { useSearchParams } from "react-router-dom";
 import {
     type ItemType,
-    type CalendarItem,
     WEEKDAYS,
-    normalizeList,
-    postJson,
     toDate,
-    formatTimeRange,
     ROLE_LABELS,
     EMPLOYMENT_TYPE_LABELS,
     formatChoiceLabel,
-    emptyNoteForm, editNoteForm, notePayload, weekRange, copyResultMessage,
 } from "./PharmacyCalendarPage.model";
 import PharmacyCalendarDialogs from "./PharmacyCalendarDialogs";
 import PharmacyCalendarWeekView from "./PharmacyCalendarWeekView";
@@ -205,64 +207,7 @@ export default function PharmacyCalendarPage() {
         setError(null);
         try {
             const feed = await getCalendarFeed({ pharmacyId: selectedPharmacyId, dateFrom: dateRange.from, dateTo: dateRange.to });
-            const eventsRaw = normalizeList(feed?.events);
-            const notesRaw = normalizeList(feed?.work_notes);
-
-            const mappedEvents: CalendarItem[] = normalizeList(eventsRaw).map((evt: any) => {
-                const dateObj = toDate(evt.date) ?? new Date();
-                const type: CalendarItem["type"] = evt.source === "birthday" ? "birthday" : "event";
-                const rawId = evt.id;
-                const id = typeof rawId === "number" ? rawId : String(rawId ?? "");
-                const seriesId = evt.series_id ?? (typeof rawId === "number" ? rawId : undefined);
-                return {
-                    id,
-                    seriesId,
-                    isOccurrence: Boolean(evt.is_occurrence),
-                    type,
-                    title: evt.title,
-                    date: dateObj,
-                    time: formatTimeRange(evt.start_time, evt.end_time),
-                    allDay: evt.all_day ?? !evt.start_time,
-                    source: evt.source,
-                    readOnly: evt.source !== "manual",
-                    description: evt.description,
-                    eventData: evt,
-                };
-            });
-
-            const mappedNotes: CalendarItem[] = normalizeList(notesRaw).map((note: any) => {
-                const dateObj = toDate(note.date) ?? new Date();
-                const assigneeNames = (note.assignees ?? []).map(
-                    (a: any) =>
-                        a.user_name ||
-                        a.userName ||
-                        a.name ||
-                        a.email ||
-                        a.user?.full_name ||
-                        "Assignee"
-                );
-                const rawId = note.id;
-                const id = typeof rawId === "number" ? rawId : String(rawId ?? "");
-                const seriesId = note.series_id ?? (typeof rawId === "number" ? rawId : undefined);
-                return {
-                    id,
-                    seriesId,
-                    isOccurrence: Boolean(note.is_occurrence),
-                    type: "note",
-                    title: note.title,
-                    date: dateObj,
-                    allDay: !note.start_time,
-                    time: formatTimeRange(note.start_time, note.end_time),
-                    source: "work_note",
-                    assignees: assigneeNames,
-                    completedBy: Array.isArray(note.completed_by) ? note.completed_by : [],
-                    assigneeMembershipIds: (note.assignees ?? []).map((a: any) => a.membershipId ?? a.membership_id),
-                    status: (note.status ?? "").toString().toUpperCase(),
-                    noteData: note,
-                };
-            });
-
-            const combined = [...mappedEvents, ...mappedNotes];
+            const combined = projectCalendarFeed(feed);
             if (request === feedRequest.current) setItems(combined);
         } catch (e) {
             if (request === feedRequest.current) { setError("Unable to load calendar data."); setItems([]); }
@@ -418,7 +363,7 @@ export default function PharmacyCalendarPage() {
       const recurrence =
         eventForm.recurrence.freq !== "NONE"
           ? {
-              freq: eventForm.recurrence.freq,
+              freq: eventForm.recurrence.freq as "DAILY" | "WEEKLY" | "MONTHLY",
               interval: eventForm.recurrence.interval || 1,
               until_date: eventForm.recurrence.until || null,
             }
@@ -428,15 +373,15 @@ export default function PharmacyCalendarPage() {
         title: eventForm.title,
         description: eventForm.description,
         date: eventForm.date,
-        all_day: eventForm.allDay,
-        start_time: eventForm.allDay ? null : eventForm.startTime || null,
-        end_time: eventForm.allDay ? null : eventForm.endTime || null,
+        allDay: eventForm.allDay,
+        startTime: eventForm.allDay ? null : eventForm.startTime || null,
+        endTime: eventForm.allDay ? null : eventForm.endTime || null,
         recurrence,
       };
       if (editingEventId) {
-        await postJson(`/calendar-events/${editingEventId}/`, payload, "PATCH");
+        await updateCalendarEventService(editingEventId, payload);
       } else {
-        await postJson("/calendar-events/", payload);
+        await createCalendarEventService(payload);
       }
             setEventModalOpen(false);
             setEditingEventId(null);
@@ -449,7 +394,7 @@ export default function PharmacyCalendarPage() {
     };
 
     const handleEditNote = async (item: CalendarItem) => {
-        if (item.noteData?.is_planner_task && !canManage) return;
+        if (!calendarTaskState(item.noteData, canManage, user?.id).canEdit) return;
         const id = getBaseItemId(item);
         if (!id) return;
         try {
@@ -483,14 +428,8 @@ export default function PharmacyCalendarPage() {
 
     const handleCopy = async (mode: "day" | "week" | "previous" | "task", day: Date, item?: CalendarItem) => {
         if (!selectedPharmacyId || !canManage || actionBusy) return;
-        const range = mode === "week" || mode === "previous" ? weekRange(mode === "previous" ? addDays(day, -7) : day)
-            : { from: format(day, "yyyy-MM-dd"), to: format(day, "yyyy-MM-dd") };
-        const input = { pharmacy: selectedPharmacyId, source_from: range.from, source_to: range.to,
-            day_offset: mode === "task" ? 0 : mode === "day" ? 1 : 7,
-            ...(item ? { task_id: getBaseItemId(item) } : {}) };
-        const { request_key: previousKey, ...previousInput } = pendingCopy.current ?? {};
-        // Retain the key after a lost response so retrying cannot duplicate writes.
-        const request = { ...input, request_key: previousKey && JSON.stringify(previousInput) === JSON.stringify(input) ? previousKey : crypto.randomUUID() };
+        const request = plannerCopyRequest(selectedPharmacyId, mode === "previous" ? addDays(day, -7) : day,
+            mode === "previous" ? "week" : mode, pendingCopy.current, item ? getBaseItemId(item) : undefined);
         pendingCopy.current = request;
         setActionBusy(true);
         setError(null);
@@ -539,8 +478,7 @@ export default function PharmacyCalendarPage() {
         setNoteSaving(true);
         setNoteError(null);
         try {
-            const saved = await createSavedTask({ pharmacy: selectedPharmacyId, title: noteForm.title.trim(), details: noteForm.body,
-                start_time: noteForm.startTime || null, end_time: noteForm.endTime || null, is_clinical: noteForm.isClinical });
+            const saved = await createSavedTask(savedTaskInput(noteForm, selectedPharmacyId));
             setSavedTasks(tasks => [...tasks, saved]);
             setNotice("Saved as a reusable task.");
         } catch (err) { setNoteError(err instanceof Error ? err.message : "Unable to save reusable task."); }
@@ -552,9 +490,8 @@ export default function PharmacyCalendarPage() {
         setNoteSaving(true);
         setNoteError(null);
         try {
-            const result = await fillPlannerFromRoster({ pharmacy: selectedPharmacyId, date: noteForm.date,
-                start_time: noteForm.startTime || null, end_time: noteForm.endTime || null, is_clinical: noteForm.isClinical });
-            setNoteForm(form => ({ ...form, assigneeIds: [...new Set([...form.assigneeIds, ...result.assignee_membership_ids])] }));
+            const result = await fillPlannerFromRoster(plannerRosterInput(noteForm, selectedPharmacyId));
+            setNoteForm(form => mergeRosterAssignees(form, result.assignee_membership_ids));
         } catch (err) { setNoteError(err instanceof Error ? err.message : "Unable to fill from roster."); }
         finally { setNoteSaving(false); }
     };
@@ -609,15 +546,15 @@ export default function PharmacyCalendarPage() {
     };
 
     return (
-        <Box sx={{ p: { xs: 2, md: 4 }, minHeight: "100vh", bgcolor: pageBg, color: "text.primary" }}>
-            <PageHeader title="Pharmacy Calendar" subtitle="Events, work notes and tasks for the selected pharmacy" actions={<>
+        <Box sx={{ ...(view === "plan" ? { "& header > .MuiStack-root": { flexDirection: { xs: "row" }, alignItems: "center", gap: 1 }, "& header h1": { fontSize: { xs: 22, md: 32 } }, "& header > .MuiBox-root": { mt: 1 } } : {}), p: { xs: 2, md: 4 }, minHeight: "100vh", bgcolor: pageBg, color: "text.primary" }}>
+            <PageHeader title="Pharmacy Calendar" subtitle={view === "month" ? "Events, work notes and tasks for the selected pharmacy" : undefined} actions={<>
                 {view === "month" && <Button sx={{ minHeight: 44 }} variant="outlined" startIcon={<AddIcon />} disabled={!selectedPharmacyId} onClick={handleOpenEventModal}>Add Event</Button>}
                 {view === "month" && <Button sx={{ minHeight: 44 }} variant="outlined" disabled={!selectedPharmacyId} onClick={() => handleOpenNoteModal()}>Add Work Note</Button>}
                 {canManage && <Button sx={{ minHeight: 44 }} variant="contained" startIcon={<AddIcon />} disabled={loading} onClick={() => handleOpenNoteModal(selectedDay, true)}>Add task</Button>}
             </>}>
                 <SegmentTabs tabs={[{ value: "month", label: "Month" }, { value: "plan", label: "Plan" }]} value={view} onChange={setView} label="Calendar views" idPrefix="calendar-view" />
             </PageHeader>
-            {notice && <Alert severity="success" onClose={() => setNotice("")} sx={{ mb: 2 }}>{notice}</Alert>}
+            <Snackbar open={Boolean(notice)} autoHideDuration={6000} onClose={() => setNotice("")}><Alert severity="success" onClose={() => setNotice("")}>{notice}</Alert></Snackbar>
             {error && (
                 <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
                     {error}
@@ -632,7 +569,7 @@ export default function PharmacyCalendarPage() {
                 <Box {...tabPanelProps("calendar-view", view)}>
                     <PharmacyCalendarWeekView day={selectedDay} setDay={setSelectedDay} items={items} manager={canManage} userId={user?.id}
                         busy={actionBusy} loading={loading} onAdd={day => handleOpenNoteModal(day, true)} onEdit={handleEditNote}
-                        onDuplicate={item => handleCopy("task", item.date, item)} onCopy={handleCopy} onComplete={handleComplete} />
+                        onDelete={setDeleteTarget} onDuplicate={item => handleCopy("task", item.date, item)} onCopy={handleCopy} onComplete={handleComplete} />
                 </Box>
             ) : (
                 <Stack {...tabPanelProps("calendar-view", view)} direction={{ xs: "column", lg: "row" }} spacing={3}>
@@ -1067,7 +1004,7 @@ export default function PharmacyCalendarPage() {
                                                                     try {
                                                                         const baseId = getBaseItemId(item);
                                                                         if (!baseId) return;
-                                                                        await postJson(`/calendar-events/${baseId}/`, {}, "DELETE" as any);
+                                                                        await deleteCalendarEventService(baseId);
                                                                         void loadFeed();
                                                                     } catch (e) {
                                                                         // swallow errors for now

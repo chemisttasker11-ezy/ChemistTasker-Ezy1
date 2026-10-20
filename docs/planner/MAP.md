@@ -1,3 +1,5 @@
+Historical baseline: this map describes PR #181 as first submitted; see [DECISIONS.md](DECISIONS.md) for the current design.
+
 # Pharmacy Operations Planner (PR #181): map
 
 Source: `git diff origin/main...HEAD` (35 files, +3706). Line refs are on this branch.

@@ -1,10 +1,11 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { SavedTaskApi } from "@chemisttasker/shared-core";
-import { applySavedTask, type CalendarNoteForm } from "./PharmacyCalendarPage.model";
+import { applySavedTask, type CalendarNoteForm } from "@chemisttasker/shared-core";
 import {
   Alert,
   Button,
   Collapse,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -236,7 +237,7 @@ export default function PharmacyCalendarDialogs({
               <InputLabel id="assignees-label">Assignees</InputLabel>
               <Select labelId="assignees-label" multiple value={noteForm.assigneeIds} label="Assignees"
                 onChange={e => setNoteForm(prev => ({ ...prev, assigneeIds: (e.target.value as (string | number)[]).map(Number) }))}
-                renderValue={selected => (selected as number[]).map(id => { const member = pharmacyMembers.find(m => m.id === id); return member ? getMemberLabel(member) : `Member ${id}`; }).join(", ")}>
+                renderValue={selected => <Stack direction="row" flexWrap="wrap" useFlexGap gap={0.5}>{(selected as number[]).map(id => { const member = pharmacyMembers.find(m => m.id === id); return <Chip size="small" key={id} label={member ? getMemberLabel(member) : `Member ${id}`} sx={{ maxWidth: "100%" }} />; })}</Stack>}>
                 {pharmacyMembers.map(member => <MenuItem key={member.id} value={member.id}>{getMemberLabel(member)}</MenuItem>)}
               </Select>
             </FormControl>

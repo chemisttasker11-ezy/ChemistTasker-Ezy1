@@ -1,3 +1,8 @@
+import {
+  weekRange, copyResultMessage, plannerCopyRequest, projectCalendarFeed,
+  createCalendarEventService, updateCalendarEventService, deleteCalendarEventService, type CalendarItem,
+  calendarTaskState, taskRepeatLabel,
+} from '@chemisttasker/shared-core';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
@@ -47,17 +52,10 @@ import {
 } from '@chemisttasker/shared-core';
 import {
   type ItemType,
-  type CalendarItem,
   WEEKDAYS,
   normalizeList,
-  postJson,
   toDate,
-  formatTimeRange,
   ROLE_LABELS,
-  plannerWeek,
-  plannerCopyRequest,
-  copyResultMessage,
-  taskStatusLabel,
   EMPLOYMENT_TYPE_LABELS,
   formatChoiceLabel,
   parseTime,
@@ -86,6 +84,9 @@ export default function SharedCalendarScreen() {
   const expandedLink = useRef('');
   const feedRequest = useRef(0);
   const activeFeedScope = useRef('');
+  const [taskMenu, setTaskMenu] = useState<number | string | null>(null);
+  const [dayMenu, setDayMenu] = useState(false);
+  const [deleteRequested, setDeleteRequested] = useState(false);
   const [editingNote, setEditingNote] = useState<WorkNoteApi | undefined>();
   const [newPlannerTask, setNewPlannerTask] = useState(true);
   const [filterType, setFilterType] = useState<ItemType>('all');
@@ -191,7 +192,7 @@ export default function SharedCalendarScreen() {
   }, [selectedDay, currentMonth]);
 
   const dateRange = useMemo(() => {
-    if (view === 'plan') return plannerWeek(selectedDay);
+    if (view === 'plan') return weekRange(selectedDay);
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(start);
     return {
@@ -223,64 +224,7 @@ export default function SharedCalendarScreen() {
         dateFrom: dateRange.from,
         dateTo: dateRange.to,
       });
-      const eventsRaw = normalizeList(feed?.events);
-      const notesRaw = normalizeList(feed?.work_notes);
-
-      const mappedEvents: CalendarItem[] = normalizeList(eventsRaw).map((evt: any) => {
-        const dateObj = toDate(evt.date) ?? new Date();
-        const type: CalendarItem['type'] = evt.source === 'birthday' ? 'birthday' : 'event';
-        const rawId = evt.id;
-        const id = typeof rawId === 'number' ? rawId : String(rawId ?? '');
-        const seriesId = evt.series_id ?? (typeof rawId === 'number' ? rawId : undefined);
-        return {
-          id,
-          seriesId,
-          isOccurrence: Boolean(evt.is_occurrence),
-          type,
-          title: evt.title,
-          date: dateObj,
-          time: formatTimeRange(evt.start_time, evt.end_time),
-          allDay: evt.all_day ?? !evt.start_time,
-          source: evt.source,
-          readOnly: evt.source !== 'manual',
-          description: evt.description,
-          eventData: evt,
-        };
-      });
-
-      const mappedNotes: CalendarItem[] = normalizeList(notesRaw).map((note: any) => {
-        const dateObj = toDate(note.date) ?? new Date();
-        const assigneeNames = (note.assignees ?? []).map(
-          (a: any) =>
-            a.user_name ||
-            a.userName ||
-            a.name ||
-            a.email ||
-            a.user?.full_name ||
-            'Assignee'
-        );
-        const rawId = note.id;
-        const id = typeof rawId === 'number' ? rawId : String(rawId ?? '');
-        const seriesId = note.series_id ?? (typeof rawId === 'number' ? rawId : undefined);
-        return {
-          id,
-          seriesId,
-          isOccurrence: Boolean(note.is_occurrence),
-          type: 'note',
-          title: note.title,
-          date: dateObj,
-          allDay: !note.start_time,
-          time: formatTimeRange(note.start_time, note.end_time),
-          source: 'work_note',
-          assignees: assigneeNames,
-          completedBy: Array.isArray(note.completed_by) ? note.completed_by : [],
-          assigneeMembershipIds: (note.assignees ?? []).map((a: any) => a.membershipId ?? a.membership_id),
-          status: (note.status ?? '').toString().toUpperCase(),
-          noteData: note,
-        };
-      });
-
-      const combined = [...mappedEvents, ...mappedNotes];
+      const combined = projectCalendarFeed(feed);
       if (request === feedRequest.current && activeFeedScope.current === feedScope) setItems(combined);
     } catch {
       if (request === feedRequest.current && activeFeedScope.current === feedScope) {
@@ -416,6 +360,7 @@ export default function SharedCalendarScreen() {
   };
 
   const handleOpenNoteModal = (planner = true) => {
+    setDeleteRequested(false);
     if (planner && !canManagePlanner) return;
     setEditingNote(undefined);
     setNewPlannerTask(planner);
@@ -481,7 +426,7 @@ export default function SharedCalendarScreen() {
       const recurrence =
         eventForm.recurrence.freq !== 'NONE'
           ? {
-              freq: eventForm.recurrence.freq,
+              freq: eventForm.recurrence.freq as "DAILY" | "WEEKLY" | "MONTHLY",
               interval: eventForm.recurrence.interval || 1,
               until_date: eventForm.recurrence.until || null,
             }
@@ -491,15 +436,15 @@ export default function SharedCalendarScreen() {
         title: eventForm.title,
         description: eventForm.description,
         date: eventForm.date,
-        all_day: eventForm.allDay,
-        start_time: eventForm.allDay ? null : eventForm.startTime || null,
-        end_time: eventForm.allDay ? null : eventForm.endTime || null,
+        allDay: eventForm.allDay,
+        startTime: eventForm.allDay ? null : eventForm.startTime || null,
+        endTime: eventForm.allDay ? null : eventForm.endTime || null,
         recurrence,
       };
       if (editingEventId) {
-        await postJson(`/calendar-events/${editingEventId}/`, payload, 'PATCH');
+        await updateCalendarEventService(editingEventId, payload);
       } else {
-        await postJson('/calendar-events/', payload);
+        await createCalendarEventService(payload);
       }
       setEventModalOpen(false);
       setEditingEventId(null);
@@ -512,7 +457,8 @@ export default function SharedCalendarScreen() {
   };
 
   const handleEditNote = (item: CalendarItem) => {
-    if (item.noteData?.is_planner_task && !canManagePlanner) return;
+    if (!calendarTaskState(item.noteData, canManagePlanner, user?.id).canEdit) return;
+    setDeleteRequested(false);
     setEditingNote(item.noteData);
     setNoteModalOpen(true);
   };
@@ -592,22 +538,21 @@ export default function SharedCalendarScreen() {
     <ThemeProvider theme={{ ...theme, colors: { ...theme.colors, primary: theme.colors.onPrimaryContainer } }}>
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.headerCard}>
+        <View style={[styles.headerCard, view === 'plan' && { padding: 8, marginBottom: 8 }]}>
           <View style={styles.headerRow}>
             <View style={styles.dayLabel}>
               <Text variant="titleLarge" style={styles.headerTitle}>
                 Pharmacy Calendar
               </Text>
-              <Text variant="bodySmall" style={styles.headerSubtitle}>
-                Tasks, events, work notes, and birthdays.
-              </Text>
+              {view === 'month' && <Text variant="bodySmall" style={styles.headerSubtitle}>Tasks, events, work notes, and birthdays.</Text>}
             </View>
+            {canManagePlanner && <Button mode="contained" contentStyle={styles.touch} icon="plus" onPress={() => handleOpenNoteModal()}>Add task</Button>}
           </View>
         </View>
 
-        <Text style={styles.selectorLabel}>{selectedPharmacyId
+        {view === 'month' && <Text style={styles.selectorLabel}>{selectedPharmacyId
           ? getPharmacyLabel(memberships.find(m => Number(getPharmacyId(m)) === selectedPharmacyId) || {})
-          : 'Select a pharmacy in your workspace'}</Text>
+          : 'Select a pharmacy in your workspace'}</Text>}
         <SegmentedButtons style={styles.selectorRow} value={view} onValueChange={setView} buttons={[
           { value: 'month', label: 'Month', style: styles.touch }, { value: 'plan', label: 'Plan', style: styles.touch },
         ]} />
@@ -704,13 +649,14 @@ export default function SharedCalendarScreen() {
                 {format(safeSelectedDay, 'EEE, d MMM')}
               </Button>
               <IconButton icon="chevron-right" size={24} style={styles.iconTouch} accessibilityLabel="Next day" onPress={() => selectDay(addDays(selectedDay, 1))} />
+              {view === 'plan' && canManagePlanner && <Menu visible={dayMenu} onDismiss={() => setDayMenu(false)} anchor={<IconButton icon="dots-vertical" accessibilityLabel="Day actions" style={styles.iconTouch} onPress={() => setDayMenu(true)} />}>
+                <Menu.Item title="Add task here" contentStyle={styles.touch} onPress={() => { setDayMenu(false); handleOpenNoteModal(); }} />
+                <Menu.Item title="Copy day to tomorrow" contentStyle={styles.touch} disabled={copying || loading} onPress={() => { setDayMenu(false); void handleCopy('day'); }} />
+              </Menu>}
             </View>
-            {canManagePlanner && <Button mode="contained" contentStyle={styles.touch} icon="plus" onPress={() => handleOpenNoteModal()}>Add task</Button>}
             {view === 'plan' && canManagePlanner && <View style={styles.copyActions}>
-              <Button contentStyle={styles.touch} disabled={copying || loading} onPress={() => handleCopy('day')}>Copy day to tomorrow</Button>
-              <Button contentStyle={styles.touch} disabled={copying || loading} onPress={() => handleCopy('week')}>Copy week to next week</Button>
+              <Button mode="outlined" contentStyle={styles.touch} style={{ flex: 1 }} disabled={copying || loading} onPress={() => handleCopy('week')}>Copy week to next week</Button>
             </View>}
-            {view === 'plan' && <Text style={styles.itemMeta}>Week: {plannerWeek(selectedDay).from} to {plannerWeek(selectedDay).to}</Text>}
             {view === 'plan' && !selectedPharmacyId && <HelperText type="info">Select a pharmacy in your workspace to view its plan.</HelperText>}
 
             {view === 'month' && <View style={styles.filterRow}>
@@ -747,17 +693,23 @@ export default function SharedCalendarScreen() {
                   ? items.some(item => item.noteData?.is_planner_task) ? 'No tasks for this day.' : canManagePlanner
                     ? 'No tasks this week. Add a task or copy last week.' : 'No tasks assigned this week.'
                   : 'No items scheduled for this day'}</Text>
+                {view === 'plan' && canManagePlanner && <>
+                  <Button mode="contained" contentStyle={styles.touch} onPress={() => handleOpenNoteModal()}>Add task</Button>
+                  <Text style={styles.emptyStateText}>Save a task as reusable in More options to use it again.</Text>
+                </>}
               </View>
             )}
 
             {filteredItems.map((item) => {
               const isExpanded = expandedId === item.id;
+              const taskState = item.noteData ? calendarTaskState(item.noteData, canManagePlanner, user?.id) : undefined;
               const typeColor = item.noteData?.is_planner_task ? theme.colors.primary : getTypeColor(item.type);
 
               return (
                 <TouchableOpacity
                   key={`${item.id}-${item.type}`}
-                  onPress={() => setExpandedId(isExpanded ? null : item.id)}
+                  accessibilityRole="button" accessibilityLabel={item.noteData?.is_planner_task && taskState?.canEdit ? `Edit ${item.title}` : item.title}
+                  onPress={() => item.noteData?.is_planner_task && taskState?.canEdit ? handleEditNote(item) : setExpandedId(isExpanded ? null : item.id)}
                   activeOpacity={0.8}
                 >
                   <Card style={styles.itemCard}>
@@ -770,14 +722,26 @@ export default function SharedCalendarScreen() {
                           <Text style={styles.itemTitle}>{item.title}</Text>
                           <Text style={styles.itemMeta}>{item.allDay ? 'All day' : item.time || ''}</Text>
                           {item.type === 'note' && item.status && <Text style={styles.itemMeta}>
-                            {item.noteData?.is_planner_task ? taskStatusLabel(item.noteData, canManagePlanner) : item.status}
+                            {item.noteData?.is_planner_task ? taskState?.label : item.status}
                           </Text>}
                         </View>
+                        {item.noteData?.is_planner_task && canManagePlanner && <Menu visible={taskMenu === item.id} onDismiss={() => setTaskMenu(null)} anchor={<IconButton icon="dots-vertical" accessibilityLabel={`More actions for ${item.title}`} style={styles.iconTouch} disabled={copying || loading}
+                          onPress={event => { event.stopPropagation(); setTaskMenu(item.id); }} />}>
+                          <Menu.Item title="Edit" contentStyle={styles.touch} onPress={() => { setTaskMenu(null); handleEditNote(item); }} />
+                          <Menu.Item title="Duplicate" contentStyle={styles.touch} onPress={() => { setTaskMenu(null); void handleCopy('task', item); }} />
+                          <Menu.Item title="Delete" contentStyle={styles.touch} onPress={() => { setTaskMenu(null); handleEditNote(item); setDeleteRequested(true); }} />
+                        </Menu>}
                       </View>
 
-                      {item.noteData?.is_planner_task && canManagePlanner && <Button contentStyle={styles.touch} icon="content-copy"
-                        disabled={copying || loading} onPress={() => handleCopy('task', item)}>Duplicate</Button>}
-                      {isExpanded && (
+                      {item.noteData?.is_planner_task && <>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                          {item.noteData.is_clinical && <Chip compact>Clinical</Chip>}
+                          {item.noteData.recurrence && <Chip compact icon="repeat">{taskRepeatLabel(item.noteData.recurrence)}</Chip>}
+                          {item.assignees?.length ? item.assignees.map((name, index) => <Chip compact key={index}>{name}</Chip>) : <Text>Unassigned</Text>}
+                        </View>
+
+                      </>}
+                      {(isExpanded || item.noteData?.is_planner_task) && (
                         <View style={styles.itemDetails}>
                           {item.type === 'note' && item.noteData?.body ? (
                             <Text style={styles.itemDetailText}>{item.noteData.body}</Text>
@@ -785,7 +749,7 @@ export default function SharedCalendarScreen() {
                           {item.type !== 'note' && item.description ? (
                             <Text style={styles.itemDetailText}>{item.description}</Text>
                           ) : null}
-                          {item.assignees && item.assignees.length > 0 && (
+                          {!item.noteData?.is_planner_task && item.assignees && item.assignees.length > 0 && (
                             <Text style={styles.itemDetailText}>
                               Assignees: {item.assignees.join(', ')}
                             </Text>
@@ -818,7 +782,7 @@ export default function SharedCalendarScreen() {
                                         try {
                                           const baseId = getBaseItemId(item);
                                           if (!baseId) return;
-                                          await postJson(`/calendar-events/${baseId}/`, {}, 'DELETE');
+                                          await deleteCalendarEventService(baseId);
                                           void loadFeed();
                                         } catch {
                                           // ignore
@@ -832,15 +796,15 @@ export default function SharedCalendarScreen() {
                               </Button>
                             )}
 
-                            {item.type === 'note' && (!item.noteData?.is_planner_task || canManagePlanner) && (
+                            {item.type === 'note' && !item.noteData?.is_planner_task && (
                               <Button mode="text" contentStyle={styles.touch} onPress={() => handleEditNote(item)}>
                                 Edit
                               </Button>
                             )}
 
-                            {item.type === 'note' && (!item.noteData?.is_planner_task ||
-                              item.noteData.assignees.some((person: { user_id: number }) => person.user_id === user?.id)) && (
-                              <Button contentStyle={styles.touch} mode="outlined" disabled={completing || loading} onPress={async () => {
+                            {item.type === 'note' && taskState?.canComplete && (
+                              <Button contentStyle={styles.touch} mode="outlined" disabled={completing || loading} onPress={async event => {
+                                event.stopPropagation();
                                 const baseId = getBaseItemId(item);
                                 if (!baseId) return;
                                 setCompleting(true);
@@ -865,7 +829,7 @@ export default function SharedCalendarScreen() {
         </View>
       </ScrollView>
       {noteModalOpen && selectedPharmacyId && <CalendarTaskDialog
-        pharmacyId={selectedPharmacyId} date={format(selectedDay, 'yyyy-MM-dd')} note={editingNote} isPlannerTask={newPlannerTask}
+        pharmacyId={selectedPharmacyId} date={format(selectedDay, 'yyyy-MM-dd')} note={editingNote} deleteRequested={deleteRequested} isPlannerTask={newPlannerTask}
         members={pharmacyMembers.map(member => ({ id: Number(member.id), label: getMemberLabel(member) }))} membersLoading={membersLoading}
         onDismiss={() => setNoteModalOpen(false)} onSaved={() => { setNoteModalOpen(false); void loadFeed(); }} onMessage={setMessage} />}
       {message ? <Portal><Snackbar visible onDismiss={() => setMessage('')} duration={8000}
@@ -1201,7 +1165,7 @@ const styles = StyleSheet.create({
   iconTouch: { width: 48, height: 48, margin: 0 },
   dayNavigation: { flexDirection: 'row', alignItems: 'center' },
   dayLabel: { flex: 1 },
-  copyActions: { marginVertical: 8 },
+  copyActions: { flexDirection: 'row', gap: 8, marginVertical: 8 },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

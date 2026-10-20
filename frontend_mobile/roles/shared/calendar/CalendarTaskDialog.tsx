@@ -1,6 +1,10 @@
+import {
+  emptyNoteForm, editNoteForm, notePayload, applySavedTask,
+  plannerRosterInput, mergeRosterAssignees, savedTaskInput,
+} from '@chemisttasker/shared-core';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Dialog, HelperText, IconButton, Menu, Portal, Switch, Text, TextInput } from 'react-native-paper';
+import { Button, Chip, Dialog, HelperText, IconButton, Menu, Portal, Switch, Text, TextInput } from 'react-native-paper';
 import { DatePickerModal, TimePickerModal } from 'react-native-paper-dates';
 import { format } from 'date-fns';
 import {
@@ -8,14 +12,15 @@ import {
   getWorkNoteDetail, fillPlannerFromRoster, listSavedTasks, updateWorkNoteService,
   type SavedTaskApi, type WorkNoteApi,
 } from '@chemisttasker/shared-core';
-import { formatTime, parseTime, taskFormFromNote, toDate } from './calendarModel';
+import { formatTime, parseTime, toDate } from './calendarModel';
 
 const message = (error: unknown) => error instanceof Error ? error.message : 'Unable to save. Please try again.';
 
-export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTask, members, membersLoading, onDismiss, onSaved, onMessage }: {
+export default function CalendarTaskDialog({ pharmacyId, date, note, deleteRequested = false, isPlannerTask, members, membersLoading, onDismiss, onSaved, onMessage }: {
   pharmacyId: number;
   date: string;
   note?: WorkNoteApi;
+  deleteRequested?: boolean;
   isPlannerTask: boolean;
   members: { id: number; label: string }[];
   membersLoading: boolean;
@@ -23,7 +28,7 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
   onSaved: () => void;
   onMessage: (text: string) => void;
 }) {
-  const [form, setForm] = useState(() => ({ ...taskFormFromNote(date, note), isPlannerTask: note?.is_planner_task ?? isPlannerTask }));
+  const [form, setForm] = useState(() => ({ ...(note ? editNoteForm(note) : emptyNoteForm(new Date(`${date}T00:00:00`), isPlannerTask)), isPlannerTask: note?.is_planner_task ?? isPlannerTask }));
   const [original, setOriginal] = useState(note);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -35,8 +40,8 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
   const [savedTasks, setSavedTasks] = useState<SavedTaskApi[]>([]);
   const [savedOpen, setSavedOpen] = useState(false);
   const [savedLoading, setSavedLoading] = useState(false);
-  const [confirmation, setConfirmation] = useState<'task' | SavedTaskApi | null>(null);
-  const locked = Boolean(note?.is_planner_task && (note.completed_count ?? note.completed_by?.length ?? 0) > 0);
+  const [confirmation, setConfirmation] = useState<'task' | SavedTaskApi | null>(deleteRequested ? 'task' : null);
+  const locked = form.locked;
   const blocked = busy || loadingOriginal || loadFailed;
 
   useEffect(() => {
@@ -46,7 +51,7 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
     getWorkNoteDetail(note.series_id!).then(value => {
       if (!active) return;
       setOriginal(value);
-      setForm(taskFormFromNote(date, value));
+      setForm(editNoteForm(value, note.completed_count ?? 0));
     }).catch(e => {
       if (active) { setError(message(e)); setLoadFailed(true); }
     }).finally(() => { if (active) setLoadingOriginal(false); });
@@ -58,7 +63,7 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
     if (form.endTime && (!form.startTime || form.endTime <= form.startTime)) {
       setError('End time must be after start time on the same day.'); return false;
     }
-    if (form.recurrence?.until_date && form.recurrence.until_date < form.date) {
+    if (form.recurrence.until && form.recurrence.until < form.date) {
       setError('Repeat until must be on or after the task date.'); return false;
     }
     return true;
@@ -68,13 +73,7 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
     if (blocked || !validate()) return;
     setBusy(true); setError('');
     try {
-      const payload = {
-        pharmacy: pharmacyId, title: form.title.trim(), body: form.body, date: form.date,
-        isPlannerTask: form.isPlannerTask, isClinical: form.isClinical,
-        startTime: form.startTime || null, endTime: form.endTime || null,
-        isGeneral: form.isGeneral, notifyOnShiftStart: form.notify,
-        assigneeMembershipIds: form.isGeneral ? [] : form.assigneeIds, recurrence: form.recurrence,
-      };
+      const payload = notePayload(form, pharmacyId);
       if (original) {
         await updateWorkNoteService(original.series_id ?? original.id, { ...payload, updatedAt: original.updated_at });
       } else {
@@ -89,9 +88,8 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
     setBusy(true); setError('');
     try {
       // shortcut: eligibility is checked on fill/save/copy, not every future recurrence.
-      const result = await fillPlannerFromRoster({ pharmacy: pharmacyId, date: form.date,
-        start_time: form.startTime || null, end_time: form.endTime || null, is_clinical: form.isClinical });
-      setForm(prev => ({ ...prev, assigneeIds: [...new Set([...prev.assigneeIds, ...result.assignee_membership_ids])] }));
+      const result = await fillPlannerFromRoster(plannerRosterInput(form, pharmacyId));
+      setForm(prev => mergeRosterAssignees(prev, result.assignee_membership_ids));
       onMessage(result.assignee_membership_ids.length ? 'Rostered people added.' : 'No eligible people rostered. You can save this task unassigned.');
     } catch (e) { setError(message(e)); }
     finally { setBusy(false); }
@@ -108,8 +106,7 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
     if (!validate()) return;
     setBusy(true); setError('');
     try {
-      await createSavedTask({ pharmacy: pharmacyId, title: form.title.trim(), details: form.body,
-        start_time: form.startTime || null, end_time: form.endTime || null, is_clinical: form.isClinical });
+      await createSavedTask(savedTaskInput(form, pharmacyId));
       onMessage('Saved as a reusable task.');
     } catch (e) { setError(message(e)); }
     finally { setBusy(false); }
@@ -156,8 +153,8 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
                   ? prev.assigneeIds.filter(id => id !== member.id) : [...prev.assigneeIds, member.id] }))} />)}
             </ScrollView>
           </Menu>}
-          {form.assigneeIds.length > 0 && <Text>{form.assigneeIds.map(id => members.find(member => member.id === id)?.label ?? `Member ${id}`).join(', ')}</Text>}
-          {form.isPlannerTask && <Button contentStyle={styles.touch} disabled={blocked || locked} onPress={fillRoster}>Fill from roster</Button>}
+          <View style={[styles.row, { flexWrap: 'wrap' }]}>{form.assigneeIds.map(id => <Chip key={id}>{members.find(member => member.id === id)?.label ?? `Member ${id}`}</Chip>)}</View>
+          {form.isPlannerTask && <Button mode="outlined" contentStyle={styles.touch} disabled={blocked || locked} onPress={fillRoster}>Fill from roster</Button>}
           {locked && <HelperText type="info">Work has started. Date and assignees are locked; wording changes keep progress.</HelperText>}
           {original?.recurrence && <HelperText type="info">Edits apply to the whole repeating series. Individual dates cannot be excluded.</HelperText>}
           {!original && form.isPlannerTask && <Button contentStyle={styles.touch} disabled={blocked} onPress={openSaved}>Use a saved task</Button>}
@@ -173,25 +170,23 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
                 disabled={blocked || !form[field]} onPress={() => setForm(prev => ({ ...prev, [field]: '' }))} />
             </View>)}
             <Menu visible={menu === 'repeat'} onDismiss={() => setMenu(null)} anchor={<Button mode="outlined" contentStyle={styles.touch}
-              disabled={blocked} onPress={() => setMenu('repeat')}>Repeat: {form.recurrence?.freq.toLowerCase() ?? 'Does not repeat'}</Button>}>
+              disabled={blocked} onPress={() => setMenu('repeat')}>Repeat: {form.recurrence.freq === 'NONE' ? 'Does not repeat' : form.recurrence.freq.toLowerCase()}</Button>}>
               {(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'] as const).map(freq => <Menu.Item key={freq}
                 title={freq === 'NONE' ? 'Does not repeat' : freq.toLowerCase()} onPress={() => {
-                  setForm(prev => ({ ...prev, recurrence: freq === 'NONE' ? null : {
-                    ...prev.recurrence, freq,
-                    byweekday: freq === 'WEEKLY' ? prev.recurrence?.byweekday : undefined,
-                  } })); setMenu(null);
+                  setForm(prev => ({ ...prev, recurrence: { ...prev.recurrence, freq,
+                    byweekday: freq === 'WEEKLY' ? prev.recurrence.byweekday : [] } })); setMenu(null);
                 }} />)}
             </Menu>
-            {form.recurrence && <>
+            {form.recurrence.freq !== 'NONE' && <>
               <TextInput label="Repeat every" mode="outlined" style={styles.field} keyboardType="number-pad" disabled={blocked}
                 value={String(form.recurrence.interval ?? 1)} onChangeText={text => setForm(prev => ({ ...prev,
                   recurrence: { ...prev.recurrence!, interval: Math.max(1, Math.floor(Number(text) || 1)) } }))} />
               <View style={styles.row}>
                 <Button style={styles.flex} contentStyle={styles.touch} disabled={blocked} onPress={() => setPicker('until')}>
-                  Repeat until: {form.recurrence.until_date || 'Not set'}
+                  Repeat until: {form.recurrence.until || 'Not set'}
                 </Button>
-                <IconButton icon="close" size={24} style={styles.iconTouch} accessibilityLabel="Clear repeat until" disabled={blocked || !form.recurrence.until_date}
-                  onPress={() => setForm(prev => ({ ...prev, recurrence: { ...prev.recurrence!, until_date: null } }))} />
+                <IconButton icon="close" size={24} style={styles.iconTouch} accessibilityLabel="Clear repeat until" disabled={blocked || !form.recurrence.until}
+                  onPress={() => setForm(prev => ({ ...prev, recurrence: { ...prev.recurrence!, until: '' } }))} />
               </View>
             </>}
             {form.isPlannerTask && <View style={styles.row}>
@@ -226,8 +221,7 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
         {!savedLoading && !savedTasks.length && <Text>No saved tasks yet. Open More options on a task and choose Save as reusable.</Text>}
         {savedTasks.map(task => <View style={styles.row} key={task.id}>
           <Button contentStyle={styles.touch} style={styles.flex} onPress={() => {
-            setForm(prev => ({ ...prev, title: task.title, body: task.details, isClinical: task.is_clinical,
-              startTime: task.start_time?.slice(0, 5) ?? '', endTime: task.end_time?.slice(0, 5) ?? '' }));
+            setForm(prev => applySavedTask(prev, task));
             setSavedOpen(false);
           }}>{task.title}</Button>
           <IconButton icon="delete-outline" size={24} style={styles.iconTouch} accessibilityLabel={`Delete saved task ${task.title}`} onPress={() => setConfirmation(task)} />
@@ -237,17 +231,17 @@ export default function CalendarTaskDialog({ pharmacyId, date, note, isPlannerTa
     </Dialog>
     <Dialog visible={Boolean(confirmation)} onDismiss={busy ? undefined : () => setConfirmation(null)} style={styles.dialog}>
       <Dialog.Title>{confirmation === 'task' ? 'Delete task?' : 'Delete saved task?'}</Dialog.Title>
-      <Dialog.Content><Text>{confirmation === 'task' ? 'This permanently deletes the task and its repeating series, if any.' : 'Placed tasks will stay unchanged.'}</Text></Dialog.Content>
+      <Dialog.Content><Text>{confirmation === 'task' ? `Delete "${original?.title}" and its repeating series, if any?` : `Delete "${confirmation ? confirmation.title : ''}"? Placed tasks will stay unchanged.`}</Text>{error ? <HelperText type="error">{error}</HelperText> : null}</Dialog.Content>
       <Dialog.Actions>
         <Button contentStyle={styles.touch} disabled={busy} onPress={() => setConfirmation(null)}>Cancel</Button>
-        <Button contentStyle={styles.touch} disabled={busy} loading={busy} onPress={confirmDelete}>Delete</Button>
+        <Button contentStyle={styles.touch} disabled={blocked} loading={busy} onPress={confirmDelete}>Delete</Button>
       </Dialog.Actions>
     </Dialog>
     <DatePickerModal locale="en" mode="single" visible={picker === 'date' || picker === 'until'}
-      date={toDate(picker === 'date' ? form.date : form.recurrence?.until_date) ?? new Date()}
+      date={toDate(picker === 'date' ? form.date : form.recurrence.until) ?? new Date()}
       onDismiss={() => setPicker(null)} onConfirm={({ date: chosen }) => {
         if (chosen) setForm(prev => picker === 'date' ? { ...prev, date: format(chosen, 'yyyy-MM-dd') }
-          : { ...prev, recurrence: { ...prev.recurrence!, until_date: format(chosen, 'yyyy-MM-dd') } });
+          : { ...prev, recurrence: { ...prev.recurrence!, until: format(chosen, 'yyyy-MM-dd') } });
         setPicker(null);
       }} />
     <TimePickerModal visible={picker === 'startTime' || picker === 'endTime'}
