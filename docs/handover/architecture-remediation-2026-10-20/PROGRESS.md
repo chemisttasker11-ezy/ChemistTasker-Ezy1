@@ -15,8 +15,11 @@
 | A01 | CHARACTERIZATION TESTS ADDED; POLICY NOT MODIFIED | Django `PharmacyViewSet.check_object_permissions` on unsafe requests can accept visible organizations or pharmacy assignments. Read and write permissions must be separated using role/action test matrix **after authorized policy is confirmed**. Do not silently change current legitimate edit access. |
 | A02 | IMPLEMENTED; QA PENDING | Commit `174c30b`: Expo certificate key corrected from `approval_certificate` to `methadone_s8_protocols` for read and upload; JSON-list multipart serialization replaced with shared `appendPharmacyFormFields`; three Vitest cases and five Django multipart HTTP cases added. |
 | A03 | ALREADY IN DRAFT #181 | `CalendarRecurrence`, occurrence-date and shared calendar methods implemented on parent; do not overwrite |
-| A04 | WHOLE-TREE INVENTORY TOOL ADDED; EVIDENCE PENDING | Read-only `node scripts/inventory-client-api-boundaries.mjs --json` plus `node --test scripts/inventory-client-api-boundaries.test.mjs`; existing change-line ratchet is retained. |
-| A05–A11 | NOT STARTED | Refer to full plan and unblock per dependency order |
+| A04 | INVENTORY + STRICT RATCHET IMPROVED; EVIDENCE PENDING | Read-only `node scripts/inventory-client-api-boundaries.mjs --json` plus `node --test scripts/inventory-client-api-boundaries.test.mjs`; existing change-line ratchet is retained. |
+| A05a | ROSTER SDK CLIENT MIGRATION IN PROGRESS | Vite roster grid and toolbar reuse `rosterV2`; shared wire tests added; final-head verification pending. |
+| A05b | EXCLUDED: PR #182 | Do not modify, rebase, merge, cherry-pick or incorporate PR #182. No shift lifecycle, cancellation or pricing/penalty changes. |
+| A05c / A10 | EXCLUDED: WINDOWS KIOSK | Windows Tauri/Rust kiosk remains separate and unchanged. Expo pairing change was reverted. |
+| A06–A09 / A11 | NOT COMPLETE | See original plan. Native acceptance and full senior package remain pending. |
 
 ## Exact test commands (not yet marked PASS)
 
@@ -36,6 +39,14 @@ Then verify emulator/device multipart uploads against isolated seeded Django/Pos
 - `5941a737`: new `backend/organizations/test_pharmacy_access_characterization.py` cross-tenant ownership/scoped visibility tests; read/write authorization implementation intentionally unchanged.
 - `5941a737` plus follow-up corrective commits: new read-only `scripts/inventory-client-api-boundaries.mjs` and Node tests; detects probable direct-route and generic escape-hatch usage across current client trees. Regex/newline escaping corrections pushed.
 - GitHub Actions started automatically. PASS status must be associated with final branch SHA rather than earlier commits.
+
+## New implementation checkpoints
+
+- Parent PR #181 remains at `bdc0b698` and is the **only** implementation base. PR #182 stays separate and untouched.
+- `fc5a8f6`: reverted kiosk-related shared-core/API changes. Windows Tauri/Rust kiosk remains independent.
+- `e32e24a`: narrowed nullable roster period ID to resolve Vite TypeScript failure.
+- `e88860b`: shifted counter-offer API invocation to an existing shared-core operation without changing its payload or policies.
+- `f0e9c27`: introduced truthful `--strict` parsing and missing-base failure for boundary audit, wider domain route matching, CLI regression tests and CI coverage. This must pass on the final PR head before merge.
 
 ## A02 behavioral guardrails
 
