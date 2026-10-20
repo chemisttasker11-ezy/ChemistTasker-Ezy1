@@ -1,3 +1,4 @@
+import { fetchPillBalanceService } from '@chemisttasker/shared-core';
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
@@ -132,8 +133,8 @@ export default function OwnerOverviewHome({
     if (!canSeeOwnerFinance) return;
     let mounted = true;
     setPillBalance(null);
-    apiClient.get("/pill-rewards/balance/")
-      .then(({ data }) => {
+    fetchPillBalanceService()
+      .then((data) => {
         const amount = Number(data?.balance);
         if (mounted) setPillBalance(Number.isFinite(amount) ? amount : null);
       })

@@ -1,3 +1,4 @@
+import { fetchPillBalanceService } from '@chemisttasker/shared-core';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, ScrollView, Share, StyleSheet, View } from 'react-native';
 import {
@@ -65,8 +66,8 @@ export default function OrganizationProfileScreen() {
 
   useEffect(() => {
     let mounted = true;
-    apiClient.get('/pill-rewards/balance/')
-      .then(({ data }) => {
+    fetchPillBalanceService()
+      .then((data) => {
         if (!mounted) return;
         setPillSummary({
           balance: Number(data?.balance ?? 0),

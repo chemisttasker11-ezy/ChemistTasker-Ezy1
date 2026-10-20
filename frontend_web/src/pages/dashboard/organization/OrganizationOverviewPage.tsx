@@ -1,3 +1,4 @@
+import { fetchPillBalanceService } from '@chemisttasker/shared-core';
 import { CalendarDays, MessageSquareText, SquarePlus, Store, UserCheck, UserPlus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Box, CircularProgress } from "@mui/material";
@@ -66,9 +67,8 @@ export default function OrganizationOverviewPage() {
 
   useEffect(() => {
     let mounted = true;
-    apiClient
-      .get("/pill-rewards/balance/")
-      .then(({ data }) => {
+    fetchPillBalanceService()
+      .then((data) => {
         if (!mounted) return;
         setPillSummary({
           balance: Number(data?.balance ?? 0),
