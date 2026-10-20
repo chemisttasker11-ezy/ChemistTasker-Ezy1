@@ -173,6 +173,21 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 
   });
 }
 
+test('a non-Monday date settles on its week and week navigation does not loop', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 });
+  const state = await plannerFixture(page);
+  await page.goto('/dashboard/owner/calendar?workspace=internal&pharmacy_id=101&date=2026-12-29');
+  await page.getByRole('tab', { name: 'Plan', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '28 Dec 2026 to 3 Jan 2027', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Next week', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '4 Jan 2027 to 10 Jan 2027', exact: true })).toBeVisible();
+  await page.waitForTimeout(1500);
+  expect(new URL(page.url()).searchParams.get('date')).toBe('2027-01-05');
+  expect(state.feeds.at(-1)).toEqual({ from: '2027-01-04', to: '2027-01-10' });
+  expect(state.feeds.length).toBeLessThanOrEqual(6);
+  await expect(page.getByRole('button', { name: 'Add task', exact: true }).first()).toBeEnabled();
+});
+
 test('editing an occurrence uses the original series start and preserves weekdays', async ({ page }) => {
   const state = await plannerFixture(page);
   await page.goto('/dashboard/owner/calendar?workspace=internal&pharmacy_id=101&date=2026-12-30');
