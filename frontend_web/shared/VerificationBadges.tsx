@@ -152,6 +152,7 @@ export function VerificationBadges({ summary, role, audience = 'employer', compa
   const open = rows.filter(row => row.state !== 'verified');
   return (
     <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" aria-label="Verification badges" role="group">
+      {summary.ahpra?.registration_status && <Typography component="span" sx={{ fontSize: 13, alignSelf: 'center' }}>AHPRA: {summary.ahpra.registration_status}</Typography>}
       <VerifiedProfilePill verified={summary.verified} role={role} summary={summary} />
       {(compact ? verified : rows).map(row => <EvidencePill key={row.code} code={row.code} label={row.label} state={row.state} explainer={row.explainer} />)}
       {compact && open.length > 0 && (

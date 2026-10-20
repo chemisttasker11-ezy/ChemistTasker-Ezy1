@@ -97,6 +97,10 @@ def evaluate(profile) -> dict:
         # Preserve existing verified profiles until the evidence itself changes.
         # Explicit change paths revoke immediately; ordinary saves do not.
         verified = was_verified
+    if getattr(profile, 'ahpra_number', None) and hasattr(profile, '_meta'):
+        from onboarding.verification.state import ahpra_state
+        if ahpra_state(profile)['state'] in ('suspended', 'unreadable', 'rejected', 'type_not_accepted', 'review'):
+            verified = False
     return {'verified': verified, 'missing': missing, 'grace': grace,
             'grace_until': getattr(settings, 'VERIFICATION_GRACE_UNTIL', None) if grace else None}
 
@@ -175,8 +179,11 @@ def badges(profile) -> list[dict]:
 
 def verification_summary(profile) -> dict:
     """What employers and the worker see: the Verified flag, every badge, certificate skills and the overseas label."""
+    from onboarding.verification.state import ahpra_state
     decision = evaluate(profile)
     return {
+        # Employers see the register status only; the worker's own `ahpra` field carries the note.
+        'ahpra': {**ahpra_state(profile), 'note': '', 'checked_at': None, 'recheck_available_at': None},
         'verified': bool(profile.verified),
         # What Verified still needs (email, mobile, ahpra, gov_id, referees, role); empty once verified.
         'missing': [] if profile.verified else decision['missing'],

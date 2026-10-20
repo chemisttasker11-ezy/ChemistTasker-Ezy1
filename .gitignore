@@ -69,12 +69,13 @@ management/
 !backend/public_hub/management/
 !backend/public_hub/management/**/
 !backend/public_hub/management/**/*.py
-# The production reevaluate_verification command only; local scripts beside it stay ignored.
+# Keep supported onboarding commands; other local scripts stay ignored.
 !backend/onboarding/management/
 backend/onboarding/management/*
 !backend/onboarding/management/__init__.py
 !backend/onboarding/management/commands/
 backend/onboarding/management/commands/*
+!backend/onboarding/management/commands/ahpra_e2e.py
 !backend/onboarding/management/commands/__init__.py
 !backend/onboarding/management/commands/reevaluate_verification.py
 
@@ -208,3 +209,4 @@ github_guidance.md
 AGENTS.md
 .dsh-code-index/
 .ci-artifacts/
+scripts/ahpra_verifier/start_bridge.bat

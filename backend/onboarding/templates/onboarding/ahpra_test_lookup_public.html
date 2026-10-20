@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="strict-origin">
+<title>{{ title }}</title>
+{% if pending %}<meta http-equiv="refresh" content="5">{% endif %}
+</head>
+<body>
+<h1>{{ title }}</h1>
+{% include "admin/ahpra_test_lookup_body.html" %}
+</body>
+</html>

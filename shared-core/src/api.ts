@@ -66,6 +66,7 @@ export {
   getOnboarding,
   updateOnboarding,
   getOnboardingDetail,
+  recheckAhpra,
   updateOnboardingForm,
   submitRefereeResponse,
   refereeRejectByToken,

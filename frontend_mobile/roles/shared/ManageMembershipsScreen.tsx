@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import apiClient from '@/utils/apiClient';
 import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
+import { useAhpra } from '@/context/AhpraContext';
 
 type AdminInvitation = {
   id: number;
@@ -57,6 +58,7 @@ function adminCapabilitiesText(membership: Membership) {
 
 export default function ManageMembershipsScreen() {
   const { refreshUser } = useAuth();
+  const { refresh: refreshAhpra } = useAhpra();
   const theme = useTheme();
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [adminInvitations, setAdminInvitations] = useState<AdminInvitation[]>([]);
@@ -99,7 +101,7 @@ export default function ManageMembershipsScreen() {
     setActingKey(`membership-${membership.id}`);
     try {
       await apiClient.post(`/my-memberships/${membership.id}/${action}/`);
-      await Promise.all([loadMemberships(), refreshUser()]);
+      await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
       setQuitTarget(null);
       setToast(
         action === 'quit'
@@ -119,7 +121,7 @@ export default function ManageMembershipsScreen() {
     setActingKey(`admin-${invitation.id}`);
     try {
       await respondToPharmacyAdminInvitation(invitation.id, accept);
-      await Promise.all([loadMemberships(), refreshUser()]);
+      await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
       setToast(accept ? 'Admin access accepted.' : 'Admin invitation declined.');
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Unable to respond to this admin invitation.');

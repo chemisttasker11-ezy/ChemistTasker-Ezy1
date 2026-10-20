@@ -21,6 +21,7 @@ import { type StatusTone } from "../../../components/ui/tone";
 import apiClient from "../../../utils/apiClient";
 import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from "@chemisttasker/shared-core";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useAhpra } from "../../../contexts/AhpraContext";
 
 type AdminInvitation = {
   id: number;
@@ -90,6 +91,7 @@ const busyIcon = (busy: boolean, icon: ReactNode) => (busy ? <CircularProgress s
 
 export default function ManageMembershipsPage() {
   const { setUser } = useAuth();
+  const { refresh: refreshAhpra } = useAhpra();
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [adminInvitations, setAdminInvitations] = useState<AdminInvitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,7 +132,7 @@ export default function ManageMembershipsPage() {
     setActingId(invitation.id);
     try {
       await respondToPharmacyAdminInvitation(invitation.id, accept);
-      await Promise.all([loadMemberships(), refreshUser()]);
+      await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
     } catch (error: any) {
       setActionError(error?.response?.data?.detail || 'Unable to respond to this admin invitation.');
     } finally {
@@ -142,7 +144,7 @@ export default function ManageMembershipsPage() {
     setActingId(membership.id);
     try {
       await apiClient.post(`/my-memberships/${membership.id}/${action}/`);
-      await Promise.all([loadMemberships(), refreshUser()]);
+      await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
       setQuitTarget(null);
     } catch (error: any) {
       setActionError(error?.response?.data?.detail || `Unable to ${action} membership.`);

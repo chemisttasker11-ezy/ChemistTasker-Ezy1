@@ -9,3 +9,4 @@ DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memor
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 AXES_ENABLED = False
 CELERY_TASK_ALWAYS_EAGER = True
+CACHES = {**CACHES, 'ahpra': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}

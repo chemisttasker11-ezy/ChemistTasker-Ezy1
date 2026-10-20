@@ -18,6 +18,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import SectionCard from "../../components/ui/SectionCard";
 import AccountDeletionSection from "../../components/AccountDeletionSection";
 import { UnsavedChangesBoundary } from "../../hooks/useUnsavedChangesGuard";
+import { useAhpra } from "../../contexts/AhpraContext";
 
 export type OnboardingStep = PostShiftWizardStep & {
   /** Full name for the step heading; `label` stays short for the stepper. */
@@ -133,6 +134,9 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
   const requested = searchParams.get("step");
   const index = Math.max(0, steps.findIndex(item => item.key === requested));
   const step = steps[index];
+  const ahpra = useAhpra();
+  // Only a frozen account; members and not-found applicants still finish onboarding.
+  const isAhpraBlocked = Boolean(ahpra.summary?.frozen);
   const [summary, setSummary] = React.useState<VerificationSummary | null>(null);
   const [progress, setProgress] = React.useState<number | null>(null);
 
@@ -141,7 +145,7 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
     const onSaved = (event: Event) => {
       const detail = (event as CustomEvent).detail as any;
       if (!detail?.verification) return;
-      setSummary(normalizeVerification(detail.verification));
+      setSummary(normalizeVerification(detail.verification, detail.ahpra));
       if (Number.isFinite(detail.progress_percent)) setProgress(detail.progress_percent);
       onDetail?.(detail);
     };
@@ -156,7 +160,7 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
     getOnboardingDetail(roleKey)
       .then((detail: any) => {
         if (!live) return;
-        setSummary(normalizeVerification(detail?.verification));
+        setSummary(normalizeVerification(detail?.verification, detail?.ahpra));
         setProgress(Number.isFinite(detail?.progress_percent) ? detail.progress_percent : null);
         onDetail?.(detail);
       })
@@ -202,7 +206,14 @@ export default function OnboardingShell({ roleKey, title, subtitle, steps, targe
                   sx={{ mt: 4, pt: 2.5, borderTop: "1px solid var(--ct-border-color)" }}>
                   <Button variant="text" onClick={() => void go(index - 1)} disabled={index === 0} sx={{ minWidth: 120 }}>Back</Button>
                   {index < steps.length - 1 && (
-                    <Button variant="contained" endIcon={<ArrowRight size={16} />} onClick={() => void go(index + 1)} fullWidth={compact} sx={{ minWidth: 160 }}>
+                    <Button
+                      variant={isAhpraBlocked ? "outlined" : "contained"}
+                      disabled={isAhpraBlocked}
+                      endIcon={<ArrowRight size={16} />}
+                      onClick={() => void go(index + 1)}
+                      fullWidth={compact}
+                      sx={{ minWidth: 160 }}
+                    >
                       Next: {steps[index + 1].title ?? steps[index + 1].label}
                     </Button>
                   )}

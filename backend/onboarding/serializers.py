@@ -46,7 +46,32 @@ from onboarding.services.profile import apply_profile_tab
 from onboarding.services.referees import apply_referees_tab
 
 
-class OwnerOnboardingV2Serializer(UploadValidationMixin, serializers.ModelSerializer):
+class AhpraSummaryMixin:
+    def get_fields(self):
+        from onboarding.verification.schema import AhpraStateSerializer
+        fields = super().get_fields()
+        fields['ahpra'] = AhpraStateSerializer(source='*', read_only=True)
+        return fields
+
+    def save(self, **kwargs):
+        from django.conf import settings
+        from onboarding.models import AhpraCheck
+        from onboarding.verification.ahpra_numbers import full_registration_number
+        from onboarding.verification.desktop import enqueue_check
+        previous = full_registration_number(getattr(self.instance, 'ahpra_number', None))
+        instance = super().save(**kwargs)
+        tab = str(self.initial_data.get('tab') or 'basic').lower().strip()
+        number = full_registration_number(getattr(instance, 'ahpra_number', None))
+        number_tab = 'regulatory' if isinstance(instance, OtherStaffOnboarding) else 'basic'
+        if settings.AHPRA_SOURCE == 'desktop' and submit_requested(self.initial_data) and tab == number_tab and number:
+            checks = AhpraCheck.objects.filter(model_name=instance._meta.object_name,
+                                               object_pk=instance.pk, registration_number=number)
+            if previous != number or not checks.exists():
+                enqueue_check(instance, number, 'onboarding')
+        return instance
+
+
+class OwnerOnboardingV2Serializer(AhpraSummaryMixin, UploadValidationMixin, serializers.ModelSerializer):
     """
     Single-tab onboarding for owners/managers.
     Mirrors the V2 pattern used by pharmacist/other staff/explorer flows.
@@ -177,7 +202,7 @@ class RefereeResponseSerializer(serializers.ModelSerializer):
         ]
 
 
-class RefreshVerifiedMixin:
+class RefreshVerifiedMixin(AhpraSummaryMixin):
     """Apply the verification policy once, before any field is read, so `verified` and `verification` agree."""
 
     def to_representation(self, instance):

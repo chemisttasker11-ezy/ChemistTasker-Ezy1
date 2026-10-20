@@ -60,7 +60,7 @@ def captured_work():
     def remind(model_name, pk, ref_idx, hours=None):
         work["reminders"].append((model_name, ref_idx))
 
-    with mock.patch("celery.app.base.Celery.send_task", side_effect=record), \
+    with override_settings(CELERY_TASK_ALWAYS_EAGER=False), mock.patch("celery.app.base.Celery.send_task", side_effect=record), \
             mock.patch("onboarding.verification.reminders.schedule_referee_reminder", side_effect=remind):
         yield work
 

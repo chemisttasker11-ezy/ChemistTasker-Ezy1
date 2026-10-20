@@ -219,6 +219,10 @@ def apply_owner_basic_tab(instance, vdata: dict, submit: bool, *, initial_data):
         instance.ahpra_verified = False
         instance.ahpra_verification_note = ""
         update_fields.extend(["ahpra_verified", "ahpra_verification_note"])
+    if role_changed:
+        # The owner chose a role themselves; AHPRA no longer switches it back.
+        instance.ahpra_switched_to_manager = False
+        update_fields.append("ahpra_switched_to_manager")
 
     first_submit = submit and not instance.submitted_for_verification
     if first_submit:

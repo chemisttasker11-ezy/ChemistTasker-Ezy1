@@ -1,3 +1,4 @@
+import { AHPRA_UNREADABLE_MESSAGE, reportAhpraError } from '@chemisttasker/shared-core';
 // utils/apiClient.ts
 import axios from 'axios';
 import { Platform } from 'react-native';
@@ -74,6 +75,11 @@ apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
+        reportAhpraError(error.response?.data);
+        if (error.response?.data?.code === 'ahpra_unreadable') {
+          error.message = AHPRA_UNREADABLE_MESSAGE;
+          error.response.data.detail = AHPRA_UNREADABLE_MESSAGE;
+        }
 
         // If 401 and we haven't retried yet, try to refresh token
         if (error.response?.status === 401 && !originalRequest._retry) {

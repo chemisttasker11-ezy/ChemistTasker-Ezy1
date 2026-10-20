@@ -1,3 +1,5 @@
+import AhpraStatus from '../../components/AhpraStatus';
+import { useAhpra } from '../../context/AhpraContext';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -66,6 +68,7 @@ export default function OwnerProfileDetailScreen({
   onCancelPath,
 }: Props) {
   const router = useRouter();
+  const ahpra = useAhpra();
   const { user, refreshUser } = useAuth();
   const imageMediaTypes = (ImagePicker as any).MediaType?.Images ?? ImagePicker.MediaTypeOptions.Images;
 
@@ -122,7 +125,7 @@ export default function OwnerProfileDetailScreen({
     return name || form.username || 'Owner setup';
   }, [form.first_name, form.last_name, form.username]);
   const showAhpra = form.role === 'PHARMACIST' || Boolean(form.ahpra_number);
-  const isAhpraVerified = form.ahpra_verified === true;
+  const isAhpraVerified = form.ahpra_verified === true && (!ahpra.summary || ahpra.summary.state === 'ok');
 
   const buildFormFromResponse = (data: any): OwnerFormData => ({
     username: data?.username || '',
@@ -221,6 +224,7 @@ export default function OwnerProfileDetailScreen({
     setSaving(true);
     try {
       await updateOnboardingForm('owner', payload);
+      await ahpra.refresh();
       await refreshUser();
       unsaved.markClean({
         form,
@@ -460,6 +464,7 @@ export default function OwnerProfileDetailScreen({
             ))}
           </Menu>
 
+          <AhpraStatus submitLabel="Submit" />
           {showAhpra ? (
             <>
               <TextInput
@@ -468,7 +473,6 @@ export default function OwnerProfileDetailScreen({
                 value={form.ahpra_number}
                 onChangeText={(value) => setForm((prev) => ({ ...prev, ahpra_number: value }))}
                 editable={!isAhpraVerified}
-                left={<TextInput.Affix text="PHA" />}
                 theme={inputTheme}
                 style={styles.input}
               />
@@ -483,7 +487,7 @@ export default function OwnerProfileDetailScreen({
                 style={styles.input}
               />
 
-              <Chip
+              {!ahpra.summary && <Chip
                 mode="outlined"
                 icon={form.ahpra_verified === true ? 'check-circle-outline' : form.ahpra_verified === false ? 'close-circle-outline' : 'clock-outline'}
                 style={[
@@ -495,8 +499,8 @@ export default function OwnerProfileDetailScreen({
                 }
               >
                 {form.ahpra_verified === true ? 'AHPRA Verified' : form.ahpra_verified === false ? 'AHPRA Not Verified' : 'AHPRA Pending'}
-              </Chip>
-              {form.ahpra_verification_note ? <HelperText type="info">{form.ahpra_verification_note}</HelperText> : null}
+              </Chip>}
+              {!ahpra.summary && form.ahpra_verification_note ? <HelperText type="info">{form.ahpra_verification_note}</HelperText> : null}
             </>
           ) : null}
 

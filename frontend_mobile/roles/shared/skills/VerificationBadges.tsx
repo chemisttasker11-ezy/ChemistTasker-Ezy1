@@ -62,6 +62,9 @@ export function VerificationBadges({ summary, role, audience = 'employer', compa
     key: 'profile', subject: 'PROFILE', state: summary.verified ? 'verified' : 'not_supplied', text: profileTitle, title: profileTitle,
     body: summary.verified ? verifiedProfileExplainer(role, summary) : 'Email or mobile not confirmed yet, so this profile cannot apply for public shifts.',
   }];
+  if (summary.ahpra?.registration_status) {
+    items.push({ key: 'ahpra-status', text: `AHPRA: ${summary.ahpra.registration_status}`, title: 'AHPRA register status', body: summary.ahpra.note });
+  }
   for (const row of compact ? rows.filter(r => r.state === 'verified') : rows) {
     items.push({ key: row.code, subject: row.code, state: row.state, title: `${row.label}: ${row.stateLabel}`, body: row.explainer,
       text: row.label, note: row.state === 'verified' ? undefined : row.stateLabel });

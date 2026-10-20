@@ -1,3 +1,4 @@
+import { AHPRA_UNREADABLE_MESSAGE, reportAhpraError } from '@chemisttasker/shared-core';
 // src/utils/apiClient.ts
 import {csrfToken,loginHref} from '../../landing_next/shared/browser-session';
 import axios, { AxiosError, AxiosResponse } from 'axios';
@@ -53,6 +54,12 @@ apiClient.interceptors.response.use(
   },
   async (error: AxiosError) => {
     const originalRequest: any = error.config || {};
+    reportAhpraError(error.response?.data);
+    const payload = error.response?.data as { code?: string; detail?: string } | undefined;
+    if (payload?.code === 'ahpra_unreadable') {
+      error.message = AHPRA_UNREADABLE_MESSAGE;
+      payload.detail = AHPRA_UNREADABLE_MESSAGE;
+    }
 
     // Attempt refresh once on 401
     if (error.response?.status === 401 && !originalRequest._retry) {

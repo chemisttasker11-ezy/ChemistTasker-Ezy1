@@ -11,7 +11,7 @@ from datetime import date, time, timedelta
 from decimal import Decimal
 from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from memberships.models import Membership
@@ -37,7 +37,7 @@ def queued_emails():
             "subject": kwargs.get("subject"),
         })
 
-    with mock.patch("celery.app.base.Celery.send_task", side_effect=record):
+    with override_settings(CELERY_TASK_ALWAYS_EAGER=False), mock.patch("celery.app.base.Celery.send_task", side_effect=record):
         yield sent
 
 

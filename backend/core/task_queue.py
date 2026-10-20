@@ -99,7 +99,10 @@ def async_task(func, *args, **kwargs):
                 transaction.on_commit(
                     lambda: _dispatch_notification(notification, recipients, subject)
                 )
-        return current_app.send_task(registered_task_name(task_name), args=args, kwargs=kwargs, **options)
+        task_name = registered_task_name(task_name)
+        if current_app.conf.task_always_eager:
+            return current_app.tasks[task_name].apply_async(args=args, kwargs=kwargs, **options)
+        return current_app.send_task(task_name, args=args, kwargs=kwargs, **options)
 
     if hasattr(func, "apply_async"):
         return func.apply_async(args=args, kwargs=kwargs, **options)

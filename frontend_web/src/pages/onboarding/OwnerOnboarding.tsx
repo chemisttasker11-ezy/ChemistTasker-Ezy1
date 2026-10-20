@@ -1,3 +1,5 @@
+import AhpraStatus from '../../components/AhpraStatus';
+import { useAhpra } from '../../contexts/AhpraContext';
 // src/pages/onboarding/OwnerOnboarding.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -80,6 +82,7 @@ function OwnerOnboardingContent({
   onSuccessPath,
 }: OwnerOnboardingProps) {
   const roleKey = 'owner';
+  const ahpra = useAhpra();
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
   const [isUpdate, setIsUpdate] = useState(false);
@@ -128,7 +131,7 @@ function OwnerOnboardingContent({
   }, [data.first_name, data.last_name, data.username]);
   const roleLabel = ROLE_OPTIONS.find((option) => option.value === data.role)?.label ?? 'Owner';
   const showAhpra = data.role === 'PHARMACIST' || Boolean(data.ahpra_number);
-  const isAhpraVerified = data.ahpra_verified === true;
+  const isAhpraVerified = data.ahpra_verified === true && (!ahpra.summary || ahpra.summary.state === 'ok');
   const sectionCardSx = {
     p: { xs: 2, md: 3 },
     borderRadius: 4,
@@ -291,6 +294,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     }
 
     const saved = await updateOnboardingForm(roleKey, payload);
+    void ahpra.refresh().catch(() => {});
     const nextData = (saved as any) || {};
     const nextPhoto =
       nextData?.profile_photo_url ||
@@ -670,6 +674,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             ))}
           </TextField>
 
+          <AhpraStatus submitLabel="Submit" />
           {showAhpra && (
             <>
               <TextField
@@ -682,9 +687,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                 disabled={isAhpraVerified}
                 required={data.role === 'PHARMACIST'}
                 helperText={isAhpraVerified ? 'AHPRA number is locked after verification.' : AHPRA_CONSENT_TEXT}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">PHA</InputAdornment>,
-                }}
                 sx={inputSx}
               />
               <TextField
@@ -700,8 +702,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                 sx={inputSx}
               />
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mt: 1 }}>
-                <VerifiedChip ok={data.ahpra_verified} label="AHPRA" />
-                {typeof data.ahpra_verified === 'boolean' && (
+                {!ahpra.summary && <VerifiedChip ok={data.ahpra_verified} label="AHPRA" />}
+                {!ahpra.summary && typeof data.ahpra_verified === 'boolean' && (
                   <Typography
                     variant="body2"
                     title={data.ahpra_verification_note || (data.ahpra_verified ? 'Verified' : 'Pending/Not verified')}

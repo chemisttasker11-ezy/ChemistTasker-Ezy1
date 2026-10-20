@@ -1,3 +1,4 @@
+import type { AhpraSummary } from './ahpra';
 /**
  * Profile verification and evidence badges: the one place for their labels and explanations (Vite, Next, Expo).
  * The backend decides the states (onboarding/verification/policy.py); clients only describe them.
@@ -10,6 +11,7 @@ export type BadgeTone = 'success' | 'info' | 'warning' | 'neutral';
 export type RequirementCode = 'email' | 'mobile' | 'ahpra' | 'gov_id' | 'referees' | 'role';
 
 export interface VerificationSummary {
+  ahpra?: AhpraSummary | null;
   verified: boolean;
   /** What the Verified profile still needs; empty once verified. */
   missing: RequirementCode[];
@@ -78,10 +80,21 @@ export const evidenceStateTone = (state: EvidenceState) => STATE_TONES[state];
 export const badgeLabel = (code: BadgeCode) => BADGES[code]?.label ?? code;
 
 /** Accepts the API shape (snake_case) or an already camel-cased one; null when the response carries no summary. */
-export function normalizeVerification(value: unknown): VerificationSummary | null {
-  if (!value || typeof value !== 'object') return null;
-  const raw = value as Record<string, any>;
+export function normalizeVerification(value: unknown, ahpra?: unknown): VerificationSummary | null {
+  if ((!value || typeof value !== 'object') && !ahpra) return null;
+  const raw = (value || {}) as Record<string, any>;
+  const check = (ahpra ?? raw.ahpra) as Record<string, any> | null | undefined;
   return {
+    ahpra: check ? {
+      frozen: check.state !== 'review' && Boolean(check.frozen),
+      attempts: check.attempts ?? 0,
+      contact_support: Boolean(check.contact_support ?? check.contactSupport),
+      state: check.state, registration_status: check.registration_status ?? check.registrationStatus ?? null,
+      registration_type: check.registration_type ?? check.registrationType ?? null,
+      expiry_date: check.expiry_date ?? check.expiryDate ?? null, note: check.note || '',
+      checked_at: check.checked_at ?? check.checkedAt ?? null,
+      recheck_available_at: check.recheck_available_at ?? check.recheckAvailableAt ?? null,
+    } : null,
     verified: Boolean(raw.verified),
     missing: Array.isArray(raw.missing) ? raw.missing : [],
     badges: Array.isArray(raw.badges) ? raw.badges : [],
@@ -100,6 +113,9 @@ export function normalizeVerification(value: unknown): VerificationSummary | nul
  * `evidence` names the thing checked ("certificate" for a skill); `note` is the check's own failure reason.
  */
 export function evidenceExplainer(state: EvidenceState, audience: BadgeAudience, evidence = 'certificate', options: { checked?: string; note?: string | null; references?: boolean } = {}): string {
+  if (evidence === 'AHPRA registration' && state !== 'verified') {
+    return options.note || (state === 'pending' ? 'AHPRA register check pending.' : 'AHPRA registration has not been verified. Check the number on your AHPRA step.');
+  }
   if (options.references) {
     if (state === 'verified') return audience === 'worker' ? 'Both of your referees confirmed. Pharmacies see this badge.' : BADGES.REFERENCES.checked;
     if (state === 'pending') return audience === 'worker' ? 'Your referees have been asked. The badge appears when both confirm.' : 'Referees have been asked and have not all confirmed yet.';
@@ -126,7 +142,7 @@ export function verificationRows(summary: VerificationSummary | null, audience: 
     state,
     stateLabel: STATE_LABELS[state],
     tone: STATE_TONES[state],
-    explainer: evidenceExplainer(state, audience, BADGES[code].evidence, { checked: BADGES[code].checked, references: code === 'REFERENCES' }),
+    explainer: evidenceExplainer(state, audience, BADGES[code].evidence, { checked: BADGES[code].checked, references: code === 'REFERENCES', note: code === 'AHPRA' || code === 'AHPRA_PROVISIONAL' ? summary?.ahpra?.note : null }),
   }));
 }
 

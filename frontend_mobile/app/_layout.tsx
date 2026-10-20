@@ -1,5 +1,7 @@
+import { useAhpra } from '../context/AhpraContext';
+import AhpraStatus from '../components/AhpraStatus';
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Platform, StatusBar } from 'react-native';
+import { AppState, Linking, Platform, StatusBar, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
@@ -230,9 +232,19 @@ function AuthGate() {
   const segments = useSegments();
   const { user, isLoading, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
+  const { summary: ahpraSummary, loading: ahpraLoading, refusal: ahpraRefusal, clearRefusal } = useAhpra();
+  const ahpraPath = user?.role === 'PHARMACIST' ? '/pharmacist/profile-basic-info' : '/otherstaff/profile-regulatory';
+  const onAhpraStep = `/${segments.join('/')}` === ahpraPath;
+  // Invitations are never blocked by AHPRA.
+  const onInvitePage = ['/pharmacist/memberships', '/otherstaff/memberships', '/admin-invitations'].includes(`/${segments.join('/')}`);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || ahpraLoading) return;
+    if (user && user.role !== 'OWNER' && ahpraSummary?.state !== 'review' && (ahpraSummary?.frozen || ahpraRefusal)) {
+      if (!onAhpraStep && !onInvitePage) router.replace(ahpraPath as any);
+      else if (ahpraRefusal) clearRefusal();
+      return;
+    }
     const top = segments[0];
     const segmentList = segments as readonly string[];
     const second = segmentList[1];
@@ -403,8 +415,13 @@ function AuthGate() {
     return () => {
       active = false;
     };
-  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user]);
+  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user, ahpraLoading, ahpraSummary?.frozen, ahpraSummary?.state, ahpraRefusal, clearRefusal, ahpraPath, onAhpraStep, onInvitePage]);
 
+  if (user && (ahpraLoading || (user.role !== 'OWNER' && ahpraSummary?.state !== 'review' && (ahpraSummary?.frozen || ahpraRefusal) && !onAhpraStep && !onInvitePage))) {
+    return <View style={{ position: 'absolute', inset: 0, zIndex: 10000, backgroundColor: '#FFFFFF', padding: 24, justifyContent: 'center' }}>
+      {ahpraLoading ? <Text>Loading AHPRA status...</Text> : <AhpraStatus />}
+    </View>;
+  }
   return null;
 }
 
@@ -440,7 +457,6 @@ export default function RootLayout() {
               <UnsavedChangesRegistryProvider>
                 <AuthProvider>
                   <WorkspaceProvider>
-                    <AuthGate />
                     <KioskLinkNotificationGate />
                     <UpdatePrompt />
                     <OfflineBanner />
@@ -451,6 +467,7 @@ export default function RootLayout() {
                         animation: 'slide_from_right',
                       }}
                     />
+                    <AuthGate />
                   </WorkspaceProvider>
                 </AuthProvider>
               </UnsavedChangesRegistryProvider>

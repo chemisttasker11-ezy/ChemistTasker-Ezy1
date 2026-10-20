@@ -244,6 +244,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         A refusal returns a stable `detail` and `code`; the internal reason is logged.
         """
 
+        from onboarding.verification.state import require_public_ahpra
         try:
             shift = self.get_object()
         except (Http404, DRFPermissionDenied, DjangoPermissionDenied):
@@ -262,6 +263,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
             )
 
 
+        require_public_ahpra(request.user, shift)
         user = request.user
         slot_id = request.data.get('slot_id')
 
@@ -270,6 +272,8 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         # The community queryset remains the single owner of tier eligibility; the row lock prevents a concurrent
         # membership update from making that queryset and the favorite-worker handling observe different tiers.
         with transaction.atomic():
+            from onboarding.verification.state import lock_public_ahpra
+            lock_public_ahpra(user, shift)
             # --- 1. Membership verification (reachable through OWNER_CHAIN / ORG_CHAIN visibility) ---
             membership = Membership.objects.select_for_update().filter(
                 user=user,

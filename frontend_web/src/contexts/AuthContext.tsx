@@ -1,3 +1,4 @@
+import { AhpraProvider } from './AhpraContext';
 import {bearerBelongsToDifferentUser, logoutSession} from '../../landing_next/shared/browser-session';
 // src/contexts/AuthContext.tsx
 
@@ -478,7 +479,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setActivePersona,
       }}
     >
-      {sessionError?<div role="alert" style={{padding:24}}><p>{sessionError}</p><button onClick={()=>window.location.reload()}>Reconnect</button><button onClick={()=>{setSessionError('');void logout();}}>Retry logout</button></div>:children}
+      {sessionError?<div role="alert" style={{padding:24}}><p>{sessionError}</p><button onClick={()=>window.location.reload()}>Reconnect</button><button onClick={()=>{setSessionError('');void logout();}}>Retry logout</button></div>:<AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider>}
     </AuthContext.Provider>
   );
 }

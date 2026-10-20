@@ -29,7 +29,7 @@ function Fact({ icon, text }: { icon: keyof typeof MaterialCommunityIcons.glyphM
 export function CandidateWorkProfile({ profile, name, bio }: { profile?: ShiftWorkProfile | null; name?: string; bio?: string | null }) {
   const p: Partial<ShiftWorkProfile> = profile || {};
   const role = [p.roleLabel, p.classification].filter(Boolean).join(' · ');
-  const verification = normalizeVerification(p.verification);
+  const verification = normalizeVerification(p.verification, p.ahpra);
   const place = [p.suburb, p.state].filter(Boolean).join(', ');
   const travel = p.openToTravel
     ? `Open to travel${p.coverageRadiusKm ? ` up to ${p.coverageRadiusKm} km` : ''}${p.travelStates?.length ? ` · ${p.travelStates.join(', ')}` : ''}`

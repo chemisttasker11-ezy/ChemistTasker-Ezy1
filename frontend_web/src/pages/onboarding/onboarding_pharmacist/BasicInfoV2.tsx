@@ -1,9 +1,11 @@
+import AhpraStatus from '../../../components/AhpraStatus';
+import { useAhpra } from '../../../contexts/AhpraContext';
 /// <reference types="@types/google.maps" />
 import * as React from 'react';
 import {
   Box, Button, Chip, MenuItem, TextField, Typography, Dialog, DialogTitle, DialogContent, DialogActions,
 
-  InputAdornment, Alert, Snackbar
+  Alert, Snackbar
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
@@ -62,6 +64,7 @@ const GENDER_OPTIONS = [
 ] as const;
 
 export default function BasicInfoV2() {
+  const ahpra = useAhpra();
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [data, setData] = React.useState<ApiData>({});
@@ -72,7 +75,7 @@ export default function BasicInfoV2() {
   const [snack, setSnack] = React.useState<string>('');
   const [error, setError] = React.useState<string>('');
   const [addressDisplay, setAddressDisplay] = React.useState<string>('');
-  const isAhpraVerified = data.ahpra_verified === true;
+  const isAhpraVerified = data.ahpra_verified === true && (!ahpra.summary || ahpra.summary.state === 'ok');
   const canSubmit = Boolean(data.ahpra_number) && !isAhpraVerified;
 
 
@@ -236,6 +239,7 @@ export default function BasicInfoV2() {
       const res = await updateOnboardingForm(roleKey, fd as any);
 
       announceOnboardingSaved(res);
+      void ahpra.refresh().catch(() => {});
       const nextData = (res as any) || {};
       setData(nextData);
       setLockedNames({
@@ -541,6 +545,7 @@ export default function BasicInfoV2() {
 
 
 
+      <AhpraStatus submitLabel="Submit & Verify Basic" />
       {/* AHPRA row — chip + note stay aligned, wrap nicely on small */}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 2 }}>
         <TextField
@@ -548,7 +553,6 @@ export default function BasicInfoV2() {
           value={data.ahpra_number || ''}
           onChange={e => setField('ahpra_number', e.target.value)}
           disabled={isAhpraVerified}
-          InputProps={{ startAdornment: <InputAdornment position="start">PHA</InputAdornment> }}
           helperText={isAhpraVerified ? 'Checked by our team. Your AHPRA number stays with you for life; contact support to correct it.' : AHPRA_CONSENT_TEXT}
           sx={{ flex: '1 1 320px', minWidth: 240, maxWidth: 420 }}
         />
@@ -562,8 +566,8 @@ export default function BasicInfoV2() {
           disabled
           sx={{ flex: '0 1 220px', minWidth: 200, maxWidth: 260 }}
         />
-        <VerifiedChip ok={data.ahpra_verified} label="AHPRA" />
-        {typeof data.ahpra_verified === 'boolean' && (
+        {!ahpra.summary && <VerifiedChip ok={data.ahpra_verified} label="AHPRA" />}
+        {!ahpra.summary && typeof data.ahpra_verified === 'boolean' && (
           <Typography
             variant="body2"
             title={data.ahpra_verification_note || (data.ahpra_verified ? 'Verified' : 'Pending/Not verified')}
