@@ -130,3 +130,14 @@ Then verify emulator/device multipart uploads against isolated seeded Django/Pos
 
 - Merge `c1e9ef3` incorporates precisely four newer PR #181 files: the planner handover, Vite planner E2E test, calendar page and shared-core planner test. Parent merge is recorded as second parent. Compare from former parent `6b6e2f7` confirmed no overlap with the 33 PR #191-specific modified files. PR #182 and #184 are not included.
 - The final exact-head CI remains authoritative. Earlier successful checks and canceled runs are not a pass for this merge.
+
+## Senior continuation - 21 October 2026
+
+**Current scope:** PR #191 alone, stacked on PR #181. The Windows kiosk (including its Tauri/Rust code and browser shell) remains fully independent and is excluded from shared-core migration. Expo's *pairing UI* is a mobile client and must retain its own verified platform adapter.
+
+- **A04:** tightened AST inventory by distinguishing named marketplace domain methods from generic `request` escape hatches, ignoring `axios.isAxiosError`/`axios.create` as backend domain calls, and recording import/destructuring/computed-property aliases and static route constants. Added negative fixtures. Current 176 finding figure is from an *earlier* scanner before this refinement; do not claim 176 confirmed bypasses or a new final count until CI inventory is complete. `--strict` remains intentionally unpassed with unreviewed debt. Branch commit `67ead5c`; follow-up `fa9f5f7` repairs CI-detected regex syntax.
+- **A02:** Expo pharmacy persistence verifies GET read-back after POST/PATCH; for multipart uploads, also compares requested document fields and array selections before marking clean and navigating. The native picker and stored bytes remain platform/server-owned. Native Android/iOS verification remains required. Commit `ffb7293`.
+- **A06:** `docs/architecture/VITE_NEXT_TWIN_DRIFT.md` records 64 same-relative-path Vite/Next migrated files, 21 identical and 43 divergent by Git blob hash. This is a *drift inventory*, not a license to overwrite intentional Next SSR/browser variants.
+- **A08:** added semantic persona-brand constants to shared-core with a unit test, and rewired the Next public theme's existing matching brand colour literals to the identical shared values; no visual redesign approved or assumed. Commit `09819af`.
+- **A01 remains blocked on owner authorization policy:** No DELETE, sensitive verification or profile-write authority changes have been introduced in this continuation.
+- **A11 incomplete:** Exact-head mandatory CI, full isolated QA (workflow skipped on preceding heads), PostgreSQL upgrade migration rehearsal, browser visual and device testing are not represented as complete. Retain draft and do not merge/deploy.
