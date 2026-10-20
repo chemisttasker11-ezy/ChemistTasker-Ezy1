@@ -1,0 +1,17 @@
+﻿<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AHPRA verifier</title></head>
+<body>
+<h1>ChemistTasker AHPRA verifier</h1>
+<form id="settings">
+<p><label>Websocket URL <input id="url" type="url" required size="55" placeholder="wss://api.example/ws/ahpra-verifier/"></label></p>
+<p><label>Token <input id="token" type="password" required autocomplete="off" size="40"></label></p>
+<p><label>Minimum gap between lookups (seconds) <input id="gap" type="number" min="1" step="1" value="30" required></label></p>
+<button id="toggle" type="submit">Connect</button>
+<button id="resume" type="button" hidden>Resume</button>
+</form>
+<p id="status" role="status" aria-live="polite">Loading…</p>
+<p id="error" role="alert"></p>
+<p>Connect both verifiers: the server sends checks to this extension first; the Python bridge is the fallback and repairer.</p>
+<script src="options.js"></script>
+</body></html>

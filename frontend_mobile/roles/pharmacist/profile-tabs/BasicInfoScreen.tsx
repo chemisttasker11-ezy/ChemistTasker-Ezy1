@@ -1,3 +1,5 @@
+import AhpraStatus from '../../../components/AhpraStatus';
+import { useAhpra } from '../../../context/AhpraContext';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,6 +42,7 @@ const GENDER_OPTIONS = [
 ] as const;
 
 export default function PharmacistBasicInfoScreen() {
+  const ahpra = useAhpra();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -74,7 +77,7 @@ export default function PharmacistBasicInfoScreen() {
     };
   }, []);
 
-  const isAhpraVerified = form.ahpra_verified === true;
+  const isAhpraVerified = form.ahpra_verified === true && (!ahpra.summary || ahpra.summary.state === 'ok');
   const canSubmit = useMemo(() => Boolean(form.ahpra_number) && !isAhpraVerified, [form.ahpra_number, isAhpraVerified]);
   const ahpraChip = boolChipProps(form.ahpra_verified);
   const genderLabel = GENDER_OPTIONS.find((g) => g.value === form.gender)?.label || 'Select gender';
@@ -136,6 +139,7 @@ export default function PharmacistBasicInfoScreen() {
 
       const res: any = await updateOnboardingForm(roleKey, fd as any);
       setForm(res || {});
+      void ahpra.refresh().catch(() => {});
       setLockedNames({
         first: Boolean(res?.first_name),
         last: Boolean(res?.last_name),
@@ -220,13 +224,13 @@ export default function PharmacistBasicInfoScreen() {
           <TextInput style={styles.flex} mode="outlined" label="Postcode" value={form.postcode || ''} onChangeText={(v) => setField('postcode', v)} />
         </View>
 
+        <AhpraStatus submitLabel="Submit & Verify Basic" />
         <TextInput
           mode="outlined"
           label="AHPRA Number"
           value={form.ahpra_number || ''}
           onChangeText={(v) => setField('ahpra_number', v)}
           editable={!isAhpraVerified}
-          left={<TextInput.Affix text="PHA" />}
         />
         <HelperText type="info">{isAhpraVerified ? 'AHPRA number is locked after verification.' : AHPRA_CONSENT_TEXT}</HelperText>
         <TextInput
@@ -235,10 +239,10 @@ export default function PharmacistBasicInfoScreen() {
           value={form.ahpra_years_since_first_registration != null ? String(form.ahpra_years_since_first_registration) : ''}
           editable={false}
         />
-        <Chip mode="outlined" icon={ahpraChip.icon} textStyle={{ color: ahpraChip.color }}>
+        {!ahpra.summary && <Chip mode="outlined" icon={ahpraChip.icon} textStyle={{ color: ahpraChip.color }}>
           AHPRA {ahpraChip.text}
-        </Chip>
-        {form.ahpra_verification_note ? <HelperText type="info">{form.ahpra_verification_note}</HelperText> : null}
+        </Chip>}
+        {!ahpra.summary && form.ahpra_verification_note ? <HelperText type="info">{form.ahpra_verification_note}</HelperText> : null}
         {error ? <HelperText type="error">{error}</HelperText> : null}
 
         <View style={styles.actions}>

@@ -17,6 +17,7 @@ export interface CurrentUserApi {
     in_free_trial?: boolean;
 }
 export interface OnboardingApi {
+    ahpra?: import('../domains/onboarding/ahpra').AhpraSummary | null;
     id?: number;
     first_name?: string | null;
     last_name?: string | null;

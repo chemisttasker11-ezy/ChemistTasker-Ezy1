@@ -5,6 +5,7 @@ from chat.models import Message, Participant
 from notifications.services import _broadcast
 
 ROOM_GROUP_FMT = "room.{room_id}"   # channel-layer group of one chat room
+USER_GROUP_FMT = "chat.user.{user_id}"
 
 
 def broadcast_message_badge(

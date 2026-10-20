@@ -96,6 +96,34 @@ def explorer_secondary_id_upload_path(instance, filename):
     return onboarding_upload_path(instance, filename, "gov_ids_secondary")
 
 
+class AhpraCheck(models.Model):
+    model_name = models.CharField(max_length=64)
+    object_pk = models.PositiveBigIntegerField()
+    registration_number = models.CharField(max_length=13)
+    reason = models.CharField(max_length=16, choices=[(v, v) for v in ('onboarding', 'recheck', 'public_recheck')])
+    status = models.CharField(max_length=8, default='pending', choices=[(v, v) for v in ('pending', 'sent', 'done')])
+    stage = models.CharField(max_length=9, default='extension', choices=[(v, v) for v in ('extension', 'bridge')])
+    needs_attention = models.BooleanField(default=False)
+    extension_error = models.TextField(blank=True)
+    repair_summary = models.TextField(blank=True)
+    repair_branch = models.CharField(max_length=255, blank=True)
+    repair_reported_at = models.DateTimeField(null=True, blank=True)
+    outcome = models.CharField(max_length=32, blank=True, choices=[(v, v) for v in ('verified', 'review', 'rejected', 'not_found', 'blocked', 'error', 'type_not_accepted')])
+    register_data = models.JSONField(default=dict, blank=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    alerted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        app_label = 'client_profile'
+        indexes = [models.Index(fields=['status', 'created_at'], name='ahpra_status_created_idx')]
+        constraints = [models.UniqueConstraint(fields=['model_name', 'object_pk', 'registration_number'], condition=models.Q(status__in=['pending', 'sent']), name='ahpra_one_active_check')]
+
+
 class OnboardingNotification(models.Model):
     # Links to any onboarding model (PharmacistOnboarding, OtherStaffOnboarding, etc.)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -162,6 +190,9 @@ class OwnerOnboarding(models.Model):
                           )
     # Verification Fields
     ahpra_verified = models.BooleanField(default=False, db_index=True)
+    # Set when an adverse AHPRA result switched this owner to MANAGER, so a later Registered result switches back.
+    # db_default keeps inserts from older code (unaware of this column) working after a code rollback.
+    ahpra_switched_to_manager = models.BooleanField(default=False, db_default=False)
     ahpra_registration_status = models.CharField(max_length=100, blank=True, null=True)
     ahpra_registration_type = models.CharField(max_length=100, blank=True, null=True)
     ahpra_expiry_date = models.DateField(blank=True, null=True)

@@ -712,7 +712,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
 
   return (
     <Box className={`chatpage-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-      <Box className="sidebar-header" sx={{ flexWrap: 'wrap', rowGap: 1.25 }}>
+      <Box className="sidebar-header" sx={{ flexWrap: 'wrap' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: 1 }}>
             <Tooltip title={isCollapsed ? "Show conversation list" : "Hide conversation list"} placement="right">
                 <IconButton onClick={onToggleCollapse} className="sidebar-toggle-button" size="small" aria-label={isCollapsed ? "Show conversation list" : "Hide conversation list"}>

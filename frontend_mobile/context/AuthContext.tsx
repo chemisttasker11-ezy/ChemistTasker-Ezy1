@@ -1,3 +1,4 @@
+import { AhpraProvider } from './AhpraContext';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { Alert, Platform } from 'react-native';
 import axios from 'axios';
@@ -558,7 +559,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isLoading,
       }}
     >
-      {children}
+      <AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider>
     </AuthContext.Provider>
   );
 }

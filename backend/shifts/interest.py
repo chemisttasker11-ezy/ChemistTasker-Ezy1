@@ -5,6 +5,7 @@ The views translate the request into these calls and serialize the rows they ret
 """
 from datetime import datetime
 
+from django.conf import settings
 from rest_framework import status
 
 from memberships.models import FAVORITE_STAFF_EMPLOYMENT_TYPES, Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
@@ -32,10 +33,19 @@ def is_public_shift_member_access(user, shift):
         pharmacy=shift.pharmacy,
         employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES,
         is_active=True,
+        status=Membership.Status.ACCEPTED,
     ).exists()
 
 
 def _require_public_shift_onboarding(user):
+    if not settings.AHPRA_ENFORCEMENT_ENABLED:
+        from onboarding.services.work_profile import current_worker_profile
+        from onboarding.verification.policy import requirements
+        profile = current_worker_profile(user)
+        if profile is not None:
+            checks = requirements(profile)
+            if 'ahpra' in checks and all(met for name, met in checks.items() if name != 'ahpra'):
+                return
     if user.role == 'PHARMACIST':
         po = PharmacistOnboarding.objects.filter(user=user).first()
         if not po:
@@ -67,8 +77,10 @@ def express_interest(*, shift, user, slot_ids=None, slot_id=None):
 
     Returns `(interests, created_interests)`.
     """
+    from onboarding.verification.state import require_public_ahpra
     # 1) Onboarding required
     if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(user, shift):
+        require_public_ahpra(user, shift)
         _require_public_shift_onboarding(user)
 
     # 2) Interest logic

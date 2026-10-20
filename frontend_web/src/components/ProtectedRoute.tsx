@@ -1,7 +1,10 @@
+import { useAhpra } from '../contexts/AhpraContext';
+import AhpraStatus from './AhpraStatus';
 import {loginHref} from '../../landing_next/shared/browser-session';
 // src/components/ProtectedRoute.tsx
 import React from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, Link } from "react-router-dom";
+import { Box, Button, CircularProgress, Container, Paper, Typography } from "@mui/material";
 import { useAuth } from "../contexts/AuthContext";
 import { hasOrganizationAccess } from "@chemisttasker/shared-core";
 import { resolveDashboardPath } from "../utils/dashboardPath";
@@ -32,6 +35,14 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, isLoading, isAdminUser, hasCapability } = useAuth();
   const location = useLocation();
+  const ahpra = useAhpra();
+  const roleKey = user?.role === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
+  const ahpraStep = roleKey === 'pharmacist' ? 'basic' : 'regulatory docs';
+  const recoveryPath = `/onboarding/${roleKey}?step=${encodeURIComponent(ahpraStep)}`;
+  const onAhpraStep = location.pathname === `/onboarding/${roleKey}` && new URLSearchParams(location.search).get('step') === ahpraStep;
+  React.useEffect(() => {
+    if (onAhpraStep && ahpra.refusal) ahpra.clearRefusal();
+  }, [onAhpraStep, ahpra.refusal, ahpra.clearRefusal]);
 
   if (isLoading) {
     return <div>Loading authentication...</div>;
@@ -40,6 +51,46 @@ export default function ProtectedRoute({
   if (!user) {
     window.location.replace(loginHref(location.pathname+location.search+location.hash));
     return <div role="status">Opening sign in…</div>;
+  }
+
+  if (location.pathname.endsWith('/logout')) return children;
+
+  const isAhpraRole = user.role === 'PHARMACIST' || user.role === 'OTHER_STAFF';
+  const isFrozen = isAhpraRole && ahpra.summary?.state !== 'review' && Boolean(ahpra.summary?.frozen || ahpra.refusal);
+
+  if (isAhpraRole && ahpra.loading) {
+    return (
+      <Box sx={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 3, textAlign: 'center' }}>
+        <CircularProgress size={32} sx={{ mb: 2 }} />
+        <Typography variant="body1" color="text.secondary">Verifying account registration…</Typography>
+      </Box>
+    );
+  }
+
+  if (isFrozen && onAhpraStep) return children;
+
+  // Invitations are never blocked by AHPRA: the invite email links land here.
+  const onInvitePage = /^\/dashboard\/((pharmacist|otherstaff)\/memberships|admin-invitations)\/?$/.test(location.pathname);
+
+  if (isFrozen && !onAhpraStep && !onInvitePage) {
+    return (
+      <Container maxWidth="sm" sx={{ py: 6 }}>
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid', borderColor: 'divider', textAlign: 'center' }}>
+          <Typography variant="h5" fontWeight={600} gutterBottom>
+            Account Access Paused
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Your account is temporarily paused pending AHPRA registration review. Please review and update your registration details to restore access.
+          </Typography>
+          <AhpraStatus submitLabel={roleKey === 'pharmacist' ? 'Submit & Verify Basic' : 'Save role & qualifications'} />
+          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 2 }}>
+            <Button variant="contained" component={Link} to={recoveryPath}>
+              Go to Account Details
+            </Button>
+          </Box>
+        </Paper>
+      </Container>
+    );
   }
 
   const hasOrgRole = hasOrganizationAccess(user);

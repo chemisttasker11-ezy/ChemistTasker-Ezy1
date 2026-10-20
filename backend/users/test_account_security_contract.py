@@ -38,20 +38,20 @@ STORAGES = {
 
 
 @contextmanager
-def queued_emails():
+def queued_emails(eager=False):
     sent = []
 
     def record(name, args=None, kwargs=None, **options):
         kwargs = kwargs or {}
         sent.append((kwargs.get("template_name"), tuple(kwargs.get("recipient_list") or [])))
 
-    with mock.patch("celery.app.base.Celery.send_task", side_effect=record):
+    with override_settings(CELERY_TASK_ALWAYS_EAGER=eager), mock.patch("celery.app.base.Celery.send_task", side_effect=record):
         yield sent
 
 
-def post(client, path, data=None):
+def post(client, path, data=None, eager=False):
     cache.clear()  # throttle counters
-    with queued_emails() as sent:
+    with queued_emails(eager) as sent:
         response = client.post(f"{API}{path}", data or {}, format="json")
     return response, sent
 
@@ -143,7 +143,7 @@ class EmailOtpTests(TestCase):
         for email, sends in ((user.email, True), (verified.email, False), ("nobody@example.com", False)):
             with self.subTest(email=email):
                 mail.outbox = []
-                response, _ = post(APIClient(), "resend-otp/", {"email": email})
+                response, _ = post(APIClient(), "resend-otp/", {"email": email}, eager=True)
                 self.assertEqual((response.status_code, response.data), (200, expected))
                 # sent through users.tasks.queue_email, which delivers immediately in eager test mode
                 self.assertEqual([m.to for m in mail.outbox], [[email]] if sends else [])
@@ -348,10 +348,10 @@ class SessionTests(TestCase):
         user = make_user("PHARMACIST")
         expected = {"detail": "If this email exists, a reset link has been sent."}
         mail.outbox = []
-        known, _ = post(APIClient(), "password-reset/", {"email": user.email.upper()})
+        known, _ = post(APIClient(), "password-reset/", {"email": user.email.upper()}, eager=True)
         self.assertEqual([(m.subject, m.to) for m in mail.outbox], [("Reset your password", [user.email])])
         mail.outbox = []
-        unknown, _ = post(APIClient(), "password-reset/", {"email": "nobody@example.com"})
+        unknown, _ = post(APIClient(), "password-reset/", {"email": "nobody@example.com"}, eager=True)
         self.assertEqual(mail.outbox, [])
         self.assertEqual((known.status_code, known.data, unknown.status_code, unknown.data), (200, expected, 200, expected))
 

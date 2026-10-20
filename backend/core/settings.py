@@ -192,6 +192,10 @@ if os.environ.get("APP_ENV", "local").lower() not in {"local", "dev", "developme
     raise RuntimeError("DJANGO_CACHE_URL is required for shared security attempt limits")
 CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "ahpra": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": CHANNEL_REDIS_URL,
+    },
     "security": (
         {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": _security_cache_url}
         if _security_cache_url
@@ -252,6 +256,10 @@ CELERY_TASK_ROUTES = {
     "onboarding.tasks.verify_skill_certificate_task": {"queue": "ocr"},
 }
 CELERY_BEAT_SCHEDULE = {
+    'ahpra-overdue-alerts': {
+        'task': 'onboarding.tasks.alert_overdue_ahpra_checks',
+        'schedule': crontab(minute='*/15'),
+    },
     'publish-editorial-revisions': {
         'task': 'public_hub.tasks.publish_scheduled_content',
         'schedule': 60.0,
@@ -287,6 +295,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'onboarding.middleware.AhpraFreezeMiddleware',
     'django_otp.middleware.OTPMiddleware',
     'axes.middleware.AxesMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -606,6 +615,8 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+ADMINS = [(email, email) for email in env.list('ADMIN_EMAILS', default=[])]
 SUPPORT_EMAIL = env('SUPPORT_EMAIL', default=DEFAULT_FROM_EMAIL)
 
 
@@ -616,6 +627,11 @@ AZURE_OCR_ENDPOINT=env('AZURE_OCR_ENDPOINT')
 AZURE_OCR_KEY=env('AZURE_OCR_KEY')
 
 SCRAPINGBEE_API_KEY=env('SCRAPINGBEE_API_KEY')
+AHPRA_SOURCE = env('AHPRA_SOURCE', default='scrapingbee')
+AHPRA_ENFORCEMENT_ENABLED = env.bool('AHPRA_ENFORCEMENT_ENABLED', default=True)
+AHPRA_TEST_LOOKUP_ENABLED = env.bool('AHPRA_TEST_LOOKUP_ENABLED', default=False)
+AHPRA_TEST_LOOKUP_KEY = env('AHPRA_TEST_LOOKUP_KEY', default='')
+AHPRA_VERIFIER_TOKEN_SHA256 = env('AHPRA_VERIFIER_TOKEN_SHA256', default='')
 
 
 # MobileMessage SMS Settings

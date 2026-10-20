@@ -25,7 +25,7 @@ const mapPost = (post: any): ExplorerPost => ({
   explorerRoleType: post.explorer_role_type ?? post.explorerRoleType ?? null,
   explorerUserId: post.explorer_user_id ?? post.explorerUserId ?? null,
   explorerProfileId: post.explorer_profile ?? post.explorerProfile ?? null,
-  verification: normalizeVerification(post.verification),
+  verification: normalizeVerification(post.verification, post.ahpra),
 });
 
 export const useTalentFeed = (options?: { enabled?: boolean }) => {

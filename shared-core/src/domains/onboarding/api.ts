@@ -46,3 +46,7 @@ export function createExplorerOnboardingProfile(data: unknown) {
         body: data instanceof FormData ? data : JSON.stringify(data),
     });
 }
+
+export function recheckAhpra() {
+  return fetchApi<{ queued: true }>('/onboarding/ahpra/recheck/', { method: 'POST' });
+}

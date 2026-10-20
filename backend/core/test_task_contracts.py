@@ -59,6 +59,7 @@ LEGACY_TASKS = {
 }
 
 LEGACY_BEAT = {
+    'ahpra-overdue-alerts': ('onboarding.tasks.alert_overdue_ahpra_checks', {}),
     "marketplace-escalations-every-minute": ("marketplace.tasks.process_goods_escalations", {}),
     "ethical-marketplace-escalations-every-minute": ("ethical_marketplace.tasks.process_ethical_escalations", {}),
     "calendar-birthdays-daily": ("client_profile.calendar_tasks.generate_all_birthday_events", {"queue": "notifications"}),
@@ -196,6 +197,7 @@ class TaskIdentityContractTests(SimpleTestCase):
             LEGACY_BEAT,
         )
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
     def test_string_dispatch_resolves_every_legacy_name(self):
         from core import task_queue
 
@@ -205,6 +207,19 @@ class TaskIdentityContractTests(SimpleTestCase):
                     mock.patch.object(task_queue, "current_app", app):
                 task_queue.async_task(name, 1, 2, flag=True)
             send_task.assert_called_once_with(name, args=(1, 2), kwargs={"flag": True})
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    def test_eager_string_dispatch_uses_registered_task_without_broker(self):
+        from core import task_queue
+
+        app = celery_app()
+        name = 'users.tasks.send_email_task'
+        with mock.patch.object(app, 'send_task') as send_task, \
+                mock.patch.object(app.tasks[name], 'apply_async') as apply_async, \
+                mock.patch.object(task_queue, 'current_app', app):
+            task_queue.async_task('users.tasks.send_async_email', suppress_auto_notification=True)
+        send_task.assert_not_called()
+        apply_async.assert_called_once_with(args=(), kwargs={})
 
 
 ABR_HTML = """
