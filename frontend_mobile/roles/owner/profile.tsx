@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { useAuth } from '../../context/AuthContext';
-import { getOnboarding, deleteAccount, updateOnboardingForm } from '@chemisttasker/shared-core';
+import { getOnboarding, deleteAccount, updateOnboardingForm, getCurrentSubscription } from '@chemisttasker/shared-core';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../../utils/apiClient';
@@ -55,9 +55,8 @@ export default function OwnerProfileScreen() {
   }, []);
 
   useEffect(() => {
-    apiClient
-      .get('/billing/subscription/')
-      .then(({ data }) => {
+    getCurrentSubscription()
+      .then((data) => {
         setSubscriptionSummary({
           active: !!data?.active,
           status: data?.status || 'inactive',

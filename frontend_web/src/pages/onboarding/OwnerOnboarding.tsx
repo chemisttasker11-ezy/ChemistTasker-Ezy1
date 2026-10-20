@@ -28,7 +28,7 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { API_BASE_URL } from '../../constants/api';
-import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
+import { getOnboardingDetail, updateOnboardingForm, getCurrentSubscription } from '@chemisttasker/shared-core';
 import { useNavigate } from 'react-router-dom';
 import ProfilePhotoUploader from '../../components/profilePhoto/ProfilePhotoUploader';
 import apiClient from '../../utils/apiClient';
@@ -233,9 +233,8 @@ function OwnerOnboardingContent({
     if (standalone) {
       return;
     }
-    apiClient
-      .get('/billing/subscription/')
-      .then(({ data }) => {
+    getCurrentSubscription()
+      .then((data) => {
         setSubscriptionSummary({
           active: !!data.active,
           status: data.status || 'inactive',
