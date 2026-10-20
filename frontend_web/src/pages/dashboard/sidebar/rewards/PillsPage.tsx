@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useParams } from "react-router-dom";
-import apiClient from "../../../../utils/apiClient";
+import { fetchPillBalanceService, fetchPillHistoryService, fetchPillReferralsService } from '@chemisttasker/shared-core';
 import { brandPanelBackground } from "../../../../components/ui/BrandBanner";
 
 type PillBalance = {
@@ -72,13 +72,12 @@ export default function PillsPage() {
     setHistoryLoading(true);
     setReferralsLoading(true);
 
-    apiClient
-      .get("/pill-rewards/balance/")
+    fetchPillBalanceService()
       .then((balanceRes) => {
         if (!mounted) return;
         setBalance({
-          balance: Number(balanceRes.data?.balance ?? 0),
-          shift_post_cost: Number(balanceRes.data?.shift_post_cost ?? 0),
+          balance: Number(balanceRes?.balance ?? 0),
+          shift_post_cost: Number(balanceRes?.shift_post_cost ?? 0),
         });
       })
       .catch((err) => {
@@ -89,14 +88,13 @@ export default function PillsPage() {
         if (mounted) setLoading(false);
       });
 
-    apiClient
-      .get("/pill-rewards/history/")
+    fetchPillHistoryService()
       .then((historyRes) => {
         if (!mounted) return;
-        const rawEntries = Array.isArray(historyRes.data?.results)
+        const rawEntries = Array.isArray(historyRes?.results)
           ? historyRes.data.results
-          : Array.isArray(historyRes.data)
-            ? historyRes.data
+          : Array.isArray(historyRes)
+            ? historyRes
             : [];
         setEntries(rawEntries);
       })
@@ -108,14 +106,13 @@ export default function PillsPage() {
         if (mounted) setHistoryLoading(false);
       });
 
-    apiClient
-      .get("/pill-rewards/referrals/")
+    fetchPillReferralsService()
       .then((referralRes) => {
         if (!mounted) return;
-        const rawReferrals = Array.isArray(referralRes.data?.results)
+        const rawReferrals = Array.isArray(referralRes?.results)
           ? referralRes.data.results
-          : Array.isArray(referralRes.data)
-            ? referralRes.data
+          : Array.isArray(referralRes)
+            ? referralRes
             : [];
         setReferrals(rawReferrals);
       })

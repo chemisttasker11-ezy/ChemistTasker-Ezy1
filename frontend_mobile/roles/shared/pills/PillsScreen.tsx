@@ -4,7 +4,7 @@ import { Button, Chip, Divider, Surface, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
-import apiClient from '@/utils/apiClient';
+import { fetchPillBalanceService, fetchPillHistoryService, fetchPillReferralsService } from '@chemisttasker/shared-core';
 
 type PillBalance = {
   balance: number;
@@ -73,24 +73,24 @@ export default function PillsScreen() {
     setError('');
     try {
       const [balanceRes, historyRes, referralRes] = await Promise.all([
-        apiClient.get('/pill-rewards/balance/'),
-        apiClient.get('/pill-rewards/history/'),
-        apiClient.get('/pill-rewards/referrals/'),
+        fetchPillBalanceService(),
+        fetchPillHistoryService(),
+        fetchPillReferralsService(),
       ]);
       setBalance({
-        balance: Number(balanceRes.data?.balance ?? 0),
-        shift_post_cost: Number(balanceRes.data?.shift_post_cost ?? 0),
+        balance: Number(balanceRes?.balance ?? 0),
+        shift_post_cost: Number(balanceRes?.shift_post_cost ?? 0),
       });
-      const rawEntries = Array.isArray(historyRes.data?.results)
+      const rawEntries = Array.isArray(historyRes?.results)
         ? historyRes.data.results
-        : Array.isArray(historyRes.data)
-          ? historyRes.data
+        : Array.isArray(historyRes)
+          ? historyRes
           : [];
       setEntries(rawEntries);
-      const rawReferrals = Array.isArray(referralRes.data?.results)
+      const rawReferrals = Array.isArray(referralRes?.results)
         ? referralRes.data.results
-        : Array.isArray(referralRes.data)
-          ? referralRes.data
+        : Array.isArray(referralRes)
+          ? referralRes
           : [];
       setReferrals(rawReferrals);
     } catch (err: any) {
