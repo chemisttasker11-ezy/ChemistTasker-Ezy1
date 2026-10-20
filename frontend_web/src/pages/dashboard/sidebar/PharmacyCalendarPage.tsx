@@ -60,6 +60,8 @@ import {
 import PharmacyCalendarDialogs from "./PharmacyCalendarDialogs";
 import PharmacyCalendarWeekView from "./PharmacyCalendarWeekView";
 import PageHeader from "../../../components/ui/PageHeader";
+import { plannerWeekSummary } from "@chemisttasker/shared-core";
+import { CountBadge } from "../../../components/ui/Pill";
 import SegmentTabs, { tabPanelProps } from "../../../components/ui/SegmentTabs";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { useWorkspace } from "../../../contexts/WorkspaceContext";
@@ -543,6 +545,7 @@ export default function PharmacyCalendarPage() {
         return [name, ...details].join(" | ");
     };
 
+    const planSummary = plannerWeekSummary(items, selectedDay);
     return (
         <Box sx={{ ...(view === "plan" ? { "& header > .MuiStack-root": { flexDirection: { xs: "row" }, alignItems: "center", gap: 1 }, "& header h1": { fontSize: { xs: 22, md: 32 } }, "& header > .MuiBox-root": { mt: 1 } } : {}), p: { xs: 2, md: 4 }, minHeight: "100vh", bgcolor: pageBg, color: "text.primary" }}>
             <PageHeader title="Pharmacy Calendar" subtitle={view === "month" ? "Events, work notes and tasks for the selected pharmacy" : undefined} actions={<>
@@ -550,9 +553,17 @@ export default function PharmacyCalendarPage() {
                 {view === "month" && <Button sx={{ minHeight: 44 }} variant="outlined" disabled={!selectedPharmacyId} onClick={() => handleOpenNoteModal()}>Add Work Note</Button>}
                 {canManage && <Button sx={{ minHeight: 44 }} variant="contained" startIcon={<AddIcon />} disabled={loading} onClick={() => handleOpenNoteModal(selectedDay, true)}>Add task</Button>}
             </>}>
-                <SegmentTabs tabs={[{ value: "month", label: "Month" }, { value: "plan", label: "Plan" }]} value={view} onChange={setView} label="Calendar views" idPrefix="calendar-view" />
+            <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap gap={1.5}>
+                <Box sx={{ width: '100%', maxWidth: 180 }}>
+                    <SegmentTabs tabs={[{ value: "month", label: "Month" }, { value: "plan", label: "Plan" }]} value={view} onChange={setView} label="Calendar views" idPrefix="calendar-view" />
+                </Box>
+                {view === 'plan' && !loading && selectedPharmacyId && <Stack direction="row" alignItems="center" gap={0.75}>
+                    <CountBadge value={planSummary.total} label={`${planSummary.total} tasks`} />
+                    <Typography variant="body2" color="text.secondary">tasks · {planSummary.unassigned} unassigned · {planSummary.done} done</Typography>
+                </Stack>}
+            </Stack>
             </PageHeader>
-            <Snackbar open={Boolean(notice)} autoHideDuration={6000} onClose={() => setNotice("")}><Alert severity="success" onClose={() => setNotice("")}>{notice}</Alert></Snackbar>
+            <Snackbar open={Boolean(notice)} autoHideDuration={6000} onClose={() => setNotice("")} sx={{ bottom: { xs: "calc(16px + env(safe-area-inset-bottom))", md: 24 } }}><Alert severity="success" onClose={() => setNotice("")}>{notice}</Alert></Snackbar>
             {error && (
                 <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
                     {error}

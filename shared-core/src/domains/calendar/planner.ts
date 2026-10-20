@@ -1,4 +1,24 @@
 import type { CalendarRecurrence, PlannerCopyInput, PlannerCopyResult, PlannerRosterInput, SavedTaskApi, SavedTaskInput, WorkNoteApi } from '../../contracts/calendar';
+import type { CalendarItem } from './mappers';
+
+export const plannerTimeLabel = (start?: string | null, end?: string | null) =>
+    start || end ? [start?.slice(0, 5), end?.slice(0, 5)].filter(Boolean).join(' - ') : undefined;
+
+/** Timed tasks first; untimed tasks retain their feed order. Never mutate the feed. */
+export const plannerDayTasks = (items: CalendarItem[], day: Date) => items
+    .filter(item => item.noteData?.is_planner_task && localDate(item.date) === localDate(day))
+    .sort((a, b) => (a.noteData.start_time || a.noteData.end_time || '24:00').slice(0, 5)
+        .localeCompare((b.noteData.start_time || b.noteData.end_time || '24:00').slice(0, 5)));
+
+export function plannerWeekSummary(items: CalendarItem[], day: Date) {
+    const { from, to } = weekRange(day);
+    const tasks = items.filter(item => item.noteData?.is_planner_task && localDate(item.date) >= from && localDate(item.date) <= to);
+    return { total: tasks.length, unassigned: tasks.filter(item => !item.noteData.assignees.length).length,
+        done: tasks.filter(item => item.status?.toUpperCase() === 'DONE').length };
+}
+
+export const plannerInitials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2)
+    .map(part => part[0]?.toUpperCase()).join('') || '?';
 
 export type CalendarNoteForm = {
     title: string;

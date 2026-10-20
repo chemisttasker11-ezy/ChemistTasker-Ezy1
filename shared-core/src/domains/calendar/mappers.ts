@@ -1,6 +1,7 @@
 import type { CalendarEventApi, CalendarFeedApi, WorkNoteApi, WorkNoteAssigneeApi } from '../../contracts/calendar';
 /** Domain-owned operations extracted from the established shared API. */
 import { ensureArray } from '../../utils/serialization';
+import { plannerTimeLabel } from './planner';
 export const mapCalendarEvent = (api: CalendarEventApi) => ({
     id: api.id,
     pharmacy: api.pharmacy,
@@ -85,8 +86,6 @@ const toDate = (value: string) => {
     const parsed = new Date(value.includes('T') ? value : `${value}T00:00:00`);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
-const formatTimeRange = (start?: string | null, end?: string | null) =>
-    start || end ? [start?.slice(0, 5), end?.slice(0, 5)].filter(Boolean).join(' - ') : undefined;
 
 export function projectCalendarFeed(feed: CalendarFeedApi): CalendarItem[] {
     const mappedEvents: CalendarItem[] = ensureArray(feed.events).map((evt: any) => {
@@ -102,7 +101,7 @@ export function projectCalendarFeed(feed: CalendarFeedApi): CalendarItem[] {
             type,
             title: evt.title,
             date: dateObj,
-            time: formatTimeRange(evt.start_time, evt.end_time),
+            time: plannerTimeLabel(evt.start_time, evt.end_time),
             allDay: evt.all_day ?? !evt.start_time,
             source: evt.source,
             readOnly: evt.source !== "manual",
@@ -133,7 +132,7 @@ export function projectCalendarFeed(feed: CalendarFeedApi): CalendarItem[] {
             title: note.title,
             date: dateObj,
             allDay: !note.start_time,
-            time: formatTimeRange(note.start_time, note.end_time),
+            time: plannerTimeLabel(note.start_time, note.end_time),
             source: "work_note",
             assignees: assigneeNames,
             completedBy: Array.isArray(note.completed_by) ? note.completed_by : [],

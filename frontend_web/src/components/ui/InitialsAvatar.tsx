@@ -1,16 +1,9 @@
 import { Box } from '@mui/material';
 import { EyeOff } from 'lucide-react';
 import { toneColors, type StatusTone } from './tone';
+import { plannerInitials } from '@chemisttasker/shared-core';
 
 const iconSize = (size: number) => ({ '& svg': { width: size, height: size, flexShrink: 0, strokeWidth: 2 } });
-
-const initialsOf = (name: string) =>
-    name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join('') || '?';
 
 export function InitialsAvatar({ name, tone = 'violet', anonymous = false, size = 34 }: {
     name: string;
@@ -37,7 +30,7 @@ export function InitialsAvatar({ name, tone = 'violet', anonymous = false, size 
                 ...iconSize(size * 0.45),
             }}
         >
-            {anonymous ? <EyeOff /> : initialsOf(name)}
+            {anonymous ? <EyeOff /> : plannerInitials(name)}
         </Box>
     );
 }
