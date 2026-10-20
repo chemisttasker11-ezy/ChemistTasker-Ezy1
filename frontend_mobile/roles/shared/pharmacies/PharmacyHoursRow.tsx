@@ -5,7 +5,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { styles } from './PharmacyForm.styles';
 
 /** Visual-only extraction: callback and closed-hours behavior unchanged. */
-export default const HoursRow = ({ label, startKey, endKey, closedKey, form, setForm, setActiveTimeField }: any) => {
+const HoursRow = ({ label, startKey, endKey, closedKey, form, setForm, setActiveTimeField }: any) => {
     const isClosed = Boolean(closedKey && form[closedKey]);
     const toggleClosed = () => {
         if (!closedKey || !setForm) return;
@@ -79,3 +79,5 @@ export default const HoursRow = ({ label, startKey, endKey, closedKey, form, set
     </View>
     );
 };
+
+export default HoursRow;

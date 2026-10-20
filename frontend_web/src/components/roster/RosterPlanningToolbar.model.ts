@@ -1,4 +1,4 @@
-import type { StaffMemberSummary, DayStackedBucket } from './RosterGridViews';
+import type { StaffMemberSummary, DayStackedBucket } from './RosterGridViews.model';
 
 /** Presentation DTOs extracted without modifying API shapes. */
 export interface RosterPlanningToolbarProps {

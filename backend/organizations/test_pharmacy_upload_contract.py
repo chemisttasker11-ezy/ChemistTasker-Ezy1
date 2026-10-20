@@ -44,7 +44,13 @@ class PharmacyMultipartContractTests(TestCase):
         self.assertTrue(self.pharmacy.methadone_s8_protocols.name.endswith(".pdf"))
         read_back = self.client.get(self.url)
         self.assertEqual(read_back.status_code, 200, read_back.content)
-        self.assertIn("protocol", read_back.data["methadone_s8_protocols"])
+        stored_name = self.pharmacy.methadone_s8_protocols.name
+        stored_url = read_back.data["methadone_s8_protocols"]
+        self.assertIsInstance(stored_url, str)
+        self.assertTrue(stored_url.endswith(stored_name), stored_url)
+        self.assertTrue(self.pharmacy.methadone_s8_protocols.storage.exists(stored_name))
+        with self.pharmacy.methadone_s8_protocols.open("rb") as persisted:
+            self.assertEqual(persisted.read(), b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
         self.assertEqual(read_back.data["employment_types"], ["PART_TIME", "LOCUMS"])
         self.assertEqual(read_back.data["roles_needed"], ["PHARMACIST", "INTERN"])
 
