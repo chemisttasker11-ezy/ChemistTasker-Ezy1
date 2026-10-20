@@ -7,19 +7,30 @@
 **Original plan:** `CHEMISTTASKER_EZY_ARCHITECTURE_REMEDIATION_HANDOVER_2026-10-20.md` (available as a separate handover artifact; do not treat this shorter progress ledger as a replacement).
 **Scope:** internal Ezy repository only. No external frontend repository, production deploy, staging deploy or merge.
 
-## Status
+## Authoritative current package status (PR #191; 2026-10-20)
 
-| ID | Current state | Evidence / next action |
+**Head used for this checkpoint:** `544acb0f`. Parent PR #181 advanced to `216fb05` after the current stack base `6b6e2f7`; do not silently rebase/cherry-pick unrelated PRs.
+
+| Package | Status | Required exit criterion |
 | --- | --- | --- |
-| A00 | STARTED | Parent PR verified; branch made directly on #181; stacked #182 and #184 protected |
-| A01 | CHARACTERIZATION TESTS ADDED; POLICY NOT MODIFIED | Django `PharmacyViewSet.check_object_permissions` on unsafe requests can accept visible organizations or pharmacy assignments. Read and write permissions must be separated using role/action test matrix **after authorized policy is confirmed**. Do not silently change current legitimate edit access. |
-| A02 | IMPLEMENTED; QA PENDING | Commit `174c30b`: Expo certificate key corrected from `approval_certificate` to `methadone_s8_protocols` for read and upload; JSON-list multipart serialization replaced with shared `appendPharmacyFormFields`; three Vitest cases and five Django multipart HTTP cases added. |
-| A03 | ALREADY IN DRAFT #181 | `CalendarRecurrence`, occurrence-date and shared calendar methods implemented on parent; do not overwrite |
-| A04 | AST INVENTORY + STRICT RATCHET; FINAL QA PENDING | Read-only `node scripts/inventory-client-api-boundaries.mjs --json` plus `node --test scripts/inventory-client-api-boundaries.test.mjs`; existing change-line ratchet is retained. |
-| A05a | ROSTER SDK CLIENT MIGRATION IN PROGRESS | Vite roster grid and toolbar reuse `rosterV2`; shared wire tests added; final-head verification pending. |
-| A05b | EXCLUDED: PR #182 | Do not modify, rebase, merge, cherry-pick or incorporate PR #182. No shift lifecycle, cancellation or pricing/penalty changes. |
-| A05c / A10 | EXCLUDED: WINDOWS KIOSK | Windows Tauri/Rust kiosk remains separate and unchanged. Expo pairing change was reverted. |
-| A06–A09 / A11 | NOT COMPLETE | See original plan. Native acceptance and full senior package remain pending. |
+| A00 ownership / sequencing | PARTIAL | Complete owner/domain manifest and assess four newer #181 files for nonconflicting synchronization. |
+| A01 pharmacy authority | BLOCKED ON OWNER POLICY | Historic read/write coupling retained; DELETE and sensitive fields require separate authorization decisions and negative matrix tests. No privilege changes approved. |
+| A02 pharmacy multipart | CODE IMPLEMENTED; NATIVE QA OPEN | Android/iOS document-picker/upload/readback and failure retry on live seeded backend. |
+| A03 calendar | OWNED BY #181 | No shadow implementation here; sync parent only after overlapping-file review. |
+| A04 transport inventory | PARTIAL | AST report and added-line ratchet exist. Classify every finding, build documented allowlist/ownership manifest and enforce whole-tree strict only after review. |
+| A05a roster SDK | PARTIAL | Vite named operations and wire tests exist; cross-platform lifecycle, errors, headers, idempotency and PostgreSQL parity require evidence. |
+| A05b financial / #182 | FROZEN | Keep existing tests incl. chargeShiftFulfillment; defer new policy/penalty/offer migrations until #182 contracts stable. |
+| A05c Next/Expo | PARTIAL | Next public-content ownership and Expo native boundary still to classify. |
+| A06 Next/Vite twins | NOT COMPLETE | Twin inventory, ownership decisions and removal of verified duplicates. |
+| A07 component decomposition | EARLY | HoursRow and roster type extraction done; split true orchestration after green behavior contracts. |
+| A08 design identity | EARLY | Brand tokens added without visual changes; persona semantic mapping, accessibility, generated skill icon check remain. |
+| A09 Django dependency graph | PARTIAL | SCC report exists; import-time AST scope corrected with tests. Approved legacy SCC baseline and new-cycle rejection pending. |
+| A10 Windows Tauri/Rust kiosk | EXCLUDED FROM SHARED-CORE MIGRATION | Independent application; runtime unchanged. Existing independent smoke/gates still protect it; no kiosk refactor needed for #191. |
+| A11 Senior Package Testing | NOT COMPLETE | Exact-head full QA, Postgres upgrade rehearsal, Vite/Next real-stack E2E, Android/iOS native and visual evidence. |
+
+**Live CI finding before this corrective batch:** at `5e9d063`, mobile, shared-core, Vite, Next, PostgreSQL concurrency and architecture jobs passed. Backend failed because the existing permission gate returned **403** for unrelated manager PATCH while a new characterization expected **404**. The test now expects the observed existing policy response; the underlying permissions were **not** modified. No exact-head green assertion is made here.
+
+**Important:** `--strict` in `audit-shared-core-boundary.mjs` is a diff-base validity ratchet, **not** zero legacy bypasses. The inventory remains report-only. The generated count of 176 was an unclassified previous-head snapshot, not 176 proven violations.
 
 ## Exact test commands (not yet marked PASS)
 
@@ -101,3 +112,9 @@ Then verify emulator/device multipart uploads against isolated seeded Django/Pos
 - The existing permission_denied positional-argument misuse was corrected without changing the previous authorization semantics.
 - Additional import-cycle SCC reporting and tests are being added without altering app model identity or migration paths.
 - PR #182 and Windows kiosk runtime remain untouched. Exact-head CI, full isolated QA and Android/iOS manual acceptance remain required; this is not a 100% completion claim.
+
+## Current review remediation checkpoint
+
+- Commits `0512a5b` onward: characterized legacy manager PATCH 403 without altering policy; expanded import-graph AST traversal to recognize import-time control flow and class body imports; exclude type-checking guards. Added fixtures. This change is in PR191 only.
+- No claim of completed A04/A06/A07/A08/A11. **Do not merge** or deploy this draft.
+- The Windows kiosk is intentionally **outside** shared-core, Vite/Next/Expo migration and PR191's refactor completion criteria. Keep its separate existing CI gate.
