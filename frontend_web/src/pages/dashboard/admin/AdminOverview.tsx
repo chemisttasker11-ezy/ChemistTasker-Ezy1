@@ -8,7 +8,6 @@ import DashboardOverviewTemplate, {
 } from "../../../components/dashboard/DashboardOverviewTemplate";
 import { useAdminScope } from "../../../contexts/AdminScopeContext";
 import { useAuth } from "../../../contexts/AuthContext";
-import apiClient from "../../../utils/apiClient";
 import ChooseAccountTypeCard from "../../../components/ChooseAccountTypeCard";
 import { dashboardGreetingName } from "../../../utils/displayName";
 import {

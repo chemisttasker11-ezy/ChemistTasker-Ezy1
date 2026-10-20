@@ -92,7 +92,7 @@ export default function PillsPage() {
       .then((historyRes) => {
         if (!mounted) return;
         const rawEntries = Array.isArray(historyRes?.results)
-          ? historyRes.data.results
+          ? historyRes.results
           : Array.isArray(historyRes)
             ? historyRes
             : [];
@@ -110,7 +110,7 @@ export default function PillsPage() {
       .then((referralRes) => {
         if (!mounted) return;
         const rawReferrals = Array.isArray(referralRes?.results)
-          ? referralRes.data.results
+          ? referralRes.results
           : Array.isArray(referralRes)
             ? referralRes
             : [];

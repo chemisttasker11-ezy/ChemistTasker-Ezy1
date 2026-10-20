@@ -1,7 +1,6 @@
 import { createShiftPillReferralService } from '@chemisttasker/shared-core';
 import { useState, useCallback } from 'react';
 import { Shift, generateShiftShareLinkService } from '@chemisttasker/shared-core';
-import apiClient from '../../../../../utils/apiClient';
 
 export function useShareShift(showSnackbar: (msg: string) => void) {
     const [sharingShiftId, setSharingShiftId] = useState<number | null>(null);

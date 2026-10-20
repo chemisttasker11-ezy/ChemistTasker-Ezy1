@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../contexts/AuthContext";
-import apiClient from "../../../../utils/apiClient";
 import { dashboardGreetingName } from "../../../../utils/displayName";
 import type { PharmacyDTO } from "./types";
 

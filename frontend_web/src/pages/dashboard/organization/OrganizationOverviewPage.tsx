@@ -11,7 +11,6 @@ import DashboardOverviewTemplate, {
 import { useAuth } from "../../../contexts/AuthContext";
 import { dashboardGreetingName } from "../../../utils/displayName";
 import { useWorkspace } from "../../../contexts/WorkspaceContext";
-import apiClient from "../../../utils/apiClient";
 
 export default function OrganizationOverviewPage() {
   const { user } = useAuth();

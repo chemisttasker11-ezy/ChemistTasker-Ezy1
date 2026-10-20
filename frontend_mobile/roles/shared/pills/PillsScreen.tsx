@@ -82,13 +82,13 @@ export default function PillsScreen() {
         shift_post_cost: Number(balanceRes?.shift_post_cost ?? 0),
       });
       const rawEntries = Array.isArray(historyRes?.results)
-        ? historyRes.data.results
+        ? historyRes.results
         : Array.isArray(historyRes)
           ? historyRes
           : [];
       setEntries(rawEntries);
       const rawReferrals = Array.isArray(referralRes?.results)
-        ? referralRes.data.results
+        ? referralRes.results
         : Array.isArray(referralRes)
           ? referralRes
           : [];
