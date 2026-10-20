@@ -25,7 +25,7 @@ function visit(folder, output = []) {
         if (ignored.has(entry.name)) continue;
         const full = path.join(folder, entry.name);
         if (entry.isDirectory()) visit(full, output);
-        else if (allowedExt.has(path.extname(entry.name)) && !/\.(?:test|spec|stories|d)\.[cm]?[jt]sx?$/.test(entry.name) && !full.replaceAll('\\', '/').includes('/src/kiosk/')) output.push(full);
+        else if (allowedExt.has(path.extname(entry.name)) && !/\.(?:test|spec|stories|d)\.[cm]?[jt]sx?$/.test(entry.name) && !full.replaceAll('\\', '/').includes('/src/kiosk/') && !/\/frontend_web\/src\/pages\/attendance\/KioskPage(?:\.runtime)?\.[jt]sx?$/.test(full.replaceAll('\\', '/'))) output.push(full);
     }
     return output;
 }
@@ -37,33 +37,79 @@ function calleeName(node) {
     const prefix = calleeName(node.expression);
     return prefix ? prefix + '.' + node.name.text : null;
   }
+  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
+    const prefix = calleeName(node.expression);
+    return prefix ? prefix + '.' + node.argumentExpression.text : null;
+  }
   return null;
 }
-function routeText(node) {
+function routeText(node, constants = new Map()) {
   if (!node) return null;
   if (ts.isStringLiteralLike(node)) return node.text;
+  if (ts.isIdentifier(node)) return constants.get(node.text) ?? null;
+  if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)) return routeText(node.expression, constants);
   if (ts.isTemplateExpression(node)) return node.head.text + node.templateSpans.map(span => '$' + '{...}' + span.literal.text).join('');
   if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
-    const a = routeText(node.left), b = routeText(node.right);
+    const a = routeText(node.left, constants), b = routeText(node.right, constants);
     return (a || b) ? (a || '$' + '{...}') + (b || '$' + '{...}') : null;
   }
   return null;
 }
 const fullDomainRoute = /\/(?:api\/(?:v1\/)?)?(?:users|client-profile|pharmacies|organizations|billing|account|attendance|roster|roster-owner|roster-worker|roster-shifts|workforce|shifts|community-shifts|public-shifts|shift-offers|shift-interests|work-notes|calendar-events|calendar-feed|team-calendar|invoices|marketplace|ethical|public-hub|content|talent|rooms|messages|notifications|ratings|rewards|onboarding)(?:\/|\?|$)/i;
-const transportName = /^(?:apiClient|axios|httpClient|fetchApi|fetchWithAuth|fetchJson|postJson|fetch|requestApi)(?:\.|$)/;
-const genericName = /^(?:marketApi|ethicalApi|marketplaceApi|ethicalMarketplaceApi)(?:\.|$)|^chemistTaskerApi\.(?:publicContent|contentManagement|marketplace|ethicalMarketplace)\.request$/;
+const transportName = /^(?:(?:apiClient|axios|httpClient|fetchApi|fetchWithAuth|requestApi)\.(?:get|post|put|patch|delete|request)$|(?:fetch|fetchJson|postJson|fetchWithAuth|fetchApi|apiClient|requestApi)$)/;
+// Only raw request escape hatches are violations. Named marketplace operations
+// (getAccess, createListing, actOnTransfer, etc.) are already domain methods.
+const genericName = /^(?:marketApi|ethicalApi|marketplaceApi\.request|ethicalMarketplaceApi\.request|chemistTaskerApi\.(?:publicContent|contentManagement|marketplace|ethicalMarketplace)\.request)$/;
 export function inventoryBoundarySources(sources) {
   const findings = [];
   for (const { path: filename, content } of sources) {
-    if (filename.includes('/src/kiosk/') || /\.(?:test|spec|d)\.[cm]?[jt]sx?$/.test(filename)) continue;
+    if (filename.includes('/src/kiosk/') || /^frontend_web\/src\/pages\/attendance\/KioskPage(?:\.runtime)?\.[jt]sx?$/.test(filename) || /\.(?:test|spec|d)\.[cm]?[jt]sx?$/.test(filename)) continue;
     const ext = path.extname(filename);
     const kind = ext === '.tsx' ? ts.ScriptKind.TSX : ext === '.jsx' ? ts.ScriptKind.JSX : (ext === '.js' || ext === '.mjs' || ext === '.cjs') ? ts.ScriptKind.JS : ts.ScriptKind.TS;
     const ast = ts.createSourceFile(filename, content, ts.ScriptTarget.Latest, true, kind);
+    const aliases = new Map();
+    const constants = new Map();
+    // Resolve straightforward import, local variable and destructured method aliases.
+    // Unknown/dynamic values remain visible as unresolved transport calls.
+    function capture(node) {
+      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+        const module = node.moduleSpecifier.text;
+        const primary = module === 'axios' ? 'axios' : /(?:^|\\/)apiClient(?:\\.[jt]sx?)?$/.test(module) ? 'apiClient' : null;
+        if (primary && node.importClause?.name) aliases.set(node.importClause.name.text, primary);
+      }
+      if (ts.isVariableDeclaration(node) && node.initializer) {
+        if (ts.isIdentifier(node.name)) {
+          if (ts.isIdentifier(node.initializer) && constants.has(node.initializer.text))
+            constants.set(node.name.text, constants.get(node.initializer.text));
+          else if (ts.isStringLiteralLike(node.initializer) || ts.isBinaryExpression(node.initializer) || ts.isTemplateExpression(node.initializer)) {
+            const known = routeText(node.initializer, constants);
+            if (known) constants.set(node.name.text, known);
+          }
+          const name = calleeName(node.initializer);
+          if (name) {
+            const resolved = aliases.get(name) ?? name;
+            if (transportName.test(resolved) || resolved === 'axios' || resolved === 'apiClient') aliases.set(node.name.text, resolved);
+          }
+        } else if (ts.isObjectBindingPattern(node.name) && ts.isIdentifier(node.initializer)) {
+          const root = aliases.get(node.initializer.text) ?? node.initializer.text;
+          if (root === 'apiClient' || root === 'axios') for (const element of node.name.elements) {
+            if (ts.isIdentifier(element.name)) {
+              const property = element.propertyName && ts.isIdentifier(element.propertyName) ? element.propertyName.text : element.name.text;
+              if (/^(get|post|put|patch|delete|request)$/.test(property)) aliases.set(element.name.text, root + '.' + property);
+            }
+          }
+        }
+      }
+      ts.forEachChild(node, capture);
+    }
+    capture(ast);
     function inspect(node) {
       if (ts.isCallExpression(node)) {
-        const callee = calleeName(node.expression);
+        const called = calleeName(node.expression);
+        const first = called?.split('.')[0] ?? '';
+        const callee = called ? (aliases.get(called) ?? (aliases.has(first) ? aliases.get(first) + called.slice(first.length) : called)) : null;
         if (callee) {
-          const route = routeText(node.arguments[0]);
+          const route = routeText(node.arguments[0], constants);
           const escape = genericName.test(callee);
           const transport = transportName.test(callee);
           const direct = !!route && fullDomainRoute.test(route) && (transport || /\.(?:get|post|put|patch|delete|request)$/.test(callee));

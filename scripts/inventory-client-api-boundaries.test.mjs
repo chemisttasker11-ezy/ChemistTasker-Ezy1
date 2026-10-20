@@ -48,3 +48,51 @@ test('callsite identifiers are stable across line shifts', () => {
     const after = inventoryBoundarySources([{ path: 'frontend_mobile/api.ts', content: "// comment\n\nfetch('/api/v1/billing/x');" }]);
     assert.equal(classifyBoundaryFindings(before)[0].key, classifyBoundaryFindings(after)[0].key);
 });
+
+test('named marketplace SDK functions are operations, not generic request escapes', () => {
+  const findings = inventoryBoundarySources([{ path: 'frontend_web/landing_next/features/marketplace/workspace.tsx',
+    content: [
+      "await marketplaceApi.getTerms();",
+      "await marketplaceApi.createListing(payload);",
+      "await ethicalMarketplaceApi.actOnTransfer(1, 'accept');",
+      "await marketplaceApi.request('/listings/');",
+    ].join('\n'),
+  }]);
+  assert.deepEqual(findings.map(x => x.callee), ['marketplaceApi.request']);
+});
+
+test('scanner detects imported aliases, destructuring, computed methods and constant routes', () => {
+  const findings = inventoryBoundarySources([{ path: 'frontend_web/src/a.ts',
+    content: [
+      "import HTTP from 'axios';",
+      "import transport from './utils/apiClient';",
+      "const endpoint = '/api/v1/pharmacies/';",
+      "const client = transport;",
+      "const {get: read} = client;",
+      "HTTP['post']('/api/v1/shifts/', {});",
+      "client.get(endpoint);",
+      "read('/api/v1/billing/subscription/');",
+    ].join('\n'),
+  }]);
+  assert.deepEqual(findings.map(x => x.kind), ['direct-backend-route', 'direct-backend-route', 'direct-backend-route']);
+  assert.deepEqual(findings.map(x => x.line), [6, 7, 8]);
+});
+
+test('independent Windows kiosk browser shell excluded, Expo kiosk-link remains inventoried', () => {
+  const findings = inventoryBoundarySources([
+    { path: 'frontend_web/src/pages/attendance/KioskPage.tsx', content: "fetch('/api/v1/attendance/kiosk/qr/')" },
+    { path: 'frontend_web/src/pages/attendance/KioskPage.runtime.ts', content: "fetch('/api/v1/attendance/kiosk/qr/')" },
+    { path: 'frontend_mobile/app/kiosk-link.tsx', content: "apiClient.post('/api/v1/attendance/kiosk/pairing/request/')" },
+  ]);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].path, 'frontend_mobile/app/kiosk-link.tsx');
+});
+
+test('axios.isAxiosError and axios.create are not unresolved backend transport calls', () => {
+  const findings = inventoryBoundarySources([{ path: 'frontend_web/src/file.ts', content: [
+    "axios.create({ baseURL: '/api/v1' });",
+    "axios.isAxiosError(error);",
+    "axios.post('/api/v1/users/login/');",
+  ].join('\n') }]);
+  assert.deepEqual(findings.map(x => x.callee), ['axios.post']);
+});
