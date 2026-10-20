@@ -2,24 +2,7 @@ import type { AttendanceWorkerStatus, AttendanceClockResult, AttendanceBreakResu
 /** Domain-owned operations extracted from the established shared API. */
 import { API_ENDPOINTS } from '../../constants/endpoints';
 import { operationalRequest } from '../../transport/operational';
-export interface KioskPairingPharmacy {
-    id: number;
-    name: string;
-    timezone: string;
-}
-export interface KioskPairingPharmaciesResponse {
-    pharmacies: KioskPairingPharmacy[];
-}
-export interface KioskPairingCodeResponse {
-    pairing_code: string;
-    expires_in_seconds: number;
-    pharmacy_id: number;
-}
 export const attendance = {
-    getKioskPairingPharmacies: () => operationalRequest<KioskPairingPharmaciesResponse>(API_ENDPOINTS.attendance.kioskPairingRequest),
-    requestKioskPairingCode: (pharmacyId: number, deviceName: string) => operationalRequest<KioskPairingCodeResponse>(API_ENDPOINTS.attendance.kioskPairingRequest, {
-        method: 'POST', body: { pharmacy_id: pharmacyId, device_name: deviceName },
-    }),
     getWorkerStatus: () => operationalRequest<AttendanceWorkerStatus>(API_ENDPOINTS.attendance.workerStatus),
     clockIn: (qrToken: string) => operationalRequest<AttendanceClockResult>(API_ENDPOINTS.attendance.workerClockIn, { method: 'POST', body: { qr_token: qrToken } }),
     breakStart: () => operationalRequest<AttendanceBreakResult>(API_ENDPOINTS.attendance.workerBreakStart, { method: 'POST', body: {} }),

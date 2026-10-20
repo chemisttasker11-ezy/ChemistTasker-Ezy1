@@ -218,7 +218,6 @@ export const API_ENDPOINTS = {
     // --- Authenticated Attendance / Roster V2 ---
     attendance: {
         workerStatus: '/attendance/worker/status/',
-    kioskPairingRequest: '/attendance/kiosk/pairing/request/',
         workerClockIn: '/attendance/worker/clock-in/',
         workerBreakStart: '/attendance/worker/break-start/',
         workerBreakEnd: '/attendance/worker/break-end/',

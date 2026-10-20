@@ -3,9 +3,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, RadioButton, Text, TextInput } from 'react-native-paper';
-import { attendance, type KioskPairingPharmacy } from '@chemisttasker/shared-core';
+import apiClient from '@/utils/apiClient';
 
-type Pharmacy = KioskPairingPharmacy;
+type Pharmacy = { id: number; name: string; timezone: string };
 export default function KioskLinkPrompt() {
   const router = useRouter();
   const params = useLocalSearchParams<{ source?: string; pharmacy_id?: string; device_name?: string }>();
@@ -24,7 +24,7 @@ export default function KioskLinkPrompt() {
     if (!prompted) { setLoading(false); return; }
     let active = true;
     setLoading(true); setError(null);
-    attendance.getKioskPairingPharmacies().then((data) => {
+    apiClient.get('/attendance/kiosk/pairing/request/').then(({ data }) => {
       if (!active) return;
       const rows: Pharmacy[] = data.pharmacies || [];
       setPharmacies(rows);
@@ -44,9 +44,11 @@ export default function KioskLinkPrompt() {
     if (!pharmacy || !deviceName.trim()) return;
     setSaving(true); setError(null);
     try {
-      const data = await attendance.requestKioskPairingCode(pharmacy.id, deviceName.trim());
+      const { data } = await apiClient.post('/attendance/kiosk/pairing/request/', {
+        pharmacy_id: pharmacy.id, device_name: deviceName.trim(),
+      });
       setCode(String(data.pairing_code)); setExpiresAt(Date.now() + data.expires_in_seconds * 1000);
-    } catch (e: any) { setError(e.response?.data?.error || e?.message || 'Unable to create a pairing code.'); }
+    } catch (e: any) { setError(e.response?.data?.error || 'Unable to create a pairing code.'); }
     finally { setSaving(false); }
   };
   return <SafeAreaView style={styles.page}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
