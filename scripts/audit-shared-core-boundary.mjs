@@ -3,6 +3,15 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+const args = new Set(process.argv.slice(2));
+for (const option of args) {
+  if (option !== '--strict') {
+    console.error(`Unknown shared-core boundary audit option: ${option}`);
+    process.exit(2);
+  }
+}
+const strict = args.has('--strict');
+
 const targets = [
   'frontend_web/src',
   'frontend_web/landing_next',
@@ -12,7 +21,7 @@ const targets = [
 // Domain routes belong in @chemisttasker/shared-core. Runtime bootstrap files
 // may configure an API origin, but feature code must not construct backend
 // domain routes or use generic shared-core escape hatches.
-const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account)\//;
+const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/(?:v1\/)?)?(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account|pharmacies|organizations|attendance|roster|roster-owner|roster-worker|roster-shifts|shifts|workforce|work-notes|calendar-events|team-calendar|invoicing|notifications|talent|ratings|rewards)\//;
 const requestCallPattern = /(?:\.(?:get|post|put|patch|delete|request)\s*(?:<[^>]*>)?\s*\(|\b(?:fetch|fetchJson|postJson|axios)\s*\()/;
 const escapeHatchPattern = /\b(?:marketApi|ethicalApi)\s*(?:<[^>]*>)?\s*\(|\b(?:chemistTaskerApi\.(?:publicContent|contentManagement|marketplace|ethicalMarketplace)|(?:marketplaceApi|ethicalMarketplaceApi))\.request\s*(?:<[^>]*>)?\s*\(/;
 // Authenticated operational domains are intentionally owned by legacy api.ts.
@@ -68,7 +77,12 @@ function resolveBase() {
 
 const base = resolveBase();
 if (!base) {
-  console.log('Shared-core boundary audit: no comparison base is available; nothing to ratchet.');
+  const message = 'Shared-core boundary audit SKIPPED: no comparison base; changed-line protection was NOT verified.';
+  if (strict) {
+    console.error(message + ' Supply SHARED_CORE_AUDIT_BASE or a checkout with HEAD^.');
+    process.exit(1);
+  }
+  console.warn(message);
   process.exit(0);
 }
 
