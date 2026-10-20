@@ -114,3 +114,6 @@ Navigation: Calendar stays reachable for everyone who could reach Operations Pla
 O1: No draft or "share week" step: staff see planner tasks as soon as they are saved.
 O2: KPI, sign-off, checklist steps and training leave this PR (recoverable from commit 9d1c6b76).
 O3: The 28 built-in starter tasks are removed; each pharmacy builds its own saved tasks.
+
+## Known pre-existing
+- Editing an informal note checks edit permission on its current pharmacy only, not on a new destination pharmacy (same on origin/main); planner tasks cannot move pharmacies, so they are unaffected.
