@@ -43,8 +43,16 @@ jobs:
         working-directory: shared-core
       - name: Full-tree Vite Next Expo transport inventory fixtures
         run: node --test scripts/inventory-client-api-boundaries.test.mjs
-      - name: Report legacy client API transport debt
-        run: node scripts/inventory-client-api-boundaries.mjs --summary
+      - name: Report classified client transport candidates with stable callsites
+        run: node scripts/inventory-client-api-boundaries.mjs
+      - name: Preserve client transport inventory as a review artifact
+        run: node scripts/inventory-client-api-boundaries.mjs --json > client-boundary-inventory.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: client-boundary-inventory
+          path: client-boundary-inventory.json
+          if-no-files-found: error
+          retention-days: 7
       - run: npm run typecheck
         working-directory: shared-core
       - run: npm run test:ci
