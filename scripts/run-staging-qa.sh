@@ -16,8 +16,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# The security ratchet must assess every PR change against its actual
+# baseline, never just the last commit in a shallow Docker checkout.
+audit_base="${SHARED_CORE_AUDIT_BASE:-}"
+if [[ -z "$audit_base" ]]; then
+  echo "Missing SHARED_CORE_AUDIT_BASE: supply the target PR base SHA for full QA." >&2
+  exit 2
+fi
+git cat-file -e "${audit_base}^{commit}"
+git merge-base --is-ancestor "$audit_base" HEAD
+echo "Shared-core audit comparison: $audit_base..$(git rev-parse HEAD)"
+
 echo "== JavaScript / TypeScript QA =="
-docker run --rm   -v "$ROOT_DIR:/src:ro"   -e CI=1   node:22-bookworm   bash -lc '
+docker run --rm   -v "$ROOT_DIR:/src:ro"   -e CI=1   -e "SHARED_CORE_AUDIT_BASE=$audit_base"   node:22-bookworm   bash -lc '
     set -euo pipefail
     cp -a /src /work
     cd /work
