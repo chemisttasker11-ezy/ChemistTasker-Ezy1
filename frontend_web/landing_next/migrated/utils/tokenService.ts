@@ -1,7 +1,7 @@
 import {refreshBrowserSession, watchSession} from '../../shared/browser-session';
 // src/utils/tokenService.ts
-import axios from 'axios';
 import { API_BASE_URL } from '../constants/api';
+import { browserWebSocketTicket } from '@chemisttasker/shared-core';
 
 export const AUTH_TOKENS_CLEARED_EVENT = 'auth:tokens-cleared';
 export const AUTH_TOKENS_UPDATED_EVENT = 'auth:tokens-updated';
@@ -118,14 +118,7 @@ export async function fetchWsTicket(): Promise<string | null> {
   const token = getAccessToken();
   if (!token) return null;
   try {
-    const response = await axios.post(
-      `${API_BASE_URL}/users/ws-ticket/`,
-      {},
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-    return response.data?.ticket || null;
+    return await browserWebSocketTicket({ baseUrl: API_BASE_URL }, token);
   } catch (error) {
     console.error('Failed to fetch WS ticket:', error);
     return null;

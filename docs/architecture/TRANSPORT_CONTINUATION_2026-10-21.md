@@ -46,3 +46,11 @@ The module graph includes two older SCCs: `attendance ↔ workforce` and a 13-ap
 - Full-tree scanner `--strict` must remain red until every non-asset remaining legacy item is migrated or individually proven as an appropriate platform adapter.
 - Named SDK migrations must pass shared-core wire unit tests, Vite/Next/Expo TypeScript builds, both browser suites, and manual/native device acceptance.
 - No PR #181 planner, #182 shift policies, Windows kiosk transport or production/staging data mutation. No automatic screenshot approval.
+
+## Mainline third-pass: explicit browser identity and public transport (21 Oct 2026)
+
+Eliminated **14** additional whole-tree direct legacy transport callsites (14 expected): two registration, two password-reset, four referee invitation/rejection, three signed public membership GET/POST branches, one Next public talent feed, one Next websocket ticket and one Vite onboarding multipart location update. The canonical shared-core `browserOperations.ts` now owns these endpoint paths and browser wire DTOs while callers still own navigation, loading indicators and error presentation. The existing onboarding role-normalization and FormData encoding remain in `updateOnboardingForm`. Browser operations have seven wire tests asserting anti-leakage, CSRF, cookies, password-reset, referee, WS-ticket, magic membership, public paging and current-user semantics. No direct auth session logic was migrated without an approved full browser and Expo acceptance contract.
+
+**Manifest after this pass:** 42 known findings; 22 still legacy candidates, 15 accepted platform adapters and 5 locally sourced non-network media blobs. The current success criteria include asserting the full scanner reclassifies exactly those removed callsites: the manifest count is a *hypothesis* until exact-head `node scripts/inventory-client-api-boundaries.mjs --json` succeeds. Re-run all exact-head workflows after this commit; previous heads are not release proof.
+
+Preserve Vite and Next separate route navigation, Next CSRF BFF, Expo native secure token store, owner role/verification policy, permissions and backend migration compatibility. Legacy login/OTP/session refresh remain a separate high-risk authentication batch; avoid flattening them into generic `fetchApi` requests.

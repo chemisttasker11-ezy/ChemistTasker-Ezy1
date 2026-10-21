@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { TextField, Button, Alert, CircularProgress } from "@mui/material";
-import axios from "axios";
-import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
+import { API_BASE_URL } from '../constants/api';
+import { browserRequestPasswordReset } from '@chemisttasker/shared-core';
 import AuthLayout from "../layouts/AuthLayout"; // Import the new layout
 import { setRobotsMeta } from "../utils/seo";
 
@@ -23,7 +23,7 @@ export default function PasswordResetRequestPage() {
     setError("");
     setMessage("");
     try {
-      await axios.post(`${API_BASE_URL}${API_ENDPOINTS.passwordReset}`, { email });
+      await browserRequestPasswordReset({ baseUrl: API_BASE_URL }, email);
       setMessage("If this email is registered, a reset link has been sent.");
     } catch (err) {
       setError("Something went wrong. Please try again.");

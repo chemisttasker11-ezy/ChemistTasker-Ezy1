@@ -304,6 +304,7 @@ export {
   claimPillReferralService,
   payShiftWithPills,
 } from './domains/rewards/api';
+export * from './domains/auth/browserOperations';
 export {
   getInvoices,
   getInvoiceDetail,

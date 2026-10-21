@@ -18,8 +18,8 @@ import {
   Paper,
   Container,
 } from "@mui/material";
-import axios from "axios";
-import { API_BASE_URL, API_ENDPOINTS } from "../../constants/api";
+import { API_BASE_URL } from "../../constants/api";
+import { browserSubmitReferee } from '@chemisttasker/shared-core';
 import AuthLayout from "../../layouts/AuthLayout";
 
 // Define the structure for our form data
@@ -135,10 +135,7 @@ export default function RefereeQuestionnairePage() {
       additional_comments: formData.additional_comments,
     };
 
-    const url = `${API_BASE_URL}${API_ENDPOINTS.submitRefereeResponse(token)}`;
-
-    axios
-      .post(url, payload)
+    browserSubmitReferee({ baseUrl: API_BASE_URL }, token, payload)
       .then(() => {
         setStatus("success");
         setMessage("Thank you for your feedback. Your reference has been successfully submitted.");
@@ -146,7 +143,7 @@ export default function RefereeQuestionnairePage() {
       .catch((err) => {
         setStatus("error");
         setMessage(
-          err.response?.data?.detail ||
+          err?.payload?.detail || err?.response?.data?.detail ||
             "An error occurred while submitting your response. Please try again or contact support."
         );
       });

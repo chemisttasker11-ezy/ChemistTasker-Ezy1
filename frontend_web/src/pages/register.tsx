@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link as RouterLink } from "react-router-dom";
-import axios from "axios";
 import ReCAPTCHA from "react-google-recaptcha";
 import {
   Button,
@@ -19,7 +18,8 @@ import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { SignupRolePicker, newcomerSignupProblem, type SignupRole } from "@chemisttasker/shared-ui/SignupRolePicker";
 import AuthLayout from "../layouts/AuthLayout"; // Import the new layout
 import PublicLogoTopBar from "../components/PublicLogoTopBar";
-import { API_BASE_URL, API_ENDPOINTS } from "../constants/api";
+import { API_BASE_URL } from "../constants/api";
+import { browserRegisterAccount } from '@chemisttasker/shared-core';
 import { setRobotsMeta } from "../utils/seo";
 
 type Role = SignupRole;
@@ -93,12 +93,12 @@ export default function Register() {
           ? parsedReferralEventId
           : undefined,
       };
-      await axios.post(`${API_BASE_URL}${API_ENDPOINTS.register}`, payload);
+      await browserRegisterAccount({ baseUrl: API_BASE_URL }, payload);
       alert("Account created successfully! Please check your email for the verification code.");
       navigate("/otp-verify", { state: { email: formData.email.toLowerCase() } });
     } catch (err: any) {
       const responseData =
-        (axios.isAxiosError(err) ? err.response?.data : undefined) ??
+        err?.payload ?? err?.response?.data ??
         (err?.data as Record<string, string[]> | undefined);
       const emailMsg =
         Array.isArray(responseData?.email)

@@ -15,6 +15,7 @@ import AuthLayout from "../layouts/AuthLayout";
 import {useAuth} from "../contexts/AuthContext";
 import TalentBoard from "./dashboard/sidebar/TalentBoard";
 import { API_BASE_URL } from "../constants/api";
+import { browserPublicTalentFeed } from '@chemisttasker/shared-core';
 import { loadAllTalentPages } from "./dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages";
 import { setCanonical, setPageMeta, setSocialMeta } from "../utils/seo";
 
@@ -49,12 +50,7 @@ export default function PublicTalentBoardPage() {
     setError(null);
     try {
       const list = await loadAllTalentPages(async (page) => {
-        const response = await fetch(`${API_BASE_URL}/explorer-posts/public-feed/?page=${page}&page_size=200`);
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({ detail: "Failed to load talent feed." }));
-          throw new Error(err.detail || `HTTP ${response.status}`);
-        }
-        return response.json();
+        return browserPublicTalentFeed({ baseUrl: API_BASE_URL }, page, 200);
       });
       const mapped = list.map((post: any) => ({
         ...post,
