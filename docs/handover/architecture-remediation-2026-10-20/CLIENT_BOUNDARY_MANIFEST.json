@@ -74,11 +74,6 @@
     "owner": "Next/Vite platform transport",
     "rationale": "Next server-only reverse proxy enforces origin, path validation, header forwarding and bounds; not business logic."
   },
-  "frontend_web/landing_next/migrated/pages/MobileOTPVerify.tsx|direct-backend-route|apiClient.post|/users/mobile/verify-otp/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing feature page direct-backend-route at apiClient.post /users/mobile/verify-otp/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
   "frontend_web/landing_next/migrated/utils/apiClient.ts|unresolved-client-transport|apiClient|#1": {
     "classification": "approved-adapter",
     "owner": "Next/Vite platform transport",
@@ -103,11 +98,6 @@
     "classification": "approved-adapter",
     "owner": "Next/Vite platform transport",
     "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
-  },
-  "frontend_web/src/pages/MobileOTPVerify.tsx|direct-backend-route|apiClient.post|/users/mobile/verify-otp/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing feature page direct-backend-route at apiClient.post /users/mobile/verify-otp/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
   "frontend_web/src/utils/apiClient.ts|unresolved-client-transport|apiClient|#1": {
     "classification": "approved-adapter",
@@ -138,5 +128,15 @@
     "classification": "approved-adapter",
     "owner": "Expo native secure-session Axios transport",
     "rationale": "POST /users/resend-otp/ preserving native OTP feedback. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
+  },
+  "frontend_web/src/utils/browserMobileOtp.ts|unresolved-client-transport|apiClient.post|#1": {
+    "classification": "approved-adapter",
+    "owner": "Vite browser auth compatibility",
+    "rationale": "Named browser mobile OTP transport wrapper delegates canonical API_ENDPOINTS.mobileVerifyOtp to its established app-specific Axios interceptor. This boundary preserves browser cookie/CSRF fallback, existing bearer refresh and session-clear behaviour, and returns identical .data DTO. UI is free of literal domain request URLs; platform-dependent HTTP auth is intentional and audited, not a business/policy bypass."
+  },
+  "frontend_web/landing_next/migrated/utils/browserMobileOtp.ts|unresolved-client-transport|apiClient.post|#1": {
+    "classification": "approved-adapter",
+    "owner": "Next BFF browser auth compatibility",
+    "rationale": "Named browser mobile OTP transport wrapper delegates canonical API_ENDPOINTS.mobileVerifyOtp to its established app-specific Axios interceptor. This boundary preserves browser cookie/CSRF fallback, existing bearer refresh and session-clear behaviour, and returns identical .data DTO. UI is free of literal domain request URLs; platform-dependent HTTP auth is intentional and audited, not a business/policy bypass."
   }
 }
