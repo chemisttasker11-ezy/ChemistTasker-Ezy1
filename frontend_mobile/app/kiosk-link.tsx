@@ -46,7 +46,7 @@ export default function KioskLinkPrompt() {
     try {
       const data = await attendance.createKioskPairingCode(pharmacy.id, deviceName.trim());
       setCode(String(data.pairing_code)); setExpiresAt(Date.now() + data.expires_in_seconds * 1000);
-    } catch (e: any) { setError(e.response?.data?.error || 'Unable to create a pairing code.'); }
+    } catch (e: any) { setError(e?.response?.data?.error || e?.message || 'Unable to create a pairing code.'); }
     finally { setSaving(false); }
   };
   return <SafeAreaView style={styles.page}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

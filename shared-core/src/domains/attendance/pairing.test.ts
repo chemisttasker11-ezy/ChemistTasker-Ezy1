@@ -21,6 +21,7 @@ describe('Expo kiosk pairing consumes shared-core, not Windows kiosk Rust', () =
         const [url, request] = fetchMock.mock.calls[0];
         expect((url as URL).pathname).toBe('/api/v1/attendance/kiosk/pairing/request/');
         expect(request.method ?? 'GET').toBe('GET');
+        expect(new Headers(request.headers).get('X-Client-Platform')).toBe('mobile');
     });
     it('retains mobile pairing payload, code and expiry fields', async () => {
         const result = await attendance.createKioskPairingCode(9, 'Front counter');
@@ -29,6 +30,7 @@ describe('Expo kiosk pairing consumes shared-core, not Windows kiosk Rust', () =
         const [url, request] = fetchMock.mock.calls[0];
         expect((url as URL).pathname).toBe('/api/v1/attendance/kiosk/pairing/request/');
         expect(request.method).toBe('POST');
+        expect(new Headers(request.headers).get('X-Client-Platform')).toBe('mobile');
         expect(JSON.parse(String(request.body))).toEqual({ pharmacy_id: 9, device_name: 'Front counter' });
     });
 });

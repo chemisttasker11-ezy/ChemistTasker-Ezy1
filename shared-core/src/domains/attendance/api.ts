@@ -21,12 +21,13 @@ export const attendance = {
     // Tauri/Rust kiosk retains its independent device protocol and transport.
     getKioskPairingOptions: () => operationalRequest<{
         pharmacies: Array<{ id: number; name: string; timezone: string }>;
-    }>('/attendance/kiosk/pairing/request/'),
+    }>('/attendance/kiosk/pairing/request/', { headers: { 'X-Client-Platform': 'mobile' } }),
     createKioskPairingCode: (pharmacyId: number, deviceName: string) => operationalRequest<{
         pairing_code: string;
         expires_in_seconds: number;
     }>('/attendance/kiosk/pairing/request/', {
         method: 'POST',
+        headers: { 'X-Client-Platform': 'mobile' },
         body: { pharmacy_id: pharmacyId, device_name: deviceName },
     }),
     getManagerKioskDevices: (pharmacyId: number | string) => operationalRequest(API_ENDPOINTS.attendance.managerKioskDevices, { query: { pharmacy_id: pharmacyId } }),
