@@ -75,6 +75,12 @@ jobs:
           git merge-base --is-ancestor "$comparison_base" HEAD
           echo "SHARED_CORE_AUDIT_BASE=$comparison_base" >> "$GITHUB_ENV"
           echo "Boundary audit will compare full branch: $comparison_base..$(git rev-parse HEAD)"
+      - name: Verify entire PR strict shared-core audit against its actual base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$SHARED_CORE_AUDIT_BASE" HEAD
+          node scripts/audit-shared-core-boundary.mjs --strict
       - name: Full isolated staging QA on exact source
         shell: bash
         run: bash scripts/run-staging-qa.sh
