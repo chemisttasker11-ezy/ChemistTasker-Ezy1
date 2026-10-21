@@ -648,7 +648,12 @@ export default function PharmacyForm({
             if (!persisted || String(persisted.id) !== persistedPharmacyId) {
                 throw new Error('Saved pharmacy could not be verified. Refresh before retrying.');
             }
-            verifyPharmacyWriteReadback(persisted, pendingReadbackRef.current ?? {
+            verifyPharmacyWriteReadback(persisted, pendingReadbackRef.current ? {
+                persistedId: pendingReadbackRef.current.id,
+                submitted: pendingReadbackRef.current.submitted,
+                uploadedFields: pendingReadbackRef.current.uploadedFields,
+                previousDocumentUrls: pendingReadbackRef.current.previousDocumentUrls,
+            } : {
                 persistedId: persistedPharmacyId,
                 submitted: payload,
                 uploadedFields: [
