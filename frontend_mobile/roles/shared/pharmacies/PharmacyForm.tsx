@@ -623,8 +623,9 @@ export default function PharmacyForm({
                 }
             }
 
+            if (!persistedPharmacyId) throw new Error('Pharmacy save did not return an ID.');
             pendingReadbackRef.current = {
-                id: persistedPharmacyId ?? '',
+                id: persistedPharmacyId,
                 submitted: payload,
                 uploadedFields: [
                     ...(files.approval ? ['methadone_s8_protocols'] as const : []),
@@ -643,7 +644,6 @@ export default function PharmacyForm({
             // Do not announce success until the saved object is readable.
             // A server-accepted multipart request can still fail persistence or
             // return a different stored document reference after validation.
-            if (!persistedPharmacyId) throw new Error('Pharmacy save did not return an ID.');
             const persisted = (await getPharmacyById(persistedPharmacyId)) as any;
             if (!persisted || String(persisted.id) !== persistedPharmacyId) {
                 throw new Error('Saved pharmacy could not be verified. Refresh before retrying.');
