@@ -1,14 +1,4 @@
 {
-  "frontend_mobile/app/kiosk-link.tsx|direct-backend-route|apiClient.get|/attendance/kiosk/pairing/request/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Attendance mobile pairing",
-    "rationale": "Existing feature page direct-backend-route at apiClient.get /attendance/kiosk/pairing/request/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/app/kiosk-link.tsx|direct-backend-route|apiClient.post|/attendance/kiosk/pairing/request/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Attendance mobile pairing",
-    "rationale": "Existing feature page direct-backend-route at apiClient.post /attendance/kiosk/pairing/request/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
   "frontend_mobile/config/api.ts|unresolved-client-transport|fetch|#1": {
     "classification": "approved-adapter",
     "owner": "Expo platform transport",
@@ -288,21 +278,6 @@
     "classification": "legacy-migrate",
     "owner": "Memberships",
     "rationale": "Existing feature page unresolved-client-transport at apiClient.post /my-memberships/${...}/${...}/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/src/pages/dashboard/sidebar/OverviewPageStaff.tsx|unresolved-client-transport|apiClient.get|/dashboard/pharmacist/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Dashboard",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.get /dashboard/pharmacist/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/src/pages/dashboard/sidebar/OverviewPageStaff.tsx|unresolved-client-transport|apiClient.get|/dashboard/otherstaff/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Dashboard",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.get /dashboard/otherstaff/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewContainer.tsx|unresolved-client-transport|apiClient.get|/dashboard/owner/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Dashboard",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.get /dashboard/owner/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
   "frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx|direct-backend-route|fetch|${...}/${...}/onboarding/me/#1": {
     "classification": "legacy-migrate",
