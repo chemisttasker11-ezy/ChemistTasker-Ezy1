@@ -410,6 +410,7 @@ export {
 } from './domains/pharmacyHub/api';
 export {
   getRooms,
+  getUnreadRoomSummary,
   getRoomDetail,
   getRoomMessages,
   sendRoomMessage,
