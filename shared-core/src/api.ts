@@ -323,6 +323,7 @@ export {
   markNotificationsAsRead,
   fetchNotificationsPage,
   markNotificationsReadService,
+  registerPushDeviceToken,
 } from './domains/notifications/api';
 export {
   getRatings,

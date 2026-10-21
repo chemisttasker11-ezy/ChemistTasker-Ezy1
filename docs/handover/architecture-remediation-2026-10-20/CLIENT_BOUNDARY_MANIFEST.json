@@ -89,11 +89,6 @@
     "owner": "Expo platform transport",
     "rationale": "Expo web-preview CSRF bootstrap; native mobile requests use bearer token."
   },
-  "frontend_mobile/utils/pushNotifications.ts|unresolved-client-transport|apiClient.post|/device-tokens/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Expo domain owner pending inspection",
-    "rationale": "Existing unreviewed utility unresolved-client-transport at apiClient.post /device-tokens/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
   "frontend_web/landing_next/lib/browser-api.ts|generic-client-escape|chemistTaskerApi.contentManagement.request|/content/${...}#1": {
     "classification": "legacy-migrate",
     "owner": "Next/Vite domain owner pending inspection",

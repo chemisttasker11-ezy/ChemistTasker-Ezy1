@@ -65,3 +65,7 @@ Removed 10 resolved callsite identities. Full-tree manifest: 32 findings, **12 r
 ### Current-user browser identity binding
 
 Both Vite and Next `AuthContext` now call the shared browser-current-user operation. Vite's cookie-only bootstrap, bearer identity mismatch check, no-token early return and fallback refresh remain in their original order; Next's prior bearer-or-cookie user request is likewise unchanged. Shared operation returns `null` only on explicit 401, never refreshes silently, and retains the exact user-unavailable message for other failures. Its wire-contract tests cover bearer and cookie-only credentials. Two more scanner findings retired after the code change. **10 remaining legacy candidates**. No changes to React role switching or Next SSR request ownership.
+
+### Expo push device-token transport
+
+`registerDeviceTokenWithBackend` now forwards the exact native token/platform request to a named `registerPushDeviceToken` domain operation, maintaining `POST /device-tokens/`, `token`, `platform`, and **best-effort** error handling without clearing authenticated state from notification failure. Wire test explicitly asserts the native bearer and `credentials: omit`. This removes one direct mobile transport call without changing Expo permission prompts or notification listeners. **Nine** legacy transport candidates remain. Validate on native simulators and physical devices before sign-off.

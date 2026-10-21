@@ -39,3 +39,11 @@ export async function markNotificationsReadService(ids: number[] | undefined) {
         unread: typeof response?.unread === 'number' ? response.unread : undefined,
     };
 }
+
+/** A best-effort Expo push-device registration; notification failure is not a login failure. */
+export function registerPushDeviceToken(token: string, platform: 'ios' | 'android' | 'web') {
+    return fetchApi('/device-tokens/', {
+        method: 'POST',
+        body: JSON.stringify({ token, platform }),
+    });
+}
