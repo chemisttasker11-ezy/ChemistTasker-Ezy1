@@ -83,3 +83,16 @@ export const formatTime = (hours: number, minutes: number) => {
   const mm = String(minutes).padStart(2, '0');
   return `${hh}:${mm}`;
 };
+// One 15s budget spans retries; auth refresh remains separately owned.
+export async function withCalendarRequestBudget<T>(
+  operation: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    return await operation(controller.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}

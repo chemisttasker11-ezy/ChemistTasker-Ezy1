@@ -3,6 +3,8 @@
 This suite pins permitted access without redefining product policy. A separate
 security decision is needed before changing per-role write capability checks.
 """
+from unittest.mock import patch
+
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -51,6 +53,18 @@ class PharmacyAccessCharacterizationTests(TestCase):
             with self.subTest(method=method):
                 response = self.request(self.stranger, method, self.owned, {"name": "Unauthorized"})
                 self.assertEqual(response.status_code, 404, response.content)
+        self.owned.refresh_from_db()
+        self.assertEqual(self.owned.name, "Owned Pharmacy")
+
+    @patch("organizations.views.PharmacyViewSet.get_queryset")
+    def test_stale_visibility_object_permission_denial_returns_generic_403_without_leak(self, mock_get_queryset):
+        mock_get_queryset.return_value = Pharmacy.objects.filter(id=self.owned.id)
+        for method in ("GET", "PATCH"):
+            with self.subTest(method=method):
+                response = self.request(self.stranger, method, self.owned, {"name": "Unauthorized"})
+                self.assertEqual(response.status_code, 403, response.content)
+                self.assertEqual(response.data, {"detail": "You do not have permission to perform this action."})
+                self.assertNotIn(self.owned.name, response.content.decode())
         self.owned.refresh_from_db()
         self.assertEqual(self.owned.name, "Owned Pharmacy")
 

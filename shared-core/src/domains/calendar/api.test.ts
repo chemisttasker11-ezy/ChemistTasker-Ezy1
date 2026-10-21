@@ -377,3 +377,111 @@ describe('Authentication and 400/403 failure semantics', () => {
     });
   });
 });
+
+
+describe('Request signal forwarding and abort semantics', () => {
+  it.each([
+    ['getCalendarFeed', (s: AbortSignal) => getCalendarFeed({ pharmacy_id: 42, date_from: '2026-10-01', date_to: '2026-10-31' }, { signal: s })],
+    ['createCalendarEvent', (s: AbortSignal) => createCalendarEvent({ pharmacy: 42, title: 'Budget Event', date: '2026-10-25' }, { signal: s })],
+    ['updateCalendarEvent', (s: AbortSignal) => updateCalendarEvent(123, { title: 'Updated Event' }, { signal: s })],
+    ['deleteCalendarEvent', (s: AbortSignal) => deleteCalendarEvent(123, { signal: s })],
+    ['createWorkNote', (s: AbortSignal) => createWorkNote({ pharmacy: 42, title: 'Check CD Safe', date: '2026-10-25' }, { signal: s })],
+    ['updateWorkNote', (s: AbortSignal) => updateWorkNote(456, { title: 'General Maintenance' }, { signal: s })],
+    ['deleteWorkNote', (s: AbortSignal) => deleteWorkNote(456, { signal: s })],
+    ['markWorkNoteDone', (s: AbortSignal) => markWorkNoteDone(456, { occurrence_date: '2026-10-25' }, { signal: s })],
+    ['markWorkNoteOpen', (s: AbortSignal) => markWorkNoteOpen(456, { occurrence_date: '2026-10-25' }, { signal: s })],
+    ['actOnWorkNote', (s: AbortSignal) => actOnWorkNote(456, 'mark_done', { occurrence_date: '2026-10-25' }, { signal: s })],
+  ] as const)('forwards signal to transport fetch options for %s', async (_name, invoke) => {
+    const controller = new AbortController();
+    await invoke(controller.signal);
+    const [, options] = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+    expect(options.signal).toBe(controller.signal);
+  });
+
+  it('rejects when aborted during a stalled fetch request', async () => {
+    let onFetchStart!: () => void;
+    const fetchStarted = new Promise<void>((resolve) => {
+      onFetchStart = resolve;
+    });
+
+    fetchMock.mockImplementationOnce((_url: URL | RequestInfo, options?: RequestInit) => {
+      onFetchStart();
+      return new Promise((_resolve, reject) => {
+        if (options?.signal?.aborted) {
+          reject(new DOMException('The operation was aborted.', 'AbortError'));
+          return;
+        }
+        options?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted.', 'AbortError'));
+        });
+      });
+    });
+
+    const controller = new AbortController();
+    const feedPromise = getCalendarFeed(
+      { pharmacy_id: 42, date_from: '2026-10-01', date_to: '2026-10-31' },
+      { signal: controller.signal }
+    );
+
+    await fetchStarted;
+    controller.abort();
+    await expect(feedPromise).rejects.toThrow('The operation was aborted.');
+  });
+
+  it('rejects when aborted during stalled response body consumption', async () => {
+    let onBodyStart!: () => void;
+    const bodyStarted = new Promise<void>((resolve) => {
+      onBodyStart = resolve;
+    });
+
+    fetchMock.mockImplementationOnce((_url: URL | RequestInfo, options?: RequestInit) => {
+      const forwardedSignal = options?.signal;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => {
+          onBodyStart();
+          return new Promise((_resolve, reject) => {
+            if (forwardedSignal?.aborted) {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+              return;
+            }
+            forwardedSignal?.addEventListener('abort', () => {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+            });
+          });
+        },
+      } as unknown as Response);
+    });
+
+    const controller = new AbortController();
+    const feedPromise = getCalendarFeed(
+      { pharmacy_id: 42, date_from: '2026-10-01', date_to: '2026-10-31' },
+      { signal: controller.signal }
+    );
+
+    await bodyStarted;
+    controller.abort();
+    await expect(feedPromise).rejects.toThrow('The operation was aborted.');
+  });
+
+  it('remains backward compatible when no signal is provided', async () => {
+    const feed = await getCalendarFeed({
+      pharmacy_id: 42,
+      date_from: '2026-10-01',
+      date_to: '2026-10-31',
+    });
+    expect(feed.pharmacy_id).toBe(42);
+    const [, feedOptions] = fetchMock.mock.calls[0];
+    expect(feedOptions.signal).toBeUndefined();
+
+    await updateCalendarEvent(123, { title: 'Updated Event' });
+    const [, updateOptions] = fetchMock.mock.calls[1];
+    expect(updateOptions.signal).toBeUndefined();
+
+    await deleteCalendarEvent(123);
+    const [, deleteOptions] = fetchMock.mock.calls[2];
+    expect(deleteOptions.signal).toBeUndefined();
+  });
+});

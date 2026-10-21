@@ -1,7 +1,7 @@
 import type { CalendarEventApi, WorkNoteApi, CalendarFeedApi } from '../../contracts/calendar';
 import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
-import { fetchApi } from '../../transport/application';
+import { fetchApi, type ApplicationRequestOptions } from '../../transport/application';
 import { asList, buildQuery, ensureArray } from '../../utils/serialization';
 import { mapCalendarEvent, mapWorkNote } from './mappers';
 export interface CalendarEventFilters {
@@ -89,7 +89,7 @@ export async function fetchCalendarEventDetail(id: number | string) {
     const data = await getCalendarEventDetail(id);
     return mapCalendarEvent(data);
 }
-export function createCalendarEvent(payload: CreateCalendarEventPayload) {
+export function createCalendarEvent(payload: CreateCalendarEventPayload, request?: Pick<ApplicationRequestOptions, 'signal'>) {
     const startTime = 'start_time' in payload ? payload.start_time : payload.startTime;
     const endTime = 'end_time' in payload ? payload.end_time : payload.endTime;
     const allDay = payload.all_day !== undefined
@@ -109,6 +109,7 @@ export function createCalendarEvent(payload: CreateCalendarEventPayload) {
     if ('recurrence' in payload) body.recurrence = payload.recurrence;
 
     return fetchApi<CalendarEventApi>('/calendar-events/', {
+        ...request,
         method: 'POST',
         body: JSON.stringify(body),
     });
@@ -117,7 +118,7 @@ export async function createCalendarEventService(payload: Parameters<typeof crea
     const data = await createCalendarEvent(payload);
     return mapCalendarEvent(data);
 }
-export function updateCalendarEvent(id: number | string, payload: UpdateCalendarEventPayload) {
+export function updateCalendarEvent(id: number | string, payload: UpdateCalendarEventPayload, request?: Pick<ApplicationRequestOptions, 'signal'>) {
     const body: Record<string, unknown> = {};
     if ('pharmacy' in payload) body.pharmacy = payload.pharmacy;
     if ('organization' in payload) body.organization = payload.organization;
@@ -133,6 +134,7 @@ export function updateCalendarEvent(id: number | string, payload: UpdateCalendar
     if ('recurrence' in payload) body.recurrence = payload.recurrence;
 
     return fetchApi<CalendarEventApi>(`/calendar-events/${id}/`, {
+        ...request,
         method: 'PATCH',
         body: JSON.stringify(body),
     });
@@ -141,8 +143,8 @@ export async function updateCalendarEventService(id: number | string, payload: P
     const data = await updateCalendarEvent(id, payload);
     return mapCalendarEvent(data);
 }
-export function deleteCalendarEvent(id: number | string) {
-    return fetchApi(`/calendar-events/${id}/`, { method: 'DELETE' });
+export function deleteCalendarEvent(id: number | string, request?: Pick<ApplicationRequestOptions, 'signal'>) {
+    return fetchApi(`/calendar-events/${id}/`, { ...request, method: 'DELETE' });
 }
 export async function deleteCalendarEventService(id: number | string) {
     await deleteCalendarEvent(id);
@@ -169,7 +171,7 @@ export async function fetchWorkNoteDetail(id: number | string) {
     const data = await getWorkNoteDetail(id);
     return mapWorkNote(data);
 }
-export function createWorkNote(payload: CreateWorkNotePayload) {
+export function createWorkNote(payload: CreateWorkNotePayload, request?: Pick<ApplicationRequestOptions, 'signal'>) {
     const notify = payload.notify_on_shift_start !== undefined
         ? payload.notify_on_shift_start
         : (payload.notifyOnShiftStart ?? false);
@@ -194,6 +196,7 @@ export function createWorkNote(payload: CreateWorkNotePayload) {
         body.recurrence = payload.recurrence;
     }
     return fetchApi<WorkNoteApi>('/work-notes/', {
+        ...request,
         method: 'POST',
         body: JSON.stringify(body),
     });
@@ -202,7 +205,7 @@ export async function createWorkNoteService(payload: Parameters<typeof createWor
     const data = await createWorkNote(payload);
     return mapWorkNote(data);
 }
-export function updateWorkNote(id: number | string, payload: UpdateWorkNotePayload) {
+export function updateWorkNote(id: number | string, payload: UpdateWorkNotePayload, request?: Pick<ApplicationRequestOptions, 'signal'>) {
     const body: Record<string, unknown> = {};
     if ('pharmacy' in payload) body.pharmacy = payload.pharmacy;
     if ('date' in payload) body.date = payload.date;
@@ -218,6 +221,7 @@ export function updateWorkNote(id: number | string, payload: UpdateWorkNotePaylo
     if ('recurrence' in payload) body.recurrence = payload.recurrence;
 
     return fetchApi<WorkNoteApi>(`/work-notes/${id}/`, {
+        ...request,
         method: 'PATCH',
         body: JSON.stringify(body),
     });
@@ -226,17 +230,18 @@ export async function updateWorkNoteService(id: number | string, payload: Parame
     const data = await updateWorkNote(id, payload);
     return mapWorkNote(data);
 }
-export function deleteWorkNote(id: number | string) {
-    return fetchApi(`/work-notes/${id}/`, { method: 'DELETE' });
+export function deleteWorkNote(id: number | string, request?: Pick<ApplicationRequestOptions, 'signal'>) {
+    return fetchApi(`/work-notes/${id}/`, { ...request, method: 'DELETE' });
 }
 export async function deleteWorkNoteService(id: number | string) {
     await deleteWorkNote(id);
 }
-export function markWorkNoteDone(id: number | string, options?: WorkNoteOccurrencePayload | string) {
+export function markWorkNoteDone(id: number | string, options?: WorkNoteOccurrencePayload | string, request?: Pick<ApplicationRequestOptions, 'signal'>) {
     const occurrenceDate = typeof options === 'string'
         ? options
         : (options?.occurrence_date ?? options?.occurrenceDate);
     return fetchApi<WorkNoteApi>(`/work-notes/${id}/mark_done/`, {
+        ...request,
         method: 'POST',
         ...(occurrenceDate ? { body: JSON.stringify({ occurrence_date: occurrenceDate }) } : {}),
     });
@@ -245,11 +250,12 @@ export async function markWorkNoteDoneService(id: number | string, options?: Wor
     const data = await markWorkNoteDone(id, options);
     return mapWorkNote(data);
 }
-export function markWorkNoteOpen(id: number | string, options?: WorkNoteOccurrencePayload | string) {
+export function markWorkNoteOpen(id: number | string, options?: WorkNoteOccurrencePayload | string, request?: Pick<ApplicationRequestOptions, 'signal'>) {
     const occurrenceDate = typeof options === 'string'
         ? options
         : (options?.occurrence_date ?? options?.occurrenceDate);
     return fetchApi<WorkNoteApi>(`/work-notes/${id}/mark_open/`, {
+        ...request,
         method: 'POST',
         ...(occurrenceDate ? { body: JSON.stringify({ occurrence_date: occurrenceDate }) } : {}),
     });
@@ -261,21 +267,22 @@ export async function markWorkNoteOpenService(id: number | string, options?: Wor
 export function actOnWorkNote(
     id: number | string,
     action: WorkNoteAction,
-    options?: WorkNoteOccurrencePayload | string
+    options?: WorkNoteOccurrencePayload | string,
+    request?: Pick<ApplicationRequestOptions, 'signal'>
 ) {
     if (action === 'mark_open') {
-        return markWorkNoteOpen(id, options);
+        return markWorkNoteOpen(id, options, request);
     }
-    return markWorkNoteDone(id, options);
+    return markWorkNoteDone(id, options, request);
 }
-export function getCalendarFeed(params: CalendarEventFilters) {
+export function getCalendarFeed(params: CalendarEventFilters, request?: Pick<ApplicationRequestOptions, 'signal'>) {
     const query = buildQuery({
         pharmacy_id: params.pharmacy_id ?? params.pharmacyId,
         organization_id: params.organization_id ?? params.organizationId,
         date_from: params.date_from ?? params.dateFrom,
         date_to: params.date_to ?? params.dateTo,
     });
-    return fetchApi<CalendarFeedApi>(`/calendar-feed/${query}`);
+    return fetchApi<CalendarFeedApi>(`/calendar-feed/${query}`, request);
 }
 export async function fetchCalendarFeed(params: CalendarEventFilters) {
     const data = await getCalendarFeed(params);

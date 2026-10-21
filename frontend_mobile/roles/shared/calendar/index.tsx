@@ -58,6 +58,7 @@ import {
   formatChoiceLabel,
   parseTime,
   formatTime,
+  withCalendarRequestBudget,
 } from './calendarModel';
 
 
@@ -198,11 +199,11 @@ export default function SharedCalendarScreen() {
     setLoading(true);
     setError(null);
     try {
-      const feed = await getCalendarFeed({
+      const feed = await withCalendarRequestBudget((signal) => getCalendarFeed({
         pharmacy_id: selectedPharmacyId,
         date_from: dateRange.from,
         date_to: dateRange.to,
-      });
+      }, { signal }));
       const eventsRaw = normalizeList(feed?.events);
       const notesRaw = normalizeList(feed?.work_notes);
 
@@ -452,9 +453,9 @@ export default function SharedCalendarScreen() {
         recurrence,
       };
       if (editingEventId) {
-        await updateCalendarEvent(editingEventId, payload);
+        await withCalendarRequestBudget((signal) => updateCalendarEvent(editingEventId, payload, { signal }));
       } else {
-        await createCalendarEvent(payload);
+        await withCalendarRequestBudget((signal) => createCalendarEvent(payload, { signal }));
       }
       setEventModalOpen(false);
       setEditingEventId(null);
@@ -518,9 +519,9 @@ export default function SharedCalendarScreen() {
         recurrence,
       };
       if (editingNoteId) {
-        await updateWorkNote(editingNoteId, payload);
+        await withCalendarRequestBudget((signal) => updateWorkNote(editingNoteId, payload, { signal }));
       } else {
-        await createWorkNote(payload);
+        await withCalendarRequestBudget((signal) => createWorkNote(payload, { signal }));
       }
       setNoteModalOpen(false);
       setEditingNoteId(null);
@@ -850,7 +851,7 @@ export default function SharedCalendarScreen() {
                                         try {
                                           const baseId = getBaseItemId(item);
                                           if (!baseId) return;
-                                          await deleteCalendarEvent(baseId);
+                                          await withCalendarRequestBudget((signal) => deleteCalendarEvent(baseId, { signal }));
                                           void loadFeed();
                                         } catch {
                                           // ignore
@@ -884,7 +885,7 @@ export default function SharedCalendarScreen() {
                                         try {
                                           const baseId = getBaseItemId(item);
                                           if (!baseId) return;
-                                          await deleteWorkNote(baseId);
+                                          await withCalendarRequestBudget((signal) => deleteWorkNote(baseId, { signal }));
                                           void loadFeed();
                                         } catch {
                                           // ignore
@@ -907,11 +908,12 @@ export default function SharedCalendarScreen() {
                                     const baseId = getBaseItemId(item);
                                     if (!baseId) return;
                                     const occurrenceDate = format(item.date, 'yyyy-MM-dd');
-                                    await actOnWorkNote(
+                                    await withCalendarRequestBudget((signal) => actOnWorkNote(
                                       baseId,
                                       action,
-                                      { occurrence_date: occurrenceDate }
-                                    );
+                                      { occurrence_date: occurrenceDate },
+                                      { signal }
+                                    ));
                                     void loadFeed();
                                   } catch {
                                     // ignore

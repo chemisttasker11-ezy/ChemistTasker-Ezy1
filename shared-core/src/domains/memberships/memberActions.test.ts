@@ -93,61 +93,113 @@ describe('Vite and Expo membership decision parity', () => {
     const emptyError = {};
     expect(getMembershipErrorMessage(emptyError, 'Unable to respond to this admin invitation.')).toBe('Unable to respond to this admin invitation.');
   });
+
+  it('falls back to friendly message on 500 HTML traceback error across domain operation and consumer interpretation', async () => {
+    fetchMock = vi.fn(async () => new Response(
+      '<!DOCTYPE html><html><body><h1>500 Internal Server Error</h1><pre>Traceback (most recent call last):...</pre></body></html>',
+      { status: 500, headers: { 'content-type': 'text/html' } }
+    ));
+    configureApi({
+      baseURL: 'https://example.test/api/v1',
+      getToken: () => 'member-token',
+      fetchImpl: fetchMock,
+    });
+
+    let caught: any;
+    try {
+      await respondToMyMembership(123, 'accept');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ApiError);
+    expect(caught.status).toBe(500);
+    expect(getMembershipErrorMessage(caught, 'Unable to accept membership.')).toBe('Unable to accept membership.');
+  });
+
+  it('falls back to friendly message on network failure across domain operation and consumer interpretation', async () => {
+    fetchMock = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    configureApi({
+      baseURL: 'https://example.test/api/v1',
+      getToken: () => 'member-token',
+      fetchImpl: fetchMock,
+    });
+
+    let caught: any;
+    try {
+      await respondToMyMembership(123, 'accept');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(TypeError);
+    expect(getMembershipErrorMessage(caught, 'Unable to accept membership.')).toBe('Unable to accept membership.');
+  });
 });
 
 describe('getMembershipErrorMessage helper', () => {
   const fallback = 'Something went wrong.';
 
   it('extracts string detail from Axios error response', () => {
-    const error = { response: { data: { detail: 'Only active members can access.' } } };
+    const error = { response: { status: 400, data: { detail: 'Only active members can access.' } } };
     expect(getMembershipErrorMessage(error, fallback)).toBe('Only active members can access.');
   });
 
   it('extracts first element from array detail in Axios error response', () => {
-    const error = { response: { data: { detail: ['Maximum member limit reached.'] } } };
+    const error = { response: { status: 400, data: { detail: ['Maximum member limit reached.'] } } };
     expect(getMembershipErrorMessage(error, fallback)).toBe('Maximum member limit reached.');
   });
 
-  it('extracts string response data from Axios error', () => {
-    const error = { response: { data: 'Service unavailable' } };
-    expect(getMembershipErrorMessage(error, fallback)).toBe('Service unavailable');
+  it('extracts safe message from 4xx ApiError', () => {
+    const apiError = new ApiError('User is not verified.', 400, { detail: 'User is not verified.' });
+    expect(getMembershipErrorMessage(apiError, fallback)).toBe('User is not verified.');
   });
 
-  it('extracts error field from Axios response data', () => {
-    const error = { response: { data: { error: 'Invalid invitation token.' } } };
-    expect(getMembershipErrorMessage(error, fallback)).toBe('Invalid invitation token.');
-  });
-
-  it('extracts message field from Axios response data', () => {
-    const error = { response: { data: { message: 'You have already accepted this invite.' } } };
-    expect(getMembershipErrorMessage(error, fallback)).toBe('You have already accepted this invite.');
-  });
-
-  it('ignores generic status message in error.message and uses fallback or response data', () => {
+  it('ignores generic status message and uses fallback or Axios response detail', () => {
     const statusError = {
       message: 'Request failed with status code 403',
-      response: { data: { detail: 'Forbidden action.' } },
+      response: { status: 403, data: { detail: 'Forbidden action.' } },
     };
     expect(getMembershipErrorMessage(statusError, fallback)).toBe('Forbidden action.');
+
+    const genericApiError = new ApiError('Request failed with status 400', 400, null);
+    expect(getMembershipErrorMessage(genericApiError, fallback)).toBe(fallback);
 
     const statusOnly = { message: 'Request failed with status 500' };
     expect(getMembershipErrorMessage(statusOnly, fallback)).toBe(fallback);
   });
 
-  it('extracts custom error.message when not a generic status string', () => {
-    const customError = new Error('Network timeout during membership action.');
-    expect(getMembershipErrorMessage(customError, fallback)).toBe('Network timeout during membership action.');
+  it('uses fallback for network TypeError and Error with no HTTP status', () => {
+    expect(getMembershipErrorMessage(new TypeError('Failed to fetch'), fallback)).toBe(fallback);
+    expect(getMembershipErrorMessage(new Error('Network timeout during membership action.'), fallback)).toBe(fallback);
   });
 
-  it('extracts detail from SDK payload', () => {
-    const sdkError = { payload: { detail: 'User is not verified.' } };
-    expect(getMembershipErrorMessage(sdkError, fallback)).toBe('User is not verified.');
-  });
+  it('uses fallback for 5xx ApiError and 5xx Axios responses with HTML/traceback bodies', () => {
+    const serverError = new ApiError('Request failed with status 500', 500, null);
+    expect(getMembershipErrorMessage(serverError, fallback)).toBe(fallback);
 
-  it('extracts error and message from SDK payload', () => {
-    expect(getMembershipErrorMessage({ payload: { error: 'Payload error' } }, fallback)).toBe('Payload error');
-    expect(getMembershipErrorMessage({ payload: { message: 'Payload message' } }, fallback)).toBe('Payload message');
-    expect(getMembershipErrorMessage({ payload: 'Raw string payload' }, fallback)).toBe('Raw string payload');
+    const tracebackApiError = new ApiError(
+      '<!DOCTYPE html><html><body>500 Internal Server Error</body></html>',
+      500,
+      null
+    );
+    expect(getMembershipErrorMessage(tracebackApiError, fallback)).toBe(fallback);
+
+    const axios500Html = {
+      response: {
+        status: 500,
+        data: '<html><body>Traceback (most recent call last)...</body></html>',
+      },
+    };
+    expect(getMembershipErrorMessage(axios500Html, fallback)).toBe(fallback);
+
+    const axios500Detail = {
+      response: {
+        status: 500,
+        data: { detail: 'Database connection failed' },
+      },
+    };
+    expect(getMembershipErrorMessage(axios500Detail, fallback)).toBe(fallback);
   });
 
   it('returns fallback for null, undefined, empty object, or whitespace', () => {

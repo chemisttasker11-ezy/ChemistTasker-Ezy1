@@ -198,6 +198,9 @@ jobs:
       - name: Mobile dependency exploit and compatibility regressions
         run: npm run test:security
         working-directory: frontend_mobile
+      - name: Mobile calendar request budget contract
+        run: node --test scripts/calendar-request-budget.test.cjs
+        working-directory: frontend_mobile
       - name: Verify patched runtime dependencies and reject new advisories
         run: npm run security:dependencies
         working-directory: frontend_mobile

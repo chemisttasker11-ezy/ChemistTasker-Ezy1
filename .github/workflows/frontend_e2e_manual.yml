@@ -182,6 +182,12 @@ jobs:
           done
           cat /tmp/chemisttasker-next.log
           exit 1
+      - name: Public login smoke cases on Next
+        working-directory: frontend_web/e2e
+        env:
+          PLAYWRIGHT_PORT: 3000
+          PLAYWRIGHT_HERMETIC: 1
+        run: npx playwright test frontend-smoke.spec.mjs --grep login --workers=1
       - name: Browser cross-origin integration
         working-directory: frontend_web/e2e
         env:
