@@ -565,6 +565,7 @@ export default function PharmacyForm({
     // reconcile it by ID instead of resubmitting a second multipart POST.
     const pendingReadbackRef = useRef<{
         id: string;
+        afterSave?: () => void;
         submitted: Record<string, unknown>;
         uploadedFields: Array<'methadone_s8_protocols' | 'sops' | 'induction_guides' | 'qld_sump_docs'>;
         previousDocumentUrls: {
@@ -624,8 +625,10 @@ export default function PharmacyForm({
             }
 
             if (!persistedPharmacyId) throw new Error('Pharmacy save did not return an ID.');
+            const originalAfterSave = pendingReadbackRef.current?.afterSave ?? afterSave;
             pendingReadbackRef.current = {
                 id: persistedPharmacyId,
+                afterSave: originalAfterSave,
                 submitted: payload,
                 uploadedFields: [
                     ...(files.approval ? ['methadone_s8_protocols'] as const : []),
@@ -669,6 +672,7 @@ export default function PharmacyForm({
                     qld_sump_docs: existingFiles.sump,
                 },
             });
+            const acceptedAfterSave = pendingReadbackRef.current?.afterSave ?? afterSave;
             pendingReadbackRef.current = null;
             setVerificationPending(false);
             const verifiedFiles = {
@@ -695,7 +699,7 @@ export default function PharmacyForm({
                 software,
                 pharmacyProfile,
             };
-            if (afterSave) afterSave();
+            if (acceptedAfterSave) await acceptedAfterSave();
             else if (onSuccess) onSuccess();
             else router.back();
             return true;
