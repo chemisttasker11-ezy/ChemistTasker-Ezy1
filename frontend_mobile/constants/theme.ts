@@ -1,5 +1,5 @@
 import { MD3LightTheme } from 'react-native-paper';
-import { CHEMISTTASKER_BRAND } from '@chemisttasker/shared-core';
+import { CHEMISTTASKER_BRAND, CHEMISTTASKER_PERSONA_BRAND } from '@chemisttasker/shared-core';
 
 export const brandColors = {
   navy: CHEMISTTASKER_BRAND.navy,
@@ -28,12 +28,12 @@ export const brandColors = {
 } as const;
 
 export const personaPalettes = {
-  owner: { accent: '#4F46E5', soft: '#EEF2FF' },
-  pharmacist: { accent: '#0EA5E9', soft: '#E0F2FE' },
-  otherStaff: { accent: '#22C55E', soft: '#DCFCE7' },
-  explorer: { accent: '#F97316', soft: '#FFEDD5' },
-  organization: { accent: '#0369A1', soft: '#E0F2FE' },
-  admin: { accent: '#6366F1', soft: '#EEF2FF' },
+  owner: { accent: CHEMISTTASKER_PERSONA_BRAND.owner, soft: '#EEF2FF' },
+  pharmacist: { accent: CHEMISTTASKER_PERSONA_BRAND.pharmacist, soft: '#E0F2FE' },
+  otherStaff: { accent: CHEMISTTASKER_PERSONA_BRAND.otherStaff, soft: '#DCFCE7' },
+  explorer: { accent: CHEMISTTASKER_PERSONA_BRAND.explorer, soft: '#FFEDD5' },
+  organization: { accent: CHEMISTTASKER_PERSONA_BRAND.organization, soft: '#E0F2FE' },
+  admin: { accent: CHEMISTTASKER_PERSONA_BRAND.admin, soft: '#EEF2FF' },
 } as const;
 
 export type PersonaPalette = (typeof personaPalettes)[keyof typeof personaPalettes];
