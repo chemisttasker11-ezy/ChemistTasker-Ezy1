@@ -294,11 +294,6 @@
     "owner": "Identity and authentication",
     "rationale": "Existing feature page direct-backend-route at apiClient.post /users/mobile/verify-otp/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
-  "frontend_web/src/pages/onboarding/OwnerOnboarding.tsx|unresolved-client-transport|apiClient.post|/pill-rewards/refer-friend/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Next/Vite domain owner pending inspection",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.post /pill-rewards/refer-friend/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
   "frontend_web/src/pages/onboarding/RefereeQuestionnairePage.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
     "classification": "legacy-migrate",
     "owner": "Next/Vite domain owner pending inspection",
