@@ -4,7 +4,7 @@ import { getUnreadRoomSummary } from './api';
 
 describe('Expo unread room summary contract', () => {
   it('keeps exact filtered route, raw backend fields and bearer token', async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+    const fetchImpl: ReturnType<typeof vi.fn> = vi.fn(async () => new Response(JSON.stringify({
       unread_total: 3, results: [{ unread_count: 2 }, { unread_count: 1 }],
     }), { headers: { 'content-type': 'application/json' } }));
     configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'chat-token', fetchImpl });
