@@ -28,7 +28,7 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { API_BASE_URL } from '../../constants/api';
-import { getOnboardingDetail, updateOnboardingForm, getCurrentSubscription } from '@chemisttasker/shared-core';
+import { getOnboardingDetail, updateOnboardingForm, getCurrentSubscription, createFriendPillReferralService } from '@chemisttasker/shared-core';
 import { useNavigate } from 'react-router-dom';
 import ProfilePhotoUploader from '../../components/profilePhoto/ProfilePhotoUploader';
 import apiClient from '../../utils/apiClient';
@@ -355,7 +355,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   const handleCopyFriendReferral = async () => {
     setReferralLoading(true);
     try {
-      const { data: referral } = await apiClient.post('/pill-rewards/refer-friend/', {});
+      const referral = await createFriendPillReferralService({});
       const code = referral?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const url = new URL('/register', window.location.origin);
