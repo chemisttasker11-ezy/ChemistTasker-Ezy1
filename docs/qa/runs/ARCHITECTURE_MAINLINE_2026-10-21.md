@@ -41,3 +41,9 @@ Release status: **DRAFT / NOT MERGE-READY** until exact-head evidence is obtaine
 | Merge authorization | NOT AUTHORISED | PR remains draft |
 
 CI success does not imply approved manual native visuals or physical-device parity. Report each result with exact SHA and workflow/job IDs. Do not count inherited PR #191 results.
+
+## 21 October transport review continuation
+
+Resolved 10 direct domain transport callsites with named cross-platform SDK operations; classified five device/media local-URI fetches as false positives, recording their evidence. The manifest now has **56** entries (15 approved adapters, five evidence-backed false positives, 36 unfinished legacy calls). Added charge fulfillment, pill settlement, reminder and binary invoice wire tests. See `docs/architecture/TRANSPORT_CONTINUATION_2026-10-21.md`.
+
+Every previous workflow success is for the prior head `f717bf4f` and must be rerun on the new head. Native PDF/Stripe return and auth/error/CSRF acceptance remain open. The backend dependency cycles and intentionally divergent Next/Vite twins are not auto-approved for code rewrites.

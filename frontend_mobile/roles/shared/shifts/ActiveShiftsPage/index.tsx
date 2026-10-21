@@ -8,13 +8,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { subscribeShiftSlotActivity } from '@/utils/pushNotifications';
-import apiClient from '@/utils/apiClient';
 import {
     Shift,
     ShiftInterest,
     ShiftMemberStatus,
     EscalationLevelKey,
     normalizeShiftWorkProfile,
+    payShiftWithPills,
+    chargeShiftFulfillment,
+    buzzShiftOffer,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 
@@ -117,14 +119,11 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const handlePayWithPills = useCallback(async (shift: Shift, offerIds: number[] = []) => {
         setPillPayingShiftId(shift.id);
         try {
-            const { data: res } = await apiClient.post('/pill-rewards/pay-shift/', {
-                shift_id: shift.id,
-                ...(offerIds.length > 0 ? { offer_ids: offerIds } : {}),
-            });
+            const res = await payShiftWithPills(shift.id, offerIds);
             showSnackbar(res?.detail || 'Shift paid with pills.');
             await loadShifts();
         } catch (err: any) {
-            const data = err?.response?.data;
+            const data = err?.response?.data ?? err?.payload;
             const detail = Array.isArray(data?.detail) ? data.detail[0] : data?.detail;
             const message = data?.code === 'insufficient_pills'
                 ? `Not enough pills. You have ${data?.balance ?? 0}; this shift needs ${data?.required ?? 'more'} pills.`
@@ -137,10 +136,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
 
     const handlePayWithStripe = useCallback(async (shift: Shift, offerIds: number[] = []) => {
         try {
-            const { data: res } = await apiClient.post(`/billing/charge-fulfillment/${shift.id}/`, {
-                platform: 'mobile',
-                ...(offerIds.length > 0 ? { offer_ids: offerIds } : {}),
-            });
+            const res = await chargeShiftFulfillment(shift.id, { offerIds, platform: 'mobile' });
             if (res?.url) {
                 await Linking.openURL(res.url);
             } else if (res?.free) {
@@ -649,8 +645,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             if (!offerId) return;
             setBuzzLoadingOfferId(offerId);
             try {
-                const response = await apiClient.post(`/shift-offers/${offerId}/buzz/`);
-                const result = response.data;
+                const result = await buzzShiftOffer(offerId);
                 Alert.alert(
                     'Buzz reminder',
                     result?.detail || "Reminder sent. We've gently nudged the candidate to confirm this shift.",
@@ -660,6 +655,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 console.error('Failed to send confirmation reminder', error);
                 const message =
                     (error as any)?.response?.data?.detail ||
+                    (error as any)?.payload?.detail ||
                     (error as any)?.data?.detail ||
                     (error as any)?.message ||
                     'Failed to send confirmation reminder';

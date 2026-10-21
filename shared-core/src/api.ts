@@ -302,6 +302,7 @@ export {
   createFriendPillReferralService,
   createShiftPillReferralService,
   claimPillReferralService,
+  payShiftWithPills,
 } from './domains/rewards/api';
 export {
   getInvoices,
@@ -312,6 +313,7 @@ export {
   generateInvoice,
   previewInvoice,
   getInvoicePdfUrl,
+  downloadInvoicePdf,
   sendInvoiceEmail,
   reportInvoiceIssue,
 } from './domains/invoicing/api';

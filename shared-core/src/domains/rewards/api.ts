@@ -39,3 +39,15 @@ export async function claimPillReferralService(payload: Record<string, unknown>)
         body: payload,
     });
 }
+
+/** Canonical shift settlement with pills; server alone decides the charge and balance. */
+export interface PillShiftPaymentResponse { detail?: string; code?: string; balance?: number; required?: number; }
+export async function payShiftWithPills(shiftId: number | string, offerIds: number[] = []) {
+    return fetchApi<PillShiftPaymentResponse>('/pill-rewards/pay-shift/', {
+        method: 'POST',
+        body: JSON.stringify({
+            shift_id: shiftId,
+            ...(offerIds.length ? { offer_ids: offerIds } : {}),
+        }),
+    });
+}

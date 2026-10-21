@@ -28,6 +28,7 @@ describe('shift fulfillment payment contract', () => {
         const result = await chargeShiftFulfillment(81, { offerIds: [21, 22] });
         await chargeShiftFulfillment(82, { offerIds: [] });
         await chargeShiftFulfillment(83);
+        await chargeShiftFulfillment(84, { offerIds: [9], platform: 'mobile' });
 
         expect(result.url).toBe('https://checkout.stripe.com/test');
         expect(requests).toEqual([
@@ -37,6 +38,8 @@ describe('shift fulfillment payment contract', () => {
               body: JSON.stringify({}), authorization: 'Bearer shift-owner-token' },
             { url: 'https://api.example.test/api/v1/billing/charge-fulfillment/83/', method: 'POST',
               body: null, authorization: 'Bearer shift-owner-token' },
+            { url: 'https://api.example.test/api/v1/billing/charge-fulfillment/84/', method: 'POST',
+              body: JSON.stringify({ offer_ids: [9], platform: 'mobile' }), authorization: 'Bearer shift-owner-token' },
         ]);
     });
 });

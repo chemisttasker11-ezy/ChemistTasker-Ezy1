@@ -44,13 +44,14 @@ export function updateSubscriptionSeats(payload: {
         })
     });
 }
-export function chargeShiftFulfillment(shiftId: number | string, payload?: { offerIds?: number[] }) {
+export function chargeShiftFulfillment(shiftId: number | string, payload?: { offerIds?: number[]; platform?: 'mobile' | 'web' }) {
     // Existing callers send a bodyless POST. Shift-centre payment selections
     // supply offer_ids exactly as the original Vite request did.
     return fetchApi<{ url?: string; free?: boolean; message?: string }>(`/billing/charge-fulfillment/${shiftId}/`, {
         method: 'POST',
         ...(payload ? { body: JSON.stringify({
-            ...(payload.offerIds?.length ? { offer_ids: payload.offerIds } : {})
+            ...(payload.offerIds?.length ? { offer_ids: payload.offerIds } : {}),
+            ...(payload.platform ? { platform: payload.platform } : {})
         }) } : {})
     });
 }

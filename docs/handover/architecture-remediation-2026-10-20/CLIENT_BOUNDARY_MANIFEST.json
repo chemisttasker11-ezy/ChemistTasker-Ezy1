@@ -35,49 +35,29 @@
     "rationale": "Existing unreviewed utility direct-backend-route at apiClient.post /users/resend-otp/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
   "frontend_mobile/features/parity/ethicalMarketplace.tsx|unresolved-client-transport|fetch|#1": {
-    "classification": "legacy-migrate",
-    "owner": "Expo domain owner pending inspection",
-    "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
   },
   "frontend_mobile/features/parity/ethicalMarketplace.tsx|unresolved-client-transport|fetch|#2": {
-    "classification": "legacy-migrate",
-    "owner": "Expo domain owner pending inspection",
-    "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
   },
   "frontend_mobile/features/parity/finance.tsx|unresolved-client-transport|fetch|#1": {
-    "classification": "legacy-migrate",
-    "owner": "Expo domain owner pending inspection",
-    "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
   },
   "frontend_mobile/features/parity/marketplace.tsx|unresolved-client-transport|fetch|#1": {
-    "classification": "legacy-migrate",
-    "owner": "Expo domain owner pending inspection",
-    "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/roles/shared/dashboard/dashboardScope.tsx|unresolved-client-transport|apiClient.get|#1": {
-    "classification": "legacy-migrate",
-    "owner": "Expo domain owner pending inspection",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.get (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
   },
   "frontend_mobile/roles/shared/hub/PostComposer.tsx|unresolved-client-transport|fetch|#1": {
-    "classification": "legacy-migrate",
-    "owner": "Expo domain owner pending inspection",
-    "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx|unresolved-client-transport|apiClient.post|/pill-rewards/pay-shift/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Billing/invoicing and shift domain",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.post /pill-rewards/pay-shift/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx|direct-backend-route|apiClient.post|/billing/charge-fulfillment/${...}/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Billing/invoicing and shift domain",
-    "rationale": "Existing feature page direct-backend-route at apiClient.post /billing/charge-fulfillment/${...}/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx|direct-backend-route|apiClient.post|/shift-offers/${...}/buzz/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Shifts",
-    "rationale": "Existing feature page direct-backend-route at apiClient.post /shift-offers/${...}/buzz/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
   },
   "frontend_mobile/utils/apiClient.ts|unresolved-client-transport|apiClient|#1": {
     "classification": "approved-adapter",
@@ -133,11 +113,6 @@
     "classification": "legacy-migrate",
     "owner": "Identity and authentication",
     "rationale": "Existing unreviewed utility direct-backend-route at fetch ${...}/users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/index.tsx|unresolved-client-transport|apiClient.get|${...}?target_type=pharmacy&target_id=${...}#1": {
-    "classification": "legacy-migrate",
-    "owner": "Next/Vite domain owner pending inspection",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.get ${...}?target_type=pharmacy&target_id=${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
   "frontend_web/landing_next/migrated/pages/login.tsx|direct-backend-route|axios.get|${...}/users/csrf/#1": {
     "classification": "legacy-migrate",
@@ -229,35 +204,10 @@
     "owner": "Identity and authentication",
     "rationale": "Existing unreviewed utility direct-backend-route at fetch ${...}/users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
-  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useOfferDecisions.ts|direct-backend-route|apiClient.post|/shift-offers/${...}/buzz/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Shifts",
-    "rationale": "Existing feature page direct-backend-route at apiClient.post /shift-offers/${...}/buzz/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts|unresolved-client-transport|apiClient.post|/pill-rewards/pay-shift/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Billing/invoicing and shift domain",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.post /pill-rewards/pay-shift/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx|direct-backend-route|apiClient.get|/invoices/${...}/pdf/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Billing/invoicing and shift domain",
-    "rationale": "Existing feature page direct-backend-route at apiClient.get /invoices/${...}/pdf/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/src/pages/dashboard/sidebar/Invoices/LegacyInvoiceManagePage.tsx|direct-backend-route|apiClient.get|/invoices/${...}/pdf/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Billing/invoicing and shift domain",
-    "rationale": "Existing feature page direct-backend-route at apiClient.get /invoices/${...}/pdf/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
   "frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx|direct-backend-route|fetch|${...}/${...}/onboarding/me/#1": {
     "classification": "legacy-migrate",
     "owner": "Next/Vite domain owner pending inspection",
     "rationale": "Existing feature page direct-backend-route at fetch ${...}/${...}/onboarding/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx|unresolved-client-transport|apiClient.get|${...}?target_type=pharmacy&target_id=${...}#1": {
-    "classification": "legacy-migrate",
-    "owner": "Next/Vite domain owner pending inspection",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.get ${...}?target_type=pharmacy&target_id=${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
   "frontend_web/src/pages/login.tsx|direct-backend-route|axios.get|${...}/users/csrf/#1": {
     "classification": "legacy-migrate",
