@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -28,4 +28,13 @@ test('--strict requires an actual comparison base', () => {
 test('the normal audit rejects an invalid explicitly selected base', () => {
   const result = run([], { SHARED_CORE_AUDIT_BASE: 'definitely-not-a-git-commit' });
   assert.notEqual(result.status, 0, result.stdout);
+});
+
+// Full Isolated QA pins a verified PR-base ref before copying the Git tree.
+// Tests preserve a strict failure on unavailable/mismatched history.
+test('the strict audit resolves its pinned base under a scoped safe Git directory', () => {
+  const src = readFileSync(audit, 'utf8');
+  assert.match(src, /refs\\/qa\\/shared-core-audit-base\\^\\{commit\\}/);
+  assert.match(src, /safe\\.directory=/);
+  assert.match(src, /gitOutput\\(\\['rev-parse', '--verify'/);
 });

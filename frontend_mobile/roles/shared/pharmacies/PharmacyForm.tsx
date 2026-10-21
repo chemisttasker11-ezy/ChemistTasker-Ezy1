@@ -876,6 +876,10 @@ export default function PharmacyForm({
                     >
                         {error ? <Text style={styles.error}>{error}</Text> : null}
 
+                        {/* Django may have saved data before readback fails.
+                            Disable editing until GET-only reconciliation finishes;
+                            otherwise new draft edits could be falsely marked saved. */}
+                        <View pointerEvents={saving || verificationPending ? 'none' : 'auto'}>
                         <Surface style={styles.card} elevation={1}>
                             {/* TAB 0: GENERAL */}
                             {activeTab === 0 && (
@@ -1292,14 +1296,21 @@ export default function PharmacyForm({
                             )}
 
                         </Surface>
+                        </View>
 
                         {/* ACTIONS */}
+                        {verificationPending && (
+                            <Text style={styles.sectionHelper}>
+                                The server accepted this pharmacy save. Editing is locked until its saved details are verified.
+                                Use Verify Saved Pharmacy to retry without submitting another write.
+                            </Text>
+                        )}
                         {verificationPending && (
                             <Button
                                 mode="contained"
                                 onPress={handleVerifySaved}
                                 loading={saving}
-                                disabled={saving}
+                                disabled={saving || verificationPending}
                             >
                                 Verify Saved Pharmacy
                             </Button>
@@ -1311,7 +1322,7 @@ export default function PharmacyForm({
                                         mode="outlined"
                                         onPress={handleSave}
                                         loading={saving}
-                                        disabled={saving}
+                                        disabled={saving || verificationPending}
                                         style={{ flex: 1 }}
                                     >
                                         Save Changes
@@ -1320,7 +1331,7 @@ export default function PharmacyForm({
                                         <Button
                                             mode="outlined"
                                             onPress={() => activeTab > 0 && setActiveTab(p => p - 1)}
-                                            disabled={saving || activeTab === 0}
+                                            disabled={saving || verificationPending || activeTab === 0}
                                             style={{ flex: 1 }}
                                         >
                                             Back
@@ -1328,7 +1339,7 @@ export default function PharmacyForm({
                                         <Button
                                             mode="contained"
                                             onPress={handleNext}
-                                            disabled={saving || activeTab === lastTabIndex}
+                                            disabled={saving || verificationPending || activeTab === lastTabIndex}
                                             style={{ flex: 1 }}
                                         >
                                             Next
@@ -1340,7 +1351,7 @@ export default function PharmacyForm({
                                     <Button
                                         mode="outlined"
                                         onPress={() => activeTab > 0 ? setActiveTab(p => p - 1) : (onCancel ? onCancel() : router.back())}
-                                        disabled={saving}
+                                        disabled={saving || verificationPending}
                                         style={{ flex: 1 }}
                                     >
                                         {activeTab > 0 ? 'Back' : 'Cancel'}
@@ -1349,7 +1360,7 @@ export default function PharmacyForm({
                                         mode="contained"
                                         onPress={activeTab === lastTabIndex ? handleSave : handleNext}
                                         loading={activeTab === lastTabIndex ? saving : false}
-                                        disabled={saving}
+                                        disabled={saving || verificationPending}
                                         style={{ flex: 1 }}
                                     >
                                         {activeTab === lastTabIndex ? 'Create Pharmacy' : 'Next'}
@@ -1362,10 +1373,10 @@ export default function PharmacyForm({
 
                 <Portal>
                     <TimePickerModal
-                        visible={Boolean(activeTimeField)}
+                        visible={Boolean(activeTimeField) && !saving && !verificationPending}
                         onDismiss={() => setActiveTimeField(null)}
                         onConfirm={({ hours, minutes }) => {
-                            if (!activeTimeField) return;
+                            if (!activeTimeField || saving || verificationPending) return;
                             setForm((prev) => ({
                                 ...prev,
                                 [activeTimeField.key]: formatTimeValue(hours, minutes),

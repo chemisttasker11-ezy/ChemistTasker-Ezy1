@@ -73,6 +73,10 @@ jobs:
           fi
           git cat-file -e "${comparison_base}^{commit}"
           git merge-base --is-ancestor "$comparison_base" HEAD
+          # Persist the validated full-PR base inside .git. The nested Docker
+          # checkout retains this ref even though environment vars are not
+          # forwarded by the existing staging QA launcher.
+          git update-ref refs/qa/shared-core-audit-base "$comparison_base"
           echo "SHARED_CORE_AUDIT_BASE=$comparison_base" >> "$GITHUB_ENV"
           echo "Boundary audit will compare full branch: $comparison_base..$(git rev-parse HEAD)"
       - name: Verify entire PR strict shared-core audit against its actual base

@@ -65,11 +65,23 @@ if (operationalFindings.length) {
 }
 
 
+// Docker copies the complete .git tree under another UID. Trust precisely
+// this inspected project root without weakening Git's global safe.directory.
+function gitOutput(args) {
+  return execFileSync('git', ['-c', `safe.directory=${root}`, ...args], { encoding: 'utf8' }).trim();
+}
+
 function resolveBase() {
   const configured = (process.env.SHARED_CORE_AUDIT_BASE || '').trim();
   if (configured && !/^0+$/.test(configured)) return configured;
   try {
-    return execFileSync('git', ['rev-parse', 'HEAD^'], { encoding: 'utf8' }).trim();
+    // Full QA writes this validated PR-base ref before copying into Docker.
+    return gitOutput(['rev-parse', '--verify', 'refs/qa/shared-core-audit-base^{commit}']);
+  } catch {
+    // The validated ref is not present on ordinary local runs.
+  }
+  try {
+    return gitOutput(['rev-parse', 'HEAD^']);
   } catch {
     return null;
   }
@@ -90,7 +102,7 @@ let diff;
 try {
   diff = execFileSync(
     'git',
-    ['diff', '--unified=0', base, 'HEAD', '--', ...targets],
+    ['-c', `safe.directory=${root}`, 'diff', '--unified=0', base, 'HEAD', '--', ...targets],
     { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
   );
 } catch (error) {
