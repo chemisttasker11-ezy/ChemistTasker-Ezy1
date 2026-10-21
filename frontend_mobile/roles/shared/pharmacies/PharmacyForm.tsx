@@ -39,6 +39,7 @@ import {
     getPharmacyById,
     lookupPharmacyAbn,
     appendPharmacyFormFields,
+    verifyPharmacyWriteReadback,
 } from '@chemisttasker/shared-core';
 import { surfaceTokens } from './types';
 import GooglePlacesInput from './GooglePlacesInput';
@@ -560,19 +561,37 @@ export default function PharmacyForm({
         });
     }, [employmentTypes, files, form, rolesNeeded]);
 
+    // When write succeeds but GET fails, preserve the accepted write and
+    // reconcile it by ID instead of resubmitting a second multipart POST.
+    const pendingReadbackRef = useRef<{
+        id: string;
+        submitted: Record<string, unknown>;
+        uploadedFields: Array<'methadone_s8_protocols' | 'sops' | 'induction_guides' | 'qld_sump_docs'>;
+        previousDocumentUrls: {
+            methadone_s8_protocols: string | null;
+            sops: string | null;
+            induction_guides: string | null;
+            qld_sump_docs: string | null;
+        };
+    } | null>(null);
+    const [verificationPending, setVerificationPending] = useState(false);
+
     const persistPharmacy = async ({ afterSave }: { afterSave?: () => void } = {}) => {
-        if (!validate()) return false;
+        if (saving) return false;
+        if (!pendingReadbackRef.current && !validate()) return false;
         setSaving(true);
         setError('');
 
         try {
-            const payload = buildPharmacyPayload();
+            const payload = pendingReadbackRef.current?.submitted ?? buildPharmacyPayload();
 
             const hasFiles = Boolean(files.approval || files.sops || files.induction || files.sump);
             const targetPharmacyId = currentPharmacyId ?? (mode === 'edit' ? pharmacyId ?? null : null);
             let persistedPharmacyId = targetPharmacyId ? String(targetPharmacyId) : null;
 
-            if (hasFiles) {
+            if (pendingReadbackRef.current) {
+                persistedPharmacyId = pendingReadbackRef.current.id;
+            } else if (hasFiles) {
                 const formData = new FormData();
                 // Encode Django JSON-list fields as one JSON array, matching the web client.
                 appendPharmacyFormFields(formData, payload);
@@ -604,6 +623,23 @@ export default function PharmacyForm({
                 }
             }
 
+            pendingReadbackRef.current = {
+                id: persistedPharmacyId ?? '',
+                submitted: payload,
+                uploadedFields: [
+                    ...(files.approval ? ['methadone_s8_protocols'] as const : []),
+                    ...(files.sops ? ['sops'] as const : []),
+                    ...(files.induction ? ['induction_guides'] as const : []),
+                    ...(files.sump ? ['qld_sump_docs'] as const : []),
+                ],
+                previousDocumentUrls: {
+                    methadone_s8_protocols: existingFiles.approval,
+                    sops: existingFiles.sops,
+                    induction_guides: existingFiles.induction,
+                    qld_sump_docs: existingFiles.sump,
+                },
+            };
+            setVerificationPending(true);
             // Do not announce success until the saved object is readable.
             // A server-accepted multipart request can still fail persistence or
             // return a different stored document reference after validation.
@@ -612,24 +648,24 @@ export default function PharmacyForm({
             if (!persisted || String(persisted.id) !== persistedPharmacyId) {
                 throw new Error('Saved pharmacy could not be verified. Refresh before retrying.');
             }
-            if (hasFiles) {
-                for (const [chosen, backendField] of [
-                    ['approval', 'methadone_s8_protocols'],
-                    ['sops', 'sops'],
-                    ['induction', 'induction_guides'],
-                    ['sump', 'qld_sump_docs'],
-                ] as const) {
-                    if (files[chosen] && !persisted[backendField]) {
-                        throw new Error(`Saved document ${backendField} was not returned by the server.`);
-                    }
-                }
-                for (const key of ['employment_types', 'roles_needed', 'software', 'services'] as const) {
-                    const expected = payload[key];
-                    if (Array.isArray(expected) && JSON.stringify(persisted[key]) !== JSON.stringify(expected)) {
-                        throw new Error(`Saved pharmacy ${key} did not match the submitted selection.`);
-                    }
-                }
-            }
+            verifyPharmacyWriteReadback(persisted, pendingReadbackRef.current ?? {
+                persistedId: persistedPharmacyId,
+                submitted: payload,
+                uploadedFields: [
+                    ...(files.approval ? ['methadone_s8_protocols'] as const : []),
+                    ...(files.sops ? ['sops'] as const : []),
+                    ...(files.induction ? ['induction_guides'] as const : []),
+                    ...(files.sump ? ['qld_sump_docs'] as const : []),
+                ],
+                previousDocumentUrls: {
+                    methadone_s8_protocols: existingFiles.approval,
+                    sops: existingFiles.sops,
+                    induction_guides: existingFiles.induction,
+                    qld_sump_docs: existingFiles.sump,
+                },
+            });
+            pendingReadbackRef.current = null;
+            setVerificationPending(false);
             const verifiedFiles = {
                 approval: persisted.methadone_s8_protocols ?? null,
                 sops: persisted.sops ?? null,
@@ -662,7 +698,9 @@ export default function PharmacyForm({
         } catch (err: any) {
             const apiMessage = formatApiError(err?.response?.data);
             const detail = apiMessage || err?.message;
-            setError(detail || 'Save failed');
+            setError(pendingReadbackRef.current
+                ? 'The pharmacy was saved, but confirmation could not be completed. Select Verify Saved Pharmacy to retry without submitting another write.'
+                : (detail || 'Save failed'));
             console.error(err);
             return false;
         } finally {
@@ -672,6 +710,9 @@ export default function PharmacyForm({
 
     const handleSave = async () => {
         await persistPharmacy();
+    };
+    const handleVerifySaved = async () => {
+        if (pendingReadbackRef.current) await persistPharmacy();
     };
 
     const handleApplyToWeekdays = () => {
@@ -1244,6 +1285,16 @@ export default function PharmacyForm({
                         </Surface>
 
                         {/* ACTIONS */}
+                        {verificationPending && (
+                            <Button
+                                mode="contained"
+                                onPress={handleVerifySaved}
+                                loading={saving}
+                                disabled={saving}
+                            >
+                                Verify Saved Pharmacy
+                            </Button>
+                        )}
                         <View style={styles.actions}>
                             {mode === 'edit' ? (
                                 <>
