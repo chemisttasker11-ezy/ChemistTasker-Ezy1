@@ -54,3 +54,9 @@ Eliminated **14** additional whole-tree direct legacy transport callsites (14 ex
 **Manifest after this pass:** 42 known findings; 22 still legacy candidates, 15 accepted platform adapters and 5 locally sourced non-network media blobs. The current success criteria include asserting the full scanner reclassifies exactly those removed callsites: the manifest count is a *hypothesis* until exact-head `node scripts/inventory-client-api-boundaries.mjs --json` succeeds. Re-run all exact-head workflows after this commit; previous heads are not release proof.
 
 Preserve Vite and Next separate route navigation, Next CSRF BFF, Expo native secure token store, owner role/verification policy, permissions and backend migration compatibility. Legacy login/OTP/session refresh remain a separate high-risk authentication batch; avoid flattening them into generic `fetchApi` requests.
+
+### Identity public browser transport consolidation — next 10 callsites
+
+The Vite/Next login and email-OTP verify/resend screens now invoke browser-specific named shared-core operations. They retain the explicit **GET CSRF then POST** handshake for login and verification, `X-Client-Platform: web`, cookie-backed authentication, remember-me payload, exact status handling for unverified email, and existing Vite/Next-specific routing, 30-second Next resend cooldown, and Next session announcement. The shared-core wire tests assert these cookies/headers/payloads. Client error interpretation now uses the shared-core structured status/payload without losing verification-specific redirects.
+
+Removed 10 resolved callsite identities. Full-tree manifest: 32 findings, **12 remaining legacy**, 15 approved platform, 5 non-network local URI. Browser login session and native Expo session refresh are intentionally separate. Physical device and fresh current-head E2E acceptance still required; previous head job results cannot sign off this commit.

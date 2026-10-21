@@ -2,7 +2,6 @@ import {useSession} from '../../shared/session-provider';
 import {returnDestination, rememberDestination, finishDestination, announceSession} from '../../shared/browser-session';
 import { useEffect, useState } from 'react';
 import { useNavigate, Link as RouterLink, useLocation } from '@/public/navigation';
-import axios from 'axios';
 import {
   Typography,
   TextField,
@@ -17,7 +16,8 @@ import {
   FormControlLabel,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
-import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
+import { API_BASE_URL } from '../constants/api';
+import { browserLoginSession } from '@chemisttasker/shared-core';
 import { ORG_ROLES } from '../constants/roles';
 import { useAuth } from '../contexts/AuthContext';
 import AuthLayout from '../layouts/AuthLayout';
@@ -72,11 +72,9 @@ export default function Login() {
     setError('');
 
     try {
-      const csrfSession = await axios.get(`${API_BASE_URL}/users/csrf/`, { withCredentials: true });
-      const { data } = await axios.post(
-        `${API_BASE_URL}${API_ENDPOINTS.login}`,
+      const data = await browserLoginSession(
+        { baseUrl: API_BASE_URL },
         { email: email.toLowerCase(), password, remember_me: rememberMe },
-        { withCredentials: true, headers: { "X-CSRFToken": csrfSession.data.csrfToken, "X-Client-Platform": "web" } }
       );
       const { access, refresh, user: userInfo } = data;
       if (!access || !userInfo) {
@@ -161,13 +159,14 @@ export default function Login() {
 
       navigate(redirectPath);
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const code = err.response?.data?.code;
+      if (err && typeof err === 'object' && 'status' in err) {
+        const data = (err as any)?.payload ?? (err as any)?.response?.data;
+        const code = data?.code;
         const msg =
-          err.response?.data?.detail ||
-          (Array.isArray(err.response?.data?.email)
-            ? err.response?.data?.email[0]
-            : err.response?.data?.message) ||
+          data?.detail ||
+          (Array.isArray(data?.email)
+            ? data?.email[0]
+            : data?.message) ||
           'Login failed. Please check your credentials.';
         setError(msg);
 
