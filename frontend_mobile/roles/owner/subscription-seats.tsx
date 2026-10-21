@@ -2,9 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, HelperText, Surface, Text, TextInput } from 'react-native-paper';
-import { createSubscriptionCheckout } from '@chemisttasker/shared-core';
+import { createSubscriptionCheckout, getCurrentSubscription, updateSubscriptionSeats } from '@chemisttasker/shared-core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import apiClient from '../../utils/apiClient';
 
 type SubscriptionState = {
   active: boolean;
@@ -40,7 +39,7 @@ export default function OwnerSubscriptionSeatsScreen() {
     setLoading(true);
     setError('');
     try {
-      const { data }: any = await apiClient.get('/billing/subscription/');
+      const data = await getCurrentSubscription();
       const nextState: SubscriptionState = {
         active: !!data?.active,
         status: data?.status || 'inactive',
@@ -99,7 +98,7 @@ export default function OwnerSubscriptionSeatsScreen() {
         staffCount: 5,
         paymentMethod: 'card',
         platform: 'mobile',
-      } as any);
+      });
       if (res?.url) {
         await Linking.openURL(res.url);
       } else if (res?.message) {
@@ -123,10 +122,7 @@ export default function OwnerSubscriptionSeatsScreen() {
     }
     setSaving(true);
     try {
-      const { data }: any = await apiClient.post('/billing/subscription/seats/', {
-        staff_count: desiredStaffCount,
-        platform: 'mobile',
-      });
+      const data = await updateSubscriptionSeats({ staffCount: desiredStaffCount, platform: 'mobile' });
       if (data?.url) {
         await Linking.openURL(data.url);
       } else {

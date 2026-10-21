@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Chip, Icon, Modal, Portal, Snackbar, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import apiClient from '@/utils/apiClient';
-import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from '@chemisttasker/shared-core';
+import { getMyMemberships, respondToMyMembership, getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useAhpra } from '@/context/AhpraContext';
 
@@ -72,12 +71,12 @@ export default function ManageMembershipsScreen() {
   const loadMemberships = useCallback(async () => {
     try {
       const [membershipsResult, invitationsResult] = await Promise.allSettled([
-        apiClient.get('/my-memberships/'),
+        getMyMemberships(),
         getPendingPharmacyAdminInvitations(),
       ]);
       if (membershipsResult.status === 'rejected') throw membershipsResult.reason;
-      const { data } = membershipsResult.value;
-      setMemberships(Array.isArray(data) ? data : data?.results || []);
+      const data = membershipsResult.value;
+      setMemberships((Array.isArray(data) ? data : data?.results || []) as unknown as Membership[]);
       if (invitationsResult.status === 'fulfilled') {
         setAdminInvitations(Array.isArray(invitationsResult.value) ? invitationsResult.value : []);
         setError(null);
@@ -100,7 +99,7 @@ export default function ManageMembershipsScreen() {
   const runAction = async (membership: Membership, action: 'accept' | 'reject' | 'quit') => {
     setActingKey(`membership-${membership.id}`);
     try {
-      await apiClient.post(`/my-memberships/${membership.id}/${action}/`);
+      await respondToMyMembership(membership.id, action);
       await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
       setQuitTarget(null);
       setToast(

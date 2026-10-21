@@ -77,6 +77,23 @@ jobs:
       - name: Install Chromium
         working-directory: frontend_web/e2e
         run: npx playwright install chromium
+      - name: Verify generated Expo skill artwork is fresh against web glyphs
+        shell: pwsh
+        run: |
+          node frontend_web/scripts/render-mobile-skill-symbols.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --exit-code -- frontend_mobile/assets/skill-symbols
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Generated skill artwork differs from tracked assets. Review updated PNG images before committing."
+            exit 1
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: proposed-expo-skill-artwork
+          path: frontend_mobile/assets/skill-symbols
+          if-no-files-found: warn
+          retention-days: 7
       - name: Compare the existing mobile and desktop appearance
         working-directory: frontend_web/e2e
         run: npm test -- frontend-appearance.spec.mjs --workers=2

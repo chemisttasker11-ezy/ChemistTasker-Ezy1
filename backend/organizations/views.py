@@ -105,7 +105,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
             visible_ids = membership_visible_pharmacy_ids(membership)
             if obj.id in visible_ids:
                 return
-        self.permission_denied(request, obj)
+        self.permission_denied(request)
 
     def get_queryset(self):
         user = self.request.user

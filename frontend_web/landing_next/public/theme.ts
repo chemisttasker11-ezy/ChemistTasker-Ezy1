@@ -1,10 +1,11 @@
+import { CHEMISTTASKER_BRAND } from '@chemisttasker/shared-core';
 import { createTheme } from '@mui/material/styles';
 
 export const publicTheme = createTheme({
   palette: {
-    primary: { main: '#5222B8', dark: '#40168F', light: '#EFE7FF' },
-    secondary: { main: '#D600C8', dark: '#A60B9C', light: '#FDE7F5' },
-    info: { main: '#008DDB', light: '#E7F0FF' },
+    primary: { main: CHEMISTTASKER_BRAND.violet, dark: '#40168F', light: '#EFE7FF' },
+    secondary: { main: CHEMISTTASKER_BRAND.magenta, dark: '#A60B9C', light: '#FDE7F5' },
+    info: { main: CHEMISTTASKER_BRAND.blue, light: '#E7F0FF' },
     success: { main: '#138A5B' },
     warning: { main: '#B86B00' },
     error: { main: '#C9364A' },
@@ -55,7 +56,7 @@ export const publicTheme = createTheme({
     },
     MuiChip: {
       styleOverrides: {
-        root: { borderRadius: 999, fontWeight: 700, backgroundColor: '#F2EDFB', color: '#5222B8' },
+        root: { borderRadius: 999, fontWeight: 700, backgroundColor: '#F2EDFB', color: CHEMISTTASKER_BRAND.violet },
         icon: { color: 'inherit' },
       },
     },

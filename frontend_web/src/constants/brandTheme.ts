@@ -1,3 +1,5 @@
+import { CHEMISTTASKER_BRAND } from '@chemisttasker/shared-core';
+
 /**
  * ChemistTasker Brand Design Tokens
  * Source of truth: this maintained module.
@@ -5,23 +7,23 @@
 
 export const BRAND_COLORS = {
   // Identity & Primary Typography
-  navy: '#06214A',
+  navy: CHEMISTTASKER_BRAND.navy,
   
   // Primary Interactive Actions & Active Controls
-  purple: '#5222B8',
+  purple: CHEMISTTASKER_BRAND.violet,
   purpleHover: '#43199B',
   purpleLight: '#F3EEFF',
 
   // Small Brand Accents & Attention Badges
-  magenta: '#D600C8',
+  magenta: CHEMISTTASKER_BRAND.magenta,
   magentaLight: '#FDF0FC',
 
   // Highlights, Network Accents & Active Badges
-  cyan: '#00BDD2',
+  cyan: CHEMISTTASKER_BRAND.cyan,
   cyanLight: '#E6FAF8',
 
   // Focus & Secondary Accents
-  blue: '#008DDB',
+  blue: CHEMISTTASKER_BRAND.blue,
   blueLight: '#EEF8FD',
   // Text on light surfaces: the accent blue is 3.3:1, this one is AA (5.5:1 on blueLight).
   blueText: '#0369A1',

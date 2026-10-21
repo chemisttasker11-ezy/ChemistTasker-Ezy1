@@ -46,7 +46,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import moment from 'moment';
-import apiClient from '../../utils/apiClient';
+import { rosterV2 } from '@chemisttasker/shared-core';
 import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
 import { type RosterGridViewsProps, getRoleStyle } from './RosterGridViews.model';
 import RosterStackedDayView from './RosterStackedDayView';
@@ -203,10 +203,8 @@ export default function RosterGridViews({
     if (isPublished) throw new Error('This roster is read-only.');
     if (periodId) return periodId;
     if (!pharmacyId) throw new Error('Select a pharmacy first.');
-    const response = await apiClient.post('/attendance/roster/period/', {
-      pharmacy_id: pharmacyId, week_start: weekStart,
-    });
-    return response.data.period_id as number;
+    const response = await rosterV2.initializePeriod(pharmacyId, weekStart);
+    return response.period_id as number;
   };
 
   const executeMoveShift = async (
@@ -218,23 +216,20 @@ export default function RosterGridViews({
 
     setIsActionLoading(true);
     try {
-      await apiClient.post('/attendance/roster/bulk-edit/', {
-        period_id: await ensureDraftPeriod(),
-        operations: [
+      await rosterV2.bulkEdit(await ensureDraftPeriod(), [
           {
             action: 'move_shift',
             slot_id: slotId,
             target_date: targetDate,
             target_user_id: targetUserId === undefined ? undefined : (targetUserId ?? 0),
           },
-        ],
-      });
+        ]);
       setFeedback({ type: 'success', text: 'Shift successfully moved and updated!' });
       onRosterUpdated?.();
     } catch (err: any) {
       setFeedback({
         type: 'error',
-        text: err.response?.data?.error || 'Failed to move shift. Please verify roster status.',
+        text: err.response?.data?.error || err?.message || 'Failed to move shift. Please verify roster status.',
       });
     } finally {
       setIsActionLoading(false);
@@ -246,16 +241,13 @@ export default function RosterGridViews({
     if (!canEditSlot(slotId)) return;
     setIsActionLoading(true);
     try {
-      await apiClient.post('/attendance/roster/bulk-edit/', {
-        period_id: await ensureDraftPeriod(),
-        operations: [{ action: 'delete_slot', slot_id: slotId }],
-      });
+      await rosterV2.bulkEdit(await ensureDraftPeriod(), [{ action: 'delete_slot', slot_id: slotId }]);
       setFeedback({ type: 'success', text: 'Shift slot deleted.' });
       onRosterUpdated?.();
     } catch (err: any) {
       setFeedback({
         type: 'error',
-        text: err.response?.data?.error || 'Failed to delete shift slot.',
+        text: err.response?.data?.error || err?.message || 'Failed to delete shift slot.',
       });
     } finally {
       setIsActionLoading(false);
@@ -271,9 +263,7 @@ export default function RosterGridViews({
 
     setIsActionLoading(true);
     try {
-      await apiClient.post('/attendance/roster/bulk-edit/', {
-        period_id: await ensureDraftPeriod(),
-        operations: [
+      await rosterV2.bulkEdit(await ensureDraftPeriod(), [
           {
             action: 'create_shift',
             date: quickAddDate,
@@ -282,15 +272,14 @@ export default function RosterGridViews({
             role: quickAddRole,
             user_id: quickAddWorkerId || undefined,
           },
-        ],
-      });
+        ]);
       setFeedback({ type: 'success', text: 'Shift created successfully.' });
       setQuickAddModalOpen(false);
       onRosterUpdated?.();
     } catch (err: any) {
       setFeedback({
         type: 'error',
-        text: err.response?.data?.error || 'Failed to create shift.',
+        text: err.response?.data?.error || err?.message || 'Failed to create shift.',
       });
     } finally {
       setIsActionLoading(false);

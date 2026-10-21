@@ -41,6 +41,18 @@ jobs:
           cache-dependency-path: shared-core/package-lock.json
       - run: npm ci
         working-directory: shared-core
+      - name: Full-tree Vite Next Expo transport inventory fixtures
+        run: node --test scripts/inventory-client-api-boundaries.test.mjs
+      - name: Report classified client transport candidates with stable callsites
+        run: node scripts/inventory-client-api-boundaries.mjs
+      - name: Preserve client transport inventory as a review artifact
+        run: node scripts/inventory-client-api-boundaries.mjs --json > client-boundary-inventory.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: client-boundary-inventory
+          path: client-boundary-inventory.json
+          if-no-files-found: error
+          retention-days: 7
       - run: npm run typecheck
         working-directory: shared-core
       - run: npm run test:ci
@@ -231,6 +243,8 @@ jobs:
         run: python backend/manage.py test core.test_pdf_rendering_contract --settings=core.contract_test_settings
       - name: Kernel and domain app tests
         run: python backend/manage.py test client_profile attendance chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar core.test_admin_registry_contract --settings=core.contract_test_settings
+      - name: Pharmacy tenant and multipart contract regression tests
+        run: python backend/manage.py test organizations.test_pharmacy_access_characterization organizations.test_pharmacy_upload_contract --settings=core.contract_test_settings
       - name: Promoted domain app and architecture contracts
         run: python backend/manage.py test shifts memberships organizations onboarding dashboards core.test_client_profile_api_composition core.test_shift_domain_contract core.test_membership_domain_contract core.test_organization_domain_contract core.test_onboarding_domain_contract core.test_dashboard_read_model_contract core.test_client_profile_common_contract core.test_kernel_utility_ownership core.test_operational_model_import_ownership core.test_promoted_model_import_ownership core.test_serializer_lifecycle_ownership core.test_backend_ownership_boundaries core.test_public_error_surface core.test_task_contracts core.test_task_dispatch_registration --settings=core.contract_test_settings
       - name: Public hub editorial and community contracts
@@ -325,7 +339,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
-      - run: node scripts/audit-shared-core-boundary.mjs
+      - name: Architecture boundary audit CLI contracts
+        run: node --test scripts/audit-shared-core-boundary.test.mjs
+      - name: Strict shared-core boundary audit
+        run: node scripts/audit-shared-core-boundary.mjs --strict
 
   architecture-audit:
     runs-on: ubuntu-latest
@@ -336,6 +353,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
+      - name: Generated mobile skill icon registry integrity
+        run: node scripts/audit-generated-skill-icons.mjs
+      - name: Runtime Django app import graph tests
+        run: python3 -m unittest discover -s scripts -p 'test_module_import_graph.py' -v
+      - name: Reject new unapproved backend module cycles
+        run: python3 scripts/module_import_graph.py --check --check-baseline
       - run: node scripts/audit-architecture-boundaries.mjs
       - run: node scripts/audit-shared-core-package.mjs
       - run: node --test scripts/audit-api-v1-cutover.test.mjs
