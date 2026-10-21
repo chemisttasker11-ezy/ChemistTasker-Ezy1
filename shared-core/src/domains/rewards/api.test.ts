@@ -49,3 +49,52 @@ describe('Pill referral creation wire compatibility', () => {
     expect(JSON.parse(String(shift[1].body))).toEqual({ shift_id: 321 });
   });
 });
+
+describe('rewards authentication and failure parity', () => {
+  it('sends the configured user bearer token for reward reads and mutations', async () => {
+    await fetchPillBalanceService();
+    await createFriendPillReferralService({});
+    for (const [, options] of fetchMock.mock.calls) {
+      const headers = new Headers(options.headers);
+      expect(headers.get('Authorization')).toBe('Bearer session-token');
+      expect(options.credentials).toBe('include');
+    }
+  });
+  it('surfaces backend validation status and message instead of treating a failed referral as successful', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      detail: 'The referral limit has been reached.',
+    }), { status: 400, headers: { 'content-type': 'application/json' } }));
+    await expect(createFriendPillReferralService({})).rejects.toMatchObject({
+      name: 'ApiError', status: 400, message: 'The referral limit has been reached.',
+    });
+  });
+  it('never exposes raw 500 response details to mobile or browser callers', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('<h1>internal traceback</h1>', {
+      status: 500, headers: { 'content-type': 'text/html' },
+    }));
+    await expect(fetchPillBalanceService()).rejects.toMatchObject({
+      status: 500, message: 'Request failed with status 500', payload: null,
+    });
+  });
+  it('uses one refresh retry when configured and respects the rotated token', async () => {
+    const refreshed = vi.fn(async () => 'rotated-token');
+    fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Expired.' }), {
+        status: 401, headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ balance: 6 }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }));
+    configureApi({
+      baseURL: 'https://example.test/api/v1',
+      getToken: () => 'expired-token',
+      refreshToken: refreshed,
+      fetchImpl: fetchMock,
+    });
+    expect((await fetchPillBalanceService()).balance).toBe(6);
+    expect(refreshed).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('Authorization')).toBe('Bearer expired-token');
+    expect(new Headers(fetchMock.mock.calls[1][1].headers).get('Authorization')).toBe('Bearer rotated-token');
+  });
+});
