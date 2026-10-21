@@ -44,8 +44,9 @@ jobs:
       - name: Inventory Vite Next Expo direct transport and verify scanner
         run: node --test scripts/inventory-client-api-boundaries.test.mjs
       - name: Record classified API transport debt and required ownership
-        run: node scripts/inventory-client-api-boundaries.mjs --json > client-boundary-inventory.json
+        run: node scripts/inventory-client-api-boundaries.mjs --strict --json > client-boundary-inventory.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
         with:
           name: client-boundary-inventory
           path: client-boundary-inventory.json

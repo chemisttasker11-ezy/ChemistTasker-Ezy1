@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import registry from '../../../skills_registry.json';
 import { appendPharmacyFormFields, verifyPharmacyWriteReadback } from './pharmacyMultipart';
 
 function collect(payload: Record<string, unknown>) {
@@ -79,5 +80,146 @@ describe('persisted pharmacy file replacement identity and retry safety', () => 
             id: 42, employment_types: ['LOCUMS'], roles_needed: [],
             methadone_s8_protocols: '/media/pharmacies/42/previous.pdf',
         }, { ...expected, uploadedFields: [] })).not.toThrow();
+    });
+});
+
+describe('canonical software and service comparison during readback verification', () => {
+    const baseExpected = {
+        persistedId: '42',
+        submitted: {
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: ['WinIFRED'],
+            services: ['VACCINATION', 'VACCINATION'],
+        },
+        uploadedFields: [] as const,
+        skillsRegistry: registry as any,
+    };
+
+    it('accepts accepted alias (WinIFRED -> FRED) and deduplicates services', () => {
+        expect(() => verifyPharmacyWriteReadback({
+            id: 42,
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: ['FRED'],
+            services: ['VACCINATION'],
+        }, baseExpected)).not.toThrow();
+    });
+
+    it('deduplicates services and software even when registry is omitted', () => {
+        const withoutRegistry = {
+            ...baseExpected,
+            skillsRegistry: undefined,
+            submitted: {
+                employment_types: ['LOCUMS'],
+                roles_needed: [],
+                software: ['FRED'],
+                services: ['VACCINATION', 'VACCINATION'],
+            },
+        };
+        expect(() => verifyPharmacyWriteReadback({
+            id: 42,
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: ['FRED'],
+            services: ['VACCINATION'],
+        }, withoutRegistry)).not.toThrow();
+    });
+
+    it('rejects real software mismatch even if an alias is configured', () => {
+        expect(() => verifyPharmacyWriteReadback({
+            id: 42,
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: ['MINFOS'],
+            services: ['VACCINATION'],
+        }, baseExpected)).toThrow(/software/);
+    });
+
+    it('rejects real service mismatch', () => {
+        expect(() => verifyPharmacyWriteReadback({
+            id: 42,
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: ['FRED'],
+            services: ['DAA'],
+        }, baseExpected)).toThrow(/services/);
+    });
+
+    it('rejects when server readback drops a submitted service', () => {
+        const multiServices = {
+            ...baseExpected,
+            submitted: {
+                ...baseExpected.submitted,
+                services: ['VACCINATION', 'ESCRIPT_PROCESSING'],
+            },
+        };
+        expect(() => verifyPharmacyWriteReadback({
+            id: 42,
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: ['FRED'],
+            services: ['VACCINATION'],
+        }, multiServices)).toThrow(/services/);
+    });
+
+    it('rejects when software or services is missing or not an array in readback', () => {
+        expect(() => verifyPharmacyWriteReadback({
+            id: 42,
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: null,
+            services: ['VACCINATION'],
+        }, baseExpected)).toThrow(/software/);
+    });
+
+    it('rejects when software or services in readback contains non-string elements instead of filtering them', () => {
+        expect(() => verifyPharmacyWriteReadback({
+            id: 42,
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: ['FRED', 123],
+            services: ['VACCINATION'],
+        }, baseExpected)).toThrow(/software/);
+
+        expect(() => verifyPharmacyWriteReadback({
+            id: 42,
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: ['FRED'],
+            services: ['VACCINATION', null],
+        }, baseExpected)).toThrow(/services/);
+    });
+
+    it('rejects malformed submitted software or services lists instead of non-null asserting null', () => {
+        const malformedSubmittedSoftware = {
+            ...baseExpected,
+            submitted: {
+                ...baseExpected.submitted,
+                software: ['WinIFRED', 999],
+            },
+        };
+        expect(() => verifyPharmacyWriteReadback({
+            id: 42,
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: ['FRED'],
+            services: ['VACCINATION'],
+        }, malformedSubmittedSoftware)).toThrow(/software/);
+
+        const malformedSubmittedServices = {
+            ...baseExpected,
+            submitted: {
+                ...baseExpected.submitted,
+                services: [null, undefined],
+            },
+        };
+        expect(() => verifyPharmacyWriteReadback({
+            id: 42,
+            employment_types: ['LOCUMS'],
+            roles_needed: [],
+            software: ['FRED'],
+            services: ['VACCINATION'],
+        }, malformedSubmittedServices)).toThrow(/services/);
     });
 });

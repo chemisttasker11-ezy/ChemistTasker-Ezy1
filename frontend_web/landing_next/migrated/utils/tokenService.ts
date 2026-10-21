@@ -41,9 +41,16 @@ export function isTokenExpired(token: string, leewaySeconds = 30): boolean {
 export async function restoreTokensFromStorage(): Promise<void> {
   authStorage = resolveAuthStorage();
   const access = authStorage.getItem(ACCESS_KEY);
-  const refresh = authStorage.getItem(REFRESH_KEY);
+
+  // One-time cleanup for users upgrading from the legacy browser-token model.
+  // Preserve a still-valid access token in memory for this page load, but never
+  // retain or restore a refresh credential from JavaScript-readable storage.
   accessToken = access || null;
-  refreshToken = refresh || null;
+  refreshToken = null;
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+  sessionStorage.removeItem(ACCESS_KEY);
+  sessionStorage.removeItem(REFRESH_KEY);
 }
 
 export function getAccessToken(): string | null {

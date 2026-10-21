@@ -40,7 +40,9 @@ import {
     lookupPharmacyAbn,
     appendPharmacyFormFields,
     verifyPharmacyWriteReadback,
+    type SkillsRegistry,
 } from '@chemisttasker/shared-core';
+import registry from '@chemisttasker/shared-core/skills_registry.json';
 import { surfaceTokens } from './types';
 import GooglePlacesInput from './GooglePlacesInput';
 import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
@@ -656,6 +658,7 @@ export default function PharmacyForm({
                 submitted: pendingReadbackRef.current.submitted,
                 uploadedFields: pendingReadbackRef.current.uploadedFields,
                 previousDocumentUrls: pendingReadbackRef.current.previousDocumentUrls,
+                skillsRegistry: registry as SkillsRegistry,
             } : {
                 persistedId: persistedPharmacyId,
                 submitted: payload,
@@ -671,6 +674,7 @@ export default function PharmacyForm({
                     induction_guides: existingFiles.induction,
                     qld_sump_docs: existingFiles.sump,
                 },
+                skillsRegistry: registry as SkillsRegistry,
             });
             const acceptedAfterSave = pendingReadbackRef.current?.afterSave ?? afterSave;
             pendingReadbackRef.current = null;

@@ -180,8 +180,6 @@ LEGACY_CELERY_TASKS = {
 # Pairs of apps that already import each other at module level: mostly `users` (identity models plus the account API,
 # which reads organisations, memberships and shifts) and `core` (settings, URLs, shared utilities). New pairs fail.
 ALLOWED_MUTUAL_APP_PAIRS = {
-    # attendance approvals use the roster-management capability; workforce timesheets read attendance sessions
-    ("attendance", "workforce"),
     # core is the composition root (URLconfs, ASGI, WebSocket routing, sitemap) and the shared utility package
     ("chat", "core"),
     ("core", "shifts"),

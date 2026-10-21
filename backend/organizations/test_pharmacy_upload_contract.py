@@ -98,3 +98,28 @@ class PharmacyMultipartContractTests(TestCase):
         self.pharmacy.refresh_from_db()
         self.assertEqual(self.pharmacy.employment_types, ["FULL_TIME", "LOCUMS"])
         self.assertEqual(self.pharmacy.roles_needed, ["PHARMACIST", "STUDENT"])
+
+    def test_multipart_normalizes_software_alias_and_deduplicates_services(self):
+        response = self.client.patch(self.url, {
+            "software": json.dumps(["WinIFRED"]),
+            "services": json.dumps(["VACCINATION", "VACCINATION"]),
+        }, format="multipart")
+        self.assertEqual(response.status_code, 200, response.content)
+        self.pharmacy.refresh_from_db()
+        self.assertEqual(self.pharmacy.software, ["FRED"])
+        self.assertEqual(self.pharmacy.services, ["VACCINATION"])
+        read_back = self.client.get(self.url)
+        self.assertEqual(read_back.status_code, 200, read_back.content)
+        self.assertEqual(read_back.data["software"], ["FRED"])
+        self.assertEqual(read_back.data["services"], ["VACCINATION"])
+
+    def test_multipart_rejects_unknown_service_and_category_conflict(self):
+        unknown_service = self.client.patch(self.url, {
+            "services": json.dumps(["NOT_A_REAL_SERVICE"]),
+        }, format="multipart")
+        self.assertEqual(unknown_service.status_code, 400)
+
+        conflict_software = self.client.patch(self.url, {
+            "software": json.dumps(["FRED", "MINFOS"]),
+        }, format="multipart")
+        self.assertEqual(conflict_software.status_code, 400)

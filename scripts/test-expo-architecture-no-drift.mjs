@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const form = readFileSync(new URL('../frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx', import.meta.url), 'utf8');
+const form = readFileSync(new URL('../frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const theme = readFileSync(new URL('../frontend_mobile/constants/theme.ts', import.meta.url), 'utf8');
 
 test('pharmacy GET recovery is enabled, is retry-only and cannot resubmit a write', () => {

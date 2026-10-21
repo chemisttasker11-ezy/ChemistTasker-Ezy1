@@ -13,6 +13,7 @@ export function configureApi(config: FinanceConfig): void {
 export * from './finance';
 export * from './financePresentation';
 export * from './api';
+export { getMembershipErrorMessage } from './domains/memberships/errors';
 export * from './talent';
 
 // Request-scoped/shared transport. Use createApiClient/createChemistTaskerApi

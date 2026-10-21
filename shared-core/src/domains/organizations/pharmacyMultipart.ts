@@ -2,6 +2,7 @@
  * Django's JSONField expects a single JSON value for an array, not repeated
  * multipart values with the same key. Native file objects stay platform-owned.
  */
+import { skillId, type SkillsRegistry } from '../../skills';
 export function appendPharmacyFormFields(
     formData: { append(name: string, value: string): void },
     payload: Record<string, unknown>,
@@ -37,11 +38,21 @@ function canonicalDocumentPath(value: unknown): string | null {
     }
 }
 
+function canonicalSkillList(values: unknown, registry?: SkillsRegistry): string[] | null {
+    if (!Array.isArray(values)) return null;
+    for (const v of values) {
+        if (typeof v !== 'string') return null;
+    }
+    const mapped = values.map(v => (registry ? (skillId(registry, v) || v) : v));
+    return Array.from(new Set(mapped));
+}
+
 export interface PharmacyWriteVerification {
     persistedId: number | string;
     submitted: Record<string, unknown>;
     uploadedFields: readonly PharmacyDocumentField[];
     previousDocumentUrls?: Partial<Record<PharmacyDocumentField, string | null>>;
+    skillsRegistry?: SkillsRegistry;
 }
 
 export function verifyPharmacyWriteReadback(
@@ -51,9 +62,22 @@ export function verifyPharmacyWriteReadback(
     if (!persisted || String(persisted.id ?? '') !== String(expected.persistedId)) {
         throw new Error('Saved pharmacy could not be verified. Retry verification without resubmitting.');
     }
+    const registry = expected.skillsRegistry;
     for (const key of pharmacyLists) {
         const selected = expected.submitted[key];
-        if (Array.isArray(selected) && JSON.stringify(persisted[key]) !== JSON.stringify(selected)) {
+        if (!Array.isArray(selected)) continue;
+        if (key === 'software' || key === 'services') {
+            const persistedCanonical = canonicalSkillList(persisted[key], registry);
+            const selectedCanonical = canonicalSkillList(selected, registry);
+            if (!persistedCanonical || !selectedCanonical) {
+                throw new Error(`Saved pharmacy ${key} did not match the submitted selection.`);
+            }
+            const a = [...selectedCanonical].sort();
+            const b = [...persistedCanonical].sort();
+            if (a.length !== b.length || a.some((val, idx) => val !== b[idx])) {
+                throw new Error(`Saved pharmacy ${key} did not match the submitted selection.`);
+            }
+        } else if (!Array.isArray(persisted[key]) || JSON.stringify(persisted[key]) !== JSON.stringify(selected)) {
             throw new Error(`Saved pharmacy ${key} did not match the submitted selection.`);
         }
     }

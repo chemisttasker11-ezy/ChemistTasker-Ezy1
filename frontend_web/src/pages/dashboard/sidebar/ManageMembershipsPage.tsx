@@ -18,7 +18,14 @@ import IconTile from "../../../components/ui/IconTile";
 import DashboardContentState from "../../../components/dashboard/DashboardContentState";
 import { Pill } from "../../../components/ui/Pill";
 import { type StatusTone } from "../../../components/ui/tone";
-import { getMyMemberships, getCurrentUser, respondToMyMembership, getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from "@chemisttasker/shared-core";
+import {
+  getMyMemberships,
+  getCurrentUser,
+  respondToMyMembership,
+  getPendingPharmacyAdminInvitations,
+  respondToPharmacyAdminInvitation,
+  getMembershipErrorMessage,
+} from "@chemisttasker/shared-core";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useAhpra } from "../../../contexts/AhpraContext";
 
@@ -111,7 +118,7 @@ export default function ManageMembershipsPage() {
       setActionError(null);
       setLoadFailed(false);
     } catch (error: any) {
-      setActionError(error?.response?.data?.detail || "Unable to load memberships.");
+      setActionError(getMembershipErrorMessage(error, "Unable to load memberships."));
       setLoadFailed(true);
     } finally {
       setLoading(false);
@@ -133,7 +140,7 @@ export default function ManageMembershipsPage() {
       await respondToPharmacyAdminInvitation(invitation.id, accept);
       await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
     } catch (error: any) {
-      setActionError(error?.response?.data?.detail || 'Unable to respond to this admin invitation.');
+      setActionError(getMembershipErrorMessage(error, 'Unable to respond to this admin invitation.'));
     } finally {
       setActingId(null);
     }
@@ -146,7 +153,7 @@ export default function ManageMembershipsPage() {
       await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
       setQuitTarget(null);
     } catch (error: any) {
-      setActionError(error?.response?.data?.detail || `Unable to ${action} membership.`);
+      setActionError(getMembershipErrorMessage(error, `Unable to ${action} membership.`));
     } finally {
       setActingId(null);
     }

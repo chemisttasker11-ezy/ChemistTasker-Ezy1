@@ -1,5 +1,4 @@
 import { isValid } from 'date-fns';
-import apiClient from '@/utils/apiClient';
 
 export type ItemType = 'all' | 'events' | 'notes' | 'birthdays';
 
@@ -27,24 +26,6 @@ export const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 export const normalizeList = (data: any) =>
   Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-
-export const fetchJson = async (path: string, params?: Record<string, any>) => {
-  const res = await apiClient.get(path, { params });
-  return res.data;
-};
-
-export const postJson = async (
-  path: string,
-  body: any = null,
-  method: 'POST' | 'PATCH' | 'DELETE' = 'POST',
-) => {
-  if (method === 'DELETE') {
-    const res = await apiClient.delete(path);
-    return res.data;
-  }
-  const res = await apiClient.request({ url: path, method, data: body });
-  return res.data;
-};
 
 export const toDate = (value?: string | null) => {
   if (!value) return null;

@@ -85,6 +85,18 @@ Replaced the last active Next CMS `contentApi(path, method, body)` feature escap
 
 **Full-tree AST legacy inventory now has 0 legacy candidates**, 22 explicitly approved platform-transport callsites and 5 annotated local-media false positives. This is only a static transport-ownership claim until exact-head scanner strict and full Senior Package Testing pass. It is **not** a claim that Django's 37 cyclic import edges or 43 Vite/Next divergent twins were eliminated. No silent merge or deployment.
 
+### Team Calendar domain consolidation (A04 unreviewed transport resolution)
+
+Replaced 22 whole-tree unreviewed calendar transport callsites (11 in `frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.tsx` and 11 in `frontend_mobile/roles/shared/calendar/index.tsx`) with canonical named domain operations in `shared-core/src/domains/calendar/api.ts`: `getCalendarFeed`, `createCalendarEvent`, `updateCalendarEvent`, `deleteCalendarEvent`, `createWorkNote`, `updateWorkNote`, `deleteWorkNote`, `markWorkNoteDone`, `markWorkNoteOpen`, and `actOnWorkNote`.
+
+- Feature-level `fetchJson`, `postJson`, and direct `apiClient` helper functions and imports were deleted from `PharmacyCalendarPage.model.ts` and `calendarModel.ts`.
+- Preserved exact wire request shapes: calendar event POST/PATCH payloads retain `pharmacy`, snake_case `all_day`, `start_time`, `end_time`, and explicit `recurrence` `{freq, interval, until_date}` or `null` without field loss or default substitution.
+- Work note POST/PATCH payloads retain `pharmacy`, `date`, `notify_on_shift_start`, `is_general`, `assignee_membership_ids`, and `recurrence`.
+- Recurring occurrence completion (`mark_done` / `mark_open`) retains `{ occurrence_date: YYYY-MM-DD }` while preserving bodyless compatibility for older callers.
+- Existing save-error handlers display the SDK `ApiError.message`, including structured backend validation messages; no feature-local error formatter was added.
+- Focused calendar wire tests in `shared-core/src/domains/calendar/api.test.ts` assert feed scoping query parameters (`pharmacy_id`, `date_from`, `date_to`), create/update/delete payloads, recurrence structures, dynamic status action mapping, and 400/403 failure status/message propagation.
+- **Factual transport count narrative:** Scanner findings (49 total: 27 classified in manifest + 22 unreviewed calendar calls) now resolve to 27 classified (22 approved platform-transport adapters, 5 local-media false positives) and 0 unreviewed/legacy calendar candidates.
+
 ### Attendance / workforce module import cycle reduction
 
 Attendance and workforce previously formed a two-app import-time strongly connected component. `attendance.approvals` and `attendance.views` used to import `workforce.roster.permissions.is_authorized_attendance_manager` at module load while workforce attendance edits import `attendance.approvals`. The permission lookup now resolves inside the identical-name `attendance.approvals.is_authorized_attendance_manager` callable. Attendance views import the local facade. Authorization **still delegates to the same workforce predicate** (owners, organisation scopes, manager capabilities unchanged); no migration, serialized output, shift, pricing, stored records or system behaviour changed. Added a pure AST no-database test to confirm module import timing and function delegate identity, plus its CI gate. `scripts/module_import_graph.py --check --check-baseline` and both SQLite/PostgreSQL acceptance must confirm the cycle reduction at the exact commit. The long-lived 13-app SCC is not automatically touched, and the old baseline is deliberately kept unchanged to preserve no-regression ratchet.

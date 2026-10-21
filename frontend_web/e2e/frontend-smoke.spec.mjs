@@ -334,7 +334,7 @@ test.describe('public/auth wiring', () => {
     expect(observed.csrf).toBe('smoke-csrf');
     expect(observed.platform).toBe('web');
   });
-  for (const status of [400, 401, 403, 404, 409, 422, 500]) {
+  for (const status of [400, 401, 403, 404, 409, 422, 429, 500, 503]) {
     test(`login handles HTTP ${status} without crashing or spinning forever`, async ({ page }) => {
       await page.route('**/api/**', async (route) => {
         const request = route.request();
@@ -351,10 +351,77 @@ test.describe('public/auth wiring', () => {
       await page.getByLabel('Email').fill('smoke@example.test');
       await page.getByLabel('Password').fill('wrong-password');
       await page.getByRole('button', { name: 'Login' }).click();
-      await expect(page.getByRole('alert')).toContainText(`Smoke HTTP ${status}`);
+      if (status >= 500) {
+        await expect(page.getByRole('alert')).toContainText('Service is temporarily unavailable. Please try again shortly.');
+      } else {
+        await expect(page.getByRole('alert')).toContainText(`Smoke HTTP ${status}`);
+      }
       await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
     });
   }
+
+  test('login handles CSRF bootstrap 500/503 outage safely', async ({ page }) => {
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      if (path.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
+      if (path.endsWith('/users/csrf/')) return json(route, { detail: 'CSRF service down' }, 503);
+      return route.fallback();
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('smoke@example.test');
+    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByRole('button', { name: 'Login' }).click();
+    await expect(page.getByRole('alert')).toContainText('Service is temporarily unavailable. Please try again shortly.');
+    await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
+  });
+
+  test('login sanitizes 500 HTML/traceback responses', async ({ page }) => {
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const apiPath = new URL(request.url()).pathname;
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
+        return route.fulfill({
+          status: 500,
+          contentType: 'text/html',
+          body: '<html><body><h1>Server Error (500)</h1><p>Traceback (most recent call last): ...</p></body></html>',
+        });
+      }
+      return json(route, {});
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('smoke@example.test');
+    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByRole('button', { name: 'Login' }).click();
+    await expect(page.getByRole('alert')).toContainText('Service is temporarily unavailable. Please try again shortly.');
+    await expect(page.locator('body')).not.toContainText('Traceback');
+    await expect(page.locator('body')).not.toContainText('Server Error (500)');
+    await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
+  });
+
+  test('login redirects unverified email with email_not_verified code', async ({ page }) => {
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const apiPath = new URL(request.url()).pathname;
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
+        return json(route, { code: 'email_not_verified', detail: 'Please verify your email address.' }, 401);
+      }
+      return json(route, {});
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('unverified@example.test');
+    await page.getByLabel('Password').fill('password123');
+    await page.getByRole('button', { name: 'Login' }).click();
+    await page.waitForURL('**/otp-verify');
+    expect(new URL(page.url()).pathname).toBe('/otp-verify');
+  });
 
   test('login handles network failure safely', async ({ page }) => {
     await page.route('**/api/**', async (route) => {

@@ -70,6 +70,38 @@ describe('browser identity and public wire contract parity', () => {
     options.fetchImpl = vi.fn(async () => json({ detail: 'Backend unavailable' }, 503)) as unknown as typeof fetch;
     await expect(browserSessionCurrentUser(options)).rejects.toThrow('Your account is temporarily unavailable.');
   });
+  it.each([400, 401, 403, 429])('browser login preserves structured %i error payloads', async (status) => {
+    const fetchImpl = vi.fn(async (u: RequestInfo | URL) => {
+      const path = new URL(String(u)).pathname;
+      if (path.endsWith('csrf/')) return json({ csrfToken: 'csrf-token' });
+      return json({ detail: `Error ${status}`, code: 'auth_error' }, status);
+    }) as unknown as typeof fetch;
+    const options = { baseUrl: 'https://example.test/api/v1', fetchImpl };
+    await expect(browserLoginSession(options, { email: 'user@example.test', password: 'pw', remember_me: false }))
+      .rejects.toMatchObject({ status, payload: { detail: `Error ${status}`, code: 'auth_error' } });
+  });
+  it.each([500, 503])('browser login strips raw %i server error payloads to protect against HTML/traceback leaks', async (status) => {
+    const fetchImpl = vi.fn(async (u: RequestInfo | URL) => {
+      const path = new URL(String(u)).pathname;
+      if (path.endsWith('csrf/')) return json({ csrfToken: 'csrf-token' });
+      return new Response('<html>Traceback leaked</html>', { status, headers: { 'content-type': 'text/html' } });
+    }) as unknown as typeof fetch;
+    const options = { baseUrl: 'https://example.test/api/v1', fetchImpl };
+    const rejection = await browserLoginSession(options, { email: 'user@example.test', password: 'pw', remember_me: false })
+      .catch(e => e);
+    expect(rejection.status).toBe(status);
+    expect(rejection.payload).toBeNull();
+  });
+  it('browser login fails safely when CSRF bootstrap returns 500/503 or empty token', async () => {
+    const fetchImpl503 = vi.fn(async () => json({ detail: 'CSRF down' }, 503)) as unknown as typeof fetch;
+    await expect(browserLoginSession({ baseUrl: 'https://example.test/api/v1', fetchImpl: fetchImpl503 },
+      { email: 'user@example.test', password: 'pw', remember_me: false })).rejects.toMatchObject({ status: 503, payload: null });
+
+    const fetchImplEmpty = vi.fn(async () => json({})) as unknown as typeof fetch;
+    await expect(browserLoginSession({ baseUrl: 'https://example.test/api/v1', fetchImpl: fetchImplEmpty },
+      { email: 'user@example.test', password: 'pw', remember_me: false }))
+      .rejects.toThrow('Browser CSRF bootstrap did not return a token.');
+  });
   it('websocket ticket uses the explicit bearer and preserves a body-object POST', async () => {
     const { seen, options } = make(() => ({ ticket: 'ws-secret' }));
     expect(await browserWebSocketTicket(options, 'access')).toBe('ws-secret');

@@ -452,6 +452,13 @@ export {
 } from './domains/chat/api';
 export {
   CalendarEventFilters,
+  CalendarEventRecurrence,
+  CreateCalendarEventPayload,
+  UpdateCalendarEventPayload,
+  CreateWorkNotePayload,
+  UpdateWorkNotePayload,
+  WorkNoteOccurrencePayload,
+  WorkNoteAction,
   WorkNoteFilters,
   getCalendarEvents,
   fetchCalendarEvents,
@@ -477,6 +484,7 @@ export {
   markWorkNoteDoneService,
   markWorkNoteOpen,
   markWorkNoteOpenService,
+  actOnWorkNote,
   getCalendarFeed,
   fetchCalendarFeed,
 } from './domains/calendar/api';

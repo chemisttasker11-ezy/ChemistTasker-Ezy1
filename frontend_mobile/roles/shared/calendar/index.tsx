@@ -34,14 +34,23 @@ import {
   startOfWeek,
   subMonths,
 } from 'date-fns';
-import { fetchMembershipsByPharmacy, fetchMyMemberships } from '@chemisttasker/shared-core';
+import {
+  actOnWorkNote,
+  createCalendarEvent,
+  createWorkNote,
+  deleteCalendarEvent,
+  deleteWorkNote,
+  fetchMembershipsByPharmacy,
+  fetchMyMemberships,
+  getCalendarFeed,
+  updateCalendarEvent,
+  updateWorkNote,
+} from '@chemisttasker/shared-core';
 import {
   type ItemType,
   type CalendarItem,
   WEEKDAYS,
   normalizeList,
-  fetchJson,
-  postJson,
   toDate,
   formatTimeRange,
   ROLE_LABELS,
@@ -50,6 +59,7 @@ import {
   parseTime,
   formatTime,
 } from './calendarModel';
+
 
 export default function SharedCalendarScreen() {
   const theme = useTheme();
@@ -188,7 +198,7 @@ export default function SharedCalendarScreen() {
     setLoading(true);
     setError(null);
     try {
-      const feed = await fetchJson('/calendar-feed/', {
+      const feed = await getCalendarFeed({
         pharmacy_id: selectedPharmacyId,
         date_from: dateRange.from,
         date_to: dateRange.to,
@@ -442,9 +452,9 @@ export default function SharedCalendarScreen() {
         recurrence,
       };
       if (editingEventId) {
-        await postJson(`/calendar-events/${editingEventId}/`, payload, 'PATCH');
+        await updateCalendarEvent(editingEventId, payload);
       } else {
-        await postJson('/calendar-events/', payload);
+        await createCalendarEvent(payload);
       }
       setEventModalOpen(false);
       setEditingEventId(null);
@@ -508,9 +518,9 @@ export default function SharedCalendarScreen() {
         recurrence,
       };
       if (editingNoteId) {
-        await postJson(`/work-notes/${editingNoteId}/`, payload, 'PATCH');
+        await updateWorkNote(editingNoteId, payload);
       } else {
-        await postJson('/work-notes/', payload);
+        await createWorkNote(payload);
       }
       setNoteModalOpen(false);
       setEditingNoteId(null);
@@ -840,7 +850,7 @@ export default function SharedCalendarScreen() {
                                         try {
                                           const baseId = getBaseItemId(item);
                                           if (!baseId) return;
-                                          await postJson(`/calendar-events/${baseId}/`, {}, 'DELETE');
+                                          await deleteCalendarEvent(baseId);
                                           void loadFeed();
                                         } catch {
                                           // ignore
@@ -874,7 +884,7 @@ export default function SharedCalendarScreen() {
                                         try {
                                           const baseId = getBaseItemId(item);
                                           if (!baseId) return;
-                                          await postJson(`/work-notes/${baseId}/`, {}, 'DELETE');
+                                          await deleteWorkNote(baseId);
                                           void loadFeed();
                                         } catch {
                                           // ignore
@@ -897,10 +907,10 @@ export default function SharedCalendarScreen() {
                                     const baseId = getBaseItemId(item);
                                     if (!baseId) return;
                                     const occurrenceDate = format(item.date, 'yyyy-MM-dd');
-                                    await postJson(
-                                      `/work-notes/${baseId}/${action}/`,
-                                      { occurrence_date: occurrenceDate },
-                                      'POST'
+                                    await actOnWorkNote(
+                                      baseId,
+                                      action,
+                                      { occurrence_date: occurrenceDate }
                                     );
                                     void loadFeed();
                                   } catch {

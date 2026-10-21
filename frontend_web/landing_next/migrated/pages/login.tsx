@@ -160,6 +160,11 @@ export default function Login() {
       navigate(redirectPath);
     } catch (err) {
       if (err && typeof err === 'object' && 'status' in err) {
+        const status = Number((err as any).status);
+        if (status >= 500) {
+          setError('Service is temporarily unavailable. Please try again shortly.');
+          return;
+        }
         const data = (err as any)?.payload ?? (err as any)?.response?.data;
         const code = data?.code;
         const msg =
@@ -178,7 +183,7 @@ export default function Login() {
         }
 
       } else {
-        setError('An unexpected error occurred. Please try again.');
+        setError('Login failed. Please check your credentials.');
       }
     } finally {
       setLoading(false);

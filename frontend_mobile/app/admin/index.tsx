@@ -7,7 +7,6 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
 import { useAdminWorkspace } from '@/context/AdminWorkspaceContext';
-import apiClient from '@/utils/apiClient';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
 import ChooseAccountTypeCard from '@/components/ChooseAccountTypeCard';
 import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } from '@/roles/shared/dashboard/dashboardScope';
