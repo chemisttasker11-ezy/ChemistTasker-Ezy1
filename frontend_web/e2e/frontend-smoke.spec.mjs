@@ -361,20 +361,32 @@ test.describe('public/auth wiring', () => {
   }
 
   test('login handles CSRF bootstrap 500/503 outage safely', async ({ page }) => {
+    let simulateCsrfOutage = false;
+    let loginPostCount = 0;
     await page.route('**/api/**', async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
-      if (path.endsWith('/users/me/')) return json(route, { detail: 'Unauthenticated' }, 401);
-      if (path.endsWith('/users/csrf/')) return json(route, { detail: 'CSRF service down' }, 503);
-      return route.fallback();
+      if (simulateCsrfOutage && path.endsWith('/users/csrf/')) {
+        return json(route, { detail: 'CSRF service down' }, 503);
+      }
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      if (request.method() === 'POST' && isPath(path, LOGIN_PATH)) {
+        loginPostCount += 1;
+        return json(route, { detail: 'Invalid credentials' }, 401);
+      }
+      return json(route, {});
     });
 
     await page.goto('/login');
+    await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
     await page.getByLabel('Email').fill('smoke@example.test');
     await page.getByLabel('Password').fill('wrong-password');
+    simulateCsrfOutage = true;
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page.getByRole('alert')).toContainText('Service is temporarily unavailable. Please try again shortly.');
     await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
+    expect(loginPostCount).toBe(0);
   });
 
   test('login sanitizes 500 HTML/traceback responses', async ({ page }) => {
