@@ -18,8 +18,7 @@ import IconTile from "../../../components/ui/IconTile";
 import DashboardContentState from "../../../components/dashboard/DashboardContentState";
 import { Pill } from "../../../components/ui/Pill";
 import { type StatusTone } from "../../../components/ui/tone";
-import apiClient from "../../../utils/apiClient";
-import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from "@chemisttasker/shared-core";
+import { getMyMemberships, getCurrentUser, respondToMyMembership, getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from "@chemisttasker/shared-core";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useAhpra } from "../../../contexts/AhpraContext";
 
@@ -103,11 +102,11 @@ export default function ManageMembershipsPage() {
   const loadMemberships = async () => {
     setLoading(true);
     try {
-      const [{ data }, invitations] = await Promise.all([
-        apiClient.get("/my-memberships/"),
+      const [data, invitations] = await Promise.all([
+        getMyMemberships(),
         getPendingPharmacyAdminInvitations(),
       ]);
-      setMemberships(Array.isArray(data) ? data : data?.results || []);
+      setMemberships((Array.isArray(data) ? data : data?.results || []) as unknown as Membership[]);
       setAdminInvitations(Array.isArray(invitations) ? invitations : []);
       setActionError(null);
       setLoadFailed(false);
@@ -124,8 +123,8 @@ export default function ManageMembershipsPage() {
   }, []);
 
   const refreshUser = async () => {
-    const { data } = await apiClient.get('/users/me/');
-    setUser(data);
+    const data = await getCurrentUser();
+    setUser(data as any);
   };
 
   const respondToAdmin = async (invitation: AdminInvitation, accept: boolean) => {
@@ -143,7 +142,7 @@ export default function ManageMembershipsPage() {
   const runAction = async (membership: Membership, action: "accept" | "reject" | "quit") => {
     setActingId(membership.id);
     try {
-      await apiClient.post(`/my-memberships/${membership.id}/${action}/`);
+      await respondToMyMembership(membership.id, action);
       await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
       setQuitTarget(null);
     } catch (error: any) {

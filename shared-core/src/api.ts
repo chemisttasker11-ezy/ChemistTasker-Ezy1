@@ -221,6 +221,7 @@ export {
 export {
   getMemberships,
   getMyMemberships,
+  respondToMyMembership,
   createMembership,
   createMembershipInviteService,
   bulkInviteMembers,
