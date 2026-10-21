@@ -64,16 +64,6 @@
     "owner": "Expo domain owner pending inspection",
     "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
-  "frontend_mobile/roles/shared/ManageMembershipsScreen.tsx|unresolved-client-transport|apiClient.get|/my-memberships/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Memberships",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.get /my-memberships/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/roles/shared/ManageMembershipsScreen.tsx|unresolved-client-transport|apiClient.post|/my-memberships/${...}/${...}/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Memberships",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.post /my-memberships/${...}/${...}/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
   "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx|unresolved-client-transport|apiClient.post|/pill-rewards/pay-shift/#1": {
     "classification": "legacy-migrate",
     "owner": "Billing/invoicing and shift domain",
@@ -263,21 +253,6 @@
     "classification": "legacy-migrate",
     "owner": "Billing/invoicing and shift domain",
     "rationale": "Existing feature page direct-backend-route at apiClient.get /invoices/${...}/pdf/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/src/pages/dashboard/sidebar/ManageMembershipsPage.tsx|unresolved-client-transport|apiClient.get|/my-memberships/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Memberships",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.get /my-memberships/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/src/pages/dashboard/sidebar/ManageMembershipsPage.tsx|direct-backend-route|apiClient.get|/users/me/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing feature page direct-backend-route at apiClient.get /users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_web/src/pages/dashboard/sidebar/ManageMembershipsPage.tsx|unresolved-client-transport|apiClient.post|/my-memberships/${...}/${...}/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Memberships",
-    "rationale": "Existing feature page unresolved-client-transport at apiClient.post /my-memberships/${...}/${...}/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
   "frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx|direct-backend-route|fetch|${...}/${...}/onboarding/me/#1": {
     "classification": "legacy-migrate",
