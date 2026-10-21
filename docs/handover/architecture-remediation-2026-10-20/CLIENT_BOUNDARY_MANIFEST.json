@@ -109,11 +109,6 @@
     "owner": "Next/Vite platform transport",
     "rationale": "Next server-only reverse proxy enforces origin, path validation, header forwarding and bounds; not business logic."
   },
-  "frontend_web/landing_next/migrated/contexts/AuthContext.tsx|direct-backend-route|fetch|${...}/users/me/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing unreviewed utility direct-backend-route at fetch ${...}/users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
   "frontend_web/landing_next/migrated/pages/MobileOTPVerify.tsx|direct-backend-route|apiClient.post|/users/mobile/verify-otp/#1": {
     "classification": "legacy-migrate",
     "owner": "Identity and authentication",
@@ -143,11 +138,6 @@
     "classification": "approved-adapter",
     "owner": "Next/Vite platform transport",
     "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
-  },
-  "frontend_web/src/contexts/AuthContext.tsx|direct-backend-route|fetch|${...}/users/me/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing unreviewed utility direct-backend-route at fetch ${...}/users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
   "frontend_web/src/pages/MobileOTPVerify.tsx|direct-backend-route|apiClient.post|/users/mobile/verify-otp/#1": {
     "classification": "legacy-migrate",
