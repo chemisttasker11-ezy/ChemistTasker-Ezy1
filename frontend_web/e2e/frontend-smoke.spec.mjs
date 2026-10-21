@@ -826,7 +826,7 @@ for (const { name, status, expectedMessage, responseBody } of [
       await expect(page.locator('body')).not.toContainText('Traceback');
       await expect(page.locator('body')).not.toContainText('503 Service Unavailable');
     }
-    await expect(page.getByText('Waiting for you')).toBeVisible();
+    await expect(page.getByText('Waiting for you', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Smoke Pharmacy' })).toBeVisible();
     await expect(acceptButton).toBeVisible();
     await expect(acceptButton).toBeEnabled();
