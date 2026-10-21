@@ -69,3 +69,9 @@ Both Vite and Next `AuthContext` now call the shared browser-current-user operat
 ### Expo push device-token transport
 
 `registerDeviceTokenWithBackend` now forwards the exact native token/platform request to a named `registerPushDeviceToken` domain operation, maintaining `POST /device-tokens/`, `token`, `platform`, and **best-effort** error handling without clearing authenticated state from notification failure. Wire test explicitly asserts the native bearer and `credentials: omit`. This removes one direct mobile transport call without changing Expo permission prompts or notification listeners. **Nine** legacy transport candidates remain. Validate on native simulators and physical devices before sign-off.
+
+### Native Expo auth transport — six feature bypasses removed without changing session semantics
+
+All **6** direct auth request callsites from `frontend_mobile/context/AuthContext.tsx` now invoke five named operations in the isolated `frontend_mobile/utils/nativeIdentityTransport.ts` (two `me` reads share one operation). Auth routes are owned by the new canonical shared-core `NATIVE_IDENTITY_ROUTES` and checked by a unit test. The platform-specific Axios interceptor is **retained** in the single Expo transport adapter so native secure token and fallback refresh, platform headers, Expo-web CSRF, timeout and structured validation error behaviour do not drift. The AST manifest explicitly approves its five new adapter callsites; this is **not** an approval to duplicate policies or move Next SSR state into mobile.
+
+Remaining legacy transport **3** (two browser mobile OTP and one dynamic Next CMS escape hatch). Full manifest **28**. Native login/logout/OTP replay tests and physical emulator evidence are still required; whole-tree parser and exact-head CI must confirm adapter key signatures.

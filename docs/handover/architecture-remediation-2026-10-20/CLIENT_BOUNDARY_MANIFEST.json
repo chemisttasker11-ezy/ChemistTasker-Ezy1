@@ -4,36 +4,6 @@
     "owner": "Expo platform transport",
     "rationale": "Mobile-only shared-core bootstrap: injects native bearer token and credentials-omit fetch adapter; no business rule."
   },
-  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.get|/users/me/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.get /users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.post|/users/login/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.post /users/login/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.get|/users/me/#2": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.get /users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.post|/users/register/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.post /users/register/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.post|/users/verify-otp/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.post /users/verify-otp/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
-  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.post|/users/resend-otp/#1": {
-    "classification": "legacy-migrate",
-    "owner": "Identity and authentication",
-    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.post /users/resend-otp/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
   "frontend_mobile/features/parity/ethicalMarketplace.tsx|unresolved-client-transport|fetch|#1": {
     "classification": "false-positive",
     "owner": "Expo device/media import boundary",
@@ -143,5 +113,30 @@
     "classification": "approved-adapter",
     "owner": "Next/Vite platform transport",
     "rationale": "Vite legacy Axios HTTP transport adapter, pending controlled replacement; not a screen business rule."
+  },
+  "frontend_mobile/utils/nativeIdentityTransport.ts|unresolved-client-transport|apiClient.get|#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo native secure-session Axios transport",
+    "rationale": "GET /users/me/ with existing bearer refresh semantics. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
+  },
+  "frontend_mobile/utils/nativeIdentityTransport.ts|unresolved-client-transport|apiClient.post|#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo native secure-session Axios transport",
+    "rationale": "POST /users/login/ with original native/Expo-web credentials override. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
+  },
+  "frontend_mobile/utils/nativeIdentityTransport.ts|unresolved-client-transport|apiClient.post|#2": {
+    "classification": "approved-adapter",
+    "owner": "Expo native secure-session Axios transport",
+    "rationale": "POST /users/register/ preserving duplicate-email and password error payload. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
+  },
+  "frontend_mobile/utils/nativeIdentityTransport.ts|unresolved-client-transport|apiClient.post|#3": {
+    "classification": "approved-adapter",
+    "owner": "Expo native secure-session Axios transport",
+    "rationale": "POST /users/verify-otp/ preserving token capture and account activation. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
+  },
+  "frontend_mobile/utils/nativeIdentityTransport.ts|unresolved-client-transport|apiClient.post|#4": {
+    "classification": "approved-adapter",
+    "owner": "Expo native secure-session Axios transport",
+    "rationale": "POST /users/resend-otp/ preserving native OTP feedback. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
   }
 }

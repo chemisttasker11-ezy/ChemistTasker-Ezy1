@@ -305,6 +305,7 @@ export {
   payShiftWithPills,
 } from './domains/rewards/api';
 export * from './domains/auth/browserOperations';
+export * from './domains/auth/nativeWire';
 export {
   getInvoices,
   getInvoiceDetail,
