@@ -306,6 +306,7 @@ export {
 } from './domains/rewards/api';
 export * from './domains/auth/browserOperations';
 export * from './domains/auth/nativeWire';
+export * from './domains/content/operations';
 export {
   getInvoices,
   getInvoiceDetail,
