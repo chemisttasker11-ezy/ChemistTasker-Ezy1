@@ -6,7 +6,7 @@ from pathlib import Path
 
 from module_import_graph import (
     approved_mutual_pairs, build_report, extract_edges, is_runtime, mutual_pairs,
-    strongly_connected_components, unapproved_internal_cycle_edges
+    strongly_connected_components, unapproved_internal_cycle_edges, check_cycle_baseline
 )
 
 
@@ -101,6 +101,44 @@ class ModuleImportGraphTests(unittest.TestCase):
             direct, delayed, _ = extract_edges(root)
             self.assertEqual(direct, {("alpha", "gamma"), ("alpha", "delta")})
             self.assertFalse(delayed)
+
+    def test_reviewed_cycle_baseline_rejects_new_edge_inside_legacy_scc(self):
+        baseline = {
+            "schema": "chemisttasker-backend-cycle-baseline-v1",
+            "strongly_connected_components": [["alpha", "beta", "gamma"]],
+            "unapproved_cycle_edges": [["alpha", "beta"]],
+        }
+        report = {
+            "strongly_connected_components": [["alpha", "beta", "gamma"]],
+            "unapproved_cycle_edges": [["alpha", "beta"], ["gamma", "alpha"]],
+        }
+        self.assertEqual(
+            check_cycle_baseline(report, baseline)["new_unapproved_cycle_edges"],
+            [("gamma", "alpha")],
+        )
+
+    def test_reviewed_cycle_baseline_accepts_shrinking_debt_not_expanded_scc(self):
+        baseline = {
+            "schema": "chemisttasker-backend-cycle-baseline-v1",
+            "strongly_connected_components": [["alpha", "beta", "gamma"], ["delta", "epsilon"]],
+            "unapproved_cycle_edges": [["alpha", "beta"], ["gamma", "alpha"]],
+        }
+        smaller = {
+            "strongly_connected_components": [["alpha", "beta"]],
+            "unapproved_cycle_edges": [["alpha", "beta"]],
+        }
+        self.assertEqual(check_cycle_baseline(smaller, baseline), {
+            "new_unapproved_cycle_edges": [],
+            "new_strongly_connected_components": [],
+        })
+        grown = {
+            "strongly_connected_components": [["alpha", "beta", "delta"]],
+            "unapproved_cycle_edges": [["alpha", "beta"]],
+        }
+        self.assertEqual(
+            check_cycle_baseline(grown, baseline)["new_strongly_connected_components"],
+            [["alpha", "beta", "delta"]],
+        )
 
     def test_real_guard_allowlist_is_parseable_without_django_import(self):
         self.assertGreaterEqual(len(approved_mutual_pairs()), 1)

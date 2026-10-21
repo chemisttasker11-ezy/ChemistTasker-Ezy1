@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 OWNERSHIP_GUARD = BACKEND / "core" / "test_backend_ownership_boundaries.py"
+REVIEWED_CYCLE_BASELINE = ROOT / "docs" / "architecture" / "backend-cycle-baseline.json"
 
 
 def is_runtime(relative):
@@ -162,6 +163,27 @@ def unapproved_internal_cycle_edges(edges, allowed_pairs):
     return sorted(violations)
 
 
+def check_cycle_baseline(report, baseline):
+    """Reject new cyclic module edges or newly joined SCCs without blessing legacy debt.
+
+    Existing SCCs can shrink; a new dependency inside the same legacy SCC is
+    still a regression, even when the names of the SCC members do not change.
+    """
+    if baseline.get("schema") != "chemisttasker-backend-cycle-baseline-v1":
+        raise ValueError("Unknown backend cycle baseline schema")
+    accepted_edges = {tuple(edge) for edge in baseline["unapproved_cycle_edges"]}
+    observed_edges = {tuple(edge) for edge in report["unapproved_cycle_edges"]}
+    accepted_groups = [set(group) for group in baseline["strongly_connected_components"]]
+    new_groups = [
+        group for group in report["strongly_connected_components"]
+        if not any(set(group).issubset(existing) for existing in accepted_groups)
+    ]
+    return {
+        "new_unapproved_cycle_edges": sorted(observed_edges - accepted_edges),
+        "new_strongly_connected_components": new_groups,
+    }
+
+
 def approved_mutual_pairs(guard=OWNERSHIP_GUARD):
     """Reuse the ownership guard's actual allowlist without importing Django."""
     tree = ast.parse(guard.read_text(encoding="utf-8"), filename=str(guard))
@@ -204,8 +226,14 @@ def main():
     parser.add_argument("--check", action="store_true", help="enforce the existing reviewed mutual-pair policy")
     parser.add_argument("--check-all-cycles", action="store_true", help="also fail for longer SCC cycles; only use once a reviewed longer-cycle baseline exists")
     parser.add_argument("--json", action="store_true", help="write machine-readable graph")
+    parser.add_argument("--check-baseline", action="store_true", help="reject new cyclic edges and SCC expansions relative to reviewed baseline")
     options = parser.parse_args()
     report = build_report()
+    baseline_regressions = None
+    if options.check_baseline:
+        baseline = json.loads(REVIEWED_CYCLE_BASELINE.read_text(encoding="utf-8"))
+        baseline_regressions = check_cycle_baseline(report, baseline)
+        report.update(baseline_regressions)
     if options.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
@@ -222,6 +250,10 @@ def main():
         for group in report["strongly_connected_components"]:
             print("EXISTING SCC:", ",".join(group))
     if options.check_all_cycles and report["unapproved_cycle_edges"]:
+        return 1
+    if baseline_regressions and any(baseline_regressions.values()):
+        for kind, findings in baseline_regressions.items():
+            print(f"UNAPPROVED BACKEND CYCLE REGRESSION: {kind}: {findings}")
         return 1
     return 1 if options.check and report["new_unapproved_mutual_pairs"] else 0
 
