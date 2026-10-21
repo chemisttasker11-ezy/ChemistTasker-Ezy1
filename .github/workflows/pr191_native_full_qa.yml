@@ -1,0 +1,16 @@
+name: PR191 Native Full QA
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  native-acceptance:
+    if: ${{ github.event.pull_request.number == 191 && contains(github.event.pull_request.labels.*.name, 'full-qa') }}
+    uses: ./.github/workflows/native_mobile_acceptance.yml
+    with:
+      platform: both
+      tested_sha: ${{ github.event.pull_request.head.sha }}
