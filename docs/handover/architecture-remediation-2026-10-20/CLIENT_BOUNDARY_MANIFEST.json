@@ -114,11 +114,6 @@
     "owner": "Expo domain owner pending inspection",
     "rationale": "Existing unreviewed utility unresolved-client-transport at apiClient.post /device-tokens/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
   },
-  "frontend_mobile/utils/unread.ts|direct-backend-route|apiClient.get|/rooms/?unread=1#1": {
-    "classification": "legacy-migrate",
-    "owner": "Expo domain owner pending inspection",
-    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.get /rooms/?unread=1; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
-  },
   "frontend_web/landing_next/lib/browser-api.ts|generic-client-escape|chemistTaskerApi.contentManagement.request|/content/${...}#1": {
     "classification": "legacy-migrate",
     "owner": "Next/Vite domain owner pending inspection",
