@@ -23,6 +23,9 @@ function verifyInstalled() {
   assert.equal(yamlRequire('js-yaml/package.json').version, '4.3.2');
   const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
   assert.equal(lock.packages['node_modules/image-size'].version, '2.0.4');
+  // New GHSA-q3jh-wrc6-jgq8 security release: reject stale redirect clients.
+  assert.equal(mobileRequire('follow-redirects/package.json').version, '1.16.1');
+  assert.equal(lock.packages['node_modules/follow-redirects'].version, '1.16.1');
   assert.equal(Object.keys(lock.packages).some(name => name.endsWith('node_modules/sprintf-js')), false);
   return lock;
 }

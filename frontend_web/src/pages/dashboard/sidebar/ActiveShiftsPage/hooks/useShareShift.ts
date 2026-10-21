@@ -1,6 +1,6 @@
+import { createShiftPillReferralService } from '@chemisttasker/shared-core';
 import { useState, useCallback } from 'react';
 import { Shift, generateShiftShareLinkService } from '@chemisttasker/shared-core';
-import apiClient from '../../../../../utils/apiClient';
 
 export function useShareShift(showSnackbar: (msg: string) => void) {
     const [sharingShiftId, setSharingShiftId] = useState<number | null>(null);
@@ -19,9 +19,7 @@ export function useShareShift(showSnackbar: (msg: string) => void) {
                     throw new Error('Missing share token');
                 }
                 const publicUrl = (link as any).url ?? `${window.location.origin}/shifts/link?token=${token}`;
-                const { data: referral } = await apiClient.post('/pill-rewards/refer-shift/', {
-                    shift_id: shift.id,
-                });
+                const referral = await createShiftPillReferralService({ shift_id: shift.id });
                 const referralCode = referral?.referral_code;
                 if (!referralCode || !referral?.id) {
                     throw new Error('Missing shift referral details');

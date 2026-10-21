@@ -1,0 +1,332 @@
+{
+  "frontend_mobile/config/api.ts|unresolved-client-transport|fetch|#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Mobile-only shared-core bootstrap: injects native bearer token and credentials-omit fetch adapter; no business rule."
+  },
+  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.get|/users/me/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.get /users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.post|/users/login/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.post /users/login/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.get|/users/me/#2": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.get /users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.post|/users/register/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.post /users/register/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.post|/users/verify-otp/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.post /users/verify-otp/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/context/AuthContext.tsx|direct-backend-route|apiClient.post|/users/resend-otp/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing unreviewed utility direct-backend-route at apiClient.post /users/resend-otp/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/features/parity/ethicalMarketplace.tsx|unresolved-client-transport|fetch|#1": {
+    "classification": "legacy-migrate",
+    "owner": "Expo domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/features/parity/ethicalMarketplace.tsx|unresolved-client-transport|fetch|#2": {
+    "classification": "legacy-migrate",
+    "owner": "Expo domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/features/parity/finance.tsx|unresolved-client-transport|fetch|#1": {
+    "classification": "legacy-migrate",
+    "owner": "Expo domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/features/parity/marketplace.tsx|unresolved-client-transport|fetch|#1": {
+    "classification": "legacy-migrate",
+    "owner": "Expo domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/roles/shared/dashboard/dashboardScope.tsx|unresolved-client-transport|apiClient.get|#1": {
+    "classification": "legacy-migrate",
+    "owner": "Expo domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at apiClient.get (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/roles/shared/hub/PostComposer.tsx|unresolved-client-transport|fetch|#1": {
+    "classification": "legacy-migrate",
+    "owner": "Expo domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at fetch (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx|unresolved-client-transport|apiClient.post|/pill-rewards/pay-shift/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Billing/invoicing and shift domain",
+    "rationale": "Existing feature page unresolved-client-transport at apiClient.post /pill-rewards/pay-shift/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx|direct-backend-route|apiClient.post|/billing/charge-fulfillment/${...}/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Billing/invoicing and shift domain",
+    "rationale": "Existing feature page direct-backend-route at apiClient.post /billing/charge-fulfillment/${...}/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx|direct-backend-route|apiClient.post|/shift-offers/${...}/buzz/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Shifts",
+    "rationale": "Existing feature page direct-backend-route at apiClient.post /shift-offers/${...}/buzz/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_mobile/utils/apiClient.ts|unresolved-client-transport|apiClient|#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Legacy Expo Axios session transport interceptor: refresh and bearer token wiring remain platform-owned pending adapter consolidation."
+  },
+  "frontend_mobile/utils/apiClient.ts|unresolved-client-transport|apiClient|#2": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Legacy Expo Axios session transport interceptor: refresh and bearer token wiring remain platform-owned pending adapter consolidation."
+  },
+  "frontend_mobile/utils/apiClient.ts|direct-backend-route|apiClient.post|/users/ws-ticket/#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Legacy Expo Axios session transport interceptor: refresh and bearer token wiring remain platform-owned pending adapter consolidation."
+  },
+  "frontend_mobile/utils/appUpdates.ts|direct-backend-route|fetch|${...}/users/mobile/app-config/#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Public unauthenticated application-version/bootstrap endpoint for app-store updates, platform-specific configuration."
+  },
+  "frontend_mobile/utils/authSession.ts|unresolved-client-transport|fetch|${...}${...}#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Mobile refresh-token storage/rotation adapter: native secure persistence, web CSRF and token renewal are platform-specific."
+  },
+  "frontend_mobile/utils/browserAuth.ts|direct-backend-route|fetch|${...}/users/csrf/#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Expo web-preview CSRF bootstrap; native mobile requests use bearer token."
+  },
+  "frontend_mobile/utils/pushNotifications.ts|unresolved-client-transport|apiClient.post|/device-tokens/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Expo domain owner pending inspection",
+    "rationale": "Existing unreviewed utility unresolved-client-transport at apiClient.post /device-tokens/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/lib/browser-api.ts|generic-client-escape|chemistTaskerApi.contentManagement.request|/content/${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing unreviewed utility generic-client-escape at chemistTaskerApi.contentManagement.request /content/${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/lib/chemisttasker-api.ts|unresolved-client-transport|fetch|#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Next browser fetch adapter injects CSRF/cookie credentials into named shared-core facade."
+  },
+  "frontend_web/landing_next/lib/platform-proxy.ts|unresolved-client-transport|fetch|${...}/${...}${...}#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Next server-only reverse proxy enforces origin, path validation, header forwarding and bounds; not business logic."
+  },
+  "frontend_web/landing_next/migrated/contexts/AuthContext.tsx|direct-backend-route|fetch|${...}/users/me/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing unreviewed utility direct-backend-route at fetch ${...}/users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/index.tsx|unresolved-client-transport|apiClient.get|${...}?target_type=pharmacy&target_id=${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at apiClient.get ${...}?target_type=pharmacy&target_id=${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/login.tsx|direct-backend-route|axios.get|${...}/users/csrf/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing feature page direct-backend-route at axios.get ${...}/users/csrf/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/login.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/MobileOTPVerify.tsx|direct-backend-route|apiClient.post|/users/mobile/verify-otp/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing feature page direct-backend-route at apiClient.post /users/mobile/verify-otp/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/onboarding/RefereeQuestionnairePage.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/OTPVerify.tsx|direct-backend-route|axios.get|${...}/users/csrf/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing feature page direct-backend-route at axios.get ${...}/users/csrf/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/OTPVerify.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/OTPVerify.tsx|unresolved-client-transport|axios.post|${...}${...}#2": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/PasswordResetRequestPage.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/PublicTalentBoardPage.tsx|unresolved-client-transport|fetch|${...}/explorer-posts/public-feed/?page=${...}&page_size=200#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at fetch ${...}/explorer-posts/public-feed/?page=${...}&page_size=200; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/pages/register.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/migrated/utils/apiClient.ts|unresolved-client-transport|apiClient|#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Next migrated Axios compatibility transport for legacy pages, not domain business logic."
+  },
+  "frontend_web/landing_next/migrated/utils/tokenService.ts|direct-backend-route|axios.post|${...}/users/ws-ticket/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing unreviewed utility direct-backend-route at axios.post ${...}/users/ws-ticket/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/landing_next/shared/browser-session.ts|direct-backend-route|fetch|${...}/users/csrf/#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
+  },
+  "frontend_web/landing_next/shared/browser-session.ts|direct-backend-route|fetch|${...}/users/token/refresh/#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
+  },
+  "frontend_web/landing_next/shared/browser-session.ts|unresolved-client-transport|fetch|#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
+  },
+  "frontend_web/landing_next/shared/browser-session.ts|direct-backend-route|fetch|${...}/users/logout/#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
+  },
+  "frontend_web/src/contexts/AuthContext.tsx|direct-backend-route|fetch|${...}/users/me/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing unreviewed utility direct-backend-route at fetch ${...}/users/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useOfferDecisions.ts|direct-backend-route|apiClient.post|/shift-offers/${...}/buzz/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Shifts",
+    "rationale": "Existing feature page direct-backend-route at apiClient.post /shift-offers/${...}/buzz/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts|unresolved-client-transport|apiClient.post|/pill-rewards/pay-shift/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Billing/invoicing and shift domain",
+    "rationale": "Existing feature page unresolved-client-transport at apiClient.post /pill-rewards/pay-shift/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx|direct-backend-route|apiClient.get|/invoices/${...}/pdf/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Billing/invoicing and shift domain",
+    "rationale": "Existing feature page direct-backend-route at apiClient.get /invoices/${...}/pdf/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/dashboard/sidebar/Invoices/LegacyInvoiceManagePage.tsx|direct-backend-route|apiClient.get|/invoices/${...}/pdf/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Billing/invoicing and shift domain",
+    "rationale": "Existing feature page direct-backend-route at apiClient.get /invoices/${...}/pdf/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx|direct-backend-route|fetch|${...}/${...}/onboarding/me/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page direct-backend-route at fetch ${...}/${...}/onboarding/me/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx|unresolved-client-transport|apiClient.get|${...}?target_type=pharmacy&target_id=${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at apiClient.get ${...}?target_type=pharmacy&target_id=${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/login.tsx|direct-backend-route|axios.get|${...}/users/csrf/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing feature page direct-backend-route at axios.get ${...}/users/csrf/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/login.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/MembershipApplyPage.tsx|unresolved-client-transport|axios.get|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.get ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/MembershipApplyPage.tsx|unresolved-client-transport|apiClient.post|#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at apiClient.post (dynamic or unresolved route); migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/MembershipApplyPage.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/MobileOTPVerify.tsx|direct-backend-route|apiClient.post|/users/mobile/verify-otp/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing feature page direct-backend-route at apiClient.post /users/mobile/verify-otp/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/onboarding/RefereeQuestionnairePage.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/onboarding/RefereeRejectPage.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/OTPVerify.tsx|direct-backend-route|axios.get|${...}/users/csrf/#1": {
+    "classification": "legacy-migrate",
+    "owner": "Identity and authentication",
+    "rationale": "Existing feature page direct-backend-route at axios.get ${...}/users/csrf/; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/OTPVerify.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/OTPVerify.tsx|unresolved-client-transport|axios.post|${...}${...}#2": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/PasswordResetRequestPage.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/pages/register.tsx|unresolved-client-transport|axios.post|${...}${...}#1": {
+    "classification": "legacy-migrate",
+    "owner": "Next/Vite domain owner pending inspection",
+    "rationale": "Existing feature page unresolved-client-transport at axios.post ${...}${...}; migrate to a named shared-core operation or prove a narrow platform-specific exception with wire-contract tests before strict acceptance."
+  },
+  "frontend_web/src/utils/apiClient.ts|unresolved-client-transport|apiClient|#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Vite legacy Axios HTTP transport adapter, pending controlled replacement; not a screen business rule."
+  }
+}

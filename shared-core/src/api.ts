@@ -221,6 +221,7 @@ export {
 export {
   getMemberships,
   getMyMemberships,
+  respondToMyMembership,
   createMembership,
   createMembershipInviteService,
   bulkInviteMembers,
@@ -409,6 +410,7 @@ export {
 } from './domains/pharmacyHub/api';
 export {
   getRooms,
+  getUnreadRoomSummary,
   getRoomDetail,
   getRoomMessages,
   sendRoomMessage,

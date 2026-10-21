@@ -48,6 +48,43 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Resolve full PR comparison baseline (no shallow or HEAD^ shortcuts)
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PREVIOUS_PUSH_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            # On PR #191 this resolves to the PR #181 base, not the last commit.
+            test -n "$PR_BASE_SHA"
+            comparison_base="$PR_BASE_SHA"
+          elif [[ "$EVENT_NAME" == "push" && -n "$PREVIOUS_PUSH_SHA" && ! "$PREVIOUS_PUSH_SHA" =~ ^0+$ ]]; then
+            comparison_base="$PREVIOUS_PUSH_SHA"
+          else
+            # On a manual branch run compare with the full default-branch base.
+            comparison_base="$(git merge-base HEAD refs/remotes/origin/main)"
+            if [[ "$comparison_base" == "$(git rev-parse HEAD)" ]]; then
+              echo "Cannot audit an unmodified main checkout without an explicit comparison base." >&2
+              exit 1
+            fi
+          fi
+          git cat-file -e "${comparison_base}^{commit}"
+          git merge-base --is-ancestor "$comparison_base" HEAD
+          # Persist the validated full-PR base inside .git. The nested Docker
+          # checkout retains this ref even though environment vars are not
+          # forwarded by the existing staging QA launcher.
+          git update-ref refs/qa/shared-core-audit-base "$comparison_base"
+          echo "SHARED_CORE_AUDIT_BASE=$comparison_base" >> "$GITHUB_ENV"
+          echo "Boundary audit will compare full branch: $comparison_base..$(git rev-parse HEAD)"
+      - name: Verify entire PR strict shared-core audit against its actual base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$SHARED_CORE_AUDIT_BASE" HEAD
+          node scripts/audit-shared-core-boundary.mjs --strict
       - name: Full isolated staging QA on exact source
         shell: bash
         run: bash scripts/run-staging-qa.sh

@@ -1,11 +1,12 @@
 import { MD3LightTheme } from 'react-native-paper';
+import { CHEMISTTASKER_BRAND } from '@chemisttasker/shared-core';
 
 export const brandColors = {
-  navy: '#06214A',
-  purple: '#5222B8',
-  magenta: '#D600C8',
-  cyan: '#00BDD2',
-  blue: '#008DDB',
+  navy: CHEMISTTASKER_BRAND.navy,
+  purple: CHEMISTTASKER_BRAND.violet,
+  magenta: CHEMISTTASKER_BRAND.magenta,
+  cyan: CHEMISTTASKER_BRAND.cyan,
+  blue: CHEMISTTASKER_BRAND.blue,
   mist: '#F5F8FC',
   white: '#FFFFFF',
   text: '#111827',
@@ -26,6 +27,8 @@ export const brandColors = {
   dangerSoft: '#FEF2F2',
 } as const;
 
+// Corporate identity is shared; native persona display colours retain the existing
+// approved appearance until their separate visual review.
 export const personaPalettes = {
   owner: { accent: '#4F46E5', soft: '#EEF2FF' },
   pharmacist: { accent: '#0EA5E9', soft: '#E0F2FE' },

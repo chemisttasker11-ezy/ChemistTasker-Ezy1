@@ -3,6 +3,10 @@ import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
 import { fetchApi } from '../../transport/application';
 import { mapChatMessage, mapChatParticipantRecord, mapChatRoom } from './mappers';
+/** Unread-only rooms must retain the backend's query-based filter. */
+export function getUnreadRoomSummary() {
+    return fetchApi<Collection<ChatRoomApi> & { unread_total?: number }>('/rooms/?unread=1');
+}
 export function getRooms() {
     return fetchApi<Collection<ChatRoomApi>>('/rooms/');
 }

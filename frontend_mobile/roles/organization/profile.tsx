@@ -1,3 +1,5 @@
+import { createFriendPillReferralService } from '@chemisttasker/shared-core';
+import { fetchPillBalanceService } from '@chemisttasker/shared-core';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, ScrollView, Share, StyleSheet, View } from 'react-native';
 import {
@@ -65,8 +67,8 @@ export default function OrganizationProfileScreen() {
 
   useEffect(() => {
     let mounted = true;
-    apiClient.get('/pill-rewards/balance/')
-      .then(({ data }) => {
+    fetchPillBalanceService()
+      .then((data) => {
         if (!mounted) return;
         setPillSummary({
           balance: Number(data?.balance ?? 0),
@@ -84,7 +86,7 @@ export default function OrganizationProfileScreen() {
   const shareFriendReferral = async () => {
     setReferralLoading(true);
     try {
-      const { data } = await apiClient.post('/pill-rewards/refer-friend/', {});
+      const data = await createFriendPillReferralService({});
       const code = data?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const baseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || webBaseUrl;

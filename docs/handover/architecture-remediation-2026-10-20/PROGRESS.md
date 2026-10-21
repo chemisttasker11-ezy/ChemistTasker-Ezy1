@@ -1,0 +1,180 @@
+> **MAINLINE PORT — 21 OCTOBER 2026:** The text below remains the historical PR #191 ledger. New architecture branch `refactor/architecture-mainline-no-drift-20261021` is based **only** on exact remote `main` at `a1b6931a8fdef718b5a9aee22e03c486c5c043dd`; PR #181 planning and PR #182 lifecycle ancestry are not present. The mainline acceptance ledger is `docs/qa/runs/ARCHITECTURE_MAINLINE_2026-10-21.md`. Older CI results are not approval for this new branch.
+
+# Senior architecture implementation ledger — PR #191
+
+**Updated:** 2026-10-20 (Australia/Brisbane)
+**Repository:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
+**Parent:** draft [PR #181](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/181) at `216fb05c2b27ec9fd26f612956fb0e389b1cc58c`
+**Remediation PR:** [#191](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/191)
+**Original plan:** `CHEMISTTASKER_EZY_ARCHITECTURE_REMEDIATION_HANDOVER_2026-10-20.md` (available as a separate handover artifact; do not treat this shorter progress ledger as a replacement).
+**Scope:** internal Ezy repository only. No external frontend repository, production deploy, staging deploy or merge.
+
+## Authoritative current package status (PR #191; 2026-10-20)
+
+**Head ancestry:** PR #191 incorporates PR #181 through `216fb05` as its second-parent merge `c1e9ef3`. The sync brought four parent-only planner files with no overlap with PR #191 changes.
+
+| Package | Status | Required exit criterion |
+| --- | --- | --- |
+| A00 ownership / sequencing | PARTIAL | Complete owner/domain manifest and assess four newer #181 files for nonconflicting synchronization. |
+| A01 pharmacy authority | BLOCKED ON OWNER POLICY | Historic read/write coupling retained; DELETE and sensitive fields require separate authorization decisions and negative matrix tests. No privilege changes approved. |
+| A02 pharmacy multipart | CODE IMPLEMENTED; NATIVE QA OPEN | Android/iOS document-picker/upload/readback and failure retry on live seeded backend. |
+| A03 calendar | OWNED BY #181 | No shadow implementation here; sync parent only after overlapping-file review. |
+| A04 transport inventory | PARTIAL | AST report and added-line ratchet exist. Classify every finding, build documented allowlist/ownership manifest and enforce whole-tree strict only after review. |
+| A05a roster SDK | PARTIAL | Vite named operations and wire tests exist; cross-platform lifecycle, errors, headers, idempotency and PostgreSQL parity require evidence. |
+| A05b financial / #182 | FROZEN | Keep existing tests incl. chargeShiftFulfillment; defer new policy/penalty/offer migrations until #182 contracts stable. |
+| A05c Next/Expo | PARTIAL | Next public-content ownership and Expo native boundary still to classify. |
+| A06 Next/Vite twins | NOT COMPLETE | Twin inventory, ownership decisions and removal of verified duplicates. |
+| A07 component decomposition | EARLY | HoursRow and roster type extraction done; split true orchestration after green behavior contracts. |
+| A08 design identity | EARLY | Brand tokens added without visual changes; persona semantic mapping, accessibility, generated skill icon check remain. |
+| A09 Django dependency graph | PARTIAL | SCC report exists; import-time AST scope corrected with tests. Approved legacy SCC baseline and new-cycle rejection pending. |
+| A10 Windows Tauri/Rust kiosk | EXCLUDED FROM SHARED-CORE MIGRATION | Independent application; runtime unchanged. Existing independent smoke/gates still protect it; no kiosk refactor needed for #191. |
+| A11 Senior Package Testing | NOT COMPLETE | Exact-head full QA, Postgres upgrade rehearsal, Vite/Next real-stack E2E, Android/iOS native and visual evidence. |
+
+**Live CI finding before this corrective batch:** at `5e9d063`, mobile, shared-core, Vite, Next, PostgreSQL concurrency and architecture jobs passed. Backend failed because the existing permission gate returned **403** for unrelated manager PATCH while a new characterization expected **404**. The test now expects the observed existing policy response; the underlying permissions were **not** modified. No exact-head green assertion is made here.
+
+**Important:** `--strict` in `audit-shared-core-boundary.mjs` is a diff-base validity ratchet, **not** zero legacy bypasses. The inventory remains report-only. The generated count of 176 was an unclassified previous-head snapshot, not 176 proven violations.
+
+## Exact test commands (not yet marked PASS)
+
+```bash
+cd shared-core && npm ci && npm run typecheck && npm run test:ci
+cd ../frontend_mobile && npm ci && npm run lint && npx tsc --noEmit
+cd ..
+python backend/manage.py test organizations.test_pharmacy_upload_contract --settings=core.contract_test_settings
+python backend/manage.py test organizations users.test_region_delegation --settings=core.contract_test_settings
+python backend/manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
+```
+
+Then verify emulator/device multipart uploads against isolated seeded Django/PostgreSQL, and exact-head GitHub Actions. Do not count existing PR #181 checks as #191 evidence. Do not record skipped full-isolated QA as passed.
+
+## Second implementation batch
+
+- `5941a737`: new `backend/organizations/test_pharmacy_access_characterization.py` cross-tenant ownership/scoped visibility tests; read/write authorization implementation intentionally unchanged.
+- `5941a737` plus follow-up corrective commits: new read-only `scripts/inventory-client-api-boundaries.mjs` and Node tests; detects probable direct-route and generic escape-hatch usage across current client trees. Regex/newline escaping corrections pushed.
+- GitHub Actions started automatically. PASS status must be associated with final branch SHA rather than earlier commits.
+
+## New implementation checkpoints
+
+- Parent PR #181 remains at `bdc0b698` and is the **only** implementation base. PR #182 stays separate and untouched.
+- `fc5a8f6`: reverted kiosk-related shared-core/API changes. Windows Tauri/Rust kiosk remains independent.
+- `e32e24a`: narrowed nullable roster period ID to resolve Vite TypeScript failure.
+- `e88860b`: shifted counter-offer API invocation to an existing shared-core operation without changing its payload or policies.
+- `f0e9c27`: introduced truthful `--strict` parsing and missing-base failure for boundary audit, wider domain route matching, CLI regression tests and CI coverage. This must pass on the final PR head before merge.
+
+## A02 behavioral guardrails
+
+- Match Django `PharmacySerializer` canonical file fields exactly.
+- `employment_types`, `roles_needed`, `software`, `services` must each be encoded once as a JSON array when using multipart. JSON-only requests are unchanged.
+- React Native `DocumentPicker` file attachments remain native; shared-core helper only encodes scalar and array fields.
+- Existing certificates remain when no replacement upload is provided.
+- No schema, endpoint, authorization, onboarding policy, shifts/payment, calendar or kiosk behavior is intentionally changed.
+
+## Next actions
+
+1. Inspect final-head CI and fix code/test defects surgically.
+2. Characterize A01 permission behavior with **negative** tenant tests and capability-action matrix, without authorizing any write change by assumption.
+3. Implement A04 whole-tree inventory/strict audit with truthful handling of missing git comparison base.
+4. Continue A05–A11 as independent domain-scope PRs after their dependencies are satisfied, running the Senior package testing handbook each time.
+
+**Merge status: NOT MERGE READY**, pending exact-head CI, dedicated backend tests, native upload acceptance and ownership/capability decisions.
+
+## Latest continuation checkpoint
+
+- `ae72c84`, `2ac5c3`: replaced line-based inventory matcher with TypeScript AST traversal for Vite/Next/Expo runtime. Handles multiline calls, template interpolation, concatenated route strings and generic transport escape hatches; reports unresolved calls honestly. Excludes Windows kiosk source and test fixtures. The scanner is **report-only**, not a zero-debt claim.
+- `e45224f`: connected inventory fixture tests and `--summary` to shared-core CI, after package dependency installation. Check exact final-head CI before claiming PASS.
+- No changes to #181 or #182; #191 remains stacked on #181. Windows Tauri/Rust kiosk unchanged; no merge/deploy.
+
+## Billing SDK continuation (2026-10-20)
+
+- Commit `ebf952b`: preserved the Expo `platform: mobile` checkout redirect parameter that the earlier shared-core checkout function dropped. Added typed billing snapshot/checkout response and migrated the Vite + Expo subscription reads and extra-seat requests to the existing shared-core billing domain. Added five Vitest wire-contract tests. No shift penalty, cancellation, payment authority or pricing logic changed; PR #182 untouched.
+- The CI checks at this commit and on final head remain authoritative, not checks from a prior commit. Native payment-return URL acceptance remains outstanding.
+- Full architecture remediation (A01 permission write policy, A06-A09 UI/backend decomposition and A11 native/staging acceptance) is not complete.
+
+## A09 backend cycle graph (current continuation)
+
+- Commit `9304d08`: added `scripts/module_import_graph.py` (machine-readable and CLI check of module-level versus delayed runtime Django-app import edges), five standard-library regression tests, and the existing architecture CI job invokes both. The authoritative eight-pair allowlist is **read from** `backend/core/test_backend_ownership_boundaries.py` using Python AST, rather than duplicated or widened.
+- No Django runtime imports, model labels, migration files, Celery tasks or Windows kiosk code were modified. The graph baseline is an inspection tool and explicitly does not assert zero existing cycles.
+- Tests and exact-head CI remain pending; do not claim 100% completion before real execution and A01 authorization resolution.
+
+## Parent synchronization and QA scope — 2026-10-20
+
+- Merge commit `02f0776` incorporated exactly seven newer #181 source files (calendar/planner/shared-core presentation changes). It has two parents: existing PR #191 and current PR #181 `68b22eca`. No intersecting #191 paths; #182 not a parent or cherry-pick.
+- AST inventory log correction `b91a3dc` now prints the actual `callee` and `route` fields rather than the removed `evidence` property.
+- `ad161745` explicitly includes new pharmacy-tenant and multipart tests in the backend CI job. Previously they were in source but were not a separately required CI step.
+- The implementation must remain aligned to changing #181 head without silently including #182 decisions. Full native/staging/manual and backend-test evidence is still required. A passing CI job on an older head does not apply to final head.
+
+## Consolidated checkpoint (one implementation commit)
+- Incorporated the latest PR181 planner/UI state as a true second-parent merge, including tracked screenshot assets. PR182/Windows kiosk remain excluded.
+- Added separate pharmacy-profile write-authority check (owner, full manager, authorized org or scoped region manager), not mere read visibility. Added nine negative/positive Django HTTP tests. Requires exact-head CI and policy verification before release.
+- Extracted Expo closed-hours row and Vite roster DTO interfaces without altering logic; ensured brand hex colors are referenced from a shared identity token while retaining identical UI output.
+- Final release tests including native device testing are not represented as complete. This PR remains draft; no merge or deploy.
+
+## Senior review corrective work (20 Oct 2026)
+- Commit `e669c576` repairs Expo syntax, checks the saved hashed file rather than its original filename, restores the original fulfillment payment wire test, and reverts unapproved pharmacy write permissions. The previously added policy test was removed because it asserted an unapproved role matrix. `PHARMACY_WRITE_POLICY_DECISION.md` records the unresolved owner choice and required POST/PUT/PATCH/DELETE tests.
+- The existing permission_denied positional-argument misuse was corrected without changing the previous authorization semantics.
+- Additional import-cycle SCC reporting and tests are being added without altering app model identity or migration paths.
+- PR #182 and Windows kiosk runtime remain untouched. Exact-head CI, full isolated QA and Android/iOS manual acceptance remain required; this is not a 100% completion claim.
+
+## Current review remediation checkpoint
+
+- Commits `0512a5b` onward: characterized legacy manager PATCH 403 without altering policy; expanded import-graph AST traversal to recognize import-time control flow and class body imports; exclude type-checking guards. Added fixtures. This change is in PR191 only.
+- No claim of completed A04/A06/A07/A08/A11. **Do not merge** or deploy this draft.
+- The Windows kiosk is intentionally **outside** shared-core, Vite/Next/Expo migration and PR191's refactor completion criteria. Keep its separate existing CI gate.
+
+## Audit controls added in this continuation
+
+- `scripts/inventory-client-api-boundaries.mjs --strict` is a **true whole-tree classification gate** separate from the preexisting added-line ratchet. Each stable callsite needs a reviewed manifest decision with owner and rationale. An empty manifest is deliberately not considered acceptable when candidate calls remain. No existing callsite is auto-approved.
+- `docs/handover/architecture-remediation-2026-10-20/CLIENT_BOUNDARY_MANIFEST.json` is initially empty; classifying existing calls is still required. `client-boundary-inventory.json` is now an explicit GitHub Action review artifact, with detailed callsites in the CI log. `--strict` is not called by the release gate while this legacy debt is outstanding; this is intentional, not completion.
+- `scripts/audit-generated-skill-icons.mjs` compares registry codes, generated native require mappings and PNG asset names without changing the drawings or kiosk. Added as a dedicated architecture CI step.
+- This is still a **draft** until every classification, domain migration, policy approval and full acceptance is complete. The full-isolated QA workflow has been **skipped**, not passed, on prior commits.
+
+## Latest parent synchronization
+
+- Merge `c1e9ef3` incorporates precisely four newer PR #181 files: the planner handover, Vite planner E2E test, calendar page and shared-core planner test. Parent merge is recorded as second parent. Compare from former parent `6b6e2f7` confirmed no overlap with the 33 PR #191-specific modified files. PR #182 and #184 are not included.
+- The final exact-head CI remains authoritative. Earlier successful checks and canceled runs are not a pass for this merge.
+
+## Senior continuation - 21 October 2026
+
+**Current scope:** PR #191 alone, stacked on PR #181. The Windows kiosk (including its Tauri/Rust code and browser shell) remains fully independent and is excluded from shared-core migration. Expo's *pairing UI* is a mobile client and must retain its own verified platform adapter.
+
+- **A04:** tightened AST inventory by distinguishing named marketplace domain methods from generic `request` escape hatches, ignoring `axios.isAxiosError`/`axios.create` as backend domain calls, and recording import/destructuring/computed-property aliases and static route constants. Added negative fixtures. Current 176 finding figure is from an *earlier* scanner before this refinement; do not claim 176 confirmed bypasses or a new final count until CI inventory is complete. `--strict` remains intentionally unpassed with unreviewed debt. Branch commit `67ead5c`; follow-up `fa9f5f7` repairs CI-detected regex syntax.
+- **A02:** Expo pharmacy persistence verifies GET read-back after POST/PATCH; for multipart uploads, also compares requested document fields and array selections before marking clean and navigating. The native picker and stored bytes remain platform/server-owned. Native Android/iOS verification remains required. Commit `ffb7293`.
+- **A06:** `docs/architecture/VITE_NEXT_TWIN_DRIFT.md` records 64 same-relative-path Vite/Next migrated files, 21 identical and 43 divergent by Git blob hash. This is a *drift inventory*, not a license to overwrite intentional Next SSR/browser variants.
+- **A08:** added semantic persona-brand constants to shared-core with a unit test, and rewired the Next public theme's existing matching brand colour literals to the identical shared values; no visual redesign approved or assumed. Commit `09819af`.
+- **A01 remains blocked on owner authorization policy:** No DELETE, sensitive verification or profile-write authority changes have been introduced in this continuation.
+- **A11 incomplete:** Exact-head mandatory CI, full isolated QA (workflow skipped on preceding heads), PostgreSQL upgrade migration rehearsal, browser visual and device testing are not represented as complete. Retain draft and do not merge/deploy.
+
+## 21 October 2026 — release verification and guarded completion
+
+- The exact-head **Shared Core Consolidation release gate passed** at `2545f52096b254d9239624fde61fbcc31dd48bbe`: backend, shared-core, Vite, Next, Expo, PostgreSQL concurrency, architecture, boundary, separate kiosk and release-gate jobs all SUCCESS (workflow run `39527740762`). Other required lightweight workflows also passed at that SHA.
+- The independent `full-qa` label was applied to PR #191 to activate `Full Isolated QA` for disposable container acceptance. **A skipped run is not a pass**, and neither an ongoing run nor the previous SHA may be reported as exact-final-head proof.
+- The graph guard in this continuation adds `docs/architecture/backend-cycle-baseline.json` with 37 previously reported cyclic edges in two SCCs from architecture audit job `118986249355`. A09 now rejects newly cyclic internal edges and expanded SCCs, while accepting reductions, and still enforces the original approved mutual-pair policy. Fixture tests added. This is a grandfathered *technical baseline*, not architecture-debt resolution.
+- The Windows kiosk remains an **independent Tauri/Rust client**, excluded from shared-core migration and any required A10 refactor. Existing independent kiosk tests remain enabled, with no kiosk runtime changes.
+- A01 remains a separately required owner-approved profile-vs-delete-vs-sensitive-write authorization matrix. The prior unapproved policy has not been reintroduced; no destructive access change is presumed authorized.
+- A04 legacy API candidates have not all been eliminated or given owner-reviewed dispositions. The manifest strict mode is *not enabled in the release gate* while these candidates remain. A06 divergent Next/Vite twins and A07 screen orchestration have not been fully decomposed with behavioral and visual proof.
+- A02 native Android and iOS file-picker/readback, populated PostgreSQL upgrade, exact-final-head Docker/browser/visual acceptance and physical device tests require separate recorded evidence. Do not count CI typechecks or static/regression tests as that evidence.
+- **Status: draft, not merge-ready.** This checkpoint remains true irrespective of the most recent GitHub Actions status until the above requirements are evidenced or explicitly excluded through a documented owner decision.
+
+## 21 October 2026 — resumed owner-directed remediation (exact-head evidence pending)
+
+The user directed implementation rather than a review-only response. This batch is pushed to **PR #191** (stacked on #181) and contains no #182 commits, migrations, Windows Tauri/Rust kiosk runtime changes, or separate-frontend-repo changes.
+
+### Implemented in this batch
+
+- **A11 isolated QA:** `8adf6f47` repairs the shallow-checkout defect. CI now obtains the complete PR ancestry and explicitly exports the PR #181 base SHA as `SHARED_CORE_AUDIT_BASE` to the Docker runner. The strict ratchet is not bypassed.
+- **A02 pharmacy:** added persisted document-reference replacement verification (reject unchanged old reference), canonical list-array readback checks, and a GET-only retry after a successful backend write if subsequent verification fails. The original after-save callback survives reconciliation. New SDK regression fixtures cover normal, replacement, missing and mismatched data.
+- **A08 identity:** Expo active persona accents now reference the shared semantic mapping instead of unrelated colour literals. Windows browser visual and device acceptance are still required.
+- **A04 inventory:** 78 previously unreviewed candidates were given explicit manifest dispositions: inspected platform/session transports are labelled `approved-adapter` with rationale; remaining paths `legacy-migrate` and **strict still fails while those remain**. Exact scanner output and manifest must be rechecked on final head; each migration retires its corresponding key rather than grandfathering it.
+- **A05:** migrated Vite owner/staff dashboard GETs, Expo pairing GET/POST (only the Expo consumer, NOT the Windows kiosk), Vite and Expo membership listing/accept/reject/quit, Vite referral creation, and Expo unread room summary into named shared-core domain operations. Added request/response, platform header, bearer/refresh and failure-behavior tests for representative attendance, membership, chat and rewards paths.
+- **A08 artwork:** Windows visual workflow now renders the checked-in Expo skill PNG set from web glyph sources and fails if regenerated bytes differ, uploading candidates for review rather than rewriting accepted artwork.
+
+### Hard exit criteria still not established
+
+- Exact-final-head GitHub Actions including isolated Docker/PostgreSQL and Windows screenshot/glyph reproducibility must finish successfully. **Pending is not PASS.** Frequent follow-up commits cancel older runs through workflow concurrency.
+- The independent native Android/iOS picker, payment-return and authenticated browser/device journeys have **not** been run at final SHA. Mobile TypeScript/static QA does not substitute for emulator/physical device acceptance.
+- A04 still has dozens of `legacy-migrate` calls. The strict whole-tree classification gate intentionally does not pass until each has been moved or an individually justified exception is accepted with evidence.
+- A06/A07 43 differing Vite/Next twin files and remaining large UI orchestration have not all been decomposed, and the backend's baseline SCC debt is not removed by A09's no-regression gate.
+- **A01 role policy has no owner-approved matrix.** The explicitly reverted authorization change remains reverted; do not infer owner approval for profile, sensitive-document, financial setting or destructive DELETE authority. Historic behavior is unchanged by this batch.
+- Payments/shift penalties controlled by #182 are not copied or edited here. Separate kiosk acceptance is retained, but the Windows kiosk is **outside** shared-core and outside PR191's refactor requirements.
+
+**Merge/deploy decision: NOT MERGE READY**, until the above requirements are evidenced or the owner explicitly records an accepted narrower scope. Keep the PR draft.
