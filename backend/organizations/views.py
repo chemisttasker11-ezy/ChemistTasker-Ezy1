@@ -1,5 +1,5 @@
 """Organisation API: organisations, pharmacies, chains and pharmacy admins."""
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, serializers, status, viewsets
 from memberships.models import Membership
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
 from onboarding.models import OwnerOnboarding
@@ -32,7 +32,7 @@ from memberships.serializers import (
     MAX_ACTIVE_PHARMACY_MEMBERSHIPS,
 )
 from organizations.access import _get_org_pharmacies_queryset
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.contrib.auth import get_user_model
 from users.models import OrganizationMembership, User
 from users.org_roles import ORG_WIDE_ADMIN_ROLES, membership_capabilities, membership_visible_pharmacy_ids, OrgCapability
@@ -145,6 +145,31 @@ class PharmacyViewSet(viewsets.ModelViewSet):
             return Pharmacy.objects.filter(owner=owner)
         return Pharmacy.objects.none()
 
+    def create(self, request, *args, **kwargs):
+        raw_key = request.headers.get('Idempotency-Key')
+        if raw_key is None:
+            return super().create(request, *args, **kwargs)
+
+        self.idempotency_key = serializers.UUIDField().run_validation(raw_key)
+        pharmacy = Pharmacy.objects.filter(idempotency_key=self.idempotency_key).first()
+        if pharmacy is not None:
+            return self._idempotent_create_response(pharmacy)
+
+        try:
+            with transaction.atomic():
+                return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            # The unique key also protects simultaneous retries that both saw no row.
+            pharmacy = Pharmacy.objects.filter(idempotency_key=self.idempotency_key).first()
+            if pharmacy is None:
+                raise
+            return self._idempotent_create_response(pharmacy)
+
+    def _idempotent_create_response(self, pharmacy):
+        if pharmacy.idempotency_user_id != self.request.user.pk:
+            raise ValidationError('Idempotency key belongs to another user.')
+        return Response(self.get_serializer(pharmacy).data, status=status.HTTP_200_OK)
+
     def perform_create(self, serializer):
         user = self.request.user
         owner_onboarding = None
@@ -164,7 +189,11 @@ class PharmacyViewSet(viewsets.ModelViewSet):
         # Use a database transaction to ensure both operations succeed or fail together
         with transaction.atomic():
             # Save the pharmacy instance
-            pharmacy = serializer.save(owner=owner_onboarding, organization=organization)
+            key = getattr(self, 'idempotency_key', None)
+            pharmacy = serializer.save(
+                owner=owner_onboarding, organization=organization,
+                idempotency_key=key, idempotency_user=user if key is not None else None,
+            )
 
             # NOW, CREATE THE MEMBERSHIP RECORD FOR THE OWNER
             # This ensures the owner is also a member and can use member-only features like chat.
