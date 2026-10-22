@@ -1,6 +1,7 @@
 /** Pharmacy wire contract shared with the established pharmacy editor. */
 export type PharmacyApi = {
     id: number;
+    can_edit?: boolean;
     owner: number;
     name: string;
     email: string | null;

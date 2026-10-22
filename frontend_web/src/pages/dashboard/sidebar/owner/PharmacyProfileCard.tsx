@@ -59,14 +59,14 @@ const RATE_LABELS: Record<string, string> = {
 };
 
 
-export default function PharmacyProfileCard({ profile, editPharmacy }: { profile?: PharmacyProfileExtras; editPharmacy: () => void }) {
+export default function PharmacyProfileCard({ profile, editPharmacy }: { profile?: PharmacyProfileExtras; editPharmacy?: () => void }) {
   const abnVerified = Boolean(profile?.abn_verified);
   const rateLabel = profile?.default_rate_type ? RATE_LABELS[String(profile.default_rate_type)] ?? "" : "";
   const fixedRate = profile?.default_rate_type === "FIXED" && profile?.default_fixed_rate ? `$${profile.default_fixed_rate}/hr` : "";
   const weekHours = DAYS.map((d) => ({ ...d, hours: hoursFor(profile, d) })).filter((d) => d.hours);
 
   return (<Box sx={{ gridArea: "profile", minWidth: 0 }}>
-            <SectionCard dense title="Pharmacy profile" action={<Button size="small" startIcon={<Pencil size={14} />} onClick={editPharmacy}>Edit</Button>}>
+            <SectionCard dense title="Pharmacy profile" action={editPharmacy && profile?.can_edit !== false && <Button size="small" startIcon={<Pencil size={14} />} onClick={editPharmacy}>Edit</Button>}>
               <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) minmax(0, 1fr)" } }}>
               <Stack spacing={1.5} sx={{ minWidth: 0 }}>
                 {profile?.email ? (

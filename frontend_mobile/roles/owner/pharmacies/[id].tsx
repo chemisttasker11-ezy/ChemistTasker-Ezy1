@@ -101,7 +101,7 @@ export default function PharmacyDetailsScreen() {
       onAdminsChanged={loadData}
       loading={loading}
       autoPublishWorkerRequests={Boolean((pharmacy as any).auto_publish_worker_requests)}
-      onToggleAutoPublishWorkerRequests={handleToggleAutoPublishWorkerRequests}
+      onToggleAutoPublishWorkerRequests={pharmacy.can_edit !== false ? handleToggleAutoPublishWorkerRequests : undefined}
       autoPublishSaving={autoPublishSaving}
       autoPublishError={autoPublishError}
     />

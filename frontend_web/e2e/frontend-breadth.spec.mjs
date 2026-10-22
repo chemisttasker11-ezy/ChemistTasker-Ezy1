@@ -403,6 +403,41 @@ test('owner pharmacy selector lists all authorised locations and delegates Admin
 });
 
 
+for (const action of ['edit', 'delete']) {
+  test(`pharmacy action=${action} link opens only when the API allows editing`, async ({ page }) => {
+    await installApiFixture(page, roleUsers.owner);
+    let canEdit = true;
+    const writes = [];
+    await page.route('**/api/v1/pharmacies/**', (route) => {
+      const request = route.request();
+      if (request.method() !== 'GET') {
+        writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
+        return json(route, {});
+      }
+      return json(route, [{ id: 101, name: 'Linked Pharmacy', can_edit: canEdit }]);
+    });
+    const dialog = page.getByRole('dialog', { name: action === 'edit' ? 'Edit Pharmacy' : 'Delete Pharmacy' });
+    // The owner overview's Edit/Delete shortcut is an in-app navigation: a cold load resets the workspace and drops pharmacyId.
+    const followLink = async () => {
+      await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101');
+      await expect(page.getByText('Linked Pharmacy').first()).toBeVisible();
+      await page.evaluate((url) => {
+        window.history.pushState({}, '', url);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }, `/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101&view=detail&pharmacyId=101&action=${action}`);
+    };
+
+    await followLink();
+    await expect(dialog).toBeVisible();
+
+    canEdit = false;
+    await followLink();
+    await expect.poll(() => new URL(page.url()).searchParams.get('action')).toBeNull();
+    await expect(dialog).toHaveCount(0);
+    expect(writes).toEqual([]);
+  });
+}
+
 test('owner sidebar collapses without losing access to navigation or widening the viewport', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
   await installApiFixture(page, roleUsers.owner);

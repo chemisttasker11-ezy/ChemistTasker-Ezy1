@@ -17,6 +17,7 @@ from organizations.access import (
     has_admin_capability,
     is_admin_of,
     pharmacies_user_admins,
+    user_can_edit_pharmacy_record,
 )
 from django.shortcuts import get_object_or_404
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -41,6 +42,7 @@ from organizations.serializers import (
     OrganizationSerializer,
     PharmacyAdminSerializer,
     PharmacySerializer,
+    PharmacyWithEditSerializer,
     PublicOrganizationSerializer,
 )
 
@@ -71,11 +73,11 @@ class PharmacyViewSet(viewsets.ModelViewSet):
     """
     Pharmacy CRUD:
       - Owners manage their own pharmacies.
-      - Organization members manage pharmacies according to their scope.
+      - Organization-wide admins manage their organization's pharmacies.
     """
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     queryset = Pharmacy.objects.all()
-    serializer_class = PharmacySerializer
+    serializer_class = PharmacyWithEditSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def check_permissions(self, request):
@@ -88,6 +90,10 @@ class PharmacyViewSet(viewsets.ModelViewSet):
         self.permission_denied(request)
 
     def check_object_permissions(self, request, obj):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            if user_can_edit_pharmacy_record(request.user, obj):
+                return
+            self.permission_denied(request)
         user = request.user
         # Owner-of-this-pharmacy?
         if obj.owner and obj.owner.user == user:
@@ -130,7 +136,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
             accessible_ids.update(owner_ids)
 
         if accessible_ids:
-            return Pharmacy.objects.filter(id__in=accessible_ids).distinct()
+            return Pharmacy.objects.filter(id__in=accessible_ids).select_related('owner').distinct()
 
         # Fallback to admin assignments if no other visibility applies
         if admin_pharmacies.exists():

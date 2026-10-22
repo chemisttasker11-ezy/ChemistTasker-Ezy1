@@ -125,25 +125,42 @@ def _get_org_pharmacies_queryset(user):
     return qs.distinct()
 
 
+def org_wide_admin_organization_ids(user) -> set:
+    from users.models import OrganizationMembership
+    from users.org_roles import ORG_WIDE_ADMIN_ROLES
+
+    return set(
+        OrganizationMembership.objects.filter(user=user, role__in=ORG_WIDE_ADMIN_ROLES).values_list(
+            "organization_id", flat=True
+        )
+    )
+
+
+def user_can_edit_pharmacy_record(user, pharmacy, admin_organization_ids=None) -> bool:
+    """Only the owner or an organization-wide admin may edit the pharmacy record. Callers checking many pharmacies pass
+    org_wide_admin_organization_ids(user) once."""
+    if not user or not getattr(user, "is_authenticated", False) or pharmacy is None:
+        return False
+
+    owner = getattr(pharmacy, "owner", None)
+    if owner and owner.user_id == user.id:
+        return True
+
+    if admin_organization_ids is None:
+        admin_organization_ids = org_wide_admin_organization_ids(user)
+    return pharmacy.organization_id is not None and pharmacy.organization_id in admin_organization_ids
+
+
 def user_can_manage_pharmacy(user, pharmacy) -> bool:
     """Who manages a pharmacy's shifts and sees its full details: the owner, an org admin of its organization, a
     chief/region admin assigned to it, or a pharmacy admin with the roster capability."""
     if not user or not getattr(user, "is_authenticated", False) or pharmacy is None:
         return False
 
-    owner = getattr(pharmacy, "owner", None)
-    if owner and getattr(owner, "user", None) == user:
+    if user_can_edit_pharmacy_record(user, pharmacy):
         return True
 
     from users.models import OrganizationMembership
-    from users.org_roles import ORG_WIDE_ADMIN_ROLES
-
-    if OrganizationMembership.objects.filter(
-        user=user,
-        role__in=ORG_WIDE_ADMIN_ROLES,
-        organization_id=pharmacy.organization_id,
-    ).exists():
-        return True
 
     if OrganizationMembership.objects.filter(
         user=user,
