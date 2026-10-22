@@ -86,7 +86,6 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
         use_url=True, allow_null=True, required=False
     )
     has_chain = serializers.SerializerMethodField()
-    can_edit = serializers.SerializerMethodField()
     claimed   = serializers.SerializerMethodField()
     claim_status = serializers.SerializerMethodField()
     claim_request_id = serializers.SerializerMethodField()
@@ -190,7 +189,6 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             "auto_publish_worker_requests",
 
             'has_chain',
-            'can_edit',
             'claimed',
             'claim_status',
             'claim_request_id',
@@ -304,11 +302,6 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
         if not weekday_end:
             data["weekdays_end"] = data.get("monday_end")
         return data
-
-    @extend_schema_field(OpenApiTypes.BOOL)
-    def get_can_edit(self, obj) -> bool:
-        request = self.context.get("request")
-        return user_can_edit_pharmacy_record(request.user, obj) if request is not None else False
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_has_chain(self, obj) -> bool:
@@ -471,6 +464,19 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             confirmation_value=confirmation_value,
         )
         return instance
+
+
+class PharmacyWithEditSerializer(PharmacySerializer):
+    # Only PharmacyViewSet adds can_edit: nested pharmacy_detail would pay one query per row.
+    can_edit = serializers.SerializerMethodField()
+
+    class Meta(PharmacySerializer.Meta):
+        fields = PharmacySerializer.Meta.fields + ["can_edit"]
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_can_edit(self, obj) -> bool:
+        request = self.context.get("request")
+        return user_can_edit_pharmacy_record(request.user, obj) if request is not None else False
 
 
 class PharmacyClaimSerializer(serializers.ModelSerializer):

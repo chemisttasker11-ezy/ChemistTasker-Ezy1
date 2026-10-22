@@ -4,7 +4,7 @@ from django.test import TestCase
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from organizations.models import Organization, Pharmacy, PharmacyAdmin
-from organizations.serializers import PharmacySerializer
+from organizations.serializers import PharmacySerializer, PharmacyWithEditSerializer
 from users.models import OrganizationMembership, User
 from users.org_roles import (
     ORG_WIDE_ADMIN_ROLES,
@@ -115,7 +115,8 @@ class OrgRoleScopeTests(TestCase):
                 self.assertEqual(self.north.name, role)
 
     def test_pharmacy_serializer_without_request_cannot_edit(self):
-        self.assertIs(PharmacySerializer(self.north).data["can_edit"], False)
+        self.assertIs(PharmacyWithEditSerializer(self.north).data["can_edit"], False)
+        self.assertNotIn("can_edit", PharmacySerializer(self.north).data)
 
     def test_out_of_scope_pharmacy_remains_not_found(self):
         membership = self.membership("REGION_ADMIN", [self.north])

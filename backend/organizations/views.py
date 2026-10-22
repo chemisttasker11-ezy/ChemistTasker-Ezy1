@@ -42,6 +42,7 @@ from organizations.serializers import (
     OrganizationSerializer,
     PharmacyAdminSerializer,
     PharmacySerializer,
+    PharmacyWithEditSerializer,
     PublicOrganizationSerializer,
 )
 
@@ -76,7 +77,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
     """
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     queryset = Pharmacy.objects.all()
-    serializer_class = PharmacySerializer
+    serializer_class = PharmacyWithEditSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def check_permissions(self, request):
