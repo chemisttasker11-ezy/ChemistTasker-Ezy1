@@ -71,9 +71,12 @@ export async function fetchChainPharmaciesService(chainId: number | string) {
 export function getPharmacyById(id: number | string) {
     return fetchApi<PharmacyApi>(`/pharmacies/${id}/`);
 }
-export function createPharmacy(data: unknown) {
+export function createPharmacy(data: unknown, idempotencyKey?: string) {
     const body = data instanceof FormData ? data : JSON.stringify(data);
-    return fetchApi<PharmacyApi>('/pharmacies/', { method: 'POST', body });
+    return fetchApi<PharmacyApi>('/pharmacies/', {
+        method: 'POST', body,
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+    });
 }
 export function updatePharmacy(id: number | string, data: unknown) {
     const body = data instanceof FormData ? data : JSON.stringify(data);

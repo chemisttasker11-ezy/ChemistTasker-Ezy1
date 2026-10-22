@@ -68,6 +68,12 @@ class Organization(models.Model):
         app_label = "client_profile"
 
 class Pharmacy(models.Model):
+    idempotency_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
+    idempotency_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='+', editable=False,
+    )
+
     EMPLOYMENT_CHOICES = [
         ('PART_TIME', 'Part-time'),
         ('FULL_TIME',  'Full-time'),
