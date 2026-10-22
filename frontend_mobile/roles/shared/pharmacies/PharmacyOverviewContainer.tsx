@@ -135,6 +135,7 @@ export default function PharmacyOverviewContainer() {
             const normalizedPharmacies: PharmacyDTO[] = res.map((item: any) => ({
                 ...item,
                 id: String(item.id),
+                can_edit: item.can_edit ?? item.canEdit,
             }));
 
             // Filter for admin scope

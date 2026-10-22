@@ -30,6 +30,7 @@ export type AdminStaffRole = 'PHARMACIST' | 'INTERN' | 'TECHNICIAN' | 'ASSISTANT
 
 export type PharmacyDTO = {
     id: string;
+    can_edit?: boolean;
     name: string;
     street_address: string;
     suburb: string;

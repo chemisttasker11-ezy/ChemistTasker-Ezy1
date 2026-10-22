@@ -219,7 +219,7 @@ export default function PharmaciesListView({
                                 >
                                     Open
                                 </Button>
-                                {onEditPharmacy && (
+                                {pharmacy.can_edit !== false && onEditPharmacy && (
                                     <Button
                                         mode="outlined"
                                         compact
@@ -229,7 +229,7 @@ export default function PharmaciesListView({
                                         Edit
                                     </Button>
                                 )}
-                                {onDeletePharmacy && (
+                                {pharmacy.can_edit !== false && onDeletePharmacy && (
                                     <Button
                                         mode="text"
                                         compact

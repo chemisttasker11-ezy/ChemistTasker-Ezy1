@@ -4,7 +4,7 @@ from drf_spectacular.utils import extend_schema_field, OpenApiTypes
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin, PharmacyClaim
 from users.serializers import UserProfileSerializer
 from django.db import transaction
-from organizations.access import user_can_manage_pharmacy
+from organizations.access import user_can_edit_pharmacy_record, user_can_manage_pharmacy
 from organizations.chains import active_owner_chains_for_pharmacy
 from core.task_queue import async_task
 from core.serializer_lifecycle import RemoveOldFilesMixin
@@ -86,6 +86,7 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
         use_url=True, allow_null=True, required=False
     )
     has_chain = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
     claimed   = serializers.SerializerMethodField()
     claim_status = serializers.SerializerMethodField()
     claim_request_id = serializers.SerializerMethodField()
@@ -189,6 +190,7 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             "auto_publish_worker_requests",
 
             'has_chain',
+            'can_edit',
             'claimed',
             'claim_status',
             'claim_request_id',
@@ -302,6 +304,11 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
         if not weekday_end:
             data["weekdays_end"] = data.get("monday_end")
         return data
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_can_edit(self, obj) -> bool:
+        request = self.context.get("request")
+        return user_can_edit_pharmacy_record(request.user, obj) if request is not None else False
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_has_chain(self, obj) -> bool:

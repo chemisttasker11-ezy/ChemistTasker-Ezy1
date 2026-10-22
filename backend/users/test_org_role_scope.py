@@ -4,6 +4,7 @@ from django.test import TestCase
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from organizations.models import Organization, Pharmacy, PharmacyAdmin
+from organizations.serializers import PharmacySerializer
 from users.models import OrganizationMembership, User
 from users.org_roles import (
     ORG_WIDE_ADMIN_ROLES,
@@ -52,7 +53,9 @@ class OrgRoleScopeTests(TestCase):
         path = f"/api/v1/pharmacies/{self.north.pk}/"
         before = Pharmacy.objects.values().get(pk=self.north.pk)
 
-        self.assertEqual(client.get(path).status_code, 200)
+        response = client.get(path)
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(response.data["can_edit"], False)
         for method in (client.patch, client.put, client.delete):
             with self.subTest(method=method.__name__):
                 self.assertEqual(method(path, {"name": "Changed"}, format="json").status_code, 403)
@@ -60,6 +63,9 @@ class OrgRoleScopeTests(TestCase):
 
     def test_assigned_region_admin_cannot_patch_pharmacy(self):
         membership = self.membership("REGION_ADMIN", [self.north])
+        detail = client_for(membership.user).get(f"/api/v1/pharmacies/{self.north.pk}/")
+        self.assertEqual(detail.status_code, 200)
+        self.assertIs(detail.data["can_edit"], False)
         response = client_for(membership.user).patch(
             f"/api/v1/pharmacies/{self.north.pk}/", {"name": "Changed"}, format="json",
         )
@@ -85,7 +91,12 @@ class OrgRoleScopeTests(TestCase):
         client = client_for(owner)
         path = f"/api/v1/pharmacies/{pharmacy.pk}/"
 
-        self.assertEqual(client.patch(path, {"name": "Renamed"}, format="json").status_code, 200)
+        detail = client.get(path)
+        self.assertEqual(detail.status_code, 200)
+        self.assertIs(detail.data["can_edit"], True)
+        response = client.patch(path, {"name": "Renamed", "can_edit": False}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(response.data["can_edit"], True)
         pharmacy.refresh_from_db()
         self.assertEqual(pharmacy.name, "Renamed")
         self.assertEqual(client.delete(path).status_code, 204)
@@ -99,8 +110,12 @@ class OrgRoleScopeTests(TestCase):
                     f"/api/v1/pharmacies/{self.north.pk}/", {"name": role}, format="json",
                 )
                 self.assertEqual(response.status_code, 200)
+                self.assertIs(response.data["can_edit"], True)
                 self.north.refresh_from_db()
                 self.assertEqual(self.north.name, role)
+
+    def test_pharmacy_serializer_without_request_cannot_edit(self):
+        self.assertIs(PharmacySerializer(self.north).data["can_edit"], False)
 
     def test_out_of_scope_pharmacy_remains_not_found(self):
         membership = self.membership("REGION_ADMIN", [self.north])

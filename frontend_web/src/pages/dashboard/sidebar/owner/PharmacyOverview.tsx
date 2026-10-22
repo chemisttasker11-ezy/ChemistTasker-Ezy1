@@ -30,7 +30,7 @@ type OverviewProps = {
   firstLoad: boolean; listsUnavailable: boolean; hasAnyMembers: boolean; onMembershipsChanged: () => void;
   attention: PharmacyAttention[]; counts: { staff: number; locums: number; admins: number; staffPending: number; locumPending: number; adminPending: number };
   statValue: (value: number) => React.ReactNode; statDetail: (pending: number, fallback: string) => React.ReactNode; roleSummary: string;
-  setTab: (tab: TabKey) => void; profile?: PharmacyProfileExtras; editPharmacy: () => void; go: (suffix: string) => void;
+  setTab: (tab: TabKey) => void; profile?: PharmacyProfileExtras; editPharmacy?: () => void; go: (suffix: string) => void;
   inviteStaff: () => void; inviteLocum: () => void; inviteAdmin: () => void; openWorkforce: () => void;
 };
 export default function PharmacyOverview({ hidden, firstLoad, listsUnavailable, hasAnyMembers, onMembershipsChanged, attention, counts, statValue, statDetail, roleSummary, setTab, profile, editPharmacy, go, inviteStaff, inviteLocum, inviteAdmin, openWorkforce }: OverviewProps) {
