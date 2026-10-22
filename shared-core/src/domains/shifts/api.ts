@@ -107,7 +107,7 @@ export function declineShiftOffer(offerId: number | string) {
     return fetchApi(`/shift-offers/${offerId}/decline/`, { method: 'POST' });
 }
 export function buzzShiftOffer(offerId: number | string) {
-    return fetchApi(`/shift-offers/${offerId}/buzz/`, { method: 'POST' });
+    return fetchApi<{ detail?: string }>(`/shift-offers/${offerId}/buzz/`, { method: 'POST' });
 }
 export function getCommunityShiftDetail(id: number | string) {
     return fetchApi<ShiftApi>(API_ENDPOINTS.getCommunityShiftDetail(id));

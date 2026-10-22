@@ -1,3 +1,4 @@
+import { createFriendPillReferralService } from '@chemisttasker/shared-core';
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Linking, Share } from 'react-native';
 import { Text, Avatar, List, Button, Surface, Divider, Switch, IconButton, Card, Portal, Dialog, TextInput } from 'react-native-paper';
@@ -5,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { useAuth } from '../../context/AuthContext';
-import { getOnboarding, deleteAccount, updateOnboardingForm } from '@chemisttasker/shared-core';
+import { getOnboarding, deleteAccount, updateOnboardingForm, getCurrentSubscription } from '@chemisttasker/shared-core';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../../utils/apiClient';
@@ -55,9 +56,8 @@ export default function OwnerProfileScreen() {
   }, []);
 
   useEffect(() => {
-    apiClient
-      .get('/billing/subscription/')
-      .then(({ data }) => {
+    getCurrentSubscription()
+      .then((data) => {
         setSubscriptionSummary({
           active: !!data?.active,
           status: data?.status || 'inactive',
@@ -159,7 +159,7 @@ export default function OwnerProfileScreen() {
   const shareFriendReferral = async () => {
     setReferralLoading(true);
     try {
-      const { data } = await apiClient.post('/pill-rewards/refer-friend/', {});
+      const data = await createFriendPillReferralService({});
       const code = data?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const baseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || webBaseUrl;

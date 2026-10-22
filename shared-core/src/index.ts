@@ -13,6 +13,7 @@ export function configureApi(config: FinanceConfig): void {
 export * from './finance';
 export * from './financePresentation';
 export * from './api';
+export { getMembershipErrorMessage } from './domains/memberships/errors';
 export * from './talent';
 
 // Request-scoped/shared transport. Use createApiClient/createChemistTaskerApi
@@ -49,6 +50,7 @@ export * from './constants/roles';
 export * from './constants/capabilities';
 export * from './constants/colors';
 export * from './constants/personas';
+export * from './constants/brandIdentity';
 
 // Shared cross-client authorization/persona policy.
 export * from './policy/accessPolicy';
@@ -71,6 +73,7 @@ export type {InvoiceDetailApi, InvoiceLineItemApi} from './contracts/invoiceDeta
 
 export * from './skills';
 export * from './pharmacyProfile';
+export * from './domains/organizations/pharmacyMultipart';
 export * from './domains/shifts/skillPresets';
 export * from './domains/shifts/visibility';
 export * from './domains/shifts/postingDraft';
@@ -85,3 +88,5 @@ export * from './domains/onboarding/newcomer';
 export * from './domains/moderation/reports';
 
 export * from './domains/shifts/bookedRate';
+
+export { countOwnedPharmaciesFromUser } from './domains/onboarding/ownerSetup';

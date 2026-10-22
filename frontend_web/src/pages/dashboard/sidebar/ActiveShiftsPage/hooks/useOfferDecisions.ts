@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import type { Shift, EscalationLevelKey } from '@chemisttasker/shared-core';
-import apiClient from '../../../../../utils/apiClient';
+import { buzzShiftOffer, type Shift, type EscalationLevelKey } from '@chemisttasker/shared-core';
 import type { useTabData } from './useTabData';
 import type { useCounterOffers } from './useCounterOffers';
 import type { useShiftActions } from './useShiftActions';
@@ -151,8 +150,7 @@ export function useOfferDecisions({ shifts, selectedLevelByShift, setTabData, lo
             if (!offerId) return;
             setBuzzLoadingOfferId(offerId);
             try {
-                const response = await apiClient.post(`/shift-offers/${offerId}/buzz/`);
-                const result = response.data;
+                const result = await buzzShiftOffer(offerId);
                 setBuzzDialog({
                     open: true,
                     sent: true,
@@ -162,6 +160,7 @@ export function useOfferDecisions({ shifts, selectedLevelByShift, setTabData, lo
                 console.error('Failed to send confirmation reminder', error);
                 const message =
                     (error as any)?.response?.data?.detail ||
+                    (error as any)?.payload?.detail ||
                     (error as any)?.data?.detail ||
                     (error as any)?.message ||
                     "The reminder didn't go through. Try again in a moment.";

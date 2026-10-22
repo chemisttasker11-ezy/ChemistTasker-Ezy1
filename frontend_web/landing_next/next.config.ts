@@ -25,6 +25,8 @@ const viteDashboardPrefixes=[
 
 const config:NextConfig={
  poweredByHeader:false,
+ // Dev-only: CI/Playwright load the dev server from 127.0.0.1, which Next blocks by default.
+ allowedDevOrigins:['127.0.0.1'],
  output:'standalone',
  outputFileTracingRoot:path.resolve(__dirname,'../..'),
  transpilePackages:['@chemisttasker/shared-ui'],

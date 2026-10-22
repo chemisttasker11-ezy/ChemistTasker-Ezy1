@@ -295,7 +295,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         rawRoleCategory: post.roleCategory ?? null,
         explorerRoleType: post.explorerRoleType ?? null,
         explorerProfileId: post.explorerProfileId ?? null,
-        verification: normalizeVerification((post as any).verification),
+        verification: normalizeVerification((post as any).verification, (post as any).ahpra),
       };
     });
   }, [posts, ratingSummary]);

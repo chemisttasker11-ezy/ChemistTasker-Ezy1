@@ -28,9 +28,9 @@ import {
   createUserAvailabilityService,
   deleteUserAvailabilityService,
   getOnboarding,
+  updateOnboardingForm,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '../../../contexts/AuthContext';
-import { API_BASE_URL } from '../../../constants/api';
 import { GoogleMap, Marker, Circle, Autocomplete, useJsApiLoader } from '@react-google-maps/api';
 
 type AvailabilityEntry = UserAvailability & { notifyNewShifts?: boolean };
@@ -127,7 +127,7 @@ const buildMonthCells = (anchor: Date) => {
 };
 
 export default function SetAvailabilityPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [availabilityEntries, setAvailabilityEntries] = useState<AvailabilityEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState<AvailabilityDraft>(createEmptyEntry());
   const [notifyNewShifts, setNotifyNewShifts] = useState(false);
@@ -327,15 +327,7 @@ export default function SetAvailabilityPage() {
         form.append('coverage_radius_km', String(locationForm.coverageRadiusKm));
       }
 
-      const response = await fetch(`${API_BASE_URL}/${safeRole}/onboarding/me/`, {
-        method: 'PATCH',
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        body: form,
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ detail: 'Failed to update location' }));
-        throw new Error(err.detail || 'Failed to update location');
-      }
+      await updateOnboardingForm(safeRole, form);
       showSnackbar('Location updated', 'success');
     } catch {
       showSnackbar('Failed to update location', 'error');

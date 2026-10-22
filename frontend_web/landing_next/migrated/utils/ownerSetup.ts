@@ -1,4 +1,4 @@
-import { fetchPharmaciesService, getOnboardingDetail } from "@chemisttasker/shared-core";
+import { fetchPharmaciesService, getOnboardingDetail, countOwnedPharmaciesFromUser } from "@chemisttasker/shared-core";
 import type { User } from "../contexts/AuthContext";
 
 export type OwnerSetupStatus = {
@@ -12,39 +12,6 @@ export type OwnerSetupStatus = {
 const OWNER_ONBOARDING_PATH = "/setup/owner/onboarding";
 const OWNER_PHARMACIES_PATH = "/setup/owner/pharmacies";
 const OWNER_PHARMACY_SETUP_SKIPPED_KEY = "owner-pharmacy-setup-skipped";
-
-function countOwnedPharmaciesFromUser(user?: User | null) {
-  if (!user) return 0;
-
-  for (const key of ["owned_pharmacies", "owner_pharmacies", "pharmacies"]) {
-    const value = (user as any)[key];
-    if (Array.isArray(value) && value.length > 0) {
-      return value.length;
-    }
-  }
-
-  if (!Array.isArray(user.memberships)) return 0;
-
-  const ownedPharmacyIds = new Set<number>();
-  for (const membership of user.memberships) {
-    if (!membership || typeof membership !== "object" || !("pharmacy_id" in membership)) {
-      continue;
-    }
-
-    const role = String((membership as any).role || "").toUpperCase();
-    const isOwner =
-      role === "OWNER" ||
-      role === "PHARMACY_OWNER" ||
-      (membership as any).is_pharmacy_owner === true;
-
-    const pharmacyId = Number((membership as any).pharmacy_id);
-    if (isOwner && Number.isFinite(pharmacyId)) {
-      ownedPharmacyIds.add(pharmacyId);
-    }
-  }
-
-  return ownedPharmacyIds.size;
-}
 
 function hasSkippedPharmacySetup() {
   if (typeof window === "undefined") return false;

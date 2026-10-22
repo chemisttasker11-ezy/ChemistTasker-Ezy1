@@ -20,14 +20,15 @@ export async function fetchPillReferralsService(params?: Record<string, unknown>
     const query = buildQuery(params);
     return fetchApi<Collection<PillReferralEventApi>>(`/pill-rewards/referrals/${query}`);
 }
+export interface PillReferralCreated { id?: number; referral_code?: string; }
 export async function createFriendPillReferralService(payload: Record<string, unknown>) {
-    return fetchApi('/pill-rewards/refer-friend/', {
+    return fetchApi<PillReferralCreated>('/pill-rewards/refer-friend/', {
         method: 'POST',
         body: payload,
     });
 }
 export async function createShiftPillReferralService(payload: Record<string, unknown>) {
-    return fetchApi('/pill-rewards/refer-shift/', {
+    return fetchApi<PillReferralCreated>('/pill-rewards/refer-shift/', {
         method: 'POST',
         body: payload,
     });
@@ -36,5 +37,17 @@ export async function claimPillReferralService(payload: Record<string, unknown>)
     return fetchApi('/pill-rewards/claim/', {
         method: 'POST',
         body: payload,
+    });
+}
+
+/** Canonical shift settlement with pills; server alone decides the charge and balance. */
+export interface PillShiftPaymentResponse { detail?: string; code?: string; balance?: number; required?: number; }
+export async function payShiftWithPills(shiftId: number | string, offerIds: number[] = []) {
+    return fetchApi<PillShiftPaymentResponse>('/pill-rewards/pay-shift/', {
+        method: 'POST',
+        body: JSON.stringify({
+            shift_id: shiftId,
+            ...(offerIds.length ? { offer_ids: offerIds } : {}),
+        }),
     });
 }

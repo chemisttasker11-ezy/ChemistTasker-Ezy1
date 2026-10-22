@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import AuthLayout from '../layouts/AuthLayout';
 import PublicLogoTopBar from '../components/PublicLogoTopBar';
-import apiClient from '../utils/apiClient';
+import { verifyBrowserMobileOtp } from '../utils/browserMobileOtp';
 import { mobileRequestOtp, mobileResendOtp } from '@chemisttasker/shared-core';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -76,8 +76,7 @@ export default function MobileOTPVerify() {
     setStatus('');
     setLoading(true);
     try {
-      const resp = await apiClient.post('/users/mobile/verify-otp/', { otp });
-      const data = resp.data;
+      const data = await verifyBrowserMobileOtp(otp);
       if (data?.access && data?.refresh && data?.user && typeof login === 'function') {
         login(data.access, data.refresh, data.user);
       }

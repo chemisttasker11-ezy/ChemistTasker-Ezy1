@@ -1,3 +1,4 @@
+import { fetchPillBalanceService } from '@chemisttasker/shared-core';
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
@@ -25,7 +26,6 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../contexts/AuthContext";
-import apiClient from "../../../../utils/apiClient";
 import { dashboardGreetingName } from "../../../../utils/displayName";
 import type { PharmacyDTO } from "./types";
 
@@ -132,8 +132,8 @@ export default function OwnerOverviewHome({
     if (!canSeeOwnerFinance) return;
     let mounted = true;
     setPillBalance(null);
-    apiClient.get("/pill-rewards/balance/")
-      .then(({ data }) => {
+    fetchPillBalanceService()
+      .then((data) => {
         const amount = Number(data?.balance);
         if (mounted) setPillBalance(Number.isFinite(amount) ? amount : null);
       })

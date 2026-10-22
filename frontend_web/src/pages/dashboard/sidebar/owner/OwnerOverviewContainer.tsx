@@ -12,9 +12,9 @@ import { MembershipDTO, PharmacyAdminDTO, PharmacyDTO } from "./types";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   fetchPharmaciesService,
+  getOwnerDashboard,
   fetchPharmacyAdminsService,
 } from "@chemisttasker/shared-core";
-import apiClient from "../../../../utils/apiClient";
 import { fetchMembershipsForPharmacy } from "./membershipApi";
 
 type View = "overview" | "pharmacies" | "pharmacy" | "billing";
@@ -188,9 +188,8 @@ export default function OwnerOverviewContainer() {
     setDashboardLoading(true);
     setDashboardError(null);
     setDashboardData(null);
-    apiClient
-      .get("/dashboard/owner/", { params: dashboardParams })
-      .then(({ data }) => {
+    getOwnerDashboard(dashboardParams)
+      .then((data) => {
         if (mounted) setDashboardData(data);
       })
       .catch((error: any) => {

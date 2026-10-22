@@ -124,7 +124,11 @@ const LOGIN_PATH = '/api/v1/users/login/';
 const REFRESH_PATH = '/api/v1/users/token/refresh/';
 
 function isPath(path, expected) {
-  return path === expected || path.endsWith(expected.replace(/^\/api/, ''));
+  return (
+    path === expected ||
+    path === expected.replace(/^\/api\/v1/, '/api/platform') ||
+    path.endsWith(expected.replace(/^\/api/, ''))
+  );
 }
 
 async function installLoggedOutBootstrap(route) {
@@ -281,6 +285,8 @@ test('owner CONTACT membership never offers the quit action', async ({ page }) =
 });
 
 test.describe('public/auth wiring', () => {
+  const loginAlert = (page) => page.locator('[role="alert"]:not(#__next-route-announcer__)');
+
   test('login requires email and password before any auth request', async ({ page }) => {
     let authPostCount = 0;
     await page.route('**/api/**', async (route) => {
@@ -294,7 +300,7 @@ test.describe('public/auth wiring', () => {
 
     await page.goto('/login');
     await page.getByRole('button', { name: 'Login' }).click();
-    await expect(page.getByRole('alert')).toContainText('Please enter both email and password');
+    await expect(loginAlert(page)).toContainText('Please enter both email and password');
     expect(authPostCount).toBe(0);
   });
 
@@ -323,7 +329,7 @@ test.describe('public/auth wiring', () => {
     await page.getByLabel('Password').fill('wrong-password');
     await page.getByRole('button', { name: 'Login' }).click();
 
-    await expect(page.getByRole('alert')).toContainText('Invalid credentials');
+    await expect(loginAlert(page)).toContainText('Invalid credentials');
     expect(observed).not.toBeNull();
     expect(observed.method).toBe('POST');
     expect(observed.body).toMatchObject({
@@ -334,7 +340,7 @@ test.describe('public/auth wiring', () => {
     expect(observed.csrf).toBe('smoke-csrf');
     expect(observed.platform).toBe('web');
   });
-  for (const status of [400, 401, 403, 404, 409, 422, 500]) {
+  for (const status of [400, 401, 403, 404, 409, 422, 429, 500, 503]) {
     test(`login handles HTTP ${status} without crashing or spinning forever`, async ({ page }) => {
       await page.route('**/api/**', async (route) => {
         const request = route.request();
@@ -351,10 +357,116 @@ test.describe('public/auth wiring', () => {
       await page.getByLabel('Email').fill('smoke@example.test');
       await page.getByLabel('Password').fill('wrong-password');
       await page.getByRole('button', { name: 'Login' }).click();
-      await expect(page.getByRole('alert')).toContainText(`Smoke HTTP ${status}`);
+      if (status >= 500) {
+        await expect(loginAlert(page)).toContainText('Service is temporarily unavailable. Please try again shortly.');
+      } else {
+        await expect(loginAlert(page)).toContainText(`Smoke HTTP ${status}`);
+      }
       await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
     });
   }
+
+  test('login handles CSRF bootstrap 500/503 outage safely', async ({ page }) => {
+    let simulateCsrfOutage = false;
+    let loginPostCount = 0;
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      if (simulateCsrfOutage && path.endsWith('/users/csrf/')) {
+        return json(route, { detail: 'CSRF service down' }, 503);
+      }
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      if (request.method() === 'POST' && isPath(path, LOGIN_PATH)) {
+        loginPostCount += 1;
+        return json(route, { detail: 'Invalid credentials' }, 401);
+      }
+      return json(route, {});
+    });
+
+    await page.goto('/login');
+    await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.getByLabel('Email').fill('smoke@example.test');
+    await page.getByLabel('Password').fill('wrong-password');
+    simulateCsrfOutage = true;
+    await page.getByRole('button', { name: 'Login' }).click();
+    await expect(loginAlert(page)).toContainText('Service is temporarily unavailable. Please try again shortly.');
+    await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
+    expect(loginPostCount).toBe(0);
+  });
+
+  test('login clears a legacy storage-only session and never sends its refresh token', async ({ page }) => {
+    const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const expiredAccess = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ exp: 1 })}.sig`;
+    const legacyRefresh = 'legacy-refresh-token-smoke';
+    const leaks = [];
+    page.on('request', (request) => {
+      const sent = `${request.url()} ${JSON.stringify(request.headers())} ${request.postData() ?? ''}`;
+      if (sent.includes(legacyRefresh)) leaks.push(request.url());
+    });
+    await page.addInitScript(([access, refresh]) => {
+      if (sessionStorage.getItem('ct_legacy_seeded')) return;
+      sessionStorage.setItem('ct_legacy_seeded', '1');
+      localStorage.setItem('ct_access', access);
+      localStorage.setItem('ct_refresh', refresh);
+    }, [expiredAccess, legacyRefresh]);
+    await page.route('**/api/**', async (route) => {
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      return json(route, {});
+    });
+
+    await page.goto('/login');
+    await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('ct_refresh'))).toBeNull();
+    expect(leaks).toEqual([]);
+  });
+
+  test('login sanitizes 500 HTML/traceback responses', async ({ page }) => {
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const apiPath = new URL(request.url()).pathname;
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
+        return route.fulfill({
+          status: 500,
+          contentType: 'text/html',
+          body: '<html><body><h1>Server Error (500)</h1><p>Traceback (most recent call last): ...</p></body></html>',
+        });
+      }
+      return json(route, {});
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('smoke@example.test');
+    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByRole('button', { name: 'Login' }).click();
+    await expect(loginAlert(page)).toContainText('Service is temporarily unavailable. Please try again shortly.');
+    await expect(page.locator('body')).not.toContainText('Traceback');
+    await expect(page.locator('body')).not.toContainText('Server Error (500)');
+    await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
+  });
+
+  test('login redirects unverified email with email_not_verified code', async ({ page }) => {
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const apiPath = new URL(request.url()).pathname;
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
+        return json(route, { code: 'email_not_verified', detail: 'Please verify your email address.' }, 401);
+      }
+      return json(route, {});
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('unverified@example.test');
+    await page.getByLabel('Password').fill('password123');
+    await page.getByRole('button', { name: 'Login' }).click();
+    await page.waitForURL('**/otp-verify');
+    expect(new URL(page.url()).pathname).toBe('/otp-verify');
+  });
 
   test('login handles network failure safely', async ({ page }) => {
     await page.route('**/api/**', async (route) => {
@@ -370,7 +482,7 @@ test.describe('public/auth wiring', () => {
     await page.getByLabel('Email').fill('smoke@example.test');
     await page.getByLabel('Password').fill('wrong-password');
     await page.getByRole('button', { name: 'Login' }).click();
-    await expect(page.getByRole('alert')).toContainText('Login failed. Please check your credentials.');
+    await expect(loginAlert(page)).toContainText('Login failed. Please check your credentials.');
     await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
   });
 
@@ -404,7 +516,7 @@ test.describe('public/auth wiring', () => {
     expect(loginPosts).toBe(1);
 
     releaseLogin();
-    await expect(page.getByRole('alert')).toContainText('Invalid credentials');
+    await expect(loginAlert(page)).toContainText('Invalid credentials');
     await expect(button).toBeEnabled();
   });
 
@@ -668,6 +780,87 @@ test('pharmacist membership accept uses the existing my-memberships action endpo
   });
   expect(listReads).toBeGreaterThanOrEqual(2);
 });
+
+for (const { name, status, expectedMessage, responseBody } of [
+  {
+    name: 'pharmacist membership accept shows 400 detail and leaves pending invitation intact',
+    status: 400,
+    expectedMessage: 'You already belong to 3 pharmacies.',
+    responseBody: { detail: 'You already belong to 3 pharmacies.' },
+  },
+  {
+    name: 'pharmacist membership accept sanitizes 503 HTML traceback with friendly error',
+    status: 503,
+    expectedMessage: 'Unable to accept membership.',
+    responseBody: '<html><body><h1>503 Service Unavailable</h1><p>Traceback (most recent call last): server error</p></body></html>',
+  },
+]) {
+  test(name, async ({ page }) => {
+    await installApiFixture(page, roleUsers.pharmacist);
+
+    let acceptPosts = 0;
+
+    await page.route('**/api/v1/my-memberships/**', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+
+      if (request.method() === 'GET' && url.pathname.endsWith('/my-memberships/')) {
+        return json(route, [{
+          id: 701,
+          role: 'PHARMACIST',
+          employment_type: 'FULL_TIME',
+          job_title: 'Pharmacist',
+          is_pharmacy_admin: false,
+          status: 'PENDING',
+          created_at: '2026-09-24T10:00:00+10:00',
+          pharmacy_detail: {
+            id: 101,
+            name: 'Smoke Pharmacy',
+            suburb: 'Brisbane',
+            state: 'QLD',
+            postcode: '4000',
+          },
+          invited_by_details: {
+            first_name: 'Smoke',
+            last_name: 'Owner',
+            email: 'owner@example.test',
+          },
+        }]);
+      }
+
+      if (request.method() === 'POST' && url.pathname.endsWith('/my-memberships/701/accept/')) {
+        acceptPosts += 1;
+        if (typeof responseBody === 'string') {
+          return route.fulfill({ status, contentType: 'text/html', body: responseBody });
+        }
+        return json(route, responseBody, status);
+      }
+
+      return route.fallback();
+    });
+
+    await page.goto('/dashboard/pharmacist/memberships');
+    await expect(page.getByRole('heading', { name: 'Smoke Pharmacy' })).toBeVisible();
+
+    const acceptButton = page.getByRole('button', { name: 'Accept' });
+    await expect(acceptButton).toBeVisible();
+    await expect(acceptButton).toBeEnabled();
+
+    await acceptButton.click();
+
+    await expect(page.getByRole('alert')).toContainText(expectedMessage);
+    if (status === 503) {
+      await expect(page.locator('body')).not.toContainText('Traceback');
+      await expect(page.locator('body')).not.toContainText('503 Service Unavailable');
+    }
+    await expect(page.getByText('Waiting for you', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Smoke Pharmacy' })).toBeVisible();
+    await expect(acceptButton).toBeVisible();
+    await expect(acceptButton).toBeEnabled();
+    await expect(page.getByText('Active', { exact: true })).toHaveCount(0);
+    expect(acceptPosts).toBe(1);
+  });
+}
 
 
 test('workforce kiosk revoke uses the existing scoped manager kiosk contract', async ({ page }) => {

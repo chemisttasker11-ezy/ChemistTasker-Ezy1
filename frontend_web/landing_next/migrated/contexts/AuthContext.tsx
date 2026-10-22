@@ -16,6 +16,7 @@ import { getRooms } from "@chemisttasker/shared-core";
 import { type PersonaMode, type AdminLevel } from "@chemisttasker/shared-core";
 import { AdminCapability, ALL_ADMIN_CAPABILITIES } from "../constants/adminCapabilities";
 import { API_BASE_URL } from "../constants/api";
+import { browserSessionCurrentUser } from '@chemisttasker/shared-core';
 import { setTokens, clearTokens, refreshCookieSession, restoreTokensFromStorage, getAccessToken, getRefreshToken, isTokenExpired, AUTH_TOKENS_CLEARED_EVENT, AUTH_TOKENS_UPDATED_EVENT } from "../utils/tokenService";
 
 export interface OrgMembership {
@@ -147,10 +148,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const fetchCurrentUser = useCallback(async (): Promise<User | null> => {
     const token=getAccessToken();
-    const resp=await fetch(`${API_BASE_URL}/users/me/`,{credentials:'include',headers:token?{Authorization:`Bearer ${token}`}:{}});
-    if(resp.status===401)return null;
-    if(!resp.ok)throw new Error('Your account is temporarily unavailable.');
-    return await resp.json() as User;
+    return await browserSessionCurrentUser({ baseUrl: API_BASE_URL }, token) as User | null;
   }, []);
 
   const ownedPharmacyIds = useMemo<Set<number>>(() => {

@@ -1,0 +1,137 @@
+{
+  "frontend_mobile/config/api.ts|unresolved-client-transport|fetch|#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Mobile-only shared-core bootstrap: injects native bearer token and credentials-omit fetch adapter; no business rule."
+  },
+  "frontend_mobile/features/parity/ethicalMarketplace.tsx|unresolved-client-transport|fetch|#1": {
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
+  },
+  "frontend_mobile/features/parity/ethicalMarketplace.tsx|unresolved-client-transport|fetch|#2": {
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
+  },
+  "frontend_mobile/features/parity/finance.tsx|unresolved-client-transport|fetch|#1": {
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
+  },
+  "frontend_mobile/features/parity/marketplace.tsx|unresolved-client-transport|fetch|#1": {
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
+  },
+  "frontend_mobile/roles/shared/hub/PostComposer.tsx|unresolved-client-transport|fetch|#1": {
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
+  },
+  "frontend_mobile/utils/apiClient.ts|unresolved-client-transport|apiClient|#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Legacy Expo Axios session transport interceptor: refresh and bearer token wiring remain platform-owned pending adapter consolidation."
+  },
+  "frontend_mobile/utils/apiClient.ts|unresolved-client-transport|apiClient|#2": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Legacy Expo Axios session transport interceptor: refresh and bearer token wiring remain platform-owned pending adapter consolidation."
+  },
+  "frontend_mobile/utils/apiClient.ts|direct-backend-route|apiClient.post|/users/ws-ticket/#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Legacy Expo Axios session transport interceptor: refresh and bearer token wiring remain platform-owned pending adapter consolidation."
+  },
+  "frontend_mobile/utils/appUpdates.ts|direct-backend-route|fetch|${...}/users/mobile/app-config/#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Public unauthenticated application-version/bootstrap endpoint for app-store updates, platform-specific configuration."
+  },
+  "frontend_mobile/utils/authSession.ts|unresolved-client-transport|fetch|${...}${...}#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Mobile refresh-token storage/rotation adapter: native secure persistence, web CSRF and token renewal are platform-specific."
+  },
+  "frontend_mobile/utils/browserAuth.ts|direct-backend-route|fetch|${...}/users/csrf/#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo platform transport",
+    "rationale": "Expo web-preview CSRF bootstrap; native mobile requests use bearer token."
+  },
+  "frontend_web/landing_next/lib/chemisttasker-api.ts|unresolved-client-transport|fetch|#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Next browser fetch adapter injects CSRF/cookie credentials into named shared-core facade."
+  },
+  "frontend_web/landing_next/lib/platform-proxy.ts|unresolved-client-transport|fetch|${...}/${...}${...}#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Next server-only reverse proxy enforces origin, path validation, header forwarding and bounds; not business logic."
+  },
+  "frontend_web/landing_next/migrated/utils/apiClient.ts|unresolved-client-transport|apiClient|#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Next migrated Axios compatibility transport for legacy pages, not domain business logic."
+  },
+  "frontend_web/landing_next/shared/browser-session.ts|direct-backend-route|fetch|${...}/users/csrf/#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
+  },
+  "frontend_web/landing_next/shared/browser-session.ts|direct-backend-route|fetch|${...}/users/token/refresh/#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
+  },
+  "frontend_web/landing_next/shared/browser-session.ts|unresolved-client-transport|fetch|#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
+  },
+  "frontend_web/landing_next/shared/browser-session.ts|direct-backend-route|fetch|${...}/users/logout/#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
+  },
+  "frontend_web/src/utils/apiClient.ts|unresolved-client-transport|apiClient|#1": {
+    "classification": "approved-adapter",
+    "owner": "Next/Vite platform transport",
+    "rationale": "Vite legacy Axios HTTP transport adapter, pending controlled replacement; not a screen business rule."
+  },
+  "frontend_mobile/utils/nativeIdentityTransport.ts|unresolved-client-transport|apiClient.get|#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo native secure-session Axios transport",
+    "rationale": "GET /users/me/ with existing bearer refresh semantics. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
+  },
+  "frontend_mobile/utils/nativeIdentityTransport.ts|unresolved-client-transport|apiClient.post|#1": {
+    "classification": "approved-adapter",
+    "owner": "Expo native secure-session Axios transport",
+    "rationale": "POST /users/login/ with original native/Expo-web credentials override. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
+  },
+  "frontend_mobile/utils/nativeIdentityTransport.ts|unresolved-client-transport|apiClient.post|#2": {
+    "classification": "approved-adapter",
+    "owner": "Expo native secure-session Axios transport",
+    "rationale": "POST /users/register/ preserving duplicate-email and password error payload. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
+  },
+  "frontend_mobile/utils/nativeIdentityTransport.ts|unresolved-client-transport|apiClient.post|#3": {
+    "classification": "approved-adapter",
+    "owner": "Expo native secure-session Axios transport",
+    "rationale": "POST /users/verify-otp/ preserving token capture and account activation. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
+  },
+  "frontend_mobile/utils/nativeIdentityTransport.ts|unresolved-client-transport|apiClient.post|#4": {
+    "classification": "approved-adapter",
+    "owner": "Expo native secure-session Axios transport",
+    "rationale": "POST /users/resend-otp/ preserving native OTP feedback. Transport call is confined to one Expo adapter with shared-core NATIVE_IDENTITY_ROUTES; all application feature views call named identity methods instead of constructing URLs. Axios interceptor remains sole native secure-token, web CSRF, refresh, timeout and error owner. Approval is for the transport adapter only, not business logic or cross-platform policy."
+  },
+  "frontend_web/src/utils/browserMobileOtp.ts|unresolved-client-transport|apiClient.post|#1": {
+    "classification": "approved-adapter",
+    "owner": "Vite browser auth compatibility",
+    "rationale": "Named browser mobile OTP transport wrapper delegates canonical API_ENDPOINTS.mobileVerifyOtp to its established app-specific Axios interceptor. This boundary preserves browser cookie/CSRF fallback, existing bearer refresh and session-clear behaviour, and returns identical .data DTO. UI is free of literal domain request URLs; platform-dependent HTTP auth is intentional and audited, not a business/policy bypass."
+  },
+  "frontend_web/landing_next/migrated/utils/browserMobileOtp.ts|unresolved-client-transport|apiClient.post|#1": {
+    "classification": "approved-adapter",
+    "owner": "Next BFF browser auth compatibility",
+    "rationale": "Named browser mobile OTP transport wrapper delegates canonical API_ENDPOINTS.mobileVerifyOtp to its established app-specific Axios interceptor. This boundary preserves browser cookie/CSRF fallback, existing bearer refresh and session-clear behaviour, and returns identical .data DTO. UI is free of literal domain request URLs; platform-dependent HTTP auth is intentional and audited, not a business/policy bypass."
+  }
+}

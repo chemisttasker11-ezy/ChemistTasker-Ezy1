@@ -1,3 +1,4 @@
+import { fetchPillBalanceService, getOwnerDashboard } from '@chemisttasker/shared-core';
 import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Chip, Surface, Text } from 'react-native-paper';
@@ -6,7 +7,6 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
 import { useAdminWorkspace } from '@/context/AdminWorkspaceContext';
-import apiClient from '@/utils/apiClient';
 import HomeNavigationGrid from '@/components/HomeNavigationGrid';
 import ChooseAccountTypeCard from '@/components/ChooseAccountTypeCard';
 import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } from '@/roles/shared/dashboard/dashboardScope';
@@ -24,19 +24,19 @@ export default function AdminHomeScreen() {
       ? { workspace: 'internal', pharmacy_id: pharmacyId }
       : { workspace: 'internal' };
     Promise.all([
-      apiClient.get('/pill-rewards/balance/').catch(() => null),
-      apiClient.get('/dashboard/owner/', { params: dashboardParams }).catch(() => null),
+      fetchPillBalanceService().catch(() => null),
+      getOwnerDashboard(dashboardParams).catch(() => null),
     ]).then(([pillRes, dashboardRes]) => {
       if (!mounted) return;
-      if (pillRes?.data) {
+      if (pillRes) {
         setPillSummary({
-          balance: Number(pillRes.data?.balance ?? 0),
-          shift_post_cost: Number(pillRes.data?.shift_post_cost ?? 0),
+          balance: Number(pillRes?.balance ?? 0),
+          shift_post_cost: Number(pillRes?.shift_post_cost ?? 0),
         });
       } else {
         setPillSummary({ balance: 0, shift_post_cost: 0 });
       }
-      setDashboardData((dashboardRes?.data ?? null) as DashboardPayload | null);
+      setDashboardData((dashboardRes ?? null) as DashboardPayload | null);
     });
     return () => {
       mounted = false;

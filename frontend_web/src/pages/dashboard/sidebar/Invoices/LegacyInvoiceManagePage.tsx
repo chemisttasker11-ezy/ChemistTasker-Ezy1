@@ -33,9 +33,9 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../../contexts/AuthContext';
-import apiClient from '../../../../utils/apiClient';
 import {
   deleteInvoice,
+  downloadInvoicePdf,
   getInvoices,
   reportInvoiceIssue,
   sendInvoiceEmail,
@@ -202,10 +202,8 @@ export default function InvoiceManagePage() {
   const handleDownloadPdf = async () => {
     if (!menuInvoiceId) return;
     try {
-      const response = await apiClient.get(`/invoices/${menuInvoiceId}/pdf/`, {
-        responseType: 'blob',
-      });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const downloaded = await downloadInvoicePdf(menuInvoiceId);
+      const blob = new Blob([downloaded], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

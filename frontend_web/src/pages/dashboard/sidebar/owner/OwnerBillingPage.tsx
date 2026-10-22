@@ -10,9 +10,8 @@ import {
     Typography,
 } from '@mui/material';
 import { ArrowLeft, Check, CreditCard, Minus, Plus, ReceiptText, RefreshCw, Users } from 'lucide-react';
-import { createSubscriptionCheckout } from '@chemisttasker/shared-core';
+import { createSubscriptionCheckout, getCurrentSubscription, updateSubscriptionSeats } from '@chemisttasker/shared-core';
 import { useToast } from '../../../../contexts/ToastContext';
-import apiClient from '../../../../utils/apiClient';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../../components/ui/PageHeader';
 import IconTile from '../../../../components/ui/IconTile';
@@ -102,7 +101,7 @@ export default function OwnerBillingPage({ onBack, totalPharmacies }: { onBack: 
         setLoadingSubscription(true);
         setLoadFailed(false);
         try {
-            const { data: res }: any = await apiClient.get('/billing/subscription/');
+            const res = await getCurrentSubscription();
             const normalized: SubscriptionState = {
                 exists: !!res.exists,
                 active: !!res.active,
@@ -185,9 +184,7 @@ export default function OwnerBillingPage({ onBack, totalPharmacies }: { onBack: 
 
         setLoading(true);
         try {
-            const { data: res }: any = await apiClient.post('/billing/subscription/seats/', {
-                staff_count: desiredStaffCount,
-            });
+            const res = await updateSubscriptionSeats({ staffCount: desiredStaffCount });
             if (res.url) {
                 window.location.href = res.url;
                 return;

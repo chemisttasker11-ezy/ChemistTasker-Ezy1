@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Divider, Icon, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
 import { usePathname, useRouter } from 'expo-router';
-import apiClient from '@/utils/apiClient';
-import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
+import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOwnerDashboard, getPharmacistDashboard, getOtherStaffDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import {
@@ -187,9 +186,14 @@ export function useScopedDashboard(roleOverride?: string | null) {
       if (isOrganizationDashboard && organizationId == null) {
         throw new Error('Your organization membership is unavailable.');
       }
-      const payload = isOrganizationDashboard && organizationId != null
+      const normalizedRole = String(role || '').toUpperCase();
+      const payload = (isOrganizationDashboard && organizationId != null
         ? await getOrganizationDashboard(organizationId, params)
-        : (await apiClient.get(endpoint!, { params })).data;
+        : normalizedRole === 'OWNER'
+          ? await getOwnerDashboard(params)
+          : normalizedRole === 'PHARMACIST'
+            ? await getPharmacistDashboard(params)
+            : await getOtherStaffDashboard(params)) as DashboardPayload;
       const selected = payload?.selected_pharmacy;
       if (selected?.id != null) {
         setSelectedPharmacyId(Number(selected.id));
@@ -197,7 +201,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
       }
       return payload as DashboardPayload;
     } catch (error: any) {
-      if (error?.response?.status === 403) {
+      if ((error?.response?.status ?? error?.status) === 403) {
         const firstPharmacy = pharmacies[0];
         if (firstPharmacy && scopedWorkspace === 'internal') {
           selectPharmacy(firstPharmacy);

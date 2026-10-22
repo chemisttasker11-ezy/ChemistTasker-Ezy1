@@ -1,3 +1,4 @@
+import { fetchPillBalanceService } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Chip, Divider, IconButton, Surface, Text } from 'react-native-paper';
@@ -51,7 +52,7 @@ export default function OrganizationDashboard() {
     try {
       const [dashboardPayload, pillRes] = await Promise.all([
         scope.fetchDashboard(),
-        apiClient.get('/pill-rewards/balance/').catch(() => null),
+        fetchPillBalanceService().catch(() => null),
       ]);
 
       const list: any[] = Array.isArray(dashboardPayload?.shifts) ? dashboardPayload.shifts : [];
@@ -68,10 +69,10 @@ export default function OrganizationDashboard() {
         }))
       );
 
-      if (pillRes?.data) {
+      if (pillRes) {
         setPillSummary({
-          balance: Number(pillRes.data?.balance ?? 0),
-          shift_post_cost: Number(pillRes.data?.shift_post_cost ?? 0),
+          balance: Number(pillRes?.balance ?? 0),
+          shift_post_cost: Number(pillRes?.shift_post_cost ?? 0),
         });
       }
     } catch (err: any) {

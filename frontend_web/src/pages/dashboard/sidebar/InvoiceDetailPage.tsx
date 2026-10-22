@@ -17,9 +17,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { finance, getInvoiceDetail, reportInvoiceIssue, updateInvoice } from '@chemisttasker/shared-core';
+import { finance, getInvoiceDetail, reportInvoiceIssue, updateInvoice, downloadInvoicePdf } from '@chemisttasker/shared-core';
 import { isIssuerWorkspace } from '../../../utils/invoiceIssuer';
-import apiClient from '../../../utils/apiClient';
 
 dayjs.extend(utc);
 
@@ -382,10 +381,9 @@ export default function InvoiceDetailPage() {
 
   const handleDownloadPdf = () => {
     if (!id) return;
-    apiClient
-      .get(`/invoices/${Number(id)}/pdf/`, { responseType: 'blob' })
-      .then((response) => {
-        const blob = new Blob([response.data], { type: 'application/pdf' });
+    downloadInvoicePdf(Number(id))
+      .then((downloaded) => {
+        const blob = new Blob([downloaded], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;

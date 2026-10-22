@@ -221,6 +221,7 @@ export {
 export {
   getMemberships,
   getMyMemberships,
+  respondToMyMembership,
   createMembership,
   createMembershipInviteService,
   bulkInviteMembers,
@@ -301,7 +302,11 @@ export {
   createFriendPillReferralService,
   createShiftPillReferralService,
   claimPillReferralService,
+  payShiftWithPills,
 } from './domains/rewards/api';
+export * from './domains/auth/browserOperations';
+export * from './domains/auth/nativeWire';
+export * from './domains/content/operations';
 export {
   getInvoices,
   getInvoiceDetail,
@@ -311,6 +316,7 @@ export {
   generateInvoice,
   previewInvoice,
   getInvoicePdfUrl,
+  downloadInvoicePdf,
   sendInvoiceEmail,
   reportInvoiceIssue,
 } from './domains/invoicing/api';
@@ -319,6 +325,7 @@ export {
   markNotificationsAsRead,
   fetchNotificationsPage,
   markNotificationsReadService,
+  registerPushDeviceToken,
 } from './domains/notifications/api';
 export {
   getRatings,
@@ -409,6 +416,7 @@ export {
 } from './domains/pharmacyHub/api';
 export {
   getRooms,
+  getUnreadRoomSummary,
   getRoomDetail,
   getRoomMessages,
   sendRoomMessage,
@@ -444,6 +452,13 @@ export {
 } from './domains/chat/api';
 export {
   CalendarEventFilters,
+  CalendarEventRecurrence,
+  CreateCalendarEventPayload,
+  UpdateCalendarEventPayload,
+  CreateWorkNotePayload,
+  UpdateWorkNotePayload,
+  WorkNoteOccurrencePayload,
+  WorkNoteAction,
   WorkNoteFilters,
   getCalendarEvents,
   fetchCalendarEvents,
@@ -469,6 +484,7 @@ export {
   markWorkNoteDoneService,
   markWorkNoteOpen,
   markWorkNoteOpenService,
+  actOnWorkNote,
   getCalendarFeed,
   fetchCalendarFeed,
 } from './domains/calendar/api';

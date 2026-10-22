@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "@/public/navigation";
 import { Box, CircularProgress, Typography, Alert } from "@mui/material";
-import axios from "axios";
-import { API_BASE_URL, API_ENDPOINTS } from "../../constants/api";
+import { API_BASE_URL } from "../../constants/api";
+import { browserRejectReferee } from '@chemisttasker/shared-core';
 import AuthLayout from "../../layouts/AuthLayout";
 
 export default function RefereeRejectPage() {
@@ -19,18 +19,17 @@ export default function RefereeRejectPage() {
       setMessage("Missing reference information.");
       return;
     }
-    const url = `${API_BASE_URL}${API_ENDPOINTS.refereeReject(pk, refIndex)}`;
-    axios
-      .post(url)
-      .then((res) => {
+    browserRejectReferee({ baseUrl: API_BASE_URL }, pk, refIndex)
+      .then((data) => {
         setStatus("success");
-        setMessage(res.data?.message || "You have declined to be a referee for this candidate.");
+        setMessage(data?.message || "You have declined to be a referee for this candidate.");
       })
       .catch((err) => {
         setStatus("error");
         setMessage(
-          err.response?.data?.detail ||
-            err.response?.data ||
+          err?.payload?.detail ||
+            err?.response?.data?.detail ||
+            err?.response?.data ||
             err.message ||
             "Something went wrong."
         );

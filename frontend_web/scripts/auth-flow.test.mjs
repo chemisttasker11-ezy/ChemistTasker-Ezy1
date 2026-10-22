@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
-import {test} from 'node:test';
-import {bearerBelongsToDifferentUser,safeNext,refreshBrowserSession,logoutSession} from '../landing_next/shared/browser-session.ts';
-import {canAccessRoute} from '../src/components/routeAccess.ts';
-import {safeHubAttachmentUrl} from '../landing_next/lib/safe-hub-attachment.ts';
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import { test } from 'node:test';
+import vm from 'node:vm';
+import { bearerBelongsToDifferentUser, safeNext, refreshBrowserSession, logoutSession } from '../landing_next/shared/browser-session.ts';
+import { canAccessRoute } from '../src/components/routeAccess.ts';
+import { safeHubAttachmentUrl } from '../landing_next/lib/safe-hub-attachment.ts';
 
 test('return links preserve permitted destinations and reject external or login loops',()=>{
  for(const path of ['/content','/content/invite/example','/hubs/posts/12?reply=4#comments','/dashboard/pharmacist/overview'])assert.equal(safeNext(path),path);
@@ -67,4 +70,140 @@ test('capability-gated manager routes reject authenticated users without the cap
  assert.equal(canAccessRoute({userRole:'PHARMACIST',requiresCapability:true,hasRequiredCapability:false}),false);
  assert.equal(canAccessRoute({userRole:'PHARMACIST',requiresCapability:true,hasRequiredCapability:true}),true);
  assert.equal(canAccessRoute({userRole:'OWNER',requiresCapability:true,hasRequiredCapability:true}),true);
+});
+
+const require = createRequire(import.meta.url);
+const ts = require('typescript');
+
+function loadTokenService({ localStorage, sessionStorage, window, refreshBrowserSession, watchSession }) {
+  const code = fs.readFileSync(new URL('../landing_next/migrated/utils/tokenService.ts', import.meta.url), 'utf8');
+  const transpiled = (ts.transpileModule || ts.default?.transpileModule)(code, {
+    compilerOptions: {
+      module: (ts.ModuleKind || ts.default?.ModuleKind).CommonJS,
+      target: (ts.ScriptTarget || ts.default?.ScriptTarget).ES2022,
+    },
+  }).outputText;
+
+  const module = { exports: {} };
+  const customRequire = (id) => {
+    if (id.includes('browser-session')) return { refreshBrowserSession, watchSession: watchSession || (() => {}) };
+    if (id.includes('api')) return { API_BASE_URL: 'https://example.test' };
+    if (id.includes('shared-core')) return { browserWebSocketTicket: async () => 'ws-ticket' };
+    return require(id);
+  };
+
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    require: customRequire,
+    localStorage,
+    sessionStorage,
+    window,
+    Event: globalThis.Event || class Event { constructor(type) { this.type = type; } },
+    atob: globalThis.atob,
+    Date: globalThis.Date,
+    console: globalThis.console,
+  });
+
+  vm.runInContext(transpiled, context);
+  return module.exports;
+}
+
+test('tokenService restoreTokensFromStorage cleans legacy tokens and retains local access in memory', async () => {
+  const localMap = new Map([
+    ['ct_access', 'legacy-local-access'],
+    ['ct_refresh', 'legacy-local-refresh'],
+    ['ct_auth_storage', 'local'],
+  ]);
+  const sessionMap = new Map([
+    ['ct_access', 'legacy-session-access'],
+    ['ct_refresh', 'legacy-session-refresh'],
+  ]);
+  const localStorage = {
+    getItem: (k) => localMap.get(k) ?? null,
+    setItem: (k, v) => localMap.set(k, String(v)),
+    removeItem: (k) => localMap.delete(k),
+  };
+  const sessionStorage = {
+    getItem: (k) => sessionMap.get(k) ?? null,
+    setItem: (k, v) => sessionMap.set(k, String(v)),
+    removeItem: (k) => sessionMap.delete(k),
+  };
+  const window = new EventTarget();
+  const tokenService = loadTokenService({ localStorage, sessionStorage, window });
+
+  await tokenService.restoreTokensFromStorage();
+  assert.equal(tokenService.getAccessToken(), 'legacy-local-access');
+  assert.equal(tokenService.getRefreshToken(), null);
+  assert.equal(localMap.has('ct_access'), false);
+  assert.equal(localMap.has('ct_refresh'), false);
+  assert.equal(sessionMap.has('ct_access'), false);
+  assert.equal(sessionMap.has('ct_refresh'), false);
+  assert.equal(localMap.get('ct_auth_storage'), 'local');
+});
+
+test('tokenService restoreTokensFromStorage uses sessionStorage when configured and purges storage refresh', async () => {
+  const localMap = new Map([
+    ['ct_access', 'legacy-local-access'],
+    ['ct_refresh', 'legacy-local-refresh'],
+    ['ct_auth_storage', 'session'],
+  ]);
+  const sessionMap = new Map([
+    ['ct_access', 'session-access-token'],
+    ['ct_refresh', 'session-refresh-token'],
+  ]);
+  const localStorage = {
+    getItem: (k) => localMap.get(k) ?? null,
+    setItem: (k, v) => localMap.set(k, String(v)),
+    removeItem: (k) => localMap.delete(k),
+  };
+  const sessionStorage = {
+    getItem: (k) => sessionMap.get(k) ?? null,
+    setItem: (k, v) => sessionMap.set(k, String(v)),
+    removeItem: (k) => sessionMap.delete(k),
+  };
+  const window = new EventTarget();
+  const tokenService = loadTokenService({ localStorage, sessionStorage, window });
+
+  await tokenService.restoreTokensFromStorage();
+  assert.equal(tokenService.getAccessToken(), 'session-access-token');
+  assert.equal(tokenService.getRefreshToken(), null);
+  assert.equal(localMap.has('ct_access'), false);
+  assert.equal(localMap.has('ct_refresh'), false);
+  assert.equal(sessionMap.has('ct_access'), false);
+  assert.equal(sessionMap.has('ct_refresh'), false);
+});
+
+test('tokenService performs cookie-only refresh and clears in-memory tokens on logout', async () => {
+  const localMap = new Map();
+  const sessionMap = new Map();
+  const localStorage = {
+    getItem: (k) => localMap.get(k) ?? null,
+    setItem: (k, v) => localMap.set(k, String(v)),
+    removeItem: (k) => localMap.delete(k),
+  };
+  const sessionStorage = {
+    getItem: (k) => sessionMap.get(k) ?? null,
+    setItem: (k, v) => sessionMap.set(k, String(v)),
+    removeItem: (k) => sessionMap.delete(k),
+  };
+  const window = new EventTarget();
+  let watchCallback = null;
+  const tokenService = loadTokenService({
+    localStorage,
+    sessionStorage,
+    window,
+    watchSession: (cb) => { watchCallback = cb; },
+    refreshBrowserSession: async () => ({ access: 'cookie-access-token' }),
+  });
+
+  const refreshed = await tokenService.refreshCookieSession(true);
+  assert.equal(refreshed?.access, 'cookie-access-token');
+  assert.equal(tokenService.getAccessToken(), 'cookie-access-token');
+  assert.equal(tokenService.getRefreshToken(), '');
+
+  assert.equal(typeof watchCallback, 'function');
+  watchCallback('logout');
+  assert.equal(tokenService.getAccessToken(), null);
+  assert.equal(tokenService.getRefreshToken(), null);
 });

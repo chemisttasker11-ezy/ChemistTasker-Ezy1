@@ -1,7 +1,7 @@
 import {refreshBrowserSession, watchSession} from '../../shared/browser-session';
 // src/utils/tokenService.ts
-import axios from 'axios';
 import { API_BASE_URL } from '../constants/api';
+import { browserWebSocketTicket } from '@chemisttasker/shared-core';
 
 export const AUTH_TOKENS_CLEARED_EVENT = 'auth:tokens-cleared';
 export const AUTH_TOKENS_UPDATED_EVENT = 'auth:tokens-updated';
@@ -41,9 +41,16 @@ export function isTokenExpired(token: string, leewaySeconds = 30): boolean {
 export async function restoreTokensFromStorage(): Promise<void> {
   authStorage = resolveAuthStorage();
   const access = authStorage.getItem(ACCESS_KEY);
-  const refresh = authStorage.getItem(REFRESH_KEY);
+
+  // One-time cleanup for users upgrading from the legacy browser-token model.
+  // Preserve a still-valid access token in memory for this page load, but never
+  // retain or restore a refresh credential from JavaScript-readable storage.
   accessToken = access || null;
-  refreshToken = refresh || null;
+  refreshToken = null;
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+  sessionStorage.removeItem(ACCESS_KEY);
+  sessionStorage.removeItem(REFRESH_KEY);
 }
 
 export function getAccessToken(): string | null {
@@ -118,14 +125,7 @@ export async function fetchWsTicket(): Promise<string | null> {
   const token = getAccessToken();
   if (!token) return null;
   try {
-    const response = await axios.post(
-      `${API_BASE_URL}/users/ws-ticket/`,
-      {},
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-    return response.data?.ticket || null;
+    return await browserWebSocketTicket({ baseUrl: API_BASE_URL }, token);
   } catch (error) {
     console.error('Failed to fetch WS ticket:', error);
     return null;
