@@ -404,37 +404,149 @@ test('owner pharmacy selector lists all authorised locations and delegates Admin
 
 
 for (const action of ['edit', 'delete']) {
-  test(`pharmacy action=${action} link opens only when the API allows editing`, async ({ page }) => {
+  test(`pharmacy action=${action} link opens only when the API allows editing`, async ({ context }) => {
+    const writes = [];
+    // Cold load of the shared link in a fresh tab (own sessionStorage), no in-app click-through.
+    const openInFreshTab = async (canEdit) => {
+      const page = await context.newPage();
+      await installApiFixture(page, roleUsers.owner);
+      await page.route('**/api/v1/pharmacies/**', (route) => {
+        const request = route.request();
+        if (request.method() !== 'GET') {
+          writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
+          return json(route, {});
+        }
+        return json(route, [{ id: 101, name: 'Linked Pharmacy', can_edit: canEdit }]);
+      });
+      await page.goto(`/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101&view=detail&pharmacyId=101&action=${action}`);
+      return { page, dialog: page.getByRole('dialog', { name: action === 'edit' ? 'Edit Pharmacy' : 'Delete Pharmacy' }) };
+    };
+
+    const allowed = await openInFreshTab(true);
+    await expect(allowed.dialog).toBeVisible();
+    expect(new URL(allowed.page.url()).searchParams.get('pharmacyId')).toBe('101');
+
+    const denied = await openInFreshTab(false);
+    await expect(denied.page.getByText('Linked Pharmacy').first()).toBeVisible();
+    await expect.poll(() => new URL(denied.page.url()).searchParams.get('action')).toBeNull();
+    expect(new URL(denied.page.url()).searchParams.get('pharmacyId')).toBe('101');
+    await expect(denied.dialog).toHaveCount(0);
+    expect(writes).toEqual([]);
+  });
+
+  test(`pharmacy action=${action} link ignores a stale cached can_edit on same-tab reload`, async ({ page }) => {
     await installApiFixture(page, roleUsers.owner);
     let canEdit = true;
+    let releaseFresh;
+    const freshHeld = new Promise((resolve) => { releaseFresh = resolve; });
     const writes = [];
-    await page.route('**/api/v1/pharmacies/**', (route) => {
+    await page.route('**/api/v1/pharmacies/**', async (route) => {
       const request = route.request();
       if (request.method() !== 'GET') {
         writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
         return json(route, {});
       }
+      // Hold the fresh answer until the test has seen the sessionStorage cache render.
+      if (!canEdit) await freshHeld;
       return json(route, [{ id: 101, name: 'Linked Pharmacy', can_edit: canEdit }]);
     });
-    const dialog = page.getByRole('dialog', { name: action === 'edit' ? 'Edit Pharmacy' : 'Delete Pharmacy' });
-    // The owner overview's Edit/Delete shortcut is an in-app navigation: a cold load resets the workspace and drops pharmacyId.
-    const followLink = async () => {
-      await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101');
-      await expect(page.getByText('Linked Pharmacy').first()).toBeVisible();
-      await page.evaluate((url) => {
-        window.history.pushState({}, '', url);
-        window.dispatchEvent(new PopStateEvent('popstate'));
-      }, `/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101&view=detail&pharmacyId=101&action=${action}`);
-    };
-
-    await followLink();
-    await expect(dialog).toBeVisible();
+    await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101');
+    await expect(page.getByText('Linked Pharmacy').first()).toBeVisible();
+    await expect.poll(() => page.evaluate(() => Object.values(sessionStorage).some((value) => value.includes('"can_edit":true')))).toBe(true);
 
     canEdit = false;
-    await followLink();
+    const dialog = page.getByRole('dialog', { name: action === 'edit' ? 'Edit Pharmacy' : 'Delete Pharmacy' });
+    const freshRequest = page.waitForRequest((request) => request.method() === 'GET' && request.url().includes('/api/v1/pharmacies/'));
+    await page.goto(`/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101&view=detail&pharmacyId=101&action=${action}`);
+    await freshRequest;
+    await expect(page.getByText('Linked Pharmacy').first()).toBeVisible();
+    await expect(dialog).toHaveCount(0);
+    releaseFresh();
     await expect.poll(() => new URL(page.url()).searchParams.get('action')).toBeNull();
     await expect(dialog).toHaveCount(0);
     expect(writes).toEqual([]);
+  });
+
+  test(`pharmacy action=${action} in-app link waits for a focus refetch that revokes can_edit`, async ({ page }) => {
+    const user = { ...roleUsers.owner };
+    await installApiFixture(page, user);
+    let canEdit = true;
+    let releaseRefetch;
+    const refetchHeld = new Promise((resolve) => { releaseRefetch = resolve; });
+    const writes = [];
+    await page.route('**/api/v1/pharmacies/**', async (route) => {
+      const request = route.request();
+      if (request.method() !== 'GET') {
+        writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
+        return json(route, {});
+      }
+      // Keep the replacement request in flight until the link has been followed.
+      if (!canEdit) await refetchHeld;
+      return json(route, [{ id: 101, name: 'Linked Pharmacy', can_edit: canEdit }]);
+    });
+    const dialog = page.getByRole('dialog', { name: action === 'edit' ? 'Edit Pharmacy' : 'Delete Pharmacy' });
+    await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101');
+    await expect(page.getByText('Linked Pharmacy').first()).toBeVisible();
+    await page.waitForLoadState('networkidle');
+
+    // A focus re-check returns a changed user, so the page refetches pharmacies; the answer now revokes editing.
+    canEdit = false;
+    user.first_name = 'Refreshed';
+    const refetch = page.waitForRequest((request) => request.method() === 'GET' && request.url().includes('/api/v1/pharmacies/'));
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await refetch;
+    await page.evaluate((url) => {
+      window.history.pushState({}, '', url);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }, `/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101&view=detail&pharmacyId=101&action=${action}`);
+
+    await expect(dialog).toHaveCount(0);
+    releaseRefetch();
+    await expect.poll(() => new URL(page.url()).searchParams.get('action')).toBeNull();
+    await expect(dialog).toHaveCount(0);
+    expect(writes).toEqual([]);
+  });
+}
+
+test('pharmacy view=detail link survives a cold load', async ({ page }) => {
+  await installApiFixture(page, roleUsers.owner);
+  await page.route('**/api/v1/pharmacies/**', (route) => json(route, [{ id: 101, name: 'Linked Pharmacy', can_edit: true }]));
+  await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101&view=detail&pharmacyId=101');
+  await expect(page.getByText('Linked Pharmacy').first()).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get('pharmacyId')).toBe('101');
+  expect(new URL(page.url()).searchParams.get('view')).toBe('detail');
+});
+
+// Calendar, post-shift and roster links carry their own `pharmacy` param (dashboardRouteScope, roster emails).
+for (const [name, path] of [
+  ['roster email', '/dashboard/owner/manage-pharmacies/roster?pharmacy=102'],
+  ['roster', '/dashboard/owner/manage-pharmacies/roster?workspace=internal&pharmacy_id=102&pharmacy=102'],
+  ['calendar', '/dashboard/owner/calendar?workspace=internal&pharmacy_id=102&pharmacy=102'],
+  ['post-shift', '/dashboard/owner/post-shift?workspace=internal&pharmacy_id=102&pharmacy=102'],
+]) {
+  test(`${name} pharmacy link survives a cold load in a fresh tab`, async ({ context }) => {
+    const page = await context.newPage();
+    await installApiFixture(page, roleUsers.owner);
+    const rosterQueries = [];
+    await page.route('**/api/v1/pharmacies/**', (route) => json(route, [
+      { id: 101, name: 'Smoke Pharmacy', can_edit: true },
+      { id: 102, name: 'Linked Pharmacy', can_edit: true },
+    ]));
+    page.on('request', (request) => {
+      if (request.url().includes('/roster-owner/')) rosterQueries.push(new URL(request.url()).searchParams.toString());
+    });
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    expect(new URL(page.url()).searchParams.get('pharmacy')).toBe('102');
+    // The calendar page re-syncs pharmacy_id from its own memberships list, which the fixture keeps at 101.
+    if (name !== 'calendar') expect(new URL(page.url()).searchParams.get('pharmacy_id')).toBe('102');
+    if (name.startsWith('roster')) {
+      // The roster reads `pharmacy` once on mount, so the normalised URL must still pick 102 on reload.
+      rosterQueries.length = 0;
+      await page.reload();
+      await expect.poll(() => rosterQueries.some((query) => /(^|&)pharmacy(_id)?=102(&|$)/.test(query))).toBe(true);
+      expect(rosterQueries.some((query) => /(^|&)pharmacy(_id)?=101(&|$)/.test(query))).toBe(false);
+    }
   });
 }
 

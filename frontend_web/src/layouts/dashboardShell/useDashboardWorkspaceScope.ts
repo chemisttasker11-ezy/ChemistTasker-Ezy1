@@ -177,8 +177,7 @@ export function useDashboardWorkspaceScope(forceAdminScope: boolean) {
       const nextParams = new URLSearchParams(current);
       nextParams.set("workspace", "internal");
       nextParams.delete("pharmacy_id");
-      nextParams.delete("pharmacy");
-      nextParams.delete("pharmacyId");
+      // Keep page-level params: roster/calendar/post-shift read `pharmacy`, the pharmacy page reads `pharmacyId`.
       if (fallbackPharmacyId != null) {
         nextParams.set("pharmacy_id", String(fallbackPharmacyId));
       }

@@ -253,6 +253,11 @@ export default function PharmacyPage({
 
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  // The sessionStorage cache or a previous user/scope can carry a stale can_edit; deep-link actions
+  // wait until the API list loaded for the current pharmaciesKey has landed.
+  const [freshPharmaciesKey, setFreshPharmaciesKey] = useState<object | null>(null);
+  // Only the latest pharmacies request may mark the list fresh; older responses are ignored.
+  const pharmaciesRequestRef = useRef(0);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [membershipsByPharmacy, setMembershipsByPharmacy] = useState<Record<string, MembershipDTO[]>>({});
@@ -1410,19 +1415,23 @@ export default function PharmacyPage({
     }
   }, [view, activePharmacyId, loadMembers]);
 
-  const loadPharmacies = useCallback(async () => {
+  const loadPharmacies = useCallback(async (key: object) => {
+    const requestId = ++pharmaciesRequestRef.current;
     setIsFetching(true);
     try {
       const data = await fetchPharmaciesService({});
+      if (requestId !== pharmaciesRequestRef.current) return;
       const normalized = data.map(normalizePharmacy);
       let accessible = normalized;
       if (isOrganizationUser && scopedOrgPharmacyIds && scopedOrgPharmacyIds.size > 0 && user?.role !== "ORG_ADMIN") {
         accessible = normalized.filter((pharmacy: Pharmacy) => scopedOrgPharmacyIds.has(Number(pharmacy.id)));
       }
       setPharmacies(scopePharmacies(accessible));
+      setFreshPharmaciesKey(key);
       await Promise.all(accessible.map((p: Pharmacy) => loadMembers(p.id)));
       setInitialLoadComplete(true);
     } catch (err) {
+      if (requestId !== pharmaciesRequestRef.current) return;
       if (err instanceof AxiosError && err.response?.status === 404) {
         setNeedsOnboarding(true);
         setInitialLoadComplete(true);
@@ -1430,12 +1439,18 @@ export default function PharmacyPage({
         console.error(err);
       }
     } finally {
-      setIsFetching(false);
+      if (requestId === pharmaciesRequestRef.current) setIsFetching(false);
     }
   }, [isOrganizationUser, loadMembers, scopePharmacies, scopedOrgPharmacyIds, user?.role]);
 
+  // A new key per user/scope (the load effect's inputs), known in the same render that changes them.
+  const pharmaciesKey = useMemo(() => ({}), [user, loadPharmacies]);
+
   useEffect(() => {
     if (!user) return;
+    // A user/scope change invalidates any in-flight load before the replacement starts.
+    pharmaciesRequestRef.current += 1;
+    let cancelled = false;
 
     const isOrgRoleUser =
       Array.isArray(user?.memberships) &&
@@ -1445,14 +1460,15 @@ export default function PharmacyPage({
       });
 
     if (isOrgRoleUser || isAdminUser || isOrganizationUser) {
-      void loadPharmacies();
+      void loadPharmacies(pharmaciesKey);
       return;
     }
 
     setIsFetching(true);
     getOnboarding("owner")
-      .then(() => loadPharmacies())
+      .then(() => (cancelled ? undefined : loadPharmacies(pharmaciesKey)))
       .catch((err: unknown) => {
+        if (cancelled) return;
         if (err instanceof AxiosError && err.response?.status === 404) {
           setNeedsOnboarding(true);
           setInitialLoadComplete(true);
@@ -1461,7 +1477,10 @@ export default function PharmacyPage({
         }
         setIsFetching(false);
       });
-  }, [user, loadPharmacies]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loadPharmacies, pharmaciesKey]);
 
   useEffect(() => {
     if (!standalone || isFetching || needsOnboarding || dialogOpen || editing || pharmacies.length > 0) {
@@ -1660,7 +1679,7 @@ export default function PharmacyPage({
   useEffect(() => {
     const action = searchParams.get("action");
     const idParam = searchParams.get("pharmacyId");
-    if (!action || !idParam) return;
+    if (!action || !idParam || freshPharmaciesKey !== pharmaciesKey) return;
 
     const target = pharmacies.find((p) => p.id === idParam);
     if (!target) return;
@@ -1673,7 +1692,7 @@ export default function PharmacyPage({
     } else if (action === "delete") {
       setPendingDeletePharmacy((current) => (current?.id === target.id ? current : target));
     }
-  }, [searchParams, pharmacies, openDialog, clearActionParam]);
+  }, [searchParams, pharmacies, freshPharmaciesKey, pharmaciesKey, openDialog, clearActionParam]);
 
   const closeDialog = () => {
     if (standalone) {
