@@ -5,7 +5,6 @@ from datetime import timedelta
 
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
 from talent.models import ExplorerPost, ExplorerPostReaction
-from ratings.models import Rating
 from django.db import models
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -55,7 +54,15 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
     queryset = (
         ExplorerPost.objects
         .select_related("explorer_profile__user", "author_user")
-        .annotate(
+        .order_by("-created_at")
+    )
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+    pagination_class = TalentPostPagination
+
+    def get_queryset(self):
+        from ratings.models import Rating
+
+        return super().get_queryset().annotate(
             rating_average=Avg(
                 "author_user__ratings_received_as_worker__stars",
                 filter=Q(author_user__ratings_received_as_worker__direction=Rating.Direction.OWNER_TO_WORKER),
@@ -66,10 +73,6 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
                 distinct=True,
             ),
         )
-        .order_by("-created_at")
-    )
-    parser_classes = (MultiPartParser, FormParser, JSONParser)
-    pagination_class = TalentPostPagination
 
     # --------- serializers ---------
     def get_serializer_class(self):

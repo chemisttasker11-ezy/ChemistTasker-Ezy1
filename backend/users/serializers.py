@@ -10,7 +10,6 @@ from rest_framework_simplejwt.tokens      import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.conf import settings
 from organizations.models import Organization
-from rewards.services import claim_referral_code, RewardError
 from .models import OrganizationMembership, ContactMessage
 import secrets
 from datetime import datetime, timezone as dt_timezone
@@ -190,6 +189,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             ExplorerOnboarding.objects.create(user=user, role_type=newcomer_type, date_of_birth=date_of_birth)
 
         if referral_code:
+            from rewards.services import claim_referral_code, RewardError
+
             shift = None
             if referral_shift_id:
                 from shifts.models import Shift  # shifts builds on users: look the referral shift up at call time

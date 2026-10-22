@@ -17,8 +17,6 @@
       "onboarding",
       "organizations",
       "public_hub",
-      "ratings",
-      "rewards",
       "shifts",
       "talent",
       "users"
@@ -114,30 +112,6 @@
       "users"
     ],
     [
-      "ratings",
-      "organizations"
-    ],
-    [
-      "ratings",
-      "shifts"
-    ],
-    [
-      "ratings",
-      "users"
-    ],
-    [
-      "rewards",
-      "onboarding"
-    ],
-    [
-      "rewards",
-      "organizations"
-    ],
-    [
-      "rewards",
-      "shifts"
-    ],
-    [
       "shifts",
       "memberships"
     ],
@@ -164,14 +138,6 @@
     [
       "talent",
       "onboarding"
-    ],
-    [
-      "talent",
-      "ratings"
-    ],
-    [
-      "users",
-      "rewards"
     ]
   ]
 }
