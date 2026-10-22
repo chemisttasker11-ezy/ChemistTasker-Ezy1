@@ -1,8 +1,12 @@
 """Organisation role scope: Org Admin and Chief Admin reach every pharmacy of their organisation; Region Admin only its
 assigned pharmacies."""
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
-from organizations.models import Organization, Pharmacy
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+from organizations.models import Organization, Pharmacy, PharmacyAdmin
+from organizations.serializers import PharmacySerializer, PharmacyWithEditSerializer
 from users.models import OrganizationMembership, User
 from users.org_roles import (
     ORG_WIDE_ADMIN_ROLES,
@@ -42,3 +46,122 @@ class OrgRoleScopeTests(TestCase):
         region = self.membership("REGION_ADMIN", [self.north])
         self.assertFalse(membership_has_org_wide_scope(region))
         self.assertEqual(membership_visible_pharmacy_ids(region), [self.north.id])
+
+    def test_restricted_member_can_read_but_cannot_write_pharmacy(self):
+        membership = self.membership("REGION_ADMIN", [self.north])
+        membership.admin_level = PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER
+        membership.save(update_fields=["admin_level"])
+        client = client_for(membership.user)
+        path = f"/api/v1/pharmacies/{self.north.pk}/"
+        before = Pharmacy.objects.values().get(pk=self.north.pk)
+
+        response = client.get(path)
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(response.data["can_edit"], False)
+        for method in (client.patch, client.put, client.delete):
+            with self.subTest(method=method.__name__):
+                self.assertEqual(method(path, {"name": "Changed"}, format="json").status_code, 403)
+                self.assertEqual(Pharmacy.objects.values().get(pk=self.north.pk), before)
+
+    def test_assigned_region_admin_cannot_patch_pharmacy(self):
+        membership = self.membership("REGION_ADMIN", [self.north])
+        detail = client_for(membership.user).get(f"/api/v1/pharmacies/{self.north.pk}/")
+        self.assertEqual(detail.status_code, 200)
+        self.assertIs(detail.data["can_edit"], False)
+        response = client_for(membership.user).patch(
+            f"/api/v1/pharmacies/{self.north.pk}/", {"name": "Changed"}, format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.north.refresh_from_db()
+        self.assertEqual(self.north.name, "North")
+
+    def test_pharmacy_admin_cannot_write_pharmacy(self):
+        for level in (PharmacyAdmin.AdminLevel.MANAGER, PharmacyAdmin.AdminLevel.OWNER):
+            with self.subTest(level=level):
+                user = make_user("OWNER")
+                PharmacyAdmin.objects.create(user=user, pharmacy=self.north, admin_level=level)
+                client = client_for(user)
+                path = f"/api/v1/pharmacies/{self.north.pk}/"
+                self.assertEqual(client.get(path).status_code, 200)
+                self.assertEqual(client.patch(path, {"name": "Changed"}, format="json").status_code, 403)
+                self.assertEqual(client.delete(path).status_code, 403)
+                self.north.refresh_from_db()
+                self.assertEqual(self.north.name, "North")
+
+    def test_owner_can_patch_and_delete_pharmacy(self):
+        owner, pharmacy = make_owner_with_pharmacy("Owned")
+        client = client_for(owner)
+        path = f"/api/v1/pharmacies/{pharmacy.pk}/"
+
+        detail = client.get(path)
+        self.assertEqual(detail.status_code, 200)
+        self.assertIs(detail.data["can_edit"], True)
+        response = client.patch(path, {"name": "Renamed", "can_edit": False}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(response.data["can_edit"], True)
+        pharmacy.refresh_from_db()
+        self.assertEqual(pharmacy.name, "Renamed")
+        self.assertEqual(client.delete(path).status_code, 204)
+        self.assertFalse(Pharmacy.objects.filter(pk=pharmacy.pk).exists())
+
+    def test_org_wide_admin_can_patch_pharmacy(self):
+        for role in ORG_WIDE_ADMIN_ROLES:
+            with self.subTest(role=role):
+                membership = self.membership(role)
+                response = client_for(membership.user).patch(
+                    f"/api/v1/pharmacies/{self.north.pk}/", {"name": role}, format="json",
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertIs(response.data["can_edit"], True)
+                self.north.refresh_from_db()
+                self.assertEqual(self.north.name, role)
+
+    def test_can_edit_queries_do_not_grow_with_pharmacy_count(self):
+        def can_edit_queries(count):
+            organization = Organization.objects.create(name=f"Count {count}", slug=f"count-{count}")
+            for index in range(count):
+                _, pharmacy = make_owner_with_pharmacy(f"Count {count}-{index}")
+                Pharmacy.objects.filter(pk=pharmacy.pk).update(organization=organization)
+            user = User.objects.create_user(email=f"count{count}@scope.test", password=None, role="ORG_STAFF")
+            OrganizationMembership.objects.create(user=user, organization=organization, role="ORG_ADMIN")
+            client = client_for(user)
+            with CaptureQueriesContext(connection) as ctx:
+                response = client.get("/api/v1/pharmacies/")
+            self.assertEqual(response.status_code, 200)
+            rows = response.data["results"] if isinstance(response.data, dict) else response.data
+            self.assertEqual([row["can_edit"] for row in rows], [True] * count)
+            return sum(
+                1 for query in ctx.captured_queries
+                if "organizationmembership" in query["sql"] or "owneronboarding" in query["sql"]
+            )
+
+        self.assertEqual(can_edit_queries(1), can_edit_queries(3))
+
+    def test_pharmacy_serializer_without_request_cannot_edit(self):
+        self.assertIs(PharmacyWithEditSerializer(self.north).data["can_edit"], False)
+        self.assertNotIn("can_edit", PharmacySerializer(self.north).data)
+
+    def test_out_of_scope_pharmacy_remains_not_found(self):
+        membership = self.membership("REGION_ADMIN", [self.north])
+        client = client_for(membership.user)
+        path = f"/api/v1/pharmacies/{self.south.pk}/"
+        before = Pharmacy.objects.values().get(pk=self.south.pk)
+
+        self.assertEqual(client.get(path).status_code, 404)
+        for method in (client.patch, client.put, client.delete):
+            with self.subTest(method=method.__name__):
+                self.assertEqual(method(path, {"name": "Changed"}, format="json").status_code, 404)
+                self.assertEqual(Pharmacy.objects.values().get(pk=self.south.pk), before)
+
+    def test_other_organization_admin_cannot_write_visible_pharmacy(self):
+        membership = self.membership("ORG_ADMIN")
+        pharmacy = Pharmacy.objects.exclude(organization=self.organization).get()
+        PharmacyAdmin.objects.create(user=membership.user, pharmacy=pharmacy)
+        client = client_for(membership.user)
+        path = f"/api/v1/pharmacies/{pharmacy.pk}/"
+
+        self.assertEqual(client.get(path).status_code, 200)
+        self.assertEqual(client.patch(path, {"name": "Changed"}, format="json").status_code, 403)
+        self.assertEqual(client.delete(path).status_code, 403)
+        pharmacy.refresh_from_db()
+        self.assertEqual(pharmacy.name, "Elsewhere")

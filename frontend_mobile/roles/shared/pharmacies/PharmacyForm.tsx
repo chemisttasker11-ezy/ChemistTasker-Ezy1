@@ -266,6 +266,11 @@ export default function PharmacyForm({
             try {
                 const data = (await getPharmacyById(pharmacyId)) as any;
                 if (cancelled || !data) return;
+                // A direct link to the edit route must not open the form for users the API would refuse.
+                if (data.can_edit === false) {
+                    if (onCancel) onCancel(); else router.back();
+                    return;
+                }
 
                 const nextForm = {
                     name: data.name || '',

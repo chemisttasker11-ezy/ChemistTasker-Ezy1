@@ -623,6 +623,7 @@ export interface ExplorerPostPayload {
 
 export interface Pharmacy {
     id: number;
+    can_edit?: boolean;
     name: string;
     street_address: string;
     suburb: string;

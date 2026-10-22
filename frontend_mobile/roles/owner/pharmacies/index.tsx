@@ -69,7 +69,7 @@ export default function PharmaciesListScreen() {
       const data: any = await fetchPharmaciesService({});
       // Normalize data
       const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-      const normalized: PharmacyDTO[] = list.map((item: any) => ({ ...item, id: String(item.id ?? item.pharmacy_id ?? '') }));
+      const normalized: PharmacyDTO[] = list.map((item: any) => ({ ...item, id: String(item.id ?? item.pharmacy_id ?? ''), can_edit: item.can_edit ?? item.canEdit }));
 
       setPharmacies(normalized);
 

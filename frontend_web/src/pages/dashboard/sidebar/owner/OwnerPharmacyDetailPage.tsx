@@ -214,9 +214,11 @@ export default function OwnerPharmacyDetailPage({
         subtitle={address || undefined}
         actions={
           <>
-            <Button variant="outlined" startIcon={<Pencil size={16} />} onClick={editPharmacy} sx={{ minHeight: 44 }}>
-              Edit details
-            </Button>
+            {pharmacy.can_edit !== false && (
+              <Button variant="outlined" startIcon={<Pencil size={16} />} onClick={editPharmacy} sx={{ minHeight: 44 }}>
+                Edit details
+              </Button>
+            )}
             <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => go("post-shift")} sx={{ minHeight: 44 }}>
               Post a shift
             </Button>
@@ -263,7 +265,7 @@ export default function OwnerPharmacyDetailPage({
 
       <PharmacyOverview hidden={tab !== "overview"} firstLoad={firstLoad} listsUnavailable={listsUnavailable} hasAnyMembers={hasAnyMembers}
           onMembershipsChanged={onMembershipsChanged} attention={attention} counts={counts} statValue={statValue} statDetail={statDetail}
-          roleSummary={roleSummary} setTab={setTab} profile={profile} editPharmacy={editPharmacy} go={go}
+          roleSummary={roleSummary} setTab={setTab} profile={profile} editPharmacy={pharmacy.can_edit !== false ? editPharmacy : undefined} go={go}
           inviteStaff={() => setInviteStaff(n => n + 1)} inviteLocum={() => setInviteLocum(n => n + 1)} inviteAdmin={() => setInviteAdmin(n => n + 1)}
           openWorkforce={() => navigate(`/dashboard/workforce/settings?pharmacy_id=${pharmacy.id}`)} />
 
@@ -280,9 +282,9 @@ export default function OwnerPharmacyDetailPage({
       )}
 
       <PharmacySettings hidden={tab !== "settings"} autoPublishWorkerRequests={autoPublishWorkerRequests} autoPublishSaving={autoPublishSaving} autoPublishError={autoPublishError}
-          onToggleAutoPublishWorkerRequests={onToggleAutoPublishWorkerRequests} payrollEnabled={payrollEnabled} payrollReady={payrollReady}
+          onToggleAutoPublishWorkerRequests={pharmacy.can_edit !== false ? onToggleAutoPublishWorkerRequests : undefined} payrollEnabled={payrollEnabled} payrollReady={payrollReady}
           payrollLoadError={payrollLoadError} payrollSaving={payrollSaving} payrollSaveError={payrollSaveError} handlePayrollToggle={handlePayrollToggle}
-          retryPayroll={retryPayroll} editPharmacy={editPharmacy} />
+          retryPayroll={retryPayroll} editPharmacy={pharmacy.can_edit !== false ? editPharmacy : undefined} />
     </Box>
   );
 }

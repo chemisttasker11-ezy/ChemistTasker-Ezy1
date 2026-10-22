@@ -15,7 +15,7 @@ type SettingsProps = {
   hidden: boolean;
   autoPublishWorkerRequests: boolean; autoPublishSaving: boolean; autoPublishError: string; onToggleAutoPublishWorkerRequests?: (enabled: boolean) => void | Promise<void>;
   payrollEnabled: boolean; payrollReady: boolean; payrollLoadError: string; payrollSaving: boolean; payrollSaveError: string;
-  handlePayrollToggle: (enabled: boolean) => Promise<void>; retryPayroll: () => void; editPharmacy: () => void;
+  handlePayrollToggle: (enabled: boolean) => Promise<void>; retryPayroll: () => void; editPharmacy?: () => void;
 };
 export default function PharmacySettings({ hidden, autoPublishWorkerRequests, autoPublishSaving, autoPublishError, onToggleAutoPublishWorkerRequests, payrollEnabled, payrollReady, payrollLoadError, payrollSaving, payrollSaveError, handlePayrollToggle, retryPayroll, editPharmacy }: SettingsProps) {
   return (
@@ -65,9 +65,11 @@ export default function PharmacySettings({ hidden, autoPublishWorkerRequests, au
               body: (
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }} justifyContent="space-between" sx={{ p: 2.25 }}>
                   <Typography sx={{ color: "var(--ct-text-secondary)", fontSize: 14 }}>Update these whenever your hours or rates change.</Typography>
-                  <Button variant="outlined" startIcon={<Pencil size={16} />} onClick={editPharmacy} sx={{ minHeight: 40, flexShrink: 0 }}>
-                    Edit pharmacy details
-                  </Button>
+                  {editPharmacy && (
+                    <Button variant="outlined" startIcon={<Pencil size={16} />} onClick={editPharmacy} sx={{ minHeight: 40, flexShrink: 0 }}>
+                      Edit pharmacy details
+                    </Button>
+                  )}
                 </Stack>
               ),
             },

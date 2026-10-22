@@ -1663,7 +1663,9 @@ export default function PharmacyPage({
     const target = pharmacies.find((p) => p.id === idParam);
     if (!target) return;
 
-    if (action === "edit") {
+    if (target.can_edit === false) {
+      clearActionParam();
+    } else if (action === "edit") {
       openDialog(target);
       clearActionParam();
     } else if (action === "delete") {

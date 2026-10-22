@@ -127,7 +127,7 @@ export default function OwnerPharmaciesPage({
                   >
                     Open
                   </Button>
-                  {onEditPharmacy && (
+                  {p.can_edit !== false && onEditPharmacy && (
                     <Button
                       variant="outlined"
                       size="small"
@@ -148,7 +148,7 @@ export default function OwnerPharmaciesPage({
                       Edit
                     </Button>
                   )}
-                  {onDeletePharmacy && (
+                  {p.can_edit !== false && onDeletePharmacy && (
                     <Button
                       color="error"
                       size="small"

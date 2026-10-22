@@ -2,6 +2,7 @@ import type { MembershipDTO, PharmacyDTO as OwnerPharmacyDTO } from './owner/typ
 
 export type PharmacyApi = {
   id: string | number;
+  can_edit?: boolean;
   owner: number;
   name: string;
   email: string | null;
@@ -80,6 +81,7 @@ export type Pharmacy = Omit<PharmacyApi, 'id'> & { id: string };
 
 export const normalizePharmacy = (raw: any): Pharmacy => ({
   id: String(raw.id),
+  can_edit: raw.can_edit ?? raw.canEdit,
   owner: raw.owner ?? raw.ownerId ?? 0,
   name: raw.name ?? '',
   email: raw.email ?? null,
@@ -156,6 +158,7 @@ export const normalizePharmacy = (raw: any): Pharmacy => ({
 
 export const toOwnerPharmacyDTO = (pharmacy: Pharmacy): OwnerPharmacyDTO => ({
   id: pharmacy.id,
+  can_edit: pharmacy.can_edit,
   name: pharmacy.name,
   street_address: pharmacy.street_address,
   suburb: pharmacy.suburb,
