@@ -1,6 +1,8 @@
 """Organisation role scope: Org Admin and Chief Admin reach every pharmacy of their organisation; Region Admin only its
 assigned pharmacies."""
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from organizations.models import Organization, Pharmacy, PharmacyAdmin
@@ -113,6 +115,27 @@ class OrgRoleScopeTests(TestCase):
                 self.assertIs(response.data["can_edit"], True)
                 self.north.refresh_from_db()
                 self.assertEqual(self.north.name, role)
+
+    def test_can_edit_queries_do_not_grow_with_pharmacy_count(self):
+        def can_edit_queries(count):
+            organization = Organization.objects.create(name=f"Count {count}", slug=f"count-{count}")
+            for index in range(count):
+                _, pharmacy = make_owner_with_pharmacy(f"Count {count}-{index}")
+                Pharmacy.objects.filter(pk=pharmacy.pk).update(organization=organization)
+            user = User.objects.create_user(email=f"count{count}@scope.test", password=None, role="ORG_STAFF")
+            OrganizationMembership.objects.create(user=user, organization=organization, role="ORG_ADMIN")
+            client = client_for(user)
+            with CaptureQueriesContext(connection) as ctx:
+                response = client.get("/api/v1/pharmacies/")
+            self.assertEqual(response.status_code, 200)
+            rows = response.data["results"] if isinstance(response.data, dict) else response.data
+            self.assertEqual([row["can_edit"] for row in rows], [True] * count)
+            return sum(
+                1 for query in ctx.captured_queries
+                if "organizationmembership" in query["sql"] or "owneronboarding" in query["sql"]
+            )
+
+        self.assertEqual(can_edit_queries(1), can_edit_queries(3))
 
     def test_pharmacy_serializer_without_request_cannot_edit(self):
         self.assertIs(PharmacyWithEditSerializer(self.north).data["can_edit"], False)

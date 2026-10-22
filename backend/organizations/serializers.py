@@ -4,7 +4,7 @@ from drf_spectacular.utils import extend_schema_field, OpenApiTypes
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin, PharmacyClaim
 from users.serializers import UserProfileSerializer
 from django.db import transaction
-from organizations.access import user_can_edit_pharmacy_record, user_can_manage_pharmacy
+from organizations.access import org_wide_admin_organization_ids, user_can_edit_pharmacy_record, user_can_manage_pharmacy
 from organizations.chains import active_owner_chains_for_pharmacy
 from core.task_queue import async_task
 from core.serializer_lifecycle import RemoveOldFilesMixin
@@ -476,7 +476,12 @@ class PharmacyWithEditSerializer(PharmacySerializer):
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_can_edit(self, obj) -> bool:
         request = self.context.get("request")
-        return user_can_edit_pharmacy_record(request.user, obj) if request is not None else False
+        if request is None or not request.user.is_authenticated:
+            return False
+        # Shared by every row of a list response, so the admin lookup runs once per request.
+        if "admin_organization_ids" not in self.context:
+            self.context["admin_organization_ids"] = org_wide_admin_organization_ids(request.user)
+        return user_can_edit_pharmacy_record(request.user, obj, self.context["admin_organization_ids"])
 
 
 class PharmacyClaimSerializer(serializers.ModelSerializer):

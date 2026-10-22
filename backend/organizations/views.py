@@ -136,7 +136,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
             accessible_ids.update(owner_ids)
 
         if accessible_ids:
-            return Pharmacy.objects.filter(id__in=accessible_ids).distinct()
+            return Pharmacy.objects.filter(id__in=accessible_ids).select_related('owner').distinct()
 
         # Fallback to admin assignments if no other visibility applies
         if admin_pharmacies.exists():
