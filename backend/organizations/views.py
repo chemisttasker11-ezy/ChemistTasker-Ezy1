@@ -17,6 +17,7 @@ from organizations.access import (
     has_admin_capability,
     is_admin_of,
     pharmacies_user_admins,
+    user_can_edit_pharmacy_record,
 )
 from django.shortcuts import get_object_or_404
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -71,7 +72,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
     """
     Pharmacy CRUD:
       - Owners manage their own pharmacies.
-      - Organization members manage pharmacies according to their scope.
+      - Organization-wide admins manage their organization's pharmacies.
     """
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     queryset = Pharmacy.objects.all()
@@ -88,6 +89,10 @@ class PharmacyViewSet(viewsets.ModelViewSet):
         self.permission_denied(request)
 
     def check_object_permissions(self, request, obj):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            if user_can_edit_pharmacy_record(request.user, obj):
+                return
+            self.permission_denied(request)
         user = request.user
         # Owner-of-this-pharmacy?
         if obj.owner and obj.owner.user == user:
