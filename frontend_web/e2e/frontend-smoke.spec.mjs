@@ -395,6 +395,33 @@ test.describe('public/auth wiring', () => {
     expect(loginPostCount).toBe(0);
   });
 
+  test('login clears a legacy storage-only session and never sends its refresh token', async ({ page }) => {
+    const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const expiredAccess = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ exp: 1 })}.sig`;
+    const legacyRefresh = 'legacy-refresh-token-smoke';
+    const leaks = [];
+    page.on('request', (request) => {
+      const sent = `${request.url()} ${JSON.stringify(request.headers())} ${request.postData() ?? ''}`;
+      if (sent.includes(legacyRefresh)) leaks.push(request.url());
+    });
+    await page.addInitScript(([access, refresh]) => {
+      if (sessionStorage.getItem('ct_legacy_seeded')) return;
+      sessionStorage.setItem('ct_legacy_seeded', '1');
+      localStorage.setItem('ct_access', access);
+      localStorage.setItem('ct_refresh', refresh);
+    }, [expiredAccess, legacyRefresh]);
+    await page.route('**/api/**', async (route) => {
+      const bootstrap = await installLoggedOutBootstrap(route);
+      if (bootstrap) return bootstrap;
+      return json(route, {});
+    });
+
+    await page.goto('/login');
+    await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('ct_refresh'))).toBeNull();
+    expect(leaks).toEqual([]);
+  });
+
   test('login sanitizes 500 HTML/traceback responses', async ({ page }) => {
     await page.route('**/api/**', async (route) => {
       const request = route.request();
