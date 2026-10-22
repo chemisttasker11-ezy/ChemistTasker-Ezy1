@@ -41,6 +41,7 @@ function AdminSidebar({
     { label: 'Overview', icon: 'view-dashboard-outline', route: '/admin' },
     { label: 'Pharmacies', icon: 'store-outline', route: '/admin/pharmacies' },
     { label: 'Roster', icon: 'calendar-month-outline', route: '/admin/shifts' },
+    { label: 'Operations Planner', icon: 'clipboard-text-clock-outline', route: '/admin/operations' },
     { label: 'Timesheets', icon: 'clock-check-outline', route: '/workforce-timesheets' },
     { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
     { label: 'Post Shift', icon: 'plus-circle-outline', route: '/admin/post-shift' },

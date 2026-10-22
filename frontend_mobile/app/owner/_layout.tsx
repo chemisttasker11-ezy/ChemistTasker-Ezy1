@@ -19,6 +19,7 @@ const tabTitles: Record<string, string> = {
   pills: 'Pills',
   notifications: 'Notifications',
   calendar: 'Calendar',
+  operations: 'Operations Planner',
   'talent-board': 'Talent Board',
   'subscription-seats': 'Subscription',
 };
@@ -33,6 +34,7 @@ const sidebarItems = [
   { label: 'Workforce & Payroll', icon: 'account-cash-outline', route: '/workforce-settings' },
   { label: 'Invoices', icon: 'receipt', route: '/owner/invoice' },
   { label: 'Calendar', icon: 'calendar', route: '/owner/calendar' },
+  { label: 'Operations Planner', icon: 'clipboard-text-clock-outline', route: '/owner/operations' },
   { label: 'Messages', icon: 'message', route: '/owner/chat' },
   { label: 'Talent Board', icon: 'account-search', route: '/owner/talent-board' },
   { label: 'Profile', icon: 'account-circle', route: '/owner/profile' },
@@ -477,6 +479,7 @@ export default function OwnerLayout() {
           }}
         />
         <Tabs.Screen name="calendar" options={{ href: null }} />
+        <Tabs.Screen name="operations" options={{ href: null }} />
         <Tabs.Screen name="talent-board" options={{ href: null }} />
         <Tabs.Screen name="pills" options={{ href: null }} />
         <Tabs.Screen name="onboarding" options={{ href: null }} />

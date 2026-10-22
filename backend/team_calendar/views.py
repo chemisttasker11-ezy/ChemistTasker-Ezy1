@@ -4,6 +4,7 @@ Reuses existing scoping helpers (HubScopeResolver, org_roles, admin_helpers).
 """
 from datetime import date, timedelta
 
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -29,6 +30,7 @@ from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Pharmacy
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee, WorkNoteCompletion
 from team_calendar.serializers import CalendarEventSerializer, CalendarFeedSerializer, WorkNoteSerializer
+from organizations.access import managed_pharmacies
 from team_calendar.recurrence import expand_recurrence_dates
 
 
@@ -361,6 +363,14 @@ class WorkNoteViewSet(
                 Q(assignees__membership_id__in=my_membership_ids) | Q(is_general=True)
             ).distinct()
         
+        # Published operations are targeted. Legacy informal notes retain their old visibility.
+        managed_ids = managed_pharmacies(user).values_list("id", flat=True)
+        queryset = queryset.filter(
+            Q(operation_item__isnull=True)
+            | Q(pharmacy_id__in=managed_ids)
+            | Q(operation_item__isnull=False, assignees__membership__user=user,
+                assignees__membership__is_active=True)
+        ).distinct()
         return queryset.order_by('-date', '-created_at')
     
     def perform_create(self, serializer):
@@ -376,6 +386,8 @@ class WorkNoteViewSet(
     
     def perform_update(self, serializer):
         note = self.get_object()
+        if hasattr(note, "operation_item"):
+            raise PermissionDenied("Published operations must be changed through the operations workflow.")
         
         if not self.can_create_work_notes(self.request.user, note.pharmacy_id):
             raise PermissionDenied("You don't have permission to edit this work note.")
@@ -383,6 +395,8 @@ class WorkNoteViewSet(
         serializer.save()
     
     def perform_destroy(self, instance):
+        if hasattr(instance, "operation_item"):
+            raise PermissionDenied("Published operations cannot be deleted as informal notes.")
         if not self.can_create_work_notes(self.request.user, instance.pharmacy_id):
             raise PermissionDenied("You don't have permission to delete this work note.")
         
@@ -405,6 +419,7 @@ class WorkNoteViewSet(
         ).first()
     
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def mark_done(self, request, pk=None):
         """Mark a work note as done."""
         note = self.get_object()
@@ -419,6 +434,25 @@ class WorkNoteViewSet(
             raise PermissionDenied("You can only mark notes assigned to you as done.")
 
         occurrence_date = self._get_occurrence_date(request, note)
+        operation = getattr(note, "operation_item", None)
+        if operation:
+            from team_calendar.operations_models import OperationTask, OperationVerification
+            operation = OperationTask.objects.select_for_update().get(pk=operation.pk)
+            if OperationVerification.objects.filter(task=operation).exists():
+                raise PermissionDenied("Verified work needs an authorised manager correction.")
+            if membership.status != Membership.Status.ACCEPTED or not WorkNoteAssignee.objects.filter(
+                work_note=note, membership=membership,
+            ).exists():
+                raise PermissionDenied("Published tasks can only be completed by an assigned, active worker.")
+            if occurrence_date != operation.date:
+                raise ValidationError({"occurrence_date": "Operational tasks belong to one published date."})
+            from team_calendar.operations_models import OperationStep
+            required = {entry["id"] for entry in operation.checklist if entry.get("required", True)}
+            checked = set(OperationStep.objects.filter(
+                task=operation, membership=membership
+            ).values_list("step_id", flat=True))
+            if required - checked:
+                raise ValidationError({"checklist": "Complete required steps before submitting work."})
         WorkNoteCompletion.objects.update_or_create(
             work_note=note,
             membership=membership,
@@ -431,6 +465,7 @@ class WorkNoteViewSet(
         return Response(self.get_serializer(note).data)
     
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def mark_open(self, request, pk=None):
         """Mark a work note as open."""
         note = self.get_object()
@@ -439,6 +474,19 @@ class WorkNoteViewSet(
             raise PermissionDenied("You don't have an active membership for this pharmacy.")
 
         occurrence_date = self._get_occurrence_date(request, note)
+        operation = getattr(note, "operation_item", None)
+        if operation:
+            from team_calendar.operations_models import OperationTask
+            operation = OperationTask.objects.select_for_update().get(pk=operation.pk)
+            if membership.status != Membership.Status.ACCEPTED or not WorkNoteAssignee.objects.filter(
+                work_note=note, membership=membership,
+            ).exists():
+                raise PermissionDenied("Published tasks can only be reopened by an assigned, active worker.")
+            if occurrence_date != operation.date:
+                raise ValidationError({"occurrence_date": "Operational tasks belong to one published date."})
+            from team_calendar.operations_models import OperationVerification
+            if OperationVerification.objects.filter(task=operation).exists():
+                raise PermissionDenied("A verified task must be reopened by an authorised manager.")
         WorkNoteCompletion.objects.filter(
             work_note=note,
             membership=membership,
@@ -497,8 +545,9 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
             event_query = event_query.filter(organization_id=organization_id)
             # Work notes are pharmacy-scoped, so get org's pharmacies
             org_pharmacy_ids = list(
-                Pharmacy.objects.filter(organization_id=organization_id)
-                .values_list('id', flat=True)
+                Pharmacy.objects.filter(
+                    organization_id=organization_id, id__in=accessible_pharmacy_ids,
+                ).values_list('id', flat=True)
             )
             work_note_query = work_note_query.filter(pharmacy_id__in=org_pharmacy_ids)
         else:
@@ -539,6 +588,15 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
             | recurring_note_q
         )
 
+        # Explicitly targeted operations are only returned to assigned workers
+        # or authorised managers. Avoid broadening legacy note permissions.
+        manager_pharmacy_ids = managed_pharmacies(user).values_list("id", flat=True)
+        work_note_query = work_note_query.filter(
+            Q(operation_item__isnull=True)
+            | Q(pharmacy_id__in=manager_pharmacy_ids)
+            | Q(operation_item__isnull=False, assignees__membership__user=user,
+                assignees__membership__is_active=True)
+        ).distinct()
         events = list(event_query.order_by('date', 'start_time'))
         work_notes = list(work_note_query.order_by('date'))
 

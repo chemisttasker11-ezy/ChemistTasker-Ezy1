@@ -1,0 +1,473 @@
+"""Manager-only planning and audited staff execution endpoints.
+
+Calendar owns published work. The planner owns drafts and read-only metadata
+for each linked WorkNote. All mutations enforce pharmacy scope on the server.
+"""
+import uuid
+from copy import deepcopy
+from datetime import date
+
+from django.db import IntegrityError, transaction
+from django.db.models import Q
+from django.utils import timezone
+from rest_framework import mixins, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from memberships.models import Membership
+from organizations.access import managed_pharmacies, user_can_manage_pharmacy
+from organizations.models import Pharmacy
+from users.models import OrganizationMembership
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
+from team_calendar.models import WorkNoteAssignee, WorkNoteCompletion
+from team_calendar.operations_catalog import catalog, CATEGORIES
+from team_calendar.operations_models import (
+    OperationTemplate, OperationPlan, OperationTask, OperationStep, OperationKpiRecord,
+    OperationVerification, OperationAudit,
+)
+from team_calendar.operations_rules import apply_template, preflight, publish_plan, check_item, resolve_memberships, MAX_ITEMS
+from team_calendar.operations_serializers import (
+    OperationTemplateSerializer, OperationPlanSerializer, OperationTaskSerializer,
+)
+
+
+def _manager_ids(user):
+    return managed_pharmacies(user).values_list("id", flat=True)
+
+
+def _manager_required(user, pharmacy):
+    if not user_can_manage_pharmacy(user, pharmacy):
+        raise PermissionDenied("You cannot manage plans for this pharmacy.")
+
+
+def _org_admin(user, org_id):
+    return bool(org_id and OrganizationMembership.objects.filter(
+        user=user, organization_id=org_id, role__in=ORG_WIDE_ADMIN_ROLES,
+    ).exists())
+
+
+def _audit(task, user, action, details=None):
+    OperationAudit.objects.create(plan=task.plan, task=task, actor=user,
+                                  action=action, details=details or {})
+
+
+class OperationContextView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        pharmacies = managed_pharmacies(request.user).select_related("organization")
+        return Response({"pharmacies": [
+            {"id": p.id, "name": p.name, "organization_id": p.organization_id}
+            for p in pharmacies
+        ], "categories": [{"id": key, "label": label} for key, label in CATEGORIES]})
+
+
+class OperationCatalogView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if not managed_pharmacies(request.user).exists():
+            raise PermissionDenied("Only pharmacy operations managers can browse templates.")
+        return Response({"templates": catalog()})
+
+
+class OperationTemplateViewSet(viewsets.ModelViewSet):
+    serializer_class = OperationTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        managed = list(_manager_ids(self.request.user))
+        managed_org_ids = list(managed_pharmacies(self.request.user).exclude(
+            organization_id__isnull=True
+        ).values_list("organization_id", flat=True))
+        org_ids = list(OrganizationMembership.objects.filter(
+            user=self.request.user, role__in=ORG_WIDE_ADMIN_ROLES
+        ).values_list("organization_id", flat=True))
+        qs = OperationTemplate.objects.filter(
+            Q(pharmacy_id__in=managed) | Q(organization_id__in=managed_org_ids + org_ids)
+        )
+        pharmacy_id = self.request.query_params.get("pharmacy_id")
+        if pharmacy_id:
+            try:
+                pharmacy_id = int(pharmacy_id)
+            except (TypeError, ValueError):
+                raise ValidationError({"pharmacy_id": "Invalid ID."})
+            if pharmacy_id not in managed:
+                raise PermissionDenied("Cannot access this pharmacy.")
+            org_id = Pharmacy.objects.filter(id=pharmacy_id).values_list("organization_id", flat=True).first()
+            qs = qs.filter(Q(pharmacy_id=pharmacy_id) | Q(organization_id=org_id, organization_id__in=managed_org_ids + org_ids))
+        return qs.distinct()
+
+    def _authorize(self, obj):
+        if obj.pharmacy_id:
+            _manager_required(self.request.user, obj.pharmacy)
+        elif not _org_admin(self.request.user, obj.organization_id):
+            raise PermissionDenied("Only organization-wide administrators can manage organization templates.")
+
+    def perform_create(self, serializer):
+        provisional = OperationTemplate(
+            pharmacy=serializer.validated_data.get("pharmacy"),
+            organization=serializer.validated_data.get("organization"),
+        )
+        self._authorize(provisional)
+        serializer.save(created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        self._authorize(serializer.instance)
+        requested_pharmacy = serializer.validated_data.get("pharmacy", serializer.instance.pharmacy)
+        requested_org = serializer.validated_data.get("organization", serializer.instance.organization)
+        self._authorize(OperationTemplate(pharmacy=requested_pharmacy, organization=requested_org))
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._authorize(instance)
+        instance.delete()
+
+
+class OperationPlanViewSet(viewsets.ModelViewSet):
+    serializer_class = OperationPlanSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = OperationPlan.objects.filter(pharmacy_id__in=_manager_ids(self.request.user))
+        ph_id = self.request.query_params.get("pharmacy_id")
+        if ph_id:
+            try:
+                ph_id = int(ph_id)
+            except (TypeError, ValueError):
+                raise ValidationError({"pharmacy_id": "Invalid ID."})
+            if not managed_pharmacies(self.request.user).filter(id=ph_id).exists():
+                raise PermissionDenied("Cannot access this pharmacy.")
+            qs = qs.filter(pharmacy_id=ph_id)
+        return qs.prefetch_related("items__calendar_note__assignees", "items__calendar_note__completions")
+
+    def perform_create(self, serializer):
+        pharmacy = serializer.validated_data["pharmacy"]
+        _manager_required(self.request.user, pharmacy)
+        serializer.save(created_by=self.request.user)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        locked = OperationPlan.objects.select_for_update().get(pk=serializer.instance.pk)
+        if locked.status != "DRAFT":
+            raise ValidationError("Published plans are immutable; manage execution from the calendar.")
+        plan = serializer.save()
+        plan.revision = locked.revision + 1
+        plan.save(update_fields=["revision", "updated_at"])
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        locked = OperationPlan.objects.select_for_update().get(pk=instance.pk)
+        if locked.status != "DRAFT":
+            raise ValidationError("Published plans cannot be deleted.")
+        locked.delete()
+
+    @action(detail=True, methods=["post"])
+    def apply_template(self, request, pk=None):
+        plan = self.get_object()
+        if plan.status != "DRAFT":
+            raise ValidationError("Only drafts accept templates.")
+        try:
+            template = OperationTemplate.objects.get(pk=int(request.data.get("template_id")))
+        except (OperationTemplate.DoesNotExist, ValueError, TypeError):
+            raise ValidationError({"template_id": "Unknown template."})
+        if not template.active:
+            raise ValidationError("Template is inactive.")
+        with transaction.atomic():
+            plan = OperationPlan.objects.select_for_update().get(pk=plan.pk)
+            if plan.status != "DRAFT":
+                raise ValidationError("Only drafts accept templates.")
+            created = apply_template(plan, template, request.user)
+        return Response({"created": len(created), "plan": self.get_serializer(plan).data})
+
+    @action(detail=True, methods=["get"])
+    def preview(self, request, pk=None):
+        plan = self.get_object()
+        if plan.status != "DRAFT":
+            raise ValidationError("Preview is for draft plans.")
+        review, _ = preflight(plan)
+        return Response(review)
+
+    @action(detail=True, methods=["post"])
+    def publish(self, request, pk=None):
+        plan = self.get_object()
+        try:
+            revision = int(request.data.get("revision"))
+        except (ValueError, TypeError):
+            raise ValidationError({"revision": "Provide the reviewed draft revision."})
+        if revision != plan.revision:
+            raise ValidationError({"revision": "Plan changed; reload before publishing."})
+        updated, preview = publish_plan(plan.id, request.user, revision=revision)
+        return Response({"plan": self.get_serializer(updated).data, "preflight": preview})
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def copy_day(self, request, pk=None):
+        """Atomic, idempotent day copy. The plan lock serializes concurrent retries."""
+        visible = self.get_object()
+        _manager_required(request.user, visible.pharmacy)
+        plan = OperationPlan.objects.select_for_update().get(pk=visible.pk)
+        try:
+            source = date.fromisoformat(request.data["source_date"])
+            destination = date.fromisoformat(request.data["destination_date"])
+            request_key = str(uuid.UUID(request.data["request_key"]))
+        except (KeyError, ValueError, TypeError, AttributeError):
+            raise ValidationError("Provide valid source_date, destination_date and UUID request_key.")
+        if source == destination or not (plan.starts_on <= source <= plan.ends_on
+                                          and plan.starts_on <= destination <= plan.ends_on):
+            raise ValidationError("Source and destination must be different dates inside this plan.")
+        previous = OperationAudit.objects.filter(
+            plan=plan, action="DAY_COPIED", details__request_key=request_key,
+        ).first()
+        if previous:
+            if previous.details.get("source_date") != source.isoformat() or (
+                previous.details.get("destination_date") != destination.isoformat()
+            ):
+                raise ValidationError({"request_key": "This key belongs to another day-copy operation."})
+            return Response({"created": previous.details["created"], "already_copied": True,
+                             "revision": plan.revision})
+        if plan.status != "DRAFT":
+            raise ValidationError("Published plans cannot be copied or edited.")
+        revision = request.data.get("revision")
+        if type(revision) is not int or revision != plan.revision:
+            raise ValidationError({"revision": "Plan changed; reload before copying days."})
+        originals = list(plan.items.filter(date=source).order_by("id"))
+        if not originals:
+            raise ValidationError("The chosen source date contains no tasks.")
+        if plan.items.count() + len(originals) > MAX_ITEMS:
+            raise ValidationError("The copy would exceed this plan's 400-task limit.")
+        for original in originals:
+            replica = OperationTask(
+                plan=plan, template=None, date=destination,
+                title=original.title, description=original.description, area=original.area,
+                start_time=original.start_time, end_time=original.end_time,
+                audience=original.audience, membership_ids=deepcopy(original.membership_ids),
+                role_codes=deepcopy(original.role_codes), checklist=deepcopy(original.checklist),
+                requires_verification=original.requires_verification,
+                target_value=original.target_value, target_unit=original.target_unit,
+                target_kind=original.target_kind, training_url=original.training_url,
+            )
+            check_item(replica)
+            replica.save()
+        plan.revision += 1
+        plan.save(update_fields=["revision", "updated_at"])
+        OperationAudit.objects.create(
+            plan=plan, actor=request.user, action="DAY_COPIED",
+            details={"request_key": request_key, "source_date": source.isoformat(),
+                     "destination_date": destination.isoformat(), "created": len(originals)},
+        )
+        return Response({"created": len(originals), "already_copied": False,
+                         "revision": plan.revision}, status=status.HTTP_201_CREATED)
+
+
+class OperationTaskViewSet(viewsets.ModelViewSet):
+    serializer_class = OperationTaskSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        assigned = Q(
+            plan__status="PUBLISHED",
+            calendar_note__assignees__membership__user=user,
+            calendar_note__assignees__membership__is_active=True,
+            calendar_note__assignees__membership__status=Membership.Status.ACCEPTED,
+        )
+        return OperationTask.objects.filter(
+            Q(plan__pharmacy_id__in=_manager_ids(user)) | assigned
+        ).select_related("plan", "calendar_note").distinct()
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        requested = serializer.validated_data["plan"]
+        _manager_required(self.request.user, requested.pharmacy)
+        plan = OperationPlan.objects.select_for_update().get(pk=requested.pk)
+        if plan.status != "DRAFT":
+            raise ValidationError("Cannot add tasks to a published plan.")
+        if plan.items.count() >= 400:
+            raise ValidationError("This plan is full.")
+        task = serializer.save()
+        plan.revision += 1
+        plan.save(update_fields=["revision", "updated_at"])
+        _audit(task, self.request.user, "ITEM_CREATED")
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        task = serializer.instance
+        _manager_required(self.request.user, task.plan.pharmacy)
+        plan = OperationPlan.objects.select_for_update().get(pk=task.plan_id)
+        if plan.status != "DRAFT":
+            raise ValidationError("Published calendar tasks cannot be edited in the draft planner.")
+        task = serializer.save()
+        plan.revision += 1
+        plan.save(update_fields=["revision", "updated_at"])
+        _audit(task, self.request.user, "ITEM_UPDATED")
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        _manager_required(self.request.user, instance.plan.pharmacy)
+        plan = OperationPlan.objects.select_for_update().get(pk=instance.plan_id)
+        if plan.status != "DRAFT":
+            raise ValidationError("Published calendar tasks cannot be deleted here.")
+        _audit(instance, self.request.user, "ITEM_REMOVED")
+        instance.delete()
+        plan.revision += 1
+        plan.save(update_fields=["revision", "updated_at"])
+
+    def _locked_task(self):
+        # First enforce the normal pharmacy/assignment scoped 404, then lock.
+        visible = self.get_object()
+        return OperationTask.objects.select_for_update().select_related(
+            "plan", "calendar_note"
+        ).get(pk=visible.pk)
+
+    def _worker_membership(self, request, task):
+        if not task.calendar_note_id:
+            raise ValidationError("This item is not published in the calendar.")
+        membership = Membership.objects.filter(
+            pharmacy_id=task.plan.pharmacy_id, user=request.user, is_active=True,
+            status=Membership.Status.ACCEPTED,
+        ).first()
+        if not membership or not WorkNoteAssignee.objects.filter(
+            work_note_id=task.calendar_note_id, membership=membership,
+        ).exists():
+            raise PermissionDenied("Only an assigned active worker may record this task.")
+        return membership
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def step(self, request, pk=None):
+        task = self._locked_task()
+        member = self._worker_membership(request, task)
+        step_id = request.data.get("step_id")
+        if not isinstance(step_id, str) or step_id not in {
+            item["id"] for item in task.checklist if isinstance(item, dict)
+        }:
+            raise ValidationError({"step_id": "Unknown checklist step."})
+        done = request.data.get("done")
+        if type(done) is not bool:
+            raise ValidationError({"done": "Expected true or false."})
+        evidence = request.data.get("evidence_note", "")
+        if not isinstance(evidence, str) or len(evidence) > 2000:
+            raise ValidationError({"evidence_note": "Maximum 2000 characters."})
+        if OperationVerification.objects.filter(task=task).exists():
+            raise ValidationError("Verified tasks cannot be modified without manager correction.")
+        if task.calendar_note.completions.filter(membership=member, occurrence_date=task.date).exists():
+            raise ValidationError("Reopen the calendar task before modifying a submitted checklist.")
+        if done:
+            OperationStep.objects.update_or_create(
+                task=task, membership=member, step_id=step_id,
+                defaults={"completed_by": request.user, "evidence_note": evidence},
+            )
+        else:
+            OperationStep.objects.filter(task=task, membership=member, step_id=step_id).delete()
+        _audit(task, request.user, "CHECKLIST_STEP", {"step_id": step_id, "done": done})
+        return Response({"completed_step_ids": list(
+            OperationStep.objects.filter(task=task, membership=member).values_list("step_id", flat=True)
+        )})
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def record_kpi(self, request, pk=None):
+        task = self._locked_task()
+        member = self._worker_membership(request, task)
+        if OperationVerification.objects.filter(task=task).exists():
+            raise ValidationError("Verified tasks cannot accept KPI updates.")
+        if task.target_value is None:
+            raise ValidationError("This task is not configured for numeric progress.")
+        try:
+            value = int(request.data.get("value"))
+        except (ValueError, TypeError):
+            raise ValidationError({"value": "Enter a positive whole number."})
+        if type(request.data.get("value")) is bool or not 1 <= value <= 10000:
+            raise ValidationError({"value": "Enter a value between 1 and 10000."})
+        key = request.data.get("key")
+        try:
+            key = str(uuid.UUID(str(key)))
+        except (ValueError, TypeError, AttributeError):
+            raise ValidationError({"key": "A unique UUID is required for idempotency."})
+        note = request.data.get("note", "")
+        if not isinstance(note, str) or len(note) > 255:
+            raise ValidationError({"note": "Use a short comment without patient identifiers."})
+        record, created = OperationKpiRecord.objects.get_or_create(
+            task=task, key=key,
+            defaults={"membership": member, "value": value, "note": note, "recorded_by": request.user},
+        )
+        if not created and (record.recorded_by_id != request.user.id or record.value != value):
+            raise ValidationError({"key": "Idempotency key already used for another entry."})
+        if created:
+            _audit(task, request.user, "KPI_RECORDED", {"value": value, "kind": task.target_kind})
+        return Response({"created": created, "progress": self.get_serializer(task).data["progress"]},
+                        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def verify(self, request, pk=None):
+        task = self._locked_task()
+        _manager_required(request.user, task.plan.pharmacy)
+        if not task.calendar_note_id or not task.requires_verification:
+            raise ValidationError("This calendar task does not need supervisor verification.")
+        assigned = task.calendar_note.assignees.count()
+        completed = task.calendar_note.completions.filter(occurrence_date=task.date)
+        threshold = assigned if task.audience in {"NAMED", "EVERY_ON_DUTY"} else 1
+        if assigned < 1 or completed.values("membership_id").distinct().count() < threshold:
+            raise ValidationError("Assigned workers must submit the task before verification.")
+        if completed.filter(completed_by=request.user).exists():
+            raise PermissionDenied("The person who completed this task cannot independently verify it.")
+        if task.target_kind == "clinical" and not Membership.objects.filter(
+            pharmacy_id=task.plan.pharmacy_id, user=request.user, is_active=True,
+            status=Membership.Status.ACCEPTED, role="PHARMACIST",
+            user__pharmacistonboarding__ahpra_verified=True,
+            user__pharmacistonboarding__ahpra_expiry_date__gte=max(task.date, timezone.localdate()),
+        ).exists():
+            raise PermissionDenied("Clinical verification requires an active pharmacist membership.")
+        note = request.data.get("note", "")
+        if not isinstance(note, str) or len(note) > 2000:
+            raise ValidationError({"note": "Maximum 2000 characters."})
+        verification, created = OperationVerification.objects.get_or_create(
+            task=task, defaults={"verified_by": request.user, "note": note},
+        )
+        if created:
+            _audit(task, request.user, "VERIFIED")
+        return Response({"verified": True, "by": verification.verified_by_id})
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def manager_reopen(self, request, pk=None):
+        task = self._locked_task()
+        _manager_required(request.user, task.plan.pharmacy)
+        verification = OperationVerification.objects.filter(task=task).first()
+        if not verification:
+            raise ValidationError("Only verified tasks require manager correction.")
+        reason = request.data.get("reason", "")
+        if not isinstance(reason, str) or not 10 <= len(reason.strip()) <= 2000:
+            raise ValidationError({"reason": "Provide a correction reason of 10-2000 characters."})
+        previous = verification.verified_by_id
+        submissions = list(WorkNoteCompletion.objects.filter(
+            work_note_id=task.calendar_note_id, occurrence_date=task.date,
+        ).values("membership_id", "completed_by_id", "completed_at"))
+        # Preserve the prior submission identities and timestamps in an
+        # append-only audit before resetting the canonical calendar completion.
+        _audit(task, request.user, "MANAGER_REOPENED", {
+            "reason": reason.strip(), "previous_verifier_id": previous,
+            "prior_submissions": [
+                {"membership_id": entry["membership_id"],
+                 "completed_by_id": entry["completed_by_id"],
+                 "completed_at": entry["completed_at"].isoformat()}
+                for entry in submissions
+            ],
+        })
+        verification.delete()
+        WorkNoteCompletion.objects.filter(
+            work_note_id=task.calendar_note_id, occurrence_date=task.date,
+        ).delete()
+        return Response({"reopened": True, "reset_submissions": len(submissions)})
+
+    @action(detail=True, methods=["get"])
+    def my_steps(self, request, pk=None):
+        task = self.get_object()
+        member = self._worker_membership(request, task)
+        return Response({"completed_step_ids": list(
+            OperationStep.objects.filter(task=task, membership=member).values_list("step_id", flat=True)
+        )})

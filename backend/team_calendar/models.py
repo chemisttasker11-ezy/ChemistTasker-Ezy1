@@ -204,3 +204,9 @@ class WorkNoteCompletion(models.Model):
             f"WorkNoteCompletion#{self.pk} note={self.work_note_id} "
             f"membership={self.membership_id} date={self.occurrence_date}"
         )
+
+# Operations metadata is owned by this calendar app, not client_profile.
+from team_calendar.operations_models import (  # noqa: F401, E402
+    OperationTemplate, OperationPlan, OperationTask, OperationStep,
+    OperationKpiRecord, OperationVerification, OperationAudit,
+)
