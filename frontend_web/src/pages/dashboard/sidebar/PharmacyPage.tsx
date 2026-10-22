@@ -266,6 +266,7 @@ export default function PharmacyPage({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Pharmacy | null>(null);
+  const createIdempotencyKeyRef = useRef<string | null>(null);
   const [tabIndex, setTabIndex] = useState(0);
   const lastTabIndex = tabLabels.length - 1;
   const [error, setError] = useState("");
@@ -1527,6 +1528,7 @@ export default function PharmacyPage({
   };
 
   const openDialog = (pharmacy?: Pharmacy) => {
+    createIdempotencyKeyRef.current = null;
     resetDialogState();
     if (pharmacy) {
       setEditing(pharmacy);
@@ -1967,8 +1969,12 @@ export default function PharmacyPage({
           return true;
         }
       } else {
-        const res = await createPharmacy(fd);
+        createIdempotencyKeyRef.current ??= crypto.randomUUID();
+        const res = await createPharmacy(fd, createIdempotencyKeyRef.current);
+        if (res?.id == null) throw new Error('Pharmacy save did not return an ID.');
+        createIdempotencyKeyRef.current = null;
         const saved = normalizePharmacy(res);
+        setEditing(saved);
         const nextCount = pharmacies.some((p) => p.id === saved.id) ? pharmacies.length : pharmacies.length + 1;
         clearOwnerPharmacySetupSkipped();
         setPharmacies((prev) => {

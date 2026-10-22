@@ -46,6 +46,7 @@ import registry from '@chemisttasker/shared-core/skills_registry.json';
 import { surfaceTokens } from './types';
 import GooglePlacesInput from './GooglePlacesInput';
 import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
+import { idempotencyKey } from '../../../features/parity/utils';
 import {
     type PharmacyFormProps,
     STATES,
@@ -583,6 +584,7 @@ export default function PharmacyForm({
         };
     } | null>(null);
     const [verificationPending, setVerificationPending] = useState(false);
+    const createIdempotencyKeyRef = useRef<string | null>(null);
 
     const persistPharmacy = async ({ afterSave }: { afterSave?: () => void } = {}) => {
         if (saving) return false;
@@ -596,6 +598,7 @@ export default function PharmacyForm({
             const hasFiles = Boolean(files.approval || files.sops || files.induction || files.sump);
             const targetPharmacyId = currentPharmacyId ?? (mode === 'edit' ? pharmacyId ?? null : null);
             let persistedPharmacyId = targetPharmacyId ? String(targetPharmacyId) : null;
+            if (!targetPharmacyId) createIdempotencyKeyRef.current ??= idempotencyKey();
 
             if (pendingReadbackRef.current) {
                 persistedPharmacyId = pendingReadbackRef.current.id;
@@ -613,8 +616,9 @@ export default function PharmacyForm({
                 if (targetPharmacyId) {
                     await updatePharmacy(targetPharmacyId, formData as any);
                 } else {
-                    const created = await createPharmacy(formData as any);
+                    const created = await createPharmacy(formData as any, createIdempotencyKeyRef.current!);
                     if (created?.id != null) {
+                        createIdempotencyKeyRef.current = null;
                         persistedPharmacyId = String(created.id);
                         setCurrentPharmacyId(persistedPharmacyId);
                     }
@@ -623,8 +627,9 @@ export default function PharmacyForm({
                 if (targetPharmacyId) {
                     await updatePharmacy(targetPharmacyId, payload as any);
                 } else {
-                    const created = await createPharmacy(payload as any);
+                    const created = await createPharmacy(payload as any, createIdempotencyKeyRef.current!);
                     if (created?.id != null) {
+                        createIdempotencyKeyRef.current = null;
                         persistedPharmacyId = String(created.id);
                         setCurrentPharmacyId(persistedPharmacyId);
                     }
