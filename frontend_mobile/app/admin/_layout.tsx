@@ -47,7 +47,7 @@ function AdminSidebar({
     { label: 'Chat', icon: 'message-text-outline', route: '/admin/chat' },
     { label: 'Pills', icon: 'pill', route: '/admin/pills' },
     { label: 'Pharmacy Hub', icon: 'account-group-outline', route: '/admin/hub', visible: canManageCommunications },
-    { label: 'Calendar', icon: 'calendar-outline', route: '/admin/calendar', visible: canManageCommunications },
+    { label: 'Calendar', icon: 'calendar-outline', route: '/admin/calendar', visible: true },
     { label: 'Notifications', icon: 'bell-outline', route: '/admin/notifications', visible: true },
   ].filter((item) => item.visible !== false);
 

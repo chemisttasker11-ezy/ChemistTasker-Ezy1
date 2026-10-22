@@ -479,3 +479,10 @@ export {
   chargeShiftFulfillment,
   chargeShiftPenalty,
 } from './domains/billing/api';
+
+export type { CalendarRecurrence, WorkNoteApi, CalendarEventApi, CalendarFeedApi } from './contracts/calendar';
+// Calendar-owned planner actions shared by web and native.
+export * from './domains/calendar/operations';
+
+export * from './domains/calendar/planner';
+export { projectCalendarFeed, type CalendarItem } from './domains/calendar/mappers';

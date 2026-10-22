@@ -93,6 +93,10 @@ class WorkNote(models.Model):
     title = models.CharField(max_length=255)
     body = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    is_planner_task = models.BooleanField(default=False)
+    is_clinical = models.BooleanField(default=False)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
     
     # Notification settings
     notify_on_shift_start = models.BooleanField(
@@ -204,3 +208,6 @@ class WorkNoteCompletion(models.Model):
             f"WorkNoteCompletion#{self.pk} note={self.work_note_id} "
             f"membership={self.membership_id} date={self.occurrence_date}"
         )
+
+# Operations metadata is owned by this calendar app, not client_profile.
+from team_calendar.operations_models import SavedTask, OperationAudit  # noqa: F401, E402

@@ -21,6 +21,7 @@ from organizations.models import Pharmacy
 from shifts.models import ShiftSlotAssignment
 from notifications.models import Notification
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee
+from team_calendar.recurrence import expand_recurrence_dates
 
 logger = logging.getLogger(__name__)
 
@@ -233,13 +234,16 @@ def send_shift_start_work_note_notifications():
 
         work_notes = (
             WorkNote.objects.filter(
-                pharmacy_id=pharmacy_id,
-                date=local_today,
-                notify_on_shift_start=True,
+                Q(date=local_today) | Q(date__lte=local_today, recurrence__isnull=False),
+                pharmacy_id=pharmacy_id, notify_on_shift_start=True,
             ).prefetch_related("assignees__membership")
         )
 
         for note in work_notes:
+            if note.date != local_today and local_today not in expand_recurrence_dates(
+                note.date, note.recurrence, local_today, local_today
+            ):
+                continue
             recipient_user_ids = set()
 
             if note.is_general:
@@ -247,7 +251,9 @@ def send_shift_start_work_note_notifications():
             else:
                 for assignee in note.assignees.all():
                     assignee_user_id = assignee.membership.user_id
-                    if assignee_user_id in users_starting_now and assignee.notified_at is None:
+                    if assignee_user_id in users_starting_now and (
+                        note.recurrence or assignee.notified_at is None
+                    ):
                         recipient_user_ids.add(assignee_user_id)
 
             if not recipient_user_ids:
@@ -302,21 +308,25 @@ def send_9am_work_note_fallback():
 
         work_notes = (
             WorkNote.objects.filter(
-                pharmacy_id=pharmacy_id,
-                date=local_today,
-                notify_on_shift_start=True,
+                Q(date=local_today) | Q(date__lte=local_today, recurrence__isnull=False),
+                pharmacy_id=pharmacy_id, notify_on_shift_start=True,
             ).prefetch_related("assignees__membership__user")
         )
 
         for note in work_notes:
+            if note.date != local_today and local_today not in expand_recurrence_dates(
+                note.date, note.recurrence, local_today, local_today
+            ):
+                continue
             recipient_user_ids = set()
 
             if note.is_general:
                 memberships = Membership.objects.filter(pharmacy_id=note.pharmacy_id, is_active=True)
                 recipient_user_ids = set(memberships.values_list("user_id", flat=True))
             else:
-                for assignee in note.assignees.filter(notified_at__isnull=True):
-                    recipient_user_ids.add(assignee.membership.user_id)
+                for assignee in note.assignees.all():
+                    if note.recurrence or assignee.notified_at is None:
+                        recipient_user_ids.add(assignee.membership.user_id)
 
             if not recipient_user_ids:
                 continue

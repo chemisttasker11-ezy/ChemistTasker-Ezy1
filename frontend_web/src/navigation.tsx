@@ -124,9 +124,10 @@ export function getOrganizationNav(hasUnreadMessages: boolean, capabilities: unk
         action: hasUnreadMessages ? <NewMessagesChip /> : null,
       },
       { segment: "dashboard/pharmacy-hub", title: "Pharmacy Hub", icon: <MessageSquareText /> },
-      { segment: "dashboard/organization/calendar", title: "Calendar", icon: <Calendar /> },
     );
   }
+
+  if (canManageComms || canManageRoster) navigation.push({ segment: "dashboard/organization/calendar", title: "Calendar", icon: <Calendar /> });
 
   if (canManagePharmacies || canManageRoster) {
     navigation.push(
@@ -313,9 +314,10 @@ export function getAdminNav({
   if (canManageComms) {
     navigation.push(
       { segment: "dashboard/pharmacy-hub", title: "Pharmacy Hub", icon: <MessageSquareText /> },
-      { segment: buildPath("calendar"), title: "Calendar", icon: <Calendar /> }
     );
   }
+
+  if (canManageComms || canManageRoster) navigation.push({ segment: buildPath("calendar"), title: "Calendar", icon: <Calendar /> });
 
   navigation.push({ kind: "divider" as const });
 

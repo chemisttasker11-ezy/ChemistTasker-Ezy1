@@ -1,0 +1,98 @@
+import { calendarTaskState, plannerDayTasks, taskRepeatLabel, weekRange, type CalendarItem } from "@chemisttasker/shared-core";
+import { Pill } from "../../../components/ui/Pill";
+import { InitialsAvatar } from "../../../components/ui/InitialsAvatar";
+import DashboardContentState from "../../../components/dashboard/DashboardContentState";
+import { useState } from "react";
+import { Box, Button, Card, CardActionArea, CircularProgress, IconButton, Menu, MenuItem, Paper, Stack, TextField, Tooltip, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { Add, ChevronLeft, ChevronRight, ContentCopy, MoreVert, RepeatRounded } from "@mui/icons-material";
+import { addDays, format, isToday, isWeekend } from "date-fns";
+
+type Props = {
+    day: Date;
+    setDay: (day: Date) => void;
+    items: CalendarItem[];
+    manager: boolean;
+    userId?: number;
+    busy: boolean;
+    loading: boolean;
+    onAdd: (day: Date) => void;
+    onEdit: (item: CalendarItem) => void;
+    onDuplicate: (item: CalendarItem) => void;
+    onDelete: (item: CalendarItem) => void;
+    onCopy: (mode: "day" | "week" | "previous", day: Date) => void;
+    onComplete: (item: CalendarItem) => void;
+};
+
+export default function PharmacyCalendarWeekView({ day, setDay, items, manager, userId, busy, loading, onAdd, onEdit, onDuplicate, onDelete, onCopy, onComplete }: Props) {
+    const phone = useMediaQuery(useTheme().breakpoints.down("lg"));
+    const monday = new Date(`${weekRange(day).from}T00:00:00`);
+    const days = phone ? [day] : Array.from({ length: 7 }, (_, index) => addDays(monday, index));
+    const tasks = items.filter(item => item.noteData?.is_planner_task);
+    const [menu, setMenu] = useState<{ anchor: HTMLElement; task?: CalendarItem; date?: Date } | null>(null);
+    const act = (action: () => void) => { setMenu(null); action(); };
+    return <Stack data-ct-tokens="" spacing={2} sx={{ "& button": { minHeight: 44, minWidth: 44 } }}>
+        <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap gap={1}>
+            <IconButton aria-label={phone ? "Previous day" : "Previous week"} onClick={() => setDay(addDays(day, phone ? -1 : -7))}><ChevronLeft /></IconButton>
+            {phone ? <TextField type="date" size="small" value={format(day, "yyyy-MM-dd")} slotProps={{ htmlInput: { "aria-label": "Selected day" } }} sx={{ flex: 1, minWidth: 0 }} onChange={event => { if (event.target.value) setDay(new Date(`${event.target.value}T00:00:00`)); }} />
+                : <Typography component="h2" variant="subtitle1" fontWeight={600}>{format(monday, "d MMM yyyy")} to {format(addDays(monday, 6), "d MMM yyyy")}</Typography>}
+            <IconButton aria-label={phone ? "Next day" : "Next week"} onClick={() => setDay(addDays(day, phone ? 1 : 7))}><ChevronRight /></IconButton>
+            <Button onClick={() => setDay(new Date())}>Today</Button>
+            {manager && <Button variant="outlined" sx={{ ml: { lg: "auto" }, width: { xs: "100%", sm: "auto" } }} startIcon={<ContentCopy />} disabled={busy || loading} onClick={() => onCopy("week", monday)}>Copy week to next week</Button>}
+        </Stack>
+        {loading ? <CircularProgress aria-label="Loading tasks" /> : tasks.length === 0 ? <>
+            <DashboardContentState kind="empty" title="No tasks this week."
+                description={manager ? "Add a task or copy last week. Save a task as reusable in More options to use it again." : "Your assigned tasks will appear here."}>
+                {manager && <Stack direction="row" flexWrap="wrap" justifyContent="center" useFlexGap gap={1} mt={1}>
+                    <Button variant="outlined" onClick={() => onAdd(day)}>Add task</Button>
+                    <Button disabled={busy} onClick={() => onCopy("previous", monday)}>Copy last week</Button>
+                </Stack>}
+            </DashboardContentState>
+        </> : <>
+            {/* Scoped token rules retain accents through the dashboard shell and legacy dark Paper overrides. */}
+            <Stack spacing={1}>
+                {days.map(date => { const dayTasks = plannerDayTasks(tasks, date); return <Paper component="section" elevation={0} aria-label={format(date, "EEEE d MMMM")} key={format(date, "yyyy-MM-dd")} sx={{ minWidth: 0, px: { xs: 1.25, md: 1.5 }, py: 1.25, borderRadius: '14px', border: '1px solid var(--ct-border-color)', '&&': { backgroundColor: `${isToday(date) ? 'var(--ct-tone-violet-bg)' : isWeekend(date) ? 'var(--ct-subtle-bg)' : 'var(--ct-surface-bg)'} !important`, borderColor: `${isToday(date) ? 'var(--ct-accent-strong)' : 'var(--ct-border-color)'} !important` }, color: isWeekend(date) && !isToday(date) ? 'var(--ct-text-muted)' : 'var(--ct-text-primary)' }}>
+                    <Stack direction="row" alignItems="center" gap={1} sx={{ my: -0.75, minHeight: 32 }}>
+                        <Typography component="h3" variant="subtitle2" sx={{ color: isToday(date) ? 'var(--ct-accent-strong)' : 'inherit', fontWeight: 600 }}>{format(date, "EEE d MMM")}</Typography>
+                        {dayTasks.length === 0 && <Typography variant="body2" color="text.secondary">No tasks</Typography>}
+                        {manager && (dayTasks.length
+                            ? <Tooltip title="Day actions"><IconButton sx={{ ml: 'auto' }} aria-label={`Day actions for ${format(date, "EEEE d MMMM")}`} aria-haspopup="menu" aria-expanded={menu?.date?.getTime() === date.getTime()} onClick={event => setMenu({ anchor: event.currentTarget, date })}><MoreVert /></IconButton></Tooltip>
+                            : <Button size="small" startIcon={<Add />} aria-label={`Add task on ${format(date, "EEEE d MMMM")}`} disabled={busy} onClick={() => onAdd(date)} sx={{ ml: 'auto', color: 'var(--ct-text-secondary)' }}>Add</Button>)}
+                    </Stack>
+                    {dayTasks.length > 0 && <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 1.25, mt: 0.5 }}>
+                        {dayTasks.map(item => { const state = calendarTaskState(item.noteData, manager, userId); return <Card component="article" aria-label={item.title} key={item.id} variant="outlined" sx={{ borderRadius: '12px', bgcolor: 'var(--ct-surface-bg)', boxShadow: 'var(--ct-dashboard-card-shadow)', '&:hover': { boxShadow: 'var(--ct-dashboard-card-shadow-hover)' }, border: '1px solid var(--ct-border-color)', borderLeft: '3px solid', '&&': { borderLeftColor: `${item.noteData.is_clinical ? 'var(--ct-tone-cyan-fg)' : 'var(--ct-border-color)'} !important` }, overflowWrap: 'anywhere', minWidth: 0, position: 'relative', '&:focus-within .planner-task-menu': { opacity: 1 } }}>
+                            {/* Positioned over the title row rather than nested: a button cannot sit inside the edit button. */}
+                            {manager && <Tooltip title="More actions"><IconButton className="planner-task-menu" aria-label={`More actions for ${item.title}`} aria-haspopup="menu" aria-expanded={menu?.task?.id === item.id} disabled={busy} onClick={event => setMenu({ anchor: event.currentTarget, task: item })} sx={{ position: 'absolute', top: 0, right: 0, zIndex: 1, opacity: { xs: 1, md: 0 }, '&:focus-visible, &[aria-expanded="true"], .MuiCard-root:hover &': { opacity: 1 }, '@media (hover: none), (pointer: coarse)': { opacity: 1 }, '&:focus-visible': { outline: '2px solid var(--ct-accent-strong)', outlineOffset: -3 } }}><MoreVert /></IconButton></Tooltip>}
+                            <CardActionArea component={state.canEdit ? "button" : "div"} disabled={busy} role={state.canEdit ? "button" : "presentation"} tabIndex={state.canEdit ? 0 : -1} aria-label={state.canEdit ? `Edit ${item.title}` : undefined} onClick={state.canEdit ? () => onEdit(item) : undefined} sx={{ px: 1.5, pt: 1.25, pb: 0.75 }}>
+                                <Stack spacing={0.75}>
+                                    <Stack direction="row" alignItems="baseline" gap={1} sx={{ pr: manager ? 4 : 0, minHeight: 20, minWidth: 0 }}>
+                                        {item.time && <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{item.time}</Typography>}
+                                        <Typography variant="subtitle2" fontWeight={600} title={item.title} sx={{ minWidth: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.title}</Typography>
+                                    </Stack>
+                                    {item.noteData.body && <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{item.noteData.body}</Typography>}
+                                    {item.noteData.recurrence && <Stack direction="row" alignItems="center" gap={0.5}><RepeatRounded fontSize="small" /><Typography variant="caption">{taskRepeatLabel(item.noteData.recurrence)}</Typography></Stack>}
+                                </Stack>
+                            </CardActionArea>
+                            {/* Meta row sits outside the edit button so Mark done can share it. */}
+                            <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap gap={1} sx={{ px: 1.5, pb: state.canComplete ? 0.5 : 1.25, minHeight: state.canComplete ? 44 : 0 }}>
+                                {item.noteData.is_clinical && <Pill label="Clinical" tone="cyan" />}
+                                {state.label && <Pill label={state.label} tone={item.status === "DONE" ? "green" : "amber"} />}
+                                {item.assignees?.length ? item.assignees.map((name, index) => <Stack key={index} direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0, maxWidth: '100%' }}><InitialsAvatar name={name} size={22} tone="violet" /><Typography variant="caption" sx={{ overflowWrap: 'anywhere' }}>{name}</Typography></Stack>) : <Typography variant="caption" color="text.secondary">Unassigned</Typography>}
+                                {state.canComplete && <Button size="small" variant="outlined" sx={{ ml: 'auto' }} disabled={busy} onClick={() => onComplete(item)}>{item.status === "DONE" ? "Mark to do" : "Mark done"}</Button>}
+                            </Stack>
+                        </Card>; })}
+                    </Box>}
+                </Paper>; })}
+            </Stack>
+        </>}
+        <Menu anchorEl={menu?.anchor} open={Boolean(menu)} onClose={() => setMenu(null)} slotProps={{ paper: { sx: { "& .MuiMenuItem-root": { minHeight: 44 } } } }}>
+            {menu?.task ? [
+                <MenuItem key="edit" onClick={() => act(() => onEdit(menu.task!))}>Edit</MenuItem>,
+                <MenuItem key="duplicate" disabled={busy} onClick={() => act(() => onDuplicate(menu.task!))}>Duplicate</MenuItem>,
+                <MenuItem key="delete" disabled={busy} onClick={() => act(() => onDelete(menu.task!))}>Delete</MenuItem>,
+            ] : [
+                <MenuItem key="add" disabled={busy} onClick={() => act(() => onAdd(menu!.date!))}>Add task here</MenuItem>,
+                <MenuItem key="copy" disabled={busy} onClick={() => act(() => onCopy("day", menu!.date!))}>Copy day to tomorrow</MenuItem>,
+            ]}
+        </Menu>
+    </Stack>;
+}
