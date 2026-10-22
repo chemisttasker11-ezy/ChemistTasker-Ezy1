@@ -5,8 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useWorkspace } from "../../../contexts/WorkspaceContext";
-import { getExplorerDashboard, getOnboardingDetail } from "@chemisttasker/shared-core";
-import apiClient from "../../../utils/apiClient";
+import { getExplorerDashboard, getPharmacistDashboard, getOtherStaffDashboard, getOnboardingDetail } from "@chemisttasker/shared-core";
 import { dashboardGreetingName } from "../../../utils/displayName";
 import { dashboardTitleForRole } from "../../../utils/roleLabels";
 import DashboardOverviewTemplate, {
@@ -105,15 +104,15 @@ export default function OverviewPageStaff() {
               ? { workspace: "internal", pharmacy_id: effectivePharmacyId }
             : { workspace: "platform" };
         const result = isPharmacist
-          ? (await apiClient.get("/dashboard/pharmacist/", { params: dashboardParams })).data
+          ? await getPharmacistDashboard(dashboardParams)
           : isOtherStaff
-            ? (await apiClient.get("/dashboard/otherstaff/", { params: dashboardParams })).data
+            ? await getOtherStaffDashboard(dashboardParams)
             : await getExplorerDashboard();
         if (cancelled) return;
         setData(result as any);
         setError(null);
       } catch (err: any) {
-        if (!isExplorer && err?.response?.status === 403) {
+        if (!isExplorer && (err?.response?.status === 403 || err?.status === 403)) {
           try {
             const fallback = await getExplorerDashboard();
             if (!cancelled) {

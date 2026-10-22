@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link as RouterLink, useLocation } from '@/public/navigation';
-import axios from 'axios';
 import {
   TextField,
   Button,
@@ -11,7 +10,8 @@ import {
   Typography,
   Stack,
 } from '@mui/material';
-import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
+import { API_BASE_URL } from '../constants/api';
+import { browserVerifyEmailOtp, browserResendEmailOtp } from '@chemisttasker/shared-core';
 import AuthLayout from '../layouts/AuthLayout'; // Import the new layout
 
 export default function OTPVerify() {
@@ -38,27 +38,13 @@ export default function OTPVerify() {
     setStatus('');
     setLoading(true);
     try {
-      const csrfSession = await axios.get(`${API_BASE_URL}/users/csrf/`, {
-        withCredentials: true,
-        headers: { "X-Client-Platform": "web" },
-      });
-      await axios.post(
-        `${API_BASE_URL}${API_ENDPOINTS.verifyOtp}`,
-        { email, otp },
-        {
-          withCredentials: true,
-          headers: {
-            "X-CSRFToken": csrfSession.data.csrfToken,
-            "X-Client-Platform": "web",
-          },
-        }
-      );
+      await browserVerifyEmailOtp({ baseUrl: API_BASE_URL }, email, otp);
       setStatus('Verification successful! Redirecting...');
       setTimeout(() => navigate('/login', { state: { email } }), 800);
 
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.detail || 'Verification failed. Please check your code.');
+      if (err && typeof err === 'object' && 'status' in err) {
+        setError((err as any)?.payload?.detail || 'Verification failed. Please check your code.');
       } else {
         setError('An unexpected error occurred. Please try again.');
       }
@@ -72,7 +58,7 @@ export default function OTPVerify() {
     setStatus('');
     setLoading(true);
     try {
-      await axios.post(`${API_BASE_URL}${API_ENDPOINTS.resendOtp}`, { email }, { withCredentials: true, headers: { "X-Client-Platform": "web" } });
+      await browserResendEmailOtp({ baseUrl: API_BASE_URL }, email);
       setStatus('A new code has been sent to your email.');
       setResendCooldown(30);
     } catch (err) {

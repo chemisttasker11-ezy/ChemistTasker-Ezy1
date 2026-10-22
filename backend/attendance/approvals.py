@@ -32,7 +32,16 @@ from django.utils import timezone
 from organizations.models import Pharmacy, PharmacyAdmin
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
-from workforce.roster.permissions import is_authorized_attendance_manager
+def is_authorized_attendance_manager(user, pharmacy: Pharmacy) -> bool:
+    """Same workforce-authorised capability check, resolved only when needed.
+
+    Attendance must not import the roster module while Django apps load.
+    This is only an import-time ownership change; workforce.permissions
+    still defines every owner, org and staff role authorisation rule.
+    """
+    from workforce.roster.permissions import is_authorized_attendance_manager as check
+    return check(user, pharmacy)
+
 
 
 def get_pending_provisional_attendances(user, pharmacy: Pharmacy) -> QuerySet:

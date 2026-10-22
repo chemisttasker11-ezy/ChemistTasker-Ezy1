@@ -1,3 +1,4 @@
+import { fetchPillBalanceService, getOwnerDashboard } from '@chemisttasker/shared-core';
 import { Briefcase, CalendarDays, Clock, MessageSquareText, Store, UserCog } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -7,7 +8,6 @@ import DashboardOverviewTemplate, {
 } from "../../../components/dashboard/DashboardOverviewTemplate";
 import { useAdminScope } from "../../../contexts/AdminScopeContext";
 import { useAuth } from "../../../contexts/AuthContext";
-import apiClient from "../../../utils/apiClient";
 import ChooseAccountTypeCard from "../../../components/ChooseAccountTypeCard";
 import { dashboardGreetingName } from "../../../utils/displayName";
 import {
@@ -26,9 +26,8 @@ export default function AdminOverview() {
 
   useEffect(() => {
     let mounted = true;
-    apiClient
-      .get("/pill-rewards/balance/")
-      .then(({ data }) => {
+    fetchPillBalanceService()
+      .then((data) => {
         if (!mounted) return;
         setPillSummary({
           balance: Number(data?.balance ?? 0),
@@ -45,9 +44,8 @@ export default function AdminOverview() {
 
   useEffect(() => {
     let mounted = true;
-    apiClient
-      .get("/dashboard/owner/", { params: { workspace: "internal", pharmacy_id: pharmacyId } })
-      .then(({ data }) => {
+    getOwnerDashboard({ workspace: "internal", pharmacy_id: pharmacyId })
+      .then((data) => {
         if (mounted) setDashboardData(data);
       })
       .catch((error: any) => {

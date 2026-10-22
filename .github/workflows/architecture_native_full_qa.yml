@@ -1,0 +1,21 @@
+name: Architecture Mainline Native Full QA
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - 'frontend_mobile/**'
+      - 'shared-core/**'
+      - '.github/workflows/architecture_native_full_qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-acceptance:
+    if: ${{ github.event_name != 'pull_request' || (startsWith(github.event.pull_request.head.ref, 'refactor/architecture-mainline-no-drift-') && contains(github.event.pull_request.labels.*.name, 'full-qa')) }}
+    uses: ./.github/workflows/native_mobile_acceptance.yml
+    with:
+      platform: both
+      tested_sha: ${{ github.event.pull_request.head.sha || github.sha }}

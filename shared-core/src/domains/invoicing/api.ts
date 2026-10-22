@@ -2,7 +2,7 @@ import type { InvoiceDetailApi } from '../../contracts/invoiceDetail';
 import type { Invoice } from '../../types';
 import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
-import { fetchApi, getApiConfig } from '../../transport/application';
+import { fetchApi, getApiConfig, performApiRequest } from '../../transport/application';
 export function getInvoices() {
     return fetchApi<Collection<Invoice>>('/invoices/');
 }
@@ -24,6 +24,11 @@ export function generateInvoice(data: unknown) {
 }
 export function previewInvoice(id: number | string) {
     return fetchApi(`/invoices/preview/${id}/`);
+}
+/** Authenticated binary read: never interpret an invoice PDF as application JSON. */
+export async function downloadInvoicePdf(id: number | string): Promise<Blob> {
+    const response = await performApiRequest(`/invoices/${id}/pdf/`, { method: 'GET' });
+    return response.blob();
 }
 export function getInvoicePdfUrl(id: number | string) {
     const { baseURL } = getApiConfig();

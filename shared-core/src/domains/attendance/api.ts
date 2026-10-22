@@ -17,6 +17,19 @@ export const attendance = {
     reject: (provisionalId: number | string, reason: string) => operationalRequest(API_ENDPOINTS.attendance.managerReject, { method: 'POST', body: { provisional_id: provisionalId, reason } }),
     correct: (eventId: number | string, correctedTimestamp: string, reason: string) => operationalRequest(API_ENDPOINTS.attendance.managerCorrect, { method: 'POST', body: { event_id: eventId, corrected_timestamp: correctedTimestamp, reason } }),
     getManagerTimeline: (sessionId: number | string) => operationalRequest<AttendanceTimeline>(API_ENDPOINTS.attendance.managerTimeline(sessionId)),
+    // Expo's pairing prompt consumes these named operations. The Windows
+    // Tauri/Rust kiosk retains its independent device protocol and transport.
+    getKioskPairingOptions: () => operationalRequest<{
+        pharmacies: Array<{ id: number; name: string; timezone: string }>;
+    }>('/attendance/kiosk/pairing/request/', { headers: { 'X-Client-Platform': 'mobile' } }),
+    createKioskPairingCode: (pharmacyId: number, deviceName: string) => operationalRequest<{
+        pairing_code: string;
+        expires_in_seconds: number;
+    }>('/attendance/kiosk/pairing/request/', {
+        method: 'POST',
+        headers: { 'X-Client-Platform': 'mobile' },
+        body: { pharmacy_id: pharmacyId, device_name: deviceName },
+    }),
     getManagerKioskDevices: (pharmacyId: number | string) => operationalRequest(API_ENDPOINTS.attendance.managerKioskDevices, { query: { pharmacy_id: pharmacyId } }),
     revokeManagerKioskDevice: (deviceId: number | string) => operationalRequest(API_ENDPOINTS.attendance.managerKioskDevices, { method: 'POST', body: { device_id: deviceId } }),
 };

@@ -117,3 +117,10 @@ export async function approveMembershipApplicationService(applicationId: number 
 export async function rejectMembershipApplicationService(applicationId: number | string) {
     await rejectMembershipApplication(applicationId);
 }
+
+/** Accepted, rejected and quit membership decisions stay server-owned.
+ * Preserve the historical bodyless POST; do not conflate with admin invitations.
+ */
+export function respondToMyMembership(id: number | string, action: 'accept' | 'reject' | 'quit') {
+    return fetchApi(`/my-memberships/${id}/${action}/`, { method: 'POST' });
+}

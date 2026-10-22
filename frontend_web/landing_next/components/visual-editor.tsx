@@ -5,14 +5,14 @@ import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import { Bold, Italic, List, ListOrdered, Heading2, Undo2, Redo2 } from 'lucide-react';
 import type { RichNode } from './rich-content';
-import { contentApi } from '@/lib/browser-api';
+import { contentOperations } from '@/lib/browser-api';
 export default function VisualEditor({value,onChange,disabled=false}:{value:RichNode;onChange:(value:RichNode)=>void;disabled?:boolean}) {
  const [link,setLink]=useState(''); const [alt,setAlt]=useState('');const [error,setError]=useState('');const [uploading,setUploading]=useState(false);
  const editor=useEditor({extensions:[StarterKit.configure({heading:{levels:[2,3,4]},codeBlock:false,horizontalRule:false,link:{openOnClick:false}}),Image.configure({allowBase64:false})],
   content:value,immediatelyRender:false,editable:!disabled,editorProps:{attributes:{'aria-label':'Article body','role':'textbox','aria-multiline':'true'}},onUpdate:({editor})=>onChange(editor.getJSON() as RichNode)});
  async function upload(file?:File) {
   if(!file||!editor)return;setUploading(true);setError('');
-  try {if(!alt.trim())throw new Error('Enter image alt text before uploading.');const form=new FormData();form.set('file',file);const result=await contentApi<{url:string}>('media/','POST',form);editor.chain().focus().setImage({src:result.url,alt}).run();}
+  try {if(!alt.trim())throw new Error('Enter image alt text before uploading.');const form=new FormData();form.set('file',file);const result=await contentOperations.uploadMedia<{url:string}>(form);editor.chain().focus().setImage({src:result.url,alt}).run();}
   catch(e){setError((e as Error).message);}finally{setUploading(false);}
  }
  if(!editor)return <p role="status">Loading editor…</p>;

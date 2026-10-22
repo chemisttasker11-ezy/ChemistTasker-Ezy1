@@ -27,8 +27,8 @@ from attendance.approvals import (
     get_effective_session_timeline,
     get_pending_provisional_attendances,
     reject_provisional_attendance,
+    is_authorized_attendance_manager,
 )
-from workforce.roster.permissions import is_authorized_attendance_manager
 from memberships.models import Membership  # noqa: F401  (ownership contract)
 from organizations.models import Pharmacy
 from shifts.models import Shift  # noqa: F401  (ownership contract)

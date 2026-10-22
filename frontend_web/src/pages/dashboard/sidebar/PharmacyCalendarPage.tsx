@@ -43,21 +43,31 @@ import {
     startOfWeek,
     subMonths,
 } from "date-fns";
-import { fetchMembershipsByPharmacy, fetchMyMemberships } from "@chemisttasker/shared-core";
+import {
+    actOnWorkNote,
+    createCalendarEvent,
+    createWorkNote,
+    deleteCalendarEvent,
+    deleteWorkNote,
+    fetchMembershipsByPharmacy,
+    fetchMyMemberships,
+    getCalendarFeed,
+    updateCalendarEvent,
+    updateWorkNote,
+} from "@chemisttasker/shared-core";
 import { useSearchParams } from "react-router-dom";
 import {
     type ItemType,
     type CalendarItem,
     WEEKDAYS,
     normalizeList,
-    fetchJson,
-    postJson,
     toDate,
     formatTimeRange,
     ROLE_LABELS,
     EMPLOYMENT_TYPE_LABELS,
     formatChoiceLabel,
 } from "./PharmacyCalendarPage.model";
+
 import PharmacyCalendarDialogs from "./PharmacyCalendarDialogs";
 
 export default function PharmacyCalendarPage() {
@@ -197,7 +207,7 @@ export default function PharmacyCalendarPage() {
         setLoading(true);
         setError(null);
         try {
-            const feed = await fetchJson("/calendar-feed/", {
+            const feed = await getCalendarFeed({
                 pharmacy_id: selectedPharmacyId,
                 date_from: dateRange.from,
                 date_to: dateRange.to,
@@ -439,15 +449,15 @@ export default function PharmacyCalendarPage() {
         recurrence,
       };
       if (editingEventId) {
-        await postJson(`/calendar-events/${editingEventId}/`, payload, "PATCH");
+        await updateCalendarEvent(editingEventId, payload);
       } else {
-        await postJson("/calendar-events/", payload);
+        await createCalendarEvent(payload);
       }
             setEventModalOpen(false);
             setEditingEventId(null);
             void loadFeed();
         } catch (e: any) {
-            setEventError(e.message || "Failed to save event.");
+            setEventError(e?.message || "Failed to save event.");
         } finally {
             setEventSaving(false);
         }
@@ -505,15 +515,15 @@ export default function PharmacyCalendarPage() {
         recurrence,
       };
             if (editingNoteId) {
-                await postJson(`/work-notes/${editingNoteId}/`, payload, "PATCH");
+                await updateWorkNote(editingNoteId, payload);
             } else {
-                await postJson("/work-notes/", payload);
+                await createWorkNote(payload);
             }
             setNoteModalOpen(false);
             setEditingNoteId(null);
             void loadFeed();
         } catch (e: any) {
-            setNoteError(e.message || "Failed to save work note.");
+            setNoteError(e?.message || "Failed to save work note.");
         } finally {
             setNoteSaving(false);
         }
@@ -1140,7 +1150,7 @@ export default function PharmacyCalendarPage() {
                                                                     try {
                                                                         const baseId = getBaseItemId(item);
                                                                         if (!baseId) return;
-                                                                        await postJson(`/calendar-events/${baseId}/`, {}, "DELETE" as any);
+                                                                        await deleteCalendarEvent(baseId);
                                                                         void loadFeed();
                                                                     } catch (e) {
                                                                         // swallow errors for now
@@ -1173,7 +1183,7 @@ export default function PharmacyCalendarPage() {
                                                                     try {
                                                                         const baseId = getBaseItemId(item);
                                                                         if (!baseId) return;
-                                                                        await postJson(`/work-notes/${baseId}/`, {}, "DELETE" as any);
+                                                                        await deleteWorkNote(baseId);
                                                                         void loadFeed();
                                                                     } catch (e) {
                                                                         // swallow errors for now
@@ -1193,10 +1203,10 @@ export default function PharmacyCalendarPage() {
                                                                             const baseId = getBaseItemId(item);
                                                                             if (!baseId) return;
                                                                             const occurrenceDate = format(item.date, "yyyy-MM-dd");
-                                                                            await postJson(
-                                                                                `/work-notes/${baseId}/${action}/`,
-                                                                                { occurrence_date: occurrenceDate },
-                                                                                "POST"
+                                                                            await actOnWorkNote(
+                                                                                baseId,
+                                                                                action,
+                                                                                { occurrence_date: occurrenceDate }
                                                                             );
                                                                             void loadFeed();
                                                                         } catch (e) {

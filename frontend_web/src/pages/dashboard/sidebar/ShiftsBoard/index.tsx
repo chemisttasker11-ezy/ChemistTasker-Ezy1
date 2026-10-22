@@ -29,10 +29,9 @@ import {
   Shift,
   getPharmacistDashboard,
   getOnboardingDetail, // ensure rate_preference fallback using existing onboarding API
+  getRatingsSummary,
 } from '@chemisttasker/shared-core';
 import { useJsApiLoader } from '@react-google-maps/api';
-import apiClient from '../../../../utils/apiClient';
-import { API_ENDPOINTS } from '../../../../constants/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { GOOGLE_LIBRARIES } from './constants';
 import { RatePreference, ShiftsBoardProps, SlotFilterMode, SortKey } from './types';
@@ -343,11 +342,10 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
     ids.forEach((id) => {
       if (ratingFetchRef.current.has(id)) return;
       ratingFetchRef.current.add(id);
-      apiClient
-        .get(`${API_ENDPOINTS.ratingsSummary}?target_type=pharmacy&target_id=${id}`)
-        .then((res) => {
-          const averageRaw = Number((res.data as any)?.average ?? 0);
-          const countRaw = Number((res.data as any)?.count ?? 0);
+      getRatingsSummary({ target_type: 'pharmacy', target_id: id })
+        .then((data) => {
+          const averageRaw = Number((data as any)?.average ?? 0);
+          const countRaw = Number((data as any)?.count ?? 0);
           const average = Number.isFinite(averageRaw) ? averageRaw : 0;
           const count = Number.isFinite(countRaw) ? countRaw : 0;
           setPharmacyRatings((prev) => ({

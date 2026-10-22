@@ -1,3 +1,4 @@
+import { createShiftPillReferralService } from '@chemisttasker/shared-core';
 import { useState, useCallback } from 'react';
 import { Share } from 'react-native';
 import { Shift, generateShiftShareLinkService } from '@chemisttasker/shared-core';
@@ -21,9 +22,7 @@ export function useShareShift(showSnackbar: (msg: string) => void) {
                 }
                 const baseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'https://app.chemisttasker.com';
                 const publicUrl = link?.url ?? `${baseUrl}/shifts/link?token=${token}`;
-                const { data: referral } = await apiClient.post('/pill-rewards/refer-shift/', {
-                    shift_id: shift.id,
-                });
+                const referral = await createShiftPillReferralService({ shift_id: shift.id });
                 const referralCode = referral?.referral_code;
                 if (!referralCode || !referral?.id) {
                     throw new Error('Missing shift referral details');

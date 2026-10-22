@@ -38,7 +38,11 @@ import {
     updatePharmacy,
     getPharmacyById,
     lookupPharmacyAbn,
+    appendPharmacyFormFields,
+    verifyPharmacyWriteReadback,
+    type SkillsRegistry,
 } from '@chemisttasker/shared-core';
+import registry from '@chemisttasker/shared-core/skills_registry.json';
 import { surfaceTokens } from './types';
 import GooglePlacesInput from './GooglePlacesInput';
 import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
@@ -60,6 +64,7 @@ import {
     formatDateTime,
 } from './PharmacyForm.config';
 import { styles } from './PharmacyForm.styles';
+import HoursRow from './PharmacyHoursRow';
 
 export default function PharmacyForm({
     mode,
@@ -324,7 +329,7 @@ export default function PharmacyForm({
                 const nextEmploymentTypes = data.employment_types || [];
                 const nextRolesNeeded = data.roles_needed || [];
                 const nextExistingFiles = {
-                    approval: data.approval_certificate || null,
+                    approval: data.methadone_s8_protocols || null,
                     sops: data.sops || null,
                     induction: data.induction_guides || null,
                     sump: data.qld_sump_docs || null,
@@ -563,35 +568,44 @@ export default function PharmacyForm({
         });
     }, [employmentTypes, files, form, rolesNeeded]);
 
+    // When write succeeds but GET fails, preserve the accepted write and
+    // reconcile it by ID instead of resubmitting a second multipart POST.
+    const pendingReadbackRef = useRef<{
+        id: string;
+        afterSave?: () => void;
+        submitted: Record<string, unknown>;
+        uploadedFields: Array<'methadone_s8_protocols' | 'sops' | 'induction_guides' | 'qld_sump_docs'>;
+        previousDocumentUrls: {
+            methadone_s8_protocols: string | null;
+            sops: string | null;
+            induction_guides: string | null;
+            qld_sump_docs: string | null;
+        };
+    } | null>(null);
+    const [verificationPending, setVerificationPending] = useState(false);
+
     const persistPharmacy = async ({ afterSave }: { afterSave?: () => void } = {}) => {
-        if (!validate()) return false;
+        if (saving) return false;
+        if (!pendingReadbackRef.current && !validate()) return false;
         setSaving(true);
         setError('');
 
         try {
-            const payload = buildPharmacyPayload();
+            const payload = pendingReadbackRef.current?.submitted ?? buildPharmacyPayload();
 
             const hasFiles = Boolean(files.approval || files.sops || files.induction || files.sump);
             const targetPharmacyId = currentPharmacyId ?? (mode === 'edit' ? pharmacyId ?? null : null);
+            let persistedPharmacyId = targetPharmacyId ? String(targetPharmacyId) : null;
 
-            if (hasFiles) {
+            if (pendingReadbackRef.current) {
+                persistedPharmacyId = pendingReadbackRef.current.id;
+            } else if (hasFiles) {
                 const formData = new FormData();
-                // Text fields
-                Object.entries(payload).forEach(([k, v]) => {
-                    if (v === null || v === undefined) return;
-                    if (k === 'software' || k === 'services') {
-                        formData.append(k, JSON.stringify(v));
-                        return;
-                    }
-                    if (Array.isArray(v)) {
-                        v.forEach(item => formData.append(k, String(item)));
-                        return;
-                    }
-                    formData.append(k, String(v));
-                });
+                // Encode Django JSON-list fields as one JSON array, matching the web client.
+                appendPharmacyFormFields(formData, payload);
 
                 // Files
-                if (files.approval) formData.append('approval_certificate', { uri: files.approval.uri, name: files.approval.name, type: files.approval.mimeType ?? 'application/pdf' } as any);
+                if (files.approval) formData.append('methadone_s8_protocols', { uri: files.approval.uri, name: files.approval.name, type: files.approval.mimeType ?? 'application/pdf' } as any);
                 if (files.sops) formData.append('sops', { uri: files.sops.uri, name: files.sops.name, type: files.sops.mimeType ?? 'application/pdf' } as any);
                 if (files.induction) formData.append('induction_guides', { uri: files.induction.uri, name: files.induction.name, type: files.induction.mimeType ?? 'application/pdf' } as any);
                 if (files.sump) formData.append('qld_sump_docs', { uri: files.sump.uri, name: files.sump.name, type: files.sump.mimeType ?? 'application/pdf' } as any);
@@ -601,7 +615,8 @@ export default function PharmacyForm({
                 } else {
                     const created = await createPharmacy(formData as any);
                     if (created?.id != null) {
-                        setCurrentPharmacyId(String(created.id));
+                        persistedPharmacyId = String(created.id);
+                        setCurrentPharmacyId(persistedPharmacyId);
                     }
                 }
             } else {
@@ -610,11 +625,73 @@ export default function PharmacyForm({
                 } else {
                     const created = await createPharmacy(payload as any);
                     if (created?.id != null) {
-                        setCurrentPharmacyId(String(created.id));
+                        persistedPharmacyId = String(created.id);
+                        setCurrentPharmacyId(persistedPharmacyId);
                     }
                 }
             }
 
+            if (!persistedPharmacyId) throw new Error('Pharmacy save did not return an ID.');
+            const originalAfterSave = pendingReadbackRef.current?.afterSave ?? afterSave;
+            pendingReadbackRef.current = {
+                id: persistedPharmacyId,
+                afterSave: originalAfterSave,
+                submitted: payload,
+                uploadedFields: [
+                    ...(files.approval ? ['methadone_s8_protocols'] as const : []),
+                    ...(files.sops ? ['sops'] as const : []),
+                    ...(files.induction ? ['induction_guides'] as const : []),
+                    ...(files.sump ? ['qld_sump_docs'] as const : []),
+                ],
+                previousDocumentUrls: {
+                    methadone_s8_protocols: existingFiles.approval,
+                    sops: existingFiles.sops,
+                    induction_guides: existingFiles.induction,
+                    qld_sump_docs: existingFiles.sump,
+                },
+            };
+            setVerificationPending(true);
+            // Do not announce success until the saved object is readable.
+            // A server-accepted multipart request can still fail persistence or
+            // return a different stored document reference after validation.
+            const persisted = (await getPharmacyById(persistedPharmacyId)) as any;
+            if (!persisted || String(persisted.id) !== persistedPharmacyId) {
+                throw new Error('Saved pharmacy could not be verified. Refresh before retrying.');
+            }
+            verifyPharmacyWriteReadback(persisted, pendingReadbackRef.current ? {
+                persistedId: pendingReadbackRef.current.id,
+                submitted: pendingReadbackRef.current.submitted,
+                uploadedFields: pendingReadbackRef.current.uploadedFields,
+                previousDocumentUrls: pendingReadbackRef.current.previousDocumentUrls,
+                skillsRegistry: registry as SkillsRegistry,
+            } : {
+                persistedId: persistedPharmacyId,
+                submitted: payload,
+                uploadedFields: [
+                    ...(files.approval ? ['methadone_s8_protocols'] as const : []),
+                    ...(files.sops ? ['sops'] as const : []),
+                    ...(files.induction ? ['induction_guides'] as const : []),
+                    ...(files.sump ? ['qld_sump_docs'] as const : []),
+                ],
+                previousDocumentUrls: {
+                    methadone_s8_protocols: existingFiles.approval,
+                    sops: existingFiles.sops,
+                    induction_guides: existingFiles.induction,
+                    qld_sump_docs: existingFiles.sump,
+                },
+                skillsRegistry: registry as SkillsRegistry,
+            });
+            const acceptedAfterSave = pendingReadbackRef.current?.afterSave ?? afterSave;
+            pendingReadbackRef.current = null;
+            setVerificationPending(false);
+            const verifiedFiles = {
+                approval: persisted.methadone_s8_protocols ?? null,
+                sops: persisted.sops ?? null,
+                induction: persisted.induction_guides ?? null,
+                sump: persisted.qld_sump_docs ?? null,
+            };
+            setExistingFiles(verifiedFiles);
+            setFiles({ approval: null, sops: null, induction: null, sump: null });
             unsaved.markClean({
                 form,
                 employmentTypes,
@@ -625,13 +702,13 @@ export default function PharmacyForm({
             });
             initialStateRef.current = {
                 employmentTypes,
-                existingFiles,
+                existingFiles: verifiedFiles,
                 form,
                 rolesNeeded,
                 software,
                 pharmacyProfile,
             };
-            if (afterSave) afterSave();
+            if (acceptedAfterSave) await acceptedAfterSave();
             else if (onSuccess) onSuccess();
             else router.back();
             return true;
@@ -639,7 +716,9 @@ export default function PharmacyForm({
         } catch (err: any) {
             const apiMessage = formatApiError(err?.response?.data);
             const detail = apiMessage || err?.message;
-            setError(detail || 'Save failed');
+            setError(pendingReadbackRef.current
+                ? 'The pharmacy was saved, but confirmation could not be completed. Select Verify Saved Pharmacy to retry without submitting another write.'
+                : (detail || 'Save failed'));
             console.error(err);
             return false;
         } finally {
@@ -649,6 +728,9 @@ export default function PharmacyForm({
 
     const handleSave = async () => {
         await persistPharmacy();
+    };
+    const handleVerifySaved = async () => {
+        if (pendingReadbackRef.current) await persistPharmacy();
     };
 
     const handleApplyToWeekdays = () => {
@@ -803,6 +885,10 @@ export default function PharmacyForm({
                     >
                         {error ? <Text style={styles.error}>{error}</Text> : null}
 
+                        {/* Django may have saved data before readback fails.
+                            Disable editing until GET-only reconciliation finishes;
+                            otherwise new draft edits could be falsely marked saved. */}
+                        <View pointerEvents={saving || verificationPending ? 'none' : 'auto'}>
                         <Surface style={styles.card} elevation={1}>
                             {/* TAB 0: GENERAL */}
                             {activeTab === 0 && (
@@ -1219,8 +1305,25 @@ export default function PharmacyForm({
                             )}
 
                         </Surface>
+                        </View>
 
                         {/* ACTIONS */}
+                        {verificationPending && (
+                            <Text style={styles.sectionHelper}>
+                                The server accepted this pharmacy save. Editing is locked until its saved details are verified.
+                                Use Verify Saved Pharmacy to retry without submitting another write.
+                            </Text>
+                        )}
+                        {verificationPending && (
+                            <Button
+                                mode="contained"
+                                onPress={handleVerifySaved}
+                                loading={saving}
+                                disabled={saving}
+                            >
+                                Verify Saved Pharmacy
+                            </Button>
+                        )}
                         <View style={styles.actions}>
                             {mode === 'edit' ? (
                                 <>
@@ -1228,7 +1331,7 @@ export default function PharmacyForm({
                                         mode="outlined"
                                         onPress={handleSave}
                                         loading={saving}
-                                        disabled={saving}
+                                        disabled={saving || verificationPending}
                                         style={{ flex: 1 }}
                                     >
                                         Save Changes
@@ -1237,7 +1340,7 @@ export default function PharmacyForm({
                                         <Button
                                             mode="outlined"
                                             onPress={() => activeTab > 0 && setActiveTab(p => p - 1)}
-                                            disabled={saving || activeTab === 0}
+                                            disabled={saving || verificationPending || activeTab === 0}
                                             style={{ flex: 1 }}
                                         >
                                             Back
@@ -1245,7 +1348,7 @@ export default function PharmacyForm({
                                         <Button
                                             mode="contained"
                                             onPress={handleNext}
-                                            disabled={saving || activeTab === lastTabIndex}
+                                            disabled={saving || verificationPending || activeTab === lastTabIndex}
                                             style={{ flex: 1 }}
                                         >
                                             Next
@@ -1257,7 +1360,7 @@ export default function PharmacyForm({
                                     <Button
                                         mode="outlined"
                                         onPress={() => activeTab > 0 ? setActiveTab(p => p - 1) : (onCancel ? onCancel() : router.back())}
-                                        disabled={saving}
+                                        disabled={saving || verificationPending}
                                         style={{ flex: 1 }}
                                     >
                                         {activeTab > 0 ? 'Back' : 'Cancel'}
@@ -1266,7 +1369,7 @@ export default function PharmacyForm({
                                         mode="contained"
                                         onPress={activeTab === lastTabIndex ? handleSave : handleNext}
                                         loading={activeTab === lastTabIndex ? saving : false}
-                                        disabled={saving}
+                                        disabled={saving || verificationPending}
                                         style={{ flex: 1 }}
                                     >
                                         {activeTab === lastTabIndex ? 'Create Pharmacy' : 'Next'}
@@ -1279,10 +1382,10 @@ export default function PharmacyForm({
 
                 <Portal>
                     <TimePickerModal
-                        visible={Boolean(activeTimeField)}
+                        visible={Boolean(activeTimeField) && !saving && !verificationPending}
                         onDismiss={() => setActiveTimeField(null)}
                         onConfirm={({ hours, minutes }) => {
-                            if (!activeTimeField) return;
+                            if (!activeTimeField || saving || verificationPending) return;
                             setForm((prev) => ({
                                 ...prev,
                                 [activeTimeField.key]: formatTimeValue(hours, minutes),
@@ -1300,77 +1403,3 @@ export default function PharmacyForm({
     );
 }
 
-const HoursRow = ({ label, startKey, endKey, closedKey, form, setForm, setActiveTimeField }: any) => {
-    const isClosed = Boolean(closedKey && form[closedKey]);
-    const toggleClosed = () => {
-        if (!closedKey || !setForm) return;
-        setForm((prev: any) => ({
-            ...prev,
-            [closedKey]: !Boolean(prev[closedKey]),
-            [startKey]: !Boolean(prev[closedKey]) ? '' : prev[startKey],
-            [endKey]: !Boolean(prev[closedKey]) ? '' : prev[endKey],
-        }));
-    };
-
-    return (
-    <View style={{ marginBottom: 16 }}>
-        <View style={styles.hoursRowHeader}>
-            <Text style={{ fontWeight: '600', marginBottom: 4 }}>{label}</Text>
-            {closedKey ? (
-                <TouchableOpacity
-                    style={[styles.closedToggle, isClosed ? styles.closedToggleActive : null]}
-                    onPress={toggleClosed}
-                    activeOpacity={0.8}
-                >
-                    <MaterialCommunityIcons
-                        name="block-helper"
-                        size={16}
-                        color={isClosed ? '#B91C1C' : '#64748B'}
-                    />
-                    <Text style={[styles.closedToggleText, isClosed ? styles.closedToggleTextActive : null]}>
-                        Closed
-                    </Text>
-                </TouchableOpacity>
-            ) : null}
-        </View>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity
-                style={styles.timeField}
-                activeOpacity={0.85}
-                disabled={isClosed}
-                onPress={() => setActiveTimeField({ key: startKey, label: `${label} start time` })}
-            >
-                <TextInput
-                    label="Start"
-                    value={isClosed ? '' : form[startKey]}
-                    mode="outlined"
-                    style={styles.timeInput}
-                    placeholder="09:00"
-                    disabled={isClosed}
-                    editable={false}
-                    pointerEvents="none"
-                    right={<TextInput.Icon icon="clock-outline" />}
-                />
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={styles.timeField}
-                activeOpacity={0.85}
-                disabled={isClosed}
-                onPress={() => setActiveTimeField({ key: endKey, label: `${label} end time` })}
-            >
-                <TextInput
-                    label="End"
-                    value={isClosed ? '' : form[endKey]}
-                    mode="outlined"
-                    style={styles.timeInput}
-                    placeholder="17:00"
-                    disabled={isClosed}
-                    editable={false}
-                    pointerEvents="none"
-                    right={<TextInput.Icon icon="clock-outline" />}
-                />
-            </TouchableOpacity>
-        </View>
-    </View>
-    );
-};

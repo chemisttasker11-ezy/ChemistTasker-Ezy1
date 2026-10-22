@@ -3,6 +3,15 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+const args = new Set(process.argv.slice(2));
+for (const option of args) {
+  if (option !== '--strict') {
+    console.error(`Unknown shared-core boundary audit option: ${option}`);
+    process.exit(2);
+  }
+}
+const strict = args.has('--strict');
+
 const targets = [
   'frontend_web/src',
   'frontend_web/landing_next',
@@ -12,7 +21,7 @@ const targets = [
 // Domain routes belong in @chemisttasker/shared-core. Runtime bootstrap files
 // may configure an API origin, but feature code must not construct backend
 // domain routes or use generic shared-core escape hatches.
-const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account)\//;
+const routePattern = /(?:['"`])(?:https?:\/\/[^'"`]+)?\/(?:api\/(?:v1\/)?)?(?:users|public-hub|content|marketplace|ethical|client-profile|billing|account|pharmacies|organizations|attendance|roster|roster-owner|roster-worker|roster-shifts|shifts|workforce|work-notes|calendar-events|team-calendar|invoicing|notifications|talent|ratings|rewards)\//;
 const requestCallPattern = /(?:\.(?:get|post|put|patch|delete|request)\s*(?:<[^>]*>)?\s*\(|\b(?:fetch|fetchJson|postJson|axios)\s*\()/;
 const escapeHatchPattern = /\b(?:marketApi|ethicalApi)\s*(?:<[^>]*>)?\s*\(|\b(?:chemistTaskerApi\.(?:publicContent|contentManagement|marketplace|ethicalMarketplace)|(?:marketplaceApi|ethicalMarketplaceApi))\.request\s*(?:<[^>]*>)?\s*\(/;
 // Authenticated operational domains are intentionally owned by legacy api.ts.
@@ -56,11 +65,23 @@ if (operationalFindings.length) {
 }
 
 
+// Docker copies the complete .git tree under another UID. Trust precisely
+// this inspected project root without weakening Git's global safe.directory.
+function gitOutput(args) {
+  return execFileSync('git', ['-c', `safe.directory=${root}`, ...args], { encoding: 'utf8' }).trim();
+}
+
 function resolveBase() {
   const configured = (process.env.SHARED_CORE_AUDIT_BASE || '').trim();
   if (configured && !/^0+$/.test(configured)) return configured;
   try {
-    return execFileSync('git', ['rev-parse', 'HEAD^'], { encoding: 'utf8' }).trim();
+    // Full QA writes this validated PR-base ref before copying into Docker.
+    return gitOutput(['rev-parse', '--verify', 'refs/qa/shared-core-audit-base^{commit}']);
+  } catch {
+    // The validated ref is not present on ordinary local runs.
+  }
+  try {
+    return gitOutput(['rev-parse', 'HEAD^']);
   } catch {
     return null;
   }
@@ -68,7 +89,12 @@ function resolveBase() {
 
 const base = resolveBase();
 if (!base) {
-  console.log('Shared-core boundary audit: no comparison base is available; nothing to ratchet.');
+  const message = 'Shared-core boundary audit SKIPPED: no comparison base; changed-line protection was NOT verified.';
+  if (strict) {
+    console.error(message + ' Supply SHARED_CORE_AUDIT_BASE or a checkout with HEAD^.');
+    process.exit(1);
+  }
+  console.warn(message);
   process.exit(0);
 }
 
@@ -76,7 +102,7 @@ let diff;
 try {
   diff = execFileSync(
     'git',
-    ['diff', '--unified=0', base, 'HEAD', '--', ...targets],
+    ['-c', `safe.directory=${root}`, 'diff', '--unified=0', base, 'HEAD', '--', ...targets],
     { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
   );
 } catch (error) {

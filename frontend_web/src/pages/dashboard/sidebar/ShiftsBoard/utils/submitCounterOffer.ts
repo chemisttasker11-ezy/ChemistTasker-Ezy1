@@ -1,5 +1,4 @@
-import apiClient from '../../../../../utils/apiClient';
-import { ShiftCounterOfferPayload } from '@chemisttasker/shared-core';
+import { createShiftCounterOffer, type ShiftCounterOfferPayload } from '@chemisttasker/shared-core';
 
 export async function submitCounterOfferDirect(payload: ShiftCounterOfferPayload) {
   const body = {
@@ -13,5 +12,5 @@ export async function submitCounterOfferDirect(payload: ShiftCounterOfferPayload
       proposed_rate: slot.proposedRate ?? null,
     })),
   };
-  await apiClient.post(`/shifts/${payload.shiftId}/counter-offers/`, body);
+  await createShiftCounterOffer(payload.shiftId, body);
 }

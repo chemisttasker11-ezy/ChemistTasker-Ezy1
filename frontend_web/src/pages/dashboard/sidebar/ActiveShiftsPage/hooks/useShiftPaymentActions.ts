@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
-import { chargeShiftFulfillment, type Shift } from '@chemisttasker/shared-core';
-import apiClient from '../../../../../utils/apiClient';
+import { chargeShiftFulfillment, payShiftWithPills, type Shift } from '@chemisttasker/shared-core';
 
 export function useShiftPaymentActions(loadShifts: () => Promise<void>, showSnackbar: (message: string) => void) {
     const [pillPayingShiftId, setPillPayingShiftId] = useState<number | null>(null);
@@ -8,15 +7,12 @@ export function useShiftPaymentActions(loadShifts: () => Promise<void>, showSnac
     const handlePayWithPills = useCallback(async (shift: Shift, offerIds: number[] = []) => {
         setPillPayingShiftId(shift.id);
         try {
-            const { data: res } = await apiClient.post('/pill-rewards/pay-shift/', {
-                shift_id: shift.id,
-                ...(offerIds.length > 0 ? { offer_ids: offerIds } : {}),
-            });
+            const res = await payShiftWithPills(shift.id, offerIds);
             showSnackbar(res?.detail || 'Shift paid with pills.');
             await loadShifts();
         } catch (err: any) {
             console.error(err);
-            const data = err?.response?.data;
+            const data = err?.response?.data ?? err?.payload;
             const detail = Array.isArray(data?.detail) ? data.detail[0] : data?.detail;
             const message = data?.code === 'insufficient_pills'
                 ? `Not enough pills. You have ${data?.balance ?? 0}; this shift needs ${data?.required ?? 'more'} pills.`

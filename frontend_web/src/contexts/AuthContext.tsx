@@ -25,6 +25,7 @@ import {
 } from "@chemisttasker/shared-core";
 import { AdminCapability } from "../constants/adminCapabilities";
 import { API_BASE_URL } from "../constants/api";
+import { browserSessionCurrentUser } from '@chemisttasker/shared-core';
 import { setTokens, clearTokens, refreshCookieSession, restoreTokensFromStorage, getAccessToken, getRefreshToken, AUTH_TOKENS_CLEARED_EVENT, AUTH_TOKENS_UPDATED_EVENT } from "../utils/tokenService";
 
 export interface OrgMembership {
@@ -158,13 +159,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const fetchCurrentUser = useCallback(async (cookieOnly = false): Promise<User | null> => {
     const token = cookieOnly ? null : getAccessToken();
     if (!cookieOnly && !token) return null;
-    const resp = await fetch(`${API_BASE_URL}/users/me/`, {
-      credentials: 'include',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (resp.status === 401) return null;
-    if (!resp.ok) throw new Error('Your account is temporarily unavailable.');
-    return await resp.json() as User;
+    return await browserSessionCurrentUser({ baseUrl: API_BASE_URL }, token) as User | null;
   }, []);
 
   const fetchSessionUser = useCallback(async (): Promise<User | null> => {

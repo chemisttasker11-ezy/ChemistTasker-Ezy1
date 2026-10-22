@@ -814,11 +814,10 @@ jobs:
               permissions:
                 all: allow
           - openLink: "frontendmobile://admin/shifts"
-          - runFlow:
-              when:
-                visible: 'Open in .*ChemistTasker.*'
-              commands:
-                - tapOn: "Open"
+          - extendedWaitUntil:
+              visible: 'Open in .*ChemistTasker.*'
+              timeout: 30000
+          - tapOn: "Open"
           YAML
           maestro --device "$SIM_UDID" test /tmp/native-link-consent.yaml
           sleep 5
@@ -879,7 +878,7 @@ jobs:
               timeout: 30000
           - assertVisible: "Admin( workspace)?"
           - openLink: "frontendmobile://admin/shifts"
-          # Accept iOS's first-use custom-scheme security confirmation.
+          # Handle subsequent custom-scheme security confirmation if presented.
           - runFlow:
               when:
                 visible: 'Open in .*ChemistTasker.*'
@@ -889,7 +888,7 @@ jobs:
               visible: "Shift Center"
               timeout: 30000
           - openLink: "frontendmobile://attendance/clock"
-          # Accept iOS's first-use custom-scheme security confirmation.
+          # Handle subsequent custom-scheme security confirmation if presented.
           - runFlow:
               when:
                 visible: 'Open in .*ChemistTasker.*'

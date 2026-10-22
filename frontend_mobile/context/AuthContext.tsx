@@ -1,7 +1,6 @@
 import { AhpraProvider } from './AhpraContext';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { Alert, Platform } from 'react-native';
-import axios from 'axios';
 import {
   getOnboarding,
   hasAdminCapability,
@@ -11,7 +10,7 @@ import {
   type AuthorityMembership,
   type AuthorityAdminAssignment,
 } from '@chemisttasker/shared-core';
-import apiClient from '../utils/apiClient';
+import { nativeIdentityTransport } from '../utils/nativeIdentityTransport';
 import { getBrowserCsrfToken } from '../utils/browserAuth';
 import { resolveApiBaseUrl } from '../utils/apiUrl';
 import { registerForPushNotificationsAsync, registerDeviceTokenWithBackend } from '../utils/pushNotifications';
@@ -161,7 +160,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (baseURL) {
           const token = await getValidAccessToken(baseURL);
           if (token) {
-            const meResponse = await apiClient.get('/users/me/').catch(() => null);
+            const meResponse = await nativeIdentityTransport.currentUser().catch(() => null);
             if (meResponse?.data) {
               const currentUser = normalizeUser(meResponse.data);
               const refreshedSession = await readStoredSession();
@@ -289,7 +288,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const loginWithCredentials = async (email: string, password: string) => {
     try {
       addNetworkDiagnostic('login-attempt', { api: process.env.EXPO_PUBLIC_API_URL });
-      const response: any = await apiClient.post('/users/login/', { email, password }, { withCredentials: true });
+      const response: any = await nativeIdentityTransport.login(email, password);
       const payload = response?.data ?? response;
       const userData = payload.user || payload.userData || payload.profile;
       const newAccess = payload.access;
@@ -350,7 +349,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     const session = await readStoredSession();
-    const response = await apiClient.get('/users/me/');
+    const response = await nativeIdentityTransport.currentUser();
     const userData = normalizeUser(response?.data);
     const refreshedSession = await readStoredSession();
     const nextAccess = refreshedSession?.access || refreshedSession?.tokens?.access || token;
@@ -374,7 +373,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const register = async (data: RegisterData) => {
     try {
-      await apiClient.post('/users/register/', data);
+      await nativeIdentityTransport.register(data);
     } catch (error: any) {
       const duplicateEmailMessage =
         'There is already an account registered with this email. Please log in or reset your password.';
@@ -419,7 +418,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const verifyOTP = async (code: string, email?: string) => {
     try {
       const targetEmail = email || user?.email;
-      const response = await apiClient.post('/users/verify-otp/', { email: targetEmail, otp: code });
+      const response = await nativeIdentityTransport.verifyEmailOtp(targetEmail, code);
       const payload = response?.data ?? response;
       const userData = payload?.user;
       const newAccess = payload?.access;
@@ -435,7 +434,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const resendOTP = async (email?: string) => {
     try {
       // Backend ResendOTPView looks up user by email from request body (same as web)
-      await apiClient.post('/users/resend-otp/', { email: email || user?.email });
+      await nativeIdentityTransport.resendEmailOtp(email || user?.email);
     } catch (error: any) {
       throw new Error(error.response?.data?.detail || 'Failed to resend OTP');
     }

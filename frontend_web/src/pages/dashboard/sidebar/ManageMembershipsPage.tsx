@@ -18,8 +18,14 @@ import IconTile from "../../../components/ui/IconTile";
 import DashboardContentState from "../../../components/dashboard/DashboardContentState";
 import { Pill } from "../../../components/ui/Pill";
 import { type StatusTone } from "../../../components/ui/tone";
-import apiClient from "../../../utils/apiClient";
-import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from "@chemisttasker/shared-core";
+import {
+  getMyMemberships,
+  getCurrentUser,
+  respondToMyMembership,
+  getPendingPharmacyAdminInvitations,
+  respondToPharmacyAdminInvitation,
+  getMembershipErrorMessage,
+} from "@chemisttasker/shared-core";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useAhpra } from "../../../contexts/AhpraContext";
 
@@ -103,16 +109,16 @@ export default function ManageMembershipsPage() {
   const loadMemberships = async () => {
     setLoading(true);
     try {
-      const [{ data }, invitations] = await Promise.all([
-        apiClient.get("/my-memberships/"),
+      const [data, invitations] = await Promise.all([
+        getMyMemberships(),
         getPendingPharmacyAdminInvitations(),
       ]);
-      setMemberships(Array.isArray(data) ? data : data?.results || []);
+      setMemberships((Array.isArray(data) ? data : data?.results || []) as unknown as Membership[]);
       setAdminInvitations(Array.isArray(invitations) ? invitations : []);
       setActionError(null);
       setLoadFailed(false);
     } catch (error: any) {
-      setActionError(error?.response?.data?.detail || "Unable to load memberships.");
+      setActionError(getMembershipErrorMessage(error, "Unable to load memberships."));
       setLoadFailed(true);
     } finally {
       setLoading(false);
@@ -124,8 +130,8 @@ export default function ManageMembershipsPage() {
   }, []);
 
   const refreshUser = async () => {
-    const { data } = await apiClient.get('/users/me/');
-    setUser(data);
+    const data = await getCurrentUser();
+    setUser(data as any);
   };
 
   const respondToAdmin = async (invitation: AdminInvitation, accept: boolean) => {
@@ -134,7 +140,7 @@ export default function ManageMembershipsPage() {
       await respondToPharmacyAdminInvitation(invitation.id, accept);
       await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
     } catch (error: any) {
-      setActionError(error?.response?.data?.detail || 'Unable to respond to this admin invitation.');
+      setActionError(getMembershipErrorMessage(error, 'Unable to respond to this admin invitation.'));
     } finally {
       setActingId(null);
     }
@@ -143,11 +149,11 @@ export default function ManageMembershipsPage() {
   const runAction = async (membership: Membership, action: "accept" | "reject" | "quit") => {
     setActingId(membership.id);
     try {
-      await apiClient.post(`/my-memberships/${membership.id}/${action}/`);
+      await respondToMyMembership(membership.id, action);
       await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
       setQuitTarget(null);
     } catch (error: any) {
-      setActionError(error?.response?.data?.detail || `Unable to ${action} membership.`);
+      setActionError(getMembershipErrorMessage(error, `Unable to ${action} membership.`));
     } finally {
       setActingId(null);
     }

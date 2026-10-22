@@ -28,10 +28,9 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { API_BASE_URL } from '../../constants/api';
-import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
+import { getOnboardingDetail, updateOnboardingForm, getCurrentSubscription, createFriendPillReferralService } from '@chemisttasker/shared-core';
 import { useNavigate } from 'react-router-dom';
 import ProfilePhotoUploader from '../../components/profilePhoto/ProfilePhotoUploader';
-import apiClient from '../../utils/apiClient';
 import { useAuth, type User } from '../../contexts/AuthContext';
 import { UnsavedChangesBoundary, useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { AHPRA_CONSENT_TEXT } from '../../constants/ahpraConsent';
@@ -233,9 +232,8 @@ function OwnerOnboardingContent({
     if (standalone) {
       return;
     }
-    apiClient
-      .get('/billing/subscription/')
-      .then(({ data }) => {
+    getCurrentSubscription()
+      .then((data) => {
         setSubscriptionSummary({
           active: !!data.active,
           status: data.status || 'inactive',
@@ -356,7 +354,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   const handleCopyFriendReferral = async () => {
     setReferralLoading(true);
     try {
-      const { data: referral } = await apiClient.post('/pill-rewards/refer-friend/', {});
+      const referral = await createFriendPillReferralService({});
       const code = referral?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const url = new URL('/register', window.location.origin);

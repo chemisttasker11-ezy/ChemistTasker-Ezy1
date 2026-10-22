@@ -2,8 +2,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Chip, Icon, Modal, Portal, Snackbar, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import apiClient from '@/utils/apiClient';
-import { getPendingPharmacyAdminInvitations, respondToPharmacyAdminInvitation } from '@chemisttasker/shared-core';
+import {
+  getMyMemberships,
+  respondToMyMembership,
+  getPendingPharmacyAdminInvitations,
+  respondToPharmacyAdminInvitation,
+  getMembershipErrorMessage,
+} from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useAhpra } from '@/context/AhpraContext';
 
@@ -72,12 +77,12 @@ export default function ManageMembershipsScreen() {
   const loadMemberships = useCallback(async () => {
     try {
       const [membershipsResult, invitationsResult] = await Promise.allSettled([
-        apiClient.get('/my-memberships/'),
+        getMyMemberships(),
         getPendingPharmacyAdminInvitations(),
       ]);
       if (membershipsResult.status === 'rejected') throw membershipsResult.reason;
-      const { data } = membershipsResult.value;
-      setMemberships(Array.isArray(data) ? data : data?.results || []);
+      const data = membershipsResult.value;
+      setMemberships((Array.isArray(data) ? data : data?.results || []) as unknown as Membership[]);
       if (invitationsResult.status === 'fulfilled') {
         setAdminInvitations(Array.isArray(invitationsResult.value) ? invitationsResult.value : []);
         setError(null);
@@ -86,7 +91,7 @@ export default function ManageMembershipsScreen() {
         setError('Memberships loaded, but admin invitations could not be refreshed. Pull down to try again.');
       }
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Unable to load memberships.');
+      setError(getMembershipErrorMessage(err, 'Unable to load memberships.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -100,7 +105,7 @@ export default function ManageMembershipsScreen() {
   const runAction = async (membership: Membership, action: 'accept' | 'reject' | 'quit') => {
     setActingKey(`membership-${membership.id}`);
     try {
-      await apiClient.post(`/my-memberships/${membership.id}/${action}/`);
+      await respondToMyMembership(membership.id, action);
       await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
       setQuitTarget(null);
       setToast(
@@ -111,7 +116,7 @@ export default function ManageMembershipsScreen() {
             : 'Invitation rejected.'
       );
     } catch (err: any) {
-      Alert.alert('Membership update failed', err?.response?.data?.detail || `Unable to ${action} membership.`);
+      Alert.alert('Membership update failed', getMembershipErrorMessage(err, `Unable to ${action} membership.`));
     } finally {
       setActingKey(null);
     }
@@ -124,7 +129,7 @@ export default function ManageMembershipsScreen() {
       await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
       setToast(accept ? 'Admin access accepted.' : 'Admin invitation declined.');
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Unable to respond to this admin invitation.');
+      setError(getMembershipErrorMessage(err, 'Unable to respond to this admin invitation.'));
     } finally {
       setActingKey(null);
     }

@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import axios from 'axios';
 import {
   TextField,
   Button,
@@ -17,8 +16,8 @@ import {
 import AuthLayout from '../layouts/AuthLayout';
 import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import { useAuth } from '../contexts/AuthContext';
-import apiClient from '../utils/apiClient';
-import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
+import { API_BASE_URL } from '../constants/api';
+import { browserMagicMembershipInfo, browserSubmitMagicMembership } from '@chemisttasker/shared-core';
 
 interface MagicInfo {
   pharmacy: number;
@@ -166,10 +165,10 @@ export default function MembershipApplyPage() {
         if (!token) throw new Error('Missing token');
         setLoadingInfo(true);
         setInfoError(null);
-        const { data } = await axios.get<MagicInfo>(`${API_BASE_URL}${API_ENDPOINTS.magicMembershipInfo(token)}`);
+        const data = await browserMagicMembershipInfo<MagicInfo>({ baseUrl: API_BASE_URL }, token);
         if (mounted) setInfo(data);
       } catch (err: any) {
-        const status = err?.response?.status;
+        const status = err?.response?.status ?? err?.status;
         if (status === 410) setInfoError('This link has expired. Please contact the pharmacy to request a new link.');
         else if (status === 404) setInfoError('This link is invalid.');
         else setInfoError('Unable to load link information. Please try again later.');
@@ -274,14 +273,10 @@ export default function MembershipApplyPage() {
         payload.job_title = trimmedJobTitle;
       }
 
-      if (user) {
-        await apiClient.post(API_ENDPOINTS.magicMembershipApply(token), payload);
-      } else {
-        await axios.post(`${API_BASE_URL}${API_ENDPOINTS.magicMembershipApply(token)}`, payload);
-      }
+      await browserSubmitMagicMembership({ baseUrl: API_BASE_URL }, token, payload, Boolean(user));
       setSubmitted(true);
     } catch (err: any) {
-      const data = err?.response?.data;
+      const data = err?.response?.data ?? err?.payload;
       const firstFieldError =
         data && typeof data === 'object'
           ? Object.values(data as Record<string, unknown>)

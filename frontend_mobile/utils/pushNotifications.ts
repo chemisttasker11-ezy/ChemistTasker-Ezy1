@@ -1,7 +1,7 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import apiClient from './apiClient';
+import { registerPushDeviceToken } from '@chemisttasker/shared-core';
 import { EventEmitter } from 'eventemitter3';
 import { Platform } from 'react-native';
 
@@ -67,12 +67,9 @@ export async function registerForPushNotificationsAsync() {
 
 export async function registerDeviceTokenWithBackend(token: string, platform: 'ios' | 'android' | 'web' = 'web') {
   try {
-    await apiClient.post('/device-tokens/', {
-      token,
-      platform,
-    });
+    await registerPushDeviceToken(token, platform);
   } catch (err) {
-    const data = (err as any)?.response?.data;
+    const data = (err as any)?.response?.data ?? (err as any)?.payload;
     // Never wipe local auth from a push-token registration failure.
     // Auth refresh/invalid-token handling belongs to the central API interceptor.
     console.error('Failed to register device token', data || err);
