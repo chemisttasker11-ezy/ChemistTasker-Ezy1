@@ -173,6 +173,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
     setRejectedSlotIds,
   } = useShiftPersistence({
     shifts,
+    userId: auth.user?.id,
     disableLocalPersistence,
     savedFeatureEnabled,
     savedShiftIdsProp,

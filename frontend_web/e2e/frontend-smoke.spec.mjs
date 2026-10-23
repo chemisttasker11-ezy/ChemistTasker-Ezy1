@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { createServer } from 'node:http';
 
 const baseCapabilities = ['MANAGE_STAFF', 'MANAGE_ROSTER', 'MANAGE_ADMINS', 'MANAGE_COMMUNICATIONS'];
 
@@ -522,7 +523,7 @@ test.describe('public/auth wiring', () => {
   });
 
   for (const previousOwner of ['9001', null]) {
-    test(`login ${previousOwner ? 'as another account wipes the previous account' : 'after browsing anonymously keeps the visitor'}'s browser storage`, async ({ page }) => {
+    test(`login ${previousOwner ? "as another account wipes the previous account's" : 'over unowned legacy data wipes that'} browser storage`, async ({ page }) => {
       const userB = roleUsers.pharmacist;
       let current = null;
       await page.route('**/api/**', async (route) => {
@@ -544,10 +545,11 @@ test.describe('public/auth wiring', () => {
       await page.goto('/login');
       await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
       const personal = {
-        local: ['saved_shift_ids', 'applied_shift_ids', 'applied_slot_ids', 'rejected_shift_ids', 'rejected_slot_ids', 'counter_offer_map'],
+        local: ['saved_shift_ids', 'applied_shift_ids', 'applied_slot_ids', 'rejected_shift_ids', 'rejected_slot_ids', 'counter_offer_map', 'ct_access', 'ct_refresh'],
         session: ['owner-pharmacy-setup-skipped', 'ct:hub-draft:community', 'ct:comment-draft:7', 'ct:route:/shifts'],
       };
-      const device = ['ct-theme-mode', 'ct-dashboard-sidebar-collapsed', 'ct:shift-skill-preset:v1:9001:PHARMACIST'];
+      // Browser-only data scoped to account 9001 stays for 9001; B reads only keys scoped to B.
+      const device = ['ct-theme-mode', 'ct-dashboard-sidebar-collapsed', 'ct:shift-skill-preset:v1:9001:PHARMACIST', 'saved_shift_ids:9001'];
       await page.evaluate(({ personal, device, previousOwner }) => {
         for (const key of personal.local) localStorage.setItem(key, '[101]');
         for (const key of personal.session) sessionStorage.setItem(key, 'Private A text');
@@ -567,13 +569,143 @@ test.describe('public/auth wiring', () => {
         device: device.filter((key) => localStorage.getItem(key) === 'dark'),
         owner: localStorage.getItem('ct:storage-owner'),
       }), { personal, device });
-      if (previousOwner) expect(left.personal).toEqual([]);
-      else expect(left.personal).toEqual(expect.arrayContaining(['ct:hub-draft:community', 'ct:comment-draft:7']));
+      expect(left.personal).toEqual([]);
       expect(left.device).toEqual(device);
       expect(left.owner).toBe(String(userB.id));
     });
   }
 
+});
+
+test.describe('login keeps hub drafts per account', () => {
+  // Hub pages render on the Next server, which reads posts from the API at 127.0.0.1:8000 (HUB_API_URL default).
+  test.skip(process.env.PLAYWRIGHT_PORT !== '3000', 'hub pages are served by the Next app');
+  const post = {
+    id: 7, platform_hub: 'public', body: 'Shared question', author_name: 'Someone', created_at: '2026-01-01T00:00:00Z',
+    allow_comments: true, is_pinned: false, comment_count: 0, reactions: {}, can_interact: true, can_edit: false, attachments: [], editorial: null,
+  };
+  const empty = { results: [], count: 0, next: null, previous: null };
+  let backend;
+  test.beforeAll(async () => {
+    backend = createServer((request, response) => {
+      response.setHeader('Content-Type', 'application/json');
+      response.end(JSON.stringify(/\/posts\/7\/$/.test(new URL(request.url, 'http://x').pathname) ? post : empty));
+    });
+    await new Promise((resolve) => backend.listen(8000, '127.0.0.1', resolve));
+  });
+  test.afterAll(() => new Promise((resolve) => backend.close(resolve)));
+
+  test('login as A restores A drafts after logout; login as B shows none of them', async ({ page }) => {
+    const userA = { ...roleUsers.pharmacist, id: 4, first_name: 'Alice' };
+    const userB = { ...roleUsers.otherstaff, id: 5, first_name: 'Bob' };
+    let current = userA;
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const apiPath = new URL(request.url()).pathname;
+      if (apiPath.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+      if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
+        current = JSON.parse(request.postData() || '{}').email === userB.email ? userB : userA;
+        return json(route, { access: 'smoke-access', refresh: '', user: current });
+      }
+      if (apiPath.endsWith('/users/logout/')) { current = null; return json(route, {}); }
+      if (apiPath.endsWith('/users/me/')) return current ? json(route, current) : json(route, { detail: 'Unauthenticated' }, 401);
+      if (isPath(apiPath, REFRESH_PATH)) return json(route, { detail: 'Unauthenticated' }, 401);
+      if (apiPath.endsWith('/public-hub/community/')) return json(route, [{ key: 'public', can_interact: true }]);
+      if (apiPath.endsWith('/posts/7/')) return json(route, post);
+      return json(route, request.method() === 'GET' ? empty : {});
+    });
+    await page.route((url) => url.pathname.startsWith('/dashboard'), (route) => (route.request().resourceType() === 'document'
+      ? route.fulfill({ contentType: 'text/html', body: '<main>Dashboard</main>' }) : route.fallback()));
+    const hubText = () => page.getByLabel('Post text');
+    const commentText = () => page.getByLabel('Write a comment');
+    // The composer remounts once the session resolves, so wait for the signed-in header first.
+    const signedIn = (name) => expect(page.locator('summary:visible', { hasText: name })).toBeVisible();
+    const openHub = async (name) => {
+      await page.goto('/hubs/public');
+      await signedIn(name);
+      const trigger = page.getByRole('button', { name: /Write something to/ });
+      await expect(trigger.or(hubText())).toBeVisible();
+      if (await trigger.isVisible()) await trigger.click();
+    };
+    const logout = async (name) => {
+      await page.locator('summary:visible', { hasText: name }).click();
+      await page.locator('button:visible', { hasText: 'Log out' }).click();
+      await expect(page.locator('summary', { hasText: name })).toHaveCount(0);
+    };
+    const login = async (user) => {
+      await page.goto('/login');
+      await page.getByLabel('Email').fill(user.email);
+      await page.getByLabel('Password').fill('test-password');
+      await page.locator('form button[type="submit"]').click();
+      await expect.poll(() => new URL(page.url()).pathname).not.toBe('/login');
+    };
+
+    await openHub('Alice');
+    await hubText().fill('A hub draft');
+    await page.goto('/hubs/posts/7');
+    await signedIn('Alice');
+    await commentText().fill('A comment draft');
+    // Sign-out on this page: the composer must drop the draft, not re-read it.
+    await logout('Alice');
+    await expect(commentText()).toHaveValue('');
+
+    await login(userA);
+    await openHub('Alice');
+    await expect(hubText()).toHaveValue('A hub draft');
+    await page.goto('/hubs/posts/7');
+    await signedIn('Alice');
+    await expect(commentText()).toHaveValue('A comment draft');
+    await logout('Alice');
+
+    await login(userB);
+    await openHub('Bob');
+    await expect(hubText()).toHaveValue('');
+    await page.goto('/hubs/posts/7');
+    await signedIn('Bob');
+    await expect(commentText()).toHaveValue('');
+    await expect(page.locator('body')).not.toContainText(/A (hub|comment) draft/);
+  });
+});
+
+test.describe('cross-tab sign-in', () => {
+  for (const sameUser of [true, false]) {
+    test(`another tab signing in ${sameUser ? 'as the same account keeps the mounted page' : 'as another account hides this tab until it reloads'}`, async ({ context }) => {
+      const user = JSON.parse(JSON.stringify(roleUsers.pharmacist));
+      const first = await context.newPage();
+      const second = await context.newPage();
+      await installApiFixture(first, user);
+      await installApiFixture(second, user);
+      await first.goto('/dashboard/pharmacist/overview');
+      await first.waitForLoadState('networkidle');
+      await second.goto('/dashboard/pharmacist/overview');
+      await second.waitForLoadState('networkidle');
+      await expect(first.locator('main')).toBeVisible();
+      await first.evaluate(() => { window.__ctMain = document.querySelector('main'); });
+
+      // Hold this tab's identity check so the hidden state can be observed.
+      let release;
+      const held = new Promise((resolve) => { release = resolve; });
+      let checked;
+      const checking = new Promise((resolve) => { checked = resolve; });
+      await first.route('**/users/me/', async (route) => { checked(); await held; await route.fallback(); });
+      if (!sameUser) Object.assign(user, JSON.parse(JSON.stringify(roleUsers.otherstaff)));
+      // What announceSession('login') writes in the tab that signed in.
+      await second.evaluate(() => localStorage.setItem('ct:session-event', JSON.stringify({ action: 'login', at: Date.now() })));
+      await checking;
+      await expect(first.locator('main')).toBeHidden();
+
+      if (sameUser) {
+        release();
+        await expect(first.locator('main')).toBeVisible();
+        expect(await first.evaluate(() => window.__ctMain === document.querySelector('main'))).toBe(true);
+      } else {
+        const navigation = first.waitForNavigation({ waitUntil: 'domcontentloaded' });
+        release();
+        await navigation;
+        await expect.poll(() => new URL(first.url()).pathname).toBe('/dashboard/otherstaff/overview');
+      }
+    });
+  }
 });
 
 test.describe('authenticated route skeleton', () => {
