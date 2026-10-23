@@ -13,7 +13,7 @@ export function addDashboardScopeParams(path: string, selectedPharmacyId: number
   if (isCalendar || isPostShift || isRoster) {
     params.set("pharmacy", String(selectedPharmacyId));
   }
-  if (isMyPharmacies) {
+  if (isMyPharmacies || (pathname.endsWith('/manage-pharmacies') && params.get('view') === 'detail')) {
     params.set("view", "detail");
     params.set("pharmacyId", String(selectedPharmacyId));
   }

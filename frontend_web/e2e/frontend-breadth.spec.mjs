@@ -508,6 +508,126 @@ for (const action of ['edit', 'delete']) {
   });
 }
 
+for (const outcome of ['failure', 'success']) {
+  test(`pharmacy cache isolates same-tab logout and login while the next user's request is delayed (${outcome})`, async ({ page }) => {
+    const ownerA = { ...roleUsers.owner, first_name: 'Account A' };
+    const ownerB = {
+      ...roleUsers.owner, id: 12, username: 'owner-b', email: 'owner-b@example.test',
+      memberships: [{ pharmacy_id: 102, pharmacy_name: 'Account B Pharmacy', role: 'OWNER' }],
+      pharmacies: [{ id: 102, name: 'Account B Pharmacy' }],
+    };
+    let currentUser = ownerA;
+    let releaseB;
+    const heldB = new Promise((resolve) => { releaseB = resolve; });
+    await installApiFixture(page, ownerA, async (route, { path }) => {
+      if (path.endsWith('/users/me/')) return json(route, currentUser ?? {}, currentUser ? 200 : 401);
+      if (path.endsWith('/users/logout/')) {
+        currentUser = null;
+        return json(route, {});
+      }
+      if (path.endsWith('/users/login/')) {
+        currentUser = ownerB;
+        return json(route, { access: 'owner-b-access', user: ownerB });
+      }
+      if (path.endsWith('/pharmacies/')) {
+        if (currentUser?.id === ownerB.id) {
+          await heldB;
+          return outcome === 'failure'
+            ? json(route, { detail: 'Unavailable' }, 503)
+            : json(route, [{ id: 102, name: 'Account B Pharmacy', can_edit: true }]);
+        }
+        return json(route, [{ id: 101, name: 'Private A Pharmacy', can_edit: true }]);
+      }
+      if (path.endsWith('/memberships/')) return json(route, currentUser?.id === ownerA.id ? [{
+        id: 901, role: 'PHARMACIST', employment_type: 'FULL_TIME', status: 'ACCEPTED', is_active: true,
+        user_details: { first_name: 'Private A Staff', email: 'staff-a@example.test' },
+      }] : []);
+      if (path.endsWith('/pharmacy-admins/')) return json(route, currentUser?.id === ownerA.id ? [{
+        id: 902, pharmacy: 101, admin_level: 'FULL_ADMIN', is_active: true,
+        user_details: { first_name: 'Private A Admin', email: 'admin-a@example.test' },
+      }] : []);
+    });
+    await page.goto('/dashboard/owner/manage-pharmacies?view=detail&pharmacyId=101&pharmacy_id=101');
+    await expect(page.getByText('Private A Pharmacy').first()).toBeVisible();
+    await page.getByRole('tab', { name: /^Staff/ }).click();
+    await expect(page.getByText('Private A Staff', { exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: /^Admins/ }).click();
+    await expect(page.getByText('Private A Admin', { exact: true })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => Object.values(sessionStorage).some(
+      (value) => value.includes('Private A Staff') && value.includes('Private A Admin'),
+    ))).toBe(true);
+
+    // Use the real logout flow and login form in this tab; sessionStorage survives navigation.
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/dashboard/owner/logout');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith('pharmacyPage.cache.')))).toEqual([]);
+    const trackLeaks = () => {
+      window.pharmacyLeaks = [];
+      new MutationObserver((records) => {
+        for (const record of records) {
+          for (const node of [record.target, ...record.addedNodes]) {
+            if (/Private A (Pharmacy|Staff|Admin)|staff-a@example.test|admin-a@example.test/.test(node.textContent || '')) {
+              window.pharmacyLeaks.push(node.textContent);
+            }
+          }
+        }
+      }).observe(document, { subtree: true, childList: true, characterData: true });
+    };
+    await page.addInitScript(trackLeaks);
+    await page.evaluate(trackLeaks);
+    await page.getByLabel('Email', { exact: true }).fill(ownerB.email);
+    await page.getByLabel('Password', { exact: true }).fill('test-password');
+    await page.getByRole('button', { name: 'Login', exact: true }).click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/dashboard/owner/overview');
+    const requestB = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith('/pharmacies/'));
+    await page.goto('/dashboard/owner/manage-pharmacies');
+    await requestB;
+    await expect(page.getByRole('main')).not.toContainText('Account B Pharmacy');
+    await expect(page.locator('body')).not.toContainText(/Private A (Pharmacy|Staff|Admin)/);
+    expect(await page.evaluate(() => window.pharmacyLeaks)).toEqual([]);
+    const responseB = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith('/pharmacies/'));
+    releaseB();
+    await responseB;
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('body')).not.toContainText(/Private A (Pharmacy|Staff|Admin)/);
+    expect(await page.evaluate(() => window.pharmacyLeaks)).toEqual([]);
+    if (outcome === 'success') await expect(page.getByRole('main').getByText('Account B Pharmacy', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => Object.entries(sessionStorage).filter(([key]) => key.startsWith('pharmacyPage.cache.')).some(
+      ([, value]) => /Private A (Pharmacy|Staff|Admin)/.test(value),
+    ))).toBe(false);
+  });
+}
+
+test('pharmacy detail shell selection keeps both scope params on the selected pharmacy without a loop', async ({ page }) => {
+  await installApiFixture(page, {
+    ...roleUsers.owner,
+    memberships: [101, 102].map((pharmacy_id) => ({ pharmacy_id, role: 'OWNER' })),
+  });
+  await page.route('**/api/v1/pharmacies/**', (route) => json(route, [
+    { id: 101, name: 'First Pharmacy', can_edit: true },
+    { id: 102, name: 'Second Pharmacy', can_edit: true },
+  ]));
+  await page.goto('/dashboard/owner/manage-pharmacies?view=detail&pharmacyId=101&pharmacy_id=101');
+  await expect(page.getByRole('heading', { name: 'First Pharmacy', exact: true })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  const navigations = [];
+  page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) navigations.push(frame.url()); });
+  await page.getByRole('button', { name: /Select pharmacy workspace/ }).click();
+  await page.getByRole('menu', { name: 'Available pharmacy workspaces' }).getByRole('menuitem', { name: /Second Pharmacy/ }).click();
+  await expect(page.getByRole('heading', { name: 'Second Pharmacy', exact: true })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  const params = new URL(page.url()).searchParams;
+  expect(params.get('pharmacyId')).toBe('102');
+  expect(params.get('pharmacy_id')).toBe('102');
+  expect(params.get('view')).toBe('detail');
+  expect(navigations.length).toBeGreaterThan(0);
+  expect(navigations.length).toBeLessThanOrEqual(3);
+  expect(navigations.every((url) => new URL(url).searchParams.get('pharmacyId') === '102')).toBe(true);
+});
+
 test('pharmacy view=detail link survives a cold load', async ({ page }) => {
   await installApiFixture(page, roleUsers.owner);
   await page.route('**/api/v1/pharmacies/**', (route) => json(route, [{ id: 101, name: 'Linked Pharmacy', can_edit: true }]));

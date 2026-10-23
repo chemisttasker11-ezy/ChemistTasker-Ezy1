@@ -26,6 +26,7 @@ import {
 import { AdminCapability } from "../constants/adminCapabilities";
 import { API_BASE_URL } from "../constants/api";
 import { browserSessionCurrentUser } from '@chemisttasker/shared-core';
+import { clearPharmacyPageCache } from "../utils/pharmacyPageCache";
 import { setTokens, clearTokens, refreshCookieSession, restoreTokensFromStorage, getAccessToken, getRefreshToken, AUTH_TOKENS_CLEARED_EVENT, AUTH_TOKENS_UPDATED_EVENT } from "../utils/tokenService";
 
 export interface OrgMembership {
@@ -149,12 +150,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [activeAdminAssignmentId, setActiveAdminAssignmentId] = useState<number | null>(null);
 
   const clearLocalAuthState = useCallback(() => {
+    clearPharmacyPageCache();
     setAccess(null);
     setRefresh(null);
     setUser(null);
     setActivePersonaState("staff");
     setActiveAdminAssignmentId(null);
   }, []);
+
+  // Retain same-session reloads, but discard snapshots when leaving an identity/persona.
+  useEffect(() => {
+    if (user?.id != null) return clearPharmacyPageCache;
+  }, [user?.id, user?.role, activePersona, activeAdminAssignmentId]);
 
   const fetchCurrentUser = useCallback(async (cookieOnly = false): Promise<User | null> => {
     const token = cookieOnly ? null : getAccessToken();
@@ -258,6 +265,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // dashboard is still open. Reload before rendering that identity so no account-scoped
           // chat, form or dialog state from the previous user survives into the new session.
           if (user?.id != null && current.id != null && user.id !== current.id) {
+            clearPharmacyPageCache();
             window.location.reload();
             return;
           }
@@ -415,6 +423,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const login = (newAccess: string, newRefresh: string, userInfo: User, rememberMe?: boolean) => {
+    clearPharmacyPageCache();
     setTokens(newAccess, newRefresh, rememberMe);
     setAccess(newAccess);
     setRefresh(newRefresh);

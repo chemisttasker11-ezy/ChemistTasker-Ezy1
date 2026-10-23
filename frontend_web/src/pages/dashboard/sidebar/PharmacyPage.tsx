@@ -86,9 +86,9 @@ import {
   RATE_MINIMUM_EXAMPLE,
   GOVERNMENT_AWARD_GUIDE_URL,
   prettifyOptionLabel,
-  PHARMACY_CACHE_KEY,
 } from "./PharmacyPage.model";
 import { brandPanelBackground } from "../../../components/ui/BrandBanner";
+import { PHARMACY_CACHE_KEY } from "../../../utils/pharmacyPageCache";
 
 const GOOGLE_LIBRARIES = ["places"] as Array<"places">;
 const LIGHT_SURFACE = "#FFFFFF";
@@ -177,12 +177,23 @@ type PharmacyPageProps = {
   targetPharmacyCount?: number;
 };
 
-export default function PharmacyPage({
+export default function PharmacyPage(props: PharmacyPageProps) {
+  const { user, activePersona, activeAdminAssignmentId } = useAuth();
+  if (user?.id == null) return null;
+  // Identity and scope only: a focus re-check that refreshes memberships must not remount open dialogs.
+  const cacheOwner = JSON.stringify([user.id, user.role, activePersona, activeAdminAssignmentId]);
+  // Remount before rendering a different identity/scope, including its team and admin state.
+  return <PharmacyPageContent key={cacheOwner} {...props} cacheOwner={cacheOwner} />;
+}
+
+function PharmacyPageContent({
   standalone = false,
   onNeedsOnboardingPath = "/onboarding/owner",
   onCompletePath = "/dashboard/owner/overview",
   targetPharmacyCount = 1,
-}: PharmacyPageProps) {
+  cacheOwner,
+}: PharmacyPageProps & { cacheOwner: string }) {
+  const cacheKey = `${PHARMACY_CACHE_KEY}:${cacheOwner}`;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAdminUser, activePersona, activeAdminPharmacyId, activeAdminAssignment } = useAuth();
@@ -1359,13 +1370,15 @@ export default function PharmacyPage({
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const cachedRaw = sessionStorage.getItem(PHARMACY_CACHE_KEY);
+      const cachedRaw = sessionStorage.getItem(cacheKey);
       if (!cachedRaw) return;
       const cached = JSON.parse(cachedRaw) as {
+        owner?: string;
         pharmacies?: Pharmacy[];
         memberships?: Record<string, MembershipDTO[]>;
         admin_assignments?: Record<string, PharmacyAdminDTO[]>;
       };
+      if (cached.owner !== cacheOwner) return;
       if (Array.isArray(cached.pharmacies)) {
         const normalized = cached.pharmacies.map((ph) => normalizePharmacy(ph));
         setPharmacies(scopePharmacies(normalized));
@@ -1508,15 +1521,16 @@ export default function PharmacyPage({
     if (!initialLoadComplete) return;
     try {
       const payload = JSON.stringify({
+        owner: cacheOwner,
         pharmacies,
         memberships: membershipsByPharmacy,
         admin_assignments: adminAssignmentsByPharmacy,
       });
-      sessionStorage.setItem(PHARMACY_CACHE_KEY, payload);
+      sessionStorage.setItem(cacheKey, payload);
     } catch (error) {
       console.error("Failed to persist pharmacy cache", error);
     }
-  }, [pharmacies, membershipsByPharmacy, adminAssignmentsByPharmacy, initialLoadComplete]);
+  }, [cacheKey, cacheOwner, pharmacies, membershipsByPharmacy, adminAssignmentsByPharmacy, initialLoadComplete]);
 
   const openPharmacy = useCallback(
     (pharmacyId: string, options?: { replace?: boolean }) => {
