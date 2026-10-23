@@ -724,7 +724,7 @@ export default function PharmacyForm({
             const conflictId = err instanceof ApiError && err.status === 409
                 ? (err.payload as { pharmacy_id?: number } | null)?.pharmacy_id : null;
             if (mode === 'create' && conflictId != null) {
-                createIdempotencyKeyRef.current = null;
+                // Key kept: the edit route replaces this form; until then a retry must replay this 409, never create.
                 // The alert, not inline text, survives the navigation to the saved pharmacy below.
                 Alert.alert('Pharmacy already saved', 'This pharmacy was already saved earlier with different details. Re-apply your changes in the saved pharmacy.');
                 // Owner setup (/setup/owner/...) has no edit route of its own; use the role's.

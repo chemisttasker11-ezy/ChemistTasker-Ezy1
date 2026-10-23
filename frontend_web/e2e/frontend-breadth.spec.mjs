@@ -557,6 +557,42 @@ test('pharmacy create asks for a retry after a lost response and shows one alrea
   expect(createKeys[1]).toBe(createKeys[0]);
 });
 
+test('pharmacy create keeps its key when the 409 recovery read fails', async ({ page }) => {
+  await installApiFixture(page, roleUsers.owner);
+  const createKeys = [];
+  await page.route('**/api/v1/pharmacies/**', (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === 'POST' && path.endsWith('/pharmacies/')) {
+      createKeys.push(request.headers()['idempotency-key']);
+      return json(route, { detail: 'Idempotency-Key was already used with different details.', pharmacy_id: 202 }, 409);
+    }
+    if (path.endsWith('/pharmacies/202/')) return route.abort('failed');
+    if (path.endsWith('/pharmacies/101/')) return json(route, { id: 101, name: 'Saved Pharmacy', can_edit: true });
+    return json(route, [{ id: 101, name: 'Saved Pharmacy', can_edit: true }]);
+  });
+  await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101');
+  await page.getByRole('button', { name: 'Add Pharmacy' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Pharmacy Name').fill('New Pharmacy');
+  await dialog.getByRole('button', { name: 'Next' }).click();
+  await dialog.getByLabel('ABN').first().fill('51824753556');
+  for (let tab = 1; tab < 5; tab += 1) await dialog.getByRole('button', { name: 'Next' }).click();
+  for (const label of ['Weekday Rate', 'Saturday Rate', 'Sunday Rate', 'Public Holiday Rate']) {
+    await dialog.getByLabel(label).fill('50');
+  }
+  await dialog.getByRole('button', { name: 'Next' }).click();
+  const create = dialog.getByRole('button', { name: 'Create Pharmacy' });
+  const notOpened = page.getByText('The saved pharmacy could not be opened.', { exact: false });
+
+  await create.click();
+  await expect(notOpened).toBeVisible();
+  await create.click();
+  await expect.poll(() => createKeys.length).toBe(2);
+  await expect(notOpened).toBeVisible();
+  expect(createKeys[1]).toBe(createKeys[0]);
+});
+
 // Calendar, post-shift and roster links carry their own `pharmacy` param (dashboardRouteScope, roster emails).
 for (const [name, path] of [
   ['roster email', '/dashboard/owner/manage-pharmacies/roster?pharmacy=102'],

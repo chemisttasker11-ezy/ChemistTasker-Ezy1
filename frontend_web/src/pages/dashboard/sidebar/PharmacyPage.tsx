@@ -2027,7 +2027,7 @@ export default function PharmacyPage({
       const conflictId = err instanceof ApiError && err.status === 409
         ? (err.payload as { pharmacy_id?: number } | null)?.pharmacy_id : null;
       if (!editing && conflictId != null) {
-        createIdempotencyKeyRef.current = null;
+        // Keep the key until the saved pharmacy opens (openDialog clears it): a retry must replay this 409, never create.
         const message = 'This pharmacy was already saved earlier with different details. Re-apply your changes in the saved pharmacy.';
         try {
           const saved = normalizePharmacy(await getPharmacyById(conflictId));
@@ -2039,7 +2039,7 @@ export default function PharmacyPage({
             setError(message);
           }
         } catch {
-          setError(`${message} The saved pharmacy could not be opened. Refresh and try again.`);
+          setError(`${message} The saved pharmacy could not be opened. Press Save again to retry — it won't create a duplicate.`);
         }
         return false;
       }
