@@ -538,6 +538,9 @@ test.describe('public/auth wiring', () => {
         if (request.method() === 'GET') return json(route, { results: [], count: 0, next: null, previous: null });
         return json(route, {});
       });
+      // The hermetic Next server has no dashboard: keep a full-page hand-off on this origin so storage stays readable.
+      await page.route((url) => url.pathname.startsWith('/dashboard'), (route) => (route.request().resourceType() === 'document'
+        ? route.fulfill({ contentType: 'text/html', body: '<main>Dashboard</main>' }) : route.fallback()));
       await page.goto('/login');
       await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
       const personal = {
