@@ -513,7 +513,8 @@ test.describe('public/auth wiring', () => {
     await expect(button).toHaveText('Login');
     await button.click();
     await expect(button).toBeDisabled();
-    expect(loginPosts).toBe(1);
+    // The button disables before the POST fires (it waits on the CSRF GET), so wait for it.
+    await expect.poll(() => loginPosts).toBe(1);
 
     releaseLogin();
     await expect(loginAlert(page)).toContainText('Invalid credentials');
