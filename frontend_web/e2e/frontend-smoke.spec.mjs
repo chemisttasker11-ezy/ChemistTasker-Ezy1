@@ -668,6 +668,47 @@ test.describe('login keeps hub drafts per account', () => {
     await values(commentText()).toEqual(['']);
     await expect(page.locator('body')).not.toContainText(/A (hub|comment) draft/);
   });
+
+  test("cross-tab login drops A's identity and draft while the check is slow and after it fails", async ({ context }) => {
+    const userA = { ...roleUsers.pharmacist, id: 4, first_name: 'Alice' };
+    const page = await context.newPage();
+    const other = await context.newPage();
+    for (const tab of [page, other]) {
+      await tab.route('**/api/**', async (route) => {
+        const apiPath = new URL(route.request().url()).pathname;
+        if (apiPath.endsWith('/users/me/')) return json(route, userA);
+        if (apiPath.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+        if (apiPath.endsWith('/public-hub/community/')) return json(route, [{ key: 'public', can_interact: true }]);
+        return json(route, route.request().method() === 'GET' ? empty : {});
+      });
+    }
+    const alice = page.locator('summary:visible', { hasText: 'Alice' });
+    const boxes = () => page.locator('textarea').evaluateAll((all) => all.map((box) => box.value));
+    await page.goto('/hubs/public');
+    await expect(alice).toBeVisible();
+    const trigger = page.getByRole('button', { name: /Write something to/ });
+    await expect(trigger.or(page.getByLabel('Post text')).first()).toBeVisible();
+    if (await trigger.isVisible()) await trigger.click();
+    await page.getByLabel('Post text').fill('A hub draft');
+    await other.goto('/hubs/public');
+
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    let checked;
+    const checking = new Promise((resolve) => { checked = resolve; });
+    await page.route('**/users/me/', async (route) => { checked(); await held; await json(route, { detail: 'Unavailable' }, 503); });
+    // What announceSession('login') writes in the tab that signed in.
+    await other.evaluate(() => localStorage.setItem('ct:session-event', JSON.stringify({ action: 'login', at: Date.now() })));
+    await checking;
+    await expect(page.locator('summary', { hasText: 'Alice' })).toHaveCount(0);
+    await expect.poll(boxes).not.toContain('A hub draft');
+
+    const failed = page.waitForResponse((response) => response.url().endsWith('/users/me/') && response.status() === 503);
+    release();
+    await failed;
+    await expect(page.locator('summary', { hasText: 'Alice' })).toHaveCount(0);
+    await expect.poll(boxes).not.toContain('A hub draft');
+  });
 });
 
 test.describe('cross-tab sign-in', () => {
@@ -709,6 +750,26 @@ test.describe('cross-tab sign-in', () => {
       }
     });
   }
+
+  test('a stalled identity check after another tab signs in shows the Reconnect prompt', async ({ context }) => {
+    test.setTimeout(60_000);
+    const user = roleUsers.pharmacist;
+    const first = await context.newPage();
+    const second = await context.newPage();
+    await installApiFixture(first, user);
+    await installApiFixture(second, user);
+    await first.goto('/dashboard/pharmacist/overview');
+    await first.waitForLoadState('networkidle');
+    await second.goto('/dashboard/pharmacist/overview');
+    await second.waitForLoadState('networkidle');
+    await expect(first.locator('main')).toBeVisible();
+
+    // Never answer: only the client-side timeout can end the check.
+    await first.route('**/users/me/', () => {});
+    await second.evaluate(() => localStorage.setItem('ct:session-event', JSON.stringify({ action: 'login', at: Date.now() })));
+    await expect(first.locator('main')).toBeHidden();
+    await expect(first.getByRole('button', { name: 'Reconnect' })).toBeVisible({ timeout: 30_000 });
+  });
 });
 
 test.describe('authenticated route skeleton', () => {
