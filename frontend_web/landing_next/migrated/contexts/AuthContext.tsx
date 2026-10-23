@@ -1,4 +1,4 @@
-import {logoutSession} from '../../shared/browser-session';
+import {claimUserBrowserStorage, logoutSession} from '../../shared/browser-session';
 // src/contexts/AuthContext.tsx
 
 import {
@@ -275,6 +275,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
 
+        claimUserBrowserStorage(parsedUser.id);
         setAccess(getAccessToken());
         setRefresh(getRefreshToken());
         setUser(parsedUser);
@@ -470,6 +471,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const login = (newAccess: string, newRefresh: string, userInfo: User, rememberMe?: boolean) => {
+    claimUserBrowserStorage(userInfo.id);
     setTokens(newAccess, newRefresh, rememberMe);
     setAccess(newAccess);
     setRefresh(newRefresh);

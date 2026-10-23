@@ -42,7 +42,8 @@ export default function CommunityFeed({hub,label,initial}:{hub:string;label:stri
  const textRef=useRef<HTMLTextAreaElement>(null);const fileRef=useRef<HTMLInputElement>(null);
  const meName=`${session.user?.first_name||''} ${session.user?.last_name||''}`.trim();
  const reload=useCallback(async()=>setFeed(await chemistTaskerApi.publicContent.listCommunityPosts(hub,{page,q:search}) as Page<PublicPost>),[hub,page,search,session.status]);
- useEffect(()=>{const draft=sessionStorage.getItem(`ct:hub-draft:${hub}`)||'';setBody(draft);if(draft)setComposerOpen(true);},[hub]);
+ // Read drafts only after the session check, which wipes another account's storage.
+ useEffect(()=>{if(session.status==='loading')return;const draft=sessionStorage.getItem(`ct:hub-draft:${hub}`)||'';setBody(draft);if(draft)setComposerOpen(true);},[hub,session.status,session.user?.id]);
  const loadPolls=useCallback(async()=>setPolls(await chemistTaskerApi.publicContent.listCommunityPolls(hub,{page:pollPage}) as Page<Poll>),[hub,pollPage]);
  useEffect(()=>{reload().catch(e=>setError(e.message));},[reload]);useEffect(()=>{loadPolls().catch(e=>setError(e.message));},[loadPolls]);
  useEffect(()=>{chemistTaskerApi.publicContent.listHubs().then(h=>setAllowed(!!h.find(x=>x.key===hub)?.can_interact)).catch(e=>setError(e.message));},[hub,session.status]);
@@ -113,7 +114,7 @@ export default function CommunityFeed({hub,label,initial}:{hub:string;label:stri
 export function PostPage({initial}:{initial:PublicPost}){
  const session=useSession();
  const [post,setPost]=useState(initial);const [comments,setComments]=useState<Page<Comment>>();const [page,setPage]=useState(1);const [body,setBody]=useState('');const [reply,setReply]=useState<Comment|null>(null);const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [report,setReport]=useState('');const [reportOpen,setReportOpen]=useState(false);const [message,setMessage]=useState('');const [editing,setEditing]=useState<number|'post'|null>(null);const [editBody,setEditBody]=useState('');const [confirmRemove,setConfirmRemove]=useState<number|'post'|null>(null);
- useEffect(()=>{setBody(sessionStorage.getItem(`ct:comment-draft:${initial.id}`)||'');},[initial.id]);
+ useEffect(()=>{if(session.status!=='loading')setBody(sessionStorage.getItem(`ct:comment-draft:${initial.id}`)||'');},[initial.id,session.status,session.user?.id]);
  const reload=useCallback(async()=>{const [p,c]=await Promise.all([chemistTaskerApi.publicContent.getPost(initial.id) as Promise<PublicPost>,chemistTaskerApi.publicContent.listPostComments(initial.id,{page}) as Promise<Page<Comment>>]);setPost(p);setComments(c);},[initial.id,page,session.status]);useEffect(()=>{reload().catch(e=>setError(e.message));},[reload]);
  async function run(action:()=>Promise<unknown>,clearCommentDraft=false){setBusy(true);setError('');try{await action();if(clearCommentDraft){setBody('');sessionStorage.removeItem(`ct:comment-draft:${post.id}`);setReply(null);}setEditing(null);setConfirmRemove(null);await reload();}catch(e){setError((e as Error).message);if((e as {status?:number}).status===401)window.location.assign(loginHref(`/hubs/posts/${post.id}`));}finally{setBusy(false);}}
  async function sendReport(){setBusy(true);setError('');try{await chemistTaskerApi.publicContent.reportPost(post.id,{reason:report});setMessage('Report received. A publisher will review it.');setReportOpen(false);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}

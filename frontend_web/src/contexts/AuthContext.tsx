@@ -1,5 +1,5 @@
 import { AhpraProvider } from './AhpraContext';
-import {bearerBelongsToDifferentUser, logoutSession} from '../../landing_next/shared/browser-session';
+import {bearerBelongsToDifferentUser, claimUserBrowserStorage, logoutSession} from '../../landing_next/shared/browser-session';
 // src/contexts/AuthContext.tsx
 
 import {
@@ -230,6 +230,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
 
+        claimUserBrowserStorage(parsedUser.id);
         setAccess(getAccessToken());
         setRefresh(getRefreshToken());
         setUser(parsedUser);
@@ -260,12 +261,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           clearTokens();
           clearLocalAuthState();
         } else {
+          claimUserBrowserStorage(current.id);
           // Keeping the mounted page is safe only while the authenticated identity is unchanged.
           // A different account can be established in another tab / the shared Next site while this
           // dashboard is still open. Reload before rendering that identity so no account-scoped
           // chat, form or dialog state from the previous user survives into the new session.
           if (user?.id != null && current.id != null && user.id !== current.id) {
-            clearPharmacyPageCache();
             window.location.reload();
             return;
           }
@@ -423,7 +424,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const login = (newAccess: string, newRefresh: string, userInfo: User, rememberMe?: boolean) => {
-    clearPharmacyPageCache();
+    claimUserBrowserStorage(userInfo.id);
     setTokens(newAccess, newRefresh, rememberMe);
     setAccess(newAccess);
     setRefresh(newRefresh);

@@ -520,6 +520,56 @@ test.describe('public/auth wiring', () => {
     await expect(button).toBeEnabled();
   });
 
+  for (const previousOwner of ['9001', null]) {
+    test(`login ${previousOwner ? 'as another account wipes the previous account' : 'after browsing anonymously keeps the visitor'}'s browser storage`, async ({ page }) => {
+      const userB = roleUsers.pharmacist;
+      let current = null;
+      await page.route('**/api/**', async (route) => {
+        const request = route.request();
+        const apiPath = new URL(request.url()).pathname;
+        if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
+          current = userB;
+          return json(route, { access: 'smoke-access', refresh: '', user: userB });
+        }
+        if (apiPath.endsWith('/users/me/') && current) return json(route, current);
+        const bootstrap = await installLoggedOutBootstrap(route);
+        if (bootstrap) return bootstrap;
+        if (request.method() === 'GET') return json(route, { results: [], count: 0, next: null, previous: null });
+        return json(route, {});
+      });
+      await page.goto('/login');
+      await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+      const personal = {
+        local: ['saved_shift_ids', 'applied_shift_ids', 'applied_slot_ids', 'rejected_shift_ids', 'rejected_slot_ids', 'counter_offer_map'],
+        session: ['owner-pharmacy-setup-skipped', 'ct:hub-draft:community', 'ct:comment-draft:7', 'ct:route:/shifts'],
+      };
+      const device = ['ct-theme-mode', 'ct-dashboard-sidebar-collapsed', 'ct:shift-skill-preset:v1:9001:PHARMACIST'];
+      await page.evaluate(({ personal, device, previousOwner }) => {
+        for (const key of personal.local) localStorage.setItem(key, '[101]');
+        for (const key of personal.session) sessionStorage.setItem(key, 'Private A text');
+        for (const key of device) localStorage.setItem(key, 'dark');
+        if (previousOwner) { localStorage.setItem('ct:storage-owner', previousOwner); sessionStorage.setItem('ct:storage-owner', previousOwner); }
+      }, { personal, device, previousOwner });
+
+      await page.getByLabel('Email').fill(userB.email);
+      await page.getByLabel('Password').fill('test-password');
+      await page.locator('form button[type="submit"]').click();
+      await expect.poll(() => new URL(page.url()).pathname).not.toBe('/login');
+      await page.waitForLoadState('networkidle');
+
+      // The signed-in app may rewrite its own markers (e.g. to "[]"); only the first account's values matter.
+      const left = await page.evaluate(({ personal, device }) => ({
+        personal: [...personal.local.filter((key) => localStorage.getItem(key) === '[101]'), ...personal.session.filter((key) => sessionStorage.getItem(key) === 'Private A text')],
+        device: device.filter((key) => localStorage.getItem(key) === 'dark'),
+        owner: localStorage.getItem('ct:storage-owner'),
+      }), { personal, device });
+      if (previousOwner) expect(left.personal).toEqual([]);
+      else expect(left.personal).toEqual(expect.arrayContaining(['ct:hub-draft:community', 'ct:comment-draft:7']));
+      expect(left.device).toEqual(device);
+      expect(left.owner).toBe(String(userB.id));
+    });
+  }
+
 });
 
 test.describe('authenticated route skeleton', () => {

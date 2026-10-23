@@ -556,6 +556,11 @@ for (const outcome of ['failure', 'success']) {
     await expect.poll(() => page.evaluate(() => Object.values(sessionStorage).some(
       (value) => value.includes('Private A Staff') && value.includes('Private A Admin'),
     ))).toBe(true);
+    await page.evaluate(() => {
+      for (const key of ['saved_shift_ids', 'applied_shift_ids', 'applied_slot_ids', 'rejected_shift_ids', 'rejected_slot_ids', 'counter_offer_map']) localStorage.setItem(key, '[101]');
+      for (const key of ['owner-pharmacy-setup-skipped', 'ct:hub-draft:community', 'ct:comment-draft:7', 'ct:route:/shifts']) sessionStorage.setItem(key, 'Private A draft');
+      localStorage.setItem('ct-theme-mode', 'dark');
+    });
 
     // Use the real logout flow and login form in this tab; sessionStorage survives navigation.
     await page.evaluate(() => {
@@ -564,6 +569,11 @@ for (const outcome of ['failure', 'success']) {
     });
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith('pharmacyPage.cache.')))).toEqual([]);
+    expect(await page.evaluate(() => [
+      ...Object.values(localStorage).filter((value) => value === '[101]'),
+      ...Object.values(sessionStorage).filter((value) => value === 'Private A draft'),
+    ])).toEqual([]);
+    expect(await page.evaluate(() => localStorage.getItem('ct-theme-mode'))).toBe('dark');
     const trackLeaks = () => {
       window.pharmacyLeaks = [];
       new MutationObserver((records) => {
