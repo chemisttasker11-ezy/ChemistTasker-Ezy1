@@ -88,7 +88,7 @@ import {
   prettifyOptionLabel,
 } from "./PharmacyPage.model";
 import { brandPanelBackground } from "../../../components/ui/BrandBanner";
-import { PHARMACY_CACHE_KEY } from "../../../utils/pharmacyPageCache";
+import { clearPharmacyPageCache } from "../../../utils/pharmacyPageCache";
 
 const GOOGLE_LIBRARIES = ["places"] as Array<"places">;
 const LIGHT_SURFACE = "#FFFFFF";
@@ -181,9 +181,9 @@ export default function PharmacyPage(props: PharmacyPageProps) {
   const { user, activePersona, activeAdminAssignmentId } = useAuth();
   if (user?.id == null) return null;
   // Identity and scope only: a focus re-check that refreshes memberships must not remount open dialogs.
-  const cacheOwner = JSON.stringify([user.id, user.role, activePersona, activeAdminAssignmentId]);
+  const scopeKey = JSON.stringify([user.id, user.role, activePersona, activeAdminAssignmentId]);
   // Remount before rendering a different identity/scope, including its team and admin state.
-  return <PharmacyPageContent key={cacheOwner} {...props} cacheOwner={cacheOwner} />;
+  return <PharmacyPageContent key={scopeKey} {...props} />;
 }
 
 function PharmacyPageContent({
@@ -1371,9 +1371,7 @@ function PharmacyPageContent({
   // a fresh server authorisation check, and remove legacy snapshots immediately.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    for (const key of Object.keys(sessionStorage)) {
-      if (key.startsWith(PHARMACY_CACHE_KEY)) sessionStorage.removeItem(key);
-    }
+    clearPharmacyPageCache();
   }, []);
 
   const loadMembers = useCallback(

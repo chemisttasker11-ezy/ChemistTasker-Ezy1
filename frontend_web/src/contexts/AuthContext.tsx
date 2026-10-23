@@ -159,11 +159,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setActiveAdminAssignmentId(null);
   }, []);
 
-  // Retain same-session reloads, but discard snapshots when leaving an identity/persona.
-  useEffect(() => {
-    if (user?.id != null) return clearPharmacyPageCache;
-  }, [user?.id, user?.role, activePersona, activeAdminAssignmentId]);
-
   const fetchCurrentUser = useCallback(async (cookieOnly = false): Promise<User | null> => {
     const token = cookieOnly ? null : getAccessToken();
     if (!cookieOnly && !token) return null;

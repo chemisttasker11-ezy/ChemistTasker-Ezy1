@@ -1,5 +1,4 @@
-export const PHARMACY_CACHE_KEY = 'pharmacyPage.cache.v3';
-
+// The pharmacy page no longer caches; this only removes snapshots written by older releases.
 export function clearPharmacyPageCache() {
   try {
     for (const key of Object.keys(sessionStorage)) {
