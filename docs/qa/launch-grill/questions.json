@@ -919,6 +919,62 @@
         }
        ],
        "current": "Today Tom's pharmacist details are sent but the server drops them, so they are lost. A manager adding an intern, technician, assistant or student profile lands on a not-found page. Profile tabs otherwise match on web and mobile."
+      },
+      {
+       "id": "ON-M01",
+       "q": "Sara uses the shared computer at Tom's Pharmacy. Sara half-writes a community hub post, signs out without posting, and Tom signs in on the same browser tab. Later Sara signs back in there. What should happen to Sara's unsent text?",
+       "context": "Keeping the text saves Sara retyping, but it stays on a shared computer after Sara signs out.",
+       "gap": "",
+       "type": "decision",
+       "options": [
+        {
+         "key": "KEEP",
+         "label": "Keep it like today",
+         "detail": "Sara's text waits, unseen by Tom, until the tab is closed."
+        },
+        {
+         "key": "A",
+         "label": "Sara's text is deleted on sign-out",
+         "detail": "Nothing stays on the shared computer; Sara retypes anything unsent."
+        },
+        {
+         "key": "B",
+         "label": "Sara chooses when signing out",
+         "detail": "Signing out with unsent text asks Sara to keep or delete it."
+        }
+       ],
+       "rec": "KEEP",
+       "recWhy": "Hub posts and comments are public once sent, so unsent text is low risk, and Tom cannot see it. Deleting it on sign-out would frustrate staff who share one dispensary computer.",
+       "sources": [],
+       "current": "Today drafts are kept per person, so Tom never sees Sara's text. Sara gets the hub post and comment text back on signing in again before the tab is closed; closing it deletes them. Attached files are not kept."
+      },
+      {
+       "id": "ON-M02",
+       "q": "Lina and Grace share the head office computer and browser. Lina is part-way through editing Tom's pharmacy details in one tab. Grace, in another tab, signs Lina out and signs in as Grace. What should happen to Lina's open tab?",
+       "context": "One browser holds one signed-in account, so two people on one computer can lose each other's open work.",
+       "gap": "",
+       "type": "decision",
+       "options": [
+        {
+         "key": "KEEP",
+         "label": "Keep it like today",
+         "detail": "Lina's tab switches to Grace at once; Lina's unsaved edits are lost."
+        },
+        {
+         "key": "A",
+         "label": "Lina's tab warns and keeps the edits",
+         "detail": "Lina's tab says who signed in and shows the unsaved edits to copy, without saving them as Grace."
+        },
+        {
+         "key": "B",
+         "label": "Lina and Grace each stay signed in",
+         "detail": "Each tab keeps its own account; a large change to how sign-in works."
+        }
+       ],
+       "rec": "KEEP",
+       "recWhy": "One account per browser stops Grace acting with Lina's wider organisation rights, and Lina's screens hide at once. Lost edits are rare; people sharing a computer can use separate browser profiles.",
+       "sources": [],
+       "current": "Today one browser holds one account. When Grace signs in, Lina's open tab hides its screens at once, checks who is signed in and reloads as Grace, so Lina's unsaved edits are lost. If that check stalls for 20 seconds, a Reconnect prompt shows."
       }
      ]
     }
