@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
 from shifts.finalize import finalize_shift_offer
+from onboarding.verification.state import lock_public_ahpra
 from shifts.emails import send_shift_payment_finalized_notifications
 from rewards.services import (
     claim_referral_code,
@@ -214,19 +215,19 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
                 raise DRFValidationError({"detail": "One or more selected slots do not require payment."})
         payment_units = max(1, len(offer_ids) or len(slot_ids))
         ledgers = []
-        try:
-            for _ in range(payment_units):
-                ledgers.append(spend_pills_for_shift_post(user=request.user, shift=shift))
-        except RewardError as exc:
-            raise DRFValidationError({
-                "detail": str(exc),
-                "code": "insufficient_pills" if "Insufficient" in str(exc) else "pill_payment_failed",
-                "balance": get_pill_balance(request.user),
-                "required": get_shift_post_pill_cost() * payment_units,
-            })
         finalized_count = 0
         finalized_offers = []
         with transaction.atomic():
+            try:
+                for _ in range(payment_units):
+                    ledgers.append(spend_pills_for_shift_post(user=request.user, shift=shift))
+            except RewardError as exc:
+                raise DRFValidationError({
+                    "detail": str(exc),
+                    "code": "insufficient_pills" if "Insufficient" in str(exc) else "pill_payment_failed",
+                    "balance": get_pill_balance(request.user),
+                    "required": get_shift_post_pill_cost() * payment_units,
+                })
             pending_offers = ShiftOffer.objects.filter(
                 shift=shift,
                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -237,6 +238,7 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
                 pending_offers = pending_offers.filter(slot_id__in=slot_ids)
             selected_slot_ids = set()
             for offer in pending_offers:
+                lock_public_ahpra(offer.user, shift, manager=True)
                 finalize_shift_offer(offer)
                 finalized_offers.append(offer)
                 if offer.slot_id:
