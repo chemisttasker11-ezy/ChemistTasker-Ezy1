@@ -178,10 +178,12 @@ type PharmacyPageProps = {
 };
 
 export default function PharmacyPage(props: PharmacyPageProps) {
-  const { user, activePersona, activeAdminAssignmentId } = useAuth();
+  const { user, activePersona, activeAdminAssignmentId, activeAdminPharmacyId } = useAuth();
   if (user?.id == null) return null;
-  // Identity and scope only: a focus re-check that refreshes memberships must not remount open dialogs.
-  const scopeKey = JSON.stringify([user.id, user.role, activePersona, activeAdminAssignmentId]);
+  // Identity and scope ids only: a focus re-check that refreshes membership details must not remount open dialogs.
+  const orgScope = (Array.isArray(user.memberships) ? user.memberships : []).flatMap((m: any) =>
+    m?.organization_id != null ? [[m.organization_id, m.role]] : []);
+  const scopeKey = JSON.stringify([user.id, user.role, activePersona, activeAdminAssignmentId, activeAdminPharmacyId, orgScope]);
   // Remount before rendering a different identity/scope, including its team and admin state.
   return <PharmacyPageContent key={scopeKey} {...props} />;
 }

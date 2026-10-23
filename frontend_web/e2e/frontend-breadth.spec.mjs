@@ -568,6 +568,46 @@ test('pharmacy edit dialog closes when a same-user focus refetch no longer retur
   await expect(page.getByRole('main')).not.toContainText('Revoked Pharmacy');
 });
 
+test('pharmacy never shows the previous organisation scope after a same-user org scope change', async ({ page }) => {
+  const orgMembership = (organization_id, pharmacyId) => ({
+    id: 1100 + organization_id, organization_id, role: 'ORG_STAFF', capabilities: baseCapabilities, pharmacies: [{ id: pharmacyId }],
+  });
+  const user = { ...roleUsers.owner, memberships: [orgMembership(301, 101)] };
+  let switched = false;
+  let releaseFresh;
+  const heldFresh = new Promise((resolve) => { releaseFresh = resolve; });
+  await installApiFixture(page, user, async (route, { path, method }) => {
+    if (method !== 'GET') return undefined;
+    if (path.endsWith('/memberships/')) return json(route, [{
+      id: 501, role: 'PHARMACIST', status: 'ACCEPTED', is_active: true,
+      user_details: { first_name: switched ? 'Org B Staff' : 'Org A Staff' },
+    }]);
+    if (path.endsWith('/pharmacies/')) {
+      if (switched) await heldFresh;
+      return json(route, [{ id: 101, name: 'Org A Pharmacy', can_edit: true }, { id: 102, name: 'Org B Pharmacy', can_edit: true }]);
+    }
+    return undefined;
+  });
+  await page.goto('/dashboard/owner/manage-pharmacies?view=detail&pharmacyId=101&pharmacy_id=101');
+  await expect(page.getByRole('main').getByText('Org A Pharmacy').first()).toBeVisible();
+  await page.getByRole('tab', { name: /^Staff/ }).click();
+  await expect(page.getByText('Org A Staff', { exact: true })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+
+  // Same user, same role; only the organisation scope changes on the focus re-check.
+  switched = true;
+  user.memberships = [orgMembership(302, 102)];
+  const requested = page.waitForRequest((request) => request.method() === 'GET' && new URL(request.url()).pathname.endsWith('/pharmacies/'));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await requested;
+  await expect(page.getByRole('main')).not.toContainText(/Org A (Pharmacy|Staff)/);
+  const fresh = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith('/pharmacies/'));
+  releaseFresh();
+  await fresh;
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('main')).not.toContainText(/Org A (Pharmacy|Staff)/);
+});
+
 for (const outcome of ['failure', 'success']) {
   test(`pharmacy cache isolates same-tab logout and login while the next user's request is delayed (${outcome})`, async ({ page }) => {
     const ownerA = { ...roleUsers.owner, first_name: 'Account A' };
