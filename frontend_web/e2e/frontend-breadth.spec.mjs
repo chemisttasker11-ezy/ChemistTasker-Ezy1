@@ -648,10 +648,11 @@ for (const outcome of ['forbidden', 'unavailable']) {
     const requested = page.waitForRequest((request) => request.method() === 'GET' && new URL(request.url()).pathname.endsWith('/pharmacies/'));
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await requested;
-    await expect(page.locator('body')).not.toContainText(/Sensitive Former (Pharmacy|Staff|Admin)/);
+    // The page, not the shell's workspace selector (its own pharmacy list), owns the team data under test.
+    await expect(page.getByRole('main')).not.toContainText(/Sensitive Former (Pharmacy|Staff|Admin)/);
     releaseFresh();
     await expect(page.getByText('Unable to verify current pharmacy access. Retry to continue.')).toBeVisible();
-    await expect(page.locator('body')).not.toContainText(/Sensitive Former (Pharmacy|Staff|Admin)/);
+    await expect(page.getByRole('main')).not.toContainText(/Sensitive Former (Pharmacy|Staff|Admin)/);
   });
 }
 
