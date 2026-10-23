@@ -712,6 +712,51 @@ test.describe('login keeps hub drafts per account', () => {
 });
 
 test.describe('cross-tab sign-in', () => {
+  test('real Vite login announces account change to an already-open tab', async ({ context }) => {
+    test.skip(process.env.PLAYWRIGHT_PORT === '3000', 'Vite-specific login broadcast');
+    const userA = { ...roleUsers.pharmacist };
+    const userB = { ...roleUsers.otherstaff };
+    let current = userA;
+    const first = await context.newPage();
+    const second = await context.newPage();
+    await installApiFixture(first, userA);
+    await installApiFixture(second, userA);
+    for (const tab of [first, second]) {
+      await tab.route('**/api/v1/users/me/', (route) => json(route, current));
+    }
+    await second.route('**/api/v1/users/login/', (route) => {
+      current = userB;
+      return json(route, { access: 'new-vite-access', refresh: '', user: userB });
+    });
+    await first.goto('/dashboard/pharmacist/overview');
+    await first.waitForLoadState('networkidle');
+    await second.goto('/login');
+    await expect(first.locator('main')).toBeVisible();
+    await first.evaluate(() => {
+      window.ctLoginEvents = 0;
+      window.addEventListener('storage', (event) => {
+        if (event.key === 'ct:session-event' && JSON.parse(event.newValue || '{}').action === 'login') window.ctLoginEvents += 1;
+      });
+    });
+    let releaseIdentity;
+    const held = new Promise((resolve) => { releaseIdentity = resolve; });
+    let recheckStarted;
+    const rechecking = new Promise((resolve) => { recheckStarted = resolve; });
+    await first.route('**/api/v1/users/me/', async (route) => {
+      recheckStarted();
+      await held;
+      return json(route, current);
+    });
+    await second.getByLabel('Email').fill(userB.email);
+    await second.getByLabel('Password').fill('test-password');
+    await second.getByRole('button', { name: 'Login', exact: true }).click();
+    await rechecking;
+    await expect.poll(() => first.evaluate(() => window.ctLoginEvents)).toBe(1);
+    await expect(first.locator('main')).toBeHidden();
+    releaseIdentity();
+    await expect.poll(() => new URL(first.url()).pathname).toBe('/dashboard/otherstaff/overview');
+  });
+
   for (const sameUser of [true, false]) {
     test(`another tab signing in ${sameUser ? 'as the same account keeps the mounted page' : 'as another account hides this tab until it reloads'}`, async ({ context }) => {
       const user = JSON.parse(JSON.stringify(roleUsers.pharmacist));
