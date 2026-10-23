@@ -29,11 +29,12 @@ import {
 } from 'react-native-paper';
 import { TimePickerModal } from 'react-native-paper-dates';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {
+    ApiError,
     createPharmacy,
     updatePharmacy,
     getPharmacyById,
@@ -585,6 +586,7 @@ export default function PharmacyForm({
     } | null>(null);
     const [verificationPending, setVerificationPending] = useState(false);
     const createIdempotencyKeyRef = useRef<string | null>(null);
+    const pathname = usePathname();
 
     const persistPharmacy = async ({ afterSave }: { afterSave?: () => void } = {}) => {
         if (saving) return false;
@@ -719,6 +721,18 @@ export default function PharmacyForm({
             return true;
 
         } catch (err: any) {
+            const conflictId = err instanceof ApiError && err.status === 409
+                ? (err.payload as { pharmacy_id?: number } | null)?.pharmacy_id : null;
+            if (mode === 'create' && conflictId != null) {
+                createIdempotencyKeyRef.current = null;
+                const message = 'This pharmacy was already saved earlier with different details. Re-apply your changes in the saved pharmacy.';
+                setError(message);
+                Alert.alert('Pharmacy already saved', message);
+                // Owner setup (/setup/owner/...) has no edit route of its own; use the role's.
+                const rolePath = pathname.replace(/^\/setup/, '').split('/')[1];
+                router.replace(`/${rolePath}/pharmacies/${conflictId}/edit` as any);
+                return false;
+            }
             const apiMessage = formatApiError(err?.response?.data);
             const detail = apiMessage || err?.message;
             setError(pendingReadbackRef.current

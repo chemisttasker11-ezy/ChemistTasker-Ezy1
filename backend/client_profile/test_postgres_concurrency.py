@@ -2,6 +2,7 @@ from datetime import date, time, timedelta
 from queue import Queue
 from threading import Barrier, Thread
 from unittest import mock, skipUnless
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -36,6 +37,81 @@ POSTGRES_ONLY = skipUnless(
     connection.vendor == "postgresql",
     "PostgreSQL row-lock/constraint semantics required.",
 )
+
+
+@POSTGRES_ONLY
+class PharmacyCreatePostgresConcurrencyTests(TransactionTestCase):
+    def setUp(self):
+        from client_profile.characterization_support import make_owner_with_pharmacy
+
+        self.owner, _ = make_owner_with_pharmacy('Race owner')
+        self.other, _ = make_owner_with_pharmacy('Other race owner')
+        self.key = str(uuid4())
+
+    def _race(self, users):
+        from organizations.views import PharmacyViewSet
+
+        barrier, results = Barrier(2), Queue()
+        perform_create = PharmacyViewSet.perform_create
+
+        def synchronized_create(view, serializer):
+            # Both requests must miss the key lookup before either inserts it.
+            barrier.wait(timeout=10)
+            return perform_create(view, serializer)
+
+        def submit(user_id):
+            close_old_connections()
+            try:
+                client = APIClient()
+                client.force_authenticate(User.objects.get(pk=user_id))
+                response = client.post('/api/v1/pharmacies/', {
+                    'name': 'Concurrent Pharmacy', 'abn': '51824753556', 'email': 'race@example.com',
+                }, format='json', HTTP_IDEMPOTENCY_KEY=self.key)
+                results.put((user_id, response.status_code, response.data))
+            except Exception as exc:
+                results.put((user_id, 'exception', repr(exc)))
+            finally:
+                close_old_connections()
+
+        before = Pharmacy.objects.count()
+        with mock.patch.object(PharmacyViewSet, 'perform_create', synchronized_create), \
+                mock.patch('organizations.claims.async_task') as send_email:
+            threads = [Thread(target=submit, args=(user.pk,)) for user in users]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=30)
+            self.assertFalse(any(thread.is_alive() for thread in threads), 'pharmacy create race timed out')
+            outcomes = [results.get(timeout=5), results.get(timeout=5)]
+            self.assertFalse(any(status == 'exception' for _, status, _ in outcomes), outcomes)
+            send_email.assert_called_once()
+            self.assertEqual(send_email.call_args.kwargs['template_name'], 'emails/pharmacy_created_notification.html')
+        self.assertEqual(Pharmacy.objects.count(), before + 1)
+        pharmacy = Pharmacy.objects.get(idempotency_key=self.key)
+        self.assertEqual(Membership.objects.filter(pharmacy=pharmacy).count(), 1)
+        self.assertEqual(PharmacyAdmin.objects.filter(pharmacy=pharmacy).count(), 1)
+        self.assertEqual(Membership.objects.get(pharmacy=pharmacy).user_id, pharmacy.idempotency_user_id)
+        self.assertEqual(PharmacyAdmin.objects.get(pharmacy=pharmacy).user_id, pharmacy.idempotency_user_id)
+        return pharmacy, outcomes
+
+    def test_same_user_key_concurrently_creates_once_and_replays(self):
+        pharmacy, outcomes = self._race([self.owner, self.owner])
+        self.assertEqual(sorted(status for _, status, _ in outcomes), [200, 201], outcomes)
+        for _, _, data in outcomes:
+            self.assertEqual(data['id'], pharmacy.pk)
+        self.assertEqual(outcomes[0][2], outcomes[1][2])
+
+    def test_different_users_racing_same_key_never_receive_each_others_pharmacy(self):
+        pharmacy, outcomes = self._race([self.owner, self.other])
+        self.assertEqual(sorted(status for _, status, _ in outcomes), [201, 400], outcomes)
+        for user_id, status, data in outcomes:
+            if status == 201:
+                self.assertEqual(user_id, pharmacy.idempotency_user_id)
+                self.assertEqual(data['id'], pharmacy.pk)
+            else:
+                self.assertNotEqual(user_id, pharmacy.idempotency_user_id)
+                self.assertNotIn('id', data)
+                self.assertNotIn('pharmacy_id', data)
 
 
 @POSTGRES_ONLY

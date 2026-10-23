@@ -53,6 +53,7 @@ import PharmacyClaimsPanels from "./PharmacyClaimsPanels";
 import { ORG_ROLES } from "../../../constants/roles";
 import { clearOwnerPharmacySetupSkipped, markOwnerPharmacySetupSkipped } from "../../../utils/ownerSetup";
 import {
+  ApiError,
   claimOnboarding,
   createPharmacy,
   deletePharmacy,
@@ -60,6 +61,7 @@ import {
   fetchPharmacyAdminsService,
   getOnboarding,
   getPharmacyClaims,
+  getPharmacyById,
   lookupPharmacyAbn,
   updatePharmacy,
   updatePharmacyClaim,
@@ -2022,6 +2024,26 @@ export default function PharmacyPage({
       closeDialog();
       return true;
     } catch (err) {
+      const conflictId = err instanceof ApiError && err.status === 409
+        ? (err.payload as { pharmacy_id?: number } | null)?.pharmacy_id : null;
+      if (!editing && conflictId != null) {
+        createIdempotencyKeyRef.current = null;
+        const message = 'This pharmacy was already saved earlier with different details. Re-apply your changes in the saved pharmacy.';
+        showSnackbar(message, 'info');
+        try {
+          const saved = normalizePharmacy(await getPharmacyById(conflictId));
+          if (saved.can_edit === false) {
+            setError(`${message} You no longer have permission to edit it.`);
+          } else {
+            setPharmacies((prev) => scopePharmacies([...prev.filter((p) => p.id !== saved.id), saved]));
+            openDialog(saved);
+            setError(message);
+          }
+        } catch {
+          setError(`${message} The saved pharmacy could not be opened. Refresh and try again.`);
+        }
+        return false;
+      }
       if (err instanceof AxiosError) {
         setError(err.response?.data?.detail || err.message);
       } else {
