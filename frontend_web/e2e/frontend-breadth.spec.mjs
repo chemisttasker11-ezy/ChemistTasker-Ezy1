@@ -434,36 +434,42 @@ for (const action of ['edit', 'delete']) {
     expect(writes).toEqual([]);
   });
 
-  test(`pharmacy action=${action} link ignores a stale cached can_edit on same-tab reload`, async ({ page }) => {
+  test(`pharmacy action=${action} does not hydrate revoked legacy pharmacy data`, async ({ page }) => {
     await installApiFixture(page, roleUsers.owner);
-    let canEdit = true;
+    let revoked = false;
     let releaseFresh;
-    const freshHeld = new Promise((resolve) => { releaseFresh = resolve; });
+    const heldFresh = new Promise((resolve) => { releaseFresh = resolve; });
     const writes = [];
     await page.route('**/api/v1/pharmacies/**', async (route) => {
-      const request = route.request();
-      if (request.method() !== 'GET') {
-        writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      if (route.request().method() !== 'GET') {
+        writes.push(route.request().method());
         return json(route, {});
       }
-      // Hold the fresh answer until the test has seen the sessionStorage cache render.
-      if (!canEdit) await freshHeld;
-      return json(route, [{ id: 101, name: 'Linked Pharmacy', can_edit: canEdit }]);
+      if (revoked) {
+        await heldFresh;
+        return json(route, { detail: 'Permission revoked' }, 403);
+      }
+      return json(route, [{ id: 101, name: 'Linked Pharmacy', can_edit: true }]);
     });
     await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101');
     await expect(page.getByText('Linked Pharmacy').first()).toBeVisible();
-    await expect.poll(() => page.evaluate(() => Object.values(sessionStorage).some((value) => value.includes('"can_edit":true')))).toBe(true);
-
-    canEdit = false;
-    const dialog = page.getByRole('dialog', { name: action === 'edit' ? 'Edit Pharmacy' : 'Delete Pharmacy' });
-    const freshRequest = page.waitForRequest((request) => request.method() === 'GET' && request.url().includes('/api/v1/pharmacies/'));
+    await page.evaluate(() => {
+      sessionStorage.setItem('pharmacyPage.cache.v3:legacy', JSON.stringify({
+        owner: 'legacy',
+        pharmacies: [{ id: 101, name: 'Private Revoked Pharmacy', can_edit: true }],
+        memberships: { 101: [{ user_details: { first_name: 'Private Revoked Staff' } }] },
+        admin_assignments: { 101: [{ user_details: { first_name: 'Private Revoked Admin' } }] },
+      }));
+    });
+    revoked = true;
+    const requested = page.waitForRequest((request) => request.method() === 'GET' && new URL(request.url()).pathname.endsWith('/pharmacies/'));
     await page.goto(`/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101&view=detail&pharmacyId=101&action=${action}`);
-    await freshRequest;
-    await expect(page.getByText('Linked Pharmacy').first()).toBeVisible();
-    await expect(dialog).toHaveCount(0);
+    await requested;
+    await expect(page.locator('body')).not.toContainText(/Private Revoked (Pharmacy|Staff|Admin)/);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith('pharmacyPage.cache.')))).toEqual([]);
     releaseFresh();
-    await expect.poll(() => new URL(page.url()).searchParams.get('action')).toBeNull();
-    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText('Unable to verify current pharmacy access. Retry to continue.')).toBeVisible();
     expect(writes).toEqual([]);
   });
 
@@ -553,9 +559,7 @@ for (const outcome of ['failure', 'success']) {
     await expect(page.getByText('Private A Staff', { exact: true })).toBeVisible();
     await page.getByRole('tab', { name: /^Admins/ }).click();
     await expect(page.getByText('Private A Admin', { exact: true })).toBeVisible();
-    await expect.poll(() => page.evaluate(() => Object.values(sessionStorage).some(
-      (value) => value.includes('Private A Staff') && value.includes('Private A Admin'),
-    ))).toBe(true);
+    expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith('pharmacyPage.cache.')))).toEqual([]);
     await page.evaluate(() => {
       for (const key of ['saved_shift_ids', 'applied_shift_ids', 'applied_slot_ids', 'rejected_shift_ids', 'rejected_slot_ids', 'counter_offer_map']) localStorage.setItem(key, '[101]');
       for (const key of ['owner-pharmacy-setup-skipped', 'ct:hub-draft:community', 'ct:comment-draft:7', 'ct:route:/shifts']) sessionStorage.setItem(key, 'Private A draft');
@@ -608,6 +612,46 @@ for (const outcome of ['failure', 'success']) {
     expect(await page.evaluate(() => Object.entries(sessionStorage).filter(([key]) => key.startsWith('pharmacyPage.cache.')).some(
       ([, value]) => /Private A (Pharmacy|Staff|Admin)/.test(value),
     ))).toBe(false);
+  });
+}
+
+for (const outcome of ['forbidden', 'unavailable']) {
+  test(`pharmacy hides prior team data while refreshing access (${outcome})`, async ({ page }) => {
+    const user = { ...roleUsers.owner };
+    let revoked = false;
+    let releaseFresh;
+    const heldFresh = new Promise((resolve) => { releaseFresh = resolve; });
+    await installApiFixture(page, user, (route, { path }) => {
+      if (path.endsWith('/memberships/')) return json(route, [{
+        id: 301, role: 'PHARMACIST', status: 'ACCEPTED', is_active: true,
+        user_details: { first_name: 'Sensitive Former Staff' },
+      }]);
+      if (path.endsWith('/pharmacy-admins/')) return json(route, [{
+        id: 401, pharmacy: 101, admin_level: 'FULL_ADMIN', is_active: true,
+        user_details: { first_name: 'Sensitive Former Admin' },
+      }]);
+    });
+    await page.route('**/api/v1/pharmacies/**', async (route) => {
+      if (route.request().method() !== 'GET') return json(route, {});
+      if (!revoked) return json(route, [{ id: 101, name: 'Sensitive Former Pharmacy', can_edit: true }]);
+      await heldFresh;
+      return json(route, { detail: 'Access unavailable' }, outcome === 'forbidden' ? 403 : 503);
+    });
+    await page.goto('/dashboard/owner/manage-pharmacies?view=detail&pharmacyId=101&pharmacy_id=101');
+    await expect(page.getByText('Sensitive Former Pharmacy').first()).toBeVisible();
+    await page.getByRole('tab', { name: /^Staff/ }).click();
+    await expect(page.getByText('Sensitive Former Staff', { exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: /^Admins/ }).click();
+    await expect(page.getByText('Sensitive Former Admin', { exact: true })).toBeVisible();
+    revoked = true;
+    user.first_name = 'Permissions Changed';
+    const requested = page.waitForRequest((request) => request.method() === 'GET' && new URL(request.url()).pathname.endsWith('/pharmacies/'));
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await requested;
+    await expect(page.locator('body')).not.toContainText(/Sensitive Former (Pharmacy|Staff|Admin)/);
+    releaseFresh();
+    await expect(page.getByText('Unable to verify current pharmacy access. Retry to continue.')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(/Sensitive Former (Pharmacy|Staff|Admin)/);
   });
 }
 
