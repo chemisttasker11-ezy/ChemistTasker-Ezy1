@@ -191,9 +191,7 @@ function PharmacyPageContent({
   onNeedsOnboardingPath = "/onboarding/owner",
   onCompletePath = "/dashboard/owner/overview",
   targetPharmacyCount = 1,
-  cacheOwner,
-}: PharmacyPageProps & { cacheOwner: string }) {
-  const cacheKey = `${PHARMACY_CACHE_KEY}:${cacheOwner}`;
+}: PharmacyPageProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAdminUser, activePersona, activeAdminPharmacyId, activeAdminAssignment } = useAuth();
