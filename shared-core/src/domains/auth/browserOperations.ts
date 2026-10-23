@@ -87,8 +87,9 @@ export async function browserSessionCurrentUser(
   options: BrowserIdentityTransport, accessToken?: string | null,
 ): Promise<CurrentUserApi | null> {
   try {
+    // A stalled identity check would leave the dashboard hidden: time it out so the Reconnect prompt shows.
     return await client(options, 'include', accessToken).get<CurrentUserApi>('/users/me/', undefined, {
-      auth: Boolean(accessToken), retryAuth: false,
+      auth: Boolean(accessToken), retryAuth: false, signal: AbortSignal.timeout(20000),
     });
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null;

@@ -167,8 +167,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const fetchCurrentUser = useCallback(async (cookieOnly = false): Promise<User | null> => {
     const token = cookieOnly ? null : getAccessToken();
     if (!cookieOnly && !token) return null;
-    // A stalled identity check would leave the dashboard hidden: time it out so the Reconnect prompt shows.
-    return await browserSessionCurrentUser({ baseUrl: API_BASE_URL, fetchImpl: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(20000) }) }, token) as User | null;
+    return await browserSessionCurrentUser({ baseUrl: API_BASE_URL }, token) as User | null;
   }, []);
 
   const fetchSessionUser = useCallback(async (): Promise<User | null> => {
