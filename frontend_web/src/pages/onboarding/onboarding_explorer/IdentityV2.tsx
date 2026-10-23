@@ -1,4 +1,5 @@
 // src/pages/onboarding_explorer/IdentityV2.tsx
+import { AuDateField } from '../../../components/AuDateField';
 import * as React from 'react';
 import { Box, Button, Link, TextField, Typography, MenuItem, Alert, Snackbar } from '@mui/material';
 import { API_BASE_URL } from '../../../constants/api';
@@ -198,12 +199,10 @@ export default function IdentityV2() {
             ))}
           </TextField>
 
-          <TextField
-            type="date"
+          <AuDateField
             label="Expiry date"
-            InputLabelProps={{ shrink: true }}
             value={meta.expiry || ''}
-            onChange={(e) => setMeta((m) => ({ ...m, expiry: e.target.value }))}
+            onChange={(isoValue) => setMeta((m) => ({ ...m, expiry: isoValue }))}
             fullWidth
           />
         </Box>
@@ -219,12 +218,10 @@ export default function IdentityV2() {
             fullWidth
           />
 
-          <TextField
-            type="date"
+          <AuDateField
             label="Valid to"
-            InputLabelProps={{ shrink: true }}
             value={meta.valid_to || ''}
-            onChange={(e) => setMeta((m) => ({ ...m, valid_to: e.target.value }))}
+            onChange={(isoValue) => setMeta((m) => ({ ...m, valid_to: isoValue }))}
             fullWidth
           />
 
@@ -242,12 +239,10 @@ export default function IdentityV2() {
             ))}
           </TextField>
 
-          <TextField
-            type="date"
+          <AuDateField
             label="Passport expiry"
-            InputLabelProps={{ shrink: true }}
             value={meta.passport_expiry || ''}
-            onChange={(e) => setMeta((m) => ({ ...m, passport_expiry: e.target.value }))}
+            onChange={(isoValue) => setMeta((m) => ({ ...m, passport_expiry: isoValue }))}
             fullWidth
           />
 
@@ -304,12 +299,10 @@ export default function IdentityV2() {
             ))}
           </TextField>
 
-          <TextField
-            type="date"
+          <AuDateField
             label="Passport expiry"
-            InputLabelProps={{ shrink: true }}
             value={meta.passport_expiry || ''}
-            onChange={(e) => setMeta((m) => ({ ...m, passport_expiry: e.target.value }))}
+            onChange={(isoValue) => setMeta((m) => ({ ...m, passport_expiry: isoValue }))}
             fullWidth
           />
         </Box>

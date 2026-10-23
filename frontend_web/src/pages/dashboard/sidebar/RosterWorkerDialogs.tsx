@@ -1,3 +1,4 @@
+import { AuDateField } from '../../../components/AuDateField';
 import type { Dispatch, SetStateAction } from 'react';
 import {
   Box,
@@ -126,12 +127,10 @@ export default function RosterWorkerDialogs({
               fullWidth
               disabled
             />
-            <TextField
+            <AuDateField
               label="Date"
-              type="date"
               value={selectedSlotDate ? moment(selectedSlotDate).format('YYYY-MM-DD') : ''}
-              onChange={(event) => handleSelectedDateChange(event.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={(isoValue) => handleSelectedDateChange(isoValue)}
               fullWidth
             />
             <Box sx={{ display: 'flex', gap: 2 }}>

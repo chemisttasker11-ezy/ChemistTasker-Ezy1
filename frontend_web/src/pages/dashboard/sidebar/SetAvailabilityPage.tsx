@@ -1,3 +1,4 @@
+import { AuDateField } from '../../../components/AuDateField';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Alert,
@@ -722,21 +723,17 @@ export default function SetAvailabilityPage() {
           </Box>
 
           <Box sx={{ display: 'flex', gap: 1.5, alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' } }}>
-            <TextField
+            <AuDateField
               label={currentEntry.isRecurring ? 'Start date' : 'Date'}
-              type="date"
               value={currentEntry.date}
-              onChange={(event) => syncSelectedDates(event.target.value ? [event.target.value] : [])}
-              InputLabelProps={{ shrink: true }}
+              onChange={(isoValue) => syncSelectedDates(isoValue ? [isoValue] : [])}
               sx={{ ...inputSx, flex: 1 }}
             />
             {currentEntry.isRecurring && (
-              <TextField
+              <AuDateField
                 label="End date"
-                type="date"
-                value={currentEntry.recurringEndDate}
-                onChange={e => setCurrentEntry({ ...currentEntry, recurringEndDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
+                value={currentEntry.recurringEndDate || ''}
+                onChange={isoValue => setCurrentEntry({ ...currentEntry, recurringEndDate: isoValue })}
                 sx={{ ...inputSx, flex: 1 }}
               />
             )}

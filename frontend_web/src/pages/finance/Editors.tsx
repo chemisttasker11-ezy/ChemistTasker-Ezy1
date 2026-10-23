@@ -1,3 +1,4 @@
+import { AuDateField } from '../../components/AuDateField';
 import { useState, useRef, type ReactNode, type FormEvent } from 'react';
 import { Alert, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, InputAdornment, MenuItem, Stack, TextField, Typography } from '@mui/material';
@@ -85,8 +86,8 @@ export function ExpenseEditor({ initial, onClose, onSaved }: { initial?: Finance
   return <FormDialog value={value} title={initial ? `Edit expense #${initial.id}` : 'New expense'} onClose={onClose} onSave={async () => { await finance.saveExpense(value, initial?.id); await onSaved(); }}>
     <Alert severity="info">Record the actual receipt GST, not an assumed 10% of the total. Save first, then attach receipts. Expense recording does not automatically bill the customer.</Alert>
     <Box sx={grid}>{text('supplier', 'Supplier', true)}{text('description', 'Description', true)}{text('category', 'Category', true)}{text('reference', 'Supplier invoice / reference')}
-      <TextField required type="date" label="Incurred date" InputLabelProps={{ shrink: true }} value={value.incurred_on} onChange={event => setValue({ ...value, incurred_on: event.target.value })} />
-      <TextField type="date" label="Paid in full on (blank if unpaid)" InputLabelProps={{ shrink: true }} value={value.paid_on || ''} onChange={event => setValue({ ...value, paid_on: event.target.value || null })} />
+      <AuDateField required label="Incurred date" value={value.incurred_on} onChange={isoValue => setValue({ ...value, incurred_on: isoValue })} />
+      <AuDateField label="Paid in full on (blank if unpaid)" value={value.paid_on || ''} onChange={isoValue => setValue({ ...value, paid_on: isoValue || null })} />
       {text('amount', 'Total including GST (AUD)', true)}{text('gst_amount', 'GST shown on receipt', true)}{text('business_use_percent', 'Creditable business use %', true)}
       <TextField select label="Tax treatment" value={value.tax_code} onChange={event => setValue({ ...value, tax_code: event.target.value as FinanceTaxCode })}>{taxes.map(tax => <MenuItem key={tax} value={tax}>{taxLabel[tax]}</MenuItem>)}</TextField>
     </Box>
@@ -118,7 +119,7 @@ export function PaymentEditor({ invoice, onClose, onSaved }: { invoice: FinanceI
         InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
         helperText={value.amount !== invoice.balance && amountError ? amountError : partial ? `Part payment. ${dollars(Number(invoice.balance) - amount)} will still be owed.` : 'Record only money that has arrived.'}
         onChange={event => setValue({ ...value, amount: event.target.value })} />
-      <TextField label="Date received" type="date" required InputLabelProps={{ shrink: true }} value={value.date} onChange={event => setValue({ ...value, date: event.target.value })} />
+      <AuDateField label="Date received" required value={value.date} onChange={isoValue => setValue({ ...value, date: isoValue })} />
       <TextField label="Reference (optional)" placeholder="Bank or fund reference" value={value.reference} sx={{ gridColumn: { sm: '1 / -1' } }} onChange={event => setValue({ ...value, reference: event.target.value })} />
     </Box>
     {invoice.kind === 'super_request' && <FormControlLabel control={<Checkbox checked={value.fund_payment_confirmed} onChange={event => setValue({ ...value, fund_payment_confirmed: event.target.checked })} />} label="This payment went to the super fund, not to me" />}

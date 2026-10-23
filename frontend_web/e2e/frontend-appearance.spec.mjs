@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { installApiFixture, roleUsers } from './support/apiFixture.mjs';
-import { assertAppearanceOutsideDateText } from './support/appearanceComparison.mjs';
 import { reviewApi } from './support/reviewFixture.mjs';
 
 // Browser/font rasterization differs by operating system; CI compares these Windows baselines in its Windows job.
@@ -51,14 +50,6 @@ for (const width of [390, 1440]) for (const mode of ['light', 'dark']) for (cons
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => document.fonts.ready);
     const snapshotName = `${name}-${mode}-${width}.png`;
-    // Capture candidate baselines only in the explicit review workflow; never silently
-    // replace the approved screenshots in the normal regression gate.
-    if (name === 'shift-filters' && process.env.CT_CAPTURE_SHIFT_BASELINE === '1') {
-      await expect(page).toHaveScreenshot(snapshotName, { animations: 'disabled', caret: 'hide', maxDiffPixels: 0 });
-    } else if (width === 1440 && (name === 'invoices' || name === 'shift-filters')) {
-      await assertAppearanceOutsideDateText(page, test.info(), snapshotName, name);
-    } else {
-      await expect(page).toHaveScreenshot(snapshotName, { animations: 'disabled', caret: 'hide', maxDiffPixels: 0 });
-    }
+    await expect(page).toHaveScreenshot(snapshotName, { animations: 'disabled', caret: 'hide', maxDiffPixels: 0 });
   });
 }

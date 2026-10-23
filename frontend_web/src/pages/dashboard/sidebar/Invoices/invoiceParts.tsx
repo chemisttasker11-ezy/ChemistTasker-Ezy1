@@ -1,4 +1,5 @@
 // Shared presentation for the invoice detail and invoice editor pages. Pure UI: the pages own data and maths.
+import { AuDateField } from '../../../../components/AuDateField';
 import type { ReactNode } from 'react';
 import {
   Box,
@@ -260,7 +261,7 @@ export function LineItemsEditor({
           {CATEGORY_CHOICES.map((c) => <MenuItem key={c.code} value={c.code}>{c.label}</MenuItem>)}
         </TextField>
       ),
-      date: timed ? <TextField size="small" type="date" fullWidth label={desktop ? undefined : 'Date'} InputLabelProps={{ shrink: true }} value={li.date || ''} onChange={(e) => onChange(idx, 'date', e.target.value)} disabled={!canEdit} sx={inputSx} inputProps={{ 'aria-label': 'Date' }} /> : null,
+      date: timed ? <AuDateField size="small" fullWidth label={desktop ? undefined : 'Date'} value={li.date || ''} onChange={(isoValue) => onChange(idx, 'date', isoValue)} disabled={!canEdit} sx={inputSx} inputProps={{ 'aria-label': 'Date' }} /> : null,
       start: timed ? <TextField size="small" type="time" fullWidth label={desktop ? undefined : 'Start'} InputLabelProps={{ shrink: true }} value={li.start_time?.slice(0, 5) || '00:00'} onChange={(e) => onChange(idx, 'start_time', toTime(e.target.value))} disabled={!canEdit} sx={timeSx} inputProps={{ 'aria-label': 'Start time' }} /> : null,
       end: timed ? <TextField size="small" type="time" fullWidth label={desktop ? undefined : 'End'} InputLabelProps={{ shrink: true }} value={li.end_time?.slice(0, 5) || '00:00'} onChange={(e) => onChange(idx, 'end_time', toTime(e.target.value))} disabled={!canEdit} sx={timeSx} inputProps={{ 'aria-label': 'End time' }} /> : null,
       unit: (

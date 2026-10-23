@@ -1,5 +1,6 @@
+import { AuDateTimeField } from '../../landing_next/shared-ui/AuDateField';
 import { type Dispatch, type SetStateAction } from 'react';
-import { Box, ButtonBase, Chip, Stack, Switch, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { Box, ButtonBase, Chip, Stack, Switch, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import dayjs from 'dayjs';
 import { type ShiftEscalationPlan } from '@chemisttasker/shared-core';
 import { Check } from 'lucide-react';
@@ -165,10 +166,10 @@ export default function PostShiftVisibilityStep({
                             </Typography>
                           </Box>
                           {!first && mode === 'custom' && (
-                            <TextField type="datetime-local" size="small" label="Opens" value={when || ''} InputLabelProps={{ shrink: true }}
+                            <AuDateTimeField size="small" label="Opens" value={when || ''}
                               inputProps={{ min: index > 1 ? escalationDates[all[index - 1]] || undefined : undefined }}
                               sx={{ width: { xs: '100%', sm: 230 } }}
-                              onChange={event => setEscalationDates(dates => ({ ...dates, [code]: event.target.value }))} />
+                              onChange={isoValue => setEscalationDates(dates => ({ ...dates, [code]: isoValue }))} />
                           )}
                         </Stack>
                       </Box>

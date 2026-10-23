@@ -1,4 +1,5 @@
 // src/pages/dashboard/sidebar/InvoiceGeneratePage.tsx
+import { AuDateField } from '../../../components/AuDateField';
 import { useState, useEffect, useCallback, useRef  } from 'react';
 import {
   Container, Paper, Typography, Tabs, Tab,
@@ -583,19 +584,15 @@ const handleGenerate = () => {
 
         {/* Dates */}
         <Box mt={5} display="flex" gap={2}>
-          <TextField
+          <AuDateField
             label="Invoice Date"
-            type="date"
             value={invoiceDate}
-            onChange={e=>setInvoiceDate(e.target.value)}
-            InputLabelProps={{ shrink:true }}
+            onChange={isoValue=>setInvoiceDate(isoValue)}
           />
-          <TextField
+          <AuDateField
             label="Due Date"
-            type="date"
             value={dueDate}
-            onChange={e=>setDueDate(e.target.value)}
-            InputLabelProps={{ shrink:true }}
+            onChange={isoValue=>setDueDate(isoValue)}
           />
         </Box>
 
@@ -665,12 +662,11 @@ const handleGenerate = () => {
           {li.category === 'ProfessionalServices' ? (
             <>
               <TableCell align="center">
-                <TextField
+                <AuDateField
                   variant="standard"
                   size="small"
-                  type="date"
                   value={li.date}
-                  onChange={e => updateRow(idx, 'date', e.target.value)}
+                  onChange={isoValue => updateRow(idx, 'date', isoValue)}
                   sx={{ minWidth: 120 }}
                   InputProps={{ sx: { textAlign: 'center' } }}
                 />

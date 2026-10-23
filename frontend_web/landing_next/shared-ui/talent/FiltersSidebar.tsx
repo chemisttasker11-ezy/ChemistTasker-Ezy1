@@ -2,6 +2,7 @@
 
 // Talent filters, shared by the Vite dashboard and the Next public site. Each app owns its data and filtering;
 // both show the shared skill symbols (renderSkillIcon can override them).
+import { AuDateField } from '../AuDateField';
 import React from 'react';
 import { Box, Collapse, IconButton, InputAdornment, Stack, TextField } from '@mui/material';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
@@ -163,24 +164,20 @@ export default function TalentFiltersSidebar({
 
       <FilterSection idPrefix="talent-filter" title="Availability dates">
         <Stack spacing={1.25}>
-          <TextField
+          <AuDateField
             label="Start date"
-            type="date"
             size="small"
             fullWidth
             value={filters.availabilityStart ?? ''}
-            onChange={(event) => onChange({ ...filters, availabilityStart: event.target.value || null })}
-            InputLabelProps={{ shrink: true }}
+            onChange={(isoValue) => onChange({ ...filters, availabilityStart: isoValue || null })}
           />
-          <TextField
+          <AuDateField
             label="End date"
-            type="date"
             size="small"
             fullWidth
             value={filters.availabilityEnd ?? ''}
             inputProps={{ min: filters.availabilityStart ?? undefined }}
-            onChange={(event) => onChange({ ...filters, availabilityEnd: event.target.value || null })}
-            InputLabelProps={{ shrink: true }}
+            onChange={(isoValue) => onChange({ ...filters, availabilityEnd: isoValue || null })}
           />
         </Stack>
       </FilterSection>

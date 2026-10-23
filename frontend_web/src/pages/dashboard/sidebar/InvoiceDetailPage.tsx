@@ -1,3 +1,4 @@
+import { AuDateField } from '../../../components/AuDateField';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
@@ -668,8 +669,8 @@ export default function InvoiceDetailPage() {
       <Stack spacing={2.5}>
         <InvoiceSection icon={<CalendarDays />} tone="violet" title="Dates">
           <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, minmax(0, 1fr))' } }}>
-            <TextField label="Invoice date" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth />
-            <TextField label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth />
+            <AuDateField label="Invoice date" value={invoiceDate} onChange={(isoValue) => setInvoiceDate(isoValue)} fullWidth />
+            <AuDateField label="Due date" value={dueDate} onChange={(isoValue) => setDueDate(isoValue)} fullWidth />
           </Box>
         </InvoiceSection>
 

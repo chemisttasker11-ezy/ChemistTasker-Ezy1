@@ -1,3 +1,4 @@
+import { AuDateField } from '../AuDateField';
 import React, { useState, useMemo } from 'react';
 import {
   Alert,
@@ -1306,13 +1307,11 @@ export default function RosterGridViews({
         </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ pt: 1 }}>
-            <TextField
+            <AuDateField
               label="Date"
-              type="date"
               size="small"
               value={quickAddDate}
-              onChange={(e) => setQuickAddDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={(isoValue) => setQuickAddDate(isoValue)}
               fullWidth
             />
 

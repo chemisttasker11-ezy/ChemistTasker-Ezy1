@@ -1,5 +1,6 @@
 'use client';
 
+import { AuDateField } from '../AuDateField';
 import React from 'react';
 import {
   Box,
@@ -136,23 +137,19 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
 
       <FilterSection idPrefix="shift-filter" title={FILTER_SECTIONS.dateRange}>
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1.25 }}>
-          <TextField
+          <AuDateField
             fullWidth
-            type="date"
             label="From"
             size="small"
-            InputLabelProps={{ shrink: true }}
             value={filterConfig.dateRange.start}
-            onChange={(event) => setFilterConfig((prev) => ({ ...prev, dateRange: { ...prev.dateRange, start: event.target.value } }))}
+            onChange={(isoValue) => setFilterConfig((prev) => ({ ...prev, dateRange: { ...prev.dateRange, start: isoValue } }))}
           />
-          <TextField
+          <AuDateField
             fullWidth
-            type="date"
             label="To"
             size="small"
-            InputLabelProps={{ shrink: true }}
             value={filterConfig.dateRange.end}
-            onChange={(event) => setFilterConfig((prev) => ({ ...prev, dateRange: { ...prev.dateRange, end: event.target.value } }))}
+            onChange={(isoValue) => setFilterConfig((prev) => ({ ...prev, dateRange: { ...prev.dateRange, end: isoValue } }))}
           />
         </Box>
       </FilterSection>

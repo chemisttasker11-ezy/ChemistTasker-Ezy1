@@ -1,3 +1,4 @@
+import { AuDateField } from '../../../components/AuDateField';
 import AhpraStatus from '../../../components/AhpraStatus';
 import { useAhpra } from '../../../contexts/AhpraContext';
 /// <reference types="@types/google.maps" />
@@ -437,12 +438,10 @@ export default function BasicInfoV2() {
 
       </Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-        <TextField
+        <AuDateField
           label="Date of Birth"
-          type="date"
           value={data.date_of_birth || ''}
-          onChange={e => setField('date_of_birth', e.target.value)}
-          InputLabelProps={{ shrink: true }}
+          onChange={isoValue => setField('date_of_birth', isoValue)}
           sx={{ flex: '1 1 220px', minWidth: 200, maxWidth: 220 }}
         />
         <TextField
