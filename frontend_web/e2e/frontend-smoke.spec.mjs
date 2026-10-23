@@ -618,13 +618,16 @@ test.describe('login keeps hub drafts per account', () => {
       ? route.fulfill({ contentType: 'text/html', body: '<main>Dashboard</main>' }) : route.fallback()));
     const hubText = () => page.getByLabel('Post text');
     const commentText = () => page.getByLabel('Write a comment');
+    // Every matching box (the remount on sign-in can briefly show two), so no copy holds another account's text.
+    const values = (locator) => expect.poll(() => locator.evaluateAll((boxes) => boxes.map((box) => box.value)));
+    const fill = async (locator, text) => { await expect(locator).toHaveCount(1); await locator.fill(text); };
     // The composer remounts once the session resolves, so wait for the signed-in header first.
     const signedIn = (name) => expect(page.locator('summary:visible', { hasText: name })).toBeVisible();
     const openHub = async (name) => {
       await page.goto('/hubs/public');
       await signedIn(name);
       const trigger = page.getByRole('button', { name: /Write something to/ });
-      await expect(trigger.or(hubText())).toBeVisible();
+      await expect(trigger.or(hubText()).first()).toBeVisible();
       if (await trigger.isVisible()) await trigger.click();
     };
     const logout = async (name) => {
@@ -641,28 +644,28 @@ test.describe('login keeps hub drafts per account', () => {
     };
 
     await openHub('Alice');
-    await hubText().fill('A hub draft');
+    await fill(hubText(), 'A hub draft');
     await page.goto('/hubs/posts/7');
     await signedIn('Alice');
-    await commentText().fill('A comment draft');
+    await fill(commentText(), 'A comment draft');
     // Sign-out on this page: the composer must drop the draft, not re-read it.
     await logout('Alice');
-    await expect(commentText()).toHaveValue('');
+    await values(commentText()).toEqual(['']);
 
     await login(userA);
     await openHub('Alice');
-    await expect(hubText()).toHaveValue('A hub draft');
+    await values(hubText()).toEqual(['A hub draft']);
     await page.goto('/hubs/posts/7');
     await signedIn('Alice');
-    await expect(commentText()).toHaveValue('A comment draft');
+    await values(commentText()).toEqual(['A comment draft']);
     await logout('Alice');
 
     await login(userB);
     await openHub('Bob');
-    await expect(hubText()).toHaveValue('');
+    await values(hubText()).toEqual(['']);
     await page.goto('/hubs/posts/7');
     await signedIn('Bob');
-    await expect(commentText()).toHaveValue('');
+    await values(commentText()).toEqual(['']);
     await expect(page.locator('body')).not.toContainText(/A (hub|comment) draft/);
   });
 });
