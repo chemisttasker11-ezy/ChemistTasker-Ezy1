@@ -1410,17 +1410,24 @@ function PharmacyPageContent({
     }
   }, [view, activePharmacyId, loadMembers]);
 
-  const loadPharmacies = useCallback(async (key: object) => {
-    const requestId = ++pharmaciesRequestRef.current;
+  // A failed re-check never keeps displaying last-known pharmacy or personnel data.
+  const failAccessCheck = useCallback(() => {
     membersGenerationRef.current += 1;
     setFreshPharmaciesKey(null);
-    setPharmaciesAccessError(false);
-    setInitialLoadComplete(false);
+    setPharmaciesAccessError(true);
     setPharmacies([]);
     setMembershipsByPharmacy({});
     setAdminAssignmentsByPharmacy({});
     setMembershipsError({});
     setMembershipsLoading({});
+  }, []);
+
+  const loadPharmacies = useCallback(async (key: object) => {
+    const requestId = ++pharmaciesRequestRef.current;
+    membersGenerationRef.current += 1;
+    // A same-scope background re-check keeps the last verified data on screen (and open dialogs mounted);
+    // a different user/scope remounts this component, so it never sees another identity's data.
+    setPharmaciesAccessError(false);
     setIsFetching(true);
     try {
       const data = await fetchPharmaciesService({});
@@ -1430,7 +1437,11 @@ function PharmacyPageContent({
       if (isOrganizationUser && scopedOrgPharmacyIds && scopedOrgPharmacyIds.size > 0 && user?.role !== "ORG_ADMIN") {
         accessible = normalized.filter((pharmacy: Pharmacy) => scopedOrgPharmacyIds.has(Number(pharmacy.id)));
       }
+      const ids = new Set(accessible.map((p: Pharmacy) => p.id));
+      const keepAccessible = <T,>(prev: Record<string, T>) => Object.fromEntries(Object.entries(prev).filter(([id]) => ids.has(id)));
       setPharmacies(scopePharmacies(accessible));
+      setMembershipsByPharmacy(keepAccessible);
+      setAdminAssignmentsByPharmacy(keepAccessible);
       setFreshPharmaciesKey(key);
       await Promise.all(accessible.map((p: Pharmacy) => loadMembers(p.id)));
       setInitialLoadComplete(true);
@@ -1440,13 +1451,13 @@ function PharmacyPageContent({
         setNeedsOnboarding(true);
         setInitialLoadComplete(true);
       } else {
-        setPharmaciesAccessError(true);
+        failAccessCheck();
         console.error(err);
       }
     } finally {
       if (requestId === pharmaciesRequestRef.current) setIsFetching(false);
     }
-  }, [isOrganizationUser, loadMembers, scopePharmacies, scopedOrgPharmacyIds, user?.role]);
+  }, [failAccessCheck, isOrganizationUser, loadMembers, scopePharmacies, scopedOrgPharmacyIds, user?.role]);
 
   // A new key per user/scope (the load effect's inputs), known in the same render that changes them.
   const pharmaciesKey = useMemo(() => ({}), [user, loadPharmacies]);
@@ -1478,7 +1489,7 @@ function PharmacyPageContent({
           setNeedsOnboarding(true);
           setInitialLoadComplete(true);
         } else {
-          setPharmaciesAccessError(true);
+          failAccessCheck();
           console.error(err);
         }
         setIsFetching(false);
@@ -1486,7 +1497,7 @@ function PharmacyPageContent({
     return () => {
       cancelled = true;
     };
-  }, [user, loadPharmacies, pharmaciesKey]);
+  }, [user, loadPharmacies, pharmaciesKey, failAccessCheck]);
 
   useEffect(() => {
     if (!standalone || isFetching || needsOnboarding || dialogOpen || editing || pharmacies.length > 0) {
@@ -1685,15 +1696,19 @@ function PharmacyPageContent({
     }
   }, [searchParams, pharmacies, freshPharmaciesKey, pharmaciesKey, openDialog, clearActionParam]);
 
+  const isEditable = useCallback(
+    (id: string) => pharmacies.some((item) => item.id === id && item.can_edit !== false),
+    [pharmacies]
+  );
+
   useEffect(() => {
     if (freshPharmaciesKey !== pharmaciesKey) return;
-    const editable = (id: string) => pharmacies.some((item) => item.id === id && item.can_edit !== false);
-    if (editing && !editable(editing.id)) {
+    if (editing && !isEditable(editing.id)) {
       setEditing(null);
       setDialogOpen(false);
     }
-    if (pendingDeletePharmacy && !editable(pendingDeletePharmacy.id)) setPendingDeletePharmacy(null);
-  }, [freshPharmaciesKey, pharmaciesKey, pharmacies, editing, pendingDeletePharmacy]);
+    if (pendingDeletePharmacy && !isEditable(pendingDeletePharmacy.id)) setPendingDeletePharmacy(null);
+  }, [freshPharmaciesKey, pharmaciesKey, isEditable, editing, pendingDeletePharmacy]);
 
   const closeDialog = () => {
     if (standalone) {
@@ -2176,8 +2191,8 @@ function PharmacyPageContent({
     );
   }
 
-  // A failed or pending re-check never displays last-known pharmacy or personnel data.
-  if (freshPharmaciesKey !== pharmaciesKey) {
+  // Nothing is shown before the first verified load, or after a failed re-check.
+  if (freshPharmaciesKey === null) {
     return (
       <Box p={4} textAlign="center">
         <Alert severity={pharmaciesAccessError ? "warning" : "info"}>
@@ -2530,7 +2545,7 @@ function PharmacyPageContent({
         handleOwnerRespond={handleOwnerRespond}
         ownerResponding={ownerResponding}
         canRespondToClaims={canRespondToClaims}
-        pendingDeletePharmacy={pendingDeletePharmacy && pharmacies.some((item) => item.id === pendingDeletePharmacy.id && item.can_edit !== false) ? pendingDeletePharmacy : null}
+        pendingDeletePharmacy={pendingDeletePharmacy && isEditable(pendingDeletePharmacy.id) ? pendingDeletePharmacy : null}
         handleCancelDeletePharmacy={handleCancelDeletePharmacy}
         confirmDeletePharmacy={confirmDeletePharmacy}
         isDeletingPharmacy={isDeletingPharmacy}
@@ -2539,7 +2554,7 @@ function PharmacyPageContent({
         onGoDashboard={() => navigate(onCompletePath)}
         onAddAnother={() => openDialog()}
         standalone={standalone}
-        dialogOpen={dialogOpen && (!editing || pharmacies.some((item) => item.id === editing.id && item.can_edit !== false))}
+        dialogOpen={dialogOpen && (!editing || isEditable(editing.id))}
         closeDialog={closeDialog}
         editing={Boolean(editing)}
         isSaving={isSaving}

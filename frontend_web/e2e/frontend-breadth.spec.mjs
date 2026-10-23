@@ -514,6 +514,60 @@ for (const action of ['edit', 'delete']) {
   });
 }
 
+test('pharmacy edit dialog keeps unsaved typing through a same-user focus refetch', async ({ page }) => {
+  const user = { ...roleUsers.owner };
+  await installApiFixture(page, user);
+  let held = false;
+  let releaseRefetch;
+  const refetchHeld = new Promise((resolve) => { releaseRefetch = resolve; });
+  await page.route('**/api/v1/pharmacies/**', async (route) => {
+    if (route.request().method() !== 'GET') return json(route, {});
+    if (held) await refetchHeld;
+    return json(route, [{ id: 101, name: 'Linked Pharmacy', can_edit: true }]);
+  });
+  await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101&view=detail&pharmacyId=101&action=edit');
+  const dialog = page.getByRole('dialog', { name: 'Edit Pharmacy' });
+  await expect(dialog).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  const nameField = dialog.getByLabel('Pharmacy Name');
+  await nameField.fill('Unsaved New Name');
+
+  held = true;
+  user.first_name = 'Refreshed';
+  const refetch = page.waitForRequest((request) => request.method() === 'GET' && new URL(request.url()).pathname.endsWith('/pharmacies/'));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await refetch;
+  await expect(dialog).toBeVisible();
+  await expect(nameField).toHaveValue('Unsaved New Name');
+  const refetched = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith('/pharmacies/'));
+  releaseRefetch();
+  await refetched;
+  await page.waitForLoadState('networkidle');
+  await expect(dialog).toBeVisible();
+  await expect(nameField).toHaveValue('Unsaved New Name');
+});
+
+test('pharmacy edit dialog closes when a same-user focus refetch no longer returns the pharmacy', async ({ page }) => {
+  const user = { ...roleUsers.owner };
+  await installApiFixture(page, user);
+  let revoked = false;
+  await page.route('**/api/v1/pharmacies/**', (route) => {
+    if (route.request().method() !== 'GET') return json(route, {});
+    return json(route, revoked ? [] : [{ id: 101, name: 'Revoked Pharmacy', can_edit: true }]);
+  });
+  await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101&view=detail&pharmacyId=101&action=edit');
+  const dialog = page.getByRole('dialog', { name: 'Edit Pharmacy' });
+  await expect(dialog).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  revoked = true;
+  user.first_name = 'Revoked';
+  const refetched = page.waitForResponse((response) => response.request().method() === 'GET' && new URL(response.url()).pathname.endsWith('/pharmacies/'));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await refetched;
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('main')).not.toContainText('Revoked Pharmacy');
+});
+
 for (const outcome of ['failure', 'success']) {
   test(`pharmacy cache isolates same-tab logout and login while the next user's request is delayed (${outcome})`, async ({ page }) => {
     const ownerA = { ...roleUsers.owner, first_name: 'Account A' };
@@ -616,7 +670,7 @@ for (const outcome of ['failure', 'success']) {
 }
 
 for (const outcome of ['forbidden', 'unavailable']) {
-  test(`pharmacy hides prior team data while refreshing access (${outcome})`, async ({ page }) => {
+  test(`pharmacy hides prior team data after a failed access re-check (${outcome})`, async ({ page }) => {
     const user = { ...roleUsers.owner };
     let revoked = false;
     let releaseFresh;
@@ -648,10 +702,9 @@ for (const outcome of ['forbidden', 'unavailable']) {
     const requested = page.waitForRequest((request) => request.method() === 'GET' && new URL(request.url()).pathname.endsWith('/pharmacies/'));
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await requested;
-    // The page, not the shell's workspace selector (its own pharmacy list), owns the team data under test.
-    await expect(page.getByRole('main')).not.toContainText(/Sensitive Former (Pharmacy|Staff|Admin)/);
     releaseFresh();
     await expect(page.getByText('Unable to verify current pharmacy access. Retry to continue.')).toBeVisible();
+    // The page, not the shell's workspace selector (its own pharmacy list), owns the team data under test.
     await expect(page.getByRole('main')).not.toContainText(/Sensitive Former (Pharmacy|Staff|Admin)/);
   });
 }
