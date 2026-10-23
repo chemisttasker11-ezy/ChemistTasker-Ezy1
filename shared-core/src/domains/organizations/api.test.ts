@@ -45,4 +45,17 @@ describe('pharmacy create idempotency wire contract', () => {
             expect(new Headers(request.headers).get('Idempotency-Key')).toBe(key);
         }
     });
+
+    it.each(['json', 'multipart'])('rejects a changed %s retry with the recovery pharmacy ID', async (format) => {
+        const conflict = { detail: 'Pharmacy already saved with different details.', pharmacy_id: 42 };
+        mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(conflict), {
+            status: 409, headers: { 'content-type': 'application/json' },
+        }));
+        const payload = format === 'multipart' ? new FormData() : { name: 'Changed Pharmacy' };
+        await expect(createPharmacy(payload, key)).rejects.toMatchObject({
+            name: 'ApiError', status: 409, message: conflict.detail, payload: conflict,
+        });
+        expect(mockedFetch).toHaveBeenCalledTimes(1);
+        expect(new Headers(lastCall()[1].headers).get('Idempotency-Key')).toBe(key);
+    });
 });

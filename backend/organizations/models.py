@@ -69,6 +69,7 @@ class Organization(models.Model):
 
 class Pharmacy(models.Model):
     idempotency_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
+    idempotency_fingerprint = models.CharField(max_length=64, null=True, blank=True, editable=False)
     idempotency_user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='+', editable=False,

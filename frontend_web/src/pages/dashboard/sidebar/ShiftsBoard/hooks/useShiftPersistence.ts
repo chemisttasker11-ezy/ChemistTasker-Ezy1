@@ -10,6 +10,7 @@ import {
 
 type UseShiftPersistenceParams = {
   shifts: Shift[];
+  userId?: number;
   disableLocalPersistence?: boolean;
   savedFeatureEnabled: boolean;
   savedShiftIdsProp?: number[];
@@ -21,6 +22,7 @@ type UseShiftPersistenceParams = {
 
 export const useShiftPersistence = ({
   shifts,
+  userId,
   disableLocalPersistence,
   savedFeatureEnabled,
   savedShiftIdsProp,
@@ -36,6 +38,8 @@ export const useShiftPersistence = ({
   const [rejectedSlotIds, setRejectedSlotIds] = useState<Set<number>>(new Set(initialRejectedSlotIds ?? []));
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // Browser-only data: scoped by user so it survives sign-out without reaching another account.
+  const savedKey = userId == null ? null : `${SAVED_STORAGE_KEY}:${userId}`;
   const savedLoadRef = useRef(false);
   const markersLoadRef = useRef(false);
 
@@ -56,8 +60,8 @@ export const useShiftPersistence = ({
     if (markersLoadRef.current) return;
     markersLoadRef.current = true;
     (async () => {
-      if (!disableLocalPersistence && savedFeatureEnabled && !savedShiftIdsProp && !savedLoadRef.current) {
-        const saved = await storageGetItem(SAVED_STORAGE_KEY).catch(() => null);
+      if (savedKey && !disableLocalPersistence && savedFeatureEnabled && !savedShiftIdsProp && !savedLoadRef.current) {
+        const saved = await storageGetItem(savedKey).catch(() => null);
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
@@ -88,18 +92,18 @@ export const useShiftPersistence = ({
       }
       setIsHydrated(true);
     })();
-  }, [savedShiftIdsProp, savedFeatureEnabled, disableLocalPersistence]);
+  }, [savedShiftIdsProp, savedFeatureEnabled, disableLocalPersistence, savedKey]);
 
   // persist saved markers
   useEffect(() => {
-    if (disableLocalPersistence || savedShiftIdsProp || !savedFeatureEnabled) return;
+    if (!savedKey || disableLocalPersistence || savedShiftIdsProp || !savedFeatureEnabled) return;
     const list = Array.from(savedShiftIds);
     if (list.length === 0) {
-      storageRemoveItem(SAVED_STORAGE_KEY).catch(() => null);
+      storageRemoveItem(savedKey).catch(() => null);
     } else {
-      storageSetItem(SAVED_STORAGE_KEY, JSON.stringify(list)).catch(() => null);
+      storageSetItem(savedKey, JSON.stringify(list)).catch(() => null);
     }
-  }, [savedShiftIds, savedShiftIdsProp, disableLocalPersistence, savedFeatureEnabled]);
+  }, [savedShiftIds, savedShiftIdsProp, disableLocalPersistence, savedFeatureEnabled, savedKey]);
 
   // keep in sync with parent props (backend interests)
   useEffect(() => {

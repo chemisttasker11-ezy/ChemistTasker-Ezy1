@@ -1,5 +1,5 @@
 import { AhpraProvider } from './AhpraContext';
-import {bearerBelongsToDifferentUser, logoutSession} from '../../landing_next/shared/browser-session';
+import {announceSession, bearerBelongsToDifferentUser, claimUserBrowserStorage, logoutSession, watchSession} from '../../landing_next/shared/browser-session';
 // src/contexts/AuthContext.tsx
 
 import {
@@ -26,6 +26,7 @@ import {
 import { AdminCapability } from "../constants/adminCapabilities";
 import { API_BASE_URL } from "../constants/api";
 import { browserSessionCurrentUser } from '@chemisttasker/shared-core';
+import { clearPharmacyPageCache } from "../utils/pharmacyPageCache";
 import { setTokens, clearTokens, refreshCookieSession, restoreTokensFromStorage, getAccessToken, getRefreshToken, AUTH_TOKENS_CLEARED_EVENT, AUTH_TOKENS_UPDATED_EVENT } from "../utils/tokenService";
 
 export interface OrgMembership {
@@ -144,11 +145,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionError, setSessionError] = useState('');
+  const [identityPending, setIdentityPending] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [activePersona, setActivePersonaState] = useState<PersonaMode>("staff");
   const [activeAdminAssignmentId, setActiveAdminAssignmentId] = useState<number | null>(null);
 
   const clearLocalAuthState = useCallback(() => {
+    clearPharmacyPageCache();
     setAccess(null);
     setRefresh(null);
     setUser(null);
@@ -223,6 +226,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
 
+        claimUserBrowserStorage(parsedUser.id);
         setAccess(getAccessToken());
         setRefresh(getRefreshToken());
         setUser(parsedUser);
@@ -239,8 +243,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     let active = true;
     let inFlight = false;
+    let again = false;
+    let identityUnknown = false;
+    let reloading = false;
     const synchronizeSession = async () => {
-      if (inFlight) return;
+      // A check already in flight may have read the cookie before another tab's login: run once more after it.
+      if (inFlight) { again = true; return; }
       inFlight = true;
       // A background re-check on focus/visibility must not toggle isLoading: ProtectedRoute would replace the
       // dashboard with a spinner and unmount every page, losing open chats, forms and dialogs.
@@ -253,11 +261,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           clearTokens();
           clearLocalAuthState();
         } else {
+          claimUserBrowserStorage(current.id);
           // Keeping the mounted page is safe only while the authenticated identity is unchanged.
           // A different account can be established in another tab / the shared Next site while this
           // dashboard is still open. Reload before rendering that identity so no account-scoped
           // chat, form or dialog state from the previous user survives into the new session.
           if (user?.id != null && current.id != null && user.id !== current.id) {
+            reloading = true;
             window.location.reload();
             return;
           }
@@ -269,14 +279,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } catch {
         // A failed background re-check keeps the current session on screen; the next focus or request retries.
+        // After another tab's login the identity is unknown, so show the reconnect prompt instead.
+        if (identityUnknown) setSessionError('Unable to connect to your account. Please retry.');
       } finally {
         inFlight = false;
+        if (again && active) { again = false; void synchronizeSession(); }
+        else if (!reloading) { identityUnknown = false; setIdentityPending(false); }
       }
     };
     const onVisible = () => { if (document.visibilityState === 'visible') void synchronizeSession(); };
+    // Another tab signed in, maybe as someone else: hide this tab's private screens until the cookie's identity is checked.
+    const stopWatching = watchSession((action, remote) => {
+      if (!remote || action !== 'login') return;
+      identityUnknown = true;
+      setIdentityPending(true);
+      void synchronizeSession();
+    });
     window.addEventListener('focus', synchronizeSession);
     document.addEventListener('visibilitychange', onVisible);
-    return () => { active = false; window.removeEventListener('focus', synchronizeSession); document.removeEventListener('visibilitychange', onVisible); };
+    return () => { active = false; stopWatching(); window.removeEventListener('focus', synchronizeSession); document.removeEventListener('visibilitychange', onVisible); };
   }, [clearLocalAuthState, fetchSessionUser, user?.id]);
   useEffect(() => {
     if (!user) {
@@ -415,12 +436,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const login = (newAccess: string, newRefresh: string, userInfo: User, rememberMe?: boolean) => {
+    claimUserBrowserStorage(userInfo.id);
     setTokens(newAccess, newRefresh, rememberMe);
     setAccess(newAccess);
     setRefresh(newRefresh);
     setActivePersonaState("staff");
     setActiveAdminAssignmentId(null);
     setUser(userInfo);
+    // Broadcast Vite login and token-returning OTP sign-ins to already-open tabs.
+    announceSession('login');
   };
 
   const logout = useCallback(async () => {
@@ -474,7 +498,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setActivePersona,
       }}
     >
-      {sessionError?<div role="alert" style={{padding:24}}><p>{sessionError}</p><button onClick={()=>window.location.reload()}>Reconnect</button><button onClick={()=>{setSessionError('');void logout();}}>Retry logout</button></div>:<AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider>}
+      {sessionError?<div role="alert" style={{padding:24}}><p>{sessionError}</p><button onClick={()=>window.location.reload()}>Reconnect</button><button onClick={()=>{setSessionError('');void logout();}}>Retry logout</button></div>:<div style={{display:identityPending?'none':'contents'}}><AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider></div>}
     </AuthContext.Provider>
   );
 }

@@ -2,13 +2,30 @@
 export type SessionUser={id:number;email:string;first_name?:string;last_name?:string;role:string;admin_assignments?:{id?:number|null;pharmacy_id?:number|null;admin_level?:string|null}[];content_capabilities?:{administrator:boolean;areas:Record<string,string>}};
 export const SESSION_EVENT='ct:session-changed';
 const EVENT_KEY='ct:session-event';
+// Kept on sign-out: auth mode, theme/layout prefs, kiosk activation, return path, and browser-only data scoped by user id
+// (each user reads only their own key). Server-backed caches and unscoped legacy copies are wiped.
+const DEVICE_KEY=/^(ct_auth_storage|ct-theme-mode|toolpad-mode|mui-.*|ct-dashboard-sidebar-collapsed|ct:session-event|ct:refresh-lease|ct:return-to|ct:last-login-redirect|ctk_kiosk_.*|ct:shift-skill-preset:.*|active_shift_slot_seen_v2:.*|ct:(?:hub|comment)-draft:\d+:.+|saved_shift_ids:\d+)$/;
+const OWNER_KEY='ct:storage-owner';
+const clearStore=(store:Storage)=>{for(const key of Object.keys(store))if(!DEVICE_KEY.test(key))store.removeItem(key);};
+/** Removes every other key (route state, shift markers, page caches) from both storages of this tab. */
+export function clearUserBrowserStorage() {
+ try{clearStore(localStorage);clearStore(sessionStorage);}catch{}
+}
+/** Call before rendering a signed-in user: a storage owned by another account, or by no proven account, is wiped. */
+export function claimUserBrowserStorage(userId:unknown) {
+ if(userId==null)return;
+ const id=String(userId);
+ try{for(const store of [localStorage,sessionStorage]){if(store.getItem(OWNER_KEY)!==id)clearStore(store);store.setItem(OWNER_KEY,id);}}catch{}
+}
 export function announceSession(action:'login'|'logout') {
+ if(action==='logout')clearUserBrowserStorage();
  window.dispatchEvent(new CustomEvent(SESSION_EVENT,{detail:action}));
  localStorage.setItem(EVENT_KEY,JSON.stringify({action,at:Date.now()}));
 }
-export function watchSession(listener:(action:string)=>void) {
- const local=(event:Event)=>listener((event as CustomEvent).detail);
- const remote=(event:StorageEvent)=>{if(event.key===EVENT_KEY&&event.newValue){try{listener(JSON.parse(event.newValue).action);}catch{}}};
+export function watchSession(listener:(action:string,remote:boolean)=>void) {
+ const local=(event:Event)=>listener((event as CustomEvent).detail,false);
+ // Another tab signed out: drop this tab's sessionStorage too (localStorage was cleared there).
+ const remote=(event:StorageEvent)=>{if(event.key===EVENT_KEY&&event.newValue){try{const {action}=JSON.parse(event.newValue);if(action==='logout')clearUserBrowserStorage();listener(action,true);}catch{}}};
  window.addEventListener(SESSION_EVENT,local);window.addEventListener('storage',remote);
  return ()=>{window.removeEventListener(SESSION_EVENT,local);window.removeEventListener('storage',remote);};
 }

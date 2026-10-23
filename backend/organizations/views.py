@@ -1,4 +1,8 @@
 """Organisation API: organisations, pharmacies, chains and pharmacy admins."""
+import hashlib
+import json
+
+from django.core.files.uploadedfile import UploadedFile
 from rest_framework import permissions, serializers, status, viewsets
 from memberships.models import Membership
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
@@ -155,6 +159,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
         if pharmacy is not None:
             return self._idempotent_create_response(pharmacy)
 
+        self.idempotency_fingerprint = self._request_fingerprint()
         try:
             with transaction.atomic():
                 return super().create(request, *args, **kwargs)
@@ -168,7 +173,39 @@ class PharmacyViewSet(viewsets.ModelViewSet):
     def _idempotent_create_response(self, pharmacy):
         if pharmacy.idempotency_user_id != self.request.user.pk:
             raise ValidationError('Idempotency key belongs to another user.')
+        pharmacy = get_object_or_404(self.get_queryset(), pk=pharmacy.pk)
+        self.check_object_permissions(self.request, pharmacy)
+        fingerprint = getattr(self, 'idempotency_fingerprint', None) or self._request_fingerprint()
+        if pharmacy.idempotency_fingerprint != fingerprint:
+            return Response({
+                'detail': 'This pharmacy was already saved earlier with different details. Open it for editing to re-apply your changes.',
+                'pharmacy_id': pharmacy.pk,
+            }, status=status.HTTP_409_CONFLICT)
         return Response(self.get_serializer(pharmacy).data, status=status.HTTP_200_OK)
+
+    def _request_fingerprint(self):
+        fields, files = {}, {}
+        data = self.request.data
+        if not isinstance(data, dict):
+            raise ValidationError('Expected an object of pharmacy fields.')
+        items = data.lists() if hasattr(data, 'lists') else ((key, [value]) for key, value in data.items())
+        for key, values in items:
+            for value in values:
+                if isinstance(value, UploadedFile):
+                    position = value.tell()
+                    digest = hashlib.sha256()
+                    try:
+                        for chunk in value.chunks():
+                            digest.update(chunk)
+                    finally:
+                        value.seek(position)
+                    files.setdefault(key, []).append({
+                        'name': value.name, 'size': value.size, 'sha256': digest.hexdigest(),
+                    })
+                else:
+                    fields.setdefault(key, []).append(value)
+        canonical = json.dumps({'fields': fields, 'files': files}, sort_keys=True, separators=(',', ':'))
+        return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -193,6 +230,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
             pharmacy = serializer.save(
                 owner=owner_onboarding, organization=organization,
                 idempotency_key=key, idempotency_user=user if key is not None else None,
+                idempotency_fingerprint=getattr(self, 'idempotency_fingerprint', None),
             )
 
             # NOW, CREATE THE MEMBERSHIP RECORD FOR THE OWNER

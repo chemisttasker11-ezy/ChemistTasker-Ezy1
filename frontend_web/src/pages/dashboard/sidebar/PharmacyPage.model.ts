@@ -250,5 +250,3 @@ export const prettifyOptionLabel = (value: string) =>
     .split('_')
     .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
     .join(' ');
-
-export const PHARMACY_CACHE_KEY = 'pharmacyPage.cache.v2';

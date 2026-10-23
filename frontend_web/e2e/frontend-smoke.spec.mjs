@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { createServer } from 'node:http';
 
 const baseCapabilities = ['MANAGE_STAFF', 'MANAGE_ROSTER', 'MANAGE_ADMINS', 'MANAGE_COMMUNICATIONS'];
 
@@ -513,13 +514,307 @@ test.describe('public/auth wiring', () => {
     await expect(button).toHaveText('Login');
     await button.click();
     await expect(button).toBeDisabled();
-    expect(loginPosts).toBe(1);
+    // The button disables before the POST fires (it waits on the CSRF GET), so wait for it.
+    await expect.poll(() => loginPosts).toBe(1);
 
     releaseLogin();
     await expect(loginAlert(page)).toContainText('Invalid credentials');
     await expect(button).toBeEnabled();
   });
 
+  for (const previousOwner of ['9001', null]) {
+    test(`login ${previousOwner ? "as another account wipes the previous account's" : 'over unowned legacy data wipes that'} browser storage`, async ({ page }) => {
+      const userB = roleUsers.pharmacist;
+      let current = null;
+      await page.route('**/api/**', async (route) => {
+        const request = route.request();
+        const apiPath = new URL(request.url()).pathname;
+        if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
+          current = userB;
+          return json(route, { access: 'smoke-access', refresh: '', user: userB });
+        }
+        if (apiPath.endsWith('/users/me/') && current) return json(route, current);
+        const bootstrap = await installLoggedOutBootstrap(route);
+        if (bootstrap) return bootstrap;
+        if (request.method() === 'GET') return json(route, { results: [], count: 0, next: null, previous: null });
+        return json(route, {});
+      });
+      // The hermetic Next server has no dashboard: keep a full-page hand-off on this origin so storage stays readable.
+      await page.route((url) => url.pathname.startsWith('/dashboard'), (route) => (route.request().resourceType() === 'document'
+        ? route.fulfill({ contentType: 'text/html', body: '<main>Dashboard</main>' }) : route.fallback()));
+      await page.goto('/login');
+      await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+      const personal = {
+        local: ['saved_shift_ids', 'applied_shift_ids', 'applied_slot_ids', 'rejected_shift_ids', 'rejected_slot_ids', 'counter_offer_map', 'ct_access', 'ct_refresh'],
+        session: ['owner-pharmacy-setup-skipped', 'ct:hub-draft:community', 'ct:comment-draft:7', 'ct:route:/shifts'],
+      };
+      // Browser-only data scoped to account 9001 stays for 9001; B reads only keys scoped to B.
+      const device = ['ct-theme-mode', 'ct-dashboard-sidebar-collapsed', 'ct:shift-skill-preset:v1:9001:PHARMACIST', 'saved_shift_ids:9001'];
+      await page.evaluate(({ personal, device, previousOwner }) => {
+        for (const key of personal.local) localStorage.setItem(key, '[101]');
+        for (const key of personal.session) sessionStorage.setItem(key, 'Private A text');
+        for (const key of device) localStorage.setItem(key, 'dark');
+        if (previousOwner) { localStorage.setItem('ct:storage-owner', previousOwner); sessionStorage.setItem('ct:storage-owner', previousOwner); }
+      }, { personal, device, previousOwner });
+
+      await page.getByLabel('Email').fill(userB.email);
+      await page.getByLabel('Password').fill('test-password');
+      await page.locator('form button[type="submit"]').click();
+      await expect.poll(() => new URL(page.url()).pathname).not.toBe('/login');
+      await page.waitForLoadState('networkidle');
+
+      // The signed-in app may rewrite its own markers (e.g. to "[]"); only the first account's values matter.
+      const left = await page.evaluate(({ personal, device }) => ({
+        personal: [...personal.local.filter((key) => localStorage.getItem(key) === '[101]'), ...personal.session.filter((key) => sessionStorage.getItem(key) === 'Private A text')],
+        device: device.filter((key) => localStorage.getItem(key) === 'dark'),
+        owner: localStorage.getItem('ct:storage-owner'),
+      }), { personal, device });
+      expect(left.personal).toEqual([]);
+      expect(left.device).toEqual(device);
+      expect(left.owner).toBe(String(userB.id));
+    });
+  }
+
+});
+
+test.describe('login keeps hub drafts per account', () => {
+  // Hub pages render on the Next server, which reads posts from the API at 127.0.0.1:8000 (HUB_API_URL default).
+  test.skip(process.env.PLAYWRIGHT_PORT !== '3000', 'hub pages are served by the Next app');
+  const post = {
+    id: 7, platform_hub: 'public', body: 'Shared question', author_name: 'Someone', created_at: '2026-01-01T00:00:00Z',
+    allow_comments: true, is_pinned: false, comment_count: 0, reactions: {}, can_interact: true, can_edit: false, attachments: [], editorial: null,
+  };
+  const empty = { results: [], count: 0, next: null, previous: null };
+  let backend;
+  test.beforeAll(async () => {
+    backend = createServer((request, response) => {
+      response.setHeader('Content-Type', 'application/json');
+      response.end(JSON.stringify(/\/posts\/7\/$/.test(new URL(request.url, 'http://x').pathname) ? post : empty));
+    });
+    await new Promise((resolve) => backend.listen(8000, '127.0.0.1', resolve));
+  });
+  test.afterAll(() => new Promise((resolve) => backend.close(resolve)));
+
+  test('login as A restores A drafts after logout; login as B shows none of them', async ({ page }) => {
+    const userA = { ...roleUsers.pharmacist, id: 4, first_name: 'Alice' };
+    const userB = { ...roleUsers.otherstaff, id: 5, first_name: 'Bob' };
+    let current = userA;
+    await page.route('**/api/**', async (route) => {
+      const request = route.request();
+      const apiPath = new URL(request.url()).pathname;
+      if (apiPath.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+      if (request.method() === 'POST' && isPath(apiPath, LOGIN_PATH)) {
+        current = JSON.parse(request.postData() || '{}').email === userB.email ? userB : userA;
+        return json(route, { access: 'smoke-access', refresh: '', user: current });
+      }
+      if (apiPath.endsWith('/users/logout/')) { current = null; return json(route, {}); }
+      if (apiPath.endsWith('/users/me/')) return current ? json(route, current) : json(route, { detail: 'Unauthenticated' }, 401);
+      if (isPath(apiPath, REFRESH_PATH)) return json(route, { detail: 'Unauthenticated' }, 401);
+      if (apiPath.endsWith('/public-hub/community/')) return json(route, [{ key: 'public', can_interact: true }]);
+      if (apiPath.endsWith('/posts/7/')) return json(route, post);
+      return json(route, request.method() === 'GET' ? empty : {});
+    });
+    await page.route((url) => url.pathname.startsWith('/dashboard'), (route) => (route.request().resourceType() === 'document'
+      ? route.fulfill({ contentType: 'text/html', body: '<main>Dashboard</main>' }) : route.fallback()));
+    const hubText = () => page.getByLabel('Post text');
+    const commentText = () => page.getByLabel('Write a comment');
+    // Every matching box (the remount on sign-in can briefly show two), so no copy holds another account's text.
+    const values = (locator) => expect.poll(() => locator.evaluateAll((boxes) => boxes.map((box) => box.value)));
+    const fill = async (locator, text) => { await expect(locator).toHaveCount(1); await locator.fill(text); };
+    // The composer remounts once the session resolves, so wait for the signed-in header first.
+    const signedIn = (name) => expect(page.locator('summary:visible', { hasText: name })).toBeVisible();
+    const openHub = async (name) => {
+      await page.goto('/hubs/public');
+      await signedIn(name);
+      const trigger = page.getByRole('button', { name: /Write something to/ });
+      await expect(trigger.or(hubText()).first()).toBeVisible();
+      if (await trigger.isVisible()) await trigger.click();
+    };
+    const logout = async (name) => {
+      await page.locator('summary:visible', { hasText: name }).click();
+      await page.locator('button:visible', { hasText: 'Log out' }).click();
+      await expect(page.locator('summary', { hasText: name })).toHaveCount(0);
+    };
+    const login = async (user) => {
+      await page.goto('/login');
+      await page.getByLabel('Email').fill(user.email);
+      await page.getByLabel('Password').fill('test-password');
+      await page.locator('form button[type="submit"]').click();
+      await expect.poll(() => new URL(page.url()).pathname).not.toBe('/login');
+    };
+
+    await openHub('Alice');
+    await fill(hubText(), 'A hub draft');
+    await page.goto('/hubs/posts/7');
+    await signedIn('Alice');
+    await fill(commentText(), 'A comment draft');
+    // Sign-out on this page: the composer must drop the draft, not re-read it.
+    await logout('Alice');
+    await values(commentText()).toEqual(['']);
+
+    await login(userA);
+    await openHub('Alice');
+    await values(hubText()).toEqual(['A hub draft']);
+    await page.goto('/hubs/posts/7');
+    await signedIn('Alice');
+    await values(commentText()).toEqual(['A comment draft']);
+    await logout('Alice');
+
+    await login(userB);
+    await openHub('Bob');
+    await values(hubText()).toEqual(['']);
+    await page.goto('/hubs/posts/7');
+    await signedIn('Bob');
+    await values(commentText()).toEqual(['']);
+    await expect(page.locator('body')).not.toContainText(/A (hub|comment) draft/);
+  });
+
+  test("cross-tab login drops A's identity and draft while the check is slow and after it fails", async ({ context }) => {
+    const userA = { ...roleUsers.pharmacist, id: 4, first_name: 'Alice' };
+    const page = await context.newPage();
+    const other = await context.newPage();
+    for (const tab of [page, other]) {
+      await tab.route('**/api/**', async (route) => {
+        const apiPath = new URL(route.request().url()).pathname;
+        if (apiPath.endsWith('/users/me/')) return json(route, userA);
+        if (apiPath.endsWith('/users/csrf/')) return json(route, { csrfToken: 'smoke-csrf' });
+        if (apiPath.endsWith('/public-hub/community/')) return json(route, [{ key: 'public', can_interact: true }]);
+        return json(route, route.request().method() === 'GET' ? empty : {});
+      });
+    }
+    const alice = page.locator('summary:visible', { hasText: 'Alice' });
+    const boxes = () => page.locator('textarea').evaluateAll((all) => all.map((box) => box.value));
+    await page.goto('/hubs/public');
+    await expect(alice).toBeVisible();
+    const trigger = page.getByRole('button', { name: /Write something to/ });
+    await expect(trigger.or(page.getByLabel('Post text')).first()).toBeVisible();
+    if (await trigger.isVisible()) await trigger.click();
+    await page.getByLabel('Post text').fill('A hub draft');
+    await other.goto('/hubs/public');
+
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    let checked;
+    const checking = new Promise((resolve) => { checked = resolve; });
+    await page.route('**/users/me/', async (route) => { checked(); await held; await json(route, { detail: 'Unavailable' }, 503); });
+    // What announceSession('login') writes in the tab that signed in.
+    await other.evaluate(() => localStorage.setItem('ct:session-event', JSON.stringify({ action: 'login', at: Date.now() })));
+    await checking;
+    await expect(page.locator('summary', { hasText: 'Alice' })).toHaveCount(0);
+    await expect.poll(boxes).not.toContain('A hub draft');
+
+    const failed = page.waitForResponse((response) => response.url().endsWith('/users/me/') && response.status() === 503);
+    release();
+    await failed;
+    await expect(page.locator('summary', { hasText: 'Alice' })).toHaveCount(0);
+    await expect.poll(boxes).not.toContain('A hub draft');
+  });
+});
+
+test.describe('cross-tab sign-in', () => {
+  test('real Vite login announces account change to an already-open tab', async ({ context }) => {
+    test.skip(process.env.PLAYWRIGHT_PORT === '3000', 'Vite-specific login broadcast');
+    const userA = { ...roleUsers.pharmacist };
+    const userB = { ...roleUsers.otherstaff };
+    let current = userA;
+    const first = await context.newPage();
+    const second = await context.newPage();
+    await installApiFixture(first, userA);
+    await installApiFixture(second, userA);
+    for (const tab of [first, second]) {
+      await tab.route('**/api/v1/users/me/', (route) => json(route, current));
+    }
+    await second.route('**/api/v1/users/login/', (route) => {
+      current = userB;
+      return json(route, { access: 'new-vite-access', refresh: '', user: userB });
+    });
+    await first.goto('/dashboard/pharmacist/overview');
+    await first.waitForLoadState('networkidle');
+    await second.goto('/login');
+    await expect(first.locator('main')).toBeVisible();
+    await first.evaluate(() => {
+      window.ctLoginEvents = 0;
+      window.addEventListener('storage', (event) => {
+        if (event.key === 'ct:session-event' && JSON.parse(event.newValue || '{}').action === 'login') window.ctLoginEvents += 1;
+      });
+    });
+    let releaseIdentity;
+    const held = new Promise((resolve) => { releaseIdentity = resolve; });
+    let recheckStarted;
+    const rechecking = new Promise((resolve) => { recheckStarted = resolve; });
+    await first.route('**/api/v1/users/me/', async (route) => {
+      recheckStarted();
+      await held;
+      return json(route, current);
+    });
+    await second.getByLabel('Email').fill(userB.email);
+    await second.getByLabel('Password').fill('test-password');
+    await second.getByRole('button', { name: 'Login', exact: true }).click();
+    await rechecking;
+    await expect.poll(() => first.evaluate(() => window.ctLoginEvents)).toBe(1);
+    await expect(first.locator('main')).toBeHidden();
+    releaseIdentity();
+    await expect.poll(() => new URL(first.url()).pathname).toBe('/dashboard/otherstaff/overview');
+  });
+
+  for (const sameUser of [true, false]) {
+    test(`another tab signing in ${sameUser ? 'as the same account keeps the mounted page' : 'as another account hides this tab until it reloads'}`, async ({ context }) => {
+      const user = JSON.parse(JSON.stringify(roleUsers.pharmacist));
+      const first = await context.newPage();
+      const second = await context.newPage();
+      await installApiFixture(first, user);
+      await installApiFixture(second, user);
+      await first.goto('/dashboard/pharmacist/overview');
+      await first.waitForLoadState('networkidle');
+      await second.goto('/dashboard/pharmacist/overview');
+      await second.waitForLoadState('networkidle');
+      await expect(first.locator('main')).toBeVisible();
+      await first.evaluate(() => { window.__ctMain = document.querySelector('main'); });
+
+      // Hold this tab's identity check so the hidden state can be observed.
+      let release;
+      const held = new Promise((resolve) => { release = resolve; });
+      let checked;
+      const checking = new Promise((resolve) => { checked = resolve; });
+      await first.route('**/users/me/', async (route) => { checked(); await held; await route.fallback(); });
+      if (!sameUser) Object.assign(user, JSON.parse(JSON.stringify(roleUsers.otherstaff)));
+      // What announceSession('login') writes in the tab that signed in.
+      await second.evaluate(() => localStorage.setItem('ct:session-event', JSON.stringify({ action: 'login', at: Date.now() })));
+      await checking;
+      await expect(first.locator('main')).toBeHidden();
+
+      if (sameUser) {
+        release();
+        await expect(first.locator('main')).toBeVisible();
+        expect(await first.evaluate(() => window.__ctMain === document.querySelector('main'))).toBe(true);
+      } else {
+        const navigation = first.waitForNavigation({ waitUntil: 'domcontentloaded' });
+        release();
+        await navigation;
+        await expect.poll(() => new URL(first.url()).pathname).toBe('/dashboard/otherstaff/overview');
+      }
+    });
+  }
+
+  test('a stalled identity check after another tab signs in shows the Reconnect prompt', async ({ context }) => {
+    test.setTimeout(60_000);
+    const user = roleUsers.pharmacist;
+    const first = await context.newPage();
+    const second = await context.newPage();
+    await installApiFixture(first, user);
+    await installApiFixture(second, user);
+    await first.goto('/dashboard/pharmacist/overview');
+    await first.waitForLoadState('networkidle');
+    await second.goto('/dashboard/pharmacist/overview');
+    await second.waitForLoadState('networkidle');
+    await expect(first.locator('main')).toBeVisible();
+
+    // Never answer: only the client-side timeout can end the check.
+    await first.route('**/users/me/', () => {});
+    await second.evaluate(() => localStorage.setItem('ct:session-event', JSON.stringify({ action: 'login', at: Date.now() })));
+    await expect(first.locator('main')).toBeHidden();
+    await expect(first.getByRole('button', { name: 'Reconnect' })).toBeVisible({ timeout: 30_000 });
+  });
 });
 
 test.describe('authenticated route skeleton', () => {

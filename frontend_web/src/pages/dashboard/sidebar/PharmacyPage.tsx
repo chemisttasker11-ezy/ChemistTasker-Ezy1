@@ -53,6 +53,7 @@ import PharmacyClaimsPanels from "./PharmacyClaimsPanels";
 import { ORG_ROLES } from "../../../constants/roles";
 import { clearOwnerPharmacySetupSkipped, markOwnerPharmacySetupSkipped } from "../../../utils/ownerSetup";
 import {
+  ApiError,
   claimOnboarding,
   createPharmacy,
   deletePharmacy,
@@ -60,6 +61,7 @@ import {
   fetchPharmacyAdminsService,
   getOnboarding,
   getPharmacyClaims,
+  getPharmacyById,
   lookupPharmacyAbn,
   updatePharmacy,
   updatePharmacyClaim,
@@ -84,9 +86,9 @@ import {
   RATE_MINIMUM_EXAMPLE,
   GOVERNMENT_AWARD_GUIDE_URL,
   prettifyOptionLabel,
-  PHARMACY_CACHE_KEY,
 } from "./PharmacyPage.model";
 import { brandPanelBackground } from "../../../components/ui/BrandBanner";
+import { clearPharmacyPageCache } from "../../../utils/pharmacyPageCache";
 
 const GOOGLE_LIBRARIES = ["places"] as Array<"places">;
 const LIGHT_SURFACE = "#FFFFFF";
@@ -175,7 +177,18 @@ type PharmacyPageProps = {
   targetPharmacyCount?: number;
 };
 
-export default function PharmacyPage({
+export default function PharmacyPage(props: PharmacyPageProps) {
+  const { user, activePersona, activeAdminAssignmentId, activeAdminPharmacyId } = useAuth();
+  if (user?.id == null) return null;
+  // Identity and scope ids only: a focus re-check that refreshes membership details must not remount open dialogs.
+  const orgScope = (Array.isArray(user.memberships) ? user.memberships : []).flatMap((m: any) =>
+    m?.organization_id != null ? [[m.organization_id, m.role]] : []);
+  const scopeKey = JSON.stringify([user.id, user.role, activePersona, activeAdminAssignmentId, activeAdminPharmacyId, orgScope]);
+  // Remount before rendering a different identity/scope, including its team and admin state.
+  return <PharmacyPageContent key={scopeKey} {...props} />;
+}
+
+function PharmacyPageContent({
   standalone = false,
   onNeedsOnboardingPath = "/onboarding/owner",
   onCompletePath = "/dashboard/owner/overview",
@@ -253,6 +266,13 @@ export default function PharmacyPage({
 
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  // The sessionStorage cache or a previous user/scope can carry a stale can_edit; deep-link actions
+  // wait until the API list loaded for the current pharmaciesKey has landed.
+  const [freshPharmaciesKey, setFreshPharmaciesKey] = useState<object | null>(null);
+  // Only the latest pharmacies request may mark the list fresh; older responses are ignored.
+  const pharmaciesRequestRef = useRef(0);
+  const membersGenerationRef = useRef(0);
+  const [pharmaciesAccessError, setPharmaciesAccessError] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [membershipsByPharmacy, setMembershipsByPharmacy] = useState<Record<string, MembershipDTO[]>>({});
@@ -1349,42 +1369,23 @@ export default function PharmacyPage({
     }
   };
 
+  // Previous releases persisted private pharmacy and team data; never hydrate it without
+  // a fresh server authorisation check, and remove legacy snapshots immediately.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const cachedRaw = sessionStorage.getItem(PHARMACY_CACHE_KEY);
-      if (!cachedRaw) return;
-      const cached = JSON.parse(cachedRaw) as {
-        pharmacies?: Pharmacy[];
-        memberships?: Record<string, MembershipDTO[]>;
-        admin_assignments?: Record<string, PharmacyAdminDTO[]>;
-      };
-      if (Array.isArray(cached.pharmacies)) {
-        const normalized = cached.pharmacies.map((ph) => normalizePharmacy(ph));
-        setPharmacies(scopePharmacies(normalized));
-        if (cached.pharmacies.length > 0) {
-          setInitialLoadComplete(true);
-        }
-      }
-      if (cached.memberships) {
-        setMembershipsByPharmacy(cached.memberships);
-      }
-      if (cached.admin_assignments) {
-        setAdminAssignmentsByPharmacy(cached.admin_assignments);
-      }
-    } catch (error) {
-      console.error("Failed to hydrate pharmacy cache", error);
-    }
+    clearPharmacyPageCache();
   }, []);
 
   const loadMembers = useCallback(
     async (pharmacyId: string) => {
+      const generation = membersGenerationRef.current;
       setMembershipsLoading((prev) => ({ ...prev, [pharmacyId]: true }));
       try {
         const [memberData, adminData] = await Promise.all([
           fetchMembershipsForPharmacy(pharmacyId),
           fetchPharmacyAdminsService({ pharmacy: pharmacyId }),
         ]);
+        if (generation !== membersGenerationRef.current) return;
         setMembershipsByPharmacy((prev) => ({
           ...prev,
           [pharmacyId]: Array.isArray(memberData) ? memberData : [],
@@ -1395,10 +1396,11 @@ export default function PharmacyPage({
         }));
         setMembershipsError((prev) => ({ ...prev, [pharmacyId]: "" }));
       } catch (err) {
+        if (generation !== membersGenerationRef.current) return;
         console.error("Failed to load memberships", err);
         setMembershipsError((prev) => ({ ...prev, [pharmacyId]: "Team lists didn't load." }));
       } finally {
-        setMembershipsLoading((prev) => ({ ...prev, [pharmacyId]: false }));
+        if (generation === membersGenerationRef.current) setMembershipsLoading((prev) => ({ ...prev, [pharmacyId]: false }));
       }
     },
     []
@@ -1410,32 +1412,63 @@ export default function PharmacyPage({
     }
   }, [view, activePharmacyId, loadMembers]);
 
-  const loadPharmacies = useCallback(async () => {
+  // A failed re-check never keeps displaying last-known pharmacy or personnel data.
+  const failAccessCheck = useCallback(() => {
+    membersGenerationRef.current += 1;
+    setFreshPharmaciesKey(null);
+    setPharmaciesAccessError(true);
+    setPharmacies([]);
+    setMembershipsByPharmacy({});
+    setAdminAssignmentsByPharmacy({});
+    setMembershipsError({});
+    setMembershipsLoading({});
+  }, []);
+
+  const loadPharmacies = useCallback(async (key: object) => {
+    const requestId = ++pharmaciesRequestRef.current;
+    membersGenerationRef.current += 1;
+    // A same-scope background re-check keeps the last verified data on screen (and open dialogs mounted);
+    // a different user/scope remounts this component, so it never sees another identity's data.
+    setPharmaciesAccessError(false);
     setIsFetching(true);
     try {
       const data = await fetchPharmaciesService({});
+      if (requestId !== pharmaciesRequestRef.current) return;
       const normalized = data.map(normalizePharmacy);
       let accessible = normalized;
       if (isOrganizationUser && scopedOrgPharmacyIds && scopedOrgPharmacyIds.size > 0 && user?.role !== "ORG_ADMIN") {
         accessible = normalized.filter((pharmacy: Pharmacy) => scopedOrgPharmacyIds.has(Number(pharmacy.id)));
       }
+      const ids = new Set(accessible.map((p: Pharmacy) => p.id));
+      const keepAccessible = <T,>(prev: Record<string, T>) => Object.fromEntries(Object.entries(prev).filter(([id]) => ids.has(id)));
       setPharmacies(scopePharmacies(accessible));
+      setMembershipsByPharmacy(keepAccessible);
+      setAdminAssignmentsByPharmacy(keepAccessible);
+      setFreshPharmaciesKey(key);
       await Promise.all(accessible.map((p: Pharmacy) => loadMembers(p.id)));
       setInitialLoadComplete(true);
     } catch (err) {
+      if (requestId !== pharmaciesRequestRef.current) return;
       if (err instanceof AxiosError && err.response?.status === 404) {
         setNeedsOnboarding(true);
         setInitialLoadComplete(true);
       } else {
+        failAccessCheck();
         console.error(err);
       }
     } finally {
-      setIsFetching(false);
+      if (requestId === pharmaciesRequestRef.current) setIsFetching(false);
     }
-  }, [isOrganizationUser, loadMembers, scopePharmacies, scopedOrgPharmacyIds, user?.role]);
+  }, [failAccessCheck, isOrganizationUser, loadMembers, scopePharmacies, scopedOrgPharmacyIds, user?.role]);
+
+  // A new key per user/scope (the load effect's inputs), known in the same render that changes them.
+  const pharmaciesKey = useMemo(() => ({}), [user, loadPharmacies]);
 
   useEffect(() => {
     if (!user) return;
+    // A user/scope change invalidates any in-flight load before the replacement starts.
+    pharmaciesRequestRef.current += 1;
+    let cancelled = false;
 
     const isOrgRoleUser =
       Array.isArray(user?.memberships) &&
@@ -1445,23 +1478,28 @@ export default function PharmacyPage({
       });
 
     if (isOrgRoleUser || isAdminUser || isOrganizationUser) {
-      void loadPharmacies();
+      void loadPharmacies(pharmaciesKey);
       return;
     }
 
     setIsFetching(true);
     getOnboarding("owner")
-      .then(() => loadPharmacies())
+      .then(() => (cancelled ? undefined : loadPharmacies(pharmaciesKey)))
       .catch((err: unknown) => {
+        if (cancelled) return;
         if (err instanceof AxiosError && err.response?.status === 404) {
           setNeedsOnboarding(true);
           setInitialLoadComplete(true);
         } else {
+          failAccessCheck();
           console.error(err);
         }
         setIsFetching(false);
       });
-  }, [user, loadPharmacies]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loadPharmacies, pharmaciesKey, failAccessCheck]);
 
   useEffect(() => {
     if (!standalone || isFetching || needsOnboarding || dialogOpen || editing || pharmacies.length > 0) {
@@ -1481,21 +1519,6 @@ export default function PharmacyPage({
       void loadOwnerClaims();
     }
   }, [isOrganizationUser, loadOwnerClaims]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!initialLoadComplete) return;
-    try {
-      const payload = JSON.stringify({
-        pharmacies,
-        memberships: membershipsByPharmacy,
-        admin_assignments: adminAssignmentsByPharmacy,
-      });
-      sessionStorage.setItem(PHARMACY_CACHE_KEY, payload);
-    } catch (error) {
-      console.error("Failed to persist pharmacy cache", error);
-    }
-  }, [pharmacies, membershipsByPharmacy, adminAssignmentsByPharmacy, initialLoadComplete]);
 
   const openPharmacy = useCallback(
     (pharmacyId: string, options?: { replace?: boolean }) => {
@@ -1660,7 +1683,7 @@ export default function PharmacyPage({
   useEffect(() => {
     const action = searchParams.get("action");
     const idParam = searchParams.get("pharmacyId");
-    if (!action || !idParam) return;
+    if (!action || !idParam || freshPharmaciesKey !== pharmaciesKey) return;
 
     const target = pharmacies.find((p) => p.id === idParam);
     if (!target) return;
@@ -1673,7 +1696,21 @@ export default function PharmacyPage({
     } else if (action === "delete") {
       setPendingDeletePharmacy((current) => (current?.id === target.id ? current : target));
     }
-  }, [searchParams, pharmacies, openDialog, clearActionParam]);
+  }, [searchParams, pharmacies, freshPharmaciesKey, pharmaciesKey, openDialog, clearActionParam]);
+
+  const isEditable = useCallback(
+    (id: string) => pharmacies.some((item) => item.id === id && item.can_edit !== false),
+    [pharmacies]
+  );
+
+  useEffect(() => {
+    if (freshPharmaciesKey !== pharmaciesKey) return;
+    if (editing && !isEditable(editing.id)) {
+      setEditing(null);
+      setDialogOpen(false);
+    }
+    if (pendingDeletePharmacy && !isEditable(pendingDeletePharmacy.id)) setPendingDeletePharmacy(null);
+  }, [freshPharmaciesKey, pharmaciesKey, isEditable, editing, pendingDeletePharmacy]);
 
   const closeDialog = () => {
     if (standalone) {
@@ -2003,8 +2040,30 @@ export default function PharmacyPage({
       closeDialog();
       return true;
     } catch (err) {
+      const conflictId = err instanceof ApiError && err.status === 409
+        ? (err.payload as { pharmacy_id?: number } | null)?.pharmacy_id : null;
+      if (!editing && conflictId != null) {
+        // Keep the key until the saved pharmacy opens (openDialog clears it): a retry must replay this 409, never create.
+        const message = 'This pharmacy was already saved earlier with different details. Re-apply your changes in the saved pharmacy.';
+        try {
+          const saved = normalizePharmacy(await getPharmacyById(conflictId));
+          if (saved.can_edit === false) {
+            setError(`${message} You no longer have permission to edit it.`);
+          } else {
+            setPharmacies((prev) => scopePharmacies([...prev.filter((p) => p.id !== saved.id), saved]));
+            openDialog(saved);
+            setError(message);
+          }
+        } catch {
+          setError(`${message} The saved pharmacy could not be opened. Press Save again to retry — it won't create a duplicate.`);
+        }
+        return false;
+      }
       if (err instanceof AxiosError) {
         setError(err.response?.data?.detail || err.message);
+      } else if (!editing && createIdempotencyKeyRef.current && !(err instanceof ApiError)) {
+        // No response: the create may have landed; the kept key makes a retry safe.
+        setError("We couldn't confirm the pharmacy was saved. Press Save again — it won't create a duplicate.");
       } else {
         setError("An unexpected error occurred.");
       }
@@ -2130,6 +2189,18 @@ export default function PharmacyPage({
         <Button variant="contained" sx={{ mt: 2 }} onClick={() => navigate(onNeedsOnboardingPath)}>
           Go to Onboarding
         </Button>
+      </Box>
+    );
+  }
+
+  // Nothing is shown before the first verified load, or after a failed re-check.
+  if (freshPharmaciesKey === null) {
+    return (
+      <Box p={4} textAlign="center">
+        <Alert severity={pharmaciesAccessError ? "warning" : "info"}>
+          {pharmaciesAccessError ? "Unable to verify current pharmacy access. Retry to continue." : "Verifying pharmacy access..."}
+        </Alert>
+        {pharmaciesAccessError && <Button variant="contained" sx={{ mt: 2 }} onClick={() => void loadPharmacies(pharmaciesKey)}>Retry</Button>}
       </Box>
     );
   }
@@ -2476,7 +2547,7 @@ export default function PharmacyPage({
         handleOwnerRespond={handleOwnerRespond}
         ownerResponding={ownerResponding}
         canRespondToClaims={canRespondToClaims}
-        pendingDeletePharmacy={pendingDeletePharmacy}
+        pendingDeletePharmacy={pendingDeletePharmacy && isEditable(pendingDeletePharmacy.id) ? pendingDeletePharmacy : null}
         handleCancelDeletePharmacy={handleCancelDeletePharmacy}
         confirmDeletePharmacy={confirmDeletePharmacy}
         isDeletingPharmacy={isDeletingPharmacy}
@@ -2485,7 +2556,7 @@ export default function PharmacyPage({
         onGoDashboard={() => navigate(onCompletePath)}
         onAddAnother={() => openDialog()}
         standalone={standalone}
-        dialogOpen={dialogOpen}
+        dialogOpen={dialogOpen && (!editing || isEditable(editing.id))}
         closeDialog={closeDialog}
         editing={Boolean(editing)}
         isSaving={isSaving}

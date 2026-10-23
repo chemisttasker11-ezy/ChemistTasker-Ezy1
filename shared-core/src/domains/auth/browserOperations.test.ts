@@ -70,6 +70,20 @@ describe('browser identity and public wire contract parity', () => {
     options.fetchImpl = vi.fn(async () => json({ detail: 'Backend unavailable' }, 503)) as unknown as typeof fetch;
     await expect(browserSessionCurrentUser(options)).rejects.toThrow('Your account is temporarily unavailable.');
   });
+  it('a stalled current-user check times out instead of hanging', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort());
+    try {
+      const fetchImpl = vi.fn(async (_u: RequestInfo | URL, init?: RequestInit) => {
+        init?.signal?.throwIfAborted();
+        return json({ id: 1 });
+      }) as unknown as typeof fetch;
+      await expect(browserSessionCurrentUser({ baseUrl: 'https://example.test/api/v1', fetchImpl }))
+        .rejects.toThrow('Your account is temporarily unavailable.');
+      expect(timeout).toHaveBeenCalledWith(20000);
+    } finally {
+      timeout.mockRestore();
+    }
+  });
   it.each([400, 401, 403, 429])('browser login preserves structured %i error payloads', async (status) => {
     const fetchImpl = vi.fn(async (u: RequestInfo | URL) => {
       const path = new URL(String(u)).pathname;

@@ -29,8 +29,10 @@ function Paging({page,next,onPage}:{page:number;next:boolean;onPage:(n:number)=>
  return <div className="ct-pagination"><button disabled={page===1} onClick={()=>onPage(page-1)}>Previous</button><span>Page {page}</span><button disabled={!next} onClick={()=>onPage(page+1)}>Next</button></div>;
 }
 
-export default function CommunityFeed({hub,label,initial}:{hub:string;label:string;initial:Page<PublicPost>}){
- const session=useSession();
+// Remount per identity so one account's composer text, files and reply/edit state never reach another account.
+export default function CommunityFeed(props:{hub:string;label:string;initial:Page<PublicPost>}){const session=useSession();return <Feed key={session.user?.id??'anonymous'} {...props}/>;}
+function Feed({hub,label,initial}:{hub:string;label:string;initial:Page<PublicPost>}){
+ const session=useSession();const draftKey=session.user?`ct:hub-draft:${session.user.id}:${hub}`:null;
  const [tab,setTab]=useState<'discussion'|'about'>('discussion');
  const [files,setFiles]=useState<File[]>([]);
  // One object URL per selected image, released when the selection changes (was created on every render).
@@ -42,13 +44,13 @@ export default function CommunityFeed({hub,label,initial}:{hub:string;label:stri
  const textRef=useRef<HTMLTextAreaElement>(null);const fileRef=useRef<HTMLInputElement>(null);
  const meName=`${session.user?.first_name||''} ${session.user?.last_name||''}`.trim();
  const reload=useCallback(async()=>setFeed(await chemistTaskerApi.publicContent.listCommunityPosts(hub,{page,q:search}) as Page<PublicPost>),[hub,page,search,session.status]);
- useEffect(()=>{const draft=sessionStorage.getItem(`ct:hub-draft:${hub}`)||'';setBody(draft);if(draft)setComposerOpen(true);},[hub]);
+ useEffect(()=>{if(!draftKey)return;const draft=sessionStorage.getItem(draftKey)||'';setBody(draft);if(draft)setComposerOpen(true);},[draftKey]);
  const loadPolls=useCallback(async()=>setPolls(await chemistTaskerApi.publicContent.listCommunityPolls(hub,{page:pollPage}) as Page<Poll>),[hub,pollPage]);
  useEffect(()=>{reload().catch(e=>setError(e.message));},[reload]);useEffect(()=>{loadPolls().catch(e=>setError(e.message));},[loadPolls]);
  useEffect(()=>{chemistTaskerApi.publicContent.listHubs().then(h=>setAllowed(!!h.find(x=>x.key===hub)?.can_interact)).catch(e=>setError(e.message));},[hub,session.status]);
  function openComposer(){setComposerOpen(true);setTimeout(()=>textRef.current?.focus(),0);}
  function addFiles(selected:File[]){const tooLarge=selected.find(file=>file.size>15*1024*1024);if(tooLarge){setError(`${tooLarge.name} is larger than the 15 MB attachment limit.`);return;}setError('');setFiles(prev=>[...prev,...selected]);setComposerOpen(true);}
- async function post(){setBusy(true);setError('');try{const data=new FormData();data.append('scope','platform');data.append('platform_hub',hub);data.append('body',body);files.forEach(file=>data.append('attachments',file));await chemistTaskerApi.publicContent.createCommunityPost(data);setBody('');sessionStorage.removeItem(`ct:hub-draft:${hub}`);setFiles([]);setComposerOpen(false);setPage(1);await reload();}catch(e){setError(`${(e as Error).message} Your text is still here, so you can try again.`);if((e as {status?:number}).status===401)window.location.assign(loginHref(`/hubs/${hub}`));}finally{setBusy(false);}}
+ async function post(){setBusy(true);setError('');try{const data=new FormData();data.append('scope','platform');data.append('platform_hub',hub);data.append('body',body);files.forEach(file=>data.append('attachments',file));await chemistTaskerApi.publicContent.createCommunityPost(data);setBody('');if(draftKey)sessionStorage.removeItem(draftKey);setFiles([]);setComposerOpen(false);setPage(1);await reload();}catch(e){setError(`${(e as Error).message} Your text is still here, so you can try again.`);if((e as {status?:number}).status===401)window.location.assign(loginHref(`/hubs/${hub}`));}finally{setBusy(false);}}
  async function vote(poll:number,option:number){setBusy(true);setError('');try{await chemistTaskerApi.publicContent.voteCommunityPoll(poll,option);await loadPolls();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  const about=ABOUT[hub]||'Share ideas, ask questions and learn with your pharmacy community.';
  const aboutPanel=<>
@@ -89,7 +91,7 @@ export default function CommunityFeed({hub,label,initial}:{hub:string;label:stri
      </div>:
      <form className="ct-card ct-composer" onSubmit={e=>{e.preventDefault();void post();}} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();addFiles(Array.from(e.dataTransfer.files||[]));}}>
       <div className="ct-composer-head"><span className="ct-avatar" aria-hidden="true">{initials(meName||'Me')}</span><div><strong>{meName||'You'}</strong><span> · posting to {label}</span></div></div>
-      <textarea ref={textRef} aria-label="Post text" placeholder="What would you like to share with the group?" required maxLength={10000} value={body} onChange={e=>{setBody(e.target.value);sessionStorage.setItem(`ct:hub-draft:${hub}`,e.target.value);}} onPaste={e=>{const pasted=Array.from(e.clipboardData.files||[]);if(pasted.length){e.preventDefault();addFiles(pasted);}}}/>
+      <textarea ref={textRef} aria-label="Post text" placeholder="What would you like to share with the group?" required maxLength={10000} value={body} onChange={e=>{setBody(e.target.value);if(draftKey)sessionStorage.setItem(draftKey,e.target.value);}} onPaste={e=>{const pasted=Array.from(e.clipboardData.files||[]);if(pasted.length){e.preventDefault();addFiles(pasted);}}}/>
       {previews.length>0&&<div className="ct-selected-files">{previews.map(({file,url},index)=><span key={index}>{url?<img src={url} alt=""/>:null}{file.name}<button type="button" onClick={()=>setFiles(files.filter((_,i)=>i!==index))} aria-label={`Remove ${file.name}`}><X size={14}/></button></span>)}</div>}
       <p className="ct-composer-note"><Globe size={13} aria-hidden="true"/> Everyone can see this post, including visitors who aren’t signed in.</p>
       <div className="ct-composer-actions">
@@ -110,12 +112,13 @@ export default function CommunityFeed({hub,label,initial}:{hub:string;label:stri
  </main>;
 }
 
-export function PostPage({initial}:{initial:PublicPost}){
- const session=useSession();
+export function PostPage(props:{initial:PublicPost}){const session=useSession();return <PostView key={session.user?.id??'anonymous'} {...props}/>;}
+function PostView({initial}:{initial:PublicPost}){
+ const session=useSession();const draftKey=session.user?`ct:comment-draft:${session.user.id}:${initial.id}`:null;
  const [post,setPost]=useState(initial);const [comments,setComments]=useState<Page<Comment>>();const [page,setPage]=useState(1);const [body,setBody]=useState('');const [reply,setReply]=useState<Comment|null>(null);const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [report,setReport]=useState('');const [reportOpen,setReportOpen]=useState(false);const [message,setMessage]=useState('');const [editing,setEditing]=useState<number|'post'|null>(null);const [editBody,setEditBody]=useState('');const [confirmRemove,setConfirmRemove]=useState<number|'post'|null>(null);
- useEffect(()=>{setBody(sessionStorage.getItem(`ct:comment-draft:${initial.id}`)||'');},[initial.id]);
+ useEffect(()=>{if(draftKey)setBody(sessionStorage.getItem(draftKey)||'');},[draftKey]);
  const reload=useCallback(async()=>{const [p,c]=await Promise.all([chemistTaskerApi.publicContent.getPost(initial.id) as Promise<PublicPost>,chemistTaskerApi.publicContent.listPostComments(initial.id,{page}) as Promise<Page<Comment>>]);setPost(p);setComments(c);},[initial.id,page,session.status]);useEffect(()=>{reload().catch(e=>setError(e.message));},[reload]);
- async function run(action:()=>Promise<unknown>,clearCommentDraft=false){setBusy(true);setError('');try{await action();if(clearCommentDraft){setBody('');sessionStorage.removeItem(`ct:comment-draft:${post.id}`);setReply(null);}setEditing(null);setConfirmRemove(null);await reload();}catch(e){setError((e as Error).message);if((e as {status?:number}).status===401)window.location.assign(loginHref(`/hubs/posts/${post.id}`));}finally{setBusy(false);}}
+ async function run(action:()=>Promise<unknown>,clearCommentDraft=false){setBusy(true);setError('');try{await action();if(clearCommentDraft){setBody('');if(draftKey)sessionStorage.removeItem(draftKey);setReply(null);}setEditing(null);setConfirmRemove(null);await reload();}catch(e){setError((e as Error).message);if((e as {status?:number}).status===401)window.location.assign(loginHref(`/hubs/posts/${post.id}`));}finally{setBusy(false);}}
  async function sendReport(){setBusy(true);setError('');try{await chemistTaskerApi.publicContent.reportPost(post.id,{reason:report});setMessage('Report received. A publisher will review it.');setReportOpen(false);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  async function removePost(){setBusy(true);try{await chemistTaskerApi.publicContent.deleteCommunityPost(post.id);window.location.assign(`/hubs/${post.platform_hub}`);}catch(e){setError((e as Error).message);setBusy(false);}}
  return <main className="ct-shell" style={{maxWidth:850}}><Link className="ct-back" href={`/hubs/${post.platform_hub}`}><ArrowLeft size={16}/>Back to the hub</Link>{error&&<p role="alert" className="ct-message">{error}</p>}{message&&<p role="status" className="ct-message">{message}</p>}<section className="ct-card ct-social-post ct-post-detail"><PostEntry post={post}/>{post.can_interact?<div className="ct-actions"><button disabled={busy} onClick={()=>void run(()=>chemistTaskerApi.publicContent.reactToCommunityPost(post.id,'LIKE'))}>Like</button><button disabled={busy} onClick={()=>void run(()=>chemistTaskerApi.publicContent.removeCommunityPostReaction(post.id))}>Remove reaction</button><button onClick={()=>setReportOpen(!reportOpen)}>Report</button>{post.can_edit&&!post.editorial&&<><button onClick={()=>{setEditing('post');setEditBody(post.body);}}>Edit post</button>{confirmRemove==='post'?<span className="ct-confirm">Remove this post for everyone? <button className="ct-danger" disabled={busy} onClick={()=>void removePost()}>Remove</button><button onClick={()=>setConfirmRemove(null)}>Keep</button></span>:<button disabled={busy} onClick={()=>setConfirmRemove('post')}>Remove post</button>}</>}</div>:<AccessNotice hub={post.platform_hub} path={`/hubs/posts/${post.id}`}/>}
@@ -135,7 +138,7 @@ export function PostPage({initial}:{initial:PublicPost}){
   <Paging page={page} next={!!comments?.next} onPage={setPage}/>
   {post.can_interact&&post.allow_comments?<form className="ct-comment-form" onSubmit={e=>{e.preventDefault();void run(()=>chemistTaskerApi.publicContent.createCommunityComment(post.id,{body,...(reply?{parent_comment:reply.parent_comment||reply.id}:{})}),true);}}>
    {reply&&<p className="ct-replying">Replying to <strong>{reply.author_name}</strong> <button type="button" onClick={()=>setReply(null)} aria-label="Cancel reply"><X size={14}/></button></p>}
-   <div className="ct-comment-input"><textarea aria-label={reply?`Reply to ${reply.author_name}`:'Write a comment'} placeholder={reply?`Reply to ${reply.author_name.split(' ')[0]}…`:'Write a comment…'} required maxLength={3000} value={body} onChange={e=>{setBody(e.target.value);sessionStorage.setItem(`ct:comment-draft:${post.id}`,e.target.value);}}/><button disabled={busy||!body.trim()} className="ct-primary" aria-label="Post comment"><Send size={16}/></button></div>
+   <div className="ct-comment-input"><textarea aria-label={reply?`Reply to ${reply.author_name}`:'Write a comment'} placeholder={reply?`Reply to ${reply.author_name.split(' ')[0]}…`:'Write a comment…'} required maxLength={3000} value={body} onChange={e=>{setBody(e.target.value);if(draftKey)sessionStorage.setItem(draftKey,e.target.value);}}/><button disabled={busy||!body.trim()} className="ct-primary" aria-label="Post comment"><Send size={16}/></button></div>
   </form>:!post.allow_comments&&<p className="ct-notice">Comments are closed for this post.</p>}
  </div></section></main>;
 }
