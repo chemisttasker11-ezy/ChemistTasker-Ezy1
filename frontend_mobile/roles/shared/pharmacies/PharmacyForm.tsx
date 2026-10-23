@@ -737,7 +737,10 @@ export default function PharmacyForm({
             const detail = apiMessage || err?.message;
             setError(pendingReadbackRef.current
                 ? 'The pharmacy was saved, but confirmation could not be completed. Select Verify Saved Pharmacy to retry without submitting another write.'
-                : (detail || 'Save failed'));
+                // No response: the create may have landed; the kept key makes a retry safe.
+                : createIdempotencyKeyRef.current && !(err instanceof ApiError)
+                    ? "We couldn't confirm the pharmacy was saved. Press Save again — it won't create a duplicate."
+                    : (detail || 'Save failed'));
             console.error(err);
             return false;
         } finally {

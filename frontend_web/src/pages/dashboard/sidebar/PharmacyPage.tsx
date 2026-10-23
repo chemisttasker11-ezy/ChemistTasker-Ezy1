@@ -2029,7 +2029,6 @@ export default function PharmacyPage({
       if (!editing && conflictId != null) {
         createIdempotencyKeyRef.current = null;
         const message = 'This pharmacy was already saved earlier with different details. Re-apply your changes in the saved pharmacy.';
-        showSnackbar(message, 'info');
         try {
           const saved = normalizePharmacy(await getPharmacyById(conflictId));
           if (saved.can_edit === false) {
@@ -2046,6 +2045,9 @@ export default function PharmacyPage({
       }
       if (err instanceof AxiosError) {
         setError(err.response?.data?.detail || err.message);
+      } else if (!editing && createIdempotencyKeyRef.current && !(err instanceof ApiError)) {
+        // No response: the create may have landed; the kept key makes a retry safe.
+        setError("We couldn't confirm the pharmacy was saved. Press Save again — it won't create a duplicate.");
       } else {
         setError("An unexpected error occurred.");
       }

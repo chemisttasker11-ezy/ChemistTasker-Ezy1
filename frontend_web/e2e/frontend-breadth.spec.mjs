@@ -517,6 +517,46 @@ test('pharmacy view=detail link survives a cold load', async ({ page }) => {
   expect(new URL(page.url()).searchParams.get('view')).toBe('detail');
 });
 
+test('pharmacy create asks for a retry after a lost response and shows one already-saved notice on 409', async ({ page }) => {
+  await installApiFixture(page, roleUsers.owner);
+  const createKeys = [];
+  await page.route('**/api/v1/pharmacies/**', (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === 'POST' && path.endsWith('/pharmacies/')) {
+      createKeys.push(request.headers()['idempotency-key']);
+      // First submit: the response never arrives. Second: the key was already used with other details.
+      if (createKeys.length === 1) return route.abort('failed');
+      return json(route, { detail: 'Idempotency-Key was already used with different details.', pharmacy_id: 101 }, 409);
+    }
+    if (path.endsWith('/pharmacies/101/')) return json(route, { id: 101, name: 'Saved Pharmacy', can_edit: true });
+    return json(route, [{ id: 101, name: 'Saved Pharmacy', can_edit: true }]);
+  });
+  await page.goto('/dashboard/owner/manage-pharmacies?workspace=internal&pharmacy_id=101');
+  await page.getByRole('button', { name: 'Add Pharmacy' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Pharmacy Name').fill('New Pharmacy');
+  await dialog.getByRole('button', { name: 'Next' }).click();
+  await dialog.getByLabel('ABN').first().fill('51824753556');
+  for (let tab = 1; tab < 5; tab += 1) await dialog.getByRole('button', { name: 'Next' }).click();
+  for (const label of ['Weekday Rate', 'Saturday Rate', 'Sunday Rate', 'Public Holiday Rate']) {
+    await dialog.getByLabel(label).fill('50');
+  }
+  await dialog.getByRole('button', { name: 'Next' }).click();
+  const create = dialog.getByRole('button', { name: 'Create Pharmacy' });
+
+  await create.click();
+  await expect(page.getByText("We couldn't confirm the pharmacy was saved. Press Save again — it won't create a duplicate.")).toBeVisible();
+  await expect(page.getByText('An unexpected error occurred.')).toHaveCount(0);
+
+  await create.click();
+  const alreadySaved = page.getByText('This pharmacy was already saved earlier with different details.', { exact: false });
+  await expect(alreadySaved).toBeVisible();
+  await expect(alreadySaved).toHaveCount(1);
+  expect(createKeys).toHaveLength(2);
+  expect(createKeys[1]).toBe(createKeys[0]);
+});
+
 // Calendar, post-shift and roster links carry their own `pharmacy` param (dashboardRouteScope, roster emails).
 for (const [name, path] of [
   ['roster email', '/dashboard/owner/manage-pharmacies/roster?pharmacy=102'],
