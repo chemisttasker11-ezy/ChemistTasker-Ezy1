@@ -1,5 +1,5 @@
 import { AhpraProvider } from './AhpraContext';
-import {bearerBelongsToDifferentUser, claimUserBrowserStorage, logoutSession, watchSession} from '../../landing_next/shared/browser-session';
+import {announceSession, bearerBelongsToDifferentUser, claimUserBrowserStorage, logoutSession, watchSession} from '../../landing_next/shared/browser-session';
 // src/contexts/AuthContext.tsx
 
 import {
@@ -448,6 +448,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setActivePersonaState("staff");
     setActiveAdminAssignmentId(null);
     setUser(userInfo);
+    // Broadcast Vite login and token-returning OTP sign-ins to already-open tabs.
+    announceSession('login');
   };
 
   const logout = useCallback(async () => {
