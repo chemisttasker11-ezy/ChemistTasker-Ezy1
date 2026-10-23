@@ -725,9 +725,8 @@ export default function PharmacyForm({
                 ? (err.payload as { pharmacy_id?: number } | null)?.pharmacy_id : null;
             if (mode === 'create' && conflictId != null) {
                 createIdempotencyKeyRef.current = null;
-                const message = 'This pharmacy was already saved earlier with different details. Re-apply your changes in the saved pharmacy.';
-                setError(message);
-                Alert.alert('Pharmacy already saved', message);
+                // The alert, not inline text, survives the navigation to the saved pharmacy below.
+                Alert.alert('Pharmacy already saved', 'This pharmacy was already saved earlier with different details. Re-apply your changes in the saved pharmacy.');
                 // Owner setup (/setup/owner/...) has no edit route of its own; use the role's.
                 const rolePath = pathname.replace(/^\/setup/, '').split('/')[1];
                 router.replace(`/${rolePath}/pharmacies/${conflictId}/edit` as any);
