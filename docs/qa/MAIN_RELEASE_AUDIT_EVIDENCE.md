@@ -127,3 +127,7 @@ Checked membership status/default vs lifecycle invite, Hub scope resolver (pharm
 ## 25 October 2026 — Deep tracing B49–B50
 
 Traced file-validation extension/MIME/magic type fallback through Hub and Chat attachment persistence and found that malicious bytes under declared PDF can pass fallback; separately traced pharmacy chat eligibility via Membership status, Conversation queryset, ConversationListSerializer last_message and stricter message route. Independent source evidence/negative tests in [wave 8](MAIN_RELEASE_DISCOVERY_WAVE_8.md). **50 source-level candidates tracked; 0 runtime reproduced or fixed**.
+
+## 25 October 2026 — B51 direct HTTP community chat authorization
+
+Independently traced `MessageViewSet.create` → `Participant` and current `Membership` flags → `MembershipViewSet.perform_update` → realtime `participant_can_receive_chat_updates` and existing REST/WS tests. Dedicated messages POST lacks active/ACCEPTED check even after revocation, while realtime helper demands both. [Wave 9 detailed report](MAIN_RELEASE_DISCOVERY_WAVE_9.md). **51 source-level candidates; B51 is not HTTP-reproduced and no fix was made**.

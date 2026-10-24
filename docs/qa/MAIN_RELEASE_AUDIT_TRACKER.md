@@ -12,7 +12,7 @@
 | Tracked repository files at baseline | 2,969 | INVENTORIED only |
 | Source paths at baseline | 2,149 (`.py/.ts/.tsx/.js/.jsx/.mjs/.cjs/.rs`, exclude generated/vendor folders) | INVENTORIED only |
 | Handbook | `docs/qa/SENIOR_PACKAGE_TESTING.md` and full 310-line archived Library handbook read | DONE |
-| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **50 source findings tracked; 0 runtime reproduced** |
+| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **51 source findings tracked; 0 runtime reproduced** |
 | Findings fixed on this branch | 0 / 23 (audit-only scope) | NO FIXES REQUESTED |
 | Findings with red-then-green targeted regression evidence on this branch | 0 / 23 | NOT PERFORMED — behavioral verification separate |
 | Complete-source automated inspection | **2,149/2,149** frozen-main paths + added scanner path (2,150/2,150 at scan SHA); blob-verified [CSV](evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv), [summary](evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md) | **100% static-scanned; 0 manual semantic certified** |
@@ -153,3 +153,7 @@ See [wave 5 report](MAIN_RELEASE_DISCOVERY_WAVE_5.md). **167 of 538** selected i
 - **B49 P1 candidate:** file validator trusts client MIME if signature sniffing fails; fake .pdf/.docx or other disguised attachments may be stored via chat or Hub. Distinguish content validation from unproven XSS.
 - **B50 P1 candidate:** room-list `community_chats` is scoped by `is_active` without accepted membership; `get_last_message` returns 200-character private chat preview even when member has no Participant. Dedicated messages route restricts participants, but list data remains exposed under stale active status.
 - [Independent end-to-end source evidence and missing tests](MAIN_RELEASE_DISCOVERY_WAVE_8.md). **50 total B01–B50**, none runtime-reproduced in this wave, zero application fixes. No full semantic certification claimed.
+
+## Deep contextual review — discovery wave 9 (B51), 25 October 2026
+
+- **B51 P1/P0-impact candidate:** direct POST `/api/v1/messages/` checks room Participant and authentication but not current pharmacy membership active/accepted; revoked participant can potentially continue authoring community messages. Existing WebSocket helper enforces accepted and active, while generic membership PATCH leaves participant. **Distinct from B05 WebSocket and B50 preview**. See [complete source path and requested HTTP negative test](MAIN_RELEASE_DISCOVERY_WAVE_9.md). **51 total source findings** (B01–B51), zero runtime-proven exploits, zero application fixes.
