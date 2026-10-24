@@ -3,14 +3,14 @@
   "domains": {
     ".agents": 46,
     "backend": 724,
-    "docs": 3,
+    "docs": 4,
     "frontend_mobile": 558,
     "frontend_web": 640,
     "scripts": 33,
     "shared-core": 146
   },
-  "files_with_heuristic_signals": 284,
-  "generated_utc": "2026-10-24T20:23:01.130232+00:00",
+  "files_with_heuristic_signals": 285,
+  "generated_utc": "2026-10-24T21:17:07.676070+00:00",
   "inherited_main_baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "interpretation": "Complete-file automated static inspection only. All rule hits require manual triage. No business behavior, role permissions, browser, device, Stripe, data integrity or release readiness is certified.",
   "largest_files": [
@@ -176,15 +176,15 @@
     }
   ],
   "manual_semantic_certified": 0,
-  "previous_baseline_ledger_total": 2149,
-  "previous_baseline_static_scanned": 2149,
+  "previous_baseline_ledger_total": 2150,
+  "previous_baseline_static_scanned": 2150,
   "python_ast_fail": 0,
-  "python_ast_pass": 776,
+  "python_ast_pass": 777,
   "read_or_hash_fail": 0,
-  "required_for_99_percent": 2129,
-  "scanned": 2150,
+  "required_for_99_percent": 2130,
+  "scanned": 2151,
   "signal_file_counts": {
-    "AUTH_ALLOW_ANY": 19,
+    "AUTH_ALLOW_ANY": 20,
     "AUTH_EMPTY_CLASSES": 3,
     "AUTH_OVERRIDE": 5,
     "AWARD_RATE_REFERENCE": 20,
@@ -200,10 +200,10 @@
     "ORG_WIDE_ROLE": 15,
     "RAW_SQL": 17,
     "STRIPE_PAYMENT": 4,
-    "TENANT_SCOPE_REFERENCE": 99,
+    "TENANT_SCOPE_REFERENCE": 100,
     "WEB_REDIRECT": 5
   },
-  "source_sha": "1d655a007dc49c219bc39d16f981afed1d4b6edc",
-  "total": 2150,
+  "source_sha": "4ad9e9326352c27ba9ae9615fd5043fb1cd3c0a2",
+  "total": 2151,
   "unread_or_mismatched_paths": []
 }
