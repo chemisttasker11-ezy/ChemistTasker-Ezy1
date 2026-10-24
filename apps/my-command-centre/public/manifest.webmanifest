@@ -1,0 +1,9 @@
+{
+  "name": "My Command Centre",
+  "short_name": "Command Centre",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f8fa",
+  "theme_color": "#383d92",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
