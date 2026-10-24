@@ -16,3 +16,9 @@
 2. Deeply investigate credible signals from newly read files and follow request→service→model and caller across Vite/Next/Expo/shared-core.
 3. Add B35+ only for genuinely new P0/P1 candidates with source line references, cause, impact, expected negative test and confidence; log inconclusive gaps separately.
 4. Update the live tracker, evidence log and PR narrative with *verified* tranche totals and commit source SHA.
+
+## 25 October 2026 actual progress
+
+- **48/538 selected source files (8.92% of selected tranche)** individually fetched, SHA verified and source-triaged; this is **2.23% of original 2,149-file inventory**, not a further 25% completed semantic review.
+- **6 new source risk candidates** B35–B40; evidence and negative tests in `MAIN_RELEASE_DISCOVERY_WAVE_4.md`.
+- GitHub Actions source read of all 538 was configured independently; report completed run status only after successful Actions check. Keep its inspection stage `SOURCE_READ_STATIC_TRIAGED`, never `CONTEXT_MANUALLY_REVIEWED`.

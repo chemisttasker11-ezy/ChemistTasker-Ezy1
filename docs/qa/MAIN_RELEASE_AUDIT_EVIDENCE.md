@@ -103,3 +103,7 @@ Previous B01–B23 were not re-reviewed. New marketplace, ethical marketplace, t
 ## 25 October 2026 — discovery wave 3
 
 Two NEW source findings B33–B34 after tracking B24–B32, via independent tracing of `backend/invoicing/views.py` → `serializers.py` → `models.py` and `backend/talent/views/explorer.py` → `models.py` → read serializer. See [MAIN_RELEASE_DISCOVERY_WAVE_3.md](MAIN_RELEASE_DISCOVERY_WAVE_3.md). Priority provisional, no reproduction and no code modifications; **34 source findings tracked**.
+
+## 25 October 2026 — actual second-quarter read evidence
+
+**48/538** selected immutable baseline source files individually fetched in six batches of eight and compared with exact GitHub blob SHAs from the quarter manifest; all reported SHA match and were read/triaged. Additional request→serializer→service→model source evidence, and existing roster HTTP regression tests, inspected for newly discovered B35–B40. See [MAIN_RELEASE_DISCOVERY_WAVE_4.md](MAIN_RELEASE_DISCOVERY_WAVE_4.md). No runtime exploit was run; no application fixes. Automated GitHub Actions quarter scan is distinct from these manual source reads and does not certify 538 human reviews.

@@ -12,7 +12,7 @@
 | Tracked repository files at baseline | 2,969 | INVENTORIED only |
 | Source paths at baseline | 2,149 (`.py/.ts/.tsx/.js/.jsx/.mjs/.cjs/.rs`, exclude generated/vendor folders) | INVENTORIED only |
 | Handbook | `docs/qa/SENIOR_PACKAGE_TESTING.md` and full 310-line archived Library handbook read | DONE |
-| Audit register | B01–B23 historical baseline; **B24–B34 eleven NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **34 source findings tracked; 0 runtime reproduced** |
+| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **40 source findings tracked; 0 runtime reproduced** |
 | Findings fixed on this branch | 0 / 23 (audit-only scope) | NO FIXES REQUESTED |
 | Findings with red-then-green targeted regression evidence on this branch | 0 / 23 | NOT PERFORMED — behavioral verification separate |
 | Complete-source automated inspection | **2,149/2,149** frozen-main paths + added scanner path (2,150/2,150 at scan SHA); blob-verified [CSV](evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv), [summary](evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md) | **100% static-scanned; 0 manual semantic certified** |
@@ -75,6 +75,19 @@ See [wave 3 evidence](MAIN_RELEASE_DISCOVERY_WAVE_3.md).
 | B33 | P0 candidate | Legacy invoicing tenant authority | InvoiceListView.perform_create stamps the caller but accepts arbitrary pharmacy, status, issuer and recipient snapshots via writable InvoiceSerializer. This lets an authenticated unrelated user create a self-authored SENT/PAID invoice referencing a foreign pharmacy, then it is eligible for that pharmacy manager's received-invoice queryset. | [views.py#L35-L66](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/invoicing/views.py#L35-L66), [serializers.py#L38-L96](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/invoicing/serializers.py#L38-L96), [models.py#L15-L29](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/invoicing/models.py#L15-L29) | Create legacy invoice with authenticated stranger and foreign pharmacy_id, status=sent; ensure 403/no row and ensure foreign owner's invoice list excludes it. | SOURCE-FINDING; no runtime reproduction |
 | B34 | P1 candidate | Talent board visibility | ExplorerPostViewSet feed and public-feed filter is_talent_board_visible (moderator hidden and expired), but generic retrieve, list and by-profile/raw view/like handlers inherit an unrestricted queryset; a hidden post can remain readable/reactable by ID and via list. | [explorer.py#L40-L76](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/talent/views/explorer.py#L40-L76), [explorer.py#L147-L217](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/talent/views/explorer.py#L147-L217), [models.py#L85-L117](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/talent/models.py#L85-L117) | Create hidden/expired talent post; authenticated GET list, GET detail, POST like and view must not reveal or interact; verify public feed hides and owner's management route remains accessible. | SOURCE-FINDING; no runtime reproduction |
 
+## Discovery wave 4 — B35–B40
+
+**48/538** selected complete files were manually opened, SHA checked and source-triaged; **6 new source findings** recorded. See [wave 4](MAIN_RELEASE_DISCOVERY_WAVE_4.md). This does not imply a complete senior semantic review of 538 files or runtime proof.
+
+| ID | Priority | New gap | Status |
+|---|---|---|---|
+| B35 | P0 candidate | Roster-create cross-tenant writes: RosterOwnerViewSet is an authenticated ModelViewSet with pharmacy-filtered get_queryset but default create/perform_create; RosterA | SOURCE-FINDING |
+| B36 | P0 candidate | Roster-shift cross-tenant writes: RosterShiftManageViewSet is a ModelViewSet with a managed-only read queryset; default POST invokes ShiftSerializer.create which re | SOURCE-FINDING |
+| B37 | P1 candidate | Worker roster disclosure: RosterWorkerViewSet.get_queryset includes all assignments in pharmacies with is_active membership, but does not require status ACC | SOURCE-FINDING |
+| B38 | P1 candidate | Roster assignment overwrite: RosterShiftManageViewSet.update explicitly permits user_id to update_or_create each ShiftSlotAssignment after serializer update; i | SOURCE-FINDING |
+| B39 | P1 candidate | Rate default destructive update: sync_pharmacy_rate_defaults sets six pharmacy rate fields to None when apply_rates_to_pharmacy is true but caller omits those fiel | SOURCE-FINDING |
+| B40 | P1 candidate | Booking eligibility stale verification: onboarding verification evaluate preserves was_verified when base checks are missing except for specified AHPRA adverse states; th | SOURCE-FINDING |
+
 ## Future remediation sequence — excluded from audit-only PR #200
 
 1. **Tenant and role boundaries:** B16 B17 B18 B19 B21 B06 B07 B22 B23; negative tests across two organisations/two pharmacies, owner, Org Admin, Chief Admin, Region Admin, Pharmacy Manager, Roster Manager, Communication Manager, staff, outsider.
@@ -105,3 +118,5 @@ See [wave 3 evidence](MAIN_RELEASE_DISCOVERY_WAVE_3.md).
 - 2026-10-25 — **Continued discovery (not B01–B23 re-review):** B24–B32 nine new reasoned source findings recorded across marketplace exchange state, audience atomicity, ethical listings/transfer concurrency, workforce period locking/overlaps, offline signed kiosk event trust, notification WebSockets. Source evidence includes immutable GitHub baseline file line links, trigger cases and missing negative tests. Total tracked B01–B32 = 32; **0 reproduced, 0 fixed, 0 proven production-ready**. See [wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md).
 
 - 2026-10-25 — Continued discovery: **B33-B34** legacy invoice foreign-pharmacy creation/forged status visibility and Talent hidden-post generic endpoint visibility. Trace paths and missing tests recorded in [wave 3](MAIN_RELEASE_DISCOVERY_WAVE_3.md). Total **34** source findings; 0 runtime reproduced, 0 fixed.
+
+- 2026-10-25 — **Actual tranche inspection**: first **48/538** immutable baseline source paths GitHub-fetched and SHA verified; deeper source→serializer→route/test reading around roster and verification. New B35–B40 logged (see wave 4). Total **40 source findings**, 0 runtime reproduced/fixed. A CI job is separately configured for all 538 file byte reads; never count automation as manual review.
