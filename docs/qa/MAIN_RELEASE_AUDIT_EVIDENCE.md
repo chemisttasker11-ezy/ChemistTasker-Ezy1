@@ -107,3 +107,7 @@ Two NEW source findings B33–B34 after tracking B24–B32, via independent trac
 ## 25 October 2026 — actual second-quarter read evidence
 
 **48/538** selected immutable baseline source files individually fetched in six batches of eight and compared with exact GitHub blob SHAs from the quarter manifest; all reported SHA match and were read/triaged. Additional request→serializer→service→model source evidence, and existing roster HTTP regression tests, inspected for newly discovered B35–B40. See [MAIN_RELEASE_DISCOVERY_WAVE_4.md](MAIN_RELEASE_DISCOVERY_WAVE_4.md). No runtime exploit was run; no application fixes. Automated GitHub Actions quarter scan is distinct from these manual source reads and does not certify 538 human reviews.
+
+## 25 October 2026 — Source reading 49–167, B41–B42
+
+167/538 selected frozen-main source paths now independently fetched and triaged by assistant via connected GitHub; only traced files labelled SOURCE_CALLPATH_REVIEWED, the rest SOURCE_TOOL_FETCHED_OUTLINE_TRIAGED. Audit-source SHA unchanged. Two new P1 candidates B41 (private community shifts/notifications expose active-but-unaccepted members) and B42 (marketplace draft PATCH partially commits before delivery validation); full evidence in [wave 5](MAIN_RELEASE_DISCOVERY_WAVE_5.md). No negative test executed.

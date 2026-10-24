@@ -12,7 +12,7 @@
 | Tracked repository files at baseline | 2,969 | INVENTORIED only |
 | Source paths at baseline | 2,149 (`.py/.ts/.tsx/.js/.jsx/.mjs/.cjs/.rs`, exclude generated/vendor folders) | INVENTORIED only |
 | Handbook | `docs/qa/SENIOR_PACKAGE_TESTING.md` and full 310-line archived Library handbook read | DONE |
-| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **40 source findings tracked; 0 runtime reproduced** |
+| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **42 source findings tracked; 0 runtime reproduced** |
 | Findings fixed on this branch | 0 / 23 (audit-only scope) | NO FIXES REQUESTED |
 | Findings with red-then-green targeted regression evidence on this branch | 0 / 23 | NOT PERFORMED — behavioral verification separate |
 | Complete-source automated inspection | **2,149/2,149** frozen-main paths + added scanner path (2,150/2,150 at scan SHA); blob-verified [CSV](evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv), [summary](evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md) | **100% static-scanned; 0 manual semantic certified** |
@@ -77,7 +77,7 @@ See [wave 3 evidence](MAIN_RELEASE_DISCOVERY_WAVE_3.md).
 
 ## Discovery wave 4 — B35–B40
 
-**48/538** selected complete files were manually opened, SHA checked and source-triaged; **6 new source findings** recorded. See [wave 4](MAIN_RELEASE_DISCOVERY_WAVE_4.md). This does not imply a complete senior semantic review of 538 files or runtime proof.
+**167/538** selected complete files were manually opened, SHA checked and source-triaged; **6 new source findings** recorded. See [wave 4](MAIN_RELEASE_DISCOVERY_WAVE_4.md). This does not imply a complete senior semantic review of 538 files or runtime proof.
 
 | ID | Priority | New gap | Status |
 |---|---|---|---|
@@ -87,6 +87,13 @@ See [wave 3 evidence](MAIN_RELEASE_DISCOVERY_WAVE_3.md).
 | B38 | P1 candidate | Roster assignment overwrite: RosterShiftManageViewSet.update explicitly permits user_id to update_or_create each ShiftSlotAssignment after serializer update; i | SOURCE-FINDING |
 | B39 | P1 candidate | Rate default destructive update: sync_pharmacy_rate_defaults sets six pharmacy rate fields to None when apply_rates_to_pharmacy is true but caller omits those fiel | SOURCE-FINDING |
 | B40 | P1 candidate | Booking eligibility stale verification: onboarding verification evaluate preserves was_verified when base checks are missing except for specified AHPRA adverse states; th | SOURCE-FINDING |
+
+## Discovery wave 5 — B41–B42
+
+- **B41 P1 (private shift visibility + alerts):** community/shift detail membership filters and posted shift recipient selection check `is_active` but omit `Membership.status == ACCEPTED`. Unaccepted/rejected memberships with active flag may reveal private vacancies and receive shift information.
+- **B42 P1 (non-atomic marketplace draft editing):** `ListingDetail.patch` calls `ListingWriteSerializer.update` without a transaction; listing and audience rows are committed before delivery validation, so invalid later delivery updates may leave a 400 response and a partially mutated listing.
+
+See [wave 5 report](MAIN_RELEASE_DISCOVERY_WAVE_5.md). **167 of 538** selected immutable source blobs were fetched through the connected GitHub tool and structurally reviewed; this is not 167 individually certified full semantic reviews. Another 371 files still need analyst-guided reading. No application fixes or reproductions.
 
 ## Future remediation sequence — excluded from audit-only PR #200
 
@@ -120,3 +127,5 @@ See [wave 3 evidence](MAIN_RELEASE_DISCOVERY_WAVE_3.md).
 - 2026-10-25 — Continued discovery: **B33-B34** legacy invoice foreign-pharmacy creation/forged status visibility and Talent hidden-post generic endpoint visibility. Trace paths and missing tests recorded in [wave 3](MAIN_RELEASE_DISCOVERY_WAVE_3.md). Total **34** source findings; 0 runtime reproduced, 0 fixed.
 
 - 2026-10-25 — **Actual tranche inspection**: first **48/538** immutable baseline source paths GitHub-fetched and SHA verified; deeper source→serializer→route/test reading around roster and verification. New B35–B40 logged (see wave 4). Total **40 source findings**, 0 runtime reproduced/fixed. A CI job is separately configured for all 538 file byte reads; never count automation as manual review.
+
+- 2026-10-25 — Continued source reading 49–167 with per-file structural evidence in updated quarter ledger; B41–B42 identified with source chains. 42 total source findings, zero runtime reproduction, zero app fixes.

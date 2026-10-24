@@ -22,3 +22,8 @@
 - **48/538 selected source files (8.92% of selected tranche)** individually fetched, SHA verified and source-triaged; this is **2.23% of original 2,149-file inventory**, not a further 25% completed semantic review.
 - **6 new source risk candidates** B35–B40; evidence and negative tests in `MAIN_RELEASE_DISCOVERY_WAVE_4.md`.
 - GitHub Actions source read of all 538 was configured independently; report completed run status only after successful Actions check. Keep its inspection stage `SOURCE_READ_STATIC_TRIAGED`, never `CONTEXT_MANUALLY_REVIEWED`.
+
+## Continued execution milestone — 25 October 2026
+
+- GitHub content-assisted review: 167/538 source blobs fetched and structural line/symbol evidence inspected (31.04% of selected tranche); 371 still requiring direct assistant inspection. CI already read all 538 and verified their blob hashes. No full-file semantic review is certified from mere summaries.
+- B41–B42 source traces and proposed regressions documented in wave 5. No app modifications.
