@@ -1,0 +1,11 @@
+frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx
+frontend_web/src/pages/dashboard/sidebar/RosterWorkerDialogs.tsx
+frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.model.ts
+frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx
+frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx
+frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/CounterOfferDialog.tsx
+frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/FiltersSidebar.tsx
+frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ReviewCounterOfferDialog.tsx
+frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ReviewOfferSlotList.tsx
+frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftBoardPreview.tsx
+frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx

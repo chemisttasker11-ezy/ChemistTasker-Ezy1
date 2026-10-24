@@ -1,0 +1,8 @@
+frontend_mobile/features/parity/attendance.tsx
+frontend_mobile/features/parity/ethicalMarketplace.tsx
+frontend_mobile/features/parity/finance.tsx
+frontend_mobile/features/parity/marketplace.tsx
+frontend_mobile/features/parity/marketplaceDraft.ts
+frontend_mobile/features/parity/roster.tsx
+frontend_mobile/features/parity/trustRewards.tsx
+frontend_mobile/features/parity/utils.ts

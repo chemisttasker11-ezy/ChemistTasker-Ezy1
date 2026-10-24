@@ -1,0 +1,13 @@
+frontend_mobile/roles/shared/hub/PostComposer.tsx
+frontend_mobile/roles/shared/hub/api.ts
+frontend_mobile/roles/shared/hub/hubUtils.ts
+frontend_mobile/roles/shared/hub/submissionGuard.tsx
+frontend_mobile/roles/shared/hub/types.ts
+frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx
+frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx
+frontend_mobile/roles/shared/invoices/InvoiceDetail.tsx
+frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx
+frontend_mobile/roles/shared/invoices/InvoiceList.tsx
+frontend_mobile/roles/shared/invoices/InvoicesPlaceholder.tsx
+frontend_mobile/roles/shared/invoices/MobileInvoiceStats.tsx
+frontend_mobile/roles/shared/invoices/invoiceStats.ts

@@ -1,0 +1,2 @@
+.agents/skills/ui-ux-pro-max/scripts/tests/test_web_stack_freshness.py
+.agents/skills/ui-ux-pro-max/scripts/validate_data.py
