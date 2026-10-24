@@ -135,3 +135,7 @@ Independently traced `MessageViewSet.create` → `Participant` and current `Memb
 ## 25 October 2026 — Deep source-path accounting (B43–B51)
 
 Added per-file baseline SHA and occurrence-to-wave mapping for 38 distinct backend source/test paths cited in detailed new findings B43–B51. See [register](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv) and [measured summary](MAIN_RELEASE_DEEP_REVIEW_PROGRESS.md). This measures multi-module causal investigation; it neither expands 538-file tranche count nor equates to fully certified semantic correctness. No test reproduction or app code fixes.
+
+## 25 October 2026 — B52 independent Expo/web session authority comparison
+
+Traced Expo secure token and cached user hydration, local JWT expiry, `/users/me/` failure handling, UI `AuthGate` role routing, Axios 401 interceptor and Vite cookie identity bootstrap. Source indicates Expo can restore cached role after server 401/403 when stale access remains. Evidence and different-status signed-device tests in [wave 10](MAIN_RELEASE_DISCOVERY_WAVE_10.md). **52 source candidates; 0 B52 runtime proof; 0 code fixes.**

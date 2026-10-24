@@ -12,7 +12,7 @@
 | Tracked repository files at baseline | 2,969 | INVENTORIED only |
 | Source paths at baseline | 2,149 (`.py/.ts/.tsx/.js/.jsx/.mjs/.cjs/.rs`, exclude generated/vendor folders) | INVENTORIED only |
 | Handbook | `docs/qa/SENIOR_PACKAGE_TESTING.md` and full 310-line archived Library handbook read | DONE |
-| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **51 source findings tracked; 0 runtime reproduced** |
+| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **52 source findings tracked; 0 runtime reproduced** |
 | Findings fixed on this branch | 0 / 23 (audit-only scope) | NO FIXES REQUESTED |
 | Findings with red-then-green targeted regression evidence on this branch | 0 / 23 | NOT PERFORMED — behavioral verification separate |
 | Complete-source automated inspection | **2,149/2,149** frozen-main paths + added scanner path (2,150/2,150 at scan SHA); blob-verified [CSV](evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv), [summary](evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md) | **100% static-scanned; 0 manual semantic certified** |
@@ -161,3 +161,8 @@ See [wave 5 report](MAIN_RELEASE_DISCOVERY_WAVE_5.md). **167 of 538** selected i
 ## Measured deep source-path evidence (25 October 2026)
 
 B43–B51 are evidenced by **38 distinct source/test file references across nine new issue call paths** (all immutable baseline SHA recorded), with **56 source-line references**. [Deep review register](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv) and [coverage distinction](MAIN_RELEASE_DEEP_REVIEW_PROGRESS.md). **This is source-path causal tracing, NOT 38 full-file semantic signoffs**. Runtime negative verification remains 0; do not merge/deploy based on these findings alone.
+
+## Cross-platform deep review — discovery wave 10 (B52), 25 October 2026
+
+- **B52 P1 candidate** Expo boot restores saved user/role on `/users/me/` failure, while browser requires confirmed server identity. Cached authorization UI may remain after 401/403 despite API rejection. Traced `authSession`, `AuthContext`, native Axios, `AuthGate`, owner dashboard, Vite session bootstrap; exact test matrix in [wave 10](MAIN_RELEASE_DISCOVERY_WAVE_10.md).
+- **B01–B52 now 52 source candidates**, no B52 runtime reproduction, no app fixes. Distinguish cached UI authorization state from proven backend data exposure.
