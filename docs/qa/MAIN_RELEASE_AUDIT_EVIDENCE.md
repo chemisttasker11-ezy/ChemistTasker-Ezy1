@@ -119,3 +119,7 @@ Following [wave 5](MAIN_RELEASE_DISCOVERY_WAVE_5.md), files #168–538 (371 addi
 ## 25 October 2026 — Deep contextual tracing and three new source findings B43–B45
 
 Read complete endpoint, serializer, permission/model, settings, storage and previous test paths for: password reset & SimpleJWT 90-day refresh revocation; per-role ID-tab file cleanup before validation; signed referee submissions with optional `would_rehire` but unconditional non-'No' confirmation. The analysis has direct frozen-main source links and precise missing negative cases in [wave 6](MAIN_RELEASE_DISCOVERY_WAVE_6.md). **45** tracked source findings, **no runtime exploit reproduction or product source fixes**. Existing B01–B42 were not revisited.
+
+## 25 October 2026 — Wave 7 B46–B48; private Hub + org invitation deep review
+
+Checked membership status/default vs lifecycle invite, Hub scope resolver (pharmacy/group/org), post create/list, member directory, tagged membership serializer, full-body notification/email, organisation invite immediate write, org membership role permission, org dashboard, and pre-existing region admin/pharmacy admin invite contract tests. Three independent source-level candidate gaps **B46–B48** documented with immutable main links and complete negative/positive fixtures in [wave 7](MAIN_RELEASE_DISCOVERY_WAVE_7.md). **48 tracked candidates**, none runtime reproduced in this wave; product code unchanged.

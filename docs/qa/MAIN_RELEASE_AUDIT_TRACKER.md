@@ -12,7 +12,7 @@
 | Tracked repository files at baseline | 2,969 | INVENTORIED only |
 | Source paths at baseline | 2,149 (`.py/.ts/.tsx/.js/.jsx/.mjs/.cjs/.rs`, exclude generated/vendor folders) | INVENTORIED only |
 | Handbook | `docs/qa/SENIOR_PACKAGE_TESTING.md` and full 310-line archived Library handbook read | DONE |
-| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **45 source findings tracked; 0 runtime reproduced** |
+| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **48 source findings tracked; 0 runtime reproduced** |
 | Findings fixed on this branch | 0 / 23 (audit-only scope) | NO FIXES REQUESTED |
 | Findings with red-then-green targeted regression evidence on this branch | 0 / 23 | NOT PERFORMED — behavioral verification separate |
 | Complete-source automated inspection | **2,149/2,149** frozen-main paths + added scanner path (2,150/2,150 at scan SHA); blob-verified [CSV](evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv), [summary](evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md) | **100% static-scanned; 0 manual semantic certified** |
@@ -140,3 +140,10 @@ See [wave 5 report](MAIN_RELEASE_DISCOVERY_WAVE_5.md). **167 of 538** selected i
 - **B44, P1 candidate — identity evidence deletion and database updates precede form validation**: onboarding view → identity serializer → storage cleanup → validation. New negative test: invalid identity PATCH preserves DB and old storage objects/verification flag.
 - **B45, P1 candidate — missing referee recommendation may still set confirmed flag**: public signed submission → model blank field → unconditional non-No approval → verified badge. New negative test: incomplete questionnaire rejected before any verified flag.
 - [Independent source chains, line links and test cases](MAIN_RELEASE_DISCOVERY_WAVE_6.md). **Total 45 source findings B01–B45; 0 runtime-reproduced, 0 application fixes.** This is genuine deeper call-path review, not a new claim of 25% semantic certification.
+
+## Deep contextual review — discovery wave 7 (B46–B48), 25 October 2026
+
+- **B46 P0/P1 candidate** private pharmacy/group/organization Hub access and posting check `Membership.is_active` without `status=ACCEPTED`; unlike accepted-only Hub directory. Affected route, permission, post, model, tests traced. Normal pending invites typically inactive; test deliberately mismatched status/active rows.
+- **B47 P1 owner policy review** organization staff/admin invitation becomes effective immediately for existing users before email acceptance. Current org invitation tests assert immediate membership; compare delayed pharmacy-admin acceptance. Must decide explicit immediate-assignment versus invitation acceptance policy.
+- **B48 P1 candidate** Hub `tagged_member_ids` accepts active nonstaff LOCUM/SHIFT_HERO and pending pharmacy members, then emits private body excerpts via push, email and notifications despite recipient lacking Hub read scope.
+- [Complete independent evidence and missing positive/negative tests](MAIN_RELEASE_DISCOVERY_WAVE_7.md). **B01–B48 total 48 source-level findings**, 0 runtime exploits reproduced, 0 application fixes; no broad semantic certification claimed.
