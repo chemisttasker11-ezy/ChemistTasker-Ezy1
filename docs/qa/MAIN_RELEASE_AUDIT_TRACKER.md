@@ -13,10 +13,10 @@
 | Source paths at baseline | 2,149 (`.py/.ts/.tsx/.js/.jsx/.mjs/.cjs/.rs`, exclude generated/vendor folders) | INVENTORIED only |
 | Handbook | `docs/qa/SENIOR_PACKAGE_TESTING.md` and full 310-line archived Library handbook read | DONE |
 | Audit register | B01–B23 enumerated from senior source review | 23 TRACKED |
-| Findings fixed on this branch | 0 / 23 | NOT STARTED |
-| Findings with red-then-green targeted regression evidence on this branch | 0 / 23 | NOT STARTED |
-| Individually evidenced file-level review | 22 SOURCE_TRIAGED, 2,127 NOT_REVIEWED in [source coverage CSV](evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv); triage is not complete file review | 0 CERTIFIED |
-| CI at this PR head (`4ec9f94d`) | [Shared Core Consolidation run 40103401291](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40103401291): 8 job gates PASS, `mobile` FAIL, `release-gate` FAIL | FAILED — dependency advisory, not code-build failure |
+| Findings fixed on this branch | 0 / 23 (audit-only scope) | NO FIXES REQUESTED |
+| Findings with red-then-green targeted regression evidence on this branch | 0 / 23 | NOT PERFORMED — behavioral verification separate |
+| Complete-source automated inspection | **2,149/2,149** frozen-main paths + added scanner path (2,150/2,150 at scan SHA); blob-verified [CSV](evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv), [summary](evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md) | **100% static-scanned; 0 manual semantic certified** |
+| Audit / CI | [PR200 scanner 40129505623](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40129505623) PASS at `1d655a00`; [Shared Core Consolidation 40129508976](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40129508976) mobile FAIL (fast-uri advisory), other gates pending final review | STATIC SCAN PASSED; RELEASE GATES NOT CERTIFIED |
 | Existing main Full Isolated QA | [40019714397](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40019714397) passed at the frozen base SHA | HISTORICAL BASE EVIDENCE ONLY |
 | Existing main Staging QA | [40019714320](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40019714320) failed at base (history / audit baseline issue) | FAILED (BASE) |
 
@@ -50,7 +50,7 @@
 | B22 | P0 | Pharmacy Hub | Org poll aggregation includes private pharmacy polls | [`polls.py`](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/polls.py) | Org-only poll filter or intersect with permitted pharmacy scope | SOURCE-FINDING; fix/test PENDING |
 | B23 | P0 | Organizations | Chief Admin may mutate/delete organization record | [`views.py`](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/organizations/views.py), [`org_roles.py`](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/users/org_roles.py) | Allow only organization owner/admin record edits; test destructive path | SOURCE-FINDING; fix/test PENDING |
 
-## Remediation sequence – small, isolated commits and strict stop rule
+## Future remediation sequence — excluded from audit-only PR #200
 
 1. **Tenant and role boundaries:** B16 B17 B18 B19 B21 B06 B07 B22 B23; negative tests across two organisations/two pharmacies, owner, Org Admin, Chief Admin, Region Admin, Pharmacy Manager, Roster Manager, Communication Manager, staff, outsider.
 2. **Payment correctness:** B15 B04 B10 B01 B14 B11 B02; exact Stripe test-mode line items, concurrency, duplicate and late webhooks, unpaid reservations, Pill ledger under PostgreSQL; avoid live charges.
@@ -74,3 +74,5 @@
 - 2026-10-24 — Independent frozen-main source triage B01–B23 completed, with file/line rationales in `MAIN_RELEASE_AUDIT_EVIDENCE.md`; 23 source findings **remain untested** and **0 fixed**. Main Staging QA run 40019714320 failed: `HEAD^` unavailable and shared-core changed-line audit skipped (job 120640790121). Archived 310-line Senior Package Testing handbook also independently read. Audit branch had no PR or exact-head CI at this checkpoint. Source triage is NOT certification of 2,149 source paths.
 
 - 2026-10-25 — PR #200 latest inspected head `4ec9f94de9489661a5b266364a45bfe6ba4322ae`: [Shared Core Consolidation run 40103401291](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40103401291) completed with **8 successful jobs** (`postgres-concurrency`, `backend`, `shared-core`, `kiosk`, `architecture-audit`, `boundary-audit`, `web-vite`, `web-next`), **mobile FAILED**, and release-gate FAILED as a downstream consequence. Mobile job `120900105223` step `Verify patched runtime dependencies and reject new advisories` stopped with `AssertionError: Unresolved advisory: https://github.com/advisories/GHSA-w74x-v6f9-j3xg` (`fast-uri`). CodeQL and Public Repository Security completed SUCCESS; iOS Native Repair Acceptance SKIPPED. **No application fix or B01–B23 regression test is evidenced**; repair/verify the dependency issue without silently accepting the advisory. Branch work is still audit documentation, not production repair.
+
+- 2026-10-25 — Owner clarified no fixes, only identify gaps. [Read-only complete-source scanner run 40129505623](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40129505623) SUCCESS at `1d655a00`: 2,149/2,149 inherited source paths static read and verified (2,150/2,150 including audit script); 776 Python AST passes, zero failures/hash mismatches, 284 heuristic-hit files. Zero manual semantic certification, zero reproduced issues, zero product fixes. [Gap verdicts](MAIN_RELEASE_GAP_VERDICTS_2026-10-25.md) now classify all B01-B23 and one conditional policy difference.

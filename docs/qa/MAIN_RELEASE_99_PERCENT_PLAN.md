@@ -1,9 +1,14 @@
 # Main release audit — 99% coverage execution plan
 
 **Frozen baseline:** `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. **Branch:** `audit/main-release-blockers-coverage-tracker-20261024`.
-**Status:** Planning and evidence collection only. No code fixes claimed complete.
+**Status:** Owner clarified 25 October 2026: audit-only gap identification, NO application fixes. Complete-file static scan finished; behavior and manual semantic coverage not certified.
 
-## Definition of completion
+## Completed static-audit scope (not release approval)
+- All 2,149 inherited main source files were fully read, Git-blob verified and static-scanned by [PR200 run 40129505623](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40129505623), plus the new scanner source file (2,150 total). No read/hash or Python AST parse failures.
+- Per-file ledger and line-level heuristic queue under `docs/qa/evidence/`; [Gap verdicts](MAIN_RELEASE_GAP_VERDICTS_2026-10-25.md) classify all 23 source findings, a conditional cancellation policy gap and runtime/UX assurance gaps.
+- User explicitly requested NO fixes on this PR. **99% source-file automated inspection != 99% semantic/behavioral correctness.** The following prior production release acceptance requirements are separately unfulfilled and remain for future authorization.
+
+## Future production verification definition (not met)
 - Review and record at least **2,128 of 2,149 applicable source-code paths** (99.02%) individually, at an exact commit SHA, with an inspection method and outcome. Directory enumeration alone earns no credit.
 - All 23 findings B01–B23 receive independent triage: reproducible failing test or demonstrable false positive/accepted design, a minimal owning-domain fix where warranted, and passing negative/positive regressions on the final SHA. A source-level finding alone is not an exploit demonstration.
 - Mandatory high-risk flows and permission matrices (all personas, two orgs/two pharmacies), payment concurrency, cancellation/expiry, staff removal, socket revocation, onboarding, timekeeping, invoice, escalation, hub and marketplace, and client parity need coverage even if the 99% file target is met.

@@ -3,7 +3,7 @@
 **Baseline:** `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`
 **Review branch:** `audit/main-release-blockers-coverage-tracker-20261024`
 **Decision:** NOT RELEASE-READY; this documentation-only branch is not a fix.
-**Last verified date:** 2026-10-24 Australia/Brisbane.
+**Last verified date:** 2026-10-25 Australia/Brisbane.
 
 ## Verified audit provenance
 - Remote `main` matched the baseline SHA at branch creation.
@@ -24,7 +24,7 @@
 | Evidence log and explicit zero-baseline | DONE — evidence metadata only | This file |
 | Fixes implemented | 0/23 | No implementation commits |
 | Fixes fully tested on PR head | 0/23 | No PR-head gate evidence |
-| Individually certified source paths | 0/2149 | No completed per-file evidence ledger |
+| Full-file automated static inspection | 2149/2149 frozen-main sources, 2150/2150 at scanner commit | PASS on [run 40129505623](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40129505623); semantic cert 0 |
 | Mandatory release gates | PENDING | See senior package handbook |
 
 ## Future evidence requirements (one row per action, never infer)
@@ -89,3 +89,9 @@ Keep future remediation in owning modules, maintain existing user/business logic
 ### Evidence completeness
 
 23/23 registered issues have a source-level triage note in this pass; **0/23 reproducible failing tests; 0/23 fixed; 0/23 exact-head green regressions.** This is not 99% line/file audit completion. The 2,149-path inventory and current source inspections must be converted into per-file rows `docs/qa/evidence/` with review method, blob SHA and outcome. No test credentials or staging data belong in this document.
+
+## 25 October 2026: audit-only completion of complete-file static inspection
+
+[GitHub Actions run 40129505623](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40129505623) passed at `1d655a007dc49c219bc39d16f981afed1d4b6edc`: all 2,149 inherited main source files plus scanner script were fully read/static-scanned with verified Git blob IDs (2,150/2,150). 776 Python AST parses passed with zero failures. Zero read/hash errors. 284 distinct files had scanner signature hits; they are NOT confirmed defects. See `docs/qa/evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.json`, `MAIN_RELEASE_SOURCE_COVERAGE.csv`, `MAIN_RELEASE_STATIC_FLAGS.csv` and [gap verdicts](MAIN_RELEASE_GAP_VERDICTS_2026-10-25.md). **Manual semantic certification and validated exploits remain 0; application code was not modified.**
+
+Official independent check: current casual pharmacist ordinary weekday $52.18 under [Fair Work MA000012](https://awards.fairwork.gov.au/MA000012.html) compared with legacy $47.68 in shift JSON. Queensland [2027 public holidays](https://www.qld.gov.au/recreation/travel/holidays/public) available but not in shift holiday JSON. Current mobile dependency security failure is GHSA-w74x-v6f9-j3xg; neither was fixed. This is audit evidence, NOT production readiness.
