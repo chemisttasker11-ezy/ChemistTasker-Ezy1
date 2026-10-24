@@ -123,3 +123,7 @@ Read complete endpoint, serializer, permission/model, settings, storage and prev
 ## 25 October 2026 — Wave 7 B46–B48; private Hub + org invitation deep review
 
 Checked membership status/default vs lifecycle invite, Hub scope resolver (pharmacy/group/org), post create/list, member directory, tagged membership serializer, full-body notification/email, organisation invite immediate write, org membership role permission, org dashboard, and pre-existing region admin/pharmacy admin invite contract tests. Three independent source-level candidate gaps **B46–B48** documented with immutable main links and complete negative/positive fixtures in [wave 7](MAIN_RELEASE_DISCOVERY_WAVE_7.md). **48 tracked candidates**, none runtime reproduced in this wave; product code unchanged.
+
+## 25 October 2026 — Deep tracing B49–B50
+
+Traced file-validation extension/MIME/magic type fallback through Hub and Chat attachment persistence and found that malicious bytes under declared PDF can pass fallback; separately traced pharmacy chat eligibility via Membership status, Conversation queryset, ConversationListSerializer last_message and stricter message route. Independent source evidence/negative tests in [wave 8](MAIN_RELEASE_DISCOVERY_WAVE_8.md). **50 source-level candidates tracked; 0 runtime reproduced or fixed**.
