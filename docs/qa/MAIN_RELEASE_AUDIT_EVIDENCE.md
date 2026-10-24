@@ -139,3 +139,7 @@ Added per-file baseline SHA and occurrence-to-wave mapping for 38 distinct backe
 ## 25 October 2026 — B52 independent Expo/web session authority comparison
 
 Traced Expo secure token and cached user hydration, local JWT expiry, `/users/me/` failure handling, UI `AuthGate` role routing, Axios 401 interceptor and Vite cookie identity bootstrap. Source indicates Expo can restore cached role after server 401/403 when stale access remains. Evidence and different-status signed-device tests in [wave 10](MAIN_RELEASE_DISCOVERY_WAVE_10.md). **52 source candidates; 0 B52 runtime proof; 0 code fixes.**
+
+## 25 October 2026 — Accurate B43–B52 new-path accounting
+
+Reconciled every immutable GitHub source line reference across waves 6–10 against frozen-main Git tree and first 538-file manifest. **44 unique source/test paths**, **24 genuinely outside first tranche** and **20 intersecting existing structural review**; hashes and references in [deep path CSV](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv), [summary](MAIN_RELEASE_DEEP_REVIEW_PROGRESS.md). No crossplatform runtime tests executed or app source edited.

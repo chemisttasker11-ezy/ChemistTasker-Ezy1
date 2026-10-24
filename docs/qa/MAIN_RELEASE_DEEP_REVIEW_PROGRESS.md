@@ -1,36 +1,32 @@
-# ChemistTasker PR #200 — Deep review evidence register (B43–B51)
+# PR #200 — Deep causal source-review accounting (B43–B52)
 
-**Reviewed frozen source:** `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`.
-**Documents:** [Wave 6](MAIN_RELEASE_DISCOVERY_WAVE_6.md) · [Wave 7](MAIN_RELEASE_DISCOVERY_WAVE_7.md) · [Wave 8](MAIN_RELEASE_DISCOVERY_WAVE_8.md) · [Wave 9](MAIN_RELEASE_DISCOVERY_WAVE_9.md).
-**Owner scope:** identify production gaps, not implement fixes.
+**Frozen app baseline:** `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. **Latest deep review:** discovery [waves 6](MAIN_RELEASE_DISCOVERY_WAVE_6.md), [7](MAIN_RELEASE_DISCOVERY_WAVE_7.md), [8](MAIN_RELEASE_DISCOVERY_WAVE_8.md), [9](MAIN_RELEASE_DISCOVERY_WAVE_9.md) and [10](MAIN_RELEASE_DISCOVERY_WAVE_10.md). All work audit-only.
 
-## Measured source-call-path evidence
+## Actual measured progress
 
-- **38 distinct backend source or test files** explicitly linked in B43–B51 detailed reasoning, with **56 source-line citation occurrences**. Each path is identified by its immutable baseline Git blob SHA in [deep review register](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv).
-- These file references trace actual request → permission → serializer/service → database/notification/storage → existing test expectation, rather than relying on regex counts.
-- **9 newly identified B43–B51 risk candidates** with source chain, impact/conditionality, exact negative/positive test in waves 6–9. B01–B42 remain unchanged.
-- **Important:** This measures files supporting deep causal chains; it is **not** 38 independently certified entire files. Some paths are inspected at only the relevant functions, and no completed HTTP/PostgreSQL/browser/real-device reproduction is recorded.
-- Selected 538-file static/source-outline tranche remains 538/538 inspected and source-triaged, of which the earlier ledger counted 10 traced functions. This new register is **a separate cross-cutting evidence scope**; do not add totals together without deduplicating paths.
+- **44 distinct backend/web/Expo source and test files** referenced in **64 code-line evidence occurrences** across **10 independent B43–B52 source findings**; each has a precise affected workflow and missing positive and negative test.
+- **24 of those paths are newly reviewed outside the previously selected 538-source tranche**, while **20 overlap** the first selection. They are *not* added twice to the source-inventory coverage.
+- These represent **function-level causal chain reviews**, often several interacting files per finding. **Do not convert the 44 references into 44 complete-file semantic certifications**. The entire 538-file tranche remains structurally examined, with deeper verification needed across most business flows.
+- **0 reproduced security exploits, 0 payment/concurrency/real-device regressions executed**, zero code fixes. PR #200 remains draft. Candidate risk priorities are not independently proven exploit severities.
 
-## Paths by backend domain
+## Domains contributing to new source evidence
 
-| Backend domain | Distinct paths |
+| Domain | Distinct source paths |
 | --- | ---: |
-| `users` | 10 |
-| `chat` | 7 |
-| `onboarding` | 6 |
-| `pharmacy_hub` | 6 |
-| `core` | 3 |
-| `memberships` | 3 |
-| `client_profile` | 1 |
-| `dashboards` | 1 |
-| `notifications` | 1 |
+| `backend/users` | 10 |
+| `backend/chat` | 7 |
+| `backend/onboarding` | 6 |
+| `backend/pharmacy_hub` | 6 |
+| `frontend_mobile` | 5 |
+| `backend/core` | 3 |
+| `backend/memberships` | 3 |
+| `backend/client_profile` | 1 |
+| `backend/dashboards` | 1 |
+| `backend/notifications` | 1 |
+| `frontend_web` | 1 |
 
-## Completion criteria for a verified production blocker
+## Evidence and next verification gates
 
-1. Reproduce a forbidden action on an isolated copy of the frozen main with **two organizations, two pharmacies, distinct users and real role memberships**, when tenant isolation is relevant.
-2. Show a positive control preserving valid role behavior, and verify rejected requests did not change database rows or emit notifications/payments.
-3. For authentication, verify previous refresh/session tokens fail after the revocation event; for storage, assert DB and underlying file objects survive invalid submissions; for communication, assert no email/WS/push exfiltration on forbidden audience.
-4. Record exact run SHA, test command, database engine, result and discovered side effects. Only then use **REPRODUCED** status, and keep fixes outside audit-only PR #200.
+The [immutable path register](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv) contains source SHA, wave IDs, overlap grade and execution status. B43 token revocation needs web/native session replay; B44 invalid identity updates need persisted-file/transaction assertions; B45 invalid referee responses need HTTP check; B46/B48/ B50/B51 require private notification and revoked-member denial tests; B47 requires owner policy decision; B49 requires fake-PDF upload rejection; B52 requires Expo startup under denied server identity and browser comparison. For release, execute negative+positive tests on representative PostgreSQL/real-client fixtures and record the exact CI head and output. Never label a candidate reproduced without those records.
 
-**Release decision:** not certified for real users. This register is a source-evidence ledger, not a guarantee of 51 confirmed exploitable defects or 99% semantic coverage.
+**Source audit work progressed; 99% manual semantic/release verification remains NOT achieved.**

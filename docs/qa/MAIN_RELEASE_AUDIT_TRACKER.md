@@ -166,3 +166,7 @@ B43–B51 are evidenced by **38 distinct source/test file references across nine
 
 - **B52 P1 candidate** Expo boot restores saved user/role on `/users/me/` failure, while browser requires confirmed server identity. Cached authorization UI may remain after 401/403 despite API rejection. Traced `authSession`, `AuthContext`, native Axios, `AuthGate`, owner dashboard, Vite session bootstrap; exact test matrix in [wave 10](MAIN_RELEASE_DISCOVERY_WAVE_10.md).
 - **B01–B52 now 52 source candidates**, no B52 runtime reproduction, no app fixes. Distinguish cached UI authorization state from proven backend data exposure.
+
+## Measured cross-platform deep-review source coverage (25 October 2026)
+
+Waves 6–10 cite **44 unique immutable baseline source/test paths** across ten independently reasoned B43–B52 issue chains, of which **24 are additional paths outside the original selected 538** and **20 are overlaps**. [Updated deep progress](MAIN_RELEASE_DEEP_REVIEW_PROGRESS.md) and [per-file path ledger](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv). These are function-level semantic source traces, **not full-file behavioral certifications**; 0 reproducible runtime negatives executed and 0 code fixes. The next 25% cannot honestly be called fully semantic-reviewed from these source references alone.
