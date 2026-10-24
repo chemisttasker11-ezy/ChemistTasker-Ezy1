@@ -15,8 +15,8 @@
 | Audit register | B01–B23 enumerated from senior source review | 23 TRACKED |
 | Findings fixed on this branch | 0 / 23 | NOT STARTED |
 | Findings with red-then-green targeted regression evidence on this branch | 0 / 23 | NOT STARTED |
-| Individually evidenced file-level review | Not yet populated; inventory is **not** file review | 0 CERTIFIED |
-| CI at this PR head | No PR-specific test run verified yet | PENDING |
+| Individually evidenced file-level review | 22 SOURCE_TRIAGED, 2,127 NOT_REVIEWED in [source coverage CSV](evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv); triage is not complete file review | 0 CERTIFIED |
+| CI at this PR head (`4ec9f94d`) | [Shared Core Consolidation run 40103401291](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40103401291): 8 job gates PASS, `mobile` FAIL, `release-gate` FAIL | FAILED — dependency advisory, not code-build failure |
 | Existing main Full Isolated QA | [40019714397](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40019714397) passed at the frozen base SHA | HISTORICAL BASE EVIDENCE ONLY |
 | Existing main Staging QA | [40019714320](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40019714320) failed at base (history / audit baseline issue) | FAILED (BASE) |
 
@@ -72,3 +72,5 @@
 - 2026-10-24 — Frozen base `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`, branch `audit/main-release-blockers-coverage-tracker-20261024`. Repository and full handbook inspected; created initial B01–B23 register. **No fixes or PR-head tests yet.**
 
 - 2026-10-24 — Independent frozen-main source triage B01–B23 completed, with file/line rationales in `MAIN_RELEASE_AUDIT_EVIDENCE.md`; 23 source findings **remain untested** and **0 fixed**. Main Staging QA run 40019714320 failed: `HEAD^` unavailable and shared-core changed-line audit skipped (job 120640790121). Archived 310-line Senior Package Testing handbook also independently read. Audit branch had no PR or exact-head CI at this checkpoint. Source triage is NOT certification of 2,149 source paths.
+
+- 2026-10-25 — PR #200 latest inspected head `4ec9f94de9489661a5b266364a45bfe6ba4322ae`: [Shared Core Consolidation run 40103401291](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40103401291) completed with **8 successful jobs** (`postgres-concurrency`, `backend`, `shared-core`, `kiosk`, `architecture-audit`, `boundary-audit`, `web-vite`, `web-next`), **mobile FAILED**, and release-gate FAILED as a downstream consequence. Mobile job `120900105223` step `Verify patched runtime dependencies and reject new advisories` stopped with `AssertionError: Unresolved advisory: https://github.com/advisories/GHSA-w74x-v6f9-j3xg` (`fast-uri`). CodeQL and Public Repository Security completed SUCCESS; iOS Native Repair Acceptance SKIPPED. **No application fix or B01–B23 regression test is evidenced**; repair/verify the dependency issue without silently accepting the advisory. Branch work is still audit documentation, not production repair.
