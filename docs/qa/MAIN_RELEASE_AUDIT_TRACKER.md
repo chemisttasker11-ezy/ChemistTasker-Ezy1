@@ -184,3 +184,7 @@ Waves 6–10 cite **44 unique immutable baseline source/test paths** across ten 
 - Second selected cohort: **516 previously uncounted files** drawn from frozen main to reach the **49.0461% structural acquisition target** when all are actually retrieved; [manifest](evidence/MAIN_RELEASE_SECOND_TRANCHE_MANIFEST.csv). `QUEUED` does not count as reviewed.
 - **20/516** now independently fetched, SHA matched and structurally source-triaged with per-file symbol/line/signature notes in [batch 01](evidence/MAIN_RELEASE_SECOND_TRANCHE_BATCH_01.csv) and [batch 02](evidence/MAIN_RELEASE_SECOND_TRANCHE_BATCH_02.csv). **496/516 still queued**.
 - **Actual complete structural acquisition 558/2,149 = 25.9656%, NOT 49%.** Original 538 cohort unchanged; deep source register unchanged at 76. [New live ledger](MAIN_RELEASE_SECOND_TRANCHE_PROGRESS.md). No new B58 or other issue without independent causal evidence. No tests, fixes, merge or deploy.
+
+## Second tranche continuation checkpoint
+
+- New SHA-matched individual full-file fetches: **80** across contiguous selected-manifest offsets 20–99 (batch CSV 03–12). Total second tranche fetched **100/516**. Remaining **416 queued**. Combined structural fetches **638/2,149 (29.6882%)**. Neither 49% target nor semantic/runtime verification reached. [Evidence](MAIN_RELEASE_SECOND_TRANCHE_PROGRESS.md). No new findings without causal proof.

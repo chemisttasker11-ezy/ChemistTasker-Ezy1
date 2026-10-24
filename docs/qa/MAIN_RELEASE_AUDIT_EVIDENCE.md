@@ -153,3 +153,7 @@ These are **five NEW source-level candidates**: B53 subscription event reorderin
 ## 25 October 2026 — Second structural source tranche: actual first 20
 
 From the 2,149-file immutable inventory selected 516 additional, unique previously unreviewed paths (manifest linked in [progress report](MAIN_RELEASE_SECOND_TRANCHE_PROGRESS.md)). The first two groups of ten were individually retrieved via connected GitHub, compared to the frozen-main Git-blob SHA and inspected by complete content, function outline, line counts and targeted risk tokens. 20/20 reads and hashes matched; 496 remained queued. This establishes **558/2,149 = 25.9656%** independent structural review, not the requested 49%, not 558 semantic signoffs. No targeted tests executed, no novel defects elevated without full cross-path proof, no product files edited.
+
+## Second tranche verification checkpoint: manifest entries 20–99
+
+80 more selected distinct GitHub frozen-main files were individually fetched, content inspected for function/class outlines, Git blob SHA matched in all 80, and recorded with explicit no-semantic-certification note. Ten corresponding evidence batch blobs committed in the same PR. First tranche 538 + this second tranche 100 = 638/2149 structural paths, 416 additional queued for 49.0461% selected goal. Source only; 0 tests executed, new issue IDs 0.
