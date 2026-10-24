@@ -131,3 +131,7 @@ Traced file-validation extension/MIME/magic type fallback through Hub and Chat a
 ## 25 October 2026 — B51 direct HTTP community chat authorization
 
 Independently traced `MessageViewSet.create` → `Participant` and current `Membership` flags → `MembershipViewSet.perform_update` → realtime `participant_can_receive_chat_updates` and existing REST/WS tests. Dedicated messages POST lacks active/ACCEPTED check even after revocation, while realtime helper demands both. [Wave 9 detailed report](MAIN_RELEASE_DISCOVERY_WAVE_9.md). **51 source-level candidates; B51 is not HTTP-reproduced and no fix was made**.
+
+## 25 October 2026 — Deep source-path accounting (B43–B51)
+
+Added per-file baseline SHA and occurrence-to-wave mapping for 38 distinct backend source/test paths cited in detailed new findings B43–B51. See [register](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv) and [measured summary](MAIN_RELEASE_DEEP_REVIEW_PROGRESS.md). This measures multi-module causal investigation; it neither expands 538-file tranche count nor equates to fully certified semantic correctness. No test reproduction or app code fixes.

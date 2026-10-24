@@ -157,3 +157,7 @@ See [wave 5 report](MAIN_RELEASE_DISCOVERY_WAVE_5.md). **167 of 538** selected i
 ## Deep contextual review — discovery wave 9 (B51), 25 October 2026
 
 - **B51 P1/P0-impact candidate:** direct POST `/api/v1/messages/` checks room Participant and authentication but not current pharmacy membership active/accepted; revoked participant can potentially continue authoring community messages. Existing WebSocket helper enforces accepted and active, while generic membership PATCH leaves participant. **Distinct from B05 WebSocket and B50 preview**. See [complete source path and requested HTTP negative test](MAIN_RELEASE_DISCOVERY_WAVE_9.md). **51 total source findings** (B01–B51), zero runtime-proven exploits, zero application fixes.
+
+## Measured deep source-path evidence (25 October 2026)
+
+B43–B51 are evidenced by **38 distinct source/test file references across nine new issue call paths** (all immutable baseline SHA recorded), with **56 source-line references**. [Deep review register](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv) and [coverage distinction](MAIN_RELEASE_DEEP_REVIEW_PROGRESS.md). **This is source-path causal tracing, NOT 38 full-file semantic signoffs**. Runtime negative verification remains 0; do not merge/deploy based on these findings alone.
