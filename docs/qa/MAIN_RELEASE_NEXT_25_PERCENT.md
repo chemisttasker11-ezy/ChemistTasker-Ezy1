@@ -27,3 +27,7 @@
 
 - GitHub content-assisted review: 167/538 source blobs fetched and structural line/symbol evidence inspected (31.04% of selected tranche); 371 still requiring direct assistant inspection. CI already read all 538 and verified their blob hashes. No full-file semantic review is certified from mere summaries.
 - B41–B42 source traces and proposed regressions documented in wave 5. No app modifications.
+
+## Selected tranche completed — 25 October 2026
+
+**538 / 538 (100% of this selection; 25.03% of original source inventory)** independently GitHub-fetched by blob SHA and structurally triaged by assistant. Every selected file has been updated in [quarter ledger](evidence/MAIN_RELEASE_QUARTER_2_FILE_LEDGER.csv). Review grades: **10 source-callpath traced**, **528 source-outline inspected**, **0 runtime acceptance tests**. This closes the *selected 25% file acquisition/source triage* task, **not 538 semantic correctness approvals**. See [completion report](MAIN_RELEASE_FIRST_QUARTER_COMPLETION.md). Source findings B01–B42; no fixes.
