@@ -6,6 +6,7 @@ on:
       - audit/main-release-blockers-coverage-tracker-20261024
     paths:
       - docs/qa/pr200_static_audit.py
+      - docs/qa/pr200_quarter_audit.py
       - .github/workflows/pr200_readonly_static_audit.yml
   workflow_dispatch:
 
@@ -30,6 +31,9 @@ jobs:
       - name: Read every tracked source blob without modifying application code
         run: python3 docs/qa/pr200_static_audit.py
 
+      - name: Independently read and hash-verify the selected 538-source tranche
+        run: python3 docs/qa/pr200_quarter_audit.py
+
       - name: Attach source-by-source audit evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -40,6 +44,9 @@ jobs:
             docs/qa/evidence/MAIN_RELEASE_STATIC_FLAGS.csv
             docs/qa/evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md
             docs/qa/evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.json
+            docs/qa/evidence/MAIN_RELEASE_QUARTER_2_FILE_LEDGER.csv
+            docs/qa/evidence/MAIN_RELEASE_QUARTER_2_STATIC_REPORT.md
+            docs/qa/evidence/MAIN_RELEASE_QUARTER_2_STATIC_REPORT.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -54,7 +61,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/qa/evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv docs/qa/evidence/MAIN_RELEASE_STATIC_FLAGS.csv docs/qa/evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md docs/qa/evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.json
+          git add docs/qa/evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv docs/qa/evidence/MAIN_RELEASE_STATIC_FLAGS.csv docs/qa/evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md docs/qa/evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.json docs/qa/evidence/MAIN_RELEASE_QUARTER_2_FILE_LEDGER.csv docs/qa/evidence/MAIN_RELEASE_QUARTER_2_STATIC_REPORT.md docs/qa/evidence/MAIN_RELEASE_QUARTER_2_STATIC_REPORT.json
           if git diff --cached --quiet; then
             echo "Audit evidence already current"
           else
