@@ -157,3 +157,12 @@ From the 2,149-file immutable inventory selected 516 additional, unique previous
 ## Second tranche verification checkpoint: manifest entries 20–99
 
 80 more selected distinct GitHub frozen-main files were individually fetched, content inspected for function/class outlines, Git blob SHA matched in all 80, and recorded with explicit no-semantic-certification note. Ten corresponding evidence batch blobs committed in the same PR. First tranche 538 + this second tranche 100 = 638/2149 structural paths, 416 additional queued for 49.0461% selected goal. Source only; 0 tests executed, new issue IDs 0.
+
+## Frozen source read provenance — second cohort complete
+
+## Selected second tranche completed — 25 October 2026
+
+- Independently acquired **all 516/516** selected, previously noncounted frozen-main source blobs and compared every returned Git blob SHA against the exact immutable inventory SHA. **516 successful matches; zero mismatches.** Source code was inspected for class/function outline, line count, and the first 20 also for additional token-based risk signals. This is **structural source triage**, not a claim that each full file was independently reasoned semantically.
+- [Final 516-path manifest](evidence/MAIN_RELEASE_SECOND_TRANCHE_MANIFEST.csv), with `source_sha_verified=YES` and individual source blob, and [64 supporting numbered batch files](evidence/) preserving fetched SHA, source line count, outline and explicit `STATIC_OUTLINE_NOT_SEMANTIC` note. Batches 01–02 contain 10 rows each; 03–64 contain eight each. Total **20 + 62×8 = 516** distinct files.
+- Coverage against the frozen 2,149-source inventory: first selected cohort 538 + second distinct cohort 516 = **1,054 / 2,149 = 49.0461%** independently fetched and *structurally* triaged. **49% structural review milestone reached, NOT 49% semantic/manual correctness verification**. Prior automated 2,149-file read is independent and not added to this count.
+- Distribution of new 516: backend 210; shared-core 50; Vite 95; Next 50; Expo 95; auxiliary/tooling 16. Existing B01–B57 candidate findings unchanged. Deeper causal source-path register B43–B57 remains 76 paths. No new source candidate raised from outline patterns alone. **No tests/Stripe/PostgreSQL/browser/device runs or production fixes.** 1,095 of 2,149 baseline source paths remain **outside both independently structured cohorts**; even the inspected 1,054 require further full semantic and behavior checks for release gating. No changes to app code, deployments or other PRs.
