@@ -99,3 +99,7 @@ Official independent check: current casual pharmacist ordinary weekday $52.18 un
 ## 25 October 2026 — B24–B32 new source discovery
 
 Previous B01–B23 were not re-reviewed. New marketplace, ethical marketplace, timesheet, attendance/kiosk and notification source paths and existing test contracts were independently traced against frozen main `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. New source findings: **9 (B24–B32)**, details [MAIN_RELEASE_DISCOVERY_WAVE_2.md](MAIN_RELEASE_DISCOVERY_WAVE_2.md). P0-impact candidates B24, B29; others conditional P1. No runtime exploit or regression was run and 0 code fixes were made. The specific missing negative tests are documented. New findings are **not** verified defects until executed against an isolated representative data fixture.
+
+## 25 October 2026 — discovery wave 3
+
+Two NEW source findings B33–B34 after tracking B24–B32, via independent tracing of `backend/invoicing/views.py` → `serializers.py` → `models.py` and `backend/talent/views/explorer.py` → `models.py` → read serializer. See [MAIN_RELEASE_DISCOVERY_WAVE_3.md](MAIN_RELEASE_DISCOVERY_WAVE_3.md). Priority provisional, no reproduction and no code modifications; **34 source findings tracked**.
