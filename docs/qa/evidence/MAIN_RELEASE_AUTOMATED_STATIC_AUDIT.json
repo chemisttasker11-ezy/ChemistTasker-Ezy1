@@ -1,0 +1,209 @@
+{
+  "coverage_percent": 100.0,
+  "domains": {
+    ".agents": 46,
+    "backend": 724,
+    "docs": 3,
+    "frontend_mobile": 558,
+    "frontend_web": 640,
+    "scripts": 33,
+    "shared-core": 146
+  },
+  "files_with_heuristic_signals": 284,
+  "generated_utc": "2026-10-24T20:23:01.130232+00:00",
+  "inherited_main_baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "interpretation": "Complete-file automated static inspection only. All rule hits require manual triage. No business behavior, role permissions, browser, device, Stripe, data integrity or release readiness is certified.",
+  "largest_files": [
+    {
+      "lines": 4462,
+      "path": "docs/roster-attendance/archive/2026-09-15-pre-repair-models.py"
+    },
+    {
+      "lines": 2573,
+      "path": "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx"
+    },
+    {
+      "lines": 2504,
+      "path": "backend/client_profile/migrations/0001_squashed_baseline.py"
+    },
+    {
+      "lines": 2118,
+      "path": "frontend_web/src/pages/attendance/KioskPage.tsx"
+    },
+    {
+      "lines": 2001,
+      "path": "frontend_web/src-tauri/src/lib.rs"
+    },
+    {
+      "lines": 1643,
+      "path": ".agents/skills/ui-ux-pro-max/scripts/design_system.py"
+    },
+    {
+      "lines": 1585,
+      "path": "frontend_mobile/roles/shared/calendar/index.tsx"
+    },
+    {
+      "lines": 1566,
+      "path": "shared-core/src/types.ts"
+    },
+    {
+      "lines": 1426,
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx"
+    },
+    {
+      "lines": 1401,
+      "path": "frontend_web/src/components/roster/RosterGridViews.tsx"
+    },
+    {
+      "lines": 1399,
+      "path": "frontend_mobile/roles/shared/hub/HubScreen.tsx"
+    },
+    {
+      "lines": 1369,
+      "path": "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx"
+    },
+    {
+      "lines": 1369,
+      "path": "frontend_web/e2e/frontend-smoke.spec.mjs"
+    },
+    {
+      "lines": 1345,
+      "path": "frontend_web/src/components/roster/HorizontalCalendarGrid.tsx"
+    },
+    {
+      "lines": 1293,
+      "path": "frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.tsx"
+    },
+    {
+      "lines": 1257,
+      "path": "frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx"
+    },
+    {
+      "lines": 1255,
+      "path": "frontend_web/src/layouts/TopBarActions.tsx"
+    },
+    {
+      "lines": 1224,
+      "path": "backend/core/test_task_contracts.py"
+    },
+    {
+      "lines": 1216,
+      "path": "scripts/ahpra_verifier/test_bridge.py"
+    },
+    {
+      "lines": 1119,
+      "path": "frontend_web/src/pages/dashboard/organization/InviteStaffPage.tsx"
+    },
+    {
+      "lines": 1097,
+      "path": "backend/dashboards/views.py"
+    },
+    {
+      "lines": 1095,
+      "path": ".agents/skills/ui-ux-pro-max/scripts/validate_data.py"
+    },
+    {
+      "lines": 1077,
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx"
+    },
+    {
+      "lines": 1061,
+      "path": "frontend_mobile/roles/shared/messages/[id].tsx"
+    },
+    {
+      "lines": 1044,
+      "path": "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx"
+    },
+    {
+      "lines": 1031,
+      "path": "frontend_web/src/pages/dashboard/sidebar/InvoiceGeneratePage.tsx"
+    },
+    {
+      "lines": 1013,
+      "path": "backend/billing/views.py"
+    },
+    {
+      "lines": 1011,
+      "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx"
+    },
+    {
+      "lines": 1011,
+      "path": "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx"
+    },
+    {
+      "lines": 995,
+      "path": "frontend_mobile/roles/shared/pharmacies/StaffManager.tsx"
+    },
+    {
+      "lines": 994,
+      "path": "backend/worker_finance/services.py"
+    },
+    {
+      "lines": 993,
+      "path": ".agents/skills/ui-ux-pro-max/scripts/core.py"
+    },
+    {
+      "lines": 991,
+      "path": "frontend_web/src/components/roster/RosterPlanningToolbar.tsx"
+    },
+    {
+      "lines": 989,
+      "path": "backend/onboarding/serializers.py"
+    },
+    {
+      "lines": 987,
+      "path": "backend/attendance/credentials.py"
+    },
+    {
+      "lines": 981,
+      "path": "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx"
+    },
+    {
+      "lines": 969,
+      "path": "backend/workforce/views.py"
+    },
+    {
+      "lines": 967,
+      "path": "frontend_web/e2e/frontend-breadth.spec.mjs"
+    },
+    {
+      "lines": 959,
+      "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx"
+    },
+    {
+      "lines": 955,
+      "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx"
+    }
+  ],
+  "manual_semantic_certified": 0,
+  "previous_baseline_ledger_total": 2149,
+  "previous_baseline_static_scanned": 2149,
+  "python_ast_fail": 0,
+  "python_ast_pass": 776,
+  "read_or_hash_fail": 0,
+  "required_for_99_percent": 2129,
+  "scanned": 2150,
+  "signal_file_counts": {
+    "AUTH_ALLOW_ANY": 19,
+    "AUTH_EMPTY_CLASSES": 3,
+    "AUTH_OVERRIDE": 5,
+    "AWARD_RATE_REFERENCE": 20,
+    "BROAD_OBJECTS_ALL": 22,
+    "BROWSER_TOKEN_STORAGE": 6,
+    "CASCADE_DELETION": 25,
+    "CSRF_EXEMPT": 4,
+    "DIRECT_WEB_TRANSPORT": 18,
+    "DYNAMIC_EVAL_EXEC": 14,
+    "FILE_UPLOAD": 31,
+    "FINANCE_IDEMPOTENCY": 71,
+    "HTML_INJECTION_SINK": 1,
+    "ORG_WIDE_ROLE": 15,
+    "RAW_SQL": 17,
+    "STRIPE_PAYMENT": 4,
+    "TENANT_SCOPE_REFERENCE": 99,
+    "WEB_REDIRECT": 5
+  },
+  "source_sha": "1d655a007dc49c219bc39d16f981afed1d4b6edc",
+  "total": 2150,
+  "unread_or_mismatched_paths": []
+}
