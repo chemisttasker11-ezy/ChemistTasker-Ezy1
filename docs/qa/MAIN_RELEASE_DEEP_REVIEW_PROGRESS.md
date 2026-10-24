@@ -1,4 +1,4 @@
-# PR #200 — Deep causal source-review accounting (B43–B52)
+# PR #200 — Deep causal source-review accounting (B43–B57)
 
 **Frozen app baseline:** `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. **Latest deep review:** discovery [waves 6](MAIN_RELEASE_DISCOVERY_WAVE_6.md), [7](MAIN_RELEASE_DISCOVERY_WAVE_7.md), [8](MAIN_RELEASE_DISCOVERY_WAVE_8.md), [9](MAIN_RELEASE_DISCOVERY_WAVE_9.md) and [10](MAIN_RELEASE_DISCOVERY_WAVE_10.md). All work audit-only.
 
@@ -30,3 +30,11 @@
 The [immutable path register](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv) contains source SHA, wave IDs, overlap grade and execution status. B43 token revocation needs web/native session replay; B44 invalid identity updates need persisted-file/transaction assertions; B45 invalid referee responses need HTTP check; B46/B48/ B50/B51 require private notification and revoked-member denial tests; B47 requires owner policy decision; B49 requires fake-PDF upload rejection; B52 requires Expo startup under denied server identity and browser comparison. For release, execute negative+positive tests on representative PostgreSQL/real-client fixtures and record the exact CI head and output. Never label a candidate reproduced without those records.
 
 **Source audit work progressed; 99% manual semantic/release verification remains NOT achieved.**
+
+## Combined deep register after wave 11 — 25 October 2026
+
+- B43–B57: **15 new deep source candidates** across waves 6–11; B01–B42 historical findings remain unaffected. Overall **57 candidate findings, zero newly runtime-reproduced or fixed**.
+- Existing waves 6–10: **44 distinct** source/test paths, with 24 outside and 20 inside prior 538-file tranche. Wave 11: **32 newly referenced distinct paths**, with 15 outside and 17 inside. Union **76 distinct** referenced paths, of which **39 outside** and **37 inside** original 538. *No overlap between old deep set and wave11 paths.* Data in [deep path register](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv) and [wave 11 exact path/SHA ledger](evidence/MAIN_RELEASE_WAVE_11_PATH_LEDGER.csv).
+- The prior 64 count referred to code-line reference occurrences in waves 6–10; wave 11 adds one ledger occurrence per new path. These are **different granularity**; do not claim their sum is 96 actual Markdown line-links, tests, files fully reviewed, or behavioral signoffs.
+- Original **538/2,149** source-path cohort remains *structurally triaged*, of which 10 original were identified as deeper source call-path examinations and 528 outline-level only. The **76** newly aggregated deep references are *a separate overlay, not an additional 76 files added to the original structural cohort*. Applying either metric to a 99% semantic target would be misleading.
+- Current scope still lacks executed positive/negative Stripe refunds/paid subscription lifecycle and competing-offer PostgreSQL transaction tests, concurrent cover approval and attendance corrections, two-organization separation matrices, kiosk native offline verification, authenticated Next/Vite/Expo journeys and real devices. **Release gating remains open.** See [wave 11](MAIN_RELEASE_DISCOVERY_WAVE_11.md).

@@ -12,7 +12,7 @@
 | Tracked repository files at baseline | 2,969 | INVENTORIED only |
 | Source paths at baseline | 2,149 (`.py/.ts/.tsx/.js/.jsx/.mjs/.cjs/.rs`, exclude generated/vendor folders) | INVENTORIED only |
 | Handbook | `docs/qa/SENIOR_PACKAGE_TESTING.md` and full 310-line archived Library handbook read | DONE |
-| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **52 source findings tracked; 0 runtime reproduced** |
+| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **57 source findings tracked; 0 runtime reproduced** |
 | Findings fixed on this branch | 0 / 23 (audit-only scope) | NO FIXES REQUESTED |
 | Findings with red-then-green targeted regression evidence on this branch | 0 / 23 | NOT PERFORMED — behavioral verification separate |
 | Complete-source automated inspection | **2,149/2,149** frozen-main paths + added scanner path (2,150/2,150 at scan SHA); blob-verified [CSV](evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv), [summary](evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md) | **100% static-scanned; 0 manual semantic certified** |
@@ -170,3 +170,11 @@ B43–B51 are evidenced by **38 distinct source/test file references across nine
 ## Measured cross-platform deep-review source coverage (25 October 2026)
 
 Waves 6–10 cite **44 unique immutable baseline source/test paths** across ten independently reasoned B43–B52 issue chains, of which **24 are additional paths outside the original selected 538** and **20 are overlaps**. [Updated deep progress](MAIN_RELEASE_DEEP_REVIEW_PROGRESS.md) and [per-file path ledger](evidence/MAIN_RELEASE_DEEP_SOURCE_PATHS.csv). These are function-level semantic source traces, **not full-file behavioral certifications**; 0 reproducible runtime negatives executed and 0 code fixes. The next 25% cannot honestly be called fully semantic-reviewed from these source references alone.
+
+## Independent deep production-path continuation — wave 11, 25 October 2026 (B53–B57)
+
+- Read and deduplicated current PR head `d0e4e91180a0f665ba209ca526ae2e21ab537a07`, full B01–B52 register, wave records 2–10, previous 538-file ledger and deep source evidence **before** beginning. Frozen product baseline remains `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`.
+- **Five genuinely new, provisional source findings:** **B53** subscription/add-on Stripe event reordering and erroneous local base-active/seat state; **B54** two paid worker offers can reserve the same slot and the losing paid offer can become ACCEPTED with no assignment; **B55** racing approval of an unlinked worker cover request can create duplicate public shifts; **B56** concurrent distinct attendance event corrections can write skew into contradictory effective timestamps/payroll segments; **B57** conditional Stripe refund/reversal reconciliation gap.
+- Full authorization/service/database/client/test chains, immutable file-line links, concrete negative/positive fixtures and uncertainty qualifications: [**wave 11 report**](MAIN_RELEASE_DISCOVERY_WAVE_11.md). Per-file exact SHA: [**wave 11 path ledger**](evidence/MAIN_RELEASE_WAVE_11_PATH_LEDGER.csv).
+- **Exact new coverage:** 32 distinct previously unregistered *deep source/test paths*; **17 overlapped** the earlier 538-file structural tranche and **15 were outside** it. Combined B43–B57 path register **76 distinct paths**, 39 outside the original 538 and 37 inside. The original 538/2,149 structural count is unchanged; **all 76 are call-path references, not 76 full-file semantic certifications**.
+- Source reading was performed; **0 tests executed, 0 production incidents reproduced, 0 provider/web/native/PostgreSQL runs, 0 app fixes**. Highest next gates: paid-offer competition and Stripe event-order/refund tests on disposable PostgreSQL/test mode, concurrency for cover approval/correction, and two-tenant web/Expo/Next journeys. Overall **57 candidates B01–B57**, none addressed by audit-only PR. Remains **draft / NOT RELEASE READY**.
