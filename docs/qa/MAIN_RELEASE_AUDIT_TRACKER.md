@@ -12,7 +12,7 @@
 | Tracked repository files at baseline | 2,969 | INVENTORIED only |
 | Source paths at baseline | 2,149 (`.py/.ts/.tsx/.js/.jsx/.mjs/.cjs/.rs`, exclude generated/vendor folders) | INVENTORIED only |
 | Handbook | `docs/qa/SENIOR_PACKAGE_TESTING.md` and full 310-line archived Library handbook read | DONE |
-| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **61 source findings tracked; 0 runtime reproduced** |
+| Audit register | B01–B23 historical baseline; **B24–B40 seventeen NEW findings** in [discovery wave 2](MAIN_RELEASE_DISCOVERY_WAVE_2.md) | **65 source findings tracked; 0 runtime reproduced** |
 | Findings fixed on this branch | 0 / 23 (audit-only scope) | NO FIXES REQUESTED |
 | Findings with red-then-green targeted regression evidence on this branch | 0 / 23 | NOT PERFORMED — behavioral verification separate |
 | Complete-source automated inspection | **2,149/2,149** frozen-main paths + added scanner path (2,150/2,150 at scan SHA); blob-verified [CSV](evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv), [summary](evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md) | **100% static-scanned; 0 manual semantic certified** |
