@@ -1,0 +1,101 @@
+{
+  "review_date": "2026-10-25",
+  "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "scope": "Triage across original B01-B71 and new C/F findings including new F12-N1 and C064-N1",
+  "method": "Root-cause and scenario comparison; source verification noted in SOURCE_CHALLENGE_20261025.json. No runtime tests. No independent separate second-agent certification.",
+  "roots": [
+    {
+      "canonical": "C071-N2",
+      "aliases": [
+        "F09-N3",
+        "F11-N2"
+      ],
+      "status": "SAME_ROOT_CONFIRMED_SOURCE",
+      "reason": "One underlying device-token revocation omission: mobile logout does not deactivate prior account's DeviceToken, and server push continues sending to active tokens. F09-N3 and F11-N2 describe the same disclosure from chat previews; C071-N2 traces exact root."
+    },
+    {
+      "canonical": "B70",
+      "aliases": [
+        "F08-N1"
+      ],
+      "status": "OVERLAPPING_ROOT_HIGH_CONFIDENCE",
+      "reason": "Repeated Stripe base-subscription setup creates recurring provider subscriptions without idempotent guard while local OwnerSubscription tracks a single id. F08-N1 is the invoice-payment variant of B70; B70 also covers extra-seat Checkout. Keep both reproduction scenarios, remediate base and seats as distinct endpoints."
+    },
+    {
+      "canonical": "C010-N1",
+      "aliases": [
+        "B42"
+      ],
+      "status": "RELATED_NOT_IDENTICAL",
+      "reason": "Ethical draft PATCH may have unauthorized destination/product reassignment, and B42 concerns atomicity/error after persistence. Shared endpoint but different vulnerabilities, both retained."
+    },
+    {
+      "canonical": "F02-N1",
+      "aliases": [
+        "F08-N3"
+      ],
+      "status": "RELATED_DIFFERENT_FAILURE_MODES",
+      "reason": "Deleting a shift with bookings and deleting while Stripe Checkout remains open share shift-deletion lifecycle boundary, but need different safety/compensation guards and negative tests. Preserve separate findings."
+    },
+    {
+      "canonical": "F02-N3",
+      "aliases": [
+        "B67"
+      ],
+      "status": "RELATED_DISTINCT_ROUTES",
+      "reason": "Roster assignment removal/escalation and generic shift-offer DELETE bypass lifecycle at different entry points. Neither should automatically close the other."
+    },
+    {
+      "canonical": "B69",
+      "aliases": [
+        "B66"
+      ],
+      "status": "RELATED_DISTINCT_FAILURE_MODES",
+      "reason": "Cancellation penalty paid-once/retry safety is different from overnight negative wage arithmetic; maintain independent test contracts."
+    },
+    {
+      "canonical": "B68",
+      "aliases": [
+        "F08-N2"
+      ],
+      "status": "NOT_DUPLICATE",
+      "reason": "Cross-customer invoice.paid subscription entitlement and failure to handle unpaid status both occur in Stripe synchronization but have different causal roots and event cases."
+    },
+    {
+      "canonical": "B71",
+      "aliases": [
+        "F01-N4"
+      ],
+      "status": "RELATED_NOT_IDENTICAL",
+      "reason": "Shift acceptance notification service failure after a committed state and misrouting owner vs posting administrator are distinct delivery/reliability problems."
+    },
+    {
+      "canonical": "F12-N1",
+      "aliases": [
+        "B51"
+      ],
+      "status": "NOT_DUPLICATE",
+      "reason": "Mobile chat send error UI missing feedback differs from backend authorization defect allowing revoked chat member to send."
+    }
+  ],
+  "refuted": [
+    {
+      "id": "C016-N2",
+      "status": "REFUTED_SOURCE_FOR_REPORTED_PATCH_PATH",
+      "reason": "HubCommunityGroupSerializer.Meta.read_only_fields includes pharmacy, so ordinary PATCH cannot reassign the group's pharmacy through validated serializer data. Preserve historical claim as disproved; investigate other routes separately if discovered.",
+      "refs": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/serialization/groups.py#L53-L82",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/groups.py#L138-L145"
+      ]
+    }
+  ],
+  "earlier_B66_B71": {
+    "B66": "Overnight wage arithmetic; not completed",
+    "B67": "Generic offer DELETE; not completed",
+    "B68": "Stripe account attribution; not completed",
+    "B69": "Penalty paid-once guard; not completed",
+    "B70": "Recurring base and extra-seat subscription creation; source overlap F08-N1",
+    "B71": "Acceptance notification transaction ordering; not completed"
+  },
+  "policy": "Preserve all source finding IDs with canonical/alias relationships; never silently delete historical candidates; exclude REFUTED_SOURCE from active blocker counts; S3 remains not executed."
+}
