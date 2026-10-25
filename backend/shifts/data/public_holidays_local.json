@@ -1,0 +1,688 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-10-25",
+  "legal_basis": "https://www.fairwork.gov.au/employment-conditions/public-holidays",
+  "award": "https://awards.fairwork.gov.au/MA000012.html",
+  "statewide_source_2026": "https://www.fairwork.gov.au/employment-conditions/public-holidays/2026-public-holidays",
+  "statewide_source_2027": "https://www.fairwork.gov.au/employment-conditions/public-holidays/2027-public-holidays",
+  "statewide_part_days": [
+    {
+      "state": "QLD",
+      "date": "2026-12-24",
+      "start": "18:00",
+      "end": "24:00",
+      "name": "Christmas Eve",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/public"
+    },
+    {
+      "state": "QLD",
+      "date": "2027-12-24",
+      "start": "18:00",
+      "end": "24:00",
+      "name": "Christmas Eve",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/public"
+    },
+    {
+      "state": "SA",
+      "date": "2026-12-24",
+      "start": "19:00",
+      "end": "24:00",
+      "name": "Christmas Eve",
+      "source": "https://www.safework.sa.gov.au/resources/public-holidays"
+    },
+    {
+      "state": "SA",
+      "date": "2026-12-31",
+      "start": "19:00",
+      "end": "24:00",
+      "name": "New Year's Eve",
+      "source": "https://www.safework.sa.gov.au/resources/public-holidays"
+    },
+    {
+      "state": "SA",
+      "date": "2027-12-24",
+      "start": "19:00",
+      "end": "24:00",
+      "name": "Christmas Eve",
+      "source": "https://www.safework.sa.gov.au/resources/public-holidays"
+    },
+    {
+      "state": "SA",
+      "date": "2027-12-31",
+      "start": "19:00",
+      "end": "24:00",
+      "name": "New Year's Eve",
+      "source": "https://www.safework.sa.gov.au/resources/public-holidays"
+    },
+    {
+      "state": "NT",
+      "date": "2026-12-24",
+      "start": "19:00",
+      "end": "24:00",
+      "name": "Christmas Eve",
+      "source": "https://nt.gov.au/nt-public-holidays"
+    },
+    {
+      "state": "NT",
+      "date": "2026-12-31",
+      "start": "19:00",
+      "end": "24:00",
+      "name": "New Year's Eve",
+      "source": "https://nt.gov.au/nt-public-holidays"
+    },
+    {
+      "state": "NT",
+      "date": "2027-12-24",
+      "start": "19:00",
+      "end": "24:00",
+      "name": "Christmas Eve",
+      "source": "https://nt.gov.au/nt-public-holidays"
+    },
+    {
+      "state": "NT",
+      "date": "2027-12-31",
+      "start": "19:00",
+      "end": "24:00",
+      "name": "New Year's Eve",
+      "source": "https://nt.gov.au/nt-public-holidays"
+    }
+  ],
+  "regions": {
+    "QLD_BRISBANE": {
+      "state": "QLD",
+      "label": "City of Brisbane - Royal Queensland Show",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/public",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-12",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Ekka Show Day"
+        },
+        {
+          "date": "2027-08-11",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Ekka Show Day"
+        }
+      ]
+    },
+    "QLD_GOLD_COAST": {
+      "state": "QLD",
+      "label": "City of Gold Coast - Show Day",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-28",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Gold Coast Show Day"
+        }
+      ]
+    },
+    "QLD_CAIRNS": {
+      "state": "QLD",
+      "label": "Cairns Regional Council - Show Day",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-07-17",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Cairns Show Day"
+        }
+      ]
+    },
+    "QLD_MORETON_BAY": {
+      "state": "QLD",
+      "label": "City of Moreton Bay Royal Queensland Show",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-10",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Queensland Show"
+        }
+      ]
+    },
+    "QLD_REDLAND": {
+      "state": "QLD",
+      "label": "City of Redland Royal Queensland Show",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-10",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Queensland Show"
+        }
+      ]
+    },
+    "QLD_LOGAN": {
+      "state": "QLD",
+      "label": "Logan City Royal Queensland Show",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-10",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Queensland Show"
+        }
+      ]
+    },
+    "QLD_GLADSTONE": {
+      "state": "QLD",
+      "label": "Gladstone Regional Royal Queensland Show",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-10",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Queensland Show"
+        }
+      ]
+    },
+    "QLD_LOCKYER_VALLEY": {
+      "state": "QLD",
+      "label": "Lockyer Valley Regional Royal Queensland Show",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-10",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Queensland Show"
+        }
+      ]
+    },
+    "QLD_SCENIC_RIM": {
+      "state": "QLD",
+      "label": "Scenic Rim Regional Royal Queensland Show",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-10",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Queensland Show"
+        }
+      ]
+    },
+    "QLD_SOMERSET": {
+      "state": "QLD",
+      "label": "Somerset Regional Royal Queensland Show",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-10",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Queensland Show"
+        }
+      ]
+    },
+    "QLD_SOUTH_BURNETT": {
+      "state": "QLD",
+      "label": "South Burnett Regional Royal Queensland Show",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-10",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Queensland Show"
+        }
+      ]
+    },
+    "QLD_NOOSA": {
+      "state": "QLD",
+      "label": "Shire of Noosa Show Day",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-09-11",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Noosa Show"
+        }
+      ]
+    },
+    "NT_ALICE_SPRINGS": {
+      "state": "NT",
+      "label": "Alice Springs Show district",
+      "coverage": "NT government official show-day geographic boundaries apply. Verify exact locality on official map.",
+      "source": "https://nt.gov.au/nt-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-07-03",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Alice Springs Show"
+        },
+        {
+          "date": "2027-07-02",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Alice Springs Show"
+        }
+      ]
+    },
+    "NT_TENNANT_CREEK": {
+      "state": "NT",
+      "label": "Tennant Creek Show district",
+      "coverage": "NT government official show-day geographic boundaries apply. Verify exact locality on official map.",
+      "source": "https://nt.gov.au/nt-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-07-10",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Tennant Creek Show"
+        },
+        {
+          "date": "2027-07-09",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Tennant Creek Show"
+        }
+      ]
+    },
+    "NT_KATHERINE": {
+      "state": "NT",
+      "label": "Katherine Show district",
+      "coverage": "NT government official show-day geographic boundaries apply. Verify exact locality on official map.",
+      "source": "https://nt.gov.au/nt-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-07-17",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Katherine Show"
+        },
+        {
+          "date": "2027-07-16",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Katherine Show"
+        }
+      ]
+    },
+    "NT_DARWIN": {
+      "state": "NT",
+      "label": "Darwin Show district",
+      "coverage": "NT government official show-day geographic boundaries apply. Verify exact locality on official map.",
+      "source": "https://nt.gov.au/nt-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-07-24",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Darwin Show"
+        },
+        {
+          "date": "2027-07-23",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Darwin Show"
+        }
+      ]
+    },
+    "NT_BORROLOOLA": {
+      "state": "NT",
+      "label": "Borroloola Show district",
+      "coverage": "NT government official show-day geographic boundaries apply. Verify exact locality on official map.",
+      "source": "https://nt.gov.au/nt-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-14",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Borroloola Show"
+        },
+        {
+          "date": "2027-08-13",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Borroloola Show"
+        }
+      ]
+    },
+    "WA_KARRATHA": {
+      "state": "WA",
+      "label": "City of Karratha alternative King's Birthday",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.wa.gov.au/service/employment/workplace-arrangements/public-holidays-western-australia",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-09-28"
+      ],
+      "events": [
+        {
+          "date": "2026-08-03",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "King's Birthday replacement"
+        }
+      ]
+    },
+    "WA_PORT_HEDLAND": {
+      "state": "WA",
+      "label": "Town of Port Hedland alternative King's Birthday",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.wa.gov.au/service/employment/workplace-arrangements/public-holidays-western-australia",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-09-28"
+      ],
+      "events": [
+        {
+          "date": "2026-08-03",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "King's Birthday replacement"
+        }
+      ]
+    },
+    "TAS_HOBART": {
+      "state": "TAS",
+      "label": "Southern Tasmania Hobart Regatta and Royal Hobart Show",
+      "coverage": "Southern Tasmania only; exact WorkSafe regional boundary, not all TAS.",
+      "source": "https://worksafe.tas.gov.au/topics/laws-and-compliance/public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-02-09",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Hobart Regatta"
+        },
+        {
+          "date": "2026-10-22",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Hobart Show"
+        },
+        {
+          "date": "2027-02-08",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Hobart Regatta"
+        },
+        {
+          "date": "2027-10-21",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Hobart Show"
+        }
+      ]
+    },
+    "TAS_LAUNCESTON": {
+      "state": "TAS",
+      "label": "Northern Tasmania Recreation Day and Royal Launceston Show",
+      "coverage": "Northern Tasmania; Recreation Day only where Royal Hobart Regatta is not observed.",
+      "source": "https://worksafe.tas.gov.au/topics/laws-and-compliance/public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-10-08",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Launceston Show"
+        },
+        {
+          "date": "2026-11-02",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Recreation Day"
+        },
+        {
+          "date": "2027-10-07",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Launceston Show"
+        },
+        {
+          "date": "2027-11-01",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Recreation Day"
+        }
+      ]
+    },
+    "NSW_WALCHA": {
+      "state": "NSW",
+      "label": "Walcha local public holiday",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-02-06",
+          "start": "12:00",
+          "end": "18:00",
+          "name": "Walcha Cup"
+        },
+        {
+          "date": "2027-02-05",
+          "start": "12:00",
+          "end": "18:00",
+          "name": "Walcha Cup"
+        }
+      ]
+    },
+    "NSW_KANGAROO_VALLEY": {
+      "state": "NSW",
+      "label": "Kangaroo Valley local public holiday",
+      "coverage": "Only Kangaroo Valley locality within Shoalhaven, not whole LGA.",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-02-13",
+          "start": "09:00",
+          "end": "17:00",
+          "name": "Kangaroo Valley Show"
+        },
+        {
+          "date": "2027-02-12",
+          "start": "09:00",
+          "end": "17:00",
+          "name": "Kangaroo Valley Show"
+        }
+      ]
+    },
+    "NSW_COONAMBLE": {
+      "state": "NSW",
+      "label": "Coonamble show local public holiday",
+      "coverage": "Whole named local-government area unless official source specifies a smaller boundary",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-05-27",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Coonamble Show"
+        },
+        {
+          "date": "2027-05-12",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Coonamble Show"
+        }
+      ]
+    }
+  },
+  "pending_state_events": [
+    {
+      "state": "VIC",
+      "year": 2027,
+      "name": "Friday before AFL Grand Final",
+      "status": "DATE_NOT_ANNOUNCED",
+      "source": "https://www.fairwork.gov.au/employment-conditions/public-holidays/2027-public-holidays"
+    }
+  ]
+}
