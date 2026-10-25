@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 historical IDs: 71 B and 155 C/F. 43 distinct runtime IDs / 48 cumulative expected-red isolated Django SQLite negative assertions across runs. B24 fixture corrected and two state transitions reproduced with two passing positives at run 40189568324, head 51db9da3. 99% independent S2 NOT CERTIFIED.",
+  "material": "226 historical IDs (71 B plus 155 C/F); 44 distinct IDs and 50 cumulative expected-red negative assertions across targeted isolated runs. B24 2 reds and 2 positives (run 40189568324), B29 2 signed drift reds and 1 positive (run 40189842660). No independent 99% S2 certified; no real payroll/provider/PostgreSQL concurrency.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,15 +10,15 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 43,
-  "runtime_failing_scenarios": 48,
+  "runtime_distinct_ids": 44,
+  "runtime_failing_scenarios": 50,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
-    "SOURCE_SUPPORTED": 13,
+    "SOURCE_SUPPORTED": 12,
     "UNVERIFIED_CANDIDATE": 156,
-    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 42,
+    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 43,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
@@ -60,8 +60,8 @@
       "negative_failures": 7,
       "errors": 0
     },
-    "cumulative_distinct_findings": 43,
-    "cumulative_failed_negative_assertions": 48,
+    "cumulative_distinct_findings": 44,
+    "cumulative_failed_negative_assertions": 50,
     "warning": "Cumulative from multiple isolated targeted runs; not 45 failures in one suite; B24 error invalid, not counted.",
     "additional_runs": [
       {
@@ -96,6 +96,17 @@
         "positive_controls": 2,
         "fixture_errors": 0,
         "note": "Focused suite contains other intentionally expected-red failures; B24 4 cases: 2 RED negatives and 2 PASS positives"
+      },
+      {
+        "id": "B29",
+        "run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189842660",
+        "head": "9c0d0f0e658d24c8c2beb2795a429f9659f4dd08",
+        "tests": 3,
+        "negative_scenarios": 2,
+        "positive_controls": 1,
+        "fixture_errors": 0,
+        "negative_test_failing": true,
+        "notes": "Ed25519 signed, integrity flag asserted before expecting no live attendance; no payroll effect proved"
       }
     ]
   },
@@ -741,20 +752,37 @@
       "severity": "P0",
       "area": "Attendance/offline kiosk",
       "title": "Signed offline event integrity flags for clock-anchor drift, backward time, monotonic rollback and seven-day server drift mark evidence NEEDS_REVIEW but still call live attendance mutation, so suspect timestamps can create normal AttendanceSessions.",
-      "status": "SOURCE_SUPPORTED",
-      "evidence_grade": "S2_SAME_ASSISTANT_SOURCE_CHALLENGE",
-      "decision": "BLOCK_UNTIL_SIGNED_EVENT_AND_DOWNSTREAM_PAYROLL_PROOF",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_SIGNED_ED25519_STANDALONE_SQLITE",
+      "decision": "FIX_OR_PROVE_DOWNSTREAM_ISOLATION_ON_SEPARATE_REMEDIATION_PR",
       "root": "B29",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
       "source_proof": [
         "backend/attendance/protocol.py:89-117",
         "backend/attendance/protocol.py:234-301",
-        "docs/qa/MAIN_RELEASE_B29_KIOSK_CLOCK_SEMANTIC_20261025.md"
+        "backend/qa_release/test_pr200_kiosk_clock_audit.py:1-72"
       ],
       "test_needed": "Properly re-sign anchor drift, backwards clock, monotonic rollback and over-seven-day timestamp events, assert retained audit row and zero live attendance until approval; valid clock positive and downstream payroll gating.",
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b29_properly_signed_anchor_drift_must_not_apply_attendance",
+          "observed": "Valid Ed25519 signed event with 10-minute difference between device_timestamp and trusted_time_estimate returned needs_review, but persisted KioskAttendanceEvent.attendance_event_id=2, not NULL. The no-apply negative assertion failed after integrity flag assertion passed.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189842660",
+          "head": "9c0d0f0e658d24c8c2beb2795a429f9659f4dd08",
+          "environment": "Ubuntu isolated standalone attendance_tests SQLite schema, real offline protocol and Ed25519 signed event"
+        },
+        {
+          "test": "test_b29_properly_signed_server_drift_must_not_apply_attendance",
+          "observed": "Valid Ed25519 signed event dated eight days before server time returned needs_review, but persisted attendance_event_id=3, not NULL. No-apply negative assertion failed after SERVER_TIME_DRIFT flag assertion passed.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189842660",
+          "head": "9c0d0f0e658d24c8c2beb2795a429f9659f4dd08",
+          "environment": "Isolated standalone attendance_tests SQLite, real signed protocol"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "Clock drift/backward/monotonic flags mark signed offline kiosk event NEEDS_REVIEW, but only chain/sequence/revocation block _apply_business_event; timestamp still mutates live attendance."
+      "explanation": "Two valid signed-event drift cases (anchor and server) resulted in NEEDS_REVIEW retaining linked live AttendanceEvent. A healthy signed event positive control passed. No payroll export or provider effect tested, so high severity is conditional on downstream isolation."
     },
     {
       "id": "B30",
