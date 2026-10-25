@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from datetime import datetime, timezone as dt_timezone
 from urllib.parse import urlencode
 import stripe
@@ -934,6 +935,35 @@ def _process_stripe_event(event):
                 logger.warning(
                     'Stripe invoice.paid could not find matching local subscription.',
                 )
+
+    elif event.type == 'charge.refunded':
+        charge = event.data.object
+        payment_intent_id = charge.get('payment_intent')
+        if not payment_intent_id:
+            logger.warning('Stripe refund event does not include a payment intent.')
+            return
+        # Stripe amount_refunded is cumulative in cents for this charge.
+        # Never mark a partially reversed payment as fully refunded.
+        refunded_cents = charge.get('amount_refunded') or 0
+        try:
+            refunded_cents = int(refunded_cents)
+        except (ValueError, TypeError):
+            logger.warning('Stripe refund callback has invalid amount_refunded.')
+            return
+        if refunded_cents < 0:
+            return
+        for payment in ShiftPayment.objects.select_for_update().filter(
+            stripe_payment_intent_id=payment_intent_id, payment_method='card'
+        ):
+            cumulative = min(payment.amount_aud, Decimal(refunded_cents) / Decimal(100))
+            if cumulative <= payment.refunded_amount_aud:
+                continue
+            payment.refunded_amount_aud = cumulative
+            payment.status = (
+                'refunded' if cumulative >= payment.amount_aud
+                else 'partially_refunded'
+            )
+            payment.save(update_fields=['refunded_amount_aud', 'status'])
 
     elif event.type == 'customer.subscription.deleted':
         sub_id = event.data.object.id

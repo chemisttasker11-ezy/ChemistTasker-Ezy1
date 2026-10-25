@@ -78,6 +78,8 @@ class ShiftPayment(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('paid', 'Paid'),
+        ('partially_refunded', 'Partially refunded'),
+        ('refunded', 'Refunded'),
         ('failed', 'Failed'),
     )
 
@@ -92,6 +94,10 @@ class ShiftPayment(models.Model):
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
     
     amount_aud = models.DecimalField(max_digits=10, decimal_places=2)
+    refunded_amount_aud = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Cumulative refund confirmed by Stripe for this payment.",
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(blank=True, null=True)
