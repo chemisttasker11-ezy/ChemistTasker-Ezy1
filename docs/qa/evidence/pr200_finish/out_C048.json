@@ -1,0 +1,136 @@
+{
+  "chunk": "C048",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "source acquisition/annotation only; no independent S2 or S3",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
+  "files": [
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/chat/MessageComposer.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "5391232ec258c05f50f5f4bffd14d3aa9fd29a61",
+      "lines": 408,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "408 lines; Vite chat/hub UI MessageComposer.tsx; async calls onEditMessage, onSendAttachment, onSendText, handleSend; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/chat/NewChatModal.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "fae2a6a17be1e2982aaafdb6ece59f1a004f1680",
+      "lines": 507,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "507 lines; Vite chat/hub UI NewChatModal.tsx; async calls createOrUpdateGroupRoom; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/chat/chatFormat.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "96af6c2969f42839cd4bafc53967d16c846e95bd",
+      "lines": 3,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "3 lines; Vite chat/hub UI chatFormat.tsx; async calls none; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/chat/types.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b274e617435be0cf5781c5ab8389f3e4485139c0",
+      "lines": 24,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "24 lines; Vite chat/hub UI types.ts; async calls none; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/chat/useConversationScroll.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "236f0fcbab3e858c92f6d01c7b29c6bd4ad7f765",
+      "lines": 101,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "101 lines; Vite chat/hub UI useConversationScroll.ts; async calls none; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.helpers.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "53a68b1c5c3ce31c24a75ccde65fe912febe1427",
+      "lines": 93,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "93 lines; Vite chat/hub UI HubFeed.helpers.tsx; async calls none; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "efaf019056a00e084f467d2c8b828fe1a446287b",
+      "lines": 960,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "960 lines; Vite chat/hub UI HubFeed.tsx; async calls fetchHubPosts, fetchHubPolls, createHubPost, updateHubPoll, createHubPoll; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ab53e84543a50b49b0fc5ed3b1a0a97447999b5d",
+      "lines": 220,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "220 lines; Vite chat/hub UI HubFeedDialogs.tsx; async calls onCreate; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubGroupModal.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "fd89ff95af30c1f8b6ecfe91d201cee08092402b",
+      "lines": 515,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "515 lines; Vite chat/hub UI HubGroupModal.tsx; async calls Promise.all, fetchOrganizationMembers; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "8cc549956db182164e933b86ba2cb1fc94b68219",
+      "lines": 643,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "643 lines; Vite chat/hub UI HubPage.tsx; async calls fetchHubContext, getHubContext, createHubGroup, fetchHubGroup, updateHubGroup; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "544bd6125325771802d3c8b4af266778a9efb560",
+      "lines": 356,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "356 lines; Vite chat/hub UI HubPollCard.tsx; async calls fetchHubPollComments, loadComments, reactToHubPoll, removeHubPollReaction, createHubPollComment; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "90793397cd650c6441279965d57efe32b2e0f63f",
+      "lines": 576,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "576 lines; Vite chat/hub UI HubPostCard.tsx; async calls reactToHubPost, fetchHubComments, createHubComment, reactToHubComment, removeHubCommentReaction; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubProfileModals.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "867fe21dc8edee2b4491b376c208e4f243de77c6",
+      "lines": 193,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "193 lines; Vite chat/hub UI HubProfileModals.tsx; async calls updatePharmacyHubProfile, updateOrganizationHubProfile; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubSections.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "64ac747cffada95cf2088bb256cbd53185a19d79",
+      "lines": 313,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "313 lines; Vite chat/hub UI HubSections.tsx; async calls fetchHubGroup; tenant/group permissions and privacy notification chain require S2 and HTTP validation."
+    }
+  ],
+  "findings": []
+}
