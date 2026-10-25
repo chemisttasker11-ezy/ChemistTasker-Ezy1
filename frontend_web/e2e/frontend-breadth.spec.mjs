@@ -1,6 +1,57 @@
 import { test, expect } from '@playwright/test';
 import { baseCapabilities, installApiFixture, json, roleUsers } from './support/apiFixture.mjs';
 
+test.describe('attendance corrections in pharmacy time (C039-N1)', () => {
+  test.use({ timezoneId: 'UTC' });
+
+  for (const [timezone, timestamp, local = '2026-01-12T17:00', edited = '2026-01-12T18:00', expectedEdit] of [
+    ['Australia/Brisbane', '2026-01-12T07:00:00.000Z'],
+    ['Australia/Sydney', '2026-01-12T06:00:00.000Z'],
+    ['Australia/Sydney', '2026-04-04T15:30:12.345Z', '2026-04-05T02:30', '2026-04-05T02:45', '2026-04-04T15:45:00.000Z'],
+    ['Australia/Sydney', '2026-04-04T16:30:12.345Z', '2026-04-05T02:30', '2026-04-05T02:45', '2026-04-04T15:45:00.000Z'],
+  ]) {
+    test(`an owner can save unchanged and edited times for ${timezone} ${timestamp}`, async ({ page }) => {
+      // Winter's current offset must not decide which occurrence of an edited rollback time is used.
+      await page.clock.setFixedTime(new Date('2026-07-01T00:00:00Z'));
+      const corrections = [];
+      await installApiFixture(page, roleUsers.owner, async (route, { path, method }) => {
+        if (path.endsWith('/pharmacies/')) return json(route, [{ id: 101, name: 'Smoke Pharmacy', timezone }]);
+        if (path.endsWith('/attendance/manager/pending/')) return json(route, [{
+          provisional_id: 1, session_id: 2, worker_name: 'Test Worker', worker_email: 'worker@example.test',
+          started_at: timestamp, ended_at: timestamp, cover_type: 'UNROSTERED_LOCAL', status: 'PENDING',
+        }]);
+        if (path.includes('/attendance/manager/timeline/')) return json(route, {
+          session_id: 2, pharmacy_id: 101, pharmacy_name: 'Smoke Pharmacy', pharmacy_timezone: timezone, worker_name: 'Test Worker',
+          is_provisional: true, timeline: [{ event_id: 3, event_type: 'CLOCK_OUT', original_timestamp: timestamp,
+            effective_timestamp: timestamp, is_corrected: false }],
+        });
+        if (method === 'POST' && path.includes('/attendance/manager/correct/')) {
+          corrections.push(route.request().postDataJSON());
+          return json(route, { correction_id: 4 });
+        }
+      });
+      await page.goto('/dashboard/owner/attendance');
+      await page.getByRole('button', { name: 'Clock times' }).click();
+      const edit = page.getByRole('button', { name: 'Correct clock out time' });
+      await edit.click();
+      const input = page.getByLabel('Correct date and time');
+      await expect(input).toHaveValue(local);
+      await page.getByLabel('Reason').fill('Confirm the recorded time');
+      await page.getByRole('button', { name: 'Save correction' }).click();
+      await expect.poll(() => corrections.length).toBe(1);
+      expect(corrections[0].corrected_timestamp).toBe(timestamp);
+      await expect(page.getByRole('button', { name: 'Save correction' })).toBeHidden();
+
+      await edit.click();
+      await input.fill(edited);
+      await page.getByLabel('Reason').fill('Confirm the corrected time');
+      await page.getByRole('button', { name: 'Save correction' }).click();
+      await expect.poll(() => corrections.length).toBe(2);
+      expect(corrections[1].corrected_timestamp).toBe(expectedEdit ?? new Date(Date.parse(timestamp) + 3600000).toISOString());
+    });
+  }
+});
+
 async function openAuthenticatedRoute(page, user, path) {
   const pageErrors = [];
   const consoleErrors = [];

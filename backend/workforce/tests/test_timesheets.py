@@ -398,6 +398,25 @@ class TimesheetProjectionTests(TestCase):
         self.assertEqual(timesheet.approved_leave_minutes, 480)
         self.assertFalse(revision.checks.filter(code="ROSTER_WITHOUT_ATTENDANCE").exists())
 
+    def test_archiving_published_roster_keeps_rostered_and_leave_minutes(self):
+        """C028-N5: an archived week is published history; rebuilding must not drop its work or leave."""
+        tz = ZoneInfo("Australia/Brisbane")
+        WorkforceLeaveRequest.objects.create(
+            pharmacy=self.pharmacy, membership=self.membership, user=self.worker, leave_type="ANNUAL",
+            start_at=datetime.combine(self.work_date, time(14, 0), tzinfo=tz),
+            end_at=datetime.combine(self.work_date, time(16, 0), tzinfo=tz),
+            status=WorkforceLeaveRequest.Status.APPROVED,
+        )
+        build_timesheet(self.timesheet.pk, actor=self.owner, force=True)
+        self.timesheet.refresh_from_db()
+        before = (self.timesheet.rostered_minutes, self.timesheet.approved_leave_minutes)
+        self.assertEqual(before, (480, 120))
+
+        self.roster_period.status = RosterPeriod.Status.ARCHIVED
+        self.roster_period.save(update_fields=["status"])
+        build_timesheet(self.timesheet.pk, actor=self.owner, force=True)
+        self.timesheet.refresh_from_db()
+        self.assertEqual((self.timesheet.rostered_minutes, self.timesheet.approved_leave_minutes), before)
 
 class LeaveOverlapFixture:
     def setUp(self):
