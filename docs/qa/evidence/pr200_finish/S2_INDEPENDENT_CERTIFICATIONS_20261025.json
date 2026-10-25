@@ -3,7 +3,7 @@
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "denominator": 2149,
   "required_99_percent": 2128,
-  "actual_independent_s2_files": 34,
+  "actual_independent_s2_files": 42,
   "proof": "Two distinct source readers: first claudeB-1 and current gpt6-phase5-independent-20261025; full frozen SHA acquisition and causal path-specific reasoning; known issues remain unresolved",
   "claim": "PARTIAL_SOURCE_REVIEW_NOT_99_PERCENT_OR_PRODUCTION_ACCEPTANCE",
   "certifications": [
@@ -609,6 +609,158 @@
       "issue_ids": [],
       "source_link": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/client_profile/domains/common/__init__.py",
       "s3": "NOT_A_WHOLE_DOMAIN_RUNTIME_SIGNOFF"
+    },
+    {
+      "path": "backend/billing/models.py",
+      "blob_sha": "fcdfc6a08f7f393fcc4ad41a1b7293ed92f4e11d",
+      "review_date": "2026-10-25",
+      "first_pass_reviewer": "claudeB-1",
+      "first_pass_ref": "out_C004.json",
+      "independent_second_reviewer": "gpt6-phase5-independent-20261025",
+      "full_file_read": true,
+      "scope": "EXACT_FROZEN_BLOB_FULL_SOURCE_PLUS_RELEVANT_CALLPATH",
+      "verdict": "ISSUE",
+      "rationale": "Full 124-line model review: OwnerSubscription one-to-one owner/org with XOR check; Stripe IDs and event-ID receipts are not an accounting event ledger. ShiftPayment.owner is CASCADE, so user deletion can delete settled payment records; status lacks refunded/reversed and payment-intent ID has no uniqueness constraint. Cross-check C004-N5/B57 with billing webhook and deletion.",
+      "positive_contract": "One owner or one organisation per subscription, not both, and webhook events with repeated event_id remain unique.",
+      "negative_contract": "Deleting a user must preserve payment audit history; refunded provider intent must not remain in paid-only state; both require a remedial schema/ledger design.",
+      "issue_ids": [
+        "C004-N5",
+        "B57"
+      ],
+      "source_link": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/models.py",
+      "s3": "EXPLICITLY_NOT_WHOLE_DOMAIN_RUNTIME_SIGNOFF"
+    },
+    {
+      "path": "backend/billing/tests.py",
+      "blob_sha": "f65c5477e2f974ac5e865ae4cd0d5df07bc46feb",
+      "review_date": "2026-10-25",
+      "first_pass_reviewer": "claudeB-1",
+      "first_pass_ref": "out_C004.json",
+      "independent_second_reviewer": "gpt6-phase5-independent-20261025",
+      "full_file_read": true,
+      "scope": "EXACT_FROZEN_BLOB_FULL_SOURCE_PLUS_RELEVANT_CALLPATH",
+      "verdict": "NOTE",
+      "rationale": "Full 326-line characterization suite reviewed: rollback/retry and replay events, authority split owner/org admin vs charge payer, HTTP fulfilment and cancellation scope. Mocked Stripe makes tests meaningful for local state but does not certify provider ordering, discounts, refunds or seat changes; coverage gaps are separately reproduced.",
+      "positive_contract": "Failed fulfillment rolls back payment; distinct authorization paths admit only operational payer; duplicate event ID processed once.",
+      "negative_contract": "Late invoice must not reactivate deleted subscription; refund must reconcile ledger; active subscriber checkout discount and add-on seat update need targeted contracts.",
+      "issue_ids": [
+        "B01",
+        "B02",
+        "B53",
+        "B57"
+      ],
+      "source_link": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/tests.py",
+      "s3": "EXPLICITLY_NOT_WHOLE_DOMAIN_RUNTIME_SIGNOFF"
+    },
+    {
+      "path": "backend/chat/migrations/0001_initial.py",
+      "blob_sha": "6d8b5a5e1babff4e4e30b2dda168d62bb6155686",
+      "review_date": "2026-10-25",
+      "first_pass_reviewer": "claudeB-1",
+      "first_pass_ref": "out_C004.json",
+      "independent_second_reviewer": "gpt6-phase5-independent-20261025",
+      "full_file_read": true,
+      "scope": "EXACT_FROZEN_BLOB_FULL_SOURCE_PLUS_RELEVANT_CALLPATH",
+      "verdict": "NOTE",
+      "rationale": "Full 128-line state-only SeparateDatabaseAndState model move preserves existing client_profile chat tables, but migration ALSO runs RunPython relabel of ContentType objects for four models. Relabel checks for conflicting target content types and skips, so claims of no SQL whatsoever are inaccurate. Existing Message.sender CASCADE survives relabel; never classify as retention fix.",
+      "positive_contract": "On populated DB state models remain attached to existing message/participant rows; ContentType relabel preserves permission references when no duplicate target exists.",
+      "negative_contract": "Migration must not create duplicate physical tables or silently strand old ContentTypes when target chat content types already exist; test populated and fresh PostgreSQL migrate path.",
+      "issue_ids": [
+        "B03"
+      ],
+      "source_link": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/chat/migrations/0001_initial.py",
+      "s3": "EXPLICITLY_NOT_WHOLE_DOMAIN_RUNTIME_SIGNOFF"
+    },
+    {
+      "path": "backend/chat/migrations/0002_clean_table_and_index_names.py",
+      "blob_sha": "f9615bc3f559b730a5c337377d49c08b3f470b40",
+      "review_date": "2026-10-25",
+      "first_pass_reviewer": "claudeB-1",
+      "first_pass_ref": "out_C004.json",
+      "independent_second_reviewer": "gpt6-phase5-independent-20261025",
+      "full_file_read": true,
+      "scope": "EXACT_FROZEN_BLOB_FULL_SOURCE_PLUS_RELEVANT_CALLPATH",
+      "verdict": "NOTE",
+      "rationale": "Full 77-line migration: explicitly renames nine indexes and changes the db_table of four chat models after client_profile 0066 release. DDL is not a row rewrite, but physical rename safety depends on dependency order and populated PostgreSQL rehearsal; no access control code.",
+      "positive_contract": "Populated migration retains conversation/message/participant data while changing table/index names and Django model mappings.",
+      "negative_contract": "A fresh install and populated upgrade must not lose chat records or leave index/table names inconsistent, including pinned/reaction foreign keys.",
+      "issue_ids": [],
+      "source_link": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/chat/migrations/0002_clean_table_and_index_names.py",
+      "s3": "EXPLICITLY_NOT_WHOLE_DOMAIN_RUNTIME_SIGNOFF"
+    },
+    {
+      "path": "backend/chat/migrations/0003_clean_constraint_names.py",
+      "blob_sha": "eea54917db06c958de3061f552c084e71200148d",
+      "review_date": "2026-10-25",
+      "first_pass_reviewer": "claudeB-1",
+      "first_pass_ref": "out_C004.json",
+      "independent_second_reviewer": "gpt6-phase5-independent-20261025",
+      "full_file_read": true,
+      "scope": "EXACT_FROZEN_BLOB_FULL_SOURCE_PLUS_RELEVANT_CALLPATH",
+      "verdict": "NOTE",
+      "rationale": "Full 56-line migration includes 30+ explicit constraint, index and identity sequence renames. Custom core.migration_operations.RenameDatabaseNames checked: PostgreSQL-only, old-exists/new-absent guard, reversible, no state_forwards; this is name-normalisation DDL, not schema/data change. Cannot infer production upgrade green from static review.",
+      "positive_contract": "Existing PG object names are renamed once while preserving FK targets; reapplication should skip already renamed objects.",
+      "negative_contract": "Populated PG migration must not abort on missing names or regress FK/index definitions, and reverse must restore original object names.",
+      "issue_ids": [],
+      "source_link": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/chat/migrations/0003_clean_constraint_names.py",
+      "s3": "EXPLICITLY_NOT_WHOLE_DOMAIN_RUNTIME_SIGNOFF"
+    },
+    {
+      "path": "backend/chat/migrations/__init__.py",
+      "blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "review_date": "2026-10-25",
+      "first_pass_reviewer": "claudeB-1",
+      "first_pass_ref": "out_C004.json",
+      "independent_second_reviewer": "gpt6-phase5-independent-20261025",
+      "full_file_read": true,
+      "scope": "EXACT_FROZEN_BLOB_FULL_SOURCE_PLUS_RELEVANT_CALLPATH",
+      "verdict": "NA",
+      "rationale": "Empty migrations package initializer; no executable migration or security policy.",
+      "positive_contract": "Django imports package to discover migration modules.",
+      "negative_contract": "No executable code or unexpected import side effect exists.",
+      "issue_ids": [],
+      "source_link": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/chat/migrations/__init__.py",
+      "s3": "EXPLICITLY_NOT_WHOLE_DOMAIN_RUNTIME_SIGNOFF"
+    },
+    {
+      "path": "backend/chat/test_api.py",
+      "blob_sha": "2b5eb7abebb02fdd6f41809ccc415ed79f894e7d",
+      "review_date": "2026-10-25",
+      "first_pass_reviewer": "claudeB-1",
+      "first_pass_ref": "out_C004.json",
+      "independent_second_reviewer": "gpt6-phase5-independent-20261025",
+      "full_file_read": true,
+      "scope": "EXACT_FROZEN_BLOB_FULL_SOURCE_PLUS_RELEVANT_CALLPATH",
+      "verdict": "NOTE",
+      "rationale": "Full 207-line REST characterization covers DM idempotent get/create, participant read/write checks, soft delete, reactions, community-chat employment gates and anonymous denial. A DM can create inactive CONTACT membership for partner as documented. Notably lacks custom-group cross-pharmacy participant selection and connected revocation checks.",
+      "positive_contract": "DM room is reused from both directions, outsiders get 404, blank message rejected, sender-only edit/delete, community access limited to pharmacy staff employment.",
+      "negative_contract": "Cross-pharmacy custom group creation cannot harvest unrelated membership identities; disabled membership must lose future message authority; tests absent and separate from current characterization.",
+      "issue_ids": [
+        "C004-N1",
+        "B05"
+      ],
+      "source_link": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/chat/test_api.py",
+      "s3": "EXPLICITLY_NOT_WHOLE_DOMAIN_RUNTIME_SIGNOFF"
+    },
+    {
+      "path": "backend/chat/test_websocket.py",
+      "blob_sha": "7352f75893303454ff35e27bd38926369412e990",
+      "review_date": "2026-10-25",
+      "first_pass_reviewer": "claudeB-1",
+      "first_pass_ref": "out_C004.json",
+      "independent_second_reviewer": "gpt6-phase5-independent-20261025",
+      "full_file_read": true,
+      "scope": "EXACT_FROZEN_BLOB_FULL_SOURCE_PLUS_RELEVANT_CALLPATH",
+      "verdict": "NOTE",
+      "rationale": "Full 181-line async websocket suite uses TransactionTestCase, verifies anonymous/nonparticipant rejection, two-user message fan-out and AHPRA suspension checks on receive/send and multi-room close. Does not check ordinary membership revocation mid-session; AHPRA suspension is a different mechanism. New B05-specific CI must be inspected separately.",
+      "positive_contract": "Anonymous 4401, nonparticipant 4403, valid DM messages persist and reach peers, AHPRA-suspended socket closes on receive and outbound event.",
+      "negative_contract": "On membership revocation without AHPRA suspension, existing connected socket must not send typing or messages and must not receive later room payloads.",
+      "issue_ids": [
+        "B05",
+        "B51"
+      ],
+      "source_link": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/chat/test_websocket.py",
+      "s3": "EXPLICITLY_NOT_WHOLE_DOMAIN_RUNTIME_SIGNOFF"
     }
   ]
 }
