@@ -280,60 +280,120 @@ class Phase5OrganizationBoundaryPolicy(TestCase):
 
 
 class Phase5MarketplaceExchangeIntegrity(TestCase):
-    def test_b24_enquiry_cannot_be_marked_complete_before_terms_acceptance(self):
-        from marketplace.models import (
-            MarketplaceCategory, MarketplaceListing, MarketplaceExchange,
-        )
-        seller = make_user(
-            "OWNER", is_otp_verified=True, is_mobile_verified=True,
-            mobile_number="0499000191",
-        )
+    """B24: distinguish illegal state transitions from invalid seller fixtures.
+
+    The listing policy is mocked only for synthetic seller eligibility at save
+    points; ExchangeAction state transitions, versions and DB writes are real.
+    """
+
+    def _exchange(self, state="ENQUIRY"):
+        from marketplace.models import MarketplaceCategory, MarketplaceListing, MarketplaceExchange
+        from types import SimpleNamespace
+        seller = make_user("OWNER", is_otp_verified=True, is_mobile_verified=True,
+                           mobile_number="0499000191")
         buyer = make_user("OWNER")
-        from marketplace.models import IdentityVerification, MarketplaceTermsAcceptance
-        IdentityVerification.objects.create(
-            user=seller, status="VERIFIED", assurance_method="MANUAL",
-            verified_at=timezone.now(),
-        )
-        MarketplaceTermsAcceptance.objects.create(
-            user=seller, version="2026-09",
-        )
         category = MarketplaceCategory.objects.create(
             slug="pr200-fixtures", name="PR200 fixtures",
             context="BOTH", permitted_modes=["SELL"], maximum_buyer_roles=["OWNER"],
         )
-        from types import SimpleNamespace
-        from unittest.mock import patch
-        with patch("marketplace.signals.can_list_category", return_value=SimpleNamespace(allowed=True)):
+        # Synthetic seller has no completed OwnerOnboarding. Seller listing
+        # validation runs again on *completion*, not just initial insertion.
+        with patch("marketplace.signals.can_list_category",
+                   return_value=SimpleNamespace(allowed=True)):
             listing = MarketplaceListing.objects.create(
-                creator=seller, seller_context="PERSONAL",
-            category=category, mode="SELL", title="PR200 Fixture Bundle",
-            slug="pr200-fixture-bundle", description="Synthetic audit fixture",
-            condition="Used", amount="250.00", suburb="Brisbane",
-            state="QLD", publication_status="PUBLISHED",
-        )
+                creator=seller, seller_context="PERSONAL", category=category,
+                mode="SELL", title="PR200 Fixture Bundle",
+                slug="pr200-fixture-bundle", description="Synthetic audit fixture",
+                condition="Used", amount="250.00", suburb="Brisbane",
+                state="QLD", publication_status="PUBLISHED",
+            )
         exchange = MarketplaceExchange.objects.create(
-            listing=listing, buyer=buyer, state=MarketplaceExchange.State.ENQUIRY,
+            listing=listing, buyer=buyer, state=state,
         )
-        base = f"/api/v1/marketplace/exchanges/{exchange.pk}/"
-        self.assertEqual(client_for(buyer).get(base).status_code, 200)
-        self.assertEqual(client_for(seller).get(base).status_code, 200)
+        return seller, buyer, listing, exchange
+
+    def _confirm_both(self, seller, buyer, exchange):
+        from types import SimpleNamespace
+        url = f"/api/v1/marketplace/exchanges/{exchange.pk}/confirm-completion/"
         initial_version = exchange.version
-        buyer_attempt = client_for(buyer).post(
-            base + "confirm-completion/",
-            {"expected_version": initial_version}, format="json",
+        first = client_for(buyer).post(
+            url, {"expected_version": initial_version}, format="json",
         )
         exchange.refresh_from_db()
-        seller_attempt = client_for(seller).post(
-            base + "confirm-completion/",
-            {"expected_version": exchange.version}, format="json",
-        )
+        # Only bypass seller eligibility for the synthetic listing save;
+        # do not mock the exchange endpoint or state machine.
+        with patch("marketplace.signals.can_list_category",
+                   return_value=SimpleNamespace(allowed=True)):
+            second = client_for(seller).post(
+                url, {"expected_version": exchange.version}, format="json",
+            )
         exchange.refresh_from_db()
+        return first, second, initial_version
+
+    def test_b24_enquiry_cannot_be_marked_complete_before_terms_acceptance(self):
+        from marketplace.models import MarketplaceExchange, MarketplaceListing
+        seller, buyer, listing, exchange = self._exchange(
+            MarketplaceExchange.State.ENQUIRY,
+        )
+        self.assertEqual(client_for(buyer).get(
+            f"/api/v1/marketplace/exchanges/{exchange.pk}/"
+        ).status_code, 200)
+        self.assertEqual(client_for(seller).get(
+            f"/api/v1/marketplace/exchanges/{exchange.pk}/"
+        ).status_code, 200)
+        first, second, initial = self._confirm_both(seller, buyer, exchange)
         listing.refresh_from_db()
-        self.assertIn(buyer_attempt.status_code, (400, 403, 409))
-        self.assertIn(seller_attempt.status_code, (400, 403, 409))
+        self.assertIn(first.status_code, (400, 403, 409))
+        self.assertIn(second.status_code, (400, 403, 409))
+        self.assertEqual(exchange.version, initial)
         self.assertEqual(exchange.state, MarketplaceExchange.State.ENQUIRY)
         self.assertFalse(exchange.buyer_confirmed)
         self.assertFalse(exchange.seller_confirmed)
         self.assertNotEqual(
             listing.availability_status, MarketplaceListing.Availability.COMPLETED,
         )
+
+    def test_b24_proposed_unaccepted_terms_cannot_be_completed(self):
+        from marketplace.models import MarketplaceExchange
+        seller, buyer, listing, exchange = self._exchange(
+            MarketplaceExchange.State.TERMS_PROPOSED,
+        )
+        first, second, initial = self._confirm_both(seller, buyer, exchange)
+        self.assertIn(first.status_code, (400, 403, 409))
+        self.assertIn(second.status_code, (400, 403, 409))
+        self.assertEqual(exchange.version, initial)
+        self.assertEqual(exchange.state, MarketplaceExchange.State.TERMS_PROPOSED)
+        self.assertFalse(exchange.buyer_confirmed)
+        self.assertFalse(exchange.seller_confirmed)
+
+    def test_b24_accepted_exchange_completion_is_legitimate_positive_control(self):
+        from marketplace.models import MarketplaceExchange, MarketplaceListing
+        seller, buyer, listing, exchange = self._exchange(
+            MarketplaceExchange.State.ACCEPTED,
+        )
+        first, second, initial = self._confirm_both(seller, buyer, exchange)
+        listing.refresh_from_db()
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(exchange.version, initial + 2)
+        self.assertTrue(exchange.buyer_confirmed)
+        self.assertTrue(exchange.seller_confirmed)
+        self.assertEqual(exchange.state, MarketplaceExchange.State.COMPLETED)
+        self.assertEqual(
+            listing.availability_status, MarketplaceListing.Availability.COMPLETED,
+        )
+
+    def test_b24_nonparty_cannot_confirm_even_on_accepted_exchange(self):
+        from marketplace.models import MarketplaceExchange
+        seller, buyer, listing, exchange = self._exchange(
+            MarketplaceExchange.State.ACCEPTED,
+        )
+        outsider = make_user("OWNER")
+        attempt = client_for(outsider).post(
+            f"/api/v1/marketplace/exchanges/{exchange.pk}/confirm-completion/",
+            {"expected_version": exchange.version}, format="json",
+        )
+        self.assertEqual(attempt.status_code, 404, attempt.content)
+        exchange.refresh_from_db()
+        self.assertFalse(exchange.seller_confirmed)
+        self.assertFalse(exchange.buyer_confirmed)
