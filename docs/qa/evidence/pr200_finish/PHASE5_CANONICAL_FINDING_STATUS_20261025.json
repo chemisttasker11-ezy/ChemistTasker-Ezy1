@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 historical IDs preserved; 54 distinct tested IDs / 62 accumulated intentionally red negative assertions. C004-N3 old/new admin free-trial reset and C004-N4 owner personal subscription org fallback both source/SQLite confirmed, policy/financial impact conditional; S2 99% still NOT CERTIFIED.",
+  "material": "226 historical IDs preserved; 54 distinct tested IDs / 62 accumulated intentionally red negative assertions. C004-N3 old/new admin free-trial reset and C004-N4 owner personal subscription org fallback both source/SQLite confirmed, policy/financial impact conditional; S2 99% still NOT CERTIFIED. Independently documented second-reader full-file S2 18/2149 (0.8376%), 99% NOT ACHIEVED.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -28,7 +28,7 @@
     "REPRODUCED_POSTGRES_CONDITIONAL_ISOLATED_SEAM": 1,
     "REPRODUCED_SQLITE_POLICY_CONDITIONAL": 4
   },
-  "independent_s2_certified_files": null,
+  "independent_s2_certified_files": 18,
   "s0_static": {
     "numerator": 2149,
     "denominator": 2149,
@@ -40,8 +40,14 @@
     "not_independent_semantic": true
   },
   "s2": {
-    "percentage": null,
-    "claim": "NOT_CERTIFIED"
+    "numerator": 18,
+    "denominator": 2149,
+    "percentage": 0.8376,
+    "required_99_percent": 2128,
+    "remaining_to_threshold": 2110,
+    "certification_file": "docs/qa/evidence/pr200_finish/S2_INDEPENDENT_CERTIFICATIONS_20261025.json",
+    "status": "PARTIAL_18_SOURCE_FILES_REVIEWED_99_NOT_ACHIEVED",
+    "critical_workflow_full_coverage": false
   },
   "s3": {
     "negative_tests_failed": 34,

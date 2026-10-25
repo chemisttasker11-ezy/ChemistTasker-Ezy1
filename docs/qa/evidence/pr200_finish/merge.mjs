@@ -25,6 +25,28 @@ for (const { p, sha } of inv) {
   // A source-file report is evidence of acquisition/S1 reporting, never proof of independent S2 or executed S3.
   rows.push([p, sha, p.split('/')[0], r ? (r.inspection?.includes('FIRST_PASS') || r.inspection?.includes('FETCH_ANNOTATED') ? 'SOURCE_ACQUIRED_FIRST_PASS_SEMANTIC_PENDING' : 'PRIOR_AGENT_S1_REPORTED_NOT_INDEPENDENT_S2') : 'PENDING', r ? '2026-10-25' : '', r?.reviewer || '', r?.verdict === 'ISSUE' ? r.note : '', '', r ? r.verdict : 'PENDING', (r?.ids || []).join(';'), r ? `out_${r.chunk}.json` : ''].map(q).join(','));
 }
+// An independent second-reader overlay is authoritative over prior first-pass S1 rows.
+const certificateFile = path.join(DIR, 'S2_INDEPENDENT_CERTIFICATIONS_20261025.json');
+if (fs.existsSync(certificateFile)) {
+  const second = JSON.parse(fs.readFileSync(certificateFile, 'utf8')).certifications;
+  const invShas = new Map(inv.map(r => [r.p, r.sha]));
+  const seen = new Set();
+  for (const c of second) {
+    if (invShas.get(c.path) !== c.blob_sha || seen.has(c.path) ||
+        !c.full_file_read || c.first_pass_reviewer === c.independent_second_reviewer ||
+        !c.rationale || !c.positive_contract || !c.negative_contract) {
+      throw new Error('Invalid S2 independent review certificate: '+c.path);
+    }
+    seen.add(c.path);
+    const idx = rows.findIndex((row,i) => i > 0 && row.startsWith(q(c.path)+','));
+    if (idx < 1) throw new Error('Missing certified file in S1 inventory: '+c.path);
+    rows[idx] = [c.path, c.blob_sha, c.path.split('/')[0], 'INDEPENDENT_S2_FULL_FILE_REVIEW', c.review_date,
+      c.independent_second_reviewer, c.rationale,
+      'POSITIVE: '+c.positive_contract+'; NEGATIVE: '+c.negative_contract,
+      c.verdict, c.issue_ids.join(';'), 'pr200_finish/S2_INDEPENDENT_CERTIFICATIONS_20261025.json'].map(q).join(',');
+  }
+  console.log('INDEPENDENT_S2_CERTIFIED', seen.size, 'of 2149; global 99pct NOT ACHIEVED');
+}
 fs.writeFileSync(path.join(EV, 'MAIN_RELEASE_FINISH_LEDGER.csv'), rows.join('\n') + '\n');
 fs.writeFileSync(path.join(DIR, 'raw_findings.json'), JSON.stringify(findings, null, 1));
 fs.writeFileSync(path.join(DIR, 'FILE_PASS_TITLES.md'), '# Found by the file pass (do not re-report)\n' + findings.map(f => `${f.id} | ${f.area} | ${f.title}`).join('\n') + '\n');
