@@ -2,6 +2,8 @@
 import logging
 
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from channels.db import database_sync_to_async
+from django.contrib.auth import get_user_model
 
 from notifications.services import USER_GROUP_FMT
 
@@ -11,7 +13,7 @@ log = logging.getLogger(__name__)
 class NotificationConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         user = self.scope.get("user")
-        if not user or user.is_anonymous:
+        if not user or user.is_anonymous or not user.is_active:
             await self.close(code=4401)
             return
         self.user_id = user.id
@@ -26,6 +28,16 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
                 self.channel_layer = None
         await self.accept()
         await self.send_json({"type": "ready"})
+
+    @database_sync_to_async
+    def _user_still_active(self):
+        return get_user_model().objects.filter(pk=self.user_id, is_active=True).exists()
+
+    async def send_json(self, content, close=False):
+        if not await self._user_still_active():
+            await self.close(code=4403)
+            return
+        await super().send_json(content, close=close)
 
     async def disconnect(self, code):
         if self.channel_layer and hasattr(self, "group_name"):
