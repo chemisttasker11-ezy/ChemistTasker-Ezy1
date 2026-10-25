@@ -75,7 +75,7 @@ def _validate_casual_table(role, classification, casual):
 
 
 @lru_cache(maxsize=None)
-def award_rates():
+def award_rates(as_of=None):
     """{role: {classification: {"casual": {day_type: rate, time_bucket: {day_type: rate}}}}}"""
     data = _read_json(AWARD_RATES_FILE)
     if not isinstance(data, dict) or not data:
@@ -100,6 +100,42 @@ def award_rates():
             if not isinstance(classifications, dict) or classification not in classifications:
                 raise PricingDataError(f"{AWARD_RATES_FILE.name}: missing {role}/{classification}")
 
+    if as_of is None:
+        as_of = date.today()
+    if as_of >= date(2026, 7, 1):
+        # The payroll engagement calculator owns the authoritative Fair Work
+        # Schedule B tables. Shift pricing derives from them, never another
+        # independently maintained 2026 dollar table.
+        from workforce.award_rates import CASUAL_WEEKDAY, CASUAL_WEEKEND, RATE_ALIAS
+        derived = {}
+        for role, rate_key, classification_key in (
+            ("ASSISTANT", "LEVEL_1", "LEVEL_1"),
+            ("TECHNICIAN", "LEVEL_1", "LEVEL_3"),
+            ("STUDENT", "YEAR_1", "LEVEL_1"),
+            ("INTERN", "FIRST_HALF", "FIRST_HALF"),
+            ("PHARMACIST", "PHARMACIST", "PHARMACIST"),
+        ):
+            canonical = RATE_ALIAS.get(classification_key, classification_key)
+            weekday = CASUAL_WEEKDAY[canonical]
+            weekend = CASUAL_WEEKEND[canonical]
+            windows = {
+                "weekday": {"early_07_08": weekday[1], "daytime_08_19": weekday[0],
+                            "evening_19_21": weekday[2], "late_21_24": weekday[3]},
+                "saturday": {"early_07_08": weekend[1], "daytime_08_18": weekend[0],
+                             "evening_18_21": weekend[2], "late_21_24": weekend[3]},
+                "sunday": {"outside_07_21": weekend[4], "daytime_07_21": weekend[5]},
+                "public_holiday": {"all_day": weekend[6]},
+            }
+            derived[role] = {rate_key: {"casual": {
+                "weekday": weekday[0], "saturday": weekend[0],
+                "sunday": weekend[5], "public_holiday": weekend[6],
+                "early_morning": {"weekday": weekday[1], "saturday": weekend[1],
+                                  "sunday": weekend[4], "public_holiday": weekend[6]},
+                "late_night": {"weekday": weekday[3], "saturday": weekend[3],
+                               "sunday": weekend[4], "public_holiday": weekend[6]},
+                "award_windows": windows,
+            }}}
+        return derived
     return data
 
 

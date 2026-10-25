@@ -44,15 +44,18 @@ def _normalize_state_code(state):
     return STATE_CODE_ALIASES.get(normalized, normalized)
 
 
-def is_public_holiday(slot_date, state):
+def is_public_holiday(slot_date, state, at_time=None):
     state_code = _normalize_state_code(state)
     if not state_code:
         return False
+    # Queensland Christmas Eve is a part-day holiday from 18:00, not all day.
+    if state_code == 'QLD' and slot_date.month == 12 and slot_date.day == 24:
+        return at_time is not None and at_time >= time(18, 0)
     return str(slot_date) in public_holidays().get(state_code, [])
 
 
-def get_day_type(slot_date, state):
-    if is_public_holiday(slot_date, state):
+def get_day_type(slot_date, state, at_time=None):
+    if is_public_holiday(slot_date, state, at_time=at_time):
         return 'public_holiday'
     weekday = slot_date.weekday()
     if weekday == 5:
@@ -117,6 +120,14 @@ def _split_day_window_into_segments(day_window):
         datetime.combine(current_date, LATE_NIGHT_START),
         day_window['end'],
     ]
+    # Current MA000012 distinguishes 07:00, 18:00 Saturday and 21:00
+    # boundaries. Historical pricing snapshots retain their original windows.
+    if current_date >= date(2026, 7, 1):
+        boundaries.extend([
+            datetime.combine(current_date, time(7, 0)),
+            datetime.combine(current_date, time(18, 0)),
+            datetime.combine(current_date, time(21, 0)),
+        ])
     sorted_points = []
     for point in boundaries:
         if day_window['start'] <= point <= day_window['end']:
@@ -190,26 +201,46 @@ def _get_first_level_award_profile(role_needed):
     return role_key, classification_key, award_rates().get(role_key, {}).get(classification_key, {}).get('casual')
 
 
-def _get_award_rate_for_segment(role_needed, day_type, time_bucket):
-    role_key, classification_key, casual_rates = _get_first_level_award_profile(role_needed)
+def _get_award_rate_for_segment(role_needed, day_type, time_bucket, *, as_of=None, start_time=None):
+    role_key = _resolve_award_role_key(role_needed)
+    classification_key = FIRST_LEVEL_CLASSIFICATIONS.get(role_needed)
+    if not classification_key:
+        raise KeyError(f'No casual award classification for {role_needed}')
+    casual_rates = award_rates(as_of).get(role_key, {}).get(classification_key, {}).get('casual')
     if not casual_rates:
         raise KeyError(f'No casual award rates found for {role_needed}')
 
-    if time_bucket == 'daytime':
+    window_key = None
+    if as_of is not None and as_of >= date(2026, 7, 1) and start_time is not None:
+        # Canonical 1 July 2026 Schedule B bands, including Saturday 18:00
+        # and Sunday after 21:00. Before 07:00 uses the published outer
+        # penalty band; overtime eligibility must be evaluated separately.
+        if day_type == 'weekday':
+            window_key = ('early_07_08' if start_time < time(8)
+                          else 'daytime_08_19' if start_time < time(19)
+                          else 'evening_19_21' if start_time < time(21)
+                          else 'late_21_24')
+        elif day_type == 'saturday':
+            window_key = ('early_07_08' if start_time < time(8)
+                          else 'daytime_08_18' if start_time < time(18)
+                          else 'evening_18_21' if start_time < time(21)
+                          else 'late_21_24')
+        elif day_type == 'sunday':
+            window_key = 'outside_07_21' if start_time < time(7) or start_time >= time(21) else 'daytime_07_21'
+        else:
+            window_key = 'all_day'
+        rate_value = casual_rates['award_windows'][day_type][window_key]
+    elif time_bucket == 'daytime':
         rate_value = casual_rates.get(day_type)
     else:
-        bucket_rates = casual_rates.get(time_bucket) or {}
-        rate_value = bucket_rates.get(day_type)
-
+        rate_value = (casual_rates.get(time_bucket) or {}).get(day_type)
     if rate_value is None:
         raise KeyError(f'No {time_bucket} rate configured for {role_needed} on {day_type}')
-
     return Decimal(str(rate_value)), {
-        'role_key': role_key,
-        'classification_key': classification_key,
-        'employment': 'casual',
-        'time_bucket': time_bucket,
-        'day_type': day_type,
+        'role_key': role_key, 'classification_key': classification_key,
+        'employment': 'casual', 'time_bucket': time_bucket, 'day_type': day_type,
+        'award_effective_from': '2026-07-01' if as_of and as_of >= date(2026, 7, 1) else 'historical',
+        'award_window': window_key,
     }
 
 
@@ -292,8 +323,12 @@ def _price_shift_segments(slot_date, start_time, end_time, shift, rate_preferenc
     total_pay = DECIMAL_ZERO
 
     for day_window in _split_shift_across_days(slot_date, start_time, end_time):
-        day_type = get_day_type(day_window['date'], getattr(shift.pharmacy, 'state', '') or '')
         for segment in _split_day_window_into_segments(day_window):
+            day_type = get_day_type(
+                day_window['date'],
+                getattr(shift.pharmacy, 'state', '') or '',
+                at_time=segment['start'].time(),
+            )
             if shift.role_needed == 'PHARMACIST':
                 segment_rate, meta = _get_pharmacist_rate_for_segment(
                     shift,
@@ -306,6 +341,8 @@ def _price_shift_segments(slot_date, start_time, end_time, shift, rate_preferenc
                     shift.role_needed,
                     day_type,
                     segment['time_bucket'],
+                    as_of=day_window['date'],
+                    start_time=segment['start'].time(),
                 )
                 owner_bonus = getattr(shift, 'owner_adjusted_rate', None) or DECIMAL_ZERO
                 if owner_bonus > 0:
