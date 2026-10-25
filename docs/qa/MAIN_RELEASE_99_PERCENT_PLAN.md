@@ -101,3 +101,7 @@ PR200's 99% source audit is **not** a release approval. Follow docs/qa/SENIOR_PA
 - Do not merge PR200 to make it production ready; audit-only evidence and any fixes/releases are separate deliverables.
 
 **Current decision: 99% NOT ACHIEVED; NOT RELEASE READY.** The next concrete action is to lock the ledger validator and independently verify the three P0 paths while the first previously unreviewed high-risk chunk (C008) is completed.
+
+## Status amendment — Phase 1 completed (25 October 2026)
+
+All nine priority backend chunk outputs **C008–C016 are now committed**. See [tracker](MAIN_RELEASE_AUDIT_TRACKER.md) and [handover](MAIN_RELEASE_FINISH_HANDOVER.md). This phase's 234 files have reviewer verdicts; **60/89 chunks** have outputs across the repository. The expected full-file count following regeneration is **1,368/2,151 (63.60%)** versus a currently stale generated CSV of 1,134. This is S1 reported review accounting only, **not S2 independent semantic certification or S3 executed safety tests**. Eight new provisional P1s from C010–C016 need deduplication and verification. **Phase 2 Expo, Phase 3 web/Next, Phase 4 operational, F12 parity and source-independent/regression test gates remain uncompleted.** The earlier queue text under section 3 should now be read as historical assignment order; skip all completed C008–C016 outputs.
