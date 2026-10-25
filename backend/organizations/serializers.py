@@ -1,5 +1,6 @@
 """Serializers for organisations, pharmacies, chains, pharmacy admins and pharmacy claims."""
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 from drf_spectacular.utils import extend_schema_field, OpenApiTypes
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin, PharmacyClaim
 from users.serializers import UserProfileSerializer
@@ -10,6 +11,8 @@ from core.task_queue import async_task
 from core.serializer_lifecycle import RemoveOldFilesMixin
 from core.serializer_mixins import UploadValidationMixin
 from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
+from users.models import OrganizationMembership
+from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
 
 # === Onboardings ===
@@ -588,6 +591,29 @@ class ChainSerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers.Mo
         queryset=Pharmacy.objects.all(),
         source='pharmacies'
     )
+
+    def validate_pharmacy_ids(self, pharmacies):
+        chain = self.instance
+        if chain is None:
+            user = self.context['request'].user
+            owner = getattr(user, 'owneronboarding', None)
+            org_mem = None
+            if owner is None:
+                org_mem = OrganizationMembership.objects.filter(
+                    user=user, role__in=ORG_WIDE_ADMIN_ROLES
+                ).first()
+            chain = Chain(owner=owner, organization=org_mem.organization if org_mem else None)
+
+        for pharmacy in pharmacies:
+            if chain.owner_id:
+                if pharmacy.owner_id != chain.owner_id:
+                    raise PermissionDenied("You don’t own that pharmacy.")
+            elif chain.organization_id:
+                if pharmacy.organization_id != chain.organization_id:
+                    raise PermissionDenied("That pharmacy isn't in your organization.")
+            else:
+                raise PermissionDenied("Chain has no owner or organization.")
+        return pharmacies
 
     class Meta:
         model = Chain
