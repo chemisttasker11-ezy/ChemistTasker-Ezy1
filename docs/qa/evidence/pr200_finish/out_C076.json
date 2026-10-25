@@ -3,7 +3,7 @@
   "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "reviewer": "gpt6-senior-20261025",
   "review_level": "first-pass source acquisition; S2/S3 pending",
-  "status": "INCOMPLETE",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
   "files": [
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx",
@@ -112,6 +112,78 @@
       "lines": 106,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
       "note": "106 lines; Next migrated shift view rates.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "96172c392f8b4ed267316830482bfb538350bf8d",
+      "lines": 170,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "170 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f257b75317a438f83af26a4fbd580ccfc79e00bb",
+      "lines": 247,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "247 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/FiltersSidebar.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b6d662403fe3e061478092ab0dcb60c6167cf96a",
+      "lines": 11,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "11 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f069e578461d2b6c71b21cabe702bbd09d342be8",
+      "lines": 829,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "829 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PublicTalentCard.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ad5facabcf8c90027bac21edb3bbedaa1603cdec",
+      "lines": 207,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "207 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/TalentCardV2.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "05e82fc5af3cbcf337ef307ab4a8b3894c7c6ba6",
+      "lines": 351,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "351 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/constants.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "71279f635a3be45f9b9463d8b359118d67fe5bc3",
+      "lines": 17,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "17 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "c4ad53ce158e9b3912756c6addc7480cea9892aa",
+      "lines": 2,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "2 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
     }
   ],
   "findings": []
