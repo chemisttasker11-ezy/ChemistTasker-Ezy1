@@ -873,16 +873,24 @@ def _process_stripe_event(event):
 
                 owner_id = metadata.get('owner_user_id') or metadata.get('billing_contact_user_id') or metadata.get('actor_user_id')
 
-                ShiftPayment.objects.create(
-                    owner_id=owner_id,
-                    shift_id=shift_id,
+                # Distinct Stripe webhook event IDs may describe the same
+                # payment intent. Never create a second local paid ledger debit.
+                payment, created = ShiftPayment.objects.get_or_create(
                     stripe_payment_intent_id=session.payment_intent,
-                    amount_aud=amount_aud,
-                    payment_type=payment_type,
-                    payment_method='card',
-                    status='paid',
-                    paid_at=timezone.now(),
+                    defaults={
+                        'owner_id': owner_id,
+                        'shift_id': shift_id,
+                        'amount_aud': amount_aud,
+                        'payment_type': payment_type,
+                        'payment_method': 'card',
+                        'status': 'paid',
+                        'paid_at': timezone.now(),
+                    },
                 )
+                if not created:
+                    # A duplicate checkout completion must not re-finalize
+                    # offers or turn a refunded payment back into paid.
+                    return
 
                 # Cancellation penalty payment must not finalize worker offers.
                 if payment_type != 'fulfillment':
