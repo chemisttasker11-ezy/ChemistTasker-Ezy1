@@ -352,7 +352,9 @@ def _segment_rate_key(day_type, clock_time):
 
 
 def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
-    from shifts.pricing import get_day_type
+    # Legal public-holiday scope is owned by shifts.holidays, not the Award
+    # minimum-rate calculator or its state-only legacy get_day_type wrapper.
+    from shifts.holidays import holiday_boundaries, resolve_public_holiday
 
     work_date = date.fromisoformat(str(occurrence["date"]))
     start_time = _parse_time(occurrence["start_time"])
@@ -372,6 +374,7 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
 
     schedule = award_snapshot["schedule"]
     state = getattr(pharmacy, "state", "") or ""
+    region = getattr(pharmacy, "public_holiday_region", "") or ""
     segments = []
     total_hours = Decimal("0")
     total_pay = Decimal("0")
@@ -380,7 +383,26 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
     while cursor < end_dt:
         day_end = datetime.combine(cursor.date() + timedelta(days=1), time.min)
         segment_end_limit = min(end_dt, day_end)
-        day_type = get_day_type(cursor.date(), state)
+        holiday = resolve_public_holiday(
+            cursor.date(), state, region, at_time=cursor.time(),
+        )
+        if holiday.needs_review:
+            return {
+                "rate": None,
+                "review_required": True,
+                "review_reason": (
+                    "Verify the employee's base-for-work public-holiday "
+                    "declaration and regional substitution before using an "
+                    "automated MA000012 minimum rate: " + holiday.status
+                ),
+                "segments": segments,
+            }
+        day_type = (
+            "public_holiday" if holiday.is_public_holiday
+            else "saturday" if cursor.weekday() == 5
+            else "sunday" if cursor.weekday() == 6
+            else "weekday"
+        )
 
         if day_type == "weekday":
             boundary_times = [time(7, 0), time(8, 0), time(19, 0), time(21, 0)]
@@ -391,8 +413,10 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
         else:
             boundary_times = []
 
+        # Region-scoped part-day boundaries (e.g. NSW 12:00/17:00,
+        # Queensland 18:00 Christmas Eve) must split the Award floor.
         boundaries = [segment_end_limit]
-        for boundary_time in boundary_times:
+        for boundary_time in (*boundary_times, *holiday_boundaries(cursor.date(), state, region)):
             boundary = datetime.combine(cursor.date(), boundary_time)
             if cursor < boundary < segment_end_limit:
                 boundaries.append(boundary)
@@ -421,6 +445,10 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
             "end_time": next_boundary.time().strftime("%H:%M:%S"),
             "day_type": day_type,
             "rate_key": rate_key[1],
+            "holiday_scope": holiday.scope,
+            "holiday_status": holiday.status,
+            "holiday_source": holiday.source,
+            "holiday_region": holiday.region,
             "rate": _money(rate),
             "hours": _money(hours),
             "line_total": _money(line_total),

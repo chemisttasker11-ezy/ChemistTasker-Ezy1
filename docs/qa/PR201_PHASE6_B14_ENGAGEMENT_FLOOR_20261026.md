@@ -1,0 +1,5 @@
+# B14 regional MA000012 floor for external TFN shift acceptances
+
+The external TFN engagement calculation in `shifts.engagement._award_floor_for_occurrence` independently evaluated `get_day_type(date,state)` and did not pass the pharmacy/worker work-base district, potentially allowing false above-Award minimum certification on Gold Coast Show or missing NSW part-day holiday.
+
+It now **consumes only `shifts.holidays.resolve_public_holiday` and `holiday_boundaries`** for legal date classification. Split at declared part-day start/end and use snapshot Award public-holiday rate for qualifying hours. If the work-base region/year is missing or pending, return `review_required=True` with no certified minimum, rather than treating it as an ordinary day. Preserve accepted raw terms and reason; activation needs a manual Award/work-base review. Contract tests cover Gold Coast vs Brisbane, NSW noon, QLD Christmas Eve at 18:00, unknown region and pending 2027. No new source-of-truth rate tables, migrations, or deployments.

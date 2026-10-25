@@ -59,7 +59,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python backend/manage.py test qa_release.test_pr200_blockers client_profile.test_admin_invitations qa_release.test_pr201_phase6_roster qa_release.test_pr201_phase6_marketplace qa_release.test_pr201_phase6_b53 qa_release.test_pr201_phase6_b01 qa_release.test_pr201_phase6_b57 qa_release.test_pr201_phase6_checkout qa_release.test_pr201_phase6_b69 qa_release.test_pr201_phase6_b10 qa_release.test_pr201_phase6_b02 qa_release.test_pr201_phase6_b14 qa_release.test_pr201_phase6_holidays shifts.test_pricing_contract --settings=core.contract_test_settings --noinput --verbosity=2 2>&1 | tee pr200-runtime-evidence.txt
+          python backend/manage.py test qa_release.test_pr200_blockers client_profile.test_admin_invitations qa_release.test_pr201_phase6_roster qa_release.test_pr201_phase6_marketplace qa_release.test_pr201_phase6_b53 qa_release.test_pr201_phase6_b01 qa_release.test_pr201_phase6_b57 qa_release.test_pr201_phase6_checkout qa_release.test_pr201_phase6_b69 qa_release.test_pr201_phase6_b10 qa_release.test_pr201_phase6_b02 qa_release.test_pr201_phase6_b14 qa_release.test_pr201_phase6_holidays qa_release.test_pr201_phase6_award_floor shifts.test_pricing_contract --settings=core.contract_test_settings --noinput --verbosity=2 2>&1 | tee pr200-runtime-evidence.txt
       - name: Test signed kiosk drift using isolated attendance schema
         working-directory: backend
         shell: bash
