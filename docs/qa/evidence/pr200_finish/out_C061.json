@@ -1,0 +1,177 @@
+{
+  "chunk": "C061",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection, service-boundary and scoped interaction review; independent S2 and runtime S3 not executed",
+  "files": [
+    {
+      "path": "frontend_mobile/roles/owner/profile-detail.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "profile-detail.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/profile.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "profile.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/setup-onboarding.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "setup-onboarding.tsx orchestrates owner/worker onboarding and verification state; baseline verification issues B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/setup-pharmacy.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "setup-pharmacy.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/shifts/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "[id].tsx routes owner/worker shift candidate, post, offer or listing actions to shared-core; booking/payment concurrency B54/B67."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/shifts/[id]/applications.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "applications.tsx routes owner/worker shift candidate, post, offer or listing actions to shared-core; booking/payment concurrency B54/B67."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/shifts/create.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "create.tsx routes owner/worker shift candidate, post, offer or listing actions to shared-core; booking/payment concurrency B54/B67."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/shifts/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "index.tsx routes owner/worker shift candidate, post, offer or listing actions to shared-core; booking/payment concurrency B54/B67."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/staff/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "index.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/subscription-seats.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B02",
+        "B53",
+        "B70"
+      ],
+      "note": "subscription-seats.tsx runs worker/owner invoice or subscription lifecycle through shared APIs; financial integrity tracked B01/B02/B33/B53/B68-B70."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/talent-board.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "talent-board.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/availability.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "availability.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/chat.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "chat.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/dashboard.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "C009-N2"
+      ],
+      "note": "dashboard.tsx presents role-specific scoped dashboard and invoice/shift summaries; source semantic caveat C009-N1/N2."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "index.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/interests.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "interests.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/invoice.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "invoice.tsx runs worker/owner invoice or subscription lifecycle through shared APIs; financial integrity tracked B01/B02/B33/B53/B68-B70."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/invoice/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "[id].tsx runs worker/owner invoice or subscription lifecycle through shared APIs; financial integrity tracked B01/B02/B33/B53/B68-B70."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/invoice/new.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "new.tsx runs worker/owner invoice or subscription lifecycle through shared APIs; financial integrity tracked B01/B02/B33/B53/B68-B70."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/learning.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "learning.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/memberships.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "memberships.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/messages/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "[id].tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/notifications.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "notifications.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/onboarding.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "onboarding.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/profile-tabs/BasicInfoScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "BasicInfoScreen.tsx handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/profile-tabs/BioScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "BioScreen.tsx handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/pharmacist/profile-tabs/IdentityScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "IdentityScreen.tsx handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    }
+  ],
+  "findings": []
+}
