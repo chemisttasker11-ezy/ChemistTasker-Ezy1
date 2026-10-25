@@ -4,6 +4,33 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8');
+
+test('marketplace gate offers mobile verification and keeps the eight steps in view', () => {
+  const steps = read('features/marketplace/access-steps.tsx');
+  const css = read('features/marketplace/add-item-wizard.module.css');
+  assert.match(steps, /row\.code==='MOBILE_UNVERIFIED'.*href="\/mobile-verify"/);
+  assert.match(read('app/(public)/mobile-verify/page.tsx'), /page="MobileOTPVerify"/);
+  assert.match(steps, /IDENTITY_UNVERIFIED/);
+  assert.match(steps, /onboardingHref\(role/);
+  const stepper = css.match(/\.stepper\s*\{([^}]+)\}/)[1];
+  assert.match(stepper, /flex-wrap:\s*wrap/);
+  assert.doesNotMatch(stepper, /overflow-x:\s*auto/);
+});
+
+test('ethical routes have distinct titles and retain private indexing rules', () => {
+  const pages = ['', 'access/', 'inventory/', 'listings/', 'listings/new/', 'transfers/'];
+  const titles = pages.map(path => {
+    const page = read(`app/(ethical)/marketplace/ethical/${path}page.tsx`);
+    assert.doesNotMatch(page, /^['"]use client['"]/);
+    const title = page.match(/metadata[^=]*=\s*\{\s*title:\s*'([^']+)'/);
+    assert.ok(title, `Missing title for ${path || 'overview'}`);
+    return title[1];
+  });
+  assert.equal(new Set(titles).size, pages.length);
+  const layout = read('app/(ethical)/marketplace/ethical/layout.tsx');
+  assert.match(layout, /robots:\{index:false,follow:false,nocache:true\}/);
+});
+
 const landing = read('app/landing-page.tsx');
 const header = read('public/header.tsx');
 const personas = read('app/persona-data.ts');

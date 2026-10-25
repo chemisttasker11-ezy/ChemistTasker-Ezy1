@@ -91,7 +91,7 @@ export interface EthicalListingAllocation {
   id: number;
   lot: number;
   quantity: number;
-  lot_detail: EthicalStockLot;
+  lot_detail?: EthicalStockLot;
 }
 
 export interface EthicalListing {

@@ -40,7 +40,7 @@ export default function MarketplaceAccessSteps({blockers,role,onAccepted}:{block
   finally{setBusy(false)}
  }
  return <>
-  <ul>{blockers.map(row=><li key={row.code}><span>{row.message||row.detail}</span>{['IDENTITY_UNVERIFIED','ONBOARDING_INCOMPLETE'].includes(row.code)&&<Link className="workspace-inline-link" href={onboardingHref(role,row.code==='IDENTITY_UNVERIFIED')}>Complete onboarding</Link>}</li>)}</ul>
+  <ul>{blockers.map(row=><li key={row.code}><span>{row.message||row.detail}</span>{row.code==='MOBILE_UNVERIFIED'&&<Link className="workspace-inline-link" href="/mobile-verify">Verify your mobile number</Link>}{['IDENTITY_UNVERIFIED','ONBOARDING_INCOMPLETE'].includes(row.code)&&<Link className="workspace-inline-link" href={onboardingHref(role,row.code==='IDENTITY_UNVERIFIED')}>Complete onboarding</Link>}</li>)}</ul>
   {needsTerms&&terms&&<form className="marketplace-terms-form" onSubmit={event=>void accept(event)}>
    <p>Review the <Link href={terms.terms_url} target="_blank" rel="noopener noreferrer">Terms of Service</Link> before accepting marketplace terms version {terms.version}.</p>
    <label><input type="checkbox" checked={agreed} onChange={event=>setAgreed(event.target.checked)}/> I have read and agree to the current terms for marketplace participation.</label>
