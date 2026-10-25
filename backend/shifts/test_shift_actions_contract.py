@@ -92,6 +92,28 @@ class ShiftActionFixture(TestCase):
         return response, sent
 
 
+class CancellationWageContracts(ShiftActionFixture):
+    def test_overnight_cancellation_has_same_positive_wage_as_day_shift(self):
+        from datetime import datetime
+        worker = self.worker()
+        shift = self.shift()
+        slot = shift.slots.get()
+        ShiftSlotAssignment.objects.create(
+            shift=shift, slot=slot, slot_date=slot.date, user=worker, unit_rate=Decimal("65.00"),
+        )
+        for start, end in ((time(9), time(17)), (time(22), time(6))):
+            with self.subTest(start=start, end=end):
+                slot.start_time, slot.end_time = start, end
+                slot.save(update_fields=["start_time", "end_time"])
+                now = timezone.make_aware(datetime.combine(slot.date, start)) - timedelta(hours=6)
+                with mock.patch("django.utils.timezone.now", return_value=now), mock.patch("billing.views.stripe.checkout.Session.create") as checkout:
+                    checkout.return_value.url = "https://checkout.example.test/cancellation"
+                    response = self.owner_client.post(f"{API}billing/charge-penalty/{shift.pk}/", {}, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                checkout.assert_called_once()
+                self.assertEqual(checkout.call_args.kwargs["line_items"][0]["price_data"]["unit_amount"], 10400)
+
+
 class ExpressInterestTests(ShiftActionFixture):
     def test_member_interest_notifies_managers_once(self):
         worker = self.worker()

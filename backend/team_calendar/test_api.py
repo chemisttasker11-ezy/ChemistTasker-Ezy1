@@ -33,6 +33,15 @@ class CalendarBase(TestCase):
 
 
 class CalendarAuthTests(CalendarBase):
+    def test_work_note_create_refuses_foreign_pharmacy_but_accepts_own(self):
+        _, foreign = make_owner_with_pharmacy("Foreign notes")
+        payload = {"title": "Private note", "date": "2026-03-11"}
+        response = client_for(self.staff).post(NOTES, {**payload, "pharmacy": foreign.pk}, format="json")
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(WorkNote.objects.exists())
+        response = client_for(self.staff).post(NOTES, {**payload, "pharmacy": self.pharmacy.pk}, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+
     def test_all_three_endpoints_require_authentication(self):
         c = client_for()
         for url in (EVENTS, NOTES, FEED):
@@ -41,6 +50,20 @@ class CalendarAuthTests(CalendarBase):
 
 class CalendarEventTests(CalendarBase):
     PAYLOAD = {"title": "Team meeting", "date": "2026-03-11"}
+
+    def test_org_only_create_requires_org_admin_not_just_staff_visibility(self):
+        from users.models import OrganizationMembership
+        org = Organization.objects.create(name="Calendar org", slug="calendar-org-create")
+        self.pharmacy.organization = org
+        self.pharmacy.save(update_fields=["organization"])
+        payload = {**self.PAYLOAD, "organization": org.pk}
+        response = client_for(self.staff).post(EVENTS, payload, format="json")
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(CalendarEvent.objects.exists())
+        OrganizationMembership.objects.create(user=self.stranger, organization=org, role="ORG_ADMIN")
+        response = client_for(self.stranger).post(EVENTS, payload, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+
 
     def test_create_refuses_mismatched_organization(self):
         foreign = Organization.objects.create(name="Foreign", slug="foreign-calendar")

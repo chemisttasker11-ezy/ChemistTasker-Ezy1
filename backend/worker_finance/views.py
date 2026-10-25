@@ -338,7 +338,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             Invoice.objects.filter(source='internal', pharmacy__in=managed, request_key__isnull=False)
             .filter(
                 models.Q(deliveries__status__in=['sent', 'legacy_queued'])
-                | models.Q(status__in=['sent', 'paid'])
+                | models.Q(status='sent')
                 | ~models.Q(review_status='NONE')
                 | models.Q(legacy_snapshot=True)
             )
@@ -364,7 +364,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         ).exists()
         current_visible = (
             delivered
-            or record.status in {'sent', 'paid'}
+            or record.status == 'sent'
             or record.review_status != 'NONE'
             or record.legacy_snapshot
         )

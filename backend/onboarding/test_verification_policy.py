@@ -8,6 +8,37 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from onboarding.verification.policy import badges, missing_requirements, refresh_verified, skill_evidence
 
 
+class RefereeSubmissionContracts(TestCase):
+    def submit(self, payload):
+        from django.core.signing import TimestampSigner
+        from client_profile.characterization_support import BASE, client_for, make_user
+        from onboarding.models import PharmacistOnboarding
+        profile = PharmacistOnboarding.objects.create(user=make_user("PHARMACIST"))
+        token = TimestampSigner().sign(f"PharmacistOnboarding:{profile.pk}:1")
+        with mock.patch("onboarding.views.cancel_referee_reminder"), mock.patch("onboarding.views.async_task"):
+            response = client_for().post(BASE + f"onboarding/submit-reference/{token}/", payload, format="json")
+        profile.refresh_from_db()
+        return profile, response
+
+    def test_missing_blank_or_unrecognized_rehire_answer_never_confirms_reference(self):
+        from onboarding.models import RefereeResponse
+        for payload in ({}, {"would_rehire": ""}, {"would_rehire": "   "}, {"would_rehire": "unknown"}):
+            with self.subTest(payload=payload):
+                profile, response = self.submit(payload)
+                self.assertEqual(response.status_code, 400, response.data)
+                self.assertFalse(profile.referee1_confirmed)
+                self.assertFalse(profile.referee1_rejected)
+        self.assertFalse(RefereeResponse.objects.exists())
+
+    def test_valid_rehire_answers_preserve_existing_confirmation_policy(self):
+        for answer in ("Yes", "NO", "With Reservations"):
+            with self.subTest(answer=answer):
+                profile, response = self.submit({"would_rehire": answer})
+                self.assertEqual(response.status_code, 201, response.data)
+                self.assertEqual(profile.referee1_confirmed, answer != "NO")
+                self.assertEqual(profile.referee1_rejected, answer == "NO")
+
+
 def profile(role="OTHER_STAFF", role_type="ASSISTANT", *, email=True, mobile=True, skipped=False, **values):
     user = SimpleNamespace(role=role, is_otp_verified=email, is_mobile_verified=mobile, mobile_check_skipped=skipped)
     defaults = dict(user=user, role_type=role_type, verified=False, save=mock.Mock(), gov_id_verified=False,

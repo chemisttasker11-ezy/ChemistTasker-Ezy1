@@ -9,11 +9,34 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from client_profile.characterization_support import make_owner_with_pharmacy, make_user
-from organizations.models import Organization, Pharmacy, PharmacyAdmin
+from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
 from users.models import OrganizationMembership
 
 
 class PharmacyAccessCharacterizationTests(TestCase):
+    def test_chain_put_without_pharmacies_preserves_links(self):
+        from client_profile.characterization_support import client_for
+        owner, first = make_owner_with_pharmacy("Chain first")
+        second = Pharmacy.objects.create(name="Chain second", owner=first.owner, abn="51824753556")
+        chain = Chain.objects.create(owner=first.owner, name="Chain", primary_contact_email=owner.email)
+        chain.pharmacies.set([first, second])
+        client = client_for(owner)
+        for fmt in ("multipart", "json"):
+            with self.subTest(format=fmt):
+                response = client.put(f"/api/v1/chains/{chain.pk}/", {
+                    "name": "Updated", "primary_contact_email": "updated@example.com",
+                }, format=fmt)
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertCountEqual(chain.pharmacies.values_list("pk", flat=True), [first.pk, second.pk])
+        response = client.put(f"/api/v1/chains/{chain.pk}/", {
+            "name": "Updated", "primary_contact_email": owner.email, "pharmacy_ids": [first.pk],
+        }, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(list(chain.pharmacies.values_list("pk", flat=True)), [first.pk])
+        response = client.patch(f"/api/v1/chains/{chain.pk}/", {"pharmacy_ids": []}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(chain.pharmacies.exists())
+
     def setUp(self):
         self.owner, self.owned = make_owner_with_pharmacy("Owned Pharmacy")
         self.stranger, self.unrelated = make_owner_with_pharmacy("Unrelated Pharmacy")

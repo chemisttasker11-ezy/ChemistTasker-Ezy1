@@ -177,6 +177,11 @@ class OwnerOnboardingV2Serializer(AhpraSummaryMixin, UploadValidationMixin, seri
 
 
 class RefereeResponseSerializer(serializers.ModelSerializer):
+    def validate_would_rehire(self, value):
+        if value.strip().lower() not in ("yes", "no", "with reservations"):
+            raise serializers.ValidationError("Select a valid rehire response.")
+        return value
+
     class Meta:
         model = RefereeResponse
         fields = [
@@ -200,6 +205,7 @@ class RefereeResponseSerializer(serializers.ModelSerializer):
             "rehire_explanation",
             "additional_comments",
         ]
+        extra_kwargs = {"would_rehire": {"required": True, "allow_blank": False}}
 
 
 class RefreshVerifiedMixin(AhpraSummaryMixin):
