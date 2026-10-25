@@ -1,7 +1,8 @@
 """Escalating a roster shift (POST roster-shifts/<id>/escalate/): the roster assignments are cleared only when the
 escalation happens. A refused escalation (invalid target, already at that level, daily public quota, published roster)
 leaves the shift and its assignments untouched."""
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta
+from unittest import mock
 
 from django.test import TestCase
 from django.utils import timezone
@@ -74,3 +75,33 @@ class RosterShiftEscalationTests(TestCase):
             res.json(),
             {"detail": ["Cannot change a shift in a published roster. Unpublish the roster period before editing it."]})
         self.assert_untouched()
+
+    def add_leave_history(self):
+        from workforce.models import WorkforceLeaveRequest
+        start = timezone.make_aware(datetime.combine(self.monday, time(9)))
+        WorkforceLeaveRequest.objects.create(
+            pharmacy=self.pharmacy, user=self.assignment.user, slot_assignment=self.assignment,
+            leave_type="SICK", start_at=start, end_at=start + timedelta(hours=8))
+
+    def test_escalation_and_removal_refuse_an_assignment_with_leave_history(self):
+        # F02-N3: neither roster path may silently drop an assignment that carries history.
+        self.add_leave_history()
+        res = self.escalate("LOCUM_CASUAL")
+        self.assertEqual(res.status_code, 400, res.content)
+        self.assert_untouched()
+        res = client_for(self.owner).delete(BASE + f"roster-owner/{self.assignment.pk}/")
+        self.assertEqual(res.status_code, 400, res.content)
+        self.assert_untouched()
+
+    def test_escalation_and_removal_tell_the_worker(self):
+        with mock.patch("workforce.roster.views.notify_shift_users") as notify:
+            res = client_for(self.owner).delete(BASE + f"roster-owner/{self.assignment.pk}/")
+        self.assertEqual(res.status_code, 204, res.content)
+        self.assertEqual(notify.call_args.args[0], [self.assignment.user])
+        self.assignment = ShiftSlotAssignment.objects.create(
+            shift=self.shift, slot=self.slot, slot_date=self.monday, user=make_user("PHARMACIST"), is_rostered=True)
+        with mock.patch("workforce.roster.views.notify_shift_users") as notify:
+            res = self.escalate("LOCUM_CASUAL")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(notify.call_args.args[0], [self.assignment.user])
+        self.assertEqual(notify.call_args.kwargs["kind"], "shift_unassigned")

@@ -76,6 +76,13 @@ class WorkerShiftRequestSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        assignment = attrs["shift"] if "shift" in attrs else getattr(self.instance, "shift", None)
+        if assignment is not None:
+            requester = self.context["request"].user
+            pharmacy = attrs.get("pharmacy") or getattr(self.instance, "pharmacy", None)
+            # Managers approve on the request's pharmacy, so it must be the assignment's own pharmacy.
+            if assignment.user_id != requester.pk or assignment.shift.pharmacy_id != getattr(pharmacy, "pk", None):
+                raise serializers.ValidationError({"shift": "Select one of your own assignments at this pharmacy."})
         if "role" in attrs:
             attrs["role"] = self._resolve_role(attrs)
         return attrs

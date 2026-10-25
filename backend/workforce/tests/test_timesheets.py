@@ -1,12 +1,16 @@
 from datetime import datetime, time, timedelta
 from importlib import import_module
+from queue import Queue
+from threading import Barrier, Thread
+from unittest import skipUnless
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.db import close_old_connections, connection
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -393,3 +397,58 @@ class TimesheetProjectionTests(TestCase):
         timesheet.refresh_from_db()
         self.assertEqual(timesheet.approved_leave_minutes, 480)
         self.assertFalse(revision.checks.filter(code="ROSTER_WITHOUT_ATTENDANCE").exists())
+
+
+class LeaveOverlapFixture:
+    def setUp(self):
+        from client_profile.characterization_support import make_owner_with_pharmacy, make_staff_member
+        self.owner, self.pharmacy = make_owner_with_pharmacy("Leave Overlap")
+        self.worker, self.membership = make_staff_member(self.pharmacy, role="ASSISTANT")
+        start = timezone.now() + timedelta(days=10)
+        self.first = self.leave(start, start + timedelta(hours=8))
+        self.second = self.leave(start + timedelta(hours=4), start + timedelta(hours=12))
+
+    def leave(self, start, end):
+        return WorkforceLeaveRequest.objects.create(
+            pharmacy=self.pharmacy, membership=self.membership, user=self.worker,
+            leave_type="ANNUAL", start_at=start, end_at=end)
+
+
+class LeaveOverlapApprovalTests(LeaveOverlapFixture, TestCase):
+    def test_overlapping_second_approval_is_refused_and_separate_leave_is_approved(self):
+        decide_leave(self.owner, self.first.pk, "APPROVED")
+        with self.assertRaises(ValidationError):
+            decide_leave(self.owner, self.second.pk, "APPROVED")
+        later = self.leave(self.first.end_at + timedelta(days=1), self.first.end_at + timedelta(days=2))
+        self.assertEqual(decide_leave(self.owner, later.pk, "APPROVED").status, "APPROVED")
+
+
+@skipUnless(connection.vendor == "postgresql", "Requires independent PostgreSQL transactions and row locks.")
+class LeaveOverlapApprovalPostgresTests(LeaveOverlapFixture, TransactionTestCase):
+    def test_concurrent_overlapping_approvals_approve_one(self):
+        # B60: each approval locks only its own row; both must not pass the overlap check.
+        barrier = Barrier(2)
+        results = Queue()
+
+        def approve(leave_id):
+            close_old_connections()
+            try:
+                manager = get_user_model().objects.get(pk=self.owner.pk)
+                with patch("workforce.leave_service.can_manage_pharmacy",
+                           side_effect=lambda *args: barrier.wait(timeout=10) is not None):
+                    decide_leave(manager, leave_id, "APPROVED")
+                results.put("approved")
+            except ValidationError:
+                results.put("refused")
+            except Exception as exc:
+                results.put(repr(exc))
+            finally:
+                connection.close()
+
+        threads = [Thread(target=approve, args=(pk,), daemon=True) for pk in (self.first.pk, self.second.pk)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+        self.assertEqual(sorted(results.get(timeout=2) for _ in threads), ["approved", "refused"])
+        self.assertEqual(WorkforceLeaveRequest.objects.filter(user=self.worker, status="APPROVED").count(), 1)

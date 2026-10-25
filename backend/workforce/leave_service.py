@@ -13,7 +13,7 @@ from shifts.models import ShiftSlotAssignment
 from organizations.timezone import get_pharmacy_timezone
 from shifts.emails import build_roster_email_link
 from core.task_queue import async_task
-from users.models import OrganizationMembership
+from users.models import OrganizationMembership, User
 from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
 from .models import WorkforceLeaveRequest
@@ -326,6 +326,9 @@ def decide_leave(actor, leave_id, decision, manager_note=""):
             raise ValidationError(
                 "This roster assignment has changed since leave was requested. Reject the stale leave request instead."
             )
+        if decision == WorkforceLeaveRequest.Status.APPROVED:
+            # Serialise one worker's approvals so two overlapping requests cannot both pass the check below.
+            User.objects.select_for_update().filter(pk=row.user_id).first()
         if decision == WorkforceLeaveRequest.Status.APPROVED and WorkforceLeaveRequest.objects.filter(
             user_id=row.user_id,
             pharmacy_id=row.pharmacy_id,
