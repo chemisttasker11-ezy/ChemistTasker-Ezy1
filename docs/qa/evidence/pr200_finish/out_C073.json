@@ -1,0 +1,228 @@
+{
+  "chunk": "C073",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 FULL SOURCE FETCH + ANNOTATED FIRST-PASS; not independent S2 semantic certification or S3 test",
+  "status": "INCOMPLETE",
+  "source_read_count": 14,
+  "files": [
+    {
+      "path": "frontend_web/e2e/support/start-authenticated-stack.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "note": "Next server component/helper; 106 lines fetched at frozen SHA; imports node:child_process, node:fs, node:path; await/call paths: fetch; mutation or form interaction present; branch/navigation guard present.",
+      "blob_sha": "484a9f2692f9d2dfa11baab1cc02b101bf7a56e5",
+      "lines": 106,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": true,
+        "mutations": true
+      }
+    },
+    {
+      "path": "frontend_web/e2e/tests/login.e2e.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "note": "browser test case; 25 lines fetched at frozen SHA; imports @e2e-dev/web, e2e; await/call paths: browser.route, app.open, expect, screen.getByRole, app.screenshot; read-only/display path; no local guard (caller/backend still authoritative). No test executed; fixture/mocking and assertion scope require independent QA.",
+      "blob_sha": "1a9ff3c258d9363fc1643b8211c6de9961aa19c8",
+      "lines": 25,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": false,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/access/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/workspace; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
+      "blob_sha": "ea2ead4b7408abb376d9a908a52bad662abb396f",
+      "lines": 3,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": false,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/inventory/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/ethical-workspace-v2; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
+      "blob_sha": "01c33910fc56cb9f6a2b8d477265fede2ab2924c",
+      "lines": 3,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": false,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/layout.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "note": "Next server component/helper; 9 lines fetched at frozen SHA; imports next, next/link, @/public/header; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative).",
+      "blob_sha": "07eff60bb749aa0f7422f826adf5f3ab63e2fdd9",
+      "lines": 9,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": false,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/new/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/ethical-workspace-v2; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
+      "blob_sha": "4569f08ba422b5eeb8d8c8de272e3480f46c8508",
+      "lines": 3,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": false,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/ethical-workspace-v2; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
+      "blob_sha": "13ab917c95d0989205dfacb3d1f1058e70106699",
+      "lines": 3,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": false,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/ethical-workspace-v2; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
+      "blob_sha": "bc61e651049d8856de65d0f2aaba385de70f1c02",
+      "lines": 3,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": false,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/transfers/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/ethical-workspace-v2; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
+      "blob_sha": "262cd602d0ec6a050b929aac66b72c125fa283ee",
+      "lines": 3,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": false,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/blog/[slug]/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Next route/view wrapper; 5 lines fetched at frozen SHA; imports ../../components/article-detail; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
+      "blob_sha": "a504b6631617287aea323051efc3df1a36cd7560",
+      "lines": 5,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": true,
+        "guards": false,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/blog/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Next route/view wrapper; 9 lines fetched at frozen SHA; imports next, ../components/listing, ../../../lib/hub; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
+      "blob_sha": "f88b44f15714eda8dd60cc1671710e0a40485955",
+      "lines": 9,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": true,
+        "guards": false,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/community/sign-in/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Next route/view wrapper; 4 lines fetched at frozen SHA; imports next/navigation, @/shared/browser-session; no direct asynchronous call detected; read-only/display path; branch/navigation guard present. Delegation does not prove backend authorization.",
+      "blob_sha": "504dc0f08fd59555b0e4cf5b260ffe9ac24c05d7",
+      "lines": 4,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": true,
+        "mutations": false
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/community/sign-in/sign-in-form.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "note": "interactive Next client module; 23 lines fetched at frozen SHA; imports react, @/lib/chemisttasker-api, @/shared/browser-session; await/call paths: chemistTaskerApi.account.login; mutation or form interaction present; no local guard (caller/backend still authoritative).",
+      "blob_sha": "eea970bf144b6823d03cfc99ae68b8d70161c4eb",
+      "lines": 23,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": true,
+        "server": false,
+        "guards": false,
+        "mutations": true
+      }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/components/article-card.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "note": "Next server component/helper; 20 lines fetched at frozen SHA; imports next/link, lucide-react, ../../../lib/hub; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative).",
+      "blob_sha": "50cad11067a8ca1ba64686b62fbb31aeae98a995",
+      "lines": 20,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "risk_flags": {
+        "client": false,
+        "server": false,
+        "guards": false,
+        "mutations": false
+      }
+    }
+  ],
+  "findings": [],
+  "known_findings": [
+    "B43",
+    "F11-N3",
+    "C010-N1",
+    "C016-N1",
+    "C016-N2"
+  ]
+}
