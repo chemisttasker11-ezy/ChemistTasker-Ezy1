@@ -22,7 +22,8 @@ let reviewed = 0;
 for (const { p, sha } of inv) {
   const r = byPath.get(p);
   if (r) reviewed++;
-  rows.push([p, sha, p.split('/')[0], r ? 'FULL_FILE_READ_AGENT_SEMANTIC' : 'PENDING', r ? '2026-10-25' : '', r?.reviewer || '', r?.verdict === 'ISSUE' ? r.note : '', '', r ? r.verdict : 'PENDING', (r?.ids || []).join(';'), r ? `out_${r.chunk}.json` : ''].map(q).join(','));
+  // A source-file report is evidence of acquisition/S1 reporting, never proof of independent S2 or executed S3.
+  rows.push([p, sha, p.split('/')[0], r ? (r.inspection?.includes('FIRST_PASS') || r.inspection?.includes('FETCH_ANNOTATED') ? 'SOURCE_ACQUIRED_FIRST_PASS_SEMANTIC_PENDING' : 'PRIOR_AGENT_S1_REPORTED_NOT_INDEPENDENT_S2') : 'PENDING', r ? '2026-10-25' : '', r?.reviewer || '', r?.verdict === 'ISSUE' ? r.note : '', '', r ? r.verdict : 'PENDING', (r?.ids || []).join(';'), r ? `out_${r.chunk}.json` : ''].map(q).join(','));
 }
 fs.writeFileSync(path.join(EV, 'MAIN_RELEASE_FINISH_LEDGER.csv'), rows.join('\n') + '\n');
 fs.writeFileSync(path.join(DIR, 'raw_findings.json'), JSON.stringify(findings, null, 1));
