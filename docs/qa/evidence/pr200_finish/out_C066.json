@@ -11,31 +11,40 @@
         "B16",
         "B17"
       ],
-      "note": "Pharmacy form calls shared create/update with idempotency and multipart files, rereads server response and handles conflicts; B16/B17/B49."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 520-664): PharmacyForm resolves ABN, uploads verification files, creates a pharmacy using a persisted idempotency key, and updates an existing pharmacy then re-reads server state. Client choosing a pharmacy ID is not sufficient authorization; organization permission and document validation remain server gates. Test contract: Negative: pharmacy ID switch, duplicate create, forged ABN/file MIME; positive: verified owner maintains only authorized pharmacy without deleting prior evidence. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        520,
+        664
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/pharmacies/PharmacyHoursRow.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "PharmacyHoursRow.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+      "note": "PharmacyHoursRow.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/pharmacies/PharmacyOverviewContainer.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "PharmacyOverviewContainer.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+      "note": "PharmacyOverviewContainer.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/pharmacies/PharmacyProfileFields.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "PharmacyProfileFields.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+      "note": "PharmacyProfileFields.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/pharmacies/PharmacySoftwareFields.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "PharmacySoftwareFields.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+      "note": "PharmacySoftwareFields.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/pharmacies/StaffManager.tsx",
@@ -44,38 +53,54 @@
         "B03",
         "B19"
       ],
-      "note": "StaffManager.tsx: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 319-525): StaffManager checks invited user's role, builds bulk invitation payload, creates an invite link, and invokes deleteMembershipService. It crosses workforce, memberships, notification and private Hub/chat membership contexts. Test contract: Negative: staff role mismatch, bulk invalid tenant, duplicate/revoked invite and deletion effects; positive: accepted membership scoped to correct pharmacy. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        319,
+        525
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/pharmacies/inviteUtils.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "inviteUtils.ts: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2."
+      "note": "inviteUtils.ts: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/pharmacies/membershipApi.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "membershipApi.ts: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2."
+      "note": "membershipApi.ts: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/pharmacies/types.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "types.ts: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+      "note": "types.ts: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/pills/PillsScreen.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "PillsScreen.tsx: Pills balance/referral ledger read with selected persona scope; B10 payment ledger concurrency."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 70-96): PillsScreen loads rewards balance/history/referrals concurrently and displays transaction history. Actual spend/reward idempotency must be checked in rewards backend; B10 reports shift-wide ledger key collision and C/F rewards concurrency candidates remain open. Test contract: Negative: two concurrent redemptions or referral claims; positive: one transaction equals one balance delta. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        70,
+        96
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/profile/RefereesScreen.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "RefereesScreen.tsx: Expo presentational utilities and shared-core adapter; no direct backend authorization decisions."
+      "note": "RefereesScreen.tsx: Expo presentational utilities and shared-core adapter; no direct backend authorization decisions.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     }
   ],
-  "findings": []
+  "findings": [],
+  "targeted_recheck_files": 3,
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3"
 }
