@@ -75,8 +75,8 @@ class SessionRevocationTests(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         return response.data['ticket']
 
-    async def closed(self, comm):
-        self.assertEqual(await comm.receive_output(timeout=TIMEOUT), {'type': 'websocket.close', 'code': 4401})
+    async def closed(self, comm, code=4401):
+        self.assertEqual(await comm.receive_output(timeout=TIMEOUT), {'type': 'websocket.close', 'code': code})
 
     async def event(self, user, *comms):
         await get_channel_layer().group_send(USER_GROUP_FMT.format(user_id=user.pk),
@@ -204,8 +204,8 @@ class SessionRevocationTests(TransactionTestCase):
                 await database_sync_to_async(User.objects.filter(pk=user.pk).update)(**change)
             await get_channel_layer().group_send(USER_GROUP_FMT.format(user_id=user_id),
                                                  {'type': 'notification.created'})
-            await self.closed(bearer)
-            await self.closed(ticket_socket)
+            await self.closed(bearer, code=4403)
+            await self.closed(ticket_socket, code=4403)
             await self.socket(access=session['access'], accepted=False)
             await self.socket(ticket=pending, accepted=False)
         await self.disconnect_sockets()

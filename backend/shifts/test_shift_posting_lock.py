@@ -1,35 +1,18 @@
 """Deterministic edit/booking interleaving against a disposable database."""
-import os
-import unittest
 from datetime import date, time
 from unittest import mock
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
-import django
-django.setup()
-
 from django.contrib.auth import get_user_model
 from django.db import connection
+from django.test import TestCase
 from rest_framework.exceptions import ValidationError
 from organizations.models import OwnerOnboarding, Pharmacy
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 from shifts.posting import revise_shift, normalize_slots_payload
 
 
-class ShiftPostingLockTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        from attendance_tests.roster_schema import create_schema
-        create_schema()
-
-    @classmethod
-    def tearDownClass(cls):
-        from attendance_tests.roster_schema import drop_schema
-        drop_schema()
-
+class ShiftPostingLockTests(TestCase):
     def setUp(self):
-        from attendance_tests.roster_schema import clear_schema
-        clear_schema()
         users = get_user_model()
         self.owner = users.objects.create(username="posting_owner", email="posting-owner@example.invalid", role="OWNER")
         self.worker = users.objects.create(username="posting_worker", email="posting-worker@example.invalid", role="PHARMACIST")

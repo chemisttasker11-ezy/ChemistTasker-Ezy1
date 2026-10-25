@@ -2,7 +2,8 @@
 from django.test import TestCase
 
 from client_profile.characterization_support import BASE, client_for, make_owner_with_pharmacy, make_user
-from client_profile.models import Chain, OwnerOnboarding, Pharmacy
+from client_profile.models import Chain, Organization, OwnerOnboarding, Pharmacy
+from users.models import OrganizationMembership
 
 URL = BASE + "chains/"
 ANONYMOUS = {"detail": "Authentication credentials were not provided."}
@@ -36,7 +37,20 @@ class ChainTests(TestCase):
         self.assertEqual(res.status_code, 403)
         res = client_for(self.owner).post(URL, {}, format="json")
         self.assertEqual(res.status_code, 400)
-        self.assertEqual(set(res.json()), {"name", "pharmacy_ids", "primary_contact_email"})
+        # Chains can be created empty; pharmacy_ids is optional on create and update.
+        self.assertEqual(set(res.json()), {"name", "primary_contact_email"})
+
+        organization = Organization.objects.create(name="Chain creation rights")
+        for role, expected in (("ORG_ADMIN", 201), ("REGION_ADMIN", 403)):
+            with self.subTest(role=role):
+                actor = make_user("ORG_STAFF")
+                OrganizationMembership.objects.create(user=actor, organization=organization, role=role)
+                res = client_for(actor).post(URL, {
+                    "name": role, "primary_contact_email": "chain@example.com",
+                }, format="json")
+                self.assertEqual(res.status_code, expected, res.data)
+                if expected == 201:
+                    self.assertEqual(Chain.objects.get(pk=res.data["id"]).organization_id, organization.pk)
 
     def test_owner_cannot_put_foreign_pharmacies_into_chain(self):
         _, foreign = make_owner_with_pharmacy("Foreign Pharmacy")

@@ -1,4 +1,4 @@
-"""Writes reject revocation immediately; delivery rechecks at the bounded interval.
+"""Writes and delivery reject revocation immediately.
 
 These tests intentionally use database QuerySet.update() to bypass model
 signals and prove that stale websocket group membership is insufficient.

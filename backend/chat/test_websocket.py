@@ -16,11 +16,11 @@ from onboarding.verification.desktop import apply_ahpra_result
 
 
 class RoomDeliveryRecheckTests(SimpleTestCase):
-    async def test_outgoing_burst_reuses_check_then_rechecks_revocation(self):
+    async def test_outgoing_burst_checks_access_each_time_and_bounds_ahpra_backstop(self):
         from chat.consumers import RoomConsumer
         consumer = RoomConsumer()
         consumer._ahpra_checked_at = 100.0
-        consumer._membership_still_authorized = AsyncMock(side_effect=[True, False])
+        consumer._membership_still_authorized = AsyncMock(return_value=True)
         consumer._ahpra_suspended = AsyncMock(return_value=False)
         consumer.scope = {"user": None}
         consumer.close = AsyncMock()
@@ -30,15 +30,18 @@ class RoomDeliveryRecheckTests(SimpleTestCase):
             clock.monotonic.return_value = 101.0
             for _ in range(20):
                 await consumer.send_json({"type": "typing"})
-            consumer._membership_still_authorized.assert_not_awaited()
+            self.assertEqual(consumer._membership_still_authorized.await_count, 20)
+            consumer._ahpra_suspended.assert_not_awaited()
             self.assertEqual(send.await_count, 20)
             clock.monotonic.return_value = 110.0
             await consumer.send_json({"type": "typing"})
             clock.monotonic.return_value = 115.0
             await consumer.send_json({"type": "typing"})
             consumer.close.assert_not_awaited()
-            self.assertEqual(consumer._membership_still_authorized.await_count, 1)
-            clock.monotonic.return_value = 120.0
+            self.assertEqual(consumer._membership_still_authorized.await_count, 22)
+            consumer._ahpra_suspended.assert_awaited_once()
+            consumer._membership_still_authorized.return_value = False
+            # Revocation closes immediately, even within the same clock tick.
             await consumer.send_json({"type": "typing"})
             consumer.close.assert_awaited_once_with(code=4403)
             self.assertEqual(send.await_count, 22)

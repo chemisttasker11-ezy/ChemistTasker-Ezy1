@@ -127,13 +127,14 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         # No immediate send here; signal will broadcast on commit
 
     async def send_json(self, content, close=False):
+        # Group membership can outlive a revoked participant, membership or user.
+        if not await self._membership_still_authorized():
+            await self.close(code=4403)
+            return
         now = time.monotonic()
-        # Backstop for missed revocation and ahpra.suspended signals, one DB check per window.
+        # Keep the separate AHPRA backstop bounded; access is checked on every delivery.
         if now - getattr(self, '_ahpra_checked_at', 0.0) >= self.AHPRA_RECHECK_SECONDS:
             self._ahpra_checked_at = now
-            if not await self._membership_still_authorized():
-                await self.close(code=4403)
-                return
             if await self._ahpra_suspended(self.scope['user']):
                 self._ahpra_frozen = True
         if getattr(self, '_ahpra_frozen', False):
@@ -221,7 +222,11 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         participant = Participant.objects.filter(
             conversation_id=self.room_id,
             membership_id=self.membership.pk,
-        ).select_related("membership__user", "conversation").first()
+        ).select_related("membership__user", "conversation").only(
+            "membership__user__is_active", "membership__status", "membership__is_active",
+            "membership__employment_type", "membership__pharmacy_id",
+            "conversation__type", "conversation__pharmacy_id",
+        ).first()
         return bool(participant and participant_can_receive_chat_updates(participant))
 
     @database_sync_to_async

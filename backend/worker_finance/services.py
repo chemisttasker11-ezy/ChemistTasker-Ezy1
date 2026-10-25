@@ -743,7 +743,7 @@ def serialize_owner_revision(record, revision):
         .values_list("version", flat=True)
     )
     if (
-        record.status in {"sent", "paid"}
+        record.status == "sent"
         or record.review_status != "NONE"
         or record.legacy_snapshot
     ):

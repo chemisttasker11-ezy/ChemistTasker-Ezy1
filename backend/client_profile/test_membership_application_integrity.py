@@ -456,6 +456,8 @@ class ExternalShiftSettlementRoutingTests(TestCase):
             id=91,
             name="External Shift Pharmacy",
             abn="51824753556",
+            state="QLD",
+            public_holiday_region="QLD_BRISBANE",
             use_chemisttasker_payroll=payroll_enabled,
         )
         slot = SimpleNamespace(
@@ -580,6 +582,12 @@ class ExternalShiftSettlementRoutingTests(TestCase):
         self.assertEqual(terms["settlement_channel"], SETTLEMENT_PAYROLL)
         self.assertEqual(terms["payroll_setup_status"], "READY")
         self.assertFalse(terms["payroll_activation_required"])
+
+        # A complete worker profile cannot certify payroll for an unknown store state.
+        shift.pharmacy.state = ""
+        terms = build_shift_engagement_terms(shift=shift, user=user, offer=offer)
+        self.assertEqual(terms["settlement_channel"], SETTLEMENT_TIMESHEET_ONLY)
+        self.assertTrue(terms["payroll_activation_required"])
 
     @patch("shifts.engagement.direct_pharmacy_staff_membership", return_value=None)
     @patch("shifts.engagement._external_payment_profile")

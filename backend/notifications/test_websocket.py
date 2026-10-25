@@ -48,7 +48,7 @@ class NotificationSocketTests(TransactionTestCase):
                 await layer.group_send(group, {"type": event_type})
                 closed = await comm.receive_output(timeout=TIMEOUT)
                 self.assertEqual(closed["type"], "websocket.close")
-                self.assertEqual(closed["code"], 4401)
+                self.assertEqual(closed["code"], 4403 if change == "inactive" else 4401)
                 await comm.disconnect()
 
     async def test_established_bearer_socket_closes_when_access_token_expires(self):

@@ -4,15 +4,22 @@ Run using the dedicated standalone attendance_tests SQLite schema, never Django
 TestCase's default suite; signed events reach the real offline protocol.
 """
 import base64
+import unittest
 from datetime import timedelta
 
-from attendance_tests.test_kiosk_offline_protocol import KioskOfflineProtocolTests
+from attendance_tests import test_kiosk_offline_protocol as offline_protocol
+from django.conf import settings
+from django.db.models import QuerySet
 from django.utils import timezone
 from attendance.protocol import calculate_event_hash, sync_offline_batch
 from attendance.models import AttendanceEvent, AttendanceSession, KioskAttendanceEvent
 
 
-class Phase6KioskClockIntegrity(KioskOfflineProtocolTests):
+@unittest.skipUnless(
+    settings.SETTINGS_MODULE == "attendance_tests.settings",
+    "Run with python -m unittest attendance_tests.test_pr201_b29_kiosk (isolated schema).",
+)
+class Phase6KioskClockIntegrity(offline_protocol.KioskOfflineProtocolTests):
     def _resign(self, event):
         payload = {
             field: event[field]
@@ -185,10 +192,11 @@ class Phase6KioskClockIntegrity(KioskOfflineProtocolTests):
         listed = api.get(pending_url, {"pharmacy_id": self.pharmacy.pk})
         self.assertEqual([row["event_id"] for row in listed.data], [event["event_id"]])
         evidence = KioskAttendanceEvent.objects.get()
-        evidence.attendance_event = _apply_business_event(
+        applied = _apply_business_event(
             self.device, evidence.employee, evidence.event_type, timezone.now(), evidence.shift_id,
         )
-        evidence.save(update_fields=["attendance_event"])
+        # Bypass the append-only manager only to seed pre-hardening legacy state.
+        QuerySet(model=KioskAttendanceEvent).filter(pk=evidence.pk).update(attendance_event=applied)
         self.assertEqual(api.get(pending_url, {"pharmacy_id": self.pharmacy.pk}).data, [])
         response = api.post("/api/v1/attendance/manager/kiosk-review/decide/", {
             "event_id": event["event_id"], "decision": "APPROVED", "reason": "Legacy row",

@@ -18,7 +18,9 @@ REVIEW_THRESHOLD = 999
 LOOSE_BASELINE_TOLERANCE = 0.10
 
 # path -> (baseline code lines, reason)
-LARGE_MODULES = {}
+LARGE_MODULES = {
+    "billing/views.py": (1047, "Payment reconciliation and idempotent Stripe webhook handlers retained together for PR201 remediation."),
+}
 
 
 def module_sizes():

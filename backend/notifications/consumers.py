@@ -35,8 +35,12 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _still_authorized(self):
-        user = get_user_model().objects.filter(pk=self.user_id, is_active=True, deleted_at__isnull=True).first()
-        if not user or user.password != self.password:
+        user = get_user_model().objects.only('is_active', 'deleted_at', 'password').filter(pk=self.user_id).first()
+        self._authorization_close_code = 4401
+        if not user or not user.is_active or user.deleted_at is not None:
+            self._authorization_close_code = 4403
+            return False
+        if user.password != self.password:
             return False
         token = self.scope.get("auth")
         if token:
@@ -55,8 +59,8 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
 
     async def send_json(self, content, close=False):
         if not await self._still_authorized():
-            await self.disconnect(4401)
-            await self.close(code=4401)
+            await self.disconnect(self._authorization_close_code)
+            await self.close(code=self._authorization_close_code)
             return
         await super().send_json(content, close=close)
 

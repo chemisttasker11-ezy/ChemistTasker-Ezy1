@@ -52,17 +52,20 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         factory = APIRequestFactory()
         for version in (1, 2):
             with self.subTest(version=version):
-                request = factory.post(f"/finance/invoices/{record.pk}/mark-paid/", {"version": version}, format="json")
+                request = factory.post(f"/finance/invoices/{record.pk}/mark-paid/", {"version": record.version}, format="json")
                 force_authenticate(request, user=self.worker)
                 response = InvoiceViewSet.as_view({"post": "mark_paid"})(request, pk=record.pk)
                 self.assertEqual(response.status_code, 200, response.data)
-                self.assertFalse(record.payments.exists())
+                # F07-N2 records the balance once, even for an undelivered draft.
+                self.assertEqual(record.payments.count(), 1)
+                self.assertEqual(record.payments.get().amount, Decimal(record.calculation["payable"]))
                 request = factory.get("/finance/received-invoices/")
                 force_authenticate(request, user=self.owner)
                 received = ReceivedInvoiceViewSet.as_view({"get": "list"})(request)
                 self.assertEqual(received.data["count"], version - 1)
                 if version == 2:
                     self.assertEqual(received.data["results"][0]["version"], 1)
+                    self.assertEqual([revision["version"] for revision in received.data["results"][0]["revisions"]], [1])
                 request = factory.get(f"/invoices/{record.pk}/")
                 force_authenticate(request, user=self.owner)
                 self.assertEqual(InvoiceDetailView.as_view()(request, pk=record.pk).status_code, 404)
