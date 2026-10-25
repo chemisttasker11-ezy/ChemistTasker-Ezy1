@@ -8,7 +8,8 @@
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftList.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "ShiftList.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "ShiftList.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts",
@@ -16,25 +17,37 @@
       "ids": [
         "N1"
       ],
-      "note": "constants.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 6-11): All six AsyncStorage marker keys are global literals, including saved/applied/rejected shifts and counter_offer_map. Expo does not namespace by session user; Vite only namespaces saved markers, Next migrated not even saved. This extends C070-N1 parity scope. Test contract: Negative: same-device multiple-account tab switching; positive: namespace by user ID, clear on sign-out. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        6,
+        11
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useCounterOffers.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "useCounterOffers.ts maintains shift board filters, offer actions or local persisted markers; mobile local state must be user-scoped."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 104-245): Counter-offer hook persists globally under counter_offer_map and fetches offers serially per listed shift ID. It filters own offers by currentUserId for display, but backend must filter; compared with Vite batch, this scales to N requests for N visible shifts. Test contract: Negative: switch worker account, list 50 shifts and measure requests, forged user ID; positive: same offer list as Vite batch. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        104,
+        245
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useFilterSort.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "useFilterSort.ts maintains shift board filters, offer actions or local persisted markers; mobile local state must be user-scoped."
+      "note": "useFilterSort.ts maintains shift board filters, offer actions or local persisted markers; mobile local state must be user-scoped.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useReviewOfferDisplay.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "useReviewOfferDisplay.ts maintains shift board filters, offer actions or local persisted markers; mobile local state must be user-scoped."
+      "note": "useReviewOfferDisplay.ts maintains shift board filters, offer actions or local persisted markers; mobile local state must be user-scoped.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts",
@@ -42,121 +55,145 @@
       "ids": [
         "N1"
       ],
-      "note": "useShiftPersistence.ts maintains shift board filters, offer actions or local persisted markers; mobile local state must be user-scoped."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 59-158): Hydrates and persists applied, rejected and saved markers to device-global AsyncStorage keys without user ID. Account switch can surface prior account state, especially before fresh parent props hydrate. Source supports the C070-N1 cached-state isolation candidate. Test contract: Negative: worker A marks shifts then logs out, worker B signs in same device; positive: each worker sees only own server state. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        59,
+        158
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/index.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "index.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "index.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/types.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "types.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "types.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/utils/counterOffers.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "counterOffers.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "counterOffers.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/utils/date.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "date.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "date.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/utils/location.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "location.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "location.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/utils/rates.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "rates.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "rates.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/utils/shift.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "shift.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "shift.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/WorkerBookedShifts.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "WorkerBookedShifts.tsx worker/public booking, offer confirmation, accepted shifts and history via shared-core; concurrency/eligibility B37/B40/B54/B67."
+      "note": "WorkerBookedShifts.tsx worker/public booking, offer confirmation, accepted shifts and history via shared-core; concurrency/eligibility B37/B40/B54/B67.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/WorkerConfirmedShiftsView.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "WorkerConfirmedShiftsView.tsx worker/public booking, offer confirmation, accepted shifts and history via shared-core; concurrency/eligibility B37/B40/B54/B67."
+      "note": "WorkerConfirmedShiftsView.tsx worker/public booking, offer confirmation, accepted shifts and history via shared-core; concurrency/eligibility B37/B40/B54/B67.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/WorkerHistoryShiftsView.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "WorkerHistoryShiftsView.tsx worker/public booking, offer confirmation, accepted shifts and history via shared-core; concurrency/eligibility B37/B40/B54/B67."
+      "note": "WorkerHistoryShiftsView.tsx worker/public booking, offer confirmation, accepted shifts and history via shared-core; concurrency/eligibility B37/B40/B54/B67.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/WorkerProfileDialog.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "WorkerProfileDialog.tsx pure display helpers, typed models, and shift/slot presentation defaults."
+      "note": "WorkerProfileDialog.tsx pure display helpers, typed models, and shift/slot presentation defaults.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/utils/getShiftPharmacyName.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "getShiftPharmacyName.ts pure display helpers, typed models, and shift/slot presentation defaults."
+      "note": "getShiftPharmacyName.ts pure display helpers, typed models, and shift/slot presentation defaults.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/skills/CandidateWorkProfile.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "CandidateWorkProfile.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+      "note": "CandidateWorkProfile.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/skills/ProfileVerificationCard.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "ProfileVerificationCard.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+      "note": "ProfileVerificationCard.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/skills/ReportButton.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "ReportButton.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+      "note": "ReportButton.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/skills/SoftwarePicker.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "SoftwarePicker.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+      "note": "SoftwarePicker.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/skills/VerificationBadges.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "VerificationBadges.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+      "note": "VerificationBadges.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/skills/WorkerSkillRows.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "WorkerSkillRows.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+      "note": "WorkerSkillRows.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/talent-board/components/AvailabilitySidebar.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "AvailabilitySidebar.tsx pure display helpers, typed models, and shift/slot presentation defaults."
+      "note": "AvailabilitySidebar.tsx pure display helpers, typed models, and shift/slot presentation defaults.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     }
   ],
   "findings": [
@@ -187,5 +224,7 @@
         ]
       }
     }
-  ]
+  ],
+  "targeted_recheck_files": 3,
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3"
 }
