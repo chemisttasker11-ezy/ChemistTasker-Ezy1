@@ -148,11 +148,14 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
         return Response(PillReferralEventSerializer(event).data)
 
     @action(detail=False, methods=["post"], url_path="pay-shift")
+    @transaction.atomic
     def pay_shift(self, request):
         shift_id = request.data.get("shift_id") or request.data.get("shiftId")
         if not shift_id:
             raise DRFValidationError({"shift_id": "This field is required."})
-        shift = get_object_or_404(Shift.objects.select_related("pharmacy", "pharmacy__owner"), pk=shift_id)
+        shift = get_object_or_404(
+            Shift.objects.select_for_update(of=("self",)).select_related("pharmacy", "pharmacy__owner"), pk=shift_id,
+        )
         if not user_can_manage_pharmacy(request.user, shift.pharmacy):
             raise PermissionDenied("You do not have permission to pay for this shift.")
         if shift.payment_status == "PAID":
@@ -212,11 +215,21 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
             ).values("slot_id").distinct().count()
             if matching_count != len(slot_ids):
                 raise DRFValidationError({"detail": "One or more selected slots do not require payment."})
-        payment_units = max(1, len(offer_ids) or len(slot_ids))
+        pending_offers = ShiftOffer.objects.filter(
+            shift=shift,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+        ).order_by("created_at")
+        if offer_ids:
+            pending_offers = pending_offers.filter(id__in=offer_ids)
+        elif slot_ids:
+            pending_offers = pending_offers.filter(slot_id__in=slot_ids)
+        pending_offers = list(pending_offers)
+        payment_units = max(1, len(pending_offers))
         ledgers = []
         try:
-            for _ in range(payment_units):
-                ledgers.append(spend_pills_for_shift_post(user=request.user, shift=shift))
+            with transaction.atomic():
+                for offer in pending_offers or [None]:
+                    ledgers.append(spend_pills_for_shift_post(user=request.user, shift=shift, offer=offer))
         except RewardError as exc:
             raise DRFValidationError({
                 "detail": str(exc),
@@ -227,14 +240,6 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
         finalized_count = 0
         finalized_offers = []
         with transaction.atomic():
-            pending_offers = ShiftOffer.objects.filter(
-                shift=shift,
-                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            ).order_by("created_at")
-            if offer_ids:
-                pending_offers = pending_offers.filter(id__in=offer_ids)
-            elif slot_ids:
-                pending_offers = pending_offers.filter(slot_id__in=slot_ids)
             selected_slot_ids = set()
             for offer in pending_offers:
                 finalize_shift_offer(offer)
@@ -254,12 +259,12 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
             ).exists()
             shift.payment_status = "PENDING" if has_pending_payment else "PAID"
             shift.save(update_fields=["payment_status"])
-        send_shift_payment_finalized_notifications(
+        transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
             shift=shift,
             offers=finalized_offers,
             paid_by=request.user,
             payment_method="pills",
-        )
+        ))
         return Response({
             "detail": "Shift paid with pills.",
             "balance": get_pill_balance(request.user),

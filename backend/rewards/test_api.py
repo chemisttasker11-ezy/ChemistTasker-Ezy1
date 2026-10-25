@@ -1,7 +1,13 @@
 """Characterization of the Pills rewards API (/api/v1/pill-rewards/)."""
+from datetime import time, timedelta
+from unittest import mock
+
 from django.test import TestCase
+from django.utils import timezone
 
 from rewards.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule
+from rewards.services import get_pill_balance, get_shift_post_pill_cost
+from shifts.models import Shift, ShiftOffer, ShiftSlot
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
 )
@@ -125,3 +131,75 @@ class PillRewardsShiftPermissionTests(TestCase):
         res = client_for(self.owner).post(URL + "pay-shift/", {"shift_id": self.shift.id}, format="json")
         self.assertEqual(res.status_code, 400)
         self.assertIn("does not require payment", str(res.json()))
+
+
+class PillRewardsOfferPaymentTests(TestCase):
+    def setUp(self):
+        self.owner, self.pharmacy = make_owner_with_pharmacy()
+        self.client = client_for(self.owner)
+        self.shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, role_needed="ASSISTANT",
+            employment_type="LOCUM", payment_status="PENDING", single_user_only=False,
+        )
+        self.offers = []
+        for offset in range(2):
+            slot = ShiftSlot.objects.create(
+                shift=self.shift, date=timezone.localdate() + timedelta(days=offset + 1),
+                start_time=time(9), end_time=time(17), rate=30,
+            )
+            self.offers.append(ShiftOffer.objects.create(
+                shift=self.shift, slot=slot, user=make_user(), offered_rate=30,
+                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            ))
+        self.cost = get_shift_post_pill_cost()
+        self.credit = PillLedgerEntry.objects.create(
+            user=self.owner, entry_type="EARN", source="MANUAL", delta=2 * self.cost,
+            balance_after=2 * self.cost, idempotency_key="offer-test-credit",
+        )
+
+    @mock.patch("rewards.views.send_shift_payment_finalized_notifications")
+    def test_two_offers_on_one_shift_are_each_charged_once(self, notify):
+        for offer in self.offers:
+            response = self.client.post(URL + "pay-shift/", {
+                "shift_id": self.shift.pk, "offer_ids": [offer.pk],
+            }, format="json")
+            self.assertEqual(response.status_code, 200, response.data)
+            offer.refresh_from_db()
+            self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED)
+        self.assertEqual(get_pill_balance(self.owner), 0)
+        self.assertEqual(PillLedgerEntry.objects.filter(user=self.owner, entry_type="SPEND").count(), 2)
+
+    @mock.patch("rewards.views.send_shift_payment_finalized_notifications")
+    def test_offer_and_slot_batches_charge_every_selected_offer(self, notify):
+        for selection in (
+            {"offer_ids": [offer.pk for offer in self.offers]},
+            {"slot_ids": [offer.slot_id for offer in self.offers]},
+            {},
+        ):
+            with self.subTest(selection=selection):
+                PillLedgerEntry.objects.filter(entry_type="SPEND").delete()
+                self.shift.payment_status = "PENDING"
+                self.shift.save(update_fields=["payment_status"])
+                ShiftOffer.objects.filter(shift=self.shift).update(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+                response = self.client.post(URL + "pay-shift/", {
+                    "shift_id": self.shift.pk, **selection,
+                }, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(len({entry["id"] for entry in response.data["ledger_entries"]}), 2)
+                self.assertEqual(get_pill_balance(self.owner), 0)
+
+    @mock.patch("rewards.views.send_shift_payment_finalized_notifications")
+    def test_insufficient_batch_balance_does_not_partially_spend_or_finalize(self, notify):
+        self.credit.delta = self.credit.balance_after = self.cost
+        self.credit.save(update_fields=["delta", "balance_after"])
+        response = self.client.post(URL + "pay-shift/", {
+            "shift_id": self.shift.pk, "offer_ids": [offer.pk for offer in self.offers],
+        }, format="json")
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(int(response.data["balance"]), self.cost)
+        self.assertEqual(int(response.data["required"]), 2 * self.cost)
+        self.assertEqual(get_pill_balance(self.owner), self.cost)
+        self.assertFalse(PillLedgerEntry.objects.filter(entry_type="SPEND").exists())
+        self.assertEqual(self.shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).count(), 2)
+        self.assertFalse(self.shift.slot_assignments.exists())
+        notify.assert_not_called()

@@ -136,11 +136,12 @@ def _create_ledger_entry(
     if amount == 0:
         raise RewardError("Pill ledger amount cannot be zero.")
 
-    existing = PillLedgerEntry.objects.filter(idempotency_key=idempotency_key).first()
-    if existing:
-        return existing
-
     with transaction.atomic():
+        # The ledger has no wallet row, so serialize balance changes on its owner.
+        User.objects.select_for_update().get(pk=user.pk)
+        existing = PillLedgerEntry.objects.filter(idempotency_key=idempotency_key).first()
+        if existing:
+            return existing
         current_balance = get_pill_balance(user)
         next_balance = current_balance + amount
         if next_balance < 0:
@@ -353,7 +354,7 @@ def get_shift_post_pill_cost() -> int:
     return get_current_rule(SHIFT_POST_COST_RULE).pill_amount
 
 
-def spend_pills_for_shift_post(*, user, shift: Shift) -> PillLedgerEntry:
+def spend_pills_for_shift_post(*, user, shift: Shift, offer=None) -> PillLedgerEntry:
     rule = get_current_rule(SHIFT_POST_COST_RULE)
     return _create_ledger_entry(
         user=user,
@@ -363,8 +364,8 @@ def spend_pills_for_shift_post(*, user, shift: Shift) -> PillLedgerEntry:
         amount=-rule.pill_amount,
         shift=shift,
         description=f"Paid shift #{shift.id} with pills",
-        idempotency_key=f"shift:{shift.id}:pill-payment",
-        metadata={"shift_id": shift.id},
+        idempotency_key=f"shift:{shift.id}:offer:{offer.pk}:pill-payment" if offer else f"shift:{shift.id}:pill-payment",
+        metadata={"shift_id": shift.id, **({"offer_id": offer.pk} if offer else {})},
     )
 
 
