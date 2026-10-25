@@ -118,3 +118,10 @@ For F12 use `FLOW_TEMPLATE.md` with the F12 entry from `flows.json`.
 - Added [Next calculator / ethical marketplace / proxy review](MAIN_RELEASE_NEXT_CALCULATOR_BOUNDARY_REVIEW_20261025.md) with **source-supported conditional P1 clinical release gate** requiring independent clinical validation before public dosing acceptance. Exposure from public route is source-supported; incorrect clinical dosage is NOT proven.
 - Started [F12 cross-client parity worklog](MAIN_RELEASE_F12_PARITY_WORKLOG_20261025.md) from actual Vite/shared-core/Expo counter-offer and chat/invoicing/attendance paths. Vite batch versus Expo per-shift counter-offer transport divergence is **not a confirmed defect**. F12 NOT signed off.
 - No out_C073/out_C074, out_F12 sign-off or regenerated aggregate published: **75/89** source chunks, **14/325 remaining**, **S1 expected 1,826/2,151 unverified by rebuild**; S2/S3 zero new independent/runtime certifications in this continuation. PR still draft, no product code changed, NOT RELEASE READY.
+
+
+### Latest audit-only advance — 25 October 2026
+
+- [C086 source review](evidence/pr200_finish/out_C086.json) adds 2 first-pass auxiliary-tooling file verdicts with no new production defects. Overall **76/89** chunks committed; **13 remaining** (C046,C048,C072,C073,C074,C076,C077,C078,C080,C082,C083,C084,C085), 323 assigned source files. Expected after generator **1,828/2,151**; generated aggregate not rebuilt and S2/S3 NOT achieved.
+- [F12 parity worklog](MAIN_RELEASE_F12_PARITY_WORKLOG_20261025.md) is an **incomplete** action-by-action cross-platform trace, not a complete F12. [Next clinical release-gate review](MAIN_RELEASE_NEXT_CALCULATOR_BOUNDARY_REVIEW_20261025.md) adds a tentative release-governance P1 requiring professional clinical sign-off, no incorrect dosage established.
+- Three original P0 candidate source confirmations and B01–B71 remain unchanged, no runtime or prod modifications. Continue priority C073/C074, then C046/C048 and Next migrated flows, F12, then scripts. Main audit PR stays draft, NOT RELEASE READY.
