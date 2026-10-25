@@ -1,0 +1,109 @@
+{
+  "chunk": "C046",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "source acquisition only S2/S3 pending",
+  "status": "INCOMPLETE",
+  "files": [
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "dbed9c25bd93c3ef176b0d82ecfd5f45d6acb16d",
+      "lines": 715,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "715 lines retrieved; Vite shift board, persistence and counter-offer flows; calls handleApplySlots; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/constants.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f85001d328fae42939f805f4f67d98e891650e52",
+      "lines": 24,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "24 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "997f2c480182f4df75ae9668d7b71d9a1a725f15",
+      "lines": 538,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "538 lines retrieved; Vite shift board, persistence and counter-offer flows; calls storageGetItem, fetchShiftCounterOffersService, fetchShiftCounterOffersBatchService, getOnboardingDetail, calculateShiftRates, onSubmitCounterOffer; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "5c23fbbaf048051d840615fd7430ec6e7bc21a0f",
+      "lines": 392,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "392 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useReviewOfferDisplay.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "7aaac77bdf51e50673557459a7d7725f3af0f4d6",
+      "lines": 29,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "29 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useShiftPersistence.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "c5c844a1122c4ae5f9b2a51aa6c9a1824d7698fc",
+      "lines": 174,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "174 lines retrieved; Vite shift board, persistence and counter-offer flows; calls storageGetItem; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "6584cfe82dc7a25aba6cf85297e633368ba754bf",
+      "lines": 778,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "778 lines retrieved; Vite shift board, persistence and counter-offer flows; calls getPharmacistDashboard, getOnboardingDetail, onToggleSave, onApplyAll, refreshShifts, onApplySlot; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/types.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3884ffd8c124220c80311b945252affab7d0ab9d",
+      "lines": 98,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "98 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/counterOffers.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "a3b8751605071cea2363021191492313fdd90c6f",
+      "lines": 26,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "26 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/date.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "29915fe7257c4a97d460ca562a45a185349dc045",
+      "lines": 11,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "11 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/location.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "1141498a06ccc2b976972aee054a7b4d8e87b24c",
+      "lines": 35,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "35 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+    }
+  ],
+  "findings": []
+}
