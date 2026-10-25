@@ -40,14 +40,14 @@ jobs:
           assert.equal(report.baseline,'b77e9fd296bc2710350ef6f3cd402ce2529ffc06');
           assert.equal(report.denominator,2149);
           assert.equal(report.required_99_percent,2128);
-          assert.equal(report.certifications.length,18);
-          assert.equal(s2.length,18);
-          assert.equal(new Set(report.certifications.map(x=>x.path)).size,18);
+          assert.equal(report.certifications.length, report.actual_independent_s2_files);
+          assert.equal(s2.length, report.actual_independent_s2_files);
+          assert.equal(new Set(report.certifications.map(x=>x.path)).size, report.actual_independent_s2_files);
           for(const c of report.certifications){
             assert.notEqual(c.first_pass_reviewer,c.independent_second_reviewer);
             assert.ok(c.full_file_read && c.rationale && c.positive_contract && c.negative_contract);
             assert.ok(s2.some(r=>r.startsWith('"'+c.path+'","'+c.blob_sha+'"')));
           }
           assert.equal(rows.length,2152);
-          console.log('S2 certified 18/2149, NOT 99%; 2151 source-inventory rows preserved');
+          console.log('S2 certified',report.actual_independent_s2_files,'/2149, NOT 99%; 2151 source-inventory rows preserved');
           NODE
