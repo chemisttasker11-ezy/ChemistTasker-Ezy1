@@ -276,3 +276,10 @@ Six new source-level candidates after checking prior 65: B66 overnight shift can
 
 - Finished and committed [C075](evidence/pr200_finish/out_C075.json), 43 Next.js/BFF/public-route source-file verdicts, at frozen application baseline `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. Reviewed request-origin validation, header allowlisting and cache prevention in `platform-proxy.ts`, browser CSRF/token refresh/logout, and Next public shift/OTP/account pages. No additional novel candidate established; linked historical B43 and F11-N3.
 - **75/89** chunk reports now complete, **14** remain, with F12 still outstanding. Expected post-merge S1 file tally **1,826/2,151 (84.89%)**; generated CSV is still stale and has not been recomputed. No S2 independent assurance, S3 runtime tests, or production source modification. PR remains draft and NOT RELEASE READY.
+
+
+## 25 October 2026 — bounded C073/C074 Next clinical release-gate review
+
+- Live head at entry `3c81f80d13a2c69bcf67a21e6666e4f677dcadc5`; audit-only evidence commit `6f63f788f9e05d6e5661bec57d3fc88661639d30` adds [Next clinical and tenant-boundary evidence](MAIN_RELEASE_NEXT_CALCULATOR_BOUNDARY_REVIEW_20261025.md).
+- A source-grounded **P1 clinical release-governance candidate** is recorded: the public paediatric calculator renders patient-specific numeric doses from explicitly unvalidated source transcriptions. **This does not prove any regimen clinically wrong**. Independent pharmacist validation, release access policy and isolated age/weight/band/maximum/strength tests remain necessary.
+- Bounded Next BFF and ethical marketplace UI checks were performed; the existing backend tenant/marketplace candidates remain open. **No new whole-file C073/C074 output, no regenerated coverage ledger, no independently accepted S2, no executed S3, and no code modification** in this continuation. Pending still **14 chunks / 325 files and F12**; expected S1 remains **1,826/2,151 (not verified by rebuilt ledger)**. PR **NOT RELEASE READY**.
