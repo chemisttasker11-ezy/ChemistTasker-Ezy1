@@ -4,7 +4,7 @@
   "reviewer": "gpt6-senior-20261025",
   "review_level": "S1 FULL SOURCE FETCH + ANNOTATED FIRST-PASS; not independent S2 semantic certification or S3 test",
   "status": "INCOMPLETE",
-  "source_read_count": 28,
+  "source_read_count": 42,
   "files": [
     {
       "path": "frontend_web/e2e/support/start-authenticated-stack.mjs",
@@ -341,6 +341,132 @@
       "blob_sha": "188231d8f59d86e5b815a0ac942bd236295ed52d",
       "lines": 6,
       "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/layout.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "1ffa90ca179eb3a9592d9709989c7d083085cd11",
+      "lines": 14,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 14 lines; thin Next route wrapper/delegation; imports @/public/header, @/public/footer; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/learning/page.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "d58e73674167c5c8638c252cdf7e58faf1f7c21b",
+      "lines": 155,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 155 lines; client interactions; imports next/link, react, lucide-react, @/shared/session-provider; call sites chemistTaskerApi.publicContent.listArticles, loadArticles, chemistTaskerApi.marketplace.getListingOptions; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/login/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "d33c15847a29af7be956736802e0606141b44f88",
+      "lines": 5,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/marketplace/exchanges/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "89858b4bff5e0d487a2e38c2ea061d4aae8dc292",
+      "lines": 5,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/workspace; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/marketplace/items/[id]/[slug]/marketplace-item.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f95ba00f80fd719af932e48a3eed4c66633159b5",
+      "lines": 50,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 50 lines; client interactions; imports next/link, lucide-react, react, @/shared/session-provider; call sites chemistTaskerApi.marketplace.getListing, chemistTaskerApi.marketplace.getAccess, chemistTaskerApi.marketplace.createEnquiry; write UI, backend permissions authoritative; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/marketplace/items/[id]/[slug]/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "6e0e87afed910d527e2d063f3d5fb8bf9b24ba73",
+      "lines": 10,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 10 lines; thin Next route wrapper/delegation; imports next, ./marketplace-item; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/marketplace/layout.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "a11a03170840f264dce62c5c8aefe50c17354a61",
+      "lines": 5,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports none; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "7e128ca5d94162779ef3c111bef5cd499133cda9",
+      "lines": 29,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 29 lines; client interactions; imports next/link, next/navigation, lucide-react, react; call sites chemistTaskerApi.marketplace.listListings, load; write UI, backend permissions authoritative; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/marketplace/medicines/page.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "7e08aab2ce7b8cbe33d6c601ebd8ebc4f248f287",
+      "lines": 11,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 11 lines; server/helper; imports next, next/link, lucide-react; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/marketplace/mine/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "5e99840b6b3f0d6ae95435fc86c4c9dd8cc4742c",
+      "lines": 5,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/goods-listings-v2; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/marketplace/new/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "06ad4740552a5d46f033367c832d95ccd67e5942",
+      "lines": 5,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/add-item-wizard; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/marketplace/page.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "44bef7459a6c7518c2dcd313d0bf57df6ed85e81",
+      "lines": 23,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 23 lines; server/helper; imports next, next/image, next/link, lucide-react; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/mobile-checkout-return/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "dd9cdc9b87c9086dd5975c3d8ec1bee3845f7b78",
+      "lines": 5,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/mobile-verify/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "7a82766f7a64ce6c95f2a6c3641f41523882f0e3",
+      "lines": 5,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
     }
   ],
   "findings": [],
