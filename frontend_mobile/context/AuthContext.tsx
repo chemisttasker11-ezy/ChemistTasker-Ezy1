@@ -151,12 +151,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
 
-        if (nextUser) {
-          setUser(nextUser);
-        }
-        setAccess(nextAccess);
-        setRefresh(nextRefresh);
-
         if (baseURL) {
           const token = await getValidAccessToken(baseURL);
           if (token) {
@@ -197,17 +191,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
 
-      if (latestAccess || latestRefresh || latestUser) {
-        primeInMemorySession(latestSession);
-        setAccess(latestAccess);
-        setRefresh(latestRefresh);
-        setUser(latestUser);
-      } else {
-        await clearStoredSession().catch(() => undefined);
-        setAccess(null);
-        setRefresh(null);
-        setUser(null);
-      }
+      await clearStoredSession().catch(() => undefined);
+      primeInMemorySession(null);
+      setAccess(null);
+      setRefresh(null);
+      setUser(null);
       setIsLoading(false);
     };
     loadStoredAuth();

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { configureApi } from '../../transport/application';
-import { reactToMessageService } from './api';
+import { fetchChatParticipants, reactToMessageService, startDirectMessageByMembership } from './api';
 
 describe('chat reaction response contract', () => {
     it.each([
@@ -25,5 +25,23 @@ describe('chat reaction response contract', () => {
         }));
         configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'fixture-token', fetchImpl });
         await expect(reactToMessageService(448, 'invalid')).rejects.toThrow('Invalid reaction.');
+    });
+});
+
+describe('chat participant identity contract', () => {
+    it('exposes searchable names without replacing membership IDs with user IDs', async () => {
+        const fetchImpl = vi.fn(async (url: RequestInfo | URL) => new Response(JSON.stringify(
+            String(url).includes('chat-participants')
+                ? { results: [{ id: 7, user_details: { id: 91, first_name: 'Omar', last_name: 'Ali', email: 'omar@example.test' } }] }
+                : { id: 12, type: 'DM', title: '', participant_ids: [7] },
+        ), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'fixture-token', fetchImpl });
+        const participants = await fetchChatParticipants();
+        const matches = participants.filter((person: any) => `${person.firstName} ${person.lastName}`.toLowerCase().includes('omar'));
+        expect(matches).toHaveLength(1);
+        expect(participants.filter((person: any) => `${person.firstName} ${person.lastName}`.toLowerCase().includes('unrelated'))).toHaveLength(0);
+        expect(matches[0]).toMatchObject({ id: 7, membership_id: 7, firstName: 'Omar', email: 'omar@example.test', userDetails: { id: 91 } });
+        await startDirectMessageByMembership((matches[0] as any).membership_id, null);
+        expect(JSON.parse((fetchImpl.mock.calls[1] as any)[1].body)).toEqual({ partner_membership_id: 7 });
     });
 });
