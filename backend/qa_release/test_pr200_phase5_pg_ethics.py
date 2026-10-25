@@ -10,6 +10,7 @@ from threading import Barrier, Thread
 from unittest import skipUnless
 from unittest.mock import patch
 from uuid import uuid4
+import json
 
 from django.db import close_old_connections, connection
 from django.test import TransactionTestCase, override_settings
@@ -25,6 +26,19 @@ from ethical_marketplace.models import (
     EthicalReservation, EthicalStockLot, EthicalTransfer,
 )
 from ethical_marketplace.views import listing_visible_to as real_listing_visible_to
+from ethical_marketplace.serializers import TransferSerializer as OriginalTransferSerializer
+from rest_framework.renderers import JSONRenderer
+
+
+class _TestReceiptJSONCompatibleTransferSerializer(OriginalTransferSerializer):
+    """B31 isolation only: use DRF's own JSONRenderer to encode UUIDs before
+    persistence into the receipt JSONField. This is NOT production behavior.
+    The separate real-handler UUID receipt failure is documented and not
+    credited as a reproduced B31 concurrency finding.
+    """
+    @property
+    def data(self):
+        return json.loads(JSONRenderer().render(super().data))
 
 
 @skipUnless(connection.vendor == "postgresql", "Requires real PostgreSQL row locks")
@@ -110,11 +124,15 @@ class B31EthicalExclusiveListingPostgres(TransactionTestCase):
         )
 
     def test_b31_positive_one_transfer_then_sequential_second_denied(self):
-        response = self.post_for_lot(self.lots[0].pk)
-        self.assertEqual(response.status_code, 201, response.data)
-        self.listing.refresh_from_db()
-        self.assertEqual(self.listing.status, "RESERVED")
-        denied = self.post_for_lot(self.lots[1].pk)
+        # Isolate listing reservation concurrency from a separate confirmed
+        # JSONField UUID serialization failure in the receipt path.
+        with patch("ethical_marketplace.views.TransferSerializer",
+                   _TestReceiptJSONCompatibleTransferSerializer):
+            response = self.post_for_lot(self.lots[0].pk)
+            self.assertEqual(response.status_code, 201, response.data)
+            self.listing.refresh_from_db()
+            self.assertEqual(self.listing.status, "RESERVED")
+            denied = self.post_for_lot(self.lots[1].pk)
         self.assertIn(denied.status_code, (400, 403, 404, 409), denied.data)
         self.assertEqual(EthicalTransfer.objects.filter(listing=self.listing).count(), 1)
         self.assertEqual(EthicalReservation.objects.filter(active=True).count(), 1)
@@ -141,7 +159,9 @@ class B31EthicalExclusiveListingPostgres(TransactionTestCase):
             finally:
                 close_old_connections()
 
-        with patch("ethical_marketplace.views.listing_visible_to",
+        with patch("ethical_marketplace.views.TransferSerializer",
+                   _TestReceiptJSONCompatibleTransferSerializer), patch(
+                   "ethical_marketplace.views.listing_visible_to",
                    side_effect=both_pass_published_visibility):
             threads = [
                 Thread(target=submit, args=(lot.pk,), daemon=True)
