@@ -121,13 +121,13 @@ export default function InvoiceComposer({ initial, prefillShiftId, previous, cus
     }, 450);
     return () => { active = false; window.clearTimeout(timer); };
   }, [value]);
-  const customerMissing = attempted && !value.customer_id;
+  const customerMissing = attempted && !value.customer_id && !value.source_assignment_ids?.length;
   const issuerMissing = attempted && !value.issuer_name.trim();
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting.current) return;
     setAttempted(true);
-    if (!value.customer_id) { showError('Choose who this invoice is for.'); return; }
+    if (!value.customer_id && !value.source_assignment_ids?.length) { showError('Choose who this invoice is for.'); return; }
     if (!value.issuer_name.trim()) { setBusinessOpen(true); showError('Add your business name under Business details.'); return; }
     if (!value.lines.length) { showError('Add at least one item you are billing for.'); return; }
     submitting.current = true; setBusy(true); setError('');

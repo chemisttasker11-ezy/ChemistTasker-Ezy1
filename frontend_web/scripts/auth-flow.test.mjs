@@ -75,6 +75,69 @@ test('capability-gated manager routes reject authenticated users without the cap
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 
+function evaluateInvoiceCode(code, context = {}) {
+  return vm.runInNewContext(ts.transpileModule(code, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText, context);
+}
+
+for (const [editor, file, handler] of [
+  ['web', '../src/pages/finance/InvoiceComposer.tsx', 'submit'],
+  ['mobile', '../../frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx', 'save'],
+]) {
+  for (const [scenario, customerId, assignments, expectedSaves] of [
+    ['accepted shift without a saved customer', 0, [9], 1],
+    ['external invoice without a customer', 0, [], 0],
+    ['legitimate external customer', 7, [], 1],
+  ]) test(`${editor} invoice save: ${scenario}`, async () => {
+    const source = fs.readFileSync(new URL(file, import.meta.url), 'utf8');
+    const start = source.indexOf(`  const ${handler} = async`);
+    const code = source.slice(start, source.indexOf('  const field =', start));
+    const saved = [], errors = [];
+    const value = { customer_id: customerId, source_assignment_ids: assignments,
+      issuer_name: 'Legitimate worker', lines: [{ description: 'Accepted work' }] };
+    await evaluateInvoiceCode(`${code}\n${handler}({preventDefault() {}});`, {
+      value, submitting: { current: false }, running: { current: false }, initial: undefined,
+      setAttempted() {}, setBusy() {}, setBusinessOpen() {}, setError: error => errors.push(error),
+      showError: error => errors.push(error), errorMessage: String,
+      finance: { saveInvoice: async draft => saved.push(draft) }, onSaved: async () => {}, onClose() {},
+    });
+    assert.equal(saved.length, expectedSaves, errors.join('; '));
+    if (expectedSaves) assert.equal(saved[0], value);
+    else assert.ok(errors.some(Boolean), 'Missing external customer must still be rejected');
+  });
+}
+
+test('legacy invoice recipients follow the active dashboard, including worker admin accounts', () => {
+  const policy = fs.readFileSync(new URL('../src/utils/invoiceIssuer.ts', import.meta.url), 'utf8');
+  const detail = fs.readFileSync(new URL('../src/pages/dashboard/sidebar/InvoiceDetailPage.tsx', import.meta.url), 'utf8');
+  const decision = detail.match(/const is(?:Owner|Recipient) = (.+);/)[1];
+  for (const [role, pathname, expected] of [
+    ['ORG_ADMIN', '/dashboard/organization/invoice/42', true],
+    ['PHARMACIST', '/dashboard/admin/101/invoice/42', true],
+    ['OWNER', '/dashboard/owner/invoice/42', true],
+    ['PHARMACIST', '/dashboard/pharmacist/invoice/42', false],
+    ['OTHER_STAFF', '/dashboard/otherstaff/invoice/42', false],
+  ]) {
+    const exports = {};
+    const recipient = evaluateInvoiceCode(`${policy}\n${decision}`, { exports, user: { role }, location: { pathname } });
+    assert.equal(recipient, expected, `${role} in ${pathname}`);
+  }
+});
+
+test('legacy mobile invoice suggests the shared SG rate and preserves an agreed onboarding rate', () => {
+  const source = fs.readFileSync(new URL('../../frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx', import.meta.url), 'utf8');
+  const shared = fs.readFileSync(new URL('../../shared-core/src/domains/shifts/postingDraft.ts', import.meta.url), 'utf8');
+  const rate = shared.match(/export const SUPER_GUARANTEE_PERCENT = (\d+);/)[1];
+  const initial = source.match(/const \[superRateSnapshot, setSuperRateSnapshot\] = useState<number>\((.+)\);/)[1];
+  const override = source.match(/if \(onboarding\?\.super_rate_snapshot\)[\s\S]*?setSuperRateSnapshot\(Number\(onboarding.super_rate_snapshot\)\);/)[0];
+  for (const [onboarding, expected] of [[{}, 12], [{ super_rate_snapshot: '11.50' }, 11.5]]) {
+    let actual = evaluateInvoiceCode(initial, { SUPER_GUARANTEE_PERCENT: Number(rate) });
+    evaluateInvoiceCode(override, { onboarding, setSuperRateSnapshot: value => { actual = value; } });
+    assert.equal(actual, expected);
+  }
+});
+
 function loadTokenService({ localStorage, sessionStorage, window, refreshBrowserSession, watchSession }) {
   const code = fs.readFileSync(new URL('../landing_next/migrated/utils/tokenService.ts', import.meta.url), 'utf8');
   const transpiled = (ts.transpileModule || ts.default?.transpileModule)(code, {
