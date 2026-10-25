@@ -964,5 +964,57 @@
       "No evidence of actual illegal underpayment; negotiated locum price and employee award covered engagements differ.",
       "No independent S2 full-file certification"
     ]
+  },
+  "B01": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/billing/views.py:635-649",
+      "backend/billing/views.py:653-691",
+      "backend/qa_release/test_pr200_phase5_wave_next.py:15-45"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b01_active_subscriber_must_get_discount",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191476067",
+        "head": "b33cdca0263df3554e1c119a47e8f59dbdda1796",
+        "environment": "GitHub-hosted Django isolated SQLite HTTP, mocked Stripe Checkout",
+        "observed": "Active OwnerSubscription and one accepted-awaiting-payment offer still selected standard locum price_1T52jFBQXaySV5ukezd5JmzS instead of documented discounted price_1T52jFBQXaySV5ukkXOKPHSV. HTTP 200 and provider call succeeded; expected-red assertion failed; no setup errors.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "positive_controls": [
+      "test_b01_non_subscriber_standard_price_positive PASSED with one offer, correct standard price and quantity one"
+    ],
+    "runtime_limitations": [
+      "Stripe Session.create mocked; real Stripe amount, production price configuration and settled money not tested.",
+      "No refund/account-type parity or multi-offer pricing."
+    ]
+  },
+  "B25": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/marketplace/views.py:198-227",
+      "backend/marketplace/models.py:135-181",
+      "backend/qa_release/test_pr200_phase5_wave_next.py:80-146"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b25_invalid_second_step_rolls_back_everything",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191476067",
+        "head": "b33cdca0263df3554e1c119a47e8f59dbdda1796",
+        "environment": "GitHub-hosted Django SQLite authenticated marketplace API, verified synthetic owner/pharmacy/identity/terms",
+        "observed": "POST with one valid schedule step and later invalid step returned HTTP 400, but listing.version increased from 1 to 2 (AssertionError: 2 != 1). Other persisted audience/schedule effects remain source-supported until separate postcondition assertion rerun.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "positive_controls": [
+      "test_b25_valid_schedule_positive PASSED: valid owner POST returned 200, version advanced and one step stored"
+    ],
+    "runtime_limitations": [
+      "Only persisted version mismatch independently asserted on first run; revised test now reports version/circle/step tuple after invalid request.",
+      "No PostgreSQL transaction proof, notification/escalation task execution or unverified-owner denial in this run."
+    ]
   }
 }

@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 historical IDs preserved; 45 distinct exercised IDs (44 SQLite service/API/protocol; 1 pure-function) / 53 cumulative expected-red isolated negative assertions. Newly verified: B24 two negative/2 positive; B29 two signed negative/1 positive; B14 three static contract negatives/2 positive; real payroll provider/PostgreSQL/F12 unverified; 99% independent S2 NOT CERTIFIED.",
+  "material": "226 historical IDs retained. 47 distinct IDs with executed targeted negative evidence; 55 cumulative expected-red assertions, including B01 and B25 (run 40191476067); B35 fixture errors excluded until corrected rerun. 99% independent S2 not certified.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,15 +10,15 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 45,
-  "runtime_failing_scenarios": 53,
+  "runtime_distinct_ids": 47,
+  "runtime_failing_scenarios": 55,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
-    "SOURCE_SUPPORTED": 12,
-    "UNVERIFIED_CANDIDATE": 156,
-    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 43,
+    "SOURCE_SUPPORTED": 11,
+    "UNVERIFIED_CANDIDATE": 155,
+    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 45,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
@@ -61,8 +61,8 @@
       "negative_failures": 7,
       "errors": 0
     },
-    "cumulative_distinct_findings": 45,
-    "cumulative_failed_negative_assertions": 53,
+    "cumulative_distinct_findings": 47,
+    "cumulative_failed_negative_assertions": 55,
     "warning": "Cumulative from multiple isolated targeted runs; not 45 failures in one suite; B24 error invalid, not counted.",
     "additional_runs": [
       {
@@ -119,6 +119,19 @@
         "fixture_errors": 0,
         "negative_test_failing": true,
         "note": "Static-data semantics only; no payroll, DB or provider calls; published Fair Work 2026 source."
+      },
+      {
+        "id": "B01+B25+B35_INITIAL",
+        "run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191476067",
+        "head": "b33cdca0263df3554e1c119a47e8f59dbdda1796",
+        "tests": 6,
+        "negatives_valid": 2,
+        "positive_passes": 2,
+        "fixture_errors": 2,
+        "invalid_ids": [
+          "B35"
+        ],
+        "note": "B35 pay-fields Shift fixture invalid; do not count. B01 and B25 valid red and positive controls."
       }
     ]
   },
@@ -128,16 +141,29 @@
       "severity": "P0",
       "area": "Billing",
       "title": "Subscriber discount omitted from shift checkout",
-      "status": "SOURCE_SUPPORTED",
-      "evidence_grade": "S2_SAME_ASSISTANT_SOURCE_CHALLENGE",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE_HTTP",
+      "decision": "FIX_IN_SEPARATE_REMEDIATION_PR",
       "root": "B01",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
+      "source_proof": [
+        "backend/billing/views.py:635-649",
+        "backend/billing/views.py:653-691",
+        "backend/qa_release/test_pr200_phase5_wave_next.py:15-45"
+      ],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b01_active_subscriber_must_get_discount",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191476067",
+          "head": "b33cdca0263df3554e1c119a47e8f59dbdda1796",
+          "environment": "GitHub-hosted Django isolated SQLite HTTP, mocked Stripe Checkout",
+          "observed": "Active OwnerSubscription and one accepted-awaiting-payment offer still selected standard locum price_1T52jFBQXaySV5ukezd5JmzS instead of documented discounted price_1T52jFBQXaySV5ukkXOKPHSV. HTTP 200 and provider call succeeded; expected-red assertion failed; no setup errors.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "The fulfillment checkout calculates is_subscriber but selects regular-rate Stripe price IDs regardless. This is source-level price selection only; actual charge not reproduced."
+      "explanation": "Subscriber active but provider checkout uses documented regular locum price. One valid authenticated positive control passed; Stripe mock, no real charge."
     },
     {
       "id": "B02",
@@ -726,16 +752,29 @@
       "severity": "P1",
       "area": "Marketplace listings",
       "title": "ListingAudience saves current circle and bumps listing.version before validating every requested schedule item. Invalid later schedule returns 400 after persistent state mutation.",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE_HTTP",
+      "decision": "FIX_IN_SEPARATE_REMEDIATION_PR",
       "root": "B25",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
+      "source_proof": [
+        "backend/marketplace/views.py:198-227",
+        "backend/marketplace/models.py:135-181",
+        "backend/qa_release/test_pr200_phase5_wave_next.py:80-146"
+      ],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b25_invalid_second_step_rolls_back_everything",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191476067",
+          "head": "b33cdca0263df3554e1c119a47e8f59dbdda1796",
+          "environment": "GitHub-hosted Django SQLite authenticated marketplace API, verified synthetic owner/pharmacy/identity/terms",
+          "observed": "POST with one valid schedule step and later invalid step returned HTTP 400, but listing.version increased from 1 to 2 (AssertionError: 2 != 1). Other persisted audience/schedule effects remain source-supported until separate postcondition assertion rerun.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Invalid late schedule POST returns 400 yet persists listing version; exact audience/step postconditions being strengthened. Valid schedule positive control passed; no actual escalation run."
     },
     {
       "id": "B26",

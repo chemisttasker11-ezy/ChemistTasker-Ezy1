@@ -53,6 +53,7 @@ class B35RosterOwnerCreateTenantBoundary(TestCase):
         self.shift_b = Shift.objects.create(
             pharmacy=self.pharmacy_b, created_by=self.owner_b,
             role_needed="ASSISTANT", employment_type="FULL_TIME",
+            min_hourly_rate=45, max_hourly_rate=60,
             visibility="FULL_PART_TIME")
 
     def payload(self):
@@ -136,6 +137,10 @@ class B25MarketplaceAudienceAtomicity(TestCase):
         self.assertEqual(resp.status_code, 400, resp.data)
         self.listing.refresh_from_db()
         self.audience.refresh_from_db()
-        self.assertEqual(self.listing.version, version)
-        self.assertEqual(self.audience.current_circle, circle)
-        self.assertFalse(ListingEscalationStep.objects.filter(listing=self.listing).exists())
+        actual = (
+            self.listing.version,
+            self.audience.current_circle,
+            ListingEscalationStep.objects.filter(listing=self.listing).count(),
+        )
+        self.assertEqual(actual, (version, circle, 0),
+                         "Invalid schedule must leave no persisted audience/version/steps.")
