@@ -838,7 +838,7 @@ def _process_stripe_event(event):
         elif session.mode == 'payment' and session.payment_status == 'paid':
             shift_id = metadata.get('shift_id')
             payment_type = metadata.get('type')
-            if shift_id and payment_type:
+            if shift_id and payment_type in ('fulfillment', 'cancellation'):
                 amount_aud = 0
                 if session.amount_total is not None:
                     amount_aud = session.amount_total / 100.0
@@ -855,6 +855,10 @@ def _process_stripe_event(event):
                     status='paid',
                     paid_at=timezone.now(),
                 )
+
+                # Cancellation penalty payment must not finalize worker offers.
+                if payment_type != 'fulfillment':
+                    return
 
                 # Mark shift paid, then finalize pending offers waiting on payment.
                 try:

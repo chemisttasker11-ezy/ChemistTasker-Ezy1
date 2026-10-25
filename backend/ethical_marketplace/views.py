@@ -108,6 +108,7 @@ class PharmacyApproval(APIView):
             raise PermissionDenied(blockers[0])
         owner_user = pharmacy.owner.user
         approval = EthicalPharmacyApproval.objects.filter(pharmacy=pharmacy).first()
+        creating = approval is None
         serializer = ApprovalSerializer(approval, data=request.data, partial=bool(approval))
         serializer.is_valid(raise_exception=True)
         approval = serializer.save(
