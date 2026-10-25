@@ -486,5 +486,33 @@
     ],
     "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
     "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "B43": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b43_password_reset_invalidates_all_preexisting_refresh_tokens",
+        "observed": "Password-reset-confirm returned HTTP 200 and positive password-change assertion passed; old SimpleJWT refresh token still returned HTTP 200 from /api/v1/users/token/refresh/ rather than 401/403.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179425592",
+        "head": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
+        "environment": "GitHub-hosted Ubuntu Python 3.12; Django contract_test_settings; disposable SQLite; real Django APIClient and SimpleJWT; no staging user.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "source_proof": [
+      "backend/users/api_passwords.py:43-56",
+      "backend/users/api_auth.py:115-152",
+      "backend/users/serializers.py:515-544",
+      "backend/core/settings.py:490-502"
+    ],
+    "root_cause": "Password-reset confirmation changes password and clears login lockout state but does not blacklist outstanding refresh tokens or bump a token-version/session-epoch. Existing RefreshToken passes CustomTokenRefreshSerializer and is rotated.",
+    "runtime_limitations": [
+      "No production/staging JWT or browser cookie session challenged",
+      "No existing access token survival window tested; this reproduction tests refresh-token validity only",
+      "Security policy should explicitly require reset-session revocation; source finding is classified P0 candidate rather than proof of a production incident",
+      "Independent full-repository S2 and PostgreSQL/real-device testing not established"
+    ]
   }
 }

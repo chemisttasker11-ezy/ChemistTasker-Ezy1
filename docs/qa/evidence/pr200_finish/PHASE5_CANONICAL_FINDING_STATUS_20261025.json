@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
-  "audit_head_prior": "69eeb738ddf2dc2ba9311843b90345f76f2ab1bb",
-  "material": "All 71 historical B IDs and all 155 C/F raw findings; source verdicts and runtime are separate; no second-independent reviewer certification.",
+  "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
+  "material": "226 total raw IDs (71 historical B plus 155 C/F). Isolated Django SQLite evidence: 27 distinct IDs and 30 RED negative scenarios in 41 tests at audited head 2fe2ce27; 11 passes. B43 confirmed by fresh source+workflow challenge. Independent whole-repository S2 not certified; 99% semantic target remains open.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,21 +10,19 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 23,
-  "runtime_failing_scenarios": 26,
+  "runtime_distinct_ids": 27,
+  "runtime_failing_scenarios": 30,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 13,
-    "UNVERIFIED_CANDIDATE": 175,
-    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 22,
+    "UNVERIFIED_CANDIDATE": 173,
+    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 26,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
-    "INCONCLUSIVE_NEGATIVE_TEST": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
     "SOURCE_SUPPORTED_CONDITIONAL": 1,
-    "SOURCE_SUPPORTED_DUPLICATE_ROOT": 1,
     "SOURCE_SUPPORTED_UI_SCOPE": 1
   },
   "independent_s2_certified_files": null,
@@ -43,10 +41,12 @@
     "claim": "NOT_CERTIFIED"
   },
   "s3": {
-    "negative_tests_failed": 26,
+    "negative_tests_failed": 30,
     "positive_or_nonnegative_passed": 11,
-    "tests_executed": 37,
-    "environment": "Django SQLite and synthetic Stripe mocks, NOT production release acceptance"
+    "tests_executed": 41,
+    "environment": "Django SQLite; synthetic Stripe mocks; actual JWT refresh for B43; NOT production release acceptance",
+    "exact_audited_head": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
+    "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179425592"
   },
   "entries": [
     {
@@ -1011,16 +1011,30 @@
       "severity": "P0",
       "area": "Historical discovery",
       "title": "P0 candidate — Password reset does not invalidate previously issued JWT refresh tokens",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE",
+      "decision": "FIX",
       "root": "B43",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
-      "test_needed": null,
-      "runtime_scenarios": [],
+      "source_proof": [
+        "backend/users/api_passwords.py:43-56",
+        "backend/users/api_auth.py:115-152",
+        "backend/users/serializers.py:515-544",
+        "backend/core/settings.py:490-502"
+      ],
+      "test_needed": "Change user's password via valid reset token; old refresh token must reject 401/403 and produce no new access token; verify old access token expiry/revocation policy and normal new login positive control.",
+      "runtime_scenarios": [
+        {
+          "test": "test_b43_password_reset_invalidates_all_preexisting_refresh_tokens",
+          "observed": "Password-reset-confirm returned HTTP 200 and positive password-change assertion passed; old SimpleJWT refresh token still returned HTTP 200 from /api/v1/users/token/refresh/ rather than 401/403.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179425592",
+          "head": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
+          "environment": "GitHub-hosted Ubuntu Python 3.12; Django contract_test_settings; disposable SQLite; real Django APIClient and SimpleJWT; no staging user.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "41-test exact-head GitHub run 40179425592 observed HTTP 200 old-refresh after successful password reset. Targeted independent source check of reset handler and token refresh path; policy P0 candidate, NOT whole-file S2 certification."
     },
     {
       "id": "B44",
@@ -1155,16 +1169,24 @@
       "severity": "P1",
       "area": "Historical discovery",
       "title": "P1 money-calculation candidate: overnight assignment produces negative cancellation wage and falsely skips penalty",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE",
+      "decision": "FIX",
       "root": "B69",
       "root_relation": "RELATED_ROOT",
       "source_proof": [],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b66_overnight_assigned_work_must_have_nonzero_cancellation_wage",
+          "observed": "22:00–06:00 future assigned shift returned no penalty due negative computed wage; equivalent same-day positive control generated a nonzero checkout.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885",
+          "head": "ce5609527e256fc228914e7d2e3d11d277a54947",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Prior agent's verified exact-run red scenario cross-checked against latest 41-test GitHub log. Preserve original source/alias caveats; not staged/production or whole-file independently S2-certified."
     },
     {
       "id": "B67",
@@ -1685,9 +1707,9 @@
       "severity": "P1",
       "area": "Memberships",
       "title": "Authenticated workers can create applications against expired or unauthorised invitation links by calling the generic applications endpoint.",
-      "status": "INCONCLUSIVE_NEGATIVE_TEST",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "RETEST",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE",
+      "decision": "FIX",
       "root": "C012-N1",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
       "source_proof": [
@@ -1701,9 +1723,17 @@
         "backend/memberships/views.py:262"
       ],
       "test_needed": "As unrelated authenticated Sara, POST /api/v1/membership-applications/ with a valid old or disabled invite_link integer, matching her email/DOB/role. Expect refusal and zero application creation; valid UUID magic-link flow must succeed.",
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_c012_n1_generic_create_rejects_expired_numeric_link",
+          "observed": "After fixing unique mobile/DOB fixture, expired inactive invite-link integer POST persisted a membership application with HTTP 201; valid UUID magic-link positive control HTTP 201.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885",
+          "head": "ce5609527e256fc228914e7d2e3d11d277a54947",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "Expired/inactive invite-link generic POST returned HTTP 400 while valid magic-link positive control returned HTTP 201. Actual rejection cause not inspected; this is not a refutation or P1 closure. Need response body and independent validation path."
+      "explanation": "Prior agent's verified exact-run red scenario cross-checked against latest 41-test GitHub log. Preserve original source/alias caveats; not staged/production or whole-file independently S2-certified."
     },
     {
       "id": "C012-N2",
@@ -3627,9 +3657,9 @@
       "severity": "P1",
       "area": "Mobile push privacy",
       "title": "Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.",
-      "status": "SOURCE_SUPPORTED_DUPLICATE_ROOT",
-      "evidence_grade": "S2_SAME_ASSISTANT_SOURCE_CHALLENGE",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE",
+      "decision": "FIX",
       "root": "C071-N2",
       "root_relation": "CANONICAL",
       "source_proof": [
@@ -3647,9 +3677,17 @@
         "backend/users/models.py:128"
       ],
       "test_needed": "Register an Expo push token while Sara is logged in. Sign out through native app. Trigger a new private message/notification for Sara; assert DeviceToken is inactive or removed and no push sent. Log in as Tom and confirm token belongs only to Tom. Server logout should revoke current device independently of client network reliability.",
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_c071_n2_logging_out_revokes_previous_device_push_token",
+          "observed": "A real user-registered synthetic Android DeviceToken remained active after server logout with valid refresh token; signed-out device still eligible for private pushes.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885",
+          "head": "ce5609527e256fc228914e7d2e3d11d277a54947",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "Expo logout clears local storage but does not delete DeviceToken; server logout blacklists JWT only; notification service delivers to active tokens. Same underlying issue as F11-N2 and F09-N3."
+      "explanation": "Prior agent's verified exact-run red scenario cross-checked against latest 41-test GitHub log. Preserve original source/alias caveats; not staged/production or whole-file independently S2-certified."
     },
     {
       "id": "C079-N1",
