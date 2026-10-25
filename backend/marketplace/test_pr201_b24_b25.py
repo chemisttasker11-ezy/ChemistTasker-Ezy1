@@ -1,4 +1,4 @@
-"""PR201 Phase 6 B24/B25 regression controls; disposable SQLite only."""
+"""PR201 Phase 6 B24/B25 regression controls; the audience tests also run on Postgres in CI (row lock + outer join)."""
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
