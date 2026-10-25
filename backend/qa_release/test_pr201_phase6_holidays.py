@@ -120,6 +120,27 @@ class PublicHolidayWorkBaseContracts(SimpleTestCase):
         self.assertFalse(self.classify(date(2026,7,6),"QLD","QLD_BRISBANE").is_public_holiday)
         self.assertEqual(self.classify(date(2027,7,6),"QLD","QLD_TOWNSVILLE").status,"LOCAL_DECLARATION_PENDING")
 
+
+    def test_state_without_regional_observance_does_not_need_district(self):
+        for state in ("ACT","SA"):
+            calendar=holiday_calendar_status(state)
+            self.assertEqual(calendar["status"],"VERIFIED",calendar)
+
+    def test_region_options_are_source_labelled_not_guessed_from_suburb(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from shifts.holiday_views import PublicHolidayRegionsView
+        from types import SimpleNamespace
+        factory=APIRequestFactory()
+        request=factory.get("/api/v1/holidays/regions/", {"state":"QLD"})
+        force_authenticate(request, user=SimpleNamespace(is_authenticated=True,is_active=True,pk=101))
+        response=PublicHolidayRegionsView.as_view()(request)
+        self.assertEqual(response.status_code,200,response.data)
+        gold=next(x for x in response.data["regions"] if x["code"]=="QLD_GOLD_COAST")
+        self.assertEqual(gold["pendingYears"],[2027])
+        self.assertTrue(gold["source"].startswith("https://"))
+        self.assertEqual(response.data["state"],"QLD")
+        self.assertTrue(response.data["regionRequired"])
+
     def test_all_eight_states_have_both_years_and_kings_birthday_differs(self):
         from shifts.pricing_data import public_holidays
         data=public_holidays()

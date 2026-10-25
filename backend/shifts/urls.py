@@ -22,6 +22,7 @@ from shifts.offers import (
     ShiftRejectionViewSet,
     ShiftSavedViewSet,
 )
+from shifts.holiday_views import PublicHolidayRegionsView
 from shifts.worker_requests import WorkerShiftRequestViewSet
 
 
@@ -60,6 +61,7 @@ router.registry.extend(lifecycle_router.registry)
 router.registry.extend(engagement_router.registry)
 
 urlpatterns = [
+    path("holidays/regions/", PublicHolidayRegionsView.as_view(), name="holiday-region-choices"),
     path("public-job-board/", PublicJobBoardView.as_view(), name="public-job-board"),
     path("view-shared-shift/", SharedShiftDetailView.as_view(), name="view-shared-shift"),
     path('', include(router.urls)),

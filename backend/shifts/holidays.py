@@ -198,9 +198,15 @@ def holiday_calendar_status(state, region_code=""):
             "verifiedYears": record["verified_years"],
             "source": record["source"],
         }
+    if code not in {"QLD", "NSW", "NT", "TAS", "VIC", "WA"}:
+        return {
+            "state": code, "region": "", "status": "VERIFIED",
+            "pendingYears": [], "verifiedYears": [2026, 2027],
+            "note": "No region-specific calendar required in the current register.",
+        }
     return {
         "state": code, "region": "",
         "status": "REGION_NOT_CONFIGURED",
         "pendingYears": [2026, 2027],
-        "note": "Statewide holidays only; local show/part-day scope must be verified.",
+        "note": "Statewide holidays only; regional show/substitution scope requires verification.",
     }
