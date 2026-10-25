@@ -3,7 +3,7 @@
   "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "reviewer": "gpt6-senior-20261025",
   "review_level": "first-pass source acquisition; S2/S3 pending",
-  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3",
   "files": [
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx",
@@ -12,7 +12,8 @@
       "blob_sha": "cdde1ebff8eba619461bdf4c8a7f893885a57abf",
       "lines": 763,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "763 lines; Next migrated shift view ShiftList.tsx; await calls handleApplySlots; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "763 lines; Next migrated shift view ShiftList.tsx; await calls handleApplySlots; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/constants.ts",
@@ -21,7 +22,8 @@
       "blob_sha": "0b18df20cbc527a58ac44feae0cd02a46f5d3b71",
       "lines": 24,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "24 lines; Next migrated shift view constants.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "24 lines; Next migrated shift view constants.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts",
@@ -30,7 +32,12 @@
       "blob_sha": "151b72c023a5e2ed86f091c6d863bea8e9c2dbcf",
       "lines": 547,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "547 lines; Next migrated shift view useCounterOffers.ts; await calls storageGetItem, fetchShiftCounterOffersService, Promise.all, getOnboardingDetail, calculateShiftRates; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 180-239): Migrated Next counter-offer hook uses per-shift fetchShiftCounterOffersService, unlike Vite batch API, with local identity filtering. Browser performance and parity must be benchmarked, and backend must still authorize response. Test contract: Negative: cross-tenant shift query, 50+ shifts and user switch; positive: same current-user offer state as Vite. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        180,
+        239
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts",
@@ -39,7 +46,8 @@
       "blob_sha": "04cabdea5e6e0ab1fccdebe4fcf97ab4aca7e8ec",
       "lines": 395,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "395 lines; Next migrated shift view useFilterSort.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "395 lines; Next migrated shift view useFilterSort.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useReviewOfferDisplay.ts",
@@ -48,7 +56,8 @@
       "blob_sha": "7aaac77bdf51e50673557459a7d7725f3af0f4d6",
       "lines": 29,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "29 lines; Next migrated shift view useReviewOfferDisplay.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "29 lines; Next migrated shift view useReviewOfferDisplay.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useShiftPersistence.ts",
@@ -57,7 +66,8 @@
       "blob_sha": "ce9a24d1b332b597d380aaf94aaac8ac3ea766d5",
       "lines": 170,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "170 lines; Next migrated shift view useShiftPersistence.ts; await calls storageGetItem; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "170 lines; Next migrated shift view useShiftPersistence.ts; await calls storageGetItem; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/index.tsx",
@@ -66,7 +76,8 @@
       "blob_sha": "4e8abac0ab717e8ba98565d4661ca2e501b1a965",
       "lines": 835,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "835 lines; Next migrated shift view index.tsx; await calls getPharmacistDashboard, getOnboardingDetail, onToggleSave, onApplyAll, refreshShifts; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "835 lines; Next migrated shift view index.tsx; await calls getPharmacistDashboard, getOnboardingDetail, onToggleSave, onApplyAll, refreshShifts; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/types.ts",
@@ -75,7 +86,8 @@
       "blob_sha": "b1b8147d56217f5f319b040c4800ac215748288d",
       "lines": 99,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "99 lines; Next migrated shift view types.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "99 lines; Next migrated shift view types.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/counterOffers.ts",
@@ -84,7 +96,8 @@
       "blob_sha": "a3b8751605071cea2363021191492313fdd90c6f",
       "lines": 26,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "26 lines; Next migrated shift view counterOffers.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "26 lines; Next migrated shift view counterOffers.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/date.ts",
@@ -93,7 +106,8 @@
       "blob_sha": "29915fe7257c4a97d460ca562a45a185349dc045",
       "lines": 11,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "11 lines; Next migrated shift view date.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "11 lines; Next migrated shift view date.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/location.ts",
@@ -102,7 +116,8 @@
       "blob_sha": "1141498a06ccc2b976972aee054a7b4d8e87b24c",
       "lines": 35,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "35 lines; Next migrated shift view location.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "35 lines; Next migrated shift view location.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/rates.ts",
@@ -111,7 +126,8 @@
       "blob_sha": "20a0274cb677c054eb300107f8b1c83b570cb6c1",
       "lines": 106,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "106 lines; Next migrated shift view rates.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3."
+      "note": "106 lines; Next migrated shift view rates.ts; await calls none; Vite/Next behaviour and backend auth require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts",
@@ -120,7 +136,8 @@
       "blob_sha": "96172c392f8b4ed267316830482bfb538350bf8d",
       "lines": 170,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "170 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+      "note": "170 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx",
@@ -129,7 +146,8 @@
       "blob_sha": "f257b75317a438f83af26a4fbd580ccfc79e00bb",
       "lines": 247,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "247 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+      "note": "247 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/FiltersSidebar.tsx",
@@ -138,7 +156,8 @@
       "blob_sha": "b6d662403fe3e061478092ab0dcb60c6167cf96a",
       "lines": 11,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "11 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+      "note": "11 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx",
@@ -147,7 +166,8 @@
       "blob_sha": "f069e578461d2b6c71b21cabe702bbd09d342be8",
       "lines": 829,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "829 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+      "note": "829 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PublicTalentCard.tsx",
@@ -156,7 +176,8 @@
       "blob_sha": "ad5facabcf8c90027bac21edb3bbedaa1603cdec",
       "lines": 207,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "207 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+      "note": "207 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/TalentCardV2.tsx",
@@ -165,7 +186,8 @@
       "blob_sha": "05e82fc5af3cbcf337ef307ab4a8b3894c7c6ba6",
       "lines": 351,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "351 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+      "note": "351 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/constants.ts",
@@ -174,7 +196,8 @@
       "blob_sha": "71279f635a3be45f9b9463d8b359118d67fe5bc3",
       "lines": 17,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "17 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+      "note": "17 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages.ts",
@@ -183,8 +206,10 @@
       "blob_sha": "c4ad53ce158e9b3912756c6addc7480cea9892aa",
       "lines": 2,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "2 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization."
+      "note": "2 lines; migrated Next talent board client/file; not proof of Vite/Next parity or backend tenant authorization.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     }
   ],
-  "findings": []
+  "findings": [],
+  "targeted_recheck_files": 1
 }
