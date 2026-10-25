@@ -1,5 +1,6 @@
 """shifts: cohesive projections serializers."""
 from rest_framework import serializers
+from shifts.access import _user_can_perform_shift_role
 from shifts.models import Shift
 from organizations.serializers import PharmacySerializer
 from .shifts import ShiftSerializer
@@ -127,6 +128,8 @@ class SharedShiftSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = ShiftSerializer(instance, context=self.context).data
+        user = getattr(self.context.get('request'), 'user', None)
+        data['can_apply'] = _user_can_perform_shift_role(user, instance.role_needed) if user and user.is_authenticated else None
 
         for field in self.SENSITIVE_TOP_LEVEL_FIELDS:
             data.pop(field, None)

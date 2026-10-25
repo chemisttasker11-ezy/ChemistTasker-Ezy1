@@ -241,12 +241,16 @@ def sync_pharmacy_rate_defaults(pharmacy, *, shift=None, request_data=None):
     )
     pharmacy.default_rate_type = next_rate_type
 
-    pharmacy.rate_weekday = to_decimal_or_none(get_request_value('rate_weekday', 'rateWeekday'))
-    pharmacy.rate_saturday = to_decimal_or_none(get_request_value('rate_saturday', 'rateSaturday'))
-    pharmacy.rate_sunday = to_decimal_or_none(get_request_value('rate_sunday', 'rateSunday'))
-    pharmacy.rate_public_holiday = to_decimal_or_none(get_request_value('rate_public_holiday', 'ratePublicHoliday'))
-    pharmacy.rate_early_morning = to_decimal_or_none(get_request_value('rate_early_morning', 'rateEarlyMorning'))
-    pharmacy.rate_late_night = to_decimal_or_none(get_request_value('rate_late_night', 'rateLateNight'))
+    for field, alias in (
+        ('rate_weekday', 'rateWeekday'),
+        ('rate_saturday', 'rateSaturday'),
+        ('rate_sunday', 'rateSunday'),
+        ('rate_public_holiday', 'ratePublicHoliday'),
+        ('rate_early_morning', 'rateEarlyMorning'),
+        ('rate_late_night', 'rateLateNight'),
+    ):
+        if field in request_data or alias in request_data:
+            setattr(pharmacy, field, to_decimal_or_none(get_request_value(field, alias)))
 
     fixed_rate_value = (
         get_request_value('fixed_rate', 'fixedRate', 'hourly_rate', 'hourlyRate')

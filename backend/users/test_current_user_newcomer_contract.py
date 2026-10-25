@@ -7,6 +7,31 @@ from onboarding.models import ExplorerOnboarding
 
 
 class CurrentUserNewcomerContractTests(TestCase):
+    def test_session_membership_ids_allow_leave_without_exposing_other_memberships(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from client_profile.characterization_support import make_owner_with_pharmacy, make_user
+        from memberships.models import Membership
+
+        _, pharmacy = make_owner_with_pharmacy("Leave pharmacy")
+        worker, other = make_user("PHARMACIST"), make_user("PHARMACIST")
+        membership = Membership.objects.create(user=worker, pharmacy=pharmacy, role="PHARMACIST",
+            employment_type="FULL_TIME", status="ACCEPTED", is_active=True)
+        foreign = Membership.objects.create(user=other, pharmacy=pharmacy, role="PHARMACIST",
+            employment_type="FULL_TIME", status="ACCEPTED", is_active=True)
+        client = APIClient()
+        client.force_authenticate(worker)
+        response = client.get('/api/v1/users/me/')
+        rows = response.data['memberships']
+        self.assertEqual([row.get('id') for row in rows], [membership.pk])
+        start = timezone.now() + timedelta(days=7)
+        payload = {'membership_id': foreign.pk, 'leave_type': 'ANNUAL',
+            'start_at': start.isoformat(), 'end_at': (start + timedelta(hours=8)).isoformat()}
+        self.assertEqual(client.post('/api/v1/workforce/leave/', payload, format='json').status_code, 403)
+        payload['membership_id'] = rows[0]['id']
+        allowed = client.post('/api/v1/workforce/leave/', payload, format='json')
+        self.assertEqual(allowed.status_code, 201, allowed.data)
+
     def test_me_restores_overseas_and_junior_subtypes_without_leaking_to_other_roles(self):
         user_model = get_user_model()
         overseas = user_model.objects.create_user(email='restore-overseas@example.test', role='EXPLORER')

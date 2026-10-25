@@ -173,6 +173,21 @@ class ShiftListingFixture(TestCase):
 
 
 class ShiftListingMatrixTests(ShiftListingFixture):
+    def test_public_board_exposes_role_eligibility_without_hiding_other_roles(self):
+        pharmacist = self.users['outsider']
+        target = self.shifts['public']
+        target.role_needed = 'TECHNICIAN'
+        target.save(update_fields=['role_needed'])
+        response = client_for(pharmacist).get(f'{API}public-job-board/')
+        rows = response.data.get('results', response.data) if isinstance(response.data, dict) else response.data
+        row = next(row for row in rows if row['id'] == target.pk)
+        self.assertIs(row.get('can_apply'), False)
+        target.role_needed = 'PHARMACIST'
+        target.save(update_fields=['role_needed'])
+        response = client_for(pharmacist).get(f'{API}public-job-board/')
+        rows = response.data.get('results', response.data) if isinstance(response.data, dict) else response.data
+        self.assertIs(next(row for row in rows if row['id'] == target.pk).get('can_apply'), True)
+
     def test_every_endpoint_and_user(self):
         actual = {
             endpoint: {name: self.visible(endpoint, user) for name, user in self.users.items()}
