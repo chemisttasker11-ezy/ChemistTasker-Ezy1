@@ -1,6 +1,6 @@
 """Characterization of calendar events, work notes and the feed
 (/calendar-events/, /work-notes/, /calendar-feed/). Fixed dates only: no test depends on today."""
-from datetime import date
+from datetime import date, timedelta
 
 from django.test import TestCase
 
@@ -277,3 +277,58 @@ class CalendarQueryParameterTests(CalendarBase):
         self.assertEqual(ids(f"{EVENTS}?pharmacy_id={self.pharmacy.id}&date_from=2026-04-01"), [april.id])
         self.assertEqual(ids(EVENTS + "?date_from=2026-4-1"), [april.id])   # the ORM's DateField form keeps working
         self.assertEqual(ids(EVENTS + "?date_to=2026-03-31&pharmacy_id="), [march.id])   # an empty id is no filter
+
+
+class CalendarTenantIsolationContracts(TestCase):
+    def setUp(self):
+        self.owner_a, self.a = make_owner_with_pharmacy("PR200 A")
+        self.owner_b, self.b = make_owner_with_pharmacy("PR200 B")
+        self.outsider = make_user("PHARMACIST")
+        self.day = date.today() + timedelta(days=21)
+
+    def test_b07_event_patch_denies_destination_pharmacy(self):
+        event = CalendarEvent.objects.create(
+            pharmacy=self.a, title="Private A calendar", date=self.day,
+            created_by=self.owner_a,
+        )
+        response = client_for(self.owner_a).patch(
+            f"/api/v1/calendar-events/{event.pk}/",
+            {"pharmacy": self.b.pk}, format="json",
+        )
+        self.assertIn(response.status_code, (400, 403, 404), response.data)
+        event.refresh_from_db()
+        self.assertEqual(event.pharmacy_id, self.a.pk)
+
+    def test_b07_work_note_patch_denies_destination_pharmacy(self):
+        note = WorkNote.objects.create(
+            pharmacy=self.a, title="Private A work note", date=self.day,
+            created_by=self.owner_a,
+        )
+        response = client_for(self.owner_a).patch(
+            f"/api/v1/work-notes/{note.pk}/",
+            {"pharmacy": self.b.pk}, format="json",
+        )
+        self.assertIn(response.status_code, (400, 403, 404), response.data)
+        note.refresh_from_db()
+        self.assertEqual(note.pharmacy_id, self.a.pk)
+
+    def test_b06_organization_feed_does_not_expose_sibling_notes(self):
+        org = Organization.objects.create(
+            name="PR200 Group", slug="pr200-group-for-isolation",
+        )
+        for pharmacy in (self.a, self.b):
+            pharmacy.organization = org
+            pharmacy.save(update_fields=["organization"])
+        staff, _membership = make_staff_member(self.a)
+        WorkNote.objects.create(
+            pharmacy=self.b, date=self.day, title="Private sibling note",
+            body="Synthetic private note", is_general=True,
+            created_by=self.owner_b,
+        )
+        response = client_for(staff).get(
+            f"/api/v1/calendar-feed/?organization_id={org.pk}"
+            f"&date_from={self.day.isoformat()}&date_to={self.day.isoformat()}"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        titles = [row.get("title") for row in response.data["work_notes"]]
+        self.assertNotIn("Private sibling note", titles)

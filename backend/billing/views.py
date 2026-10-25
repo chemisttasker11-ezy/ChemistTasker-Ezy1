@@ -602,7 +602,6 @@ def charge_shift_fulfillment(request, shift_id):
             offer_ids=offer_ids,
             return_offers=True,
         )
-        from shifts.models import ShiftOffer
         from shifts.emails import send_shift_payment_finalized_notifications
         has_pending_payment = ShiftOffer.objects.filter(
             shift=shift,

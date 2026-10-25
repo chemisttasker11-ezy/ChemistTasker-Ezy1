@@ -154,3 +154,39 @@ class LegacyRosterAdminCapabilityTests(TestCase):
         response = client.delete(f"{BASE}roster-owner/{self.assignment.id}/")
         self.assertEqual(response.status_code, 204, getattr(response, "data", None))
         self.assertFalse(ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).exists())
+
+
+class RosterTenantIsolationContracts(TestCase):
+    def setUp(self):
+        self.owner_a, self.a = make_owner_with_pharmacy("PR200 A")
+        self.owner_b, self.b = make_owner_with_pharmacy("PR200 B")
+        self.outsider = make_user("PHARMACIST")
+        self.day = date.today() + timedelta(days=21)
+
+    def roster_payload(self):
+        return {
+            "pharmacy": self.b.pk, "role_needed": "PHARMACIST",
+            "employment_type": "LOCUM", "visibility": "LOCUM_CASUAL",
+            "rate_type": "FLEXIBLE", "description": "PR200 roster",
+            "slots": [{
+                "date": self.day.isoformat(), "start_time": "09:00",
+                "end_time": "17:00", "rate": "70.00",
+            }],
+        }
+
+    def test_b36_roster_positive_control(self):
+        response = client_for(self.owner_b).post(
+            "/api/v1/roster-shifts/", self.roster_payload(), format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_b36_roster_post_denies_unmanaged_pharmacy(self):
+        client = client_for(self.outsider)
+        client.raise_request_exception = False
+        response = client.post(
+            "/api/v1/roster-shifts/", self.roster_payload(), format="json",
+        )
+        self.assertIn(response.status_code, (403, 404), response.data)
+        self.assertFalse(
+            Shift.objects.filter(pharmacy=self.b, created_by=self.outsider).exists()
+        )

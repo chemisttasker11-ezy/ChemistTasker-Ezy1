@@ -75,3 +75,43 @@ class EthicalTransferDocumentValidationTests(TestCase):
         upload = SimpleUploadedFile('evidence.bin', b'MZsynthetic-executable', content_type='application/octet-stream')
         with self.assertRaises(ValidationError):
             _validate_transfer_document(upload)
+
+
+@override_settings(ETHICAL_ACCESS_APPLICATIONS_ENABLED=True)
+class EthicalApprovalContracts(TestCase):
+    def test_f10_approval_valid_post_returns_201(self):
+        from client_profile.models import OwnerOnboarding, Pharmacy
+        from ethical_marketplace.models import EthicalPharmacyApproval
+        from marketplace.models import IdentityVerification, MarketplaceTermsAcceptance
+        from users.models import User
+
+        user = User.objects.create_user(
+            email="pr200-ethical@example.test", password="test-only",
+            role="OWNER", is_active=True, is_otp_verified=True,
+            mobile_number="0400000000", is_mobile_verified=True,
+        )
+        owner = OwnerOnboarding.objects.create(
+            user=user, phone_number="0400000000",
+            role="PHARMACIST", verified=True, ahpra_verified=True,
+        )
+        IdentityVerification.objects.create(
+            user=user, status="VERIFIED", assurance_method="MANUAL",
+        )
+        MarketplaceTermsAcceptance.objects.create(user=user, version="2026-09")
+        pharmacy = Pharmacy.objects.create(
+            name="PR200 Ethical Premises", owner=owner,
+            verified=True, state="QLD",
+        )
+        client = APIClient()
+        client.force_authenticate(user)
+        client.raise_request_exception = False
+        response = client.post(
+            f"/api/v1/ethical/pharmacies/{pharmacy.pk}/approval/",
+            {"business_phone": "0700000000",
+             "business_email": "pr200-ethical@example.test"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(
+            EthicalPharmacyApproval.objects.filter(pharmacy=pharmacy).count(), 1
+        )

@@ -14,7 +14,7 @@ from unittest import mock
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_staff_member, make_user
 from memberships.models import Membership
 from notifications.models import Notification
 from onboarding.models import PharmacistOnboarding
@@ -679,3 +679,45 @@ class MemberStatusTests(ShiftActionFixture):
         response = client_for(self.owner).get(f"{API}shifts/{multi.id}/member_status/")
         self.assertEqual((response.status_code, response.data["detail"]), (
             400, "slot_id is required for multi-slot shifts via this endpoint."))
+
+
+class ShiftTenantIsolationContracts(TestCase):
+    def setUp(self):
+        self.owner_a, self.a = make_owner_with_pharmacy("PR200 A")
+        self.owner_b, self.b = make_owner_with_pharmacy("PR200 B")
+        self.outsider = make_user("PHARMACIST")
+        self.day = date.today() + timedelta(days=21)
+
+    def test_f04_private_staff_member_status_denies_external_shift_viewer(self):
+        shift = Shift.objects.create(
+            pharmacy=self.b, created_by=self.owner_b,
+            role_needed="PHARMACIST", employment_type="LOCUM",
+            visibility="PLATFORM", single_user_only=True,
+        )
+        member, _membership = make_staff_member(self.b, role="PHARMACIST")
+        outsider = client_for(self.outsider)
+        response = outsider.get(
+            f"/api/v1/shifts/{shift.pk}/member_status/?visibility=FULL_PART_TIME"
+        )
+        self.assertIn(response.status_code, (403, 404), response.data)
+        manager_response = client_for(self.owner_b).get(
+            f"/api/v1/shifts/{shift.pk}/member_status/?visibility=FULL_PART_TIME"
+        )
+        self.assertEqual(manager_response.status_code, 200, manager_response.data)
+
+    def test_f04_shift_patch_denies_cross_tenant_and_paid_override(self):
+        shift = Shift.objects.create(
+            pharmacy=self.a, created_by=self.owner_a,
+            role_needed="PHARMACIST", employment_type="LOCUM",
+            visibility="LOCUM_CASUAL", payment_status="PENDING",
+        )
+        client = client_for(self.owner_a)
+        client.raise_request_exception = False
+        response = client.patch(
+            f"/api/v1/shifts/{shift.pk}/",
+            {"pharmacy": self.b.pk, "payment_status": "PAID"}, format="json",
+        )
+        self.assertIn(response.status_code, (400, 403, 404), response.data)
+        shift.refresh_from_db()
+        self.assertEqual(shift.pharmacy_id, self.a.pk)
+        self.assertEqual(shift.payment_status, "PENDING")

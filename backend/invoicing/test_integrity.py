@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -16,7 +16,8 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
-from invoicing.models import InvoiceLineItem
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+from invoicing.models import Invoice, InvoiceLineItem
 from notifications.models import Notification
 from invoicing.serializers import InvoiceSerializer
 from invoicing.services import generate_invoice_from_shifts
@@ -677,3 +678,41 @@ class InvoiceIssuerProfileTests(TestCase):
         org_staff = User.objects.create_user(email="issuer-org-svc@example.com", password="x", role="ORG_STAFF")
         with self.assertRaises(ValidationError):
             generate_invoice_from_shifts(user=org_staff, pharmacy_id=None, shift_ids=[], custom_lines=[], external=True)
+
+
+class InvoiceTenantIsolationContracts(TestCase):
+    def setUp(self):
+        self.owner_a, self.a = make_owner_with_pharmacy("PR200 A")
+        self.owner_b, self.b = make_owner_with_pharmacy("PR200 B")
+        self.outsider = make_user("PHARMACIST")
+        self.day = date.today() + timedelta(days=21)
+
+    def invoice_payload(self):
+        return {
+            "pharmacy": self.b.pk, "external": False, "status": "paid",
+            "pharmacy_name_snapshot": self.b.name,
+            "invoice_date": self.day.isoformat(),
+            "line_items": [{
+                "description": "Synthetic one-hour invoice",
+                "category_code": "ProfessionalServices", "unit": "Hours",
+                "quantity": "1.00", "unit_price": "65.00", "discount": "0",
+                "gst_applicable": False, "super_applicable": False,
+            }],
+        }
+
+    def test_b33_invoice_positive_control(self):
+        response = client_for(self.owner_b).post(
+            "/api/v1/invoices/", self.invoice_payload(), format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_b33_invoice_post_denies_foreign_pharmacy(self):
+        client = client_for(self.outsider)
+        client.raise_request_exception = False
+        response = client.post(
+            "/api/v1/invoices/", self.invoice_payload(), format="json",
+        )
+        self.assertIn(response.status_code, (400, 403, 404), response.data)
+        self.assertFalse(
+            Invoice.objects.filter(user=self.outsider, pharmacy=self.b).exists()
+        )

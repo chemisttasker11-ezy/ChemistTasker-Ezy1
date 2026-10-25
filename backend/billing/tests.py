@@ -8,6 +8,7 @@ from .models import ShiftPayment
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from client_profile.models import Pharmacy, Shift
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy
 
 
 class _StripeObject(dict):
@@ -447,3 +448,40 @@ class OrganizationBillingScopeTests(TestCase):
         )
         self.assertEqual(response.status_code, 403, response.data)
 
+
+@override_settings(STRIPE_WEBHOOK_SECRET="whsec-pr200-test")
+class StripePaymentIsolationContracts(TestCase):
+    def test_b15_cancellation_webhook_never_finalizes_worker_offer(self):
+        owner, pharmacy = make_owner_with_pharmacy("PR200 Penalty")
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner,
+            role_needed="PHARMACIST", employment_type="LOCUM",
+            payment_status="PENDING",
+        )
+        event = _StripeObject(
+            id="evt_pr200_cancellation", type="checkout.session.completed",
+            data=_StripeObject(object=_StripeObject(
+                mode="payment", payment_status="paid", amount_total=1200,
+                payment_intent="pi_pr200_cancel",
+                metadata={
+                    "shift_id": str(shift.pk), "type": "cancellation",
+                    "owner_user_id": str(owner.pk), "actor_user_id": str(owner.pk),
+                },
+            )),
+        )
+        with (
+            patch("billing.views.stripe.Webhook.construct_event", return_value=event),
+            patch("billing.views._finalize_pending_offers_for_shift", return_value=(0, [])) as finalize,
+            patch("shifts.emails.send_shift_payment_finalized_notifications"),
+        ):
+            response = client_for().post(
+                reverse("api_v1:billing:stripe_webhook"),
+                data=b"{}", content_type="application/json",
+            )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(
+            ShiftPayment.objects.filter(shift=shift, payment_type="cancellation").count(), 1
+        )
+        finalize.assert_not_called()
+        shift.refresh_from_db()
+        self.assertEqual(shift.payment_status, "PENDING")
