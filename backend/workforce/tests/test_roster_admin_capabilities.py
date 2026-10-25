@@ -64,18 +64,34 @@ class LegacyRosterAdminCapabilityTests(TestCase):
         self.assertEqual(response.status_code, 404, getattr(response, "data", None))
         self.assertTrue(ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).exists())
 
-    def test_region_admin_cannot_create_shift_outside_roster_queryset(self):
+    def region_admin(self, admin_level):
         self.pharmacy.organization = Organization.objects.create(name="Roster region", slug="roster-region")
         self.pharmacy.save(update_fields=["organization"])
         region_admin = make_user("ORG_STAFF")
         membership = OrganizationMembership.objects.create(
-            user=region_admin, organization=self.pharmacy.organization, role="REGION_ADMIN", admin_level="MANAGER",
+            user=region_admin, organization=self.pharmacy.organization, role="REGION_ADMIN", admin_level=admin_level,
         )
         membership.pharmacies.add(self.pharmacy)
-        response = client_for(region_admin).post(f"{BASE}roster-shifts/", {
+        return client_for(region_admin)
+
+    def post_roster_shift(self, client):
+        return client.post(f"{BASE}roster-shifts/", {
             "pharmacy": self.pharmacy.pk, "role_needed": "PHARMACIST", "employment_type": "LOCUM",
             "visibility": "FULL_PART_TIME", "slots": [],
         }, format="json")
+
+    def test_roster_level_region_admin_can_create_and_then_see_roster_shift(self):
+        client = self.region_admin("ROSTER_MANAGER")
+        response = self.post_roster_shift(client)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(client.get(f"{BASE}roster-shifts/{response.data['id']}/").status_code, 200)
+        listing = client.get(f"{BASE}roster-shifts/")
+        self.assertEqual(listing.status_code, 200, listing.data)
+        rows = listing.data.get("results", []) if isinstance(listing.data, dict) else listing.data
+        self.assertIn(response.data["id"], [row["id"] for row in rows])
+
+    def test_region_admin_without_roster_capability_cannot_create_shift(self):
+        response = self.post_roster_shift(self.region_admin("COMMUNICATION_MANAGER"))
         self.assertEqual(response.status_code, 403, response.data)
         self.assertEqual(Shift.objects.count(), 1)
 

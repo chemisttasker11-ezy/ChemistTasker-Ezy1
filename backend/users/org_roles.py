@@ -166,11 +166,8 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
             PharmacyAdmin.AdminLevel.ROSTER_MANAGER,
             PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER,
         ),
+        # Roster/staff/admin/comms capabilities come from the chosen admin level.
         organisation_capabilities=(
-            OrgCapability.MANAGE_ROSTER,
-            OrgCapability.MANAGE_COMMS,
-            OrgCapability.MANAGE_STAFF,
-            OrgCapability.MANAGE_ADMINS,
             OrgCapability.INVITE_STAFF,
             OrgCapability.ASSIGN_PHARMACIES,
         ),
