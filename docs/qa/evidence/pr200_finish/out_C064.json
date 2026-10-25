@@ -1,0 +1,93 @@
+{
+  "chunk": "C064",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection, service-boundary and scoped interaction review; S2/S3 pending",
+  "files": [
+    {
+      "path": "frontend_mobile/roles/shared/hub/PostComposer.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B46",
+        "B48"
+      ],
+      "note": "PostComposer.tsx: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/hub/api.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "api.ts: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/hub/hubUtils.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "hubUtils.ts: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/hub/submissionGuard.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "submissionGuard.tsx: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/hub/types.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "types.ts: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "FinanceInvoiceEditor.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "FinanceWorkspace.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/invoices/InvoiceDetail.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B33",
+        "B58"
+      ],
+      "note": "InvoiceDetail.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "InvoiceGenerate.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/invoices/InvoiceList.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "InvoiceList.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/invoices/InvoicesPlaceholder.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "InvoicesPlaceholder.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/invoices/MobileInvoiceStats.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "MobileInvoiceStats.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/invoices/invoiceStats.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "invoiceStats.ts: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+    }
+  ],
+  "findings": []
+}
