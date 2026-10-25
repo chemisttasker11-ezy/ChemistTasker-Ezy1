@@ -1,0 +1,67 @@
+{
+  "F03-N1": {
+    "verdict": "CONFIRMED_SOURCE",
+    "verifier": "gpt6-senior-20261025",
+    "independent_of": "claudeA-3",
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "reason": "DELETE deactivates PharmacyAdmin but leaves accepted/active Membership unchanged. The custom invitation list and accept action explicitly select inactive PharmacyAdmin with accepted active Membership; POST reactivates assignment without a fresh owner grant. Tests cover accepting a fresh invite but omit the removal-then-reaccept case.",
+    "evidence": [
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/organizations/views.py#L313-L361",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/organizations/views.py#L586-L592",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/client_profile/test_admin_invitations.py#L31-L92"
+    ],
+    "confidence": "high",
+    "runtime_verification": "NOT_EXECUTED",
+    "negative_test": "As owner remove existing accepted staff manager via DELETE /api/v1/pharmacy-admins/{id}/. Authenticate as removed manager; GET my-pending-invitations must exclude old assignment and POST /api/v1/pharmacy-admins/{id}/accept-invitation/ must refuse; is_active stays false.",
+    "positive_test": "Newly invited existing accepted staff can accept once; active admin remains usable and a separately reissued invitation succeeds only if current manager explicitly sent it.",
+    "impact": "Revoked staff could restore manager authority without fresh consent.",
+    "classification": "FIX",
+    "severity": "P0 candidate; no exploit run",
+    "status_note": "Source-level verification is not a runtime reproduction, and production exploitability still requires authenticated negative test."
+  },
+  "F04-N2": {
+    "verdict": "CONFIRMED_SOURCE",
+    "verifier": "gpt6-senior-20261025",
+    "independent_of": "claudeB-2",
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "reason": "PATCH authorization inspects existing shift.pharmacy only; serializer pharmacy is writable and has unrestricted queryset; validate() has no destination tenant guard; revise_shift assigns validated pharmacy then saves, optionally synchronizes destination pharmacy defaults. payment_status is also in writable serializer fields.",
+    "evidence": [
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/base.py#L114-L135",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L42-L52",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L97-L110",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L138-L187",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L330-L351",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L142-L200"
+    ],
+    "confidence": "high",
+    "runtime_verification": "NOT_EXECUTED",
+    "negative_test": "Owner of pharmacy A PATCHes their own shift with pharmacy=unrelated B, apply_rates_to_pharmacy=true and payment_status=PAID; must reject (or ignore nonmutable payment state) and leave A's shift, B's rate defaults and financial status unchanged.",
+    "positive_test": "Owner edits allowed fields of their own pharmacy's shift without breaking normal rates, slots or notifications; if cross-site moves are explicitly permitted, require authority over both pharmacies.",
+    "impact": "Cross-tenant mutable shift ownership, unrelated pharmacy rate tampering and forged shift payment state.",
+    "classification": "FIX",
+    "severity": "P0 candidate; no exploit run",
+    "status_note": "Exact protected write branch is visible; no real PostgreSQL/API mutation executed."
+  },
+  "F04-N1": {
+    "verdict": "CONFIRMED_SOURCE",
+    "verifier": "gpt6-senior-20261025",
+    "independent_of": "claudeB-2",
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "reason": "SAFE GET actions bypass manager check; platform-visible PHARMACIST shifts enter worker get_queryset; member_status action returns _build_member_status_response; requested_visibility selects active FULL_PART_TIME or ORG_CHAIN memberships without verifying caller manages target pharmacy. Candidate rows include name, user id, membership and team details.",
+    "evidence": [
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/base.py#L114-L172",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/lifecycle.py#L285-L295",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/lifecycle.py#L384-L399",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/candidates.py#L212-L292",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/candidates.py#L446-L469"
+    ],
+    "confidence": "high",
+    "runtime_verification": "NOT_EXECUTED",
+    "negative_test": "External verified PHARMACIST without pharmacy membership requests a PLATFORM PHARMACIST shift member_status with FULL_PART_TIME or ORG_CHAIN visibility; server must refuse or restrict to self without returning any unrelated staff data.",
+    "positive_test": "Owner/authorized manager receives permitted staff status, and external worker can see their own permitted shift status through non-leaking worker-facing endpoint.",
+    "impact": "An external user who can view a public shift may enumerate staff identity and participation in unrelated pharmacy or organisation.",
+    "classification": "FIX",
+    "severity": "P0 candidate; no exploit run",
+    "status_note": "Unrestricted filters identified by source, but sensitive-field availability and full response shape need request-based confirmation."
+  }
+}
