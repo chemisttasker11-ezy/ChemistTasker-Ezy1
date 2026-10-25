@@ -13,13 +13,18 @@ from memberships.models import Membership
 
 @database_sync_to_async
 def _room(alice_m, bob_m):
-    conversation = Conversation.objects.create(
+    # Membership post_save may have already created this one-per-pharmacy
+    # community room. Reuse it to respect uniq_community_chat_per_pharmacy.
+    conversation, _ = Conversation.objects.get_or_create(
         pharmacy=alice_m.pharmacy,
-        type=Conversation.Type.GROUP,
-        title="PR200 B05 synthetic room",
+        defaults={
+            "type": Conversation.Type.GROUP,
+            "title": "PR200 B05 synthetic room",
+            "created_by": alice_m.user,
+        },
     )
-    Participant.objects.create(conversation=conversation, membership=alice_m)
-    Participant.objects.create(conversation=conversation, membership=bob_m)
+    Participant.objects.get_or_create(conversation=conversation, membership=alice_m)
+    Participant.objects.get_or_create(conversation=conversation, membership=bob_m)
     return conversation.pk
 
 
