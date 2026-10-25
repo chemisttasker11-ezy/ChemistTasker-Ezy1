@@ -8,6 +8,7 @@ from django.test import TransactionTestCase, override_settings
 
 from core.websocket_testing import APP, TIMEOUT, connect, make_actors, new_ticket
 from users.models import WebSocketTicket
+from notifications.services import USER_GROUP_FMT
 
 
 @database_sync_to_async
@@ -16,6 +17,57 @@ def ticket_count():
 
 
 class NotificationSocketTests(TransactionTestCase):
+    async def test_events_stop_after_deactivation_or_password_change_but_survive_token_rotation(self):
+        from channels.layers import get_channel_layer
+        from users.models import User
+        from rest_framework_simplejwt.tokens import RefreshToken
+        for change in ("inactive", "password", "rotation"):
+            for event_type in ("notification.created", "notification.updated", "notification.counter", "message.badge", "message.read"):
+                alice, *_ = await make_actors()
+                refresh = await database_sync_to_async(RefreshToken.for_user)(alice)
+                ticket = f"revoke-{alice.pk}"
+                await new_ticket(alice, ticket)
+                comm, ok, _ = await connect("/ws/notifications/", f"?ticket={ticket}")
+                self.assertTrue(ok)
+                await comm.receive_json_from(timeout=TIMEOUT)
+                layer = get_channel_layer()
+                group = USER_GROUP_FMT.format(user_id=alice.pk)
+                await layer.group_send(group, {"type": event_type})
+                self.assertEqual((await comm.receive_json_from(timeout=TIMEOUT))["type"], event_type)
+                if change == "inactive":
+                    await database_sync_to_async(User.objects.filter(pk=alice.pk).update)(is_active=False)
+                elif change == "password":
+                    await database_sync_to_async(User.objects.filter(pk=alice.pk).update)(password="revoked-password")
+                else:
+                    # Routine refresh rotation blacklists a token; the active user keeps receiving events.
+                    await database_sync_to_async(refresh.blacklist)()
+                    await layer.group_send(group, {"type": event_type})
+                    self.assertEqual((await comm.receive_json_from(timeout=TIMEOUT))["type"], event_type)
+                    await comm.disconnect()
+                    continue
+                await layer.group_send(group, {"type": event_type})
+                closed = await comm.receive_output(timeout=TIMEOUT)
+                self.assertEqual(closed["type"], "websocket.close")
+                self.assertEqual(closed["code"], 4401)
+                await comm.disconnect()
+
+    async def test_established_bearer_socket_closes_when_access_token_expires(self):
+        from datetime import timedelta
+        from unittest.mock import patch
+        from django.utils import timezone
+        from channels.layers import get_channel_layer
+        from rest_framework_simplejwt.tokens import AccessToken
+        alice, *_ = await make_actors()
+        token = str(await database_sync_to_async(AccessToken.for_user)(alice))
+        comm = WebsocketCommunicator(APP, "/ws/notifications/", headers=[(b"authorization", f"Bearer {token}".encode())])
+        ok, _ = await comm.connect(timeout=TIMEOUT)
+        self.assertTrue(ok)
+        await comm.receive_json_from(timeout=TIMEOUT)
+        with patch("notifications.consumers.timezone.now", return_value=timezone.now() + timedelta(days=1)):
+            await get_channel_layer().group_send(USER_GROUP_FMT.format(user_id=alice.pk), {"type": "message.badge"})
+            self.assertEqual((await comm.receive_output(timeout=TIMEOUT))["type"], "websocket.close")
+        await comm.disconnect()
+
     async def test_anonymous_is_refused_with_4401(self):
         comm, ok, code = await connect("/ws/notifications/")
         self.assertFalse(ok)

@@ -47,6 +47,7 @@ class JWTAuthMiddleware:
                 validated = await sync_to_async(self.jwt_auth.get_validated_token, thread_sensitive=True)(token)
                 user = await database_sync_to_async(self.jwt_auth.get_user)(validated)
                 scope["user"] = user
+                scope["auth"] = validated
             except (InvalidToken, AuthenticationFailed):
                 pass
 

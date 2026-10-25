@@ -159,12 +159,19 @@ class LogoutView(APIView):
     def post(self, request, *args, **kwargs):
         from .authentication import enforce_browser_csrf
         enforce_browser_csrf(request)
-        from rest_framework_simplejwt.tokens import RefreshToken
+        from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
         from rest_framework_simplejwt.exceptions import TokenError
         token = request.COOKIES.get(getattr(settings, 'JWT_REFRESH_COOKIE', 'ct_refresh')) or request.data.get('refresh')
         if token:
             try:
-                RefreshToken(token).blacklist()
+                refresh = UntypedToken(token)
+                if refresh.get('token_type') == 'refresh':
+                    device_token = request.data.get('device_token')
+                    if isinstance(device_token, str) and device_token:
+                        from users.models import DeviceToken
+                        # Rotation must not prevent unregistering this user's device during logout.
+                        DeviceToken.objects.filter(user_id=refresh['user_id'], token=device_token).delete()
+                    RefreshToken(token).blacklist()
             except TokenError:
                 pass
         response = Response({"detail": "Logged out successfully."}, status=200)

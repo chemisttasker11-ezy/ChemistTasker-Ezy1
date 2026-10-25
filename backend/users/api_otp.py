@@ -474,7 +474,21 @@ class VerifyMobileOTPView(APIView):
         user.save()
 
         from rest_framework_simplejwt.tokens import RefreshToken
+        remember_me = request.auth.get('remember_me') if request.auth else None
+        cookie_refresh = request.COOKIES.get(getattr(settings, 'JWT_REFRESH_COOKIE', 'ct_refresh'))
+        if remember_me is None and cookie_refresh:
+            from rest_framework_simplejwt.exceptions import TokenError
+            try:
+                previous = RefreshToken(cookie_refresh)
+                if str(previous['user_id']) == str(user.pk):
+                    remember_me = previous.get('remember_me')
+            except TokenError:
+                pass
         refresh = RefreshToken.for_user(user)
+        if remember_me is not None:
+            refresh['remember_me'] = remember_me
+        if remember_me is True:
+            refresh.set_exp(lifetime=settings.JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME)
         access = str(refresh.access_token)
 
         response = Response(
@@ -486,7 +500,7 @@ class VerifyMobileOTPView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-        _set_auth_cookies(response, access_token=access, refresh_token=str(refresh))
+        _set_auth_cookies(response, access_token=access, refresh_token=str(refresh), remember_me=remember_me)
         if _is_web_client(request):
             response.data.pop("refresh", None)
         return response

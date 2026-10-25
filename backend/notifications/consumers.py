@@ -2,6 +2,10 @@
 import logging
 
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from channels.db import database_sync_to_async
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from rest_framework_simplejwt.exceptions import TokenError
 
 from notifications.services import USER_GROUP_FMT
 
@@ -11,10 +15,11 @@ log = logging.getLogger(__name__)
 class NotificationConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         user = self.scope.get("user")
-        if not user or user.is_anonymous:
+        if not user or user.is_anonymous or not user.is_active:
             await self.close(code=4401)
             return
         self.user_id = user.id
+        self.password = user.password
         self.group_name = USER_GROUP_FMT.format(user_id=self.user_id)
         if self.channel_layer:
             try:
@@ -26,6 +31,27 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
                 self.channel_layer = None
         await self.accept()
         await self.send_json({"type": "ready"})
+
+    @database_sync_to_async
+    def _still_authorized(self):
+        user = get_user_model().objects.filter(pk=self.user_id, is_active=True, deleted_at__isnull=True).first()
+        if not user or user.password != self.password:
+            return False
+        token = self.scope.get("auth")
+        if token:
+            try:
+                token.check_exp(current_time=timezone.now())
+            except TokenError:
+                return False
+        # Not the blacklist: routine refresh rotation blacklists tokens too; reset/deletion change password or is_active.
+        return True
+
+    async def send_json(self, content, close=False):
+        if not await self._still_authorized():
+            await self.disconnect(4401)
+            await self.close(code=4401)
+            return
+        await super().send_json(content, close=close)
 
     async def disconnect(self, code):
         if self.channel_layer and hasattr(self, "group_name"):
