@@ -1,13 +1,14 @@
 import json
 import logging
-from decimal import Decimal
-from datetime import datetime, timezone as dt_timezone
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime, timedelta, timezone as dt_timezone
 from hashlib import sha256
 from urllib.parse import urlencode
 import stripe
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -793,7 +794,7 @@ def charge_penalty(request, shift_id):
 
     # Calculate expected wage
     assignments = ShiftSlotAssignment.objects.filter(shift=shift)
-    total_wage = 0.0
+    total_wage = Decimal('0')
 
     now = timezone.now()
     earliest_start = None
@@ -806,12 +807,14 @@ def charge_penalty(request, shift_id):
         from datetime import datetime
         start_dt = timezone.make_aware(datetime.combine(slot_date, slot.start_time))
         end_dt = timezone.make_aware(datetime.combine(slot_date, slot.end_time))
+        if slot.end_time <= slot.start_time:
+            end_dt += timedelta(days=1)
         
         if not earliest_start or start_dt < earliest_start:
             earliest_start = start_dt
 
-        hours = (end_dt - start_dt).total_seconds() / 3600.0
-        rate = float(assignment.unit_rate or 0)
+        hours = Decimal(str((end_dt - start_dt).total_seconds())) / Decimal('3600')
+        rate = assignment.unit_rate or Decimal('0')
         total_wage += (hours * rate)
 
     if not earliest_start or total_wage <= 0:
@@ -820,17 +823,18 @@ def charge_penalty(request, shift_id):
     # Calculate Penalty Percentage
     hours_until_shift = (earliest_start - now).total_seconds() / 3600.0
 
-    penalty_percentage = 0.0
+    penalty_percentage = Decimal('0')
     if hours_until_shift <= 24:
-        penalty_percentage = 0.20
+        penalty_percentage = Decimal('0.20')
     elif hours_until_shift <= 72:
-        penalty_percentage = 0.10
+        penalty_percentage = Decimal('0.10')
 
-    if penalty_percentage == 0.0:
+    if penalty_percentage == 0:
         return Response({'message': 'No penalty required, cancelled > 72 hours in advance.'})
 
     penalty_amount_aud = total_wage * penalty_percentage
-    penalty_amount_cents = int(penalty_amount_aud * 100)
+    # Round once at the Stripe boundary so half cents are not truncated.
+    penalty_amount_cents = int((penalty_amount_aud * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     success_url, cancel_url = _shift_checkout_return_urls(
         shift,
         acting_user=user,
@@ -894,24 +898,39 @@ def _process_stripe_event(event):
                 if not sub:
                     logger.warning('Stripe subscription checkout completed but no local subscription matched.')
                     raise OwnerSubscription.DoesNotExist
-                # A metadata owner ID is not proof of Stripe customer ownership.
-                # Lock the local account and reject late checkouts for a
-                # terminated subscription as well as cross-customer events.
+                # Metadata cannot authorize a different Stripe customer.
                 sub = OwnerSubscription.objects.select_for_update().get(pk=sub.pk)
-                if (sub.stripe_customer_id != session.get('customer')
-                        or sub.status == 'canceled'):
-                    logger.warning('Ignoring subscription checkout for canceled or mismatched account.')
+                if sub.stripe_customer_id != session.get('customer'):
+                    logger.warning('Ignoring subscription checkout for mismatched account.')
+                    return
+                if sub.status == 'canceled':
+                    # Only a new, paid base plan can replace a canceled subscription.
+                    if (subscription_kind == 'extra_seats'
+                            or not session.get('subscription')
+                            or session.subscription == sub.stripe_subscription_id
+                            or session.get('payment_status') != 'paid'):
+                        return
+                # A completed checkout may arrive after the subscription became unpaid.
+                current = stripe.Subscription.retrieve(session.subscription)
+                if (_stripe_object_value(current, 'id') != session.subscription
+                        or _stripe_object_value(current, 'customer') != sub.stripe_customer_id):
+                    return
+                is_active = _stripe_object_value(current, 'status') in ('active', 'trialing')
+                if sub.status == 'canceled' and not is_active:
                     return
                 if subscription_kind == 'extra_seats':
                     sub.stripe_extra_seat_subscription_id = session.subscription
-                    sub.status = 'active'
-                    if 'extra_seat_count' in metadata:
+                    if not is_active:
+                        sub.staff_count = 5
+                    elif 'extra_seat_count' in metadata:
                         sub.staff_count = 5 + int(metadata['extra_seat_count'])
+                    updated_fields = ['stripe_extra_seat_subscription_id', 'staff_count', 'updated_at']
                 else:
                     sub.stripe_subscription_id = session.subscription
-                    sub.status = 'active'
+                    sub.status = 'active' if is_active else 'inactive'
                     sub.staff_count = 5
-                sub.save()
+                    updated_fields = ['stripe_subscription_id', 'status', 'staff_count', 'updated_at']
+                sub.save(update_fields=updated_fields)
             except OwnerSubscription.DoesNotExist:
                 logger.warning(
                     'Stripe checkout.session.completed subscription event ignored because no matching OwnerSubscription was found.'
@@ -922,9 +941,9 @@ def _process_stripe_event(event):
             shift_id = metadata.get('shift_id')
             payment_type = metadata.get('type')
             if shift_id and payment_type in ('fulfillment', 'cancellation'):
-                amount_aud = 0
+                amount_aud = Decimal('0')
                 if session.amount_total is not None:
-                    amount_aud = session.amount_total / 100.0
+                    amount_aud = Decimal(session.amount_total) / Decimal('100')
 
                 owner_id = metadata.get('owner_user_id') or metadata.get('billing_contact_user_id') or metadata.get('actor_user_id')
 
@@ -972,12 +991,13 @@ def _process_stripe_event(event):
                         )
                         from users.models import User
                         paid_by_user = User.objects.filter(id=metadata.get('actor_user_id')).first()
-                        send_shift_payment_finalized_notifications(
+                        # Notifications must see committed payment and offer changes.
+                        transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
                             shift=shift_obj,
                             offers=finalized_offers,
                             paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
                             payment_method='stripe',
-                        )
+                        ), robust=True)
                         from shifts.models import ShiftOffer
                         has_pending_payment = ShiftOffer.objects.filter(
                             shift=shift_obj,
@@ -995,23 +1015,29 @@ def _process_stripe_event(event):
     elif event.type == 'customer.subscription.updated':
         provider = event.data.object
         sub_id = provider.get('id')
-        sub_status = provider.get('status')
         customer_id = provider.get('customer')
         # A billing event may only affect the exact local provider subscription.
         base = OwnerSubscription.objects.select_for_update().filter(
             stripe_subscription_id=sub_id, stripe_customer_id=customer_id,
         ).first()
+        addon = None if base else OwnerSubscription.objects.select_for_update().filter(
+            stripe_extra_seat_subscription_id=sub_id, stripe_customer_id=customer_id,
+        ).first()
+        sub = base or addon
+        if not sub or sub.status == 'canceled':
+            return
+        # Stripe events can arrive out of order; read current state while holding the row lock.
+        provider = stripe.Subscription.retrieve(sub_id)
+        if (_stripe_object_value(provider, 'id') != sub_id
+                or _stripe_object_value(provider, 'customer') != customer_id):
+            return
+        sub_status = _stripe_object_value(provider, 'status')
         if base:
-            if base.status == 'canceled':
-                return
             base.status = 'active' if sub_status in ('active', 'trialing') else 'inactive'
             base.save(update_fields=['status', 'updated_at'])
             return
-        addon = OwnerSubscription.objects.select_for_update().filter(
-            stripe_extra_seat_subscription_id=sub_id, stripe_customer_id=customer_id,
-        ).first()
         if addon:
-            items = provider.get('items', {}).get('data', [])
+            items = _stripe_object_value(_stripe_object_value(provider, 'items', {}), 'data', [])
             matched = [
                 item for item in items
                 if _stripe_object_value(_stripe_object_value(item, 'price', {}), 'id') == EXTRA_SEAT_PRICE
@@ -1038,23 +1064,30 @@ def _process_stripe_event(event):
                         stripe_extra_seat_subscription_id=sub_id,
                         stripe_customer_id=customer_id,
                     ).first()
-                # An invoice must belong to the *exact* active local
-                # subscription. Matching on customer alone can resurrect a
-                # previously deleted subscription or credit a different plan.
+                # The first invoice can precede checkout; canceled plans retain their old ID.
+                if not sub and customer_id:
+                    sub = OwnerSubscription.objects.select_for_update().filter(
+                        Q(stripe_subscription_id__isnull=True) | Q(stripe_subscription_id=''),
+                        stripe_customer_id=customer_id,
+                    ).first()
                 if not sub:
                     raise OwnerSubscription.DoesNotExist
                 if sub.status == 'canceled':
                     logger.info('Ignoring paid invoice for canceled Stripe subscription %s', sub_id)
                     return
-                # Inactive may represent a recoverable lapsed payment; the
-                # existing canceled state is reserved for deleted subscriptions.
-                sub.status = 'active'
+                # Paid invoices can arrive after Stripe has withdrawn entitlement.
+                current = stripe.Subscription.retrieve(sub_id)
+                if (_stripe_object_value(current, 'id') != sub_id
+                        or _stripe_object_value(current, 'customer') != customer_id):
+                    return
+                if sub_id != sub.stripe_extra_seat_subscription_id:
+                    sub.status = 'active' if _stripe_object_value(current, 'status') in ('active', 'trialing') else 'inactive'
                 period_end = invoice.get('lines', {}).get('data', [])
                 if period_end:
                     period_end_ts = period_end[0].get('period', {}).get('end')
                     if period_end_ts:
                         sub.current_period_end = datetime.fromtimestamp(period_end_ts, tz=dt_timezone.utc)
-                sub.save()
+                sub.save(update_fields=['status', 'current_period_end', 'updated_at'])
             except OwnerSubscription.DoesNotExist:
                 logger.warning(
                     'Stripe invoice.paid could not find matching local subscription.',
@@ -1076,9 +1109,18 @@ def _process_stripe_event(event):
             return
         if refunded_cents < 0:
             return
-        for payment in ShiftPayment.objects.select_for_update().filter(
+        payments = list(ShiftPayment.objects.select_for_update().filter(
             stripe_payment_intent_id=payment_intent_id, payment_method='card'
-        ):
+        ))
+        if not payments:
+            # Retry only shift checkout refunds that beat checkout; other charges (e.g. invoices) are not ours.
+            sessions = stripe.checkout.Session.list(payment_intent=payment_intent_id, limit=1)
+            session = next(iter(_stripe_object_value(sessions, 'data', None) or []), None)
+            if _stripe_object_value(_stripe_object_value(session, 'metadata', None) or {}, 'type') in ('fulfillment', 'cancellation'):
+                raise ValueError('Stripe refund payment is not recorded yet.')
+            logger.info('Ignoring refund for a charge without a shift payment.')
+            return
+        for payment in payments:
             cumulative = min(payment.amount_aud, Decimal(refunded_cents) / Decimal(100))
             if cumulative <= payment.refunded_amount_aud:
                 continue

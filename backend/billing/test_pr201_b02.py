@@ -1,8 +1,8 @@
 """B02: safely resize an existing Stripe extra-seat subscription."""
 from types import SimpleNamespace
 from unittest.mock import patch
-from django.test import TestCase
-from billing.models import OwnerSubscription
+from django.test import TestCase, override_settings
+from billing.models import OwnerSubscription, StripeWebhookEvent
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy
 from billing.views import EXTRA_SEAT_PRICE
 
@@ -13,6 +13,7 @@ def stripe_result(quantity, customer="cus_b02", status="active"):
     return {"id": "sub_addon_b02", "customer": customer, "status": status,
             "items": {"data": [item]}}
 
+@override_settings(STRIPE_WEBHOOK_SECRET="whsec-b02-test")
 class SeatQuantityContracts(TestCase):
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy("P6 B02")
@@ -64,3 +65,47 @@ class SeatQuantityContracts(TestCase):
         self.assertEqual(resp.status_code, 400, resp.data)
         retrieve.assert_not_called()
         modify.assert_not_called()
+
+    def deliver_update(self, event_quantity, current=None, error=None):
+        event = SimpleNamespace(
+            id="evt_b02_update", type="customer.subscription.updated",
+            data=SimpleNamespace(object=stripe_result(event_quantity)),
+        )
+        with (
+            patch("billing.views.stripe.Webhook.construct_event", return_value=event),
+            patch("billing.views.stripe.Subscription.retrieve", return_value=current, side_effect=error) as retrieve,
+        ):
+            response = self.client.post("/api/v1/billing/webhook/", b"{}", content_type="application/json")
+        self.sub.refresh_from_db()
+        return response, retrieve
+
+    def test_stale_seat_event_uses_current_stripe_quantity(self):
+        response, retrieve = self.deliver_update(1, stripe_result(4))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.sub.staff_count, 9)
+        retrieve.assert_called_once_with("sub_addon_b02")
+
+    def test_current_seat_event_positive_control(self):
+        response, _ = self.deliver_update(4, stripe_result(4))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.sub.staff_count, 9)
+
+    def test_stripe_read_failure_is_retryable_without_changing_seats(self):
+        response, _ = self.deliver_update(1, error=RuntimeError("provider unavailable"))
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(self.sub.staff_count, 7)
+        self.assertEqual(StripeWebhookEvent.objects.get(event_id="evt_b02_update").status, "failed")
+
+    def test_current_subscription_must_still_belong_to_customer(self):
+        response, _ = self.deliver_update(4, stripe_result(4, customer="cus_foreign"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.sub.staff_count, 7)
+
+    def test_seat_update_cannot_modify_a_canceled_base_plan(self):
+        self.sub.status = "canceled"
+        self.sub.save(update_fields=["status"])
+        response, retrieve = self.deliver_update(4, stripe_result(4))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.sub.staff_count, 7)
+        self.assertEqual(self.sub.status, "canceled")
+        retrieve.assert_not_called()
