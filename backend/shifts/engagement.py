@@ -111,7 +111,6 @@ def staff_assignment_defaults(*, user, pharmacy, work_date):
         "pay_basis": engagement.pay_basis,
         "award_code": engagement.award_code,
         "award_classification": engagement.award_classification,
-        "public_holiday_work_base": (engagement.award_rate_snapshot or {}).get("public_holiday_work_base"),
         "rates": {
             "weekday": str(engagement.rate_weekday),
             "saturday": str(engagement.rate_saturday),
@@ -352,7 +351,7 @@ def _segment_rate_key(day_type, clock_time):
     return ("sunday", "daytime_07_21")
 
 
-def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy, *, work_base=None):
+def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
     # Legal public-holiday scope is owned by shifts.holidays, not the Award
     # minimum-rate calculator or its state-only legacy get_day_type wrapper.
     from shifts.holidays import holiday_boundaries, resolve_public_holiday
@@ -374,8 +373,8 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy, *, work_ba
         }
 
     schedule = award_snapshot["schedule"]
-    state = work_base["state"] if work_base else (getattr(pharmacy, "state", "") or "")
-    region = work_base["region"] if work_base else (getattr(pharmacy, "public_holiday_region", "") or "")
+    state = getattr(pharmacy, "state", "") or ""
+    region = getattr(pharmacy, "public_holiday_region", "") or ""
     segments = []
     total_hours = Decimal("0")
     total_pay = Decimal("0")
@@ -472,7 +471,7 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy, *, work_ba
     }
 
 
-def _build_tfn_award_terms(*, shift, onboarding, occurrences, work_base=None):
+def _build_tfn_award_terms(*, shift, onboarding, occurrences):
     from workforce.award_rates import resolve_award_schedule
 
     role = str(shift.role_needed or "").upper()
@@ -503,7 +502,7 @@ def _build_tfn_award_terms(*, shift, onboarding, occurrences, work_base=None):
         if first_award_snapshot is None:
             first_award_snapshot = award_snapshot
 
-        floor = _award_floor_for_occurrence(award_snapshot, occurrence, shift.pharmacy, work_base=work_base)
+        floor = _award_floor_for_occurrence(award_snapshot, occurrence, shift.pharmacy)
         posted_rate = (
             Decimal(str(occurrence.get("agreed_rate")))
             if occurrence.get("agreed_rate") not in (None, "")
@@ -555,7 +554,7 @@ def _build_tfn_award_terms(*, shift, onboarding, occurrences, work_base=None):
         "payroll_review_reasons": review_reasons,
     }
 
-def build_shift_engagement_terms(*, shift, user, offer=None, work_base=None):
+def build_shift_engagement_terms(*, shift, user, offer=None):
     staff_membership = direct_pharmacy_staff_membership(user=user, pharmacy=shift.pharmacy)
     occurrences = _offer_occurrences(shift, offer)
     pharmacy = shift.pharmacy
@@ -637,18 +636,12 @@ def build_shift_engagement_terms(*, shift, user, offer=None, work_base=None):
     }
 
     if pref == PAYMENT_TFN:
-        from shifts.holidays import confirmed_employee_work_base
-        validated_base = confirmed_employee_work_base(work_base) if work_base is not None else None
         payroll_enabled = bool(getattr(pharmacy, "use_chemisttasker_payroll", False))
         award_terms = _build_tfn_award_terms(
             shift=shift,
             onboarding=onboarding,
             occurrences=occurrences,
-            work_base=validated_base,
         )
-        if validated_base is None:
-            award_terms["payroll_review_required"] = True
-            award_terms["payroll_review_reasons"].append("employee_work_base_not_confirmed")
         profile_status = _tfn_payroll_status(onboarding)
         payroll_ready = bool(
             payroll_enabled
@@ -684,7 +677,6 @@ def build_shift_engagement_terms(*, shift, user, offer=None, work_base=None):
             "award_floor": award_terms["award_floor"],
             "owner_bonus": award_terms["owner_bonus"],
             "occurrences": award_terms["occurrences"],
-            "public_holiday_work_base": validated_base,
             "award_payroll_review_required": award_terms["payroll_review_required"],
             "award_payroll_review_reasons": award_terms["payroll_review_reasons"],
             "super": profile_status["super"],

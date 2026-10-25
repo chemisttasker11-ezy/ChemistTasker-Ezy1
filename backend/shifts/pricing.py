@@ -40,16 +40,17 @@ def get_day_type(slot_date, state, at_time=None, *, region=None):
 
 
 def _holiday_work_base(shift, terms=None):
-    """Default to the posting pharmacy; staff-specific terms may override.
+    """Use the registered store that owns this shift, never a worker override.
 
-    Fair Work entitlements follow the employee's base for work, not the
-    destination of a temporary assignment. Never infer this from postcode.
+    The pharmacy's declared locality decides shift holiday classification.
+    The optional terms argument remains for existing callers but cannot
+    change the store. Exceptional legal base/substitution cases require
+    separate employer review, not silent per-worker holiday override.
     """
     pharmacy = shift.pharmacy
-    declared = (terms or {}).get("public_holiday_work_base") or {}
     return (
-        declared.get("state") or getattr(pharmacy, "state", ""),
-        declared.get("region") or getattr(pharmacy, "public_holiday_region", ""),
+        getattr(pharmacy, "state", "") or "",
+        getattr(pharmacy, "public_holiday_region", "") or "",
     )
 
 
@@ -335,7 +336,7 @@ def _price_shift_segments(slot_date, start_time, end_time, shift, rate_preferenc
             )
             if holiday.needs_review and getattr(shift.pharmacy, 'use_chemisttasker_payroll', False):
                 raise ValidationError(
-                    'Verify the employee work-base public-holiday region and declaration '
+                    'Verify the store public-holiday district and declaration '
                     'before automatic payroll pricing. ' + holiday.status
                 )
             if shift.role_needed == 'PHARMACIST':
@@ -421,8 +422,8 @@ def _price_staff_agreement(slot, shift, slot_date, terms):
             )
             if holiday.needs_review and terms.get('settlement_channel') == 'PAYROLL':
                 raise ValidationError(
-                    'Payroll holiday entitlement needs verified employee base-for-work '
-                    'region: ' + holiday.status
+                    'Payroll holiday entitlement needs the store public-holiday '
+                    'district verified: ' + holiday.status
                 )
             bucket = segment['time_bucket']
             # Public holidays take precedence over early and late ordinary

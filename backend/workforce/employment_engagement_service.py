@@ -104,14 +104,6 @@ def build_employment_engagement_payload(request_data, membership, *, effective_f
         date_of_birth=date_of_birth,
         as_of=effective_from,
     )
-    from shifts.holidays import confirmed_employee_work_base
-    supplied = request_data.get(
-        "public_holiday_work_base",
-        (getattr(existing, "award_rate_snapshot", {}) or {}).get("public_holiday_work_base")
-        if existing else None,
-    )
-    employee_base = confirmed_employee_work_base(supplied) if supplied is not None else None
-    resolved["public_holiday_work_base"] = employee_base
     resolved["adult_rate_confirmed"] = None
     resolved["correspondence"] = correspondence
     next_review = parse_date(resolved.get("next_rate_review_date") or "")
@@ -274,7 +266,6 @@ def build_employment_engagement_payload(request_data, membership, *, effective_f
     payload.update(
         award_rate_snapshot={
             "kind": "ABOVE_AWARD",
-            "public_holiday_work_base": employee_base,
             "adult_rate_confirmed": None,
             "correspondence": correspondence,
             "award_floor": resolved,
