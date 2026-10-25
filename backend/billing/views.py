@@ -569,6 +569,18 @@ def charge_shift_fulfillment(request, shift_id):
     slot_ids = _normalize_slot_ids(request.data.get('slot_ids') or request.data.get('slotIds'), slot_id)
     offer_ids = _normalize_offer_ids(request.data.get('offer_ids') or request.data.get('offerIds'), request.data.get('offer_id') or request.data.get('offerId'))
 
+    if not offer_ids and not slot_ids and not candidate_id:
+        return Response({'error': 'Select a pending offer or slot before checkout.'}, status=400)
+    selected_unit_count = 0
+    if candidate_id and not offer_ids and not slot_ids:
+        from shifts.models import ShiftOffer
+        selected_unit_count = ShiftOffer.objects.filter(
+            shift=shift, user_id=candidate_id,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+        ).count()
+        if not selected_unit_count:
+            return Response({'error': 'Candidate has no pending offer.'}, status=400)
+
     if offer_ids:
         from shifts.models import ShiftOffer
         selected_offers = list(ShiftOffer.objects.filter(
@@ -578,6 +590,7 @@ def charge_shift_fulfillment(request, shift_id):
         ))
         if len(selected_offers) != len(offer_ids):
             return Response({'error': 'One or more selected offers do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
+        selected_unit_count = len(selected_offers)
         selected_slot_ids = [offer.slot_id for offer in selected_offers if offer.slot_id]
         if len(selected_slot_ids) != len(set(selected_slot_ids)):
             return Response({'error': 'Select only one candidate per slot.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -588,6 +601,7 @@ def charge_shift_fulfillment(request, shift_id):
             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
             slot_id__in=slot_ids,
         ).values('slot_id').distinct().count()
+        selected_unit_count = matching_count
         if matching_count != len(slot_ids):
             return Response({'error': 'One or more selected slots do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -669,7 +683,7 @@ def charge_shift_fulfillment(request, shift_id):
             'payment_method_types': ['card'],
             'line_items': [{
                 'price': price_id,
-                'quantity': max(1, len(offer_ids) or len(slot_ids)),
+                'quantity': selected_unit_count,
             }],
             'mode': 'payment',
             'success_url': success_url,
