@@ -1,0 +1,118 @@
+{
+  "chunk": "C078",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "first-pass source fetch; S2/S3 pending",
+  "status": "INCOMPLETE",
+  "files": [
+    {
+      "path": "frontend_web/scripts/render-mobile-skill-symbols.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e568f0b8801485d2e7de1078f6ad8b7c007b09e0",
+      "lines": 72,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "72 lines; web/kiosk build or check script; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/scripts/run-tauri.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "efdc77ce31c9a8ad6690f5dd5fd57b6991a9e9ac",
+      "lines": 52,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "52 lines; web/kiosk build or check script; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/scripts/validate-kiosk-build.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ee7ba14d715ae02897aa2a375e98ea42581b3c49",
+      "lines": 51,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "51 lines; web/kiosk build or check script; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/scripts/ws-url.test.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b9a1e8e522f8d2a99345f7a4b812aa1f3e60f336",
+      "lines": 25,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "25 lines; web/kiosk build or check script; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/shared/PharmacyContext.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "8364447e58b09e89c84e89a899b281b364b851f4",
+      "lines": 50,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "50 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/shared/PharmacyProfileFields.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "fb3fdbf1acadfa6e2a3c62ff92087f4c68c8aaa6",
+      "lines": 92,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "92 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/shared/ReportButton.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "8bee0c9a51bdd264925c3af27ebf3f7e6098e268",
+      "lines": 70,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "70 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/shared/RoleTile.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "6597345037f0a1cf2cd31c28b6c72a5d1ed9a5e7",
+      "lines": 46,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "46 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/shared/ShiftRequirements.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e4c887ab19442df93fbe2f172665a52f1a66770e",
+      "lines": 49,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "49 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/shared/ShiftRequirementsPicker.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "c2af4b36bc832c761e1513080ae51fd60ca7f6e6",
+      "lines": 201,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "201 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/shared/ShiftSkillPresetControls.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "d0538203a9e8fb915a8ffe8c91ffb3678b6eeaa5",
+      "lines": 86,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "86 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/shared/SignupRolePicker.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "51f6436951e811295384988364892ef8e57c4aba",
+      "lines": 127,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "127 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
+    }
+  ],
+  "findings": []
+}
