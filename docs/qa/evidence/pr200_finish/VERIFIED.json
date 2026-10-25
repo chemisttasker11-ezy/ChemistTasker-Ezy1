@@ -824,5 +824,28 @@
       "Provider call mocked, checkout URL synthetic, no payment charged; only empty obligation contract reproduced, not duplicate checkout concurrency.",
       "No live environment or independent whole-source S2 review"
     ]
+  },
+  "B10": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b10_two_distinct_paid_offer_units_require_two_debits",
+        "observed": "Two sequential spend_pills_for_shift_post(user, same shift) calls returned the same PillLedgerEntry pk (2 == 2). Negative distinct-entry assertion failed; positive opening balance 100 and first debit to 90 passed. This invokes the service twice without separate obligation selectors.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40188055560",
+        "head": "10c92441453ab36af1b86a00c275a9af07c2431d",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Isolated Django SQLite; mock active Pill rule; no provider, API or concurrency"
+      }
+    ],
+    "source_proof": [
+      "backend/rewards/services.py:352-368",
+      "backend/qa_release/test_pr200_phase5_pills.py:10-40"
+    ],
+    "runtime_limitations": [
+      "Service does not accept offer/slot unit identifiers. Test models a two-unit requirement by two calls on same shift but does not establish an actual user-facing multi-unit charge or desired once-per-shift product pricing.",
+      "No actual HTTP selector, provider charge or two-connection PostgreSQL concurrency proof. Treat source service behavior as demonstrated and multi-unit defect impact as policy/use-case conditional.",
+      "No S2 whole-file independent certification"
+    ]
   }
 }
