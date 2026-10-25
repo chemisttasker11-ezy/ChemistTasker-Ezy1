@@ -140,3 +140,54 @@ class AdditionalAdminInvitationTests(TestCase):
         self.assertEqual(self.invite(target.email).status_code, 409)
         assignment.refresh_from_db()
         self.assertTrue(assignment.is_active)
+
+    def test_revoked_admin_cannot_self_restore_without_new_invitation(self):
+        target = get_user_model().objects.create_user(
+            email='revoked-admin@example.com', password='Password123!', role='OTHER_STAFF'
+        )
+        membership = Membership.objects.create(
+            user=target, pharmacy=self.pharmacy, role='ASSISTANT',
+            employment_type='FULL_TIME', is_active=True, status=Membership.Status.ACCEPTED,
+        )
+        assignment = PharmacyAdmin.objects.create(
+            user=target, pharmacy=self.pharmacy, membership=membership,
+            admin_level='MANAGER', staff_role='ASSISTANT', is_active=True,
+        )
+        removed = self.client.delete(f'/api/v1/pharmacy-admins/{assignment.pk}/')
+        self.assertEqual(removed.status_code, 204)
+        assignment.refresh_from_db()
+        membership.refresh_from_db()
+        self.assertFalse(assignment.is_active)
+        self.assertIsNone(assignment.membership_id)
+        self.assertTrue(membership.is_active)
+        self.assertEqual(membership.status, Membership.Status.ACCEPTED)
+
+        self.client.force_authenticate(user=target)
+        pending = self.client.get('/api/v1/pharmacy-admins/my-pending-invitations/')
+        self.assertEqual(pending.status_code, 200)
+        self.assertEqual(pending.data, [])
+        forbidden = self.client.post(
+            f'/api/v1/pharmacy-admins/{assignment.pk}/accept-invitation/'
+        )
+        self.assertEqual(forbidden.status_code, 404)
+        assignment.refresh_from_db()
+        self.assertFalse(assignment.is_active)
+
+        # An authorized administrator may deliberately re-invite the same worker.
+        self.client.force_authenticate(user=self.inviter)
+        with patch('organizations.views.async_task'):
+            renewed = self.client.post('/api/v1/pharmacy-admins/', {
+                'pharmacy': self.pharmacy.pk, 'email': target.email,
+                'admin_level': 'MANAGER', 'staff_role': 'ASSISTANT',
+            }, format='json')
+        self.assertEqual(renewed.status_code, 200)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.membership_id, membership.id)
+        self.assertFalse(assignment.is_active)
+        self.client.force_authenticate(user=target)
+        accepted = self.client.post(
+            f'/api/v1/pharmacy-admins/{assignment.pk}/accept-invitation/'
+        )
+        self.assertEqual(accepted.status_code, 200)
+        assignment.refresh_from_db()
+        self.assertTrue(assignment.is_active)

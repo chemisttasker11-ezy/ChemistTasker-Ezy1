@@ -587,8 +587,13 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
         assignment: PharmacyAdmin = self.get_object()
         if not assignment.can_be_removed_by(request.user):
             return Response({"detail": "Not allowed to remove this admin."}, status=status.HTTP_403_FORBIDDEN)
+        # Revocation is not a pending invitation: unlink its membership so
+        # my-pending-invitations and accept-invitation cannot resurrect it.
+        # Keep the inactive assignment for audit and let a fresh authorized
+        # create() explicitly re-link membership for any later re-invite.
         assignment.is_active = False
-        assignment.save(update_fields=["is_active", "updated_at"])
+        assignment.membership = None
+        assignment.save(update_fields=["is_active", "membership", "updated_at"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
