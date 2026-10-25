@@ -69,3 +69,77 @@ class Phase6KioskClockIntegrity(KioskOfflineProtocolTests):
         self.assertIsNone(stored.attendance_event_id)
         self.assertEqual(AttendanceEvent.objects.count(), 0)
         self.assertEqual(AttendanceSession.objects.count(), 0)
+
+    def review_client(self, user):
+        from rest_framework.test import APIClient
+        api = APIClient()
+        api.force_authenticate(user)
+        return api
+
+    def drift_pending(self):
+        event = self.signed_event()
+        event["device_timestamp"] = (
+            timezone.now() - timedelta(minutes=10)
+        ).isoformat()
+        event["trusted_time_estimate"] = timezone.now().isoformat()
+        event = self._resign(event)
+        result = sync_offline_batch(self.device, [event])
+        self.assertEqual(result["results"][0]["result"], "needs_review")
+        return event
+
+    def test_b29_manager_can_approve_with_corrected_time_and_replay_is_safe(self):
+        from attendance.models import KioskAttendanceReview
+        event = self.drift_pending()
+        api = self.review_client(self.owner)
+        url = "/api/v1/attendance/manager/kiosk-review/decide/"
+        payload = {"event_id": event["event_id"], "decision": "APPROVED",
+                   "corrected_timestamp": timezone.now().isoformat(),
+                   "reason": "Verified original shift against recorded evidence."}
+        approved = api.post(url, payload, format="json")
+        self.assertEqual(approved.status_code, 200, approved.data)
+        self.assertEqual(AttendanceEvent.objects.count(), 1)
+        self.assertEqual(KioskAttendanceReview.objects.count(), 1)
+        again = api.post(url, payload, format="json")
+        self.assertEqual(again.status_code, 200, again.data)
+        self.assertEqual(AttendanceEvent.objects.count(), 1)
+        self.assertEqual(sync_offline_batch(self.device, [event])["results"][0]["result"], "already_received")
+        self.assertEqual(KioskAttendanceEvent.objects.get().processing_status, "NEEDS_REVIEW")
+
+    def test_b29_approve_without_corrected_time_does_not_apply_attendance(self):
+        event = self.drift_pending()
+        response = self.review_client(self.owner).post(
+            "/api/v1/attendance/manager/kiosk-review/decide/",
+            {"event_id": event["event_id"], "decision": "APPROVED", "reason": "Check"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
+
+    def test_b29_rejection_retains_evidence_and_cannot_be_reversed(self):
+        from attendance.models import KioskAttendanceReview
+        event = self.drift_pending()
+        api = self.review_client(self.owner)
+        url = "/api/v1/attendance/manager/kiosk-review/decide/"
+        rejected = api.post(url, {"event_id": event["event_id"], "decision": "REJECTED",
+                                  "reason": "Could not establish actual time."}, format="json")
+        self.assertEqual(rejected.status_code, 200, rejected.data)
+        attempt = api.post(url, {"event_id": event["event_id"], "decision": "APPROVED",
+                                 "reason": "Changed mind",
+                                 "corrected_timestamp": timezone.now().isoformat()}, format="json")
+        self.assertEqual(attempt.status_code, 409, attempt.data)
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
+        self.assertEqual(KioskAttendanceReview.objects.count(), 1)
+
+    def test_b29_unrelated_manager_cannot_view_or_decide_other_pharmacy(self):
+        from client_profile.characterization_support import make_owner_with_pharmacy
+        foreign_owner, _ = make_owner_with_pharmacy("Foreign kiosk manager")
+        event = self.drift_pending()
+        api = self.review_client(foreign_owner)
+        pending = api.get("/api/v1/attendance/manager/kiosk-review/pending/",
+                          {"pharmacy_id": self.pharmacy.pk})
+        self.assertEqual(pending.status_code, 403, pending.data)
+        response = api.post("/api/v1/attendance/manager/kiosk-review/decide/",
+                            {"event_id": event["event_id"], "decision": "REJECTED",
+                             "reason": "Foreign"}, format="json")
+        self.assertEqual(response.status_code, 403, response.data)
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
