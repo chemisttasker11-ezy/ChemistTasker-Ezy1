@@ -16,11 +16,15 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.sessions.models import Session
 from django.core.cache import cache
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -321,6 +325,60 @@ class MobileOtpTests(TestCase):
 
 
 class SessionTests(TestCase):
+    def test_password_reset_revokes_existing_refresh_tokens_and_sessions(self):
+        user = make_user("PHARMACIST", is_otp_verified=True)
+        other = make_user("PHARMACIST")
+        old_refresh = str(RefreshToken.for_user(user))
+        other_refresh = str(RefreshToken.for_user(other))
+        session_client = APIClient()
+        session_client.force_login(user)
+        session_key = session_client.session.session_key
+        other_client = APIClient()
+        other_client.force_login(other)
+        other_key = other_client.session.session_key
+
+        response, _ = post(APIClient(), "password-reset-confirm/", {
+            "uid": urlsafe_base64_encode(force_bytes(user.pk)),
+            "token": default_token_generator.make_token(user),
+            "new_password1": "NewStrongPassword248!",
+            "new_password2": "NewStrongPassword248!",
+        })
+        self.assertEqual(response.status_code, 200, response.data)
+        refreshed, _ = post(APIClient(), "token/refresh/", {"refresh": old_refresh})
+        self.assertEqual(refreshed.status_code, 401)
+        self.assertFalse(Session.objects.filter(session_key=session_key).exists())
+        self.assertTrue(Session.objects.filter(session_key=other_key).exists())
+        unaffected, _ = post(APIClient(), "token/refresh/", {"refresh": other_refresh})
+        self.assertEqual(unaffected.status_code, 200)
+        login, _ = post(APIClient(), "login/", {"email": user.email, "password": "NewStrongPassword248!"})
+        self.assertEqual(login.status_code, 200, login.data)
+        fresh, _ = post(APIClient(), "token/refresh/", {"refresh": login.data["refresh"]})
+        self.assertEqual(fresh.status_code, 200, fresh.data)
+
+    def test_html_password_reset_revokes_existing_credentials(self):
+        user = make_user("PHARMACIST", is_otp_verified=True)
+        old_refresh = str(RefreshToken.for_user(user))
+        session_client = APIClient()
+        session_client.force_login(user)
+        session_key = session_client.session.session_key
+        client = APIClient()
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        redirect = client.get(f"{API}auth/reset/{uid}/{token}/")
+        self.assertEqual(redirect.status_code, 302)
+        response = client.post(redirect.url, {
+            "new_password1": "NewStrongPassword248!",
+            "new_password2": "NewStrongPassword248!",
+        })
+        self.assertEqual(response.status_code, 302)
+        refreshed, _ = post(APIClient(), "token/refresh/", {"refresh": old_refresh})
+        self.assertEqual(refreshed.status_code, 401)
+        self.assertFalse(Session.objects.filter(session_key=session_key).exists())
+        login, _ = post(APIClient(), "login/", {"email": user.email, "password": "NewStrongPassword248!"})
+        self.assertEqual(login.status_code, 200, login.data)
+        fresh, _ = post(APIClient(), "token/refresh/", {"refresh": login.data["refresh"]})
+        self.assertEqual(fresh.status_code, 200, fresh.data)
+
     def test_logout_blacklists_the_refresh_token_and_clears_cookies(self):
         user = make_user("PHARMACIST")
         refresh = RefreshToken.for_user(user)
