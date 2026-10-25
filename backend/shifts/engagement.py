@@ -391,8 +391,8 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
                 "rate": None,
                 "review_required": True,
                 "review_reason": (
-                    "Verify the employee's base-for-work public-holiday "
-                    "declaration and regional substitution before using an "
+                    "Verify the posting pharmacy's public-holiday district "
+                    "and regional substitution before using an "
                     "automated MA000012 minimum rate: " + holiday.status
                 ),
                 "segments": segments,

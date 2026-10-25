@@ -125,7 +125,7 @@ def resolve_public_holiday(work_date: date, state, region_code="", at_time=None)
         status = "REGION_REQUIRED" if candidate else "VERIFIED"
         note = (
             "Local public holidays or regional replacements may apply; "
-            "confirm the employee's work-base district against the "
+            "confirm the registered store's declared district against the "
             "jurisdiction's official declaration."
         ) if candidate else ""
     else:
