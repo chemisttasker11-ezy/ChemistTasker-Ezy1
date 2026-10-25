@@ -86,7 +86,46 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
                 pass
         return qs
 
+    def _validate_assignment_scope(self, serializer):
+        """An assignment must stay inside the caller's roster capability and slot."""
+        from workforce.permissions import can_manage_roster_pharmacy
+
+        attrs = serializer.validated_data
+        instance = serializer.instance
+        shift = attrs.get("shift", instance.shift if instance else None)
+        slot = attrs.get("slot", instance.slot if instance else None)
+        worker = attrs.get("user", instance.user if instance else None)
+        slot_date = attrs.get("slot_date", instance.slot_date if instance else None)
+        if not shift or not slot or not worker:
+            raise DRFValidationError({"detail": "Shift, slot and worker are required."})
+        if not can_manage_roster_pharmacy(self.request.user, shift.pharmacy):
+            self.permission_denied(self.request)
+        if slot.shift_id != shift.pk:
+            raise DRFValidationError({"slot": "Slot does not belong to the selected shift."})
+        if slot_date != slot.date and not (
+            slot.is_recurring and slot.recurring_end_date
+            and slot.date <= slot_date <= slot.recurring_end_date
+            and slot_date.weekday() in slot.recurring_days
+        ):
+            raise DRFValidationError({"slot_date": "Date is not a valid slot occurrence."})
+        if not Membership.objects.filter(
+            user=worker, pharmacy=shift.pharmacy, is_active=True,
+            status=Membership.Status.ACCEPTED, role=shift.role_needed,
+        ).exists():
+            raise DRFValidationError({"user": "Worker must have an accepted matching-role pharmacy membership."})
+        if instance and instance.shift_id != shift.pk:
+            raise DRFValidationError({"shift": "An existing assignment cannot move between shifts."})
+        if instance and instance.slot_id != slot.pk:
+            raise DRFValidationError({"slot": "An existing assignment cannot move between slots."})
+
+    def perform_create(self, serializer):
+        self._validate_assignment_scope(serializer)
+        if _slot_locked_by_published_roster(serializer.validated_data["slot"]):
+            raise DRFValidationError("Unpublish this shift before assigning a published roster slot.")
+        serializer.save()
+
     def perform_update(self, serializer):
+        self._validate_assignment_scope(serializer)
         if _slot_locked_by_published_roster(serializer.instance.slot):
             raise DRFValidationError(
                 "Unpublish this shift for editing before changing its assignment in a published roster."

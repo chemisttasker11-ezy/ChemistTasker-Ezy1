@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python backend/manage.py test qa_release.test_pr200_blockers client_profile.test_admin_invitations --settings=core.contract_test_settings --noinput --verbosity=2 2>&1 | tee pr200-runtime-evidence.txt
+          python backend/manage.py test qa_release.test_pr200_blockers client_profile.test_admin_invitations qa_release.test_pr201_phase6_roster --settings=core.contract_test_settings --noinput --verbosity=2 2>&1 | tee pr200-runtime-evidence.txt
       - name: Preserve synthetic CI evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
