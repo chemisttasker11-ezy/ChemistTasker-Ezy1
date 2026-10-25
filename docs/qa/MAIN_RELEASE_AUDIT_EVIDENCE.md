@@ -273,3 +273,18 @@ Six new source-level candidates after checking prior 65: B66 overnight shift can
 - **Actual GitHub CI checked:** [Shared Core Consolidation run](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40166190041) on audit commit `c8fe2c8e` completed **FAILURE** (mobile dependency gate and release-gate). Backend, PostgreSQL concurrency, kiosk, Vite, Next, shared-core, architectural and boundary checks passed in that run; CodeQL and public repository secret scan succeeded; native iOS acceptance skipped. Passing general CI does not clear the historical P0s.
 - **Mobile blocker:** npm's advisory `GHSA-w74x-v6f9-j3xg` reported at `frontend_mobile/scripts/verify-dependency-security.cjs` against locked `fast-uri@3.1.8` (dependency via Expo `ajv`; patched 3.x version 3.1.9). This establishes failing CI and the remediation requirement, **not live app exploitation**. Structured data: [CI_GATE_OBSERVED_20261025.json](evidence/pr200_finish/CI_GATE_OBSERVED_20261025.json).
 - Coverage stays split: **S0 source inventory complete; S1 source paths reconciled 2,151 but not all deep semantic; S2 independent 99% unproven; S3 targeted payment/tenant/browser/native acceptance unexecuted by this audit**. NO-GO; no code, migrations, deployment, merge, or payment touched.
+
+
+## PR200 isolated red-test reproduction — 25 October 2026
+
+**Executed [GitHub Actions PR200 audit test workflow](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953) on exact PR head `d9a278031c251584589aa5f20b5e9831394d30a9`, frozen main `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. 10 tests ran, 8 failed negative assertions, 2 passed positive controls. These eight are **observed failing production-safety contracts** under isolated Django SQLite; not a live attack, real Stripe settlement, or successful release gate. The failure was intentional red-first testing, not infrastructure failure.
+
+- B07 calendar event and note cross-pharmacy PATCH returned HTTP 200.
+- B33 unrelated authenticated user created foreign paid invoice via legacy POST: HTTP 201.
+- B36 unrelated authenticated user created roster shift in other pharmacy: HTTP 201.
+- F04-N2 source-authorized shift PATCH changed target pharmacy and payment_status PAID: HTTP 200.
+- B15 synthetic signed Stripe cancellation checkout event called fulfillment finalizer.
+- F10-N5 valid ethical application POST produced HTTP 500 due undefined `creating`.
+- B06 ordinary staff saw sibling pharmacy work note via org feed; policy scope still needs ratification.
+
+Evidence: [structured runtime run](evidence/pr200_finish/RUNTIME_REPRODUCTION_20261025.json), [VERIFIED](evidence/pr200_finish/VERIFIED.json), [negative contract source](../qa_release/test_pr200_blockers.py). **No application code changed and no remediation completed. NO-GO remains.**

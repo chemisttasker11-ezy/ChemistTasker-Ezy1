@@ -20,7 +20,7 @@
     "status_note": "Source-level verification is not a runtime reproduction, and production exploitability still requires authenticated negative test."
   },
   "F04-N2": {
-    "verdict": "CONFIRMED_SOURCE",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
     "verifier": "gpt6-senior-20261025",
     "independent_of": "claudeB-2",
     "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
@@ -34,13 +34,23 @@
       "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L142-L200"
     ],
     "confidence": "high",
-    "runtime_verification": "NOT_EXECUTED",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
     "negative_test": "Owner of pharmacy A PATCHes their own shift with pharmacy=unrelated B, apply_rates_to_pharmacy=true and payment_status=PAID; must reject (or ignore nonmutable payment state) and leave A's shift, B's rate defaults and financial status unchanged.",
     "positive_test": "Owner edits allowed fields of their own pharmacy's shift without breaking normal rates, slots or notifications; if cross-site moves are explicitly permitted, require authority over both pharmacies.",
     "impact": "Cross-tenant mutable shift ownership, unrelated pharmacy rate tampering and forged shift payment state.",
     "classification": "FIX",
     "severity": "P0 candidate; no exploit run",
-    "status_note": "Exact protected write branch is visible; no real PostgreSQL/API mutation executed."
+    "status_note": "Exact protected write branch is visible; no real PostgreSQL/API mutation executed.",
+    "scenarios": [
+      {
+        "test": "test_f04_shift_patch_denies_cross_tenant_and_paid_override",
+        "observed": "HTTP 200; unrelated target pharmacy and PAID accepted",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ]
   },
   "F04-N1": {
     "verdict": "CONFIRMED_SOURCE",
@@ -63,5 +73,109 @@
     "classification": "FIX",
     "severity": "P0 candidate; no exploit run",
     "status_note": "Unrestricted filters identified by source, but sensitive-field availability and full response shape need request-based confirmation."
+  },
+  "B07": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b07_event_patch_denies_destination_pharmacy",
+        "observed": "HTTP 200; destination pharmacy field accepted",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      },
+      {
+        "test": "test_b07_work_note_patch_denies_destination_pharmacy",
+        "observed": "HTTP 200; note destination accepted",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "B33": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b33_invoice_post_denies_foreign_pharmacy",
+        "observed": "HTTP 201; unrelated user's paid invoice created for pharmacy B",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "B36": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b36_roster_post_denies_unmanaged_pharmacy",
+        "observed": "HTTP 201; unrelated worker creates B roster shift",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "B15": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b15_cancellation_webhook_never_finalizes_worker_offer",
+        "observed": "Penalty session invoked fulfillment finalizer",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "F10-N5": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_f10_approval_valid_post_returns_201",
+        "observed": "HTTP 500; NameError creating variable",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "B06": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b06_organization_feed_does_not_expose_sibling_notes",
+        "observed": "Ordinary A staff received B's organization work note",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
   }
 }

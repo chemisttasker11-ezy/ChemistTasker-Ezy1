@@ -224,7 +224,7 @@
     },
     {
       "id": "F10-N5",
-      "status": "SOURCE_SUPPORTED",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "PharmacyApproval.post references 'creating' in response expression, but variable was declared only in get; NameError on valid POST after serializer.save and audit event create. Transaction persistence or rollback must be checked in runtime.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/ethical_marketplace/views.py#L100",
@@ -234,9 +234,10 @@
       "negative_test": "Valid first/second application POST must never 500 or leave indeterminate state; invalid inputs do not mutate audit trail.",
       "positive_test": "New application returns 201, update returns 200 with exactly one correct approval/audit entry.",
       "existing_test_gap": "Ethical tests cover application GET and gates, not successful POST.",
-      "runtime": "NOT_EXECUTED",
+      "runtime": "HTTP 500; NameError creating variable",
       "independent_second_agent": "NOT_CERTIFIED",
-      "reviewer": "same_online_assistant_20261025"
+      "reviewer": "same_online_assistant_20261025",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953"
     },
     {
       "id": "C064-N1",
@@ -288,7 +289,7 @@
     },
     {
       "id": "B06",
-      "status": "SOURCE_SUPPORTED_POLICY_SCOPE_PENDING",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "Ordinary staff's pharmacy membership grants org ID for CalendarFeed; org filter queries notes from all org pharmacies without intersecting visible pharmacy IDs. Product policy for org-wide note access must be checked.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/team_calendar/views.py#L108",
@@ -300,11 +301,12 @@
       "existing_test_gap": "Calendar test_api doesn't exercise sibling-work-note privacy.",
       "reviewer": "gpt6_same_assistant_20261025",
       "independent_second_agent": "NOT_CERTIFIED",
-      "runtime": "NOT_REPRODUCED"
+      "runtime": "Ordinary A staff received B's organization work note",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953"
     },
     {
       "id": "B07",
-      "status": "SOURCE_SUPPORTED",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "Calendar event and WorkNote edits authorize current source object only; serializers make destination pharmacy or organization writable, allowing potential move to unauthorized location.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/team_calendar/views.py#L266",
@@ -317,11 +319,12 @@
       "existing_test_gap": "Existing ordinary manager edit tests don't challenge target scope.",
       "reviewer": "gpt6_same_assistant_20261025",
       "independent_second_agent": "NOT_CERTIFIED",
-      "runtime": "NOT_REPRODUCED"
+      "runtime": "HTTP 200; note destination accepted",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953"
     },
     {
       "id": "B15",
-      "status": "SOURCE_SUPPORTED",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "Payment webhook processes any paid session metadata type with shift_id, including cancellation, then unconditionally calls _finalize_pending_offers_for_shift and writes shift payment status.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L781",
@@ -333,7 +336,8 @@
       "existing_test_gap": "Existing billing test covers fulfillment retry, not penalty routing.",
       "reviewer": "gpt6_same_assistant_20261025",
       "independent_second_agent": "NOT_CERTIFIED",
-      "runtime": "NOT_REPRODUCED"
+      "runtime": "Penalty session invoked fulfillment finalizer",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953"
     },
     {
       "id": "B29",
@@ -353,7 +357,7 @@
     },
     {
       "id": "B33",
-      "status": "SOURCE_SUPPORTED",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "Legacy authenticated invoice POST only stamps user; serializer exposes pharmacy/status and issuer/recipient fields without tenant validation; a user can attribute self-created paid/sent invoice to unrelated pharmacy by source path.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/invoicing/views.py#L48",
@@ -365,11 +369,12 @@
       "existing_test_gap": "New finance service tests do not exercise legacy ListCreateAPIView.",
       "reviewer": "gpt6_same_assistant_20261025",
       "independent_second_agent": "NOT_CERTIFIED",
-      "runtime": "NOT_REPRODUCED"
+      "runtime": "HTTP 201; unrelated user's paid invoice created for pharmacy B",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953"
     },
     {
       "id": "B36",
-      "status": "SOURCE_SUPPORTED",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "Authenticated RosterShiftManageViewSet ModelViewSet registers POST and scopes only get_queryset; default create invokes ShiftSerializer.post_shift with caller-specified pharmacy but no create-time manage permission.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/workforce/roster/views.py#L116",
@@ -382,7 +387,8 @@
       "existing_test_gap": "Roster HTTP tests cover managed PATCH, not outsider POST.",
       "reviewer": "gpt6_same_assistant_20261025",
       "independent_second_agent": "NOT_CERTIFIED",
-      "runtime": "NOT_REPRODUCED"
+      "runtime": "HTTP 201; unrelated worker creates B roster shift",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953"
     },
     {
       "id": "B68",
@@ -441,7 +447,17 @@
     "refuted_source": 1,
     "second_agent_certified": 0,
     "runtime_reproduced_in_audit": 0,
-    "total_challenged": 30
+    "total_challenged": 30,
+    "runtime_reproduced_identifiers": [
+      "B07",
+      "B33",
+      "B36",
+      "F04-N2",
+      "B15",
+      "F10-N5",
+      "B06"
+    ],
+    "runtime_reproduced_scenarios": 8
   },
   "review_update": "2026-10-25 ten further B-series high-risk challenges: B03 B06 B07 B15 B29 B33 B36 B68 B69 B70; immutable evidence, negative/positive tests, caveated status, no S3 tests or independent second-agent certifications."
 }
