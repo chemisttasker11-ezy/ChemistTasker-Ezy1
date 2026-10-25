@@ -1,0 +1,239 @@
+{
+ "chunk": "R076",
+ "files": [
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2",
+    "N3"
+   ],
+   "note": "Displayed dates inherit browser-time filtering and recurring occurrence truncation."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/constants.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2",
+    "N3"
+   ],
+   "note": "Counter-offer dates inherit incorrect time filtering and recurring truncation."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "N2",
+    "N3"
+   ],
+   "note": "Rate filtering excludes qualifying undated roles; upcoming-date filtering inherits date defects."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useReviewOfferDisplay.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useShiftPersistence.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no confirmed user-facing problem in current callers."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; board wiring and action handlers reviewed."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/types.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific contract problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/counterOffers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/date.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific formatting problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/location.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/rates.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional confirmed problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2",
+    "N3"
+   ],
+   "note": "Uses browser time for pharmacy schedules and silently truncates recurring dates."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N4"
+   ],
+   "note": "Fixed calendar window prevents viewing or selecting later published availability."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/FiltersSidebar.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; shared filter wrapper preserves its contract."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional confirmed production problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PublicTalentCard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; public action handlers checked against callers."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/TalentCardV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/constants.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; engagement labels match their values."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; shared pagination helper also inspected."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Minimum-rate filtering hides qualifying roles without dated shifts.",
+   "scenario": "Tom advertises a part-time role paying $65 per hour without individual dated shifts. Sara sets a $50 minimum rate. The server returns Tom's qualifying role, but the board removes it because it checks only rates attached to dated shifts.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts:272",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts:280",
+    "backend/shifts/browse.py:563",
+    "backend/shifts/browse.py:619"
+   ],
+   "confidence": "high",
+   "test_needed": "Return a part-time role with no slots and minHourlyRate 65; setting minRate 50 must not remove it.",
+   "owner_question": {
+    "question": "When Sara filters for at least $50 per hour, what should happen to Tom's undated part-time role advertising $65 per hour?",
+    "options": [
+     "Include it using its advertised hourly pay",
+     "Skip minimum-rate filtering for undated roles",
+     "Hide undated roles whenever a minimum is set (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "The board hides future pharmacy shifts using the viewer's local clock.",
+   "scenario": "Tom posts a noon shift at his Perth pharmacy. Sara browses from Brisbane when it is 1 pm for her and 11 am at Tom's pharmacy. The board treats noon as Brisbane time and removes the shift even though Tom's shift has not started.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:117",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:124",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:128",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts:268",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:185",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:287"
+   ],
+   "confidence": "high",
+   "test_needed": "At 03:00 UTC with a Brisbane browser, a same-day noon Perth shift returned by the API must remain visible and counterable.",
+   "owner_question": {
+    "question": "Should Sara still see Tom's noon Perth shift when her Brisbane clock says 1 pm but Tom's pharmacy clock says 11 am?",
+    "options": [
+     "Keep it available until its start time at Tom's pharmacy",
+     "Hide it using Sara's unconverted browser clock (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Recurring schedules silently omit dates after the first 90 occurrences.",
+   "scenario": "Tom publishes a daily recurring schedule starting tomorrow and lasting 180 days. Sara can see only its first 90 dates, with no way to reach the remaining dates. Opening a counter offer also includes only those first 90 dates, leaving the rest of Tom's advertised schedule inaccessible.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:74",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:77",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:86",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:185",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:287",
+    "backend/shifts/models.py:407"
+   ],
+   "confidence": "high",
+   "test_needed": "Supply a valid 180-day daily recurring schedule starting tomorrow; verify that occurrence 91 remains accessible for display and counter offers.",
+   "owner_question": {
+    "question": "What should Sara be able to do with dates beyond the first 90 occurrences of Tom's published recurring schedule?",
+    "options": [
+     "View and select all published dates",
+     "Prevent Tom from publishing more than 90 occurrences",
+     "Keep accepting longer schedules while hiding later dates (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Talent",
+   "title": "The availability calendar cannot show published dates beyond four weeks.",
+   "scenario": "Sara publishes availability six weeks ahead. Tom opens her availability calendar, but it contains only a fixed four-week window with no navigation. Her published date is absent, and Tom cannot select it or request it through the calendar.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:42",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:43",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:145",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:231",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:625"
+   ],
+   "confidence": "high",
+   "test_needed": "Publish Sara's sole available date six weeks ahead; Tom must be able to reach, select and request that date from her calendar.",
+   "owner_question": {
+    "question": "When Sara publishes availability six weeks ahead, what should Tom see in her calendar?",
+    "options": [
+     "Allow navigation to every published date",
+     "Limit Sara's publication to dates the calendar supports",
+     "Keep later dates publishable but absent from the calendar (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-1"
+}

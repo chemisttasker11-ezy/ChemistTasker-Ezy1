@@ -1,0 +1,85 @@
+{
+ "chunk": "X03",
+ "verdicts": [
+  {
+   "id": "F14-U1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The public listing includes all roles, and Apply Now checks verification without checking whether the worker can perform that role. The application endpoint excludes technician shifts from a pharmacist's queryset and returns 404. The page replaces that response with the reported generic failure message, so the backend guard prevents the application but does not prevent the confusing UI.",
+   "evidence": [
+    "backend/shifts/browse.py:571",
+    "backend/shifts/browse.py:449",
+    "backend/shifts/access.py:84",
+    "backend/shifts/base.py:197",
+    "backend/shifts/urls.py:31",
+    "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:298",
+    "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:325",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:480"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F14-U3",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Confirmed at P2 for the small map IconButton, 32px Report target, 36px landing role pills and explicitly 38px phone dashboard icons. The later landing CSS overrides the earlier 44px minimum. The broader claim about talent-board navigation is not established: the mobile menu links receive 12px padding on each side, and account-menu entries have a 44px minimum.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:429",
+    "frontend_web/shared/ReportButton.tsx:42",
+    "frontend_web/landing_next/app/globals.css:440",
+    "frontend_web/landing_next/app/globals.css:513",
+    "frontend_web/src/layouts/DashboardTopShell.tsx:259",
+    "frontend_web/src/layouts/TopBarActions.tsx:933",
+    "frontend_web/landing_next/app/globals.css:54",
+    "frontend_web/landing_next/app/globals.css:78"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F14-U5",
+   "verdict": "REFUTED",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The form uses FormControlLabel with a controlled Checkbox whose onChange updates acceptedTerms, so ordinary label text activates the checkbox. Only the policy names are links, with target=\"_blank\"; neither the navigation wrapper nor the surrounding styles extend them over the other label text. Opening a policy by tapping its linked words is expected behavior and does not establish the claimed registration blocker.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/register.tsx:177",
+    "frontend_web/landing_next/migrated/pages/register.tsx:178",
+    "frontend_web/landing_next/migrated/pages/register.tsx:182",
+    "frontend_web/landing_next/migrated/pages/register.tsx:186",
+    "frontend_web/landing_next/public/navigation.tsx:32",
+    "frontend_web/src/pages/register.tsx:177"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F14-U7",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Confirmed at P2 for the Vite application: a startup identity-request failure replaces the router with adjacent plain buttons without spacing or target sizing. Reconnect reloads the same bootstrap, while failed logout returns to the error without clearing local authentication. The scope is narrower than the whole website because Next public pages retain their separate header and footer outside the migrated authentication provider.",
+   "evidence": [
+    "shared-core/src/domains/auth/browserOperations.ts:94",
+    "frontend_web/src/contexts/AuthContext.tsx:234",
+    "frontend_web/src/contexts/AuthContext.tsx:453",
+    "frontend_web/src/contexts/AuthContext.tsx:457",
+    "frontend_web/src/contexts/AuthContext.tsx:501",
+    "frontend_web/src/main.tsx:597",
+    "frontend_web/landing_next/shared/browser-session.ts:91",
+    "frontend_web/landing_next/app/(public)/layout.tsx:8",
+    "frontend_web/landing_next/public/runtime.tsx:35"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

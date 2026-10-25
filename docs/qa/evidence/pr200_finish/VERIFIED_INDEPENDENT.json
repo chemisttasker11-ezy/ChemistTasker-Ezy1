@@ -3903,5 +3903,376 @@
    }
   ],
   "s3": "NOT_EXECUTED"
+ },
+ "F13-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Expo Hub",
+  "title": "A Hub with more than 50 posts repeatedly clears and reloads its mobile feed.",
+  "finder": "codexA-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "claudeB-1",
+    "batch": "X01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The `load` callback lists `next` as a dependency, and the mount effect depends on `load`. So when a page comes back with a non-null `next` (DRF PageNumberPagination, PAGE_SIZE 50, which HubPostViewSet.list uses), `load` is rebuilt and the effect runs again. Each run clears posts, the open discussion, the comment draft and the reply target, sets `next` back to null (which rebuilds `load` again) and fetches again, so it loops for as long as the Hub has more than 50 posts. Load more is also broken: it calls `fetchHubPosts(nextUrl)`, so the URL string is passed as the scope argument and `options.cursor` is never set. `buildScopeParams` then reads `scope.type` from a string, gets undefined, and sends a request with no valid scope instead of following the next URL.",
+    "evidence": [
+     "backend/core/settings.py:360",
+     "backend/core/settings.py:361",
+     "backend/pharmacy_hub/posts.py:192",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:511",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:518",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:521",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:526",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:541",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:501",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:573",
+     "shared-core/src/domains/pharmacyHub/api.ts:145",
+     "shared-core/src/domains/pharmacyHub/api.ts:149",
+     "shared-core/src/domains/pharmacyHub/mappers.ts:191"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C048-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Hub",
+  "title": "Correcting a poll question silently deletes every existing vote.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "claudeB-1",
+    "batch": "X01",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The web poll dialog always sends the full options list with the question, and updateHubPollService passes it on. The backend's update turns `options` into `option_labels`. Whenever `option_labels` is present, the serializer deletes every PharmacyHubPollVote and every option and recreates them, without checking whether the labels changed. So editing only the question silently wipes all votes; the dialog shows no warning. This is real, but the lost data is informal Hub poll votes, so P2 rather than P1.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx:121",
+     "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:315",
+     "shared-core/src/domains/pharmacyHub/api.ts:214",
+     "backend/pharmacy_hub/polls.py:162",
+     "backend/pharmacy_hub/serialization/polls.py:149",
+     "backend/pharmacy_hub/serialization/polls.py:150",
+     "backend/pharmacy_hub/serialization/polls.py:151"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C077-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Onboarding",
+  "title": "Referee decline links do not match the web page or its request",
+  "finder": "codexA-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "claudeB-1",
+    "batch": "X01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The email builds the decline link as `/onboarding/referee-reject/{token}`, which is one path segment; the signed token contains colons but no slash. The Next page and the old SPA route both need two segments (`/:pk/:refIndex`), so the link matches no page. Even if a page rendered, it calls the deprecated `refereeReject(pk, refIndex)` endpoint, which POSTs to `/onboarding/referee-reject/{pk}/{refIndex}/`. Django only routes `onboarding/referee-reject/<str:token>/`, and the existing token client (`refereeRejectByToken`) is never used. The decline is never recorded, so the reference stays pending and reminders keep going.",
+    "evidence": [
+     "backend/onboarding/emails.py:70",
+     "backend/onboarding/emails.py:79",
+     "frontend_web/landing_next/app/(public)/onboarding/referee-reject/[pk]/[refIndex]/page.tsx:4",
+     "frontend_web/src/main.tsx:158",
+     "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:11",
+     "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:22",
+     "shared-core/src/domains/auth/browserOperations.ts:71",
+     "shared-core/src/constants/endpoints.ts:47",
+     "backend/onboarding/urls.py:41",
+     "backend/onboarding/views.py:163"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C077-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Talent",
+  "title": "Expired availability prevents Explorers from publishing again",
+  "finder": "codexA-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "claudeB-1",
+    "batch": "X01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The web Talent Board finds the user's own post only in `useTalentFeed`, which calls the `feed` action. That action drops posts that fail `is_talent_board_visible`, which includes dated availability whose last date has passed. So for an expired post `existingPostId` stays null: the form offers neither edit nor delete and submits a create. For an Explorer, `_create_newcomer_post` refuses any create while any of their posts exists, expired or not, with \"Edit it, or delete it to post again\", which the UI cannot do. No backend job removes expired posts; the only delete happens on role upgrade.",
+    "evidence": [
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:116",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:540",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:614",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:757",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:1051",
+     "backend/talent/models.py:127",
+     "backend/talent/views/explorer.py:126",
+     "backend/talent/views/explorer.py:174",
+     "backend/talent/views/explorer.py:182"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F14-U8": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P2",
+  "area": "Attendance",
+  "title": "Workers can clock in only with the counter QR or kiosk PIN; there is no manual fallback when both are unavailable.",
+  "finder": "agy-ux",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "X02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P2",
+    "reason": "Worker clock-in requires a valid pharmacy QR token, while kiosk alternatives require a working kiosk. Missing-punch and manager-correction workflows require an existing session or event, so they cannot create Sara's initial attendance record when neither clocking method is available. Choosing an alternative form of attendance evidence requires an owner policy decision.",
+    "evidence": [
+     "frontend_web/src/pages/attendance/WorkerAttendancePage.tsx:236",
+     "backend/attendance/urls.py:47",
+     "backend/attendance/worker_api.py:59",
+     "backend/attendance/transitions.py:83",
+     "backend/workforce/attendance_edits.py:34",
+     "backend/attendance/approvals.py:316"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F14-U2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P2",
+  "area": "Web",
+  "title": "The marketplace listing gate lists 'Verify your mobile number' with no way to do it, and the 8-step bar is cut off at desktop width.",
+  "finder": "agy-ux",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "X02",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The mobile-verification blocker is returned for an unverified owner, but the gate renders links only for identity and onboarding blockers. This confirms a missing route from the mobile prerequisite to its completion screen, rather than a complete inability to verify a mobile number. Terms can be accepted directly below the list, and the step bar allows horizontal scrolling; permanent label truncation at 1440px is not established by source alone.",
+    "evidence": [
+     "backend/marketplace/policy.py:72",
+     "backend/marketplace/entry_views.py:14",
+     "frontend_web/landing_next/features/marketplace/add-item-wizard.tsx:297",
+     "frontend_web/landing_next/features/marketplace/access-steps.tsx:43",
+     "frontend_web/landing_next/features/marketplace/access-steps.tsx:44",
+     "frontend_web/landing_next/features/marketplace/add-item-wizard.module.css:22",
+     "frontend_web/src/main.tsx:140"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F14-U4": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P2",
+  "area": "Web",
+  "title": "Ethical marketplace sub-pages keep the generic landing page title, so browser tabs and history cannot be told apart.",
+  "finder": "agy-ux",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "X02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P2",
+    "reason": "Inventory, listings and transfers render different workspace views but export no page title. Their shared ethical layout supplies only robots metadata, and the workspace does not update document.title. All three therefore inherit the same generic title from the root layout, including when access prerequisites are unmet.",
+    "evidence": [
+     "frontend_web/landing_next/app/layout.tsx:12",
+     "frontend_web/landing_next/app/(ethical)/marketplace/ethical/layout.tsx:7",
+     "frontend_web/landing_next/app/(ethical)/marketplace/ethical/inventory/page.tsx:2",
+     "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/page.tsx:2",
+     "frontend_web/landing_next/app/(ethical)/marketplace/ethical/transfers/page.tsx:2",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:74"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F14-U6": {
+  "status": "NEEDS_RUNTIME",
+  "severity": "P2",
+  "claimed_severity": "P2",
+  "area": "Web",
+  "title": "Typing a date (DD/MM/YYYY) in the post-shift date field is rejected with 'Pick a date first'; only the picker works.",
+  "finder": "agy-ux",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "X02",
+    "verdict": "NEEDS_RUNTIME",
+    "severity": "P2",
+    "reason": "The date picker explicitly uses DD/MM/YYYY and stores any valid value supplied by its onChange callback, without distinguishing typing from calendar selection. Add date reports 'Pick a date first' only when that stored value is empty. Whether keyboard entry fails to produce a valid callback depends on the rendered picker interaction; the supplied screenshot shows an empty field and does not settle that.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx:16",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:571",
+     "frontend_web/shared/postShift/PostShiftTimetableStep.tsx:217",
+     "frontend_web/shared/postShift/PostShiftTimetableStep.tsx:282",
+     "frontend_web/shared/postShift/useShiftTimetable.ts:227"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F14-U1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P2",
+  "area": "Web",
+  "title": "The public shift board offers Apply Now on shifts for a role the worker cannot take, then shows only a vague failure toast.",
+  "finder": "agy-ux",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "X03",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P2",
+    "reason": "The public listing includes all roles, and Apply Now checks verification without checking whether the worker can perform that role. The application endpoint excludes technician shifts from a pharmacist's queryset and returns 404. The page replaces that response with the reported generic failure message, so the backend guard prevents the application but does not prevent the confusing UI.",
+    "evidence": [
+     "backend/shifts/browse.py:571",
+     "backend/shifts/browse.py:449",
+     "backend/shifts/access.py:84",
+     "backend/shifts/base.py:197",
+     "backend/shifts/urls.py:31",
+     "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:298",
+     "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:325",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:480"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F14-U3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P2",
+  "area": "Web",
+  "title": "Several phone tap targets are below 44px (public job board map/report buttons, talent board nav links, landing role pills, dashboard top-bar icons).",
+  "finder": "agy-ux",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "X03",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "Confirmed at P2 for the small map IconButton, 32px Report target, 36px landing role pills and explicitly 38px phone dashboard icons. The later landing CSS overrides the earlier 44px minimum. The broader claim about talent-board navigation is not established: the mobile menu links receive 12px padding on each side, and account-menu entries have a 44px minimum.",
+    "evidence": [
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:429",
+     "frontend_web/shared/ReportButton.tsx:42",
+     "frontend_web/landing_next/app/globals.css:440",
+     "frontend_web/landing_next/app/globals.css:513",
+     "frontend_web/src/layouts/DashboardTopShell.tsx:259",
+     "frontend_web/src/layouts/TopBarActions.tsx:933",
+     "frontend_web/landing_next/app/globals.css:54",
+     "frontend_web/landing_next/app/globals.css:78"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F14-U5": {
+  "status": "REFUTED",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Web",
+  "title": "On phone, tapping the 'I agree to the Terms' label may open the terms link instead of ticking the box, leaving Register disabled.",
+  "finder": "agy-ux",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "X03",
+    "verdict": "REFUTED",
+    "severity": "P1",
+    "reason": "The form uses FormControlLabel with a controlled Checkbox whose onChange updates acceptedTerms, so ordinary label text activates the checkbox. Only the policy names are links, with target=\"_blank\"; neither the navigation wrapper nor the surrounding styles extend them over the other label text. Opening a policy by tapping its linked words is expected behavior and does not establish the claimed registration blocker.",
+    "evidence": [
+     "frontend_web/landing_next/migrated/pages/register.tsx:177",
+     "frontend_web/landing_next/migrated/pages/register.tsx:178",
+     "frontend_web/landing_next/migrated/pages/register.tsx:182",
+     "frontend_web/landing_next/migrated/pages/register.tsx:186",
+     "frontend_web/landing_next/public/navigation.tsx:32",
+     "frontend_web/src/pages/register.tsx:177"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F14-U7": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P2",
+  "area": "Web",
+  "title": "If the API cannot be reached at start-up, the web app shows an unstyled error with run-together buttons; Reconnect reloads into the same state and Retry logout has no way out.",
+  "finder": "agy-ux",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "X03",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "Confirmed at P2 for the Vite application: a startup identity-request failure replaces the router with adjacent plain buttons without spacing or target sizing. Reconnect reloads the same bootstrap, while failed logout returns to the error without clearing local authentication. The scope is narrower than the whole website because Next public pages retain their separate header and footer outside the migrated authentication provider.",
+    "evidence": [
+     "shared-core/src/domains/auth/browserOperations.ts:94",
+     "frontend_web/src/contexts/AuthContext.tsx:234",
+     "frontend_web/src/contexts/AuthContext.tsx:453",
+     "frontend_web/src/contexts/AuthContext.tsx:457",
+     "frontend_web/src/contexts/AuthContext.tsx:501",
+     "frontend_web/src/main.tsx:597",
+     "frontend_web/landing_next/shared/browser-session.ts:91",
+     "frontend_web/landing_next/app/(public)/layout.tsx:8",
+     "frontend_web/landing_next/public/runtime.tsx:35"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
  }
 }

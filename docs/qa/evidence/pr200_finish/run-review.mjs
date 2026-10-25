@@ -13,7 +13,7 @@ const RUNS = path.join(DIR, 'runs'), CLAIMS = path.join(DIR, 'claims');
 fs.mkdirSync(RUNS, { recursive: true }); fs.mkdirSync(CLAIMS, { recursive: true });
 const STACK = 'C:\\dev\\my-stack';
 const HOME = process.env.USERPROFILE;
-const TIMEOUT_MIN = 45, CLAIM_MIN = 55;
+const TIMEOUT_MIN = 90, CLAIM_MIN = 100;
 // A: keep 5h headroom for the orchestrator session (same account). B: keep its week for the next 3 days.
 const GUARD = { claudeA: { five: 85, week: 96 }, claudeB: { five: 85, week: 50 } };
 const LIMIT_RE = /rate.?limit|usage limit|quota|\b429\b|RESOURCE_EXHAUSTED|\b401\b|logged out|not logged in|hit your limit|hit your session limit|out of credits/i;

@@ -1,0 +1,339 @@
+{
+ "chunk": "R077",
+ "files": [
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Visible feed excludes expired posts needed for owner editing."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFilters.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2",
+    "N3"
+   ],
+   "note": "Expired posts become unmanageable; clearing engagement choices does not persist."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/types.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/login.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional concrete problem established."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/onboarding/RefereeQuestionnairePage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "B45"
+   ],
+   "note": "Submission disables browser validation and does not validate required answers."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Expects legacy identifiers instead of the signed token used by current invitations."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/pages/register.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/theme/sleekTheme.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/utils/apiClient.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional concrete problem established."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/utils/browserMobileOtp.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/utils/dashboardPath.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/utils/ownerSetup.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no concrete problem established."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/utils/roleLabels.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/utils/seo.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/migrated/utils/tokenService.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional concrete problem established."
+  },
+  {
+   "path": "frontend_web/landing_next/next-env.d.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Generated Next.js declarations; read fully."
+  },
+  {
+   "path": "frontend_web/landing_next/next.config.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Next.js configuration; read fully."
+  },
+  {
+   "path": "frontend_web/landing_next/postcss.config.mjs",
+   "verdict": "NA",
+   "ids": [],
+   "note": "CSS pipeline configuration; read fully."
+  },
+  {
+   "path": "frontend_web/landing_next/public/entry.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/public/footer.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/public/header.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/public/hero.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/public/navigation.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional concrete problem established."
+  },
+  {
+   "path": "frontend_web/landing_next/public/routes.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/public/runtime.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/public/skill-icon.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/public/theme.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/shared-ui/filterParts.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/shared-ui/shifts/FiltersSidebar.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/shared-ui/shifts/model.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/shared-ui/talent/FiltersSidebar.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/shared-ui/talent/RoleTile.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates to the shared component."
+  },
+  {
+   "path": "frontend_web/landing_next/shared/account-controls.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/landing_next/shared/browser-session.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional concrete problem established."
+  },
+  {
+   "path": "frontend_web/landing_next/shared/session-provider.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/scripts/audit-dashboard-visual-states.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; checks source contracts without claiming runtime coverage."
+  },
+  {
+   "path": "frontend_web/scripts/audit-ui-boundaries.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/scripts/auth-flow.test.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion identified."
+  },
+  {
+   "path": "frontend_web/scripts/build-kiosk-ui.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "frontend_web/scripts/dev-all.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no concrete problem established."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Onboarding",
+   "title": "Referee decline links do not match the web page or its request",
+   "scenario": "Sara names Tom as her referee. Tom follows the decline link in his invitation, but the web page expects a different address and cannot record his refusal. Sara's reference remains pending.",
+   "evidence": [
+    "backend/onboarding/emails.py:79",
+    "frontend_web/landing_next/app/(public)/onboarding/referee-reject/[pk]/[refIndex]/page.tsx:4",
+    "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:11",
+    "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:22",
+    "shared-core/src/domains/auth/browserOperations.ts:71",
+    "backend/onboarding/urls.py:41"
+   ],
+   "confidence": "high",
+   "test_needed": "Open the actual signed decline URL generated for Tom; assert it renders, records rejection, and stops reminders.",
+   "owner_question": {
+    "question": "When Tom follows Sara's referee decline link, what should happen?",
+    "options": [
+     "Record Tom's refusal immediately",
+     "Ask Tom to confirm, then record his refusal",
+     "Leave Sara's reference pending because the link fails (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Talent",
+   "title": "Expired availability prevents Explorers from publishing again",
+   "scenario": "Zoe publishes dated availability on the Talent Board. After her last available date passes, her post disappears and the publishing form no longer offers to edit or delete it. When Zoe tries to publish new dates, she is refused because her previous post still exists.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:540",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:614",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:757",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:1051",
+    "backend/talent/models.py:127",
+    "backend/talent/views/explorer.py:126",
+    "backend/talent/views/explorer.py:182"
+   ],
+   "confidence": "high",
+   "test_needed": "Give Zoe an existing post whose availability ended yesterday; assert she can use the web publishing form to publish future dates.",
+   "owner_question": {
+    "question": "After Zoe's published availability expires, how should she publish new dates?",
+    "options": [
+     "Let Zoe edit and renew her expired post",
+     "Let Zoe replace her expired post",
+     "Block Zoe while her expired post exists (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Talent",
+   "title": "Clearing every engagement choice leaves the previous choices saved",
+   "scenario": "Sara edits her published availability and deselects her last engagement choice. Saving appears successful, but the previous choice remains on her profile. Tom can still find Sara under an engagement preference she removed.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:508",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:744",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:768",
+    "shared-core/src/domains/talent/api.ts:68",
+    "backend/talent/serializers/explorer.py:281"
+   ],
+   "confidence": "high",
+   "test_needed": "Edit Sara's AVAILABILITY post from work_types=['CASUAL'] to no selections; save and reload, asserting the old choice is cleared or explicitly rejected before saving.",
+   "owner_question": {
+    "question": "When Sara removes her last engagement choice and saves her availability, what should happen?",
+    "options": [
+     "Save Sara's profile with no engagement choices",
+     "Require Sara to choose at least one before saving",
+     "Silently retain Sara's previous choice (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-1"
+}

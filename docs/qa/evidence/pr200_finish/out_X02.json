@@ -1,0 +1,78 @@
+{
+ "chunk": "X02",
+ "verdicts": [
+  {
+   "id": "F14-U8",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Worker clock-in requires a valid pharmacy QR token, while kiosk alternatives require a working kiosk. Missing-punch and manager-correction workflows require an existing session or event, so they cannot create Sara's initial attendance record when neither clocking method is available. Choosing an alternative form of attendance evidence requires an owner policy decision.",
+   "evidence": [
+    "frontend_web/src/pages/attendance/WorkerAttendancePage.tsx:236",
+    "backend/attendance/urls.py:47",
+    "backend/attendance/worker_api.py:59",
+    "backend/attendance/transitions.py:83",
+    "backend/workforce/attendance_edits.py:34",
+    "backend/attendance/approvals.py:316"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "F14-U2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The mobile-verification blocker is returned for an unverified owner, but the gate renders links only for identity and onboarding blockers. This confirms a missing route from the mobile prerequisite to its completion screen, rather than a complete inability to verify a mobile number. Terms can be accepted directly below the list, and the step bar allows horizontal scrolling; permanent label truncation at 1440px is not established by source alone.",
+   "evidence": [
+    "backend/marketplace/policy.py:72",
+    "backend/marketplace/entry_views.py:14",
+    "frontend_web/landing_next/features/marketplace/add-item-wizard.tsx:297",
+    "frontend_web/landing_next/features/marketplace/access-steps.tsx:43",
+    "frontend_web/landing_next/features/marketplace/access-steps.tsx:44",
+    "frontend_web/landing_next/features/marketplace/add-item-wizard.module.css:22",
+    "frontend_web/src/main.tsx:140"
+   ],
+   "runtime_test": "For the separate clipping claim, open /marketplace/new at 1440px and check whether the full final step label is accessible by scrolling the step bar.",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F14-U4",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Inventory, listings and transfers render different workspace views but export no page title. Their shared ethical layout supplies only robots metadata, and the workspace does not update document.title. All three therefore inherit the same generic title from the root layout, including when access prerequisites are unmet.",
+   "evidence": [
+    "frontend_web/landing_next/app/layout.tsx:12",
+    "frontend_web/landing_next/app/(ethical)/marketplace/ethical/layout.tsx:7",
+    "frontend_web/landing_next/app/(ethical)/marketplace/ethical/inventory/page.tsx:2",
+    "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/page.tsx:2",
+    "frontend_web/landing_next/app/(ethical)/marketplace/ethical/transfers/page.tsx:2",
+    "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:74"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F14-U6",
+   "verdict": "NEEDS_RUNTIME",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The date picker explicitly uses DD/MM/YYYY and stores any valid value supplied by its onChange callback, without distinguishing typing from calendar selection. Add date reports 'Pick a date first' only when that stored value is empty. Whether keyboard entry fails to produce a valid callback depends on the rendered picker interaction; the supplied screenshot shows an empty field and does not settle that.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx:16",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:571",
+    "frontend_web/shared/postShift/PostShiftTimetableStep.tsx:217",
+    "frontend_web/shared/postShift/PostShiftTimetableStep.tsx:282",
+    "frontend_web/shared/postShift/useShiftTimetable.ts:227"
+   ],
+   "runtime_test": "As an owner, open Post Shift and reach Dates. Using real keyboard input, enter a valid future DD/MM/YYYY date into the date field, blur it, and click Add date. Verify that the date appears under Your dates without 'Pick a date first'; compare with selecting the same date through the picker.",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

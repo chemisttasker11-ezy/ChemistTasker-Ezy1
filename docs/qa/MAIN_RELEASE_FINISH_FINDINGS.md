@@ -1,6 +1,6 @@
 # PR200 finish - candidate findings (source statuses)
 
-Generated from 101 chunk outputs. Source-level challenges and root-cause aliases are annotated separately from S3 tests; only F03-N1/F04-N1/F04-N2 have distinct earlier source verifiers. No S3 runtime reproduction is recorded.
+Generated from 103 chunk outputs. Source-level challenges and root-cause aliases are annotated separately from S3 tests; only F03-N1/F04-N1/F04-N2 have distinct earlier source verifiers. No S3 runtime reproduction is recorded.
 
 ## F03-N1 - P0 - Pharmacy admins - A staff member whose admin role was removed can give it back to themselves by accepting it as a pending admin invitation.
 
@@ -366,6 +366,20 @@ Tom publishes an offer for two packs from the pharmacy where Nadia works to his 
   - Additional inventory details after separate authorisation
   - The full underlying stock-lot record (keep today's behaviour)
 
+## F13-N1 - P1 - Expo Hub - A Hub with more than 50 posts repeatedly clears and reloads its mobile feed.
+
+Tom's pharmacy Hub grows to 51 posts, and Omar opens it on mobile. Each completed load starts another reload that clears the posts, open discussion and unfinished comment, making the Hub unstable to read or use. The Load more action also sends the wrong request, so Omar cannot reach the older posts.
+
+- Evidence: `backend/core/settings.py:361`, `backend/pharmacy_hub/posts.py:192`, `frontend_mobile/roles/shared/hub/HubFeed.tsx:511`, `frontend_mobile/roles/shared/hub/HubFeed.tsx:518`, `frontend_mobile/roles/shared/hub/HubFeed.tsx:521`, `frontend_mobile/roles/shared/hub/HubFeed.tsx:541`, `frontend_mobile/roles/shared/hub/HubFeed.tsx:501`, `shared-core/src/domains/pharmacyHub/api.ts:145`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Open Omar's mobile Hub containing 51 posts and verify it settles without repeated requests or cleared comment text, then loads the remaining post exactly once.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom's Hub exceeds 50 posts, how should Omar read and discuss its history on mobile?
+  - Keep the feed stable and let Omar load older posts without losing his comment
+  - Give Omar explicit pages while preserving his unfinished comment
+  - Keep clearing and reloading the feed (keep today's behaviour)
+
 ## F07-N3 - P1 - Finance summaries - Saving an invoice revision removes its recorded receipts from the cash worksheet.
 
 Sara sends Tom an invoice and records a partial payment that appears correctly in her cash worksheet. She then corrects only the invoice notes and saves without sending the replacement yet. The payment and its GST disappear from the same worksheet period even though Sara still has the money and the payment history remains.
@@ -407,6 +421,20 @@ Tom administers a community group at his own pharmacy. He edits it and includes 
   - No, pharmacy ownership of a group is immutable
   - Only through an explicit, audited two-party transfer workflow
   - Yes, source manager authorization is sufficient
+
+## C048-N1 - P1 - Hub - Correcting a poll question silently deletes every existing vote.
+
+Tom creates a poll, and Omar and Ali vote. Tom corrects a spelling mistake in the question without changing any choices. Saving the edit deletes both votes without warning.
+
+- Evidence: `frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx:121`, `frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:315`, `backend/pharmacy_hub/polls.py:162`, `backend/pharmacy_hub/serialization/polls.py:149`
+- Confidence: high; found by codexB-1
+- Test that would prove it: Edit only the question of a poll with existing votes through the web editor; assert option identities and all votes remain unchanged.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom corrects only a poll question, what should happen to Omar's and Ali's votes?
+  - Preserve their votes and the existing choices
+  - Prevent Tom from editing after voting begins
+  - Erase their votes whenever Tom saves an edit (keep today's behaviour)
 
 ## F09-N4 - P1 - Hub permissions - Users without pharmacy memberships can overwrite or delete each other's Hub polls.
 
@@ -745,6 +773,16 @@ Sara signs out from a shared iPhone. Native logout clears local secure tokens bu
   - Only send generic notifications without personal details until next login
   - Yes; preserve notifications after signing out
 
+## C074-N1 - P1 - Next / cross-account private workspace privacy - Next marketplace and publishing workspaces can display the previous account's private stock, messages or unpublished drafts after cross-tab login.
+
+Alice has private ethical-stock inventory, listing drafts and marketplace conversations open in a Next tab. In another tab, Bob signs in and the shared session-provider sets this tab to loading then authenticated as Bob. The marketplace components retain Alice's contexts and rows. EthicalWorkspaceV2 hides loading only when contexts is empty, and its getAccess callbacks are not bound to user/session generation. GoodsWorkspace can render old exchanges while reloading; GoodsListingsV2 preserves old rows and access even after Bob's getAccess/dashboard request fails. Bob may momentarily or persistently see Alice's private item names, batches, transfers, listings or messages in the existing tab even though backend requests for Bob would be forbidden. The publishing ContentDashboard is also session-insensitive: it loads editor and moderation content once on mount with useEffect([]), does not use the current session or clear its rows on account switch, so the original account's unpublished drafts can remain visible after an unrelated account signs in through another tab. GoodsWorkspace's child listing/exchange managers initialize their own rows from `initial` props and do not resynchronize after new user data arrives, so stale exchange messages can persist even after a successful reload.
+
+- Evidence: `frontend_web/landing_next/shared/session-provider.tsx:11`, `frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:27`, `frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:78`, `frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:86`, `frontend_web/landing_next/features/marketplace/workspace.tsx:15`, `frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:14`, `frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:16`, `frontend_web/landing_next/app/content/workspace.tsx:20`, `frontend_web/landing_next/app/content/workspace.tsx:25`, `frontend_web/landing_next/features/marketplace/workspace.tsx:23`, `frontend_web/landing_next/features/marketplace/workspace.tsx:26`
+- Confidence: high for source-retained-state render possibility; account-switch timing and live UX untested; found by gpt6-senior-20261025
+- Test that would prove it: Two unrelated owner accounts A/B with separate ethical inventories, goods listings and exchanges. Open A's private pages in tab1, log in as B in tab2 while tab1 remains mounted; simulate slow B getAccess and 403/error, and delay old A promises to finish last. Assert tab1 never renders A names, stock levels or messages once B is authenticated; confirm B sees only permitted data on success and old rows are purged immediately on session change. Repeat with same-tab account switch and logout/reauth. Add publisher A and unrelated user B: open A content workspace and moderation queue in tab1, sign in B in tab2; tab1 must purge all A drafts immediately, while B's server requests are denied. Validate child GoodsExchangeManager rows update when initial data changes instead of using stale initial state.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+
 ## F09-N2 - P1 - Notification privacy - Removed Hub group members still receive new private comment text.
 
 Omar writes a post in a restricted Hub group, then Tom removes Omar from that group while keeping him employed. Mia subsequently adds a confidential comment to Omar's old post. Omar still receives up to 280 characters of the new comment through notifications and push, even though he can no longer open the group.
@@ -786,6 +824,20 @@ Zoe registers as an Explorer and provides a referee for verification. The refere
   - The referee decline page accepts the signed token, records the decline, notifies Zoe to nominate a new referee, and cancels reminder emails
   - The decline link asks the referee to confirm their decision on a questionnaire before cancelling reminders
   - Keep today's behaviour where the decline link fails with a not found error
+
+## C077-N1 - P1 - Onboarding - Referee decline links do not match the web page or its request
+
+Sara names Tom as her referee. Tom follows the decline link in his invitation, but the web page expects a different address and cannot record his refusal. Sara's reference remains pending.
+
+- Evidence: `backend/onboarding/emails.py:79`, `frontend_web/landing_next/app/(public)/onboarding/referee-reject/[pk]/[refIndex]/page.tsx:4`, `frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:11`, `frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:22`, `shared-core/src/domains/auth/browserOperations.ts:71`, `backend/onboarding/urls.py:41`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Open the actual signed decline URL generated for Tom; assert it renders, records rejection, and stops reminders.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom follows Sara's referee decline link, what should happen?
+  - Record Tom's refusal immediately
+  - Ask Tom to confirm, then record his refusal
+  - Leave Sara's reference pending because the link fails (keep today's behaviour)
 
 ## F05-N1 - P1 - Onboarding / Public shifts - A New to pharmacy account can apply for public shifts without ever being verified, though the same profile is blocked from posting on the talent hub.
 
@@ -1389,6 +1441,20 @@ Zoe publishes her availability, then all the published dates pass. When she retu
   - Offer to replace her expired post with a new one
   - Reject publication until the expired post is removed elsewhere (keep today's behaviour)
 
+## C077-N2 - P1 - Talent - Expired availability prevents Explorers from publishing again
+
+Zoe publishes dated availability on the Talent Board. After her last available date passes, her post disappears and the publishing form no longer offers to edit or delete it. When Zoe tries to publish new dates, she is refused because her previous post still exists.
+
+- Evidence: `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:540`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:614`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:757`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:1051`, `backend/talent/models.py:127`, `backend/talent/views/explorer.py:126`, `backend/talent/views/explorer.py:182`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Give Zoe an existing post whose availability ended yesterday; assert she can use the web publishing form to publish future dates.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: After Zoe's published availability expires, how should she publish new dates?
+  - Let Zoe edit and renew her expired post
+  - Let Zoe replace her expired post
+  - Block Zoe while her expired post exists (keep today's behaviour)
+
 ## F10-N1 - P1 - Talent - Any signed-in account can identify authors of anonymous talent posts.
 
 Sara publishes anonymous availability, and the public board hides her identity. Zoe signs in and can obtain Sara's full name and account identifiers from the signed-in talent feed without any hiring relationship, verification or permission to reveal Sara. The same post number connects Sara's identity to her anonymous public availability.
@@ -1529,6 +1595,16 @@ After Zoe (or Sara, Ali, or Mia) finishes verifying her mobile number on the web
   - Update each caller individually to construct the role dashboard path before navigating.
   - Keep today's behaviour where '/dashboard' falls through to the 404 Page Not Found screen.
 
+## F14-U5 - P1 - Web - On phone, tapping the 'I agree to the Terms' label may open the terms link instead of ticking the box, leaving Register disabled.
+
+Zoe signs up on her phone. She taps the 'I agree to the Terms of Service and Privacy Policy' text to tick it; a terms page opens instead and the box stays unticked, so Register stays greyed out.
+
+- Evidence: `docs/qa/evidence/pr200_finish/runs/agy-ux2-g1/zoe_register_overlap_phone.png`
+- Confidence: low; found by agy-ux
+- Test that would prove it: At 390px on /register, tap the label text outside the link words: the checkbox should toggle; only the link words open the policy.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+
 ## F02-N2 - P1 - Workforce/Shifts - Cover requests from the web and mobile worker screens are never linked to the worker's assignment, so approving one never releases the worker.
 
 Ali can't work his rostered Saturday and taps 'Request cover' on web or mobile. Both screens send only pharmacy, date, times and role, never the assignment itself. On web, Tom approves: the server sees an unlinked request and publishes a brand-new locum shift, while Ali stays rostered. Ali is emailed that his cover was approved, so Tom may end up paying a locum like Sara plus a booking fee while the roster still expects Ali (or marks him absent). On the mobile manager screen, 'Approve' with a replacement always fails with 'assignment no longer exists'. 'Release worker' marks the request approved and reports the worker as released, but changes nothing and publishes no vacancy. Neither Ali nor a replacement like Mia is notified on the mobile path.
@@ -1556,6 +1632,20 @@ Omar takes a tea break from 10:00 to 10:10 and a lunch break from 13:00 to 13:30
   - Allow it: only check against that break's own end and against clock in and clock out
   - Allow it, and also block any overlap between the two breaks
   - Keep today's behaviour: refuse the correction
+
+## F14-U8 - P2 - Attendance - Workers can clock in only with the counter QR or kiosk PIN; there is no manual fallback when both are unavailable.
+
+Sara arrives for Tom's shift but the counter QR is missing and the kiosk tablet is off. The app offers no other way to record her start time, so her timesheet starts late or empty.
+
+- Evidence: `docs/qa/evidence/pr200_finish/runs/agy-ux2-g1/sara_04_attendance.png`
+- Confidence: medium; found by agy-ux
+- Test that would prove it: Product decision first; then a test for the chosen fallback.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara is at Tom's pharmacy but the QR code and the kiosk are both unavailable. What should happen?
+  - She requests a manual clock-in that Tom approves
+  - Tom records her times afterwards in attendance review
+  - Keep today: no fallback; fix in the timesheet
 
 ## C004-N4 - P2 - Billing - Organisation billing falls back to the pharmacy owner's personal subscription for viewing, seat purchases and subscriber status.
 
@@ -1623,6 +1713,20 @@ Sara taps send on a direct chat while offline. Mobile sendMessage catches the ne
 - Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
 - Deduplication: CANONICAL NOT_DUPLICATE; aliases: B51
 
+## F13-N3 - P2 - Expo notification deep links - Organisation administrators cannot open Hub posts from their in-app notifications.
+
+Lina posts an organisation Hub announcement and Omar comments on it. Lina receives the reply alert, but tapping it in the mobile notification list does nothing because organisation administrators have no Hub destination in the notification routing. The alert is nevertheless marked read, while the web client can follow its supplied link.
+
+- Evidence: `backend/pharmacy_hub/posts.py:443`, `backend/pharmacy_hub/notifications.py:50`, `backend/pharmacy_hub/notifications.py:67`, `frontend_mobile/utils/notificationNavigation.ts:25`, `frontend_mobile/utils/notificationNavigation.ts:295`, `frontend_mobile/features/notifications/NotificationsScreen.tsx:115`, `frontend_mobile/features/notifications/NotificationsScreen.tsx:144`, `frontend_mobile/app/organization/hub.tsx:1`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Sign in as Lina with the ORG_ADMIN role, tap a recent organisation Hub reply notification, and verify the app opens the correct organisation and post.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Lina taps Omar's reply alert on mobile, where should she land?
+  - Open Lina's organisation Hub at the exact post
+  - Open the exact post in the web app
+  - Mark the alert read without navigating (keep today's behaviour)
+
 ## C070-N1 - P2 - Expo shift board state - Shared AsyncStorage keys can expose previous account's applied/rejected shift markers after account switching.
 
 Sara uses a shared phone and marks shift IDs applied or rejected; after logout Tom signs in on the same device. The shift board persistence hook hydrates applied/rejected marker IDs from device-global AsyncStorage keys without an account prefix. Tom can briefly see Sara's state as his own until backend data refresh and shift pruning.
@@ -1664,6 +1768,48 @@ Tom edits his pharmacy hub post on mobile to tag Omar and gets 'Unable to determ
   - Both work and Omar is notified
   - Tags can only be added when a post is first created; the edit screen hides tagging
   - Keep today's behaviour (both requests fail with an error)
+
+## C048-N2 - P2 - Hub - The web Hub never loads posts or polls beyond the first 50.
+
+Tom publishes 51 updates in the pharmacy Hub. Omar can see only the newest 50 because scrolling never requests older updates. Following a notification to the oldest update also fails to reveal it.
+
+- Evidence: `frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:145`, `frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:170`, `frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:187`, `frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:604`, `shared-core/src/domains/pharmacyHub/api.ts:157`, `shared-core/src/domains/pharmacyHub/api.ts:163`, `backend/pharmacy_hub/posts.py:192`, `backend/pharmacy_hub/polls.py:95`, `backend/core/settings.py:361`
+- Confidence: high; found by codexB-1
+- Test that would prove it: Populate a Hub with 51 posts and 51 polls; assert Omar can reach both second pages and open a notification targeting the oldest post.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: How should Omar access Tom's updates once the pharmacy Hub contains more than 50 posts?
+  - Load older updates as Omar scrolls
+  - Offer pages or a Load more button
+  - Show only the first 50 updates (keep today's behaviour)
+
+## C048-N3 - P2 - Hub - A failed poll save erases the question and choices.
+
+Tom writes a poll question and five choices, then submits it during a connection failure. The dialog displays an error but clears everything Tom entered. Tom must recreate the poll before retrying.
+
+- Evidence: `frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:325`, `frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx:126`
+- Confidence: high; found by codexB-1
+- Test that would prove it: Reject the poll save request and assert the error appears while the original question and every choice remain available for retry.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom's poll cannot be saved, what should happen to his question and choices?
+  - Keep everything in the dialog for retry
+  - Preserve a draft that Tom can reopen
+  - Clear the question and choices (keep today's behaviour)
+
+## C048-N4 - P2 - Hub - Comment submissions erase text typed while the earlier comment is sending.
+
+Omar submits a comment on Tom's post over a slow connection, then starts typing his next comment in the still-editable field. When the first comment finishes sending, Omar's new text disappears. The same loss occurs with post replies and poll comments.
+
+- Evidence: `frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:165`, `frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:172`, `frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:552`, `frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx:141`, `frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx:142`, `frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx:338`
+- Confidence: high; found by codexB-1
+- Test that would prove it: Delay a comment response, enter additional text while it is pending, then resolve it; assert the additional text survives for post comments, replies and poll comments.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: While Omar's comment is sending, how should the comment field behave?
+  - Allow typing and preserve any newly entered text
+  - Disable editing until the submission finishes
+  - Allow typing but clear it when sending finishes (keep today's behaviour)
 
 ## F07-N5 - P2 - Invoice documents - Current finance invoice PDFs are labelled draft even after delivery.
 
@@ -2070,6 +2216,75 @@ Tom clears his pharmacy's late-night rate and saves the pharmacy. The page repor
   - Reject the save and explain that a replacement rate is required
   - Report success while retaining the old rate (keep today's behaviour)
 
+## C046-N1 - P2 - Shifts - Whole-shift applications disappear from Interested after reload
+
+Sara applies to Tom's dated shift that requires one person for the entire booking. After reloading, her application remains recorded, but opening Interested hides the shift because the board checks individual-date applications and ignores her whole-shift application.
+
+- Evidence: `frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:286`, `frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:222`, `frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:298`, `frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:300`, `frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:196`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Load a dated single-user shift with its ID in initialAppliedShiftIds and no applied slot IDs; assert Interested displays it.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara applies for Tom's entire dated booking, should it remain visible in Interested after she reloads?
+  - Show Sara's whole booking in Interested
+  - Show whole-booking applications in a separate accessible list
+  - Hide whole-booking applications from Interested (keep today's behaviour)
+
+## C046-N2 - P2 - Shifts - Interested and rejected tabs cannot reach results on other pages
+
+Sara previously applied for a shift that now falls on the second page of available opportunities. She returns on the first page and opens Interested, which filters only that loaded page and removes the page controls. Her application is missing from the tab, and she cannot reach it there; the community Rejected tab has the same limitation.
+
+- Evidence: `frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:201`, `frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:217`, `frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:660`, `frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:290`, `frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:701`, `frontend_web/src/pages/dashboard/sidebar/CommunityShiftsPage.tsx:592`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Provide more than one server page with Sara's applied shift only on page two; assert Interested can retrieve and display it.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara opens Interested or Rejected, how should she reach matching shifts outside the currently loaded browse page?
+  - Fetch and paginate all matching shifts for Sara
+  - Load all available pages before filtering those tabs
+  - Show only the current browse page without navigation (keep today's behaviour)
+
+## C076-N1 - P2 - Shifts - Minimum-rate filtering hides qualifying roles without dated shifts.
+
+Tom advertises a part-time role paying $65 per hour without individual dated shifts. Sara sets a $50 minimum rate. The server returns Tom's qualifying role, but the board removes it because it checks only rates attached to dated shifts.
+
+- Evidence: `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts:272`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts:280`, `backend/shifts/browse.py:563`, `backend/shifts/browse.py:619`
+- Confidence: high; found by codexB-1
+- Test that would prove it: Return a part-time role with no slots and minHourlyRate 65; setting minRate 50 must not remove it.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara filters for at least $50 per hour, what should happen to Tom's undated part-time role advertising $65 per hour?
+  - Include it using its advertised hourly pay
+  - Skip minimum-rate filtering for undated roles
+  - Hide undated roles whenever a minimum is set (keep today's behaviour)
+
+## C076-N2 - P2 - Shifts - The board hides future pharmacy shifts using the viewer's local clock.
+
+Tom posts a noon shift at his Perth pharmacy. Sara browses from Brisbane when it is 1 pm for her and 11 am at Tom's pharmacy. The board treats noon as Brisbane time and removes the shift even though Tom's shift has not started.
+
+- Evidence: `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:117`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:124`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:128`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts:268`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:185`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:287`
+- Confidence: high; found by codexB-1
+- Test that would prove it: At 03:00 UTC with a Brisbane browser, a same-day noon Perth shift returned by the API must remain visible and counterable.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should Sara still see Tom's noon Perth shift when her Brisbane clock says 1 pm but Tom's pharmacy clock says 11 am?
+  - Keep it available until its start time at Tom's pharmacy
+  - Hide it using Sara's unconverted browser clock (keep today's behaviour)
+
+## C076-N3 - P2 - Shifts - Recurring schedules silently omit dates after the first 90 occurrences.
+
+Tom publishes a daily recurring schedule starting tomorrow and lasting 180 days. Sara can see only its first 90 dates, with no way to reach the remaining dates. Opening a counter offer also includes only those first 90 dates, leaving the rest of Tom's advertised schedule inaccessible.
+
+- Evidence: `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:74`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:77`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:86`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:185`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:287`, `backend/shifts/models.py:407`
+- Confidence: high; found by codexB-1
+- Test that would prove it: Supply a valid 180-day daily recurring schedule starting tomorrow; verify that occurrence 91 remains accessible for display and counter offers.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: What should Sara be able to do with dates beyond the first 90 occurrences of Tom's published recurring schedule?
+  - View and select all published dates
+  - Prevent Tom from publishing more than 90 occurrences
+  - Keep accepting longer schedules while hiding later dates (keep today's behaviour)
+
 ## C079-N2 - P2 - Shifts - Manual shift times revert to pharmacy opening hours
 
 Tom selects a date manually for his first shift entry at a pharmacy whose hours are 09:00–17:00. He changes the start to 10:00 because Sara is needed for a shorter shift. The form immediately restores 09:00, preventing him from keeping his chosen time through this entry flow.
@@ -2126,6 +2341,62 @@ Sara posts her availability as anonymous, which is the default, because she is q
   - Name visible only to verified owners and organisation admins
   - Keep today: every logged-in user gets her full name and id
 
+## C046-N3 - P2 - Talent - Published availability beyond four weeks cannot be requested
+
+Sara publishes availability six weeks ahead. Tom can see the future dates on her talent card, but Request Booking opens a calendar containing only four weeks with no navigation. None of Sara's dates can be selected, so Tom cannot start a booking request from her post.
+
+- Evidence: `frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:625`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:42`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:43`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:155`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:231`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/TalentCardV2.tsx:271`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Give Sara availability six weeks ahead; assert Tom can select that published date and initiate its booking request.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara publishes a date six weeks ahead, should Tom be able to request it immediately?
+  - Let Tom navigate to every published date
+  - Restrict Sara's publishing to the bookable calendar window
+  - Make Tom wait until the date enters the calendar window (keep today's behaviour)
+
+## C046-N4 - P2 - Talent - Pitch submission errors are hidden on the final tab
+
+Sara selects willingness to travel but leaves travel states empty, then reaches the final tab and presses Post Availability. Saving is refused, but the explanation appears only on the first tab while Sara remains on the final tab. The same placement hides other save failures, leaving her without a visible explanation.
+
+- Evidence: `frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:306`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:332`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:334`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:819`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:653`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:741`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Submit from Time Availability with willingness to travel enabled and no travel state; assert the refusal explanation is visible immediately.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara's pitch cannot be saved from the final tab, where should she see the reason?
+  - Show the error on the current tab
+  - Move Sara to the relevant tab and show the error
+  - Leave the explanation hidden on Basic Info (keep today's behaviour)
+
+## C076-N4 - P2 - Talent - The availability calendar cannot show published dates beyond four weeks.
+
+Sara publishes availability six weeks ahead. Tom opens her availability calendar, but it contains only a fixed four-week window with no navigation. Her published date is absent, and Tom cannot select it or request it through the calendar.
+
+- Evidence: `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:42`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:43`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:145`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:231`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:625`
+- Confidence: high; found by codexB-1
+- Test that would prove it: Publish Sara's sole available date six weeks ahead; Tom must be able to reach, select and request that date from her calendar.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara publishes availability six weeks ahead, what should Tom see in her calendar?
+  - Allow navigation to every published date
+  - Limit Sara's publication to dates the calendar supports
+  - Keep later dates publishable but absent from the calendar (keep today's behaviour)
+
+## C077-N3 - P2 - Talent - Clearing every engagement choice leaves the previous choices saved
+
+Sara edits her published availability and deselects her last engagement choice. Saving appears successful, but the previous choice remains on her profile. Tom can still find Sara under an engagement preference she removed.
+
+- Evidence: `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:508`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:744`, `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:768`, `shared-core/src/domains/talent/api.ts:68`, `backend/talent/serializers/explorer.py:281`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Edit Sara's AVAILABILITY post from work_types=['CASUAL'] to no selections; save and reload, asserting the old choice is cleared or explicitly rejected before saving.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara removes her last engagement choice and saves her availability, what should happen?
+  - Save Sara's profile with no engagement choices
+  - Require Sara to choose at least one before saving
+  - Silently retain Sara's previous choice (keep today's behaviour)
+
 ## C028-N2 - P2 - Timesheets - Changing contracted hours leaves rebuilt timesheets showing the previous hours
 
 Tom changes Omar's contracted week from 38 hours to 30 hours after a timesheet has been built. The change schedules a rebuild, but ordinary rebuilding treats the inputs as unchanged and keeps the old 38-hour total. The timesheet is then marked current and can retain its previous approval.
@@ -2168,3 +2439,80 @@ Omar opens My Hours to review his worked hours at Tom's pharmacy and inspects a 
   - Allow Omar to submit explanations as comments on the timesheet without showing direct resolution or waiving controls.
   - Leave the manager resolution and punch buttons visible to workers even though server permissions reject their submissions (keep today's behaviour).
 
+## F14-U1 - P2 - Web - The public shift board offers Apply Now on shifts for a role the worker cannot take, then shows only a vague failure toast.
+
+Sara is a pharmacist. On the public shift board she sees Apply Now on Tom's technician shift and taps it. She gets 'Failed to express interest in this shift.' with no reason, so she may think the site is broken or retry.
+
+- Evidence: `docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/desktop-sara-apply-modal.png`, `docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/check_sara_apply.py`
+- Confidence: high; found by agy-ux
+- Test that would prove it: Log in as a pharmacist, open a technician shift on the public board: the button should be hidden/disabled with the reason, or the error should name the role mismatch.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara (pharmacist) sees Tom's technician shift on the public board. What should she see?
+  - Hide shifts for roles she cannot take
+  - Show them but disable Apply with 'For technicians only'
+  - Keep today: Apply Now, then a generic error
+
+## F14-U2 - P2 - Web - The marketplace listing gate lists 'Verify your mobile number' with no way to do it, and the 8-step bar is cut off at desktop width.
+
+Tom opens Add item in the marketplace. He is told to verify his mobile number, complete identity checks and accept terms. Only the identity row has a link, so Tom does not know where to verify his mobile. The step bar's last label is cut off ('Save draf').
+
+- Evidence: `docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/desktop-tom-marketplace-new.png`
+- Confidence: high; found by agy-ux
+- Test that would prove it: Open /marketplace/new as an owner without a verified mobile: each unmet prerequisite should link to where it is completed; step labels fit at 1440px.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+
+## F14-U3 - P2 - Web - Several phone tap targets are below 44px (public job board map/report buttons, talent board nav links, landing role pills, dashboard top-bar icons).
+
+Sara browses shifts on her phone and keeps missing the small 'Show map' and 'Report' buttons; Tom misses the 38px top-bar icons on his dashboard.
+
+- Evidence: `docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/phone-public_job_board.png`, `docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/phone-public_talent_board.png`, `docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/phone-landing.png`, `docs/qa/evidence/pr200_finish/runs/agy-ux2-g1/tom_dashboard_phone.png`
+- Confidence: medium; found by agy-ux
+- Test that would prove it: Measure the named controls at 390px width: each tappable box should be at least 44x44px.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+
+## F14-U4 - P2 - Web - Ethical marketplace sub-pages keep the generic landing page title, so browser tabs and history cannot be told apart.
+
+Tom has inventory, listings and transfers open in three tabs; all three tabs show the same generic title.
+
+- Evidence: `docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/desktop-tom-_marketplace_ethical.png`
+- Confidence: medium; found by agy-ux
+- Test that would prove it: Open /marketplace/ethical/inventory, /listings, /transfers: each should set its own document title.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+
+## F14-U6 - P2 - Web - Typing a date (DD/MM/YYYY) in the post-shift date field is rejected with 'Pick a date first'; only the picker works.
+
+Tom types 27/10/2026 into the shift date box and presses Add date; he gets 'Pick a date first' and has to reopen the picker for each date of a multi-date shift.
+
+- Evidence: `docs/qa/evidence/pr200_finish/runs/agy-ux2-g1/tom_shift_dates_no_selection_error.png`
+- Confidence: medium; found by agy-ux
+- Test that would prove it: Type a valid DD/MM/YYYY date and press Add date: it should be added.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+
+## F14-U7 - P2 - Web - If the API cannot be reached at start-up, the web app shows an unstyled error with run-together buttons; Reconnect reloads into the same state and Retry logout has no way out.
+
+Omar opens the app during a backend outage or on bad Wi-Fi. He sees plain text and 'ReconnectRetry logout' run together; Reconnect reloads into the same page and logout fails, so he is stuck with no explanation.
+
+- Evidence: `docs/qa/evidence/pr200_finish/runs/agy-ux-g1/relay/result.json`
+- Confidence: high; found by agy-ux
+- Test that would prove it: Start the web app with the API unreachable: the error screen should be styled, buttons separated and at least 44px, and offer a working way back (e.g. to /login).
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+
+## F13-N2 - P2 - Web and Expo notifications - Notification screens make alerts older than the newest 20 inaccessible.
+
+Tom returns after receiving 21 alerts, with the oldest telling him that Sara's booking needs payment. Both the web notification menu and mobile notification screen show only the newest 20, with no way to open the older page. Sara's payment notice remains saved and unread, but Tom cannot find it through either notification list.
+
+- Evidence: `backend/notifications/views.py:22`, `backend/notifications/views.py:32`, `shared-core/src/domains/notifications/api.ts:6`, `frontend_web/src/layouts/TopBarActions.tsx:245`, `frontend_web/src/layouts/TopBarActions.tsx:1012`, `frontend_mobile/features/notifications/NotificationsScreen.tsx:60`, `frontend_mobile/features/notifications/NotificationsScreen.tsx:217`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Give Tom 21 persisted alerts with an unread payment notice last, reopen both clients, and verify he can reach and open that notice.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: How should Tom find Sara's unread payment notice after 20 newer alerts arrive?
+  - Let Tom browse the full notification history
+  - Prioritise unread alerts and provide older history
+  - Show only the newest 20 alerts (keep today's behaviour)

@@ -2402,6 +2402,113 @@
   "reviewer": "claudeB-1"
  },
  {
+  "id": "C046-N1",
+  "severity": "P2",
+  "area": "Shifts",
+  "title": "Whole-shift applications disappear from Interested after reload",
+  "scenario": "Sara applies to Tom's dated shift that requires one person for the entire booking. After reloading, her application remains recorded, but opening Interested hides the shift because the board checks individual-date applications and ignores her whole-shift application.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:286",
+   "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:222",
+   "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:298",
+   "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:300",
+   "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:196"
+  ],
+  "confidence": "high",
+  "test_needed": "Load a dated single-user shift with its ID in initialAppliedShiftIds and no applied slot IDs; assert Interested displays it.",
+  "owner_question": {
+   "question": "When Sara applies for Tom's entire dated booking, should it remain visible in Interested after she reloads?",
+   "options": [
+    "Show Sara's whole booking in Interested",
+    "Show whole-booking applications in a separate accessible list",
+    "Hide whole-booking applications from Interested (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C046",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "C046-N2",
+  "severity": "P2",
+  "area": "Shifts",
+  "title": "Interested and rejected tabs cannot reach results on other pages",
+  "scenario": "Sara previously applied for a shift that now falls on the second page of available opportunities. She returns on the first page and opens Interested, which filters only that loaded page and removes the page controls. Her application is missing from the tab, and she cannot reach it there; the community Rejected tab has the same limitation.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:201",
+   "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:217",
+   "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:660",
+   "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:290",
+   "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:701",
+   "frontend_web/src/pages/dashboard/sidebar/CommunityShiftsPage.tsx:592"
+  ],
+  "confidence": "high",
+  "test_needed": "Provide more than one server page with Sara's applied shift only on page two; assert Interested can retrieve and display it.",
+  "owner_question": {
+   "question": "When Sara opens Interested or Rejected, how should she reach matching shifts outside the currently loaded browse page?",
+   "options": [
+    "Fetch and paginate all matching shifts for Sara",
+    "Load all available pages before filtering those tabs",
+    "Show only the current browse page without navigation (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C046",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "C046-N3",
+  "severity": "P2",
+  "area": "Talent",
+  "title": "Published availability beyond four weeks cannot be requested",
+  "scenario": "Sara publishes availability six weeks ahead. Tom can see the future dates on her talent card, but Request Booking opens a calendar containing only four weeks with no navigation. None of Sara's dates can be selected, so Tom cannot start a booking request from her post.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:625",
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:42",
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:43",
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:155",
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:231",
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/TalentCardV2.tsx:271"
+  ],
+  "confidence": "high",
+  "test_needed": "Give Sara availability six weeks ahead; assert Tom can select that published date and initiate its booking request.",
+  "owner_question": {
+   "question": "When Sara publishes a date six weeks ahead, should Tom be able to request it immediately?",
+   "options": [
+    "Let Tom navigate to every published date",
+    "Restrict Sara's publishing to the bookable calendar window",
+    "Make Tom wait until the date enters the calendar window (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C046",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "C046-N4",
+  "severity": "P2",
+  "area": "Talent",
+  "title": "Pitch submission errors are hidden on the final tab",
+  "scenario": "Sara selects willingness to travel but leaves travel states empty, then reaches the final tab and presses Post Availability. Saving is refused, but the explanation appears only on the first tab while Sara remains on the final tab. The same placement hides other save failures, leaving her without a visible explanation.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:306",
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:332",
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:334",
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:819",
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:653",
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:741"
+  ],
+  "confidence": "high",
+  "test_needed": "Submit from Time Availability with willingness to travel enabled and no travel state; assert the refusal explanation is visible immediately.",
+  "owner_question": {
+   "question": "When Sara's pitch cannot be saved from the final tab, where should she see the reason?",
+   "options": [
+    "Show the error on the current tab",
+    "Move Sara to the relevant tab and show the error",
+    "Leave the explanation hidden on Basic Info (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C046",
+  "reviewer": "codexA-1"
+ },
+ {
   "id": "C047-N1",
   "severity": "P1",
   "area": "Chat",
@@ -2483,6 +2590,111 @@
   },
   "chunk": "C047",
   "reviewer": "codexA-4"
+ },
+ {
+  "id": "C048-N1",
+  "severity": "P1",
+  "area": "Hub",
+  "title": "Correcting a poll question silently deletes every existing vote.",
+  "scenario": "Tom creates a poll, and Omar and Ali vote. Tom corrects a spelling mistake in the question without changing any choices. Saving the edit deletes both votes without warning.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx:121",
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:315",
+   "backend/pharmacy_hub/polls.py:162",
+   "backend/pharmacy_hub/serialization/polls.py:149"
+  ],
+  "confidence": "high",
+  "test_needed": "Edit only the question of a poll with existing votes through the web editor; assert option identities and all votes remain unchanged.",
+  "owner_question": {
+   "question": "When Tom corrects only a poll question, what should happen to Omar's and Ali's votes?",
+   "options": [
+    "Preserve their votes and the existing choices",
+    "Prevent Tom from editing after voting begins",
+    "Erase their votes whenever Tom saves an edit (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C048",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "C048-N2",
+  "severity": "P2",
+  "area": "Hub",
+  "title": "The web Hub never loads posts or polls beyond the first 50.",
+  "scenario": "Tom publishes 51 updates in the pharmacy Hub. Omar can see only the newest 50 because scrolling never requests older updates. Following a notification to the oldest update also fails to reveal it.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:145",
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:170",
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:187",
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:604",
+   "shared-core/src/domains/pharmacyHub/api.ts:157",
+   "shared-core/src/domains/pharmacyHub/api.ts:163",
+   "backend/pharmacy_hub/posts.py:192",
+   "backend/pharmacy_hub/polls.py:95",
+   "backend/core/settings.py:361"
+  ],
+  "confidence": "high",
+  "test_needed": "Populate a Hub with 51 posts and 51 polls; assert Omar can reach both second pages and open a notification targeting the oldest post.",
+  "owner_question": {
+   "question": "How should Omar access Tom's updates once the pharmacy Hub contains more than 50 posts?",
+   "options": [
+    "Load older updates as Omar scrolls",
+    "Offer pages or a Load more button",
+    "Show only the first 50 updates (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C048",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "C048-N3",
+  "severity": "P2",
+  "area": "Hub",
+  "title": "A failed poll save erases the question and choices.",
+  "scenario": "Tom writes a poll question and five choices, then submits it during a connection failure. The dialog displays an error but clears everything Tom entered. Tom must recreate the poll before retrying.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:325",
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx:126"
+  ],
+  "confidence": "high",
+  "test_needed": "Reject the poll save request and assert the error appears while the original question and every choice remain available for retry.",
+  "owner_question": {
+   "question": "When Tom's poll cannot be saved, what should happen to his question and choices?",
+   "options": [
+    "Keep everything in the dialog for retry",
+    "Preserve a draft that Tom can reopen",
+    "Clear the question and choices (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C048",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "C048-N4",
+  "severity": "P2",
+  "area": "Hub",
+  "title": "Comment submissions erase text typed while the earlier comment is sending.",
+  "scenario": "Omar submits a comment on Tom's post over a slow connection, then starts typing his next comment in the still-editable field. When the first comment finishes sending, Omar's new text disappears. The same loss occurs with post replies and poll comments.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:165",
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:172",
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:552",
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx:141",
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx:142",
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx:338"
+  ],
+  "confidence": "high",
+  "test_needed": "Delay a comment response, enter additional text while it is pending, then resolve it; assert the additional text survives for post comments, replies and poll comments.",
+  "owner_question": {
+   "question": "While Omar's comment is sending, how should the comment field behave?",
+   "options": [
+    "Allow typing and preserve any newly entered text",
+    "Disable editing until the submission finishes",
+    "Allow typing but clear it when sending finishes (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C048",
+  "reviewer": "codexB-1"
  },
  {
   "id": "C049-N1",
@@ -2783,6 +2995,192 @@
   "test_needed": "Two unrelated owner accounts A/B with separate ethical inventories, goods listings and exchanges. Open A's private pages in tab1, log in as B in tab2 while tab1 remains mounted; simulate slow B getAccess and 403/error, and delay old A promises to finish last. Assert tab1 never renders A names, stock levels or messages once B is authenticated; confirm B sees only permitted data on success and old rows are purged immediately on session change. Repeat with same-tab account switch and logout/reauth. Add publisher A and unrelated user B: open A content workspace and moderation queue in tab1, sign in B in tab2; tab1 must purge all A drafts immediately, while B's server requests are denied. Validate child GoodsExchangeManager rows update when initial data changes instead of using stale initial state.",
   "chunk": "C074",
   "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C076-N1",
+  "severity": "P2",
+  "area": "Shifts",
+  "title": "Minimum-rate filtering hides qualifying roles without dated shifts.",
+  "scenario": "Tom advertises a part-time role paying $65 per hour without individual dated shifts. Sara sets a $50 minimum rate. The server returns Tom's qualifying role, but the board removes it because it checks only rates attached to dated shifts.",
+  "evidence": [
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts:272",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts:280",
+   "backend/shifts/browse.py:563",
+   "backend/shifts/browse.py:619"
+  ],
+  "confidence": "high",
+  "test_needed": "Return a part-time role with no slots and minHourlyRate 65; setting minRate 50 must not remove it.",
+  "owner_question": {
+   "question": "When Sara filters for at least $50 per hour, what should happen to Tom's undated part-time role advertising $65 per hour?",
+   "options": [
+    "Include it using its advertised hourly pay",
+    "Skip minimum-rate filtering for undated roles",
+    "Hide undated roles whenever a minimum is set (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C076",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "C076-N2",
+  "severity": "P2",
+  "area": "Shifts",
+  "title": "The board hides future pharmacy shifts using the viewer's local clock.",
+  "scenario": "Tom posts a noon shift at his Perth pharmacy. Sara browses from Brisbane when it is 1 pm for her and 11 am at Tom's pharmacy. The board treats noon as Brisbane time and removes the shift even though Tom's shift has not started.",
+  "evidence": [
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:117",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:124",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:128",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts:268",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:185",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:287"
+  ],
+  "confidence": "high",
+  "test_needed": "At 03:00 UTC with a Brisbane browser, a same-day noon Perth shift returned by the API must remain visible and counterable.",
+  "owner_question": {
+   "question": "Should Sara still see Tom's noon Perth shift when her Brisbane clock says 1 pm but Tom's pharmacy clock says 11 am?",
+   "options": [
+    "Keep it available until its start time at Tom's pharmacy",
+    "Hide it using Sara's unconverted browser clock (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C076",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "C076-N3",
+  "severity": "P2",
+  "area": "Shifts",
+  "title": "Recurring schedules silently omit dates after the first 90 occurrences.",
+  "scenario": "Tom publishes a daily recurring schedule starting tomorrow and lasting 180 days. Sara can see only its first 90 dates, with no way to reach the remaining dates. Opening a counter offer also includes only those first 90 dates, leaving the rest of Tom's advertised schedule inaccessible.",
+  "evidence": [
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:74",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:77",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts:86",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:185",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:287",
+   "backend/shifts/models.py:407"
+  ],
+  "confidence": "high",
+  "test_needed": "Supply a valid 180-day daily recurring schedule starting tomorrow; verify that occurrence 91 remains accessible for display and counter offers.",
+  "owner_question": {
+   "question": "What should Sara be able to do with dates beyond the first 90 occurrences of Tom's published recurring schedule?",
+   "options": [
+    "View and select all published dates",
+    "Prevent Tom from publishing more than 90 occurrences",
+    "Keep accepting longer schedules while hiding later dates (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C076",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "C076-N4",
+  "severity": "P2",
+  "area": "Talent",
+  "title": "The availability calendar cannot show published dates beyond four weeks.",
+  "scenario": "Sara publishes availability six weeks ahead. Tom opens her availability calendar, but it contains only a fixed four-week window with no navigation. Her published date is absent, and Tom cannot select it or request it through the calendar.",
+  "evidence": [
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:42",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:43",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:145",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx:231",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:625"
+  ],
+  "confidence": "high",
+  "test_needed": "Publish Sara's sole available date six weeks ahead; Tom must be able to reach, select and request that date from her calendar.",
+  "owner_question": {
+   "question": "When Sara publishes availability six weeks ahead, what should Tom see in her calendar?",
+   "options": [
+    "Allow navigation to every published date",
+    "Limit Sara's publication to dates the calendar supports",
+    "Keep later dates publishable but absent from the calendar (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C076",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "C077-N1",
+  "severity": "P1",
+  "area": "Onboarding",
+  "title": "Referee decline links do not match the web page or its request",
+  "scenario": "Sara names Tom as her referee. Tom follows the decline link in his invitation, but the web page expects a different address and cannot record his refusal. Sara's reference remains pending.",
+  "evidence": [
+   "backend/onboarding/emails.py:79",
+   "frontend_web/landing_next/app/(public)/onboarding/referee-reject/[pk]/[refIndex]/page.tsx:4",
+   "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:11",
+   "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:22",
+   "shared-core/src/domains/auth/browserOperations.ts:71",
+   "backend/onboarding/urls.py:41"
+  ],
+  "confidence": "high",
+  "test_needed": "Open the actual signed decline URL generated for Tom; assert it renders, records rejection, and stops reminders.",
+  "owner_question": {
+   "question": "When Tom follows Sara's referee decline link, what should happen?",
+   "options": [
+    "Record Tom's refusal immediately",
+    "Ask Tom to confirm, then record his refusal",
+    "Leave Sara's reference pending because the link fails (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C077",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "C077-N2",
+  "severity": "P1",
+  "area": "Talent",
+  "title": "Expired availability prevents Explorers from publishing again",
+  "scenario": "Zoe publishes dated availability on the Talent Board. After her last available date passes, her post disappears and the publishing form no longer offers to edit or delete it. When Zoe tries to publish new dates, she is refused because her previous post still exists.",
+  "evidence": [
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:540",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:614",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:757",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:1051",
+   "backend/talent/models.py:127",
+   "backend/talent/views/explorer.py:126",
+   "backend/talent/views/explorer.py:182"
+  ],
+  "confidence": "high",
+  "test_needed": "Give Zoe an existing post whose availability ended yesterday; assert she can use the web publishing form to publish future dates.",
+  "owner_question": {
+   "question": "After Zoe's published availability expires, how should she publish new dates?",
+   "options": [
+    "Let Zoe edit and renew her expired post",
+    "Let Zoe replace her expired post",
+    "Block Zoe while her expired post exists (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C077",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "C077-N3",
+  "severity": "P2",
+  "area": "Talent",
+  "title": "Clearing every engagement choice leaves the previous choices saved",
+  "scenario": "Sara edits her published availability and deselects her last engagement choice. Saving appears successful, but the previous choice remains on her profile. Tom can still find Sara under an engagement preference she removed.",
+  "evidence": [
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:508",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:744",
+   "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:768",
+   "shared-core/src/domains/talent/api.ts:68",
+   "backend/talent/serializers/explorer.py:281"
+  ],
+  "confidence": "high",
+  "test_needed": "Edit Sara's AVAILABILITY post from work_types=['CASUAL'] to no selections; save and reload, asserting the old choice is cleared or explicitly rejected before saving.",
+  "owner_question": {
+   "question": "When Sara removes her last engagement choice and saves her availability, what should happen?",
+   "options": [
+    "Save Sara's profile with no engagement choices",
+    "Require Sara to choose at least one before saving",
+    "Silently retain Sara's previous choice (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C077",
+  "reviewer": "codexA-1"
  },
  {
   "id": "C079-N1",
@@ -4169,5 +4567,223 @@
   "test_needed": "Disconnect native device network, send a direct text chat; assert clear error and draft retained. Vite shows explicit send failure; retry after reconnect sends once. Ensure global notifications are not already surfacing equivalent errors.",
   "chunk": "F12",
   "reviewer": "gpt6-cross-platform-20261025"
+ },
+ {
+  "id": "F13-N1",
+  "severity": "P1",
+  "area": "Expo Hub",
+  "title": "A Hub with more than 50 posts repeatedly clears and reloads its mobile feed.",
+  "scenario": "Tom's pharmacy Hub grows to 51 posts, and Omar opens it on mobile. Each completed load starts another reload that clears the posts, open discussion and unfinished comment, making the Hub unstable to read or use. The Load more action also sends the wrong request, so Omar cannot reach the older posts.",
+  "evidence": [
+   "backend/core/settings.py:361",
+   "backend/pharmacy_hub/posts.py:192",
+   "frontend_mobile/roles/shared/hub/HubFeed.tsx:511",
+   "frontend_mobile/roles/shared/hub/HubFeed.tsx:518",
+   "frontend_mobile/roles/shared/hub/HubFeed.tsx:521",
+   "frontend_mobile/roles/shared/hub/HubFeed.tsx:541",
+   "frontend_mobile/roles/shared/hub/HubFeed.tsx:501",
+   "shared-core/src/domains/pharmacyHub/api.ts:145"
+  ],
+  "confidence": "high",
+  "test_needed": "Open Omar's mobile Hub containing 51 posts and verify it settles without repeated requests or cleared comment text, then loads the remaining post exactly once.",
+  "owner_question": {
+   "question": "When Tom's Hub exceeds 50 posts, how should Omar read and discuss its history on mobile?",
+   "options": [
+    "Keep the feed stable and let Omar load older posts without losing his comment",
+    "Give Omar explicit pages while preserving his unfinished comment",
+    "Keep clearing and reloading the feed (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F13",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "F13-N2",
+  "severity": "P2",
+  "area": "Web and Expo notifications",
+  "title": "Notification screens make alerts older than the newest 20 inaccessible.",
+  "scenario": "Tom returns after receiving 21 alerts, with the oldest telling him that Sara's booking needs payment. Both the web notification menu and mobile notification screen show only the newest 20, with no way to open the older page. Sara's payment notice remains saved and unread, but Tom cannot find it through either notification list.",
+  "evidence": [
+   "backend/notifications/views.py:22",
+   "backend/notifications/views.py:32",
+   "shared-core/src/domains/notifications/api.ts:6",
+   "frontend_web/src/layouts/TopBarActions.tsx:245",
+   "frontend_web/src/layouts/TopBarActions.tsx:1012",
+   "frontend_mobile/features/notifications/NotificationsScreen.tsx:60",
+   "frontend_mobile/features/notifications/NotificationsScreen.tsx:217"
+  ],
+  "confidence": "high",
+  "test_needed": "Give Tom 21 persisted alerts with an unread payment notice last, reopen both clients, and verify he can reach and open that notice.",
+  "owner_question": {
+   "question": "How should Tom find Sara's unread payment notice after 20 newer alerts arrive?",
+   "options": [
+    "Let Tom browse the full notification history",
+    "Prioritise unread alerts and provide older history",
+    "Show only the newest 20 alerts (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F13",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "F13-N3",
+  "severity": "P2",
+  "area": "Expo notification deep links",
+  "title": "Organisation administrators cannot open Hub posts from their in-app notifications.",
+  "scenario": "Lina posts an organisation Hub announcement and Omar comments on it. Lina receives the reply alert, but tapping it in the mobile notification list does nothing because organisation administrators have no Hub destination in the notification routing. The alert is nevertheless marked read, while the web client can follow its supplied link.",
+  "evidence": [
+   "backend/pharmacy_hub/posts.py:443",
+   "backend/pharmacy_hub/notifications.py:50",
+   "backend/pharmacy_hub/notifications.py:67",
+   "frontend_mobile/utils/notificationNavigation.ts:25",
+   "frontend_mobile/utils/notificationNavigation.ts:295",
+   "frontend_mobile/features/notifications/NotificationsScreen.tsx:115",
+   "frontend_mobile/features/notifications/NotificationsScreen.tsx:144",
+   "frontend_mobile/app/organization/hub.tsx:1"
+  ],
+  "confidence": "high",
+  "test_needed": "Sign in as Lina with the ORG_ADMIN role, tap a recent organisation Hub reply notification, and verify the app opens the correct organisation and post.",
+  "owner_question": {
+   "question": "When Lina taps Omar's reply alert on mobile, where should she land?",
+   "options": [
+    "Open Lina's organisation Hub at the exact post",
+    "Open the exact post in the web app",
+    "Mark the alert read without navigating (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F13",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "F14-U1",
+  "severity": "P2",
+  "area": "Web",
+  "title": "The public shift board offers Apply Now on shifts for a role the worker cannot take, then shows only a vague failure toast.",
+  "scenario": "Sara is a pharmacist. On the public shift board she sees Apply Now on Tom's technician shift and taps it. She gets 'Failed to express interest in this shift.' with no reason, so she may think the site is broken or retry.",
+  "evidence": [
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/desktop-sara-apply-modal.png",
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/check_sara_apply.py"
+  ],
+  "confidence": "high",
+  "test_needed": "Log in as a pharmacist, open a technician shift on the public board: the button should be hidden/disabled with the reason, or the error should name the role mismatch.",
+  "owner_question": {
+   "question": "Sara (pharmacist) sees Tom's technician shift on the public board. What should she see?",
+   "options": [
+    "Hide shifts for roles she cannot take",
+    "Show them but disable Apply with 'For technicians only'",
+    "Keep today: Apply Now, then a generic error"
+   ]
+  },
+  "chunk": "F14",
+  "reviewer": "agy-ux"
+ },
+ {
+  "id": "F14-U2",
+  "severity": "P2",
+  "area": "Web",
+  "title": "The marketplace listing gate lists 'Verify your mobile number' with no way to do it, and the 8-step bar is cut off at desktop width.",
+  "scenario": "Tom opens Add item in the marketplace. He is told to verify his mobile number, complete identity checks and accept terms. Only the identity row has a link, so Tom does not know where to verify his mobile. The step bar's last label is cut off ('Save draf').",
+  "evidence": [
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/desktop-tom-marketplace-new.png"
+  ],
+  "confidence": "high",
+  "test_needed": "Open /marketplace/new as an owner without a verified mobile: each unmet prerequisite should link to where it is completed; step labels fit at 1440px.",
+  "chunk": "F14",
+  "reviewer": "agy-ux"
+ },
+ {
+  "id": "F14-U3",
+  "severity": "P2",
+  "area": "Web",
+  "title": "Several phone tap targets are below 44px (public job board map/report buttons, talent board nav links, landing role pills, dashboard top-bar icons).",
+  "scenario": "Sara browses shifts on her phone and keeps missing the small 'Show map' and 'Report' buttons; Tom misses the 38px top-bar icons on his dashboard.",
+  "evidence": [
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/phone-public_job_board.png",
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/phone-public_talent_board.png",
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/phone-landing.png",
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g1/tom_dashboard_phone.png"
+  ],
+  "confidence": "medium",
+  "test_needed": "Measure the named controls at 390px width: each tappable box should be at least 44x44px.",
+  "chunk": "F14",
+  "reviewer": "agy-ux"
+ },
+ {
+  "id": "F14-U4",
+  "severity": "P2",
+  "area": "Web",
+  "title": "Ethical marketplace sub-pages keep the generic landing page title, so browser tabs and history cannot be told apart.",
+  "scenario": "Tom has inventory, listings and transfers open in three tabs; all three tabs show the same generic title.",
+  "evidence": [
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g2/desktop-tom-_marketplace_ethical.png"
+  ],
+  "confidence": "medium",
+  "test_needed": "Open /marketplace/ethical/inventory, /listings, /transfers: each should set its own document title.",
+  "chunk": "F14",
+  "reviewer": "agy-ux"
+ },
+ {
+  "id": "F14-U5",
+  "severity": "P1",
+  "area": "Web",
+  "title": "On phone, tapping the 'I agree to the Terms' label may open the terms link instead of ticking the box, leaving Register disabled.",
+  "scenario": "Zoe signs up on her phone. She taps the 'I agree to the Terms of Service and Privacy Policy' text to tick it; a terms page opens instead and the box stays unticked, so Register stays greyed out.",
+  "evidence": [
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g1/zoe_register_overlap_phone.png"
+  ],
+  "confidence": "low",
+  "test_needed": "At 390px on /register, tap the label text outside the link words: the checkbox should toggle; only the link words open the policy.",
+  "chunk": "F14",
+  "reviewer": "agy-ux"
+ },
+ {
+  "id": "F14-U6",
+  "severity": "P2",
+  "area": "Web",
+  "title": "Typing a date (DD/MM/YYYY) in the post-shift date field is rejected with 'Pick a date first'; only the picker works.",
+  "scenario": "Tom types 27/10/2026 into the shift date box and presses Add date; he gets 'Pick a date first' and has to reopen the picker for each date of a multi-date shift.",
+  "evidence": [
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g1/tom_shift_dates_no_selection_error.png"
+  ],
+  "confidence": "medium",
+  "test_needed": "Type a valid DD/MM/YYYY date and press Add date: it should be added.",
+  "chunk": "F14",
+  "reviewer": "agy-ux"
+ },
+ {
+  "id": "F14-U7",
+  "severity": "P2",
+  "area": "Web",
+  "title": "If the API cannot be reached at start-up, the web app shows an unstyled error with run-together buttons; Reconnect reloads into the same state and Retry logout has no way out.",
+  "scenario": "Omar opens the app during a backend outage or on bad Wi-Fi. He sees plain text and 'ReconnectRetry logout' run together; Reconnect reloads into the same page and logout fails, so he is stuck with no explanation.",
+  "evidence": [
+   "docs/qa/evidence/pr200_finish/runs/agy-ux-g1/relay/result.json"
+  ],
+  "confidence": "high",
+  "test_needed": "Start the web app with the API unreachable: the error screen should be styled, buttons separated and at least 44px, and offer a working way back (e.g. to /login).",
+  "chunk": "F14",
+  "reviewer": "agy-ux"
+ },
+ {
+  "id": "F14-U8",
+  "severity": "P2",
+  "area": "Attendance",
+  "title": "Workers can clock in only with the counter QR or kiosk PIN; there is no manual fallback when both are unavailable.",
+  "scenario": "Sara arrives for Tom's shift but the counter QR is missing and the kiosk tablet is off. The app offers no other way to record her start time, so her timesheet starts late or empty.",
+  "evidence": [
+   "docs/qa/evidence/pr200_finish/runs/agy-ux2-g1/sara_04_attendance.png"
+  ],
+  "confidence": "medium",
+  "test_needed": "Product decision first; then a test for the chosen fallback.",
+  "owner_question": {
+   "question": "Sara is at Tom's pharmacy but the QR code and the kiosk are both unavailable. What should happen?",
+   "options": [
+    "She requests a manual clock-in that Tom approves",
+    "Tom records her times afterwards in attendance review",
+    "Keep today: no fallback; fix in the timesheet"
+   ]
+  },
+  "chunk": "F14",
+  "reviewer": "agy-ux"
  }
 ]

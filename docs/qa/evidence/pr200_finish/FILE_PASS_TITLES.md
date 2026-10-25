@@ -91,9 +91,17 @@ C044-N3 | Shifts | Clearing an optional pharmacy rate does not remove the saved 
 C045-N1 | Roster | Cancelling a convert-to-open-shift edit leaves the old shift marked for deletion, so a later, unrelated open-shift post deletes it.
 C045-N2 | Roster | Staff on the worker roster can see coworkers' leave type and private leave notes.
 C045-N3 | Notifications | The 'notify me about matching shifts' checkbox is never saved on its own, so unchecking it does not stop notifications.
+C046-N1 | Shifts | Whole-shift applications disappear from Interested after reload
+C046-N2 | Shifts | Interested and rejected tabs cannot reach results on other pages
+C046-N3 | Talent | Published availability beyond four weeks cannot be requested
+C046-N4 | Talent | Pitch submission errors are hidden on the final tab
 C047-N1 | Chat | Reopening a cached conversation hides messages received while it was closed
 C047-N2 | Chat | Deleted messages remain readable in conversation previews
 C047-N3 | Talent | Explorers cannot renew their availability after their published dates expire
+C048-N1 | Hub | Correcting a poll question silently deletes every existing vote.
+C048-N2 | Hub | The web Hub never loads posts or polls beyond the first 50.
+C048-N3 | Hub | A failed poll save erases the question and choices.
+C048-N4 | Hub | Comment submissions erase text typed while the earlier comment is sending.
 C049-N1 | Memberships | The pharmacy applications panel reads only the newest 50 pending applications across every pharmacy the admin manages, so older ones for a given pharmacy vanish.
 C050-N1 | Memberships | When some bulk staff invitations fail, the error is shown on the wrong person if the form has a blank row in the middle.
 C051-N1 | Onboarding | Referee decline link routes to a 404 and invokes an obsolete two-parameter backend path instead of token verification
@@ -105,6 +113,13 @@ C070-N1 | Expo shift board state | Shared AsyncStorage keys can expose previous 
 C071-N1 | Mobile authentication | Concurrent mobile logout and in-flight refresh/profile hydration can resurrect old tokens or overwrite the newly signed-in account.
 C071-N2 | Mobile push privacy | Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.
 C074-N1 | Next / cross-account private workspace privacy | Next marketplace and publishing workspaces can display the previous account's private stock, messages or unpublished drafts after cross-tab login.
+C076-N1 | Shifts | Minimum-rate filtering hides qualifying roles without dated shifts.
+C076-N2 | Shifts | The board hides future pharmacy shifts using the viewer's local clock.
+C076-N3 | Shifts | Recurring schedules silently omit dates after the first 90 occurrences.
+C076-N4 | Talent | The availability calendar cannot show published dates beyond four weeks.
+C077-N1 | Onboarding | Referee decline links do not match the web page or its request
+C077-N2 | Talent | Expired availability prevents Explorers from publishing again
+C077-N3 | Talent | Clearing every engagement choice leaves the previous choices saved
 C079-N1 | Shifts | Editing a shift replaces its saved per-date rates
 C079-N2 | Shifts | Manual shift times revert to pharmacy opening hours
 F01-N1 | Shifts/Privacy | Workers browsing shifts can see the names and emails of other workers who are booked on the shift or waiting for payment.
@@ -155,3 +170,14 @@ F11-N1 | Auth | Changing a pending phone number leaves the previous number's ver
 F11-N2 | Auth | Signing out of Expo leaves private push notifications active on that device.
 F11-N3 | Auth | Phone verification replaces a browser-only session with a persistent 90-day session.
 F12-N1 | Expo chat UX | Native direct-message send failure is logged but not shown to the user, unlike Vite's retry warning.
+F13-N1 | Expo Hub | A Hub with more than 50 posts repeatedly clears and reloads its mobile feed.
+F13-N2 | Web and Expo notifications | Notification screens make alerts older than the newest 20 inaccessible.
+F13-N3 | Expo notification deep links | Organisation administrators cannot open Hub posts from their in-app notifications.
+F14-U1 | Web | The public shift board offers Apply Now on shifts for a role the worker cannot take, then shows only a vague failure toast.
+F14-U2 | Web | The marketplace listing gate lists 'Verify your mobile number' with no way to do it, and the 8-step bar is cut off at desktop width.
+F14-U3 | Web | Several phone tap targets are below 44px (public job board map/report buttons, talent board nav links, landing role pills, dashboard top-bar icons).
+F14-U4 | Web | Ethical marketplace sub-pages keep the generic landing page title, so browser tabs and history cannot be told apart.
+F14-U5 | Web | On phone, tapping the 'I agree to the Terms' label may open the terms link instead of ticking the box, leaving Register disabled.
+F14-U6 | Web | Typing a date (DD/MM/YYYY) in the post-shift date field is rejected with 'Pick a date first'; only the picker works.
+F14-U7 | Web | If the API cannot be reached at start-up, the web app shows an unstyled error with run-together buttons; Reconnect reloads into the same state and Retry logout has no way out.
+F14-U8 | Attendance | Workers can clock in only with the counter QR or kiosk PIN; there is no manual fallback when both are unavailable.

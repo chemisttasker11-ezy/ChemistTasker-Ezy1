@@ -1,4 +1,4 @@
-// Combine independent checks into one status per finding: out_V* (Codex, never the finder's account) and
+﻿// Combine independent checks into one status per finding: out_V* (Codex, never the finder's account) and
 // out_W* (Claude, on Codex-found findings, without seeing Codex's verdict). Writes VERIFIED_INDEPENDENT.json.
 // Final status: CONFIRMED when every checker confirms; DISPUTED when checkers split; REFUTED / DUPLICATE as given.
 import fs from 'node:fs';
@@ -8,7 +8,7 @@ const DIR = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/
 const read = f => JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8'));
 const raw = new Map(read('raw_findings.json').map(f => [f.id, f]));
 const checks = {};
-for (const f of fs.readdirSync(DIR).filter(f => /^out_[VW]\d+\.json$/.test(f))) {
+for (const f of fs.readdirSync(DIR).filter(f => /^out_[VWX]\d+\.json$/.test(f))) {
   const j = read(f);
   for (const v of j.verdicts) (checks[v.id] ||= []).push({ ...v, checker: j.reviewer, batch: j.chunk });
 }

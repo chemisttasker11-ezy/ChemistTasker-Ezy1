@@ -1,0 +1,94 @@
+{
+ "chunk": "X01",
+ "verdicts": [
+  {
+   "id": "F13-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The `load` callback lists `next` as a dependency, and the mount effect depends on `load`. So when a page comes back with a non-null `next` (DRF PageNumberPagination, PAGE_SIZE 50, which HubPostViewSet.list uses), `load` is rebuilt and the effect runs again. Each run clears posts, the open discussion, the comment draft and the reply target, sets `next` back to null (which rebuilds `load` again) and fetches again, so it loops for as long as the Hub has more than 50 posts. Load more is also broken: it calls `fetchHubPosts(nextUrl)`, so the URL string is passed as the scope argument and `options.cursor` is never set. `buildScopeParams` then reads `scope.type` from a string, gets undefined, and sends a request with no valid scope instead of following the next URL.",
+   "evidence": [
+    "backend/core/settings.py:360",
+    "backend/core/settings.py:361",
+    "backend/pharmacy_hub/posts.py:192",
+    "frontend_mobile/roles/shared/hub/HubFeed.tsx:511",
+    "frontend_mobile/roles/shared/hub/HubFeed.tsx:518",
+    "frontend_mobile/roles/shared/hub/HubFeed.tsx:521",
+    "frontend_mobile/roles/shared/hub/HubFeed.tsx:526",
+    "frontend_mobile/roles/shared/hub/HubFeed.tsx:541",
+    "frontend_mobile/roles/shared/hub/HubFeed.tsx:501",
+    "frontend_mobile/roles/shared/hub/HubFeed.tsx:573",
+    "shared-core/src/domains/pharmacyHub/api.ts:145",
+    "shared-core/src/domains/pharmacyHub/api.ts:149",
+    "shared-core/src/domains/pharmacyHub/mappers.ts:191"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C048-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The web poll dialog always sends the full options list with the question, and updateHubPollService passes it on. The backend's update turns `options` into `option_labels`. Whenever `option_labels` is present, the serializer deletes every PharmacyHubPollVote and every option and recreates them, without checking whether the labels changed. So editing only the question silently wipes all votes; the dialog shows no warning. This is real, but the lost data is informal Hub poll votes, so P2 rather than P1.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx:121",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:315",
+    "shared-core/src/domains/pharmacyHub/api.ts:214",
+    "backend/pharmacy_hub/polls.py:162",
+    "backend/pharmacy_hub/serialization/polls.py:149",
+    "backend/pharmacy_hub/serialization/polls.py:150",
+    "backend/pharmacy_hub/serialization/polls.py:151"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C077-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The email builds the decline link as `/onboarding/referee-reject/{token}`, which is one path segment; the signed token contains colons but no slash. The Next page and the old SPA route both need two segments (`/:pk/:refIndex`), so the link matches no page. Even if a page rendered, it calls the deprecated `refereeReject(pk, refIndex)` endpoint, which POSTs to `/onboarding/referee-reject/{pk}/{refIndex}/`. Django only routes `onboarding/referee-reject/<str:token>/`, and the existing token client (`refereeRejectByToken`) is never used. The decline is never recorded, so the reference stays pending and reminders keep going.",
+   "evidence": [
+    "backend/onboarding/emails.py:70",
+    "backend/onboarding/emails.py:79",
+    "frontend_web/landing_next/app/(public)/onboarding/referee-reject/[pk]/[refIndex]/page.tsx:4",
+    "frontend_web/src/main.tsx:158",
+    "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:11",
+    "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:22",
+    "shared-core/src/domains/auth/browserOperations.ts:71",
+    "shared-core/src/constants/endpoints.ts:47",
+    "backend/onboarding/urls.py:41",
+    "backend/onboarding/views.py:163"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C077-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The web Talent Board finds the user's own post only in `useTalentFeed`, which calls the `feed` action. That action drops posts that fail `is_talent_board_visible`, which includes dated availability whose last date has passed. So for an expired post `existingPostId` stays null: the form offers neither edit nor delete and submits a create. For an Explorer, `_create_newcomer_post` refuses any create while any of their posts exists, expired or not, with \"Edit it, or delete it to post again\", which the UI cannot do. No backend job removes expired posts; the only delete happens on role upgrade.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:116",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:540",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:614",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:757",
+    "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:1051",
+    "backend/talent/models.py:127",
+    "backend/talent/views/explorer.py:126",
+    "backend/talent/views/explorer.py:174",
+    "backend/talent/views/explorer.py:182"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}
