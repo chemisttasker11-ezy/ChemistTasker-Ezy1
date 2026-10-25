@@ -224,3 +224,7 @@ Write docs/qa/MAIN_RELEASE_PHASE5_FINAL_VERDICT.md (or equivalent current dated 
 - **B10**: [run 40188055560](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40188055560) remains **one service-only red**, first debit and balance positive controls passed; true per-unit charge semantics and concurrency not established.
 
 Phase 5 **INCOMPLETE**, 99% independent S2 **NOT CERTIFIED** (accepted full-file count unknown), F12 authenticated parity open, 226 historical finding roots not all adjudicated, PostgreSQL concurrency open, release **NO-GO**, Phase 6 **NOT STARTED**. These targeted intentionally-red audit workflows should **not** be treated as failures of existing production-code green regression gates. Do not mark any queued, skipped, cancelled or incomplete CI as PASS.
+
+## 25 October 2026 — S2 certificate invariant test added
+
+Audit-only `.github/workflows/pr200_s2_certificate_integrity.yml` validates the 18 second-reader source certificates and `merge.mjs` on Node22, regenerates the ledger in disposable checkout, checks exact baseline SHA, blob SHA, distinct first/second reviewers, contract text, and **18 independently reviewed rows out of 2,149 source files** while preserving 2,151 baseline plus audit rows. It never pushes to GitHub or modifies product code. The status remains partial Phase5; expected-red API tests are separate.
