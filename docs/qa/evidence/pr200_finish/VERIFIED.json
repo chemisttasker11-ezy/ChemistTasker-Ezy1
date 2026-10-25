@@ -1070,5 +1070,33 @@
       "Separate event IDs, sequential out-of-order delivery only; subscription lifecycle cancellation/original invoice provider ordering and real entitlement checks not validated.",
       "Distinct from B68 customer fallback for unknown subscription and B70 duplicate subscription creation."
     ]
+  },
+  "B31": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_POSTGRES_CONDITIONAL_ISOLATED_SEAM",
+    "source_proof": [
+      "backend/ethical_marketplace/views.py:365-410",
+      "backend/ethical_marketplace/models.py:164-276",
+      "backend/qa_release/test_pr200_phase5_pg_ethics.py:1-195"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b31_parallel_disjoint_lot_requests_reserve_one_listing_once",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192236075",
+        "head": "974c2e80891e32ea3712fbd574a6fe84ad0ba594",
+        "environment": "Ubuntu GitHub Actions Postgres 16, Django TransactionTestCase, 2 independently opened DB connections/threads and real atomic transfer/stock ORM; test-only DRF JSON-compatible serializer substitution for receipt output",
+        "observed": "Both authentically verified synthetic buyer requests passed PUBLISHED gate before transactions. Different lot stock rows locked separately; both HTTP 201 responses committed different EthicalTransfer/Reservation for same listing (two UUIDs). Expected exactly one 201; assertion failed with 2 != 1. No threading errors.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED_CONDITIONAL_TEST_SEAM"
+      }
+    ],
+    "positive_controls": [
+      "test_b31_positive_one_transfer_then_sequential_second_denied PASSED: after first 201 reservation listing becomes RESERVED, second sequential attempt denied; only one transfer and one active reservation"
+    ],
+    "runtime_limitations": [
+      "Original unmodified HTTP path failed with TypeError Object of type UUID is not JSON serializable when storing TransferSerializer.data into EthicalRequestReceipt JSONField (runs 40191894383 and 40192054917). These errors are not counted as concurrency reproductions.",
+      "This run uses test-only subclass of the original TransferSerializer which renders DRF output to native JSON-compatible types before the receipt persistence. **This masks a separate serialization issue solely to isolate locking**; original production code cannot be claimed to successfully create two transfers in unmodified HTTP environment.",
+      "No real pharmacy data, provider settlement, controlled-drug distribution or physical stock movement; jurisdiction S4 synthetic only.",
+      "PostgreSQL row-locking/transaction overlap genuinely exercised, with disjoint lot locks and two DB connections; no source application code altered."
+    ]
   }
 }

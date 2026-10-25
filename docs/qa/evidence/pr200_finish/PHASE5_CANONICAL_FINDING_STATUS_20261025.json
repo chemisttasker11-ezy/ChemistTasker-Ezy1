@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 historical IDs (71 B +155 C/F) preserved; 49 distinct tested IDs / 57 cumulative intentional negative red assertions. Newly B53 old Stripe invoice reactivation reproduced in real synthetic Django HTTP workflow, one positive control. B31 first PostgreSQL attempts invalid due UUID receipt serialization; pending JSON-only test-isolation rerun. 99% independent S2 NOT CERTIFIED.",
+  "material": "226 historical IDs preserved. 50 distinct IDs with targeted negative evidence / 58 cumulative intentional failing assertions; B31 PostgreSQL two-connection race conditional on JSON serializer-only test shim, prior unmodified receipt UUID errors excluded; source code unchanged. S2 independent whole-file 99% NOT CERTIFIED.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,21 +10,22 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 49,
-  "runtime_failing_scenarios": 57,
+  "runtime_distinct_ids": 50,
+  "runtime_failing_scenarios": 58,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 11,
-    "UNVERIFIED_CANDIDATE": 153,
+    "UNVERIFIED_CANDIDATE": 152,
     "REPRODUCED_RUNTIME_DJANGO_SQLITE": 47,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
     "SOURCE_SUPPORTED_CONDITIONAL": 1,
     "SOURCE_SUPPORTED_UI_SCOPE": 1,
-    "REPRODUCED_ISOLATED_PURE_FUNCTION": 1
+    "REPRODUCED_ISOLATED_PURE_FUNCTION": 1,
+    "REPRODUCED_POSTGRES_CONDITIONAL_ISOLATED_SEAM": 1
   },
   "independent_s2_certified_files": null,
   "s0_static": {
@@ -61,8 +62,8 @@
       "negative_failures": 7,
       "errors": 0
     },
-    "cumulative_distinct_findings": 49,
-    "cumulative_failed_negative_assertions": 57,
+    "cumulative_distinct_findings": 50,
+    "cumulative_failed_negative_assertions": 58,
     "warning": "Cumulative from multiple isolated targeted runs; not 45 failures in one suite; B24 error invalid, not counted.",
     "additional_runs": [
       {
@@ -154,6 +155,20 @@
         "fixture_errors": 0,
         "negative_test_failing": true,
         "notes": "Different event IDs, deleted known subscription, late paid invoice reactivation with mocked Stripe signature"
+      },
+      {
+        "id": "B31",
+        "run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192236075",
+        "head": "974c2e80891e32ea3712fbd574a6fe84ad0ba594",
+        "tests": 2,
+        "expected_red_negative": 1,
+        "positive_control": 1,
+        "fixture_errors": 0,
+        "previous_invalid_runs": [
+          "40191894383",
+          "40192054917"
+        ],
+        "note": "Actual two-connection PG race conditional on test-only JSON-serializable receipt; cannot claim two valid unmodified production HTTP completions."
       }
     ]
   },
@@ -904,16 +919,29 @@
       "severity": "P1",
       "area": "Ethical transfer concurrency",
       "title": "Ethical listing request verifies PUBLISHED status before transaction but never locks/rechecks listing inside it; two concurrent requests can create two active transfers for one single-reservation listing if they reserve different available lots.",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_POSTGRES_CONDITIONAL_ISOLATED_SEAM",
+      "evidence_grade": "S3_ISOLATED_POSTGRES_16_TWO_CONNECTIONS_SERIALIZER_SEAM",
+      "decision": "FIX_SEPARATE_REMEDIATION_PR_BOTH_SERIALIZATION_AND_LISTING_STATE_GUARD",
       "root": "B31",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
+      "source_proof": [
+        "backend/ethical_marketplace/views.py:365-410",
+        "backend/ethical_marketplace/models.py:164-276",
+        "backend/qa_release/test_pr200_phase5_pg_ethics.py:1-195"
+      ],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b31_parallel_disjoint_lot_requests_reserve_one_listing_once",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192236075",
+          "head": "974c2e80891e32ea3712fbd574a6fe84ad0ba594",
+          "environment": "Ubuntu GitHub Actions Postgres 16, Django TransactionTestCase, 2 independently opened DB connections/threads and real atomic transfer/stock ORM; test-only DRF JSON-compatible serializer substitution for receipt output",
+          "observed": "Both authentically verified synthetic buyer requests passed PUBLISHED gate before transactions. Different lot stock rows locked separately; both HTTP 201 responses committed different EthicalTransfer/Reservation for same listing (two UUIDs). Expected exactly one 201; assertion failed with 2 != 1. No threading errors.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED_CONDITIONAL_TEST_SEAM"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Two real PG connections/transactions both reserved distinct lots for same PUBLISHED listing (2 HTTP 201) when only response UUID receipt encoding is replaced by JSON-compatible test serializer. Sequential positive control passed. Actual frozen-main HTTP blocked first by separate JSONField UUID error; do not overclaim end-to-end production exploit."
     },
     {
       "id": "B32",
