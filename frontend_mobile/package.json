@@ -98,7 +98,8 @@
     "braces": "3.0.3",
     "node-forge": "1.4.0",
     "follow-redirects": "1.16.1",
-    "fast-uri": "3.1.9"
+    "fast-uri": "3.1.9",
+    "undici": "6.29.1"
   },
   "private": true
 }
