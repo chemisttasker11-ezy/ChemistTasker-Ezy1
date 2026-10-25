@@ -13,7 +13,7 @@ ChemistTasker is a pharmacy workforce platform: pharmacy owners and organisation
    - ISSUE: it holds (part of) a real problem: a wrong permission/tenant check, data loss, money mistake, race, privacy leak, broken flow, web/mobile behaving differently for the same action, a test that asserts the wrong thing, etc.
    - NOTE: a minor quality point (dead code, confusing duplicate logic) that is not a user-facing problem.
    - NA: not app logic (generated file, config, migration with no data change, asset).
-3. Problems already known are listed in docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md (B01-B65). Read that list first. If you see one of those, put its B-id on the file and do NOT write a new finding for it.
+3. Problems already known are listed in docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md (B01-B71). Read that list first. If you see one of those, put its B-id on the file and do NOT write a new finding for it.
 4. The goal is real problems and production blockers: things that would hurt real users, money, privacy or data once the app is live. Write a new finding only for a real, specific problem you can point to with file:line evidence. No speculation and no style nits. Quality beats quantity; zero new findings is a fine result.
 
 ## The fixed cast (use these names in every scenario)

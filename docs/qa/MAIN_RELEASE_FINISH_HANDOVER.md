@@ -40,7 +40,7 @@ If one side finishes early it may take the other's chunks, from the END of that 
 For F12 use `FLOW_TEMPLATE.md` with the F12 entry from `flows.json`.
 
 ## 4. After the pass: finish order (be specific, save tokens)
-1. **Dedupe** `raw_findings.json`: the same root cause found by a file chunk and a flow trace becomes one finding (keep the best evidence; list the other ids).
+1. **Dedupe** `raw_findings.json` (also against B66-B71, which wave 14 added in parallel after this pass started): the same root cause found by a file chunk and a flow trace becomes one finding (keep the best evidence; list the other ids).
 2. **Verify every P0 and P1 with a different agent than the one that found it** (Codex verifies Claude/agy findings; Claude B verifies Codex findings). Read only the cited `path:line` evidence and its direct callers. Record `CONFIRMED`, `REJECTED` (with reason) or `DUPLICATE_OF` in `evidence/pr200_finish/VERIFIED.json` (`{ "<id>": {"verdict": ..., "reason": "...", "verifier": "..."} }`). P2s are verified only if they will become a grill question or a fix.
 3. **Targeted tests only where a finding is not obvious from the code**, on the local Docker stack (Postgres + Redis compose stack, not SQLite run folders). One small negative test per finding, run once, result recorded in `VERIFIED.json` (`"test": "<command> -> FAIL as predicted"`). No broad suites, no fixes in this PR.
 4. **agy UI checks as a user**, for confirmed findings that a person would see on screen (web or Expo): one agy slot per profile at most (agy is the front-end checker for the fix phase too, so save it). Brief per the my-stack visual lane (`ui-shots.ps1`, demo mode, named screens only); reply <= 10 lines per finding.

@@ -1,4 +1,4 @@
-# Known findings B01-B65 (do not re-report; reference by ID if you see the same issue)
+# Known findings B01-B71 (do not re-report; reference by ID if you see the same issue)
 B01 | P0 | Billing | Subscriber discount omitted from shift checkout 
 B02 | P1 | Billing | Purchased extra seats cannot subsequently be adjusted 
 B03 | P0 | Memberships/Chat | Removing staff cascades historical chat messages 
@@ -64,3 +64,9 @@ B48 — P1 candidate: Pharmacy Hub mention validation can deliver confidential p
 B49 — P1 candidate — Attachment/document upload type validation trusts client-declared MIME after failed magic-byte detection
 B50 — P1 candidate — Active but non-accepted pharmacy membership can read community-chat last-message previews
 B51 — P1 / potentially P0-impact candidate: Revoked pharmacy chat participant can send new messages through direct message endpoint after leaving the pharmacy
+B66 — P1 money-calculation candidate: overnight assignment produces negative cancellation wage and falsely skips penalty
+B67 — P1 booking/financial-evidence candidate: generic shift-offer DELETE bypasses state-machine transitions
+B68 — P1 conditional accounting/entitlement candidate: unrelated Stripe subscription invoice can activate local customer entitlement
+B69 — P1 conditional duplicate-charge candidate: cancellation penalty has no durable cancellation obligation or paid-once guard
+B70 — P1/P0-impact candidate: repeated base or extra-seat checkout can create two independent recurring Stripe subscriptions
+B71 — P1 user-flow reliability candidate: shift offer acceptance commits before notification errors can surface to the caller

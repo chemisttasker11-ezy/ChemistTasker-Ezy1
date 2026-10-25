@@ -13,7 +13,7 @@ Follow the real chain: client screen -> shared-core API call -> URL -> view -> p
 
 Report only real problems and production blockers: things that would hurt real users, money, privacy or data once live. No speculation, no style nits, no tests to run. Zero findings is a fine result.
 
-Known problems B01-B65 are in docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md. Read it first; do not re-report them (mention their id in "confirmed_known" if you see them). If docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md exists, skip anything listed there too (found by the file-by-file pass).
+Known problems B01-B71 are in docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md. Read it first; do not re-report them (mention their id in "confirmed_known" if you see them). If docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md exists, skip anything listed there too (found by the file-by-file pass).
 
 ## The fixed cast (use these names in every scenario)
 Tom = pharmacy owner. Lina = organisation admin. Grace = region admin. Sara = external locum pharmacist. Omar = Tom's own pharmacist. Ali = technician. Mia = pharmacy assistant. Jack = intern. Zoe = Explorer (new user, no role yet). Ben = Tom's favourite locum. Nadia = staff at Tom's other pharmacy.
