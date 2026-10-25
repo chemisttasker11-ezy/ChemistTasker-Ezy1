@@ -157,7 +157,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (baseURL) {
           const token = await getValidAccessToken(baseURL);
-          if (getSessionGeneration() !== bootstrapId) return;
+          const refreshGeneration = getSessionGeneration();
+          if (refreshGeneration !== bootstrapId) {
+            // A rejected refresh clears its own session and advances the generation.
+            if (!token) {
+              const remainingSession = await readStoredSession();
+              if (!remainingSession && getSessionGeneration() === refreshGeneration) setIsLoading(false);
+            }
+            return;
+          }
           if (token) {
             const meResponse = await nativeIdentityTransport.currentUser().catch(() => null);
             if (meResponse?.data) {
