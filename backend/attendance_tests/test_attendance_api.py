@@ -237,7 +237,9 @@ class AttendanceAPITests(unittest.TestCase):
         self.assertEqual(clock_in_resp.data["action"], "CLOCKED_IN")
         self.assertTrue(clock_in_resp.data["is_provisional"])
 
-        # 3. Clock out with valid PIN
+        # 3. Clock out with valid PIN once the retry window has passed
+        earlier = timezone.now() - timedelta(minutes=5)
+        AttendanceSession.objects.filter(user=self.worker_user).update(started_at=earlier)
         clock_out_resp = kiosk_client.post(
             "/attendance/kiosk/pin-clock/",
             {"device_token": raw_token, "identifier": self.worker_user.email, "pin": "1234"},
@@ -245,6 +247,29 @@ class AttendanceAPITests(unittest.TestCase):
         self.assertEqual(clock_out_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(clock_out_resp.data["action"], "CLOCKED_OUT")
         self.assertIsNotNone(clock_out_resp.data["ended_at"])
+
+    def test_kiosk_pin_resubmit_is_a_retry_not_a_toggle(self):
+        """C002-N1: a lost-response resubmit repeats the last action instead of reversing it."""
+        _, raw_token = activate_kiosk_device(self.owner_user, self.pharmacy, "Pin Pad")
+        set_worker_personal_code(self.owner_user, self.membership, "1234")
+        kiosk_client = APIClient()
+        body = {"device_token": raw_token, "identifier": self.worker_user.email, "pin": "1234"}
+
+        first = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
+        retry = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
+        self.assertEqual(first.data["action"], "CLOCKED_IN")
+        self.assertEqual(retry.data["action"], "CLOCKED_IN")
+        self.assertEqual(retry.data["session_id"], first.data["session_id"])
+        session = AttendanceSession.objects.get(user=self.worker_user)
+        self.assertIsNone(session.ended_at)
+
+        earlier = timezone.now() - timedelta(minutes=5)
+        AttendanceSession.objects.filter(pk=session.pk).update(started_at=earlier)
+        out = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
+        out_retry = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
+        self.assertEqual(out.data["action"], "CLOCKED_OUT")
+        self.assertEqual(out_retry.data["action"], "CLOCKED_OUT")
+        self.assertEqual(AttendanceSession.objects.filter(user=self.worker_user).count(), 1)
 
     def test_worker_mobile_qr_and_break_lifecycle(self):
         # Setup kiosk and generate active QR

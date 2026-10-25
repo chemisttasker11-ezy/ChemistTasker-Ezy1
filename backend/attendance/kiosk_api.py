@@ -452,7 +452,14 @@ class KioskPinClockView(APIView):
 
             # Check existing open session at this pharmacy
             status_info = get_active_session_status(worker)
-            if status_info is not None and status_info["pharmacy_id"] == device.pharmacy_id:
+            at_this_pharmacy = status_info is not None and status_info["pharmacy_id"] == device.pharmacy_id
+            # A resubmit inside the transitions' 30s retry window repeats the last action instead of reversing it.
+            retry_since = timezone.now() - timedelta(seconds=30)
+            just_clocked_in = at_this_pharmacy and status_info["started_at"] >= retry_since
+            just_clocked_out = status_info is None and AttendanceSession.objects.filter(
+                user=worker, pharmacy=device.pharmacy, ended_at__gte=retry_since,
+            ).exists()
+            if (at_this_pharmacy and not just_clocked_in) or just_clocked_out:
                 # Clock out
                 session, out_event = clock_out(
                     user=worker,
