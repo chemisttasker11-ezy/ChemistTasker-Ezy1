@@ -1,0 +1,200 @@
+{
+  "chunk": "C060",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection, service-boundary and scoped interaction review; independent S2 and runtime S3 not executed",
+  "files": [
+    {
+      "path": "frontend_mobile/roles/otherstaff/dashboard.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "C009-N2"
+      ],
+      "note": "dashboard.tsx presents role-specific scoped dashboard and invoice/shift summaries; source semantic caveat C009-N1/N2."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/memberships.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "memberships.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/profile-tabs/BasicInfoScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "BasicInfoScreen.tsx handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/profile-tabs/BioScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "BioScreen.tsx handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/profile-tabs/IdentityScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "IdentityScreen.tsx handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/profile-tabs/PaymentScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PaymentScreen.tsx handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/profile-tabs/RefereesScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "RefereesScreen.tsx handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/profile-tabs/RegulatoryScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "RegulatoryScreen.tsx handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/profile-tabs/SkillsScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "SkillsScreen.tsx handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/profile-tabs/shared.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "shared.ts handles role-specific onboarding field editing, document evidence and shared-core form submission; verification/failure cases B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/profile.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "profile.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/publish-availability.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "publish-availability.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/shifts.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "shifts.tsx routes owner/worker shift candidate, post, offer or listing actions to shared-core; booking/payment concurrency B54/B67."
+    },
+    {
+      "path": "frontend_mobile/roles/otherstaff/talent-board.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "talent-board.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/dashboard.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "dashboard.tsx presents role-specific scoped dashboard and invoice/shift summaries; source semantic caveat C009-N1/N2."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/hub.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "hub.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/locums/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "index.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/onboarding/_context.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "_context.tsx orchestrates owner/worker onboarding and verification state; baseline verification issues B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/onboarding/review.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "review.tsx orchestrates owner/worker onboarding and verification state; baseline verification issues B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/onboarding/step1.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "step1.tsx orchestrates owner/worker onboarding and verification state; baseline verification issues B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/onboarding/step2.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "step2.tsx orchestrates owner/worker onboarding and verification state; baseline verification issues B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/onboarding/step3.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "step3.tsx orchestrates owner/worker onboarding and verification state; baseline verification issues B40/B44."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/pharmacies/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "[id].tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/pharmacies/[id]/edit.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "edit.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/pharmacies/[id]/locums.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "locums.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/pharmacies/[id]/staff.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "staff.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/pharmacies/add.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "add.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/pharmacies/index.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B16",
+        "B17"
+      ],
+      "note": "index.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/pharmacy.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "pharmacy.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/pills.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "pills.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/roles/owner/post-shift.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "post-shift.tsx routes owner/worker shift candidate, post, offer or listing actions to shared-core; booking/payment concurrency B54/B67."
+    }
+  ],
+  "findings": []
+}
