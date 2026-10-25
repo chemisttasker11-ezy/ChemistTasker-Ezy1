@@ -228,3 +228,10 @@ Six new source-level candidates after checking prior 65: B66 overnight shift can
 - Per-file review records contain **zero populated test_contract columns**. Do not advertise 1,134 as independently validated semantic or runtime coverage. Publish separate S0 automatic, S1 full-file agent report, S2 independently cross-checked semantic and S3 executed test metrics.
 - Senior source inspection identified credible high-impact P0 chains **F03-N1**, **F04-N1**, **F04-N2** in baseline views/serializers/services; none has an audit-run HTTP reproduction. Verify in isolation before final severity decisions. No application code or tests were changed in this planning pass.
 - Next queue: C008–C016 (security-critical Django), C054/C056–C061 and C064–C071 (Expo), C046/C048/C072–C078 (web/Next), C080/C082–C086 (tooling), F12 (client parity), then dedupe, independent P0/P1 verification and exact-head acceptance.
+
+## Execution continuation — C008 plus independent P0 source verification (25 October 2026)
+
+- Completed new C008 output for all 36 frozen-main backend/core files: [source review](evidence/pr200_finish/out_C008.json), SHA `0b5d4ed8ce08b77ee64dd4e16ff690f78e812adc`. No new unique production finding. Mapped file-validation sniff/MIME fallback to historical B49 and early identity-file cleanup to B44.
+- Independent reviewer checked F03-N1, F04-N1, F04-N2 against current baseline source, invite and shift existing tests. All marked **CONFIRMED_SOURCE** in [VERIFIED.json](evidence/pr200_finish/VERIFIED.json). None is **RUNTIME_REPRODUCED** and zero targeted tests executed; negative/positive test contracts preserved.
+- **Outputs:** 52 of 89 chunk outputs now committed; 37 chunks remain, F12 flow remains. Aggregated per-file CSV still 1,134 until `merge.mjs` is rerun; a correct rebuild should produce **1,170 / 2,151 (54.39%)** reported full-file reviews, including 2 PR-added audit scripts in denominator. Do not update measured ledger percentage before merge.
+- **No product code, migrations, fixes or staging changes**. Audit remains DRAFT, not release-ready.
