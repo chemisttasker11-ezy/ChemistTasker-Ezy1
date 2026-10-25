@@ -439,20 +439,26 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
         line_total = rate * hours
         total_hours += hours
         total_pay += line_total
-        segments.append({
+        segment = {
             "date": str(cursor.date()),
             "start_time": cursor.time().strftime("%H:%M:%S"),
             "end_time": next_boundary.time().strftime("%H:%M:%S"),
             "day_type": day_type,
             "rate_key": rate_key[1],
-            "holiday_scope": holiday.scope,
-            "holiday_status": holiday.status,
-            "holiday_source": holiday.source,
-            "holiday_region": holiday.region,
             "rate": _money(rate),
             "hours": _money(hours),
             "line_total": _money(line_total),
-        })
+        }
+        # Ordinary hours keep their historical immutable snapshot shape;
+        # only holiday segments need additional legal provenance.
+        if holiday.scope != "NONE":
+            segment.update({
+                "holiday_scope": holiday.scope,
+                "holiday_status": holiday.status,
+                "holiday_source": holiday.source,
+                "holiday_region": holiday.region,
+            })
+        segments.append(segment)
         cursor = next_boundary
 
     if total_hours <= 0:
