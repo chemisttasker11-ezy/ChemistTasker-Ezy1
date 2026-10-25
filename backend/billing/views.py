@@ -322,11 +322,14 @@ def _normalize_offer_ids(raw_offer_ids=None, raw_offer_id=None):
     return sorted(set(offer_ids))
 
 
-def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None, return_offers=False):
+def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None, return_offers=False, unbookable=None):
     """
     Finalize shift offers waiting on payment.
     If candidate_id/slot_id are provided, narrow the target set.
+    With an `unbookable` list, an offer whose occurrence is no longer available is expired and
+    collected there instead of failing the whole call.
     """
+    from rest_framework.exceptions import ValidationError
     from shifts.models import ShiftOffer
     from shifts.finalize import finalize_shift_offer
 
@@ -346,19 +349,28 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
 
     finalized = 0
     finalized_offers = []
-    selected_slot_ids = set()
     for offer in offers:
-        finalize_shift_offer(offer)
+        try:
+            finalize_shift_offer(offer)  # its own atomic block rolls back a refused offer
+        except ValidationError:
+            if unbookable is None:
+                raise
+            offer.status = ShiftOffer.Status.EXPIRED
+            offer.save(update_fields=['status', 'updated_at'])
+            unbookable.append(offer)
+            continue
         finalized_offers.append(offer)
-        if offer.slot_id:
-            selected_slot_ids.add(offer.slot_id)
         finalized += 1
-    if selected_slot_ids:
-        ShiftOffer.objects.filter(
-            shift=shift,
-            slot_id__in=selected_slot_ids,
-            status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
-        ).exclude(id__in=list(target_offer_ids)).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
+    finalized_ids = [offer.id for offer in finalized_offers]
+    for offer in finalized_offers:
+        if offer.slot_id:
+            # Like shifts.offers: only the booked occurrence closes; other dates of a recurring slot stay open.
+            ShiftOffer.objects.filter(
+                shift=shift,
+                slot_id=offer.slot_id,
+                offered_slot_date=offer.offered_slot_date,
+                status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
+            ).exclude(id__in=finalized_ids).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
     if return_offers:
         return finalized, finalized_offers
     return finalized
@@ -978,6 +990,7 @@ def _process_stripe_event(event):
                     from shifts.models import Shift as ShiftModel
                     shift_obj = ShiftModel.objects.filter(id=shift_id).first()
                     if shift_obj:
+                        unbookable_offers = []
                         finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
                             shift_obj,
                             candidate_id=metadata.get('candidate_id'),
@@ -985,7 +998,24 @@ def _process_stripe_event(event):
                             slot_ids=metadata.get('slot_ids'),
                             offer_ids=metadata.get('offer_ids'),
                             return_offers=True,
+                            unbookable=unbookable_offers,
                         )
+                        if unbookable_offers:
+                            # The payment stays recorded; a lost occurrence needs a refund, not a Stripe retry.
+                            lost_ids = [offer.id for offer in unbookable_offers]
+                            logger.error(
+                                'Paid shift checkout %s could not book offers %s: refund or manual action required.',
+                                payment.pk, lost_ids,
+                            )
+                            from shifts.notifications import notify_shift_managers
+                            transaction.on_commit(lambda: notify_shift_managers(
+                                shift_obj,
+                                title='Shift payment needs a refund',
+                                body='A paid shift offer could not be booked because its date was already taken. '
+                                     'The payment needs a refund or manual follow-up.',
+                                kind='shift_payment_refund_required',
+                                payload={'payment_id': payment.pk, 'offer_ids': lost_ids},
+                            ), robust=True)
                         from shifts.emails import (
                             send_shift_payment_finalized_notifications,
                         )

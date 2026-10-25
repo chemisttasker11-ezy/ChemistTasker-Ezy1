@@ -588,3 +588,78 @@ class PaymentWebhookCommitContracts(TestCase):
         self.assertFalse(ShiftPayment.objects.exists())
         self.shift.refresh_from_db()
         self.assertEqual(self.shift.payment_status, "PENDING")
+
+
+@override_settings(STRIPE_WEBHOOK_SECRET="whsec-lost-occurrence")
+class PaidOfferLosingOccurrenceContracts(TestCase):
+    def setUp(self):
+        from client_profile.characterization_support import make_user
+        from shifts.models import ShiftSlot
+        self.owner, pharmacy = make_owner_with_pharmacy("Lost occurrence")
+        self.day = timezone.localdate() + timedelta(days=3)
+        self.shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=self.owner, role_needed="PHARMACIST",
+            employment_type="LOCUM", single_user_only=False, payment_status="PENDING",
+        )
+        self.slot = ShiftSlot.objects.create(
+            shift=self.shift, date=self.day, start_time=time(9), end_time=time(17), rate=Decimal("70"),
+            is_recurring=True, recurring_days=list(range(7)), recurring_end_date=self.day + timedelta(days=7),
+        )
+        self.make_user = make_user
+
+    def offer(self, status, day):
+        from shifts.models import ShiftOffer
+        return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=self.make_user("PHARMACIST"),
+                                         status=status, offered_slot_date=day)
+
+    def pay(self, offer, intent):
+        event = _StripeObject(
+            id=f"evt_{intent}", type="checkout.session.completed",
+            data=_StripeObject(object=_StripeObject(
+                mode="payment", payment_status="paid", amount_total=1500, payment_intent=intent,
+                metadata={"shift_id": str(self.shift.pk), "type": "fulfillment", "offer_ids": str(offer.pk),
+                          "owner_user_id": str(self.owner.pk), "actor_user_id": str(self.owner.pk)},
+            )),
+        )
+        with (
+            patch("billing.views.stripe.Webhook.construct_event", return_value=event),
+            patch("shifts.finalize.get_locked_rate_for_slot", return_value=(Decimal("70"), {})),
+            patch("shifts.emails.send_shift_payment_finalized_notifications"),
+            patch("shifts.notifications.notify_shift_managers") as notify,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = client_for().post(reverse("api_v1:billing:stripe_webhook"), data=b"{}",
+                                         content_type="application/json")
+        return response, notify
+
+    def test_losing_paid_offer_records_payment_and_is_flagged_for_refund(self):
+        from shifts.finalize import finalize_shift_offer
+        from shifts.models import ShiftOffer, ShiftSlotAssignment
+        winner = self.offer(ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, self.day)
+        with patch("shifts.finalize.get_locked_rate_for_slot", return_value=(Decimal("70"), {})):
+            finalize_shift_offer(winner)
+        loser = self.offer(ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, self.day)
+        response, notify = self.pay(loser, "pi_lost_occurrence")
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(ShiftPayment.objects.filter(stripe_payment_intent_id="pi_lost_occurrence", status="paid").exists())
+        loser.refresh_from_db()
+        self.assertEqual(loser.status, ShiftOffer.Status.EXPIRED)
+        self.assertEqual(list(ShiftSlotAssignment.objects.filter(shift=self.shift).values_list("source_offer_id", flat=True)), [winner.pk])
+        notify.assert_called_once()
+        self.assertEqual(notify.call_args.kwargs["kind"], "shift_payment_refund_required")
+        self.assertEqual(notify.call_args.kwargs["payload"]["offer_ids"], [loser.pk])
+
+    def test_winning_paid_offer_closes_only_its_own_occurrence(self):
+        from shifts.models import ShiftOffer
+        winner = self.offer(ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, self.day)
+        same_date = self.offer(ShiftOffer.Status.PENDING, self.day)
+        next_date = self.offer(ShiftOffer.Status.PENDING, self.day + timedelta(days=1))
+        response, notify = self.pay(winner, "pi_won_occurrence")
+        self.assertEqual(response.status_code, 200, response.content)
+        for offer, expected in ((winner, ShiftOffer.Status.ACCEPTED), (same_date, ShiftOffer.Status.EXPIRED),
+                                (next_date, ShiftOffer.Status.PENDING)):
+            offer.refresh_from_db()
+            self.assertEqual(offer.status, expected)
+        notify.assert_not_called()
+        self.shift.refresh_from_db()
+        self.assertEqual(self.shift.payment_status, "PAID")
