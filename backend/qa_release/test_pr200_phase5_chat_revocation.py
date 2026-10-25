@@ -29,6 +29,17 @@ def _room(alice_m, bob_m):
 
 
 @database_sync_to_async
+def _activate_staff_memberships(*member_ids):
+    # The generic characterization helper leaves employment_type blank;
+    # a pharmacy community group admits only actual employed local staff.
+    for member in Membership.objects.filter(pk__in=member_ids):
+        member.employment_type = "FULL_TIME"
+        member.is_active = True
+        member.status = Membership.Status.ACCEPTED
+        member.save(update_fields=["employment_type", "is_active", "status"])
+
+
+@database_sync_to_async
 def _revoke(membership_pk):
     member = Membership.objects.get(pk=membership_pk)
     member.is_active = False
@@ -50,6 +61,7 @@ def _participant_exists(membership_pk):
 class B05RevokedWebsocketStillConnected(TransactionTestCase):
     async def _paired(self, prefix):
         alice, alice_m, bob, bob_m, outsider = await make_actors()
+        await _activate_staff_memberships(alice_m.pk, bob_m.pk)
         room = await _room(alice_m, bob_m)
         await new_ticket(alice, f"b05-a-{prefix}")
         await new_ticket(bob, f"b05-b-{prefix}")
