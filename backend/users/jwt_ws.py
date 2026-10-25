@@ -9,8 +9,22 @@ from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 
 from users.authentication import CookieJWTAuthentication
-from rest_framework_simplejwt.exceptions import InvalidToken, AuthenticationFailed
+from rest_framework_simplejwt.exceptions import InvalidToken, AuthenticationFailed, TokenError
 from users.models import WebSocketTicket
+
+
+def websocket_credentials_valid(scope, user):
+    """Check the connection's password snapshot and access expiry, not refresh rotation blacklists."""
+    if user.password != scope['user'].password:
+        return False
+    token = scope.get('auth')
+    if token:
+        try:
+            token.check_exp(current_time=timezone.now())
+        except TokenError:
+            return False
+    return True
+
 
 class JWTAuthMiddleware:
     """

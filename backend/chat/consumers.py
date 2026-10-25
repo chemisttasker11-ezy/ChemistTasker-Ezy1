@@ -9,6 +9,7 @@ from chat.models import Conversation, Message, Participant
 from chat.realtime import ROOM_GROUP_FMT, USER_GROUP_FMT, participant_can_receive_chat_updates
 from memberships.models import Membership
 from chat.text import sanitize_chat_text
+from users.jwt_ws import websocket_credentials_valid
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             await self.close(code=4401)
             return
 
+        self.session_id = self.scope.get('session_id', '')
         if await self._ahpra_suspended(user):
             await self.close(code=4403)
             return
@@ -52,7 +54,10 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             log.error("No channel_layer on consumer!")
 
         # Catch a suspension or revocation committed after joining a group.
-        if not await self._membership_still_authorized() or await self._ahpra_suspended(user):
+        if not await self._membership_still_authorized():
+            await self.close(code=self._authorization_close_code)
+            return
+        if await self._ahpra_suspended(user):
             await self.close(code=4403)
             return
         self._last_typing_emit = 0.0
@@ -77,7 +82,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             await self.ahpra_suspended({})
             return
         if not await self._membership_still_authorized():
-            await self.close(code=4403)
+            await self.close(code=self._authorization_close_code)
             return
         if content.get("type") == "typing":
             if not getattr(self, "membership", None):
@@ -129,7 +134,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
     async def send_json(self, content, close=False):
         # Group membership can outlive a revoked participant, membership or user.
         if not await self._membership_still_authorized():
-            await self.close(code=4403)
+            await self.close(code=getattr(self, '_authorization_close_code', 4403))
             return
         now = time.monotonic()
         # Keep the separate AHPRA backstop bounded; access is checked on every delivery.
@@ -143,6 +148,11 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         await super().send_json(content, close)
 
     # ---- channel-layer events ----
+    async def auth_changed(self, event):
+        if event.get('sid') == self.session_id or not await self._membership_still_authorized():
+            await self.disconnect(4401)
+            await self.close(code=4401)
+
     async def ahpra_suspended(self, event):
         if not await self._ahpra_suspended(self.scope['user']):
             return
@@ -217,17 +227,23 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _membership_still_authorized(self):
+        self._authorization_close_code = 4403
         if not getattr(self, "membership", None):
             return False
         participant = Participant.objects.filter(
             conversation_id=self.room_id,
             membership_id=self.membership.pk,
         ).select_related("membership__user", "conversation").only(
-            "membership__user__is_active", "membership__status", "membership__is_active",
+            "membership__user__is_active", "membership__user__password", "membership__status", "membership__is_active",
             "membership__employment_type", "membership__pharmacy_id",
             "conversation__type", "conversation__pharmacy_id",
         ).first()
-        return bool(participant and participant_can_receive_chat_updates(participant))
+        if not participant or not participant_can_receive_chat_updates(participant):
+            return False
+        if not websocket_credentials_valid(self.scope, participant.membership.user):
+            self._authorization_close_code = 4401
+            return False
+        return True
 
     @database_sync_to_async
     def _create_message(self, conversation_id: int, membership: Membership, body: str):

@@ -4,10 +4,9 @@ import logging
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
-from django.utils import timezone
-from rest_framework_simplejwt.exceptions import TokenError
 
 from notifications.services import USER_GROUP_FMT
+from users.jwt_ws import websocket_credentials_valid
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +18,6 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             await self.close(code=4401)
             return
         self.user_id = user.id
-        self.password = user.password
         self.session_id = self.scope.get('session_id', '')
         self.group_name = USER_GROUP_FMT.format(user_id=self.user_id)
         if self.channel_layer:
@@ -40,16 +38,7 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
         if not user or not user.is_active or user.deleted_at is not None:
             self._authorization_close_code = 4403
             return False
-        if user.password != self.password:
-            return False
-        token = self.scope.get("auth")
-        if token:
-            try:
-                token.check_exp(current_time=timezone.now())
-            except TokenError:
-                return False
-        # Not the blacklist: routine refresh rotation blacklists tokens too; reset/deletion change password or is_active.
-        return True
+        return websocket_credentials_valid(self.scope, user)
 
     async def auth_changed(self, event):
         # `sid` set = one session logged out; unset = account-wide change (password reset, deletion).

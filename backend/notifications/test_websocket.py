@@ -63,7 +63,7 @@ class NotificationSocketTests(TransactionTestCase):
         ok, _ = await comm.connect(timeout=TIMEOUT)
         self.assertTrue(ok)
         await comm.receive_json_from(timeout=TIMEOUT)
-        with patch("notifications.consumers.timezone.now", return_value=timezone.now() + timedelta(days=1)):
+        with patch("users.jwt_ws.timezone.now", return_value=timezone.now() + timedelta(days=1)):
             await get_channel_layer().group_send(USER_GROUP_FMT.format(user_id=alice.pk), {"type": "message.badge"})
             self.assertEqual((await comm.receive_output(timeout=TIMEOUT))["type"], "websocket.close")
         await comm.disconnect()
