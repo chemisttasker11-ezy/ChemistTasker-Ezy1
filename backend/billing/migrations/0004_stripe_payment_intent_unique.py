@@ -12,6 +12,7 @@ def block_existing_duplicate_payments(apps, schema_editor):
         .values("stripe_payment_intent_id")
         .annotate(total=Count("pk"))
         .filter(total__gt=1)
+        .order_by("stripe_payment_intent_id")
         .first()
     )
     if duplicate:
