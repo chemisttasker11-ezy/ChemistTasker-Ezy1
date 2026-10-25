@@ -1,6 +1,6 @@
 # PR200 finish - candidate findings (source statuses)
 
-Generated from 101 chunk outputs. Source-level challenges and root-cause aliases are annotated separately from S3 tests; only F03-N1/F04-N1/F04-N2 have distinct earlier source verifiers. No S3 runtime reproduction is recorded.
+Generated from 101 chunk outputs. Source-level challenges (20 entries) and root-cause aliases are annotated separately from S3 tests; only F03-N1/F04-N1/F04-N2 have distinct earlier source verifiers. No S3 runtime reproduction is recorded.
 
 ## F03-N1 - P0 - Pharmacy admins - A staff member whose admin role was removed can give it back to themselves by accepting it as a pending admin invitation.
 
@@ -219,7 +219,7 @@ Tom opens checkout to confirm Sara, then deletes the still-unpaid shift from his
 - Evidence: `frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts:44`, `shared-core/src/domains/shifts/api.ts:121`, `backend/shifts/base.py:111`, `backend/shifts/lifecycle.py:50`, `backend/billing/views.py:689`, `backend/billing/views.py:848`, `backend/billing/models.py:85`, `backend/billing/views.py:1011`
 - Confidence: high; found by codexA-3
 - Test that would prove it: Create checkout for Sara's pending offer, delete the shift, then deliver the paid checkout event and assert that the charge is reconciled or refunded rather than failing permanently against the missing shift.
-- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
 - Deduplication: RELATED_DIFFERENT_FAILURE_MODES; related to canonical F02-N1
 - Owner question: If Tom deletes Sara's shift while its checkout is open, what should happen to a payment completed afterward?
   - Prevent payment where possible and automatically refund any late charge
@@ -345,7 +345,7 @@ Tom submits a valid premises application from the website or mobile app. The app
 - Evidence: `frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:143`, `frontend_mobile/features/parity/ethicalMarketplace.tsx:54`, `shared-core/src/platformApi.ts:141`, `backend/ethical_marketplace/views.py:100`, `backend/ethical_marketplace/views.py:102`, `backend/ethical_marketplace/views.py:113`, `backend/ethical_marketplace/views.py:121`
 - Confidence: high; found by codexB-1
 - Test that would prove it: Submit Tom's first valid premises application and assert a successful creation response containing the saved pending-review application instead of a server error.
-- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
 - Deduplication: No root-cluster assignment yet
 - Owner question: What should Tom see after his valid premises application has been saved?
   - Confirmation that the application is pending review
@@ -429,7 +429,7 @@ Tom and Omar share confidential posts and attachments in a restricted Hub group 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx:421`, `backend/pharmacy_hub/groups.py:147`, `backend/pharmacy_hub/models.py:143`, `backend/pharmacy_hub/scoping.py:156`, `backend/pharmacy_hub/serialization/posts.py:366`
 - Confidence: high; found by codexB-2
 - Test that would prove it: Delete Tom's restricted group containing a post, comment and attachment, then fetch the pharmacy feed as Mia, who was never a group member; verify none of that content becomes accessible.
-- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
 - Deduplication: No root-cluster assignment yet
 - Owner question: After Tom deletes a restricted Hub group, what should happen to Omar's confidential posts and attachments?
   - Archive them with their restricted audience preserved
@@ -555,7 +555,7 @@ Sara chooses her accepted shift at Tom's pharmacy and the invoice fills in Tom's
 - Evidence: `backend/worker_finance/services.py:362`, `frontend_web/src/pages/finance/InvoiceComposer.tsx:103`, `frontend_web/src/pages/finance/InvoiceComposer.tsx:130`, `frontend_web/src/pages/finance/InvoiceComposer.tsx:187`, `frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:199`, `frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:229`
 - Confidence: high; found by codexB-3
 - Test that would prove it: Choose an eligible accepted shift in each editor and save without manually selecting a customer; assert that an internal invoice is created for the shift's pharmacy.
-- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
 - Deduplication: No root-cluster assignment yet
 - Owner question: When Sara starts an invoice from her accepted shift at Tom's pharmacy, should she be able to save with the pharmacy already selected?
   - Sara saves directly using the shift's pharmacy.
@@ -569,7 +569,7 @@ An eligible contractor or worker opens the legacy Expo invoice generator without
 - Evidence: `frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:115`, `frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:152`, `frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:392`, `backend/invoicing/services.py:175`, `backend/invoicing/services.py:332`, `frontend_mobile/roles/shared/invoices/InvoiceList.tsx:52`
 - Confidence: high for hardcoded default/source calculation; legal applicability conditional; found by gpt6-senior-20261025
 - Test that would prove it: New user with no onboarding super_rate_snapshot uses legacy InvoiceGenerate for an eligible 2026 invoice; assert suggested rate is current rate 12% (or explicitly configured award/agreement rate), correctly calculates amount, and backend does not silently accept stale default. Confirm historical invoice dates, contractor eligibility, intentionally different agreed rates and legacy vs new FinanceWorkspace paths.
-- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Source status: SOURCE_SUPPORTED_CONDITIONAL (same assistant source challenge; NOT separate second-agent S2)
 - Deduplication: No root-cluster assignment yet
 - External reference: https://www.ato.gov.au/api/public/content/0-1cca4d23-4e4a-4642-96f8-eb229b882fb3
 - Owner question: Should the legacy Expo invoice generator continue pre-populating a 10% superannuation rate for 2026 invoices?
@@ -1620,7 +1620,7 @@ Sara taps send on a direct chat while offline. Mobile sendMessage catches the ne
 - Evidence: `frontend_mobile/roles/shared/messages/[id].tsx:403`, `frontend_mobile/roles/shared/messages/[id].tsx:435`, `frontend_web/src/pages/dashboard/sidebar/chat/MessageComposer.tsx:179`
 - Confidence: high for source UI path; must test global error handler and runtime rendering; found by gpt6-cross-platform-20261025
 - Test that would prove it: Disconnect native device network, send a direct text chat; assert clear error and draft retained. Vite shows explicit send failure; retry after reconnect sends once. Ensure global notifications are not already surfacing equivalent errors.
-- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Source status: SOURCE_SUPPORTED_UI_SCOPE (same assistant source challenge; NOT separate second-agent S2)
 - Deduplication: CANONICAL NOT_DUPLICATE; aliases: B51
 
 ## C070-N1 - P2 - Expo shift board state - Shared AsyncStorage keys can expose previous account's applied/rejected shift markers after account switching.
