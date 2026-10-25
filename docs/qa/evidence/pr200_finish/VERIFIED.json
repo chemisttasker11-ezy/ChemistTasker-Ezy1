@@ -921,7 +921,7 @@
   },
   "B14": {
     "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
-    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "verdict": "REPRODUCED_ISOLATED_PURE_FUNCTION",
     "source_proof": [
       "backend/shifts/data/award_rates_casual_first_level.json:1-107",
       "backend/shifts/data/public_holidays.json",
