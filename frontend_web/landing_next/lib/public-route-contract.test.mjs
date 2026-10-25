@@ -9,6 +9,18 @@ const header = read('public/header.tsx');
 const personas = read('app/persona-data.ts');
 const routes = read('public/routes.ts');
 
+test('emailed referee decline URLs have a single signed-token route in both web clients', () => {
+  const email = read('../../backend/onboarding/emails.py');
+  assert.match(email, /onboarding\/referee-reject\/\{token\}/);
+  assert.match(read('../src/main.tsx'), /onboarding\/referee-reject\/:token'/);
+  assert.match(read('app/(public)/onboarding/referee-reject/[token]/page.tsx'), /onboarding\/RefereeRejectPage/);
+  for (const page of ['../src/pages/onboarding/RefereeRejectPage.tsx', 'migrated/pages/onboarding/RefereeRejectPage.tsx']) {
+    const source = read(page);
+    assert.match(source, /browserRejectReferee\(\{ baseUrl: API_BASE_URL \}, token\)/);
+    assert.doesNotMatch(source, /refIndex/);
+  }
+});
+
 const routeContract = {
   home: '/',
   register: '/register',

@@ -30,11 +30,11 @@ function responses(...payloads: unknown[]) {
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('source-backed wire/domain contracts after extraction',()=>{
-  it('retains 431 runtime exports after retiring seven unused onboarding/application operations',()=>{
+  it('retains 430 runtime exports after retiring eight unused onboarding/application operations',()=>{
     const modules=import.meta.glob('./**/api.ts',{eager:true});
     const retiredExports = ['createOnboarding', 'getShiftApplications',
       'acceptShiftApplication', 'rejectShiftApplication', 'fetchShiftApplicationsService',
-      'acceptShiftApplicationService', 'rejectShiftApplicationService'];
+      'acceptShiftApplicationService', 'rejectShiftApplicationService', 'refereeReject'];
     expect(Object.keys(exportOwners)).toHaveLength(438 - retiredExports.length);
     for (const name of retiredExports) {
       expect(exportOwners).not.toHaveProperty(name);

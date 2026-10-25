@@ -12,6 +12,7 @@ import {
   createExplorerPost,
   deleteExplorerPost,
   fetchUserAvailabilityService,
+  getExplorerPostForEditing,
   getOnboarding,
   getRatingsSummary,
   likeExplorerPost,
@@ -454,7 +455,7 @@ export default function TalentBoard({
         setRoleTitle((onboarding?.role_type || 'Pharmacy team').replace('_', ' '));
         onboardingSkills = Array.isArray(onboarding?.skills) ? onboarding.skills : [];
         }
-        const mine = posts.find((post) => post.authorUserId === user?.id);
+        const mine = await getExplorerPostForEditing();
         if (mine) {
           const minePostKind =
             mine.postKind ||
@@ -501,7 +502,7 @@ export default function TalentBoard({
     } catch (err: any) {
       setPitchError(err?.message || 'Failed to load your profile.');
     }
-  }, [isExplorer, isOtherStaff, isPharmacist, posts, resetPitchForm, user]);
+  }, [isExplorer, isOtherStaff, isPharmacist, resetPitchForm, user]);
 
   useEffect(() => {
     if (pitchOpen) void loadPitchDefaults();

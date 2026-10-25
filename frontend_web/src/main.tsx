@@ -155,7 +155,7 @@ const router = createBrowserRouter([
 
       // PUBLIC referee confirmation page (add here)
       { path: 'referee/questionnaire/:token', element: <RefereeQuestionnairePage /> },
-      { path: 'onboarding/referee-reject/:pk/:refIndex', element: <RefereeRejectPage /> },
+      { path: 'onboarding/referee-reject/:token', element: <RefereeRejectPage /> },
 
       // Password reset confirm route
       { path: 'reset-password/:uid/:token', element: <ResetPasswordPage /> },

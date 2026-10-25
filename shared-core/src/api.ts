@@ -70,7 +70,6 @@ export {
   updateOnboardingForm,
   submitRefereeResponse,
   refereeRejectByToken,
-  refereeReject,
   getExplorerOnboardingProfile,
   updateExplorerOnboardingProfile,
   createExplorerOnboardingProfile,

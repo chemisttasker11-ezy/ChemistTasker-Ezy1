@@ -173,6 +173,27 @@ class ShiftListingFixture(TestCase):
 
 
 class ShiftListingMatrixTests(ShiftListingFixture):
+    def test_public_search_does_not_match_anonymous_pharmacy_identity(self):
+        self.pharmacy.name = "Unmistakable Pharmacy"
+        self.pharmacy.street_address = "984 Secret Boulevard"
+        self.pharmacy.suburb = "Brisbane"
+        self.pharmacy.save(update_fields=["name", "street_address", "suburb"])
+        for search in (self.pharmacy.name, self.pharmacy.street_address):
+            with self.subTest(search=search):
+                response = client_for().get(API + "public-job-board/", {"search": search})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual([row["id"] for row in response.data["results"]], [self.shifts["public"].pk])
+        response = client_for().get(API + "public-job-board/", {"search": "Brisbane"})
+        self.assertEqual({row["id"] for row in response.data["results"]},
+                         {self.shifts["public"].pk, self.shifts["anonymous_public"].pk})
+        anonymous = next(row for row in response.data["results"] if row["id"] == self.shifts["anonymous_public"].pk)
+        self.assertNotIn(self.pharmacy.name, str(anonymous))
+        self.assertNotIn(self.pharmacy.street_address, str(anonymous))
+        # The signed-in platform browse is the same public audience.
+        for search, expected in (("Unmistakable", ["public"]), ("Secret", ["public"]), ("Brisbane", ["anonymous_public", "public"])):
+            with self.subTest(endpoint="public-shifts", search=search):
+                self.assertEqual(self.visible(f"public-shifts/?search={search}", self.users["outsider"]), expected)
+
     def test_every_endpoint_and_user(self):
         actual = {
             endpoint: {name: self.visible(endpoint, user) for name, user in self.users.items()}

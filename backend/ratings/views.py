@@ -54,7 +54,7 @@ class RatingViewSet(viewsets.GenericViewSet):
     def _has_completed_relationship_owner_to_worker(self, rater, worker_user) -> bool:
         """
         True if the rater controls at least one pharmacy (as Owner, Org Admin, or Pharmacy Admin)
-        where the given worker has at least one assignment (any time). No date filtering here.
+        where the given worker has at least one completed assignment.
         """
         # Pharmacies directly owned by rater
         owned_pharmacies = Pharmacy.objects.filter(owner__user=rater).values_list("id", flat=True)
@@ -79,15 +79,17 @@ class RatingViewSet(viewsets.GenericViewSet):
         return ShiftSlotAssignment.objects.filter(
             user=worker_user,
             shift__pharmacy_id__in=list(controlled_pharmacy_ids),
+            slot_date__lt=timezone.localdate(),
         ).exists()
 
     def _has_completed_relationship_worker_to_pharmacy(self, worker, pharmacy: Pharmacy) -> bool:
         """
-        True if the worker has at least one assignment at the pharmacy (any time). No date filtering here.
+        True if the worker has at least one completed assignment at the pharmacy.
         """
         return ShiftSlotAssignment.objects.filter(
             user=worker,
             shift__pharmacy=pharmacy,
+            slot_date__lt=timezone.localdate(),
         ).exists()
 
 

@@ -29,7 +29,7 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from client_profile.characterization_support import make_owner_with_pharmacy, make_user
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from onboarding.models import OwnerOnboarding, PharmacistOnboarding
 from users.models import WebSocketTicket
 
@@ -504,6 +504,25 @@ class SessionTests(TestCase):
 
 @override_settings(STORAGES=STORAGES)
 class AccountDeletionTests(TestCase):
+    def test_deletion_removes_authored_and_legacy_talent_posts_but_keeps_other_users(self):
+        from onboarding.models import ExplorerOnboarding
+        from talent.models import ExplorerPost
+
+        user = make_user("EXPLORER")
+        profile = ExplorerOnboarding.objects.create(user=user, verified=True)
+        authored = ExplorerPost.objects.create(author_user=user, headline="personal content", post_kind="FULL_TIME_APPLICATION")
+        legacy = ExplorerPost.objects.create(explorer_profile=profile, headline="legacy personal content")
+        other = make_user("EXPLORER")
+        control = ExplorerPost.objects.create(author_user=other, headline="still available")
+        with queued_emails():
+            response = client_for(user).delete("/api/v1/account/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ExplorerPost.objects.filter(pk__in=[authored.pk, legacy.pk]).exists())
+        self.assertTrue(ExplorerPost.objects.filter(pk=control.pk).exists())
+        for viewer, path in ((None, "public-feed/"), (other, "feed/")):
+            feed = client_for(viewer).get("/api/v1/explorer-posts/" + path)
+            self.assertEqual([row["id"] for row in feed.data["results"]], [control.pk])
+
     def test_deletion_anonymises_revokes_and_removes_identity_documents(self):
         path = "/api/v1/account/"
         pharmacist = make_user("PHARMACIST", mobile_number="61400000000", is_mobile_verified=True)
