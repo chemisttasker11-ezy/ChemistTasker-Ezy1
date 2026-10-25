@@ -313,9 +313,9 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             return Response({'detail': 'Email acceptance is uncertain. Do not resend until checked with your mail provider.'}, status=503)
         with transaction.atomic():
             Delivery.objects.filter(pk=delivery.pk).update(status='sent', sent_at=timezone.now())
-            Invoice.objects.filter(pk=record.pk).update(status='sent')
+            Invoice.objects.filter(pk=record.pk, version=delivery.version).update(status='sent')
+            record.revisions.filter(version=delivery.version).update(invoice_status='sent')
         record.refresh_from_db()
-        record_revision_state(record)
         return Response({'detail': 'Accepted by the email provider; inbox delivery is not guaranteed.',
                          'document': serialize_record(record)})
 
@@ -627,14 +627,13 @@ def bas_worksheet(request):
         user=request.user,
         kind='invoice',
         voided_at__isnull=True,
-        status__in=['sent', 'paid'],
     )
     sales = gst = credit = ZERO
     if basis == 'cash':
         totals = Payment.objects.filter(invoice__in=records, date__range=(start, end)).aggregate(sales=Sum('sales'), gst=Sum('gst'))
         sales, gst = totals['sales'] or ZERO, totals['gst'] or ZERO
     else:
-        for record in records.filter(invoice_date__range=(start, end)):
+        for record in records.filter(status__in=['sent', 'paid'], invoice_date__range=(start, end)):
             sales += Decimal(record.calculation['sales_gross'])
             gst += Decimal(record.calculation['gst'])
     expenses = Expense.objects.filter(owner=request.user, archived_at__isnull=True)

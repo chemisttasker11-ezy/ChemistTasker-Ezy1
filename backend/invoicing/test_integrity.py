@@ -1,5 +1,6 @@
 from datetime import date, time, timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -22,9 +23,9 @@ from notifications.models import Notification
 from invoicing.serializers import InvoiceSerializer
 from invoicing.services import generate_invoice_from_shifts
 from invoicing.views import InvoiceDetailView, send_invoice_email
-from worker_finance.views import ReceivedInvoiceViewSet
+from worker_finance.views import InvoiceViewSet, ReceivedInvoiceViewSet
 from worker_finance.models import CatalogueItem, Customer, Delivery, InvoiceRevision
-from worker_finance.services import internal_invoice_prefill, save_draft, serialize_record
+from worker_finance.services import internal_invoice_prefill, save_draft, serialize_record, owner_visible_document
 
 
 User = get_user_model()
@@ -164,6 +165,71 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(record.version, 1)
         self.assertEqual(record.pharmacy_id, self.pharmacy.id)
         self.assertEqual(InvoiceRevision.objects.filter(invoice=record).count(), 1)
+
+    @patch("worker_finance.documents.render_pdf", return_value=b"%PDF-test")
+    @patch("worker_finance.views.EmailMessage.send", return_value=1)
+    def test_cash_receipts_survive_an_unsent_invoice_revision(self, _send, _render):
+        draft = internal_invoice_prefill(self.worker, [self.assignment.id])
+        record = save_draft(self.worker, draft)
+        client = client_for(self.worker)
+        url = f"/api/v1/finance/invoices/{record.pk}/"
+        sent = client.post(url + "send/", {"version": 1, "confirmed": True}, format="json")
+        self.assertEqual(sent.status_code, 200, sent.data)
+        paid = client.post(url + "payments/", {
+            "request_key": str(uuid4()),
+            "date": timezone.localdate().isoformat(), "amount": "308.00",
+        }, format="json")
+        self.assertEqual(paid.status_code, 200, paid.data)
+        day = timezone.localdate().isoformat()
+        worksheet = f"/api/v1/finance/bas-worksheet/?start={day}&end={day}&basis=cash"
+        before = client.get(worksheet)
+        self.assertEqual(before.status_code, 200, before.data)
+        self.assertEqual(Decimal(before.data["G1"]), Decimal("308.00"))
+        self.assertEqual(Decimal(before.data["1A"]), Decimal("28.00"))
+
+        revised = save_draft(self.worker, {**record.payload, "version": 1, "notes": "Corrected notes"}, record.pk)
+        self.assertEqual(revised.status, "draft")
+        after = client.get(worksheet)
+        self.assertEqual(after.data["G1"], before.data["G1"])
+        self.assertEqual(after.data["1A"], before.data["1A"])
+        self.assertEqual(Decimal(client_for(self.owner).get(worksheet).data["G1"]), 0)
+        self.assertEqual(Decimal(client.get(worksheet.replace("basis=cash", "basis=accrual")).data["G1"]), 0)
+
+    @patch("worker_finance.documents.render_pdf", return_value=b"%PDF-test")
+    def test_finishing_old_email_does_not_publish_a_new_saved_revision(self, _render):
+        draft = internal_invoice_prefill(self.worker, [self.assignment.id])
+        record = save_draft(self.worker, draft)
+
+        def save_during_send(**kwargs):
+            save_draft(self.worker, {**record.payload, "version": 1, "notes": "Unsent revision"}, record.pk)
+            return 1
+
+        request = APIRequestFactory().post("/finance/invoices/send/", {"version": 1, "confirmed": True}, format="json")
+        force_authenticate(request, user=self.worker)
+        with patch("worker_finance.views.EmailMessage.send", side_effect=save_during_send):
+            response = InvoiceViewSet.as_view({"post": "send"})(request, pk=record.pk)
+        self.assertEqual(response.status_code, 200, response.data)
+        record.refresh_from_db()
+        self.assertEqual(record.version, 2)
+        self.assertEqual(record.status, "draft")
+        self.assertEqual(record.deliveries.get(version=1).status, "sent")
+        self.assertEqual(record.revisions.get(version=1).invoice_status, "sent")
+        self.assertEqual(record.revisions.get(version=2).invoice_status, "draft")
+        self.assertEqual(owner_visible_document(record)["version"], 1)
+        self.assertNotEqual(owner_visible_document(record)["payload"]["notes"], "Unsent revision")
+
+    @patch("worker_finance.documents.render_pdf", return_value=b"%PDF-test")
+    @patch("worker_finance.views.EmailMessage.send", return_value=1)
+    def test_finishing_current_email_publishes_that_revision(self, _send, _render):
+        record = save_draft(self.worker, internal_invoice_prefill(self.worker, [self.assignment.id]))
+        request = APIRequestFactory().post("/finance/invoices/send/", {"version": 1, "confirmed": True}, format="json")
+        force_authenticate(request, user=self.worker)
+        response = InvoiceViewSet.as_view({"post": "send"})(request, pk=record.pk)
+        self.assertEqual(response.status_code, 200, response.data)
+        record.refresh_from_db()
+        self.assertEqual(record.status, "sent")
+        self.assertEqual(record.revisions.get(version=1).invoice_status, "sent")
+        self.assertEqual(owner_visible_document(record)["version"], 1)
 
     def test_internal_invoice_recipient_override_is_invoice_only_and_keeps_pharmacy_provenance(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
