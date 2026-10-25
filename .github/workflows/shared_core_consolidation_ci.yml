@@ -306,7 +306,7 @@ jobs:
       - name: PostgreSQL migration rehearsal
         run: python backend/manage.py migrate --noinput --settings=core.postgres_test_settings
       - name: PostgreSQL concurrency contracts
-        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards.PillSpendPostgresConcurrencyTests billing.test_pr201_finance_pg ethical_marketplace.test_pr201_b31_pg --settings=core.postgres_test_settings
+        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards.PillSpendPostgresConcurrencyTests billing.test_pr201_finance_pg ethical_marketplace.test_pr201_b31_pg marketplace.test_pr201_b24_b25.ListingAudienceAtomicity --settings=core.postgres_test_settings
 
   boundary-audit:
     runs-on: ubuntu-latest

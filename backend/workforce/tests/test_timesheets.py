@@ -129,7 +129,7 @@ class TimesheetProjectionTests(TestCase):
         assignment.save(update_fields=["is_active"])
         scoped = OrganizationMembership.objects.create(
             user=manager, organization=self.pharmacy.organization,
-            role="REGION_ADMIN", admin_level="COMMUNICATION_MANAGER",
+            role="REGION_ADMIN", admin_level="ROSTER_MANAGER",
             region="Brisbane", job_title="Regional Lead",
         )
         scoped.pharmacies.add(self.pharmacy)

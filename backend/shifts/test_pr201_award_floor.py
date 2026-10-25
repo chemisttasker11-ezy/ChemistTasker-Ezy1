@@ -41,13 +41,16 @@ class RegionalAwardFloorTests(SimpleTestCase):
         self.assertEqual([x["day_type"] for x in floor["segments"]],["weekday","public_holiday"])
         self.assertEqual(floor["segments"][1]["start_time"],"18:00:00")
 
-    def test_unconfigured_region_returns_explicit_review_not_guess(self):
+    def test_unconfigured_region_keeps_statewide_floor_and_flags_review(self):
         floor=self.floor("2026-08-12","")
         self.assertTrue(floor["review_required"])
-        self.assertIsNone(floor["rate"])
+        self.assertFalse(floor["payroll_blocked"])
+        self.assertIsNotNone(floor["rate"])
+        self.assertEqual({x["day_type"] for x in floor["segments"]},{"weekday"})
         self.assertIn("REGION_REQUIRED",floor["review_reason"])
 
     def test_unpublished_2027_local_show_requires_review(self):
         floor=self.floor("2027-08-27","QLD_GOLD_COAST")
         self.assertTrue(floor["review_required"])
+        self.assertTrue(floor["payroll_blocked"])
         self.assertIn("LOCAL_DECLARATION_PENDING",floor["review_reason"])

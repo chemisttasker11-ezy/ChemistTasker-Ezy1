@@ -30,6 +30,9 @@ class ScopedRoleSeparationContracts(TestCase):
         self.assertTrue(user_can_manage_pharmacy(self.manager, self.a))
         self.assertIn(self.a.pk, managed_pharmacies(self.manager).values_list("pk", flat=True))
         self.assertFalse(user_can_edit_pharmacy_record(self.manager, self.a))
+        from workforce.permissions import can_manage_workforce_pharmacy
+        self.assertTrue(can_manage_workforce_pharmacy(self.manager, self.a))
+        self.assertFalse(can_manage_workforce_pharmacy(self.manager, self.b))
 
     def test_cross_organization_m2m_never_grants_roster_or_visibility(self):
         self.role.pharmacies.add(self.b)
@@ -81,3 +84,16 @@ class ScopedRoleSeparationContracts(TestCase):
         self.role.save(update_fields=["role", "admin_level"])
         self.assertTrue(can_manage_roster_pharmacy(self.manager, self.a))
         self.assertFalse(can_manage_roster_pharmacy(self.manager, self.b))
+
+    def test_manager_level_region_admin_and_org_wide_roles_keep_roster_and_staff(self):
+        self.role.admin_level = "MANAGER"
+        self.role.save(update_fields=["admin_level"])
+        self.assertTrue(can_manage_roster_pharmacy(self.manager, self.a))
+        self.assertTrue(can_manage_staff_pharmacy(self.manager, self.a))
+        self.assertFalse(can_manage_staff_pharmacy(self.manager, self.b))
+        for role in ("ORG_ADMIN", "CHIEF_ADMIN"):
+            self.role.role = role
+            self.role.save(update_fields=["role"])
+            self.assertTrue(can_manage_roster_pharmacy(self.manager, self.a), role)
+            self.assertTrue(can_manage_staff_pharmacy(self.manager, self.a), role)
+        self.assertTrue(can_manage_staff_pharmacy(self.owner_a, self.a))

@@ -199,7 +199,7 @@ class ListingAudience(APIView):
     permission_classes = (IsAuthenticated,)
     @transaction.atomic
     def post(self, request, pk):
-        listing = get_object_or_404(MarketplaceListing.objects.select_for_update().select_related("pharmacy", "audience"), pk=pk)
+        listing = get_object_or_404(MarketplaceListing.objects.select_for_update(of=("self",)).select_related("pharmacy", "audience"), pk=pk)
         assert_listing_manager(request.user, listing)
         if request.data.get("expected_version") != listing.version:
             return Response({"code": "STALE_VERSION"}, status=409)

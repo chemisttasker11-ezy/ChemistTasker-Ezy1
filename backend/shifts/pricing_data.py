@@ -76,7 +76,7 @@ def _validate_casual_table(role, classification, casual):
 
 
 @lru_cache(maxsize=None)
-def award_rates(as_of=None):
+def award_rates(as_of):
     """{role: {classification: {"casual": {day_type: rate, time_bucket: {day_type: rate}}}}}"""
     data = _read_json(AWARD_RATES_FILE)
     if not isinstance(data, dict) or not data:
@@ -101,8 +101,6 @@ def award_rates(as_of=None):
             if not isinstance(classifications, dict) or classification not in classifications:
                 raise PricingDataError(f"{AWARD_RATES_FILE.name}: missing {role}/{classification}")
 
-    if as_of is None:
-        as_of = date.today()
     if as_of >= date(2026, 7, 1):
         # The payroll engagement calculator owns the authoritative Fair Work
         # Schedule B tables. Shift pricing derives from them, never another

@@ -1,5 +1,10 @@
 """Pricing equivalence: a fingerprint of calculate_shift_rates over a representative matrix.
 
+F2 application-policy decision on 26 October 2026: a missing store district
+flags only dates with local events, while retaining statewide pricing. The
+metadata fingerprint changes; all 600 hourly rates and totals were compared
+with the committed matrix and are unchanged. No legal/rate data was revised.
+
 B14 deliberate source-only string change on 26 October 2026:
 the resolver now describes an unconfigured **store district**, not an
 employee-specific base. The reference hash changed because segment metadata
@@ -92,7 +97,7 @@ class PricingEquivalenceTests(SimpleTestCase):
         self.assertEqual(rates, EXPECTED_ASSISTANT_DAYTIME)
 
 
-EXPECTED_FINGERPRINT = "ad683b2ba0f64963fe23a0ea84ffe9b654135357cf3293fc5b7d26d856bd8476"
+EXPECTED_FINGERPRINT = "682ecafdc6dcfdfff90ad7b480b358bb97836ada0caa297f3c88eaa27d745518"
 EXPECTED_ASSISTANT_DAYTIME = {  # casual first-level assistant, 09:00-17:00, NSW
     date(2026, 1, 27): "33.19",  # weekday
     date(2026, 1, 31): "39.83",  # Saturday
@@ -102,6 +107,15 @@ EXPECTED_ASSISTANT_DAYTIME = {  # casual first-level assistant, 09:00-17:00, NSW
 
 
 class PricingDataLoaderTests(SimpleTestCase):
+    def test_award_cache_requires_date_and_keeps_effective_periods_separate(self):
+        from shifts.pricing_data import award_rates
+        with self.assertRaises(TypeError):
+            award_rates()
+        historical = award_rates(date(2026, 6, 30))["ASSISTANT"]["LEVEL_1"]["casual"]["weekday"]
+        current = award_rates(date(2026, 7, 1))["ASSISTANT"]["LEVEL_1"]["casual"]["weekday"]
+        self.assertNotEqual(historical, current)
+        self.assertEqual(award_rates(date(2026, 6, 30))["ASSISTANT"]["LEVEL_1"]["casual"]["weekday"], historical)
+
     def tearDown(self):
         from shifts import pricing_data
 
@@ -115,8 +129,8 @@ class PricingDataLoaderTests(SimpleTestCase):
         self.assertEqual(pricing_data.DATA_DIR.parent.name, "shifts")
         pricing_data.reset_cache()
         with mock.patch.object(pricing_data, "_read_json", wraps=pricing_data._read_json) as read:
-            pricing_data.award_rates()
-            pricing_data.award_rates()
+            pricing_data.award_rates(date(2026, 1, 27))
+            pricing_data.award_rates(date(2026, 1, 27))
             pricing_data.public_holidays()
         self.assertEqual(read.call_count, 2)
 
@@ -133,7 +147,7 @@ class PricingDataLoaderTests(SimpleTestCase):
             with mock.patch.object(pricing_data, "AWARD_RATES_FILE", corrupt):
                 pricing_data.reset_cache()
                 with self.assertRaisesRegex(pricing_data.PricingDataError, "award_rates_casual_first_level.json"):
-                    pricing_data.award_rates()
+                    pricing_data.award_rates(date(2026, 1, 27))
             missing = Path(folder) / "public_holidays.json"
             with mock.patch.object(pricing_data, "PUBLIC_HOLIDAYS_FILE", missing):
                 pricing_data.reset_cache()
@@ -158,7 +172,7 @@ class PricingDataLoaderTests(SimpleTestCase):
             with mock.patch.object(pricing_data, "AWARD_RATES_FILE", bad):
                 pricing_data.reset_cache()
                 with self.assertRaisesRegex(pricing_data.PricingDataError, "ASSISTANT/LEVEL_1.*sunday"):
-                    pricing_data.award_rates()
+                    pricing_data.award_rates(date(2026, 1, 27))
 
     def test_nonnumeric_award_rate_is_rejected(self):
         import json
@@ -178,7 +192,7 @@ class PricingDataLoaderTests(SimpleTestCase):
             with mock.patch.object(pricing_data, "AWARD_RATES_FILE", bad):
                 pricing_data.reset_cache()
                 with self.assertRaisesRegex(pricing_data.PricingDataError, "INTERN/FIRST_HALF.*early_morning.*weekday"):
-                    pricing_data.award_rates()
+                    pricing_data.award_rates(date(2026, 1, 27))
 
     def test_required_award_role_is_rejected_when_missing(self):
         import json
@@ -196,7 +210,7 @@ class PricingDataLoaderTests(SimpleTestCase):
             with mock.patch.object(pricing_data, "AWARD_RATES_FILE", bad):
                 pricing_data.reset_cache()
                 with self.assertRaisesRegex(pricing_data.PricingDataError, "STUDENT/YEAR_1"):
-                    pricing_data.award_rates()
+                    pricing_data.award_rates(date(2026, 1, 27))
 
     def test_public_holidays_require_all_states_and_canonical_iso_dates(self):
         import json
@@ -240,4 +254,4 @@ class PricingDataLoaderTests(SimpleTestCase):
             with mock.patch.object(pricing_data, "AWARD_RATES_FILE", bad):
                 pricing_data.reset_cache()
                 with self.assertRaisesRegex(pricing_data.PricingDataError, "no casual rates"):
-                    pricing_data.award_rates()
+                    pricing_data.award_rates(date(2026, 1, 27))

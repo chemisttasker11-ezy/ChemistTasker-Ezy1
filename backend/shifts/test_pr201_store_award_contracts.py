@@ -16,6 +16,24 @@ from workforce.award_rates import resolve_award_schedule
 
 
 class VerifiedPharmacyAwardCalculations(SimpleTestCase):
+    def test_money_half_cent_rounds_up_in_preview_posted_staff_and_floor(self):
+        store = self.store("QLD_BRISBANE")
+        store.rate_weekday = Decimal("60.005")
+        shift = SimpleNamespace(role_needed="PHARMACIST", pharmacy=store, rate_type="FIXED")
+        slot = SimpleNamespace(date=date(2026, 9, 21), start_time=time(9), end_time=time(17), rate=Decimal("60.005"))
+        preview, _ = calculate_shift_rates(shift, slot.date, slot.start_time, slot.end_time)
+        posted, _ = get_locked_rate_for_slot(slot, shift, None)
+        staff, _ = get_locked_rate_for_slot(slot, shift, None, staff_terms={
+            "settlement_channel": "PAYROLL", "rates": {"weekday": "60.005"},
+        })
+        award = self.award("PHARMACIST", "PHARMACIST", as_of=slot.date)
+        award["schedule"]["weekday"]["daytime_08_19"] = "60.005"
+        floor = _award_floor_for_occurrence(award, {
+            "date": str(slot.date), "start_time": "09:00", "end_time": "17:00",
+        }, store)
+        self.assertEqual((preview, posted, staff), (Decimal("60.01"),) * 3)
+        self.assertEqual(floor["rate"], "60.01")
+
     def award(self, role, classification, employment="CASUAL", as_of=date(2026, 8, 28)):
         return resolve_award_schedule(
             role=role, classification=classification,

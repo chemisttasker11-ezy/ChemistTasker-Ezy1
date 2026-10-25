@@ -218,6 +218,8 @@ class ShiftDetailViewSet(BaseShiftViewSet):
 
         pharmacy_for_calc = SimpleNamespace(
             state=pharmacy.state,
+            public_holiday_region=pharmacy.public_holiday_region,
+            use_chemisttasker_payroll=pharmacy.use_chemisttasker_payroll,
             rate_weekday=to_decimal(get_override('rate_weekday', 'rateWeekday')) or pharmacy.rate_weekday,
             rate_saturday=to_decimal(get_override('rate_saturday', 'rateSaturday')) or pharmacy.rate_saturday,
             rate_sunday=to_decimal(get_override('rate_sunday', 'rateSunday')) or pharmacy.rate_sunday,

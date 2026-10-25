@@ -76,6 +76,42 @@ class DirectMessageTests(ChatBase):
             (contact.employment_type, contact.is_active, contact.pharmacy_id, contact.invited_by_id),
             ("CONTACT", False, self.pharmacy.id, self.alice.id))
 
+    def test_contact_can_list_read_and_reply_to_dm_but_cannot_join_group(self):
+        from chat.realtime import participant_can_receive_chat_updates
+        room = self.dm(self.alice, self.no_role).json()["id"]
+        contact = Membership.objects.get(user=self.no_role)
+        self.assertEqual(contact.role, "STUDENT")
+        api = client_for(self.no_role)
+        self.assertEqual([row["id"] for row in self.rows(api.get(ROOMS))], [room])
+        self.assertEqual(api.get(f"{ROOMS}{room}/messages/").status_code, 200)
+        reply = api.post(f"{ROOMS}{room}/messages/", {"body": "Contact reply"}, format="json")
+        self.assertEqual(reply.status_code, 201, reply.data)
+        group = Conversation.objects.create(type="GROUP", pharmacy=self.pharmacy)
+        participant = Participant.objects.create(conversation=group, membership=contact)
+        self.assertFalse(participant_can_receive_chat_updates(participant))
+        self.assertEqual(api.get(f"{ROOMS}{group.pk}/").status_code, 404)
+
+    def test_rest_and_socket_choose_valid_participant_after_legacy_revoked_row(self):
+        from asgiref.sync import async_to_sync
+        from chat.consumers import RoomConsumer
+        from chat.realtime import authorized_participant
+        _, other_pharmacy = make_owner_with_pharmacy("Revoked legacy pharmacy")
+        Membership.objects.filter(pk=self.alice_m.pk).update(is_active=False)
+        valid = Membership.objects.create(
+            user=self.alice, pharmacy=other_pharmacy, role="PHARMACIST",
+            employment_type="FULL_TIME", status="ACCEPTED", is_active=True,
+        )
+        room = Conversation.objects.create(type="DM").pk
+        Participant.objects.create(conversation_id=room, membership=self.alice_m)
+        Participant.objects.create(conversation_id=room, membership=valid)
+        Participant.objects.create(conversation_id=room, membership=self.bob_m)
+        self.assertEqual(authorized_participant(room, self.alice.pk).membership_id, valid.pk)
+        consumer = RoomConsumer()
+        self.assertEqual(async_to_sync(consumer._get_membership)(room, self.alice.pk).pk, valid.pk)
+        sent = client_for(self.alice).post(MESSAGES, {"conversation": room, "body": "Still authorized"}, format="json")
+        self.assertEqual(sent.status_code, 201, sent.data)
+        self.assertEqual(Message.objects.get(pk=sent.data["id"]).sender_id, valid.pk)
+
     def test_room_visibility_is_limited_to_participants(self):
         room = self.dm(self.alice, self.bob).json()["id"]
         self.assertEqual([r["id"] for r in self.rows(client_for(self.alice).get(ROOMS))], [room])

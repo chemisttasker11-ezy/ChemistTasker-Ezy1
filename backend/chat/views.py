@@ -21,7 +21,7 @@ from django.utils import timezone
 from chat.text import sanitize_chat_text
 from chat.realtime import (
     broadcast_message_badge, broadcast_message_read,
-    accessible_conversations_queryset, participant_can_receive_chat_updates,
+    accessible_conversations_queryset, authorized_participant,
 )
 from core.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 from datetime import date
@@ -652,8 +652,8 @@ class MessageViewSet(viewsets.ModelViewSet):
         except Conversation.DoesNotExist:
             return Response({"detail": "Conversation not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        participant = Participant.objects.filter(conversation=conversation, membership__user=user).select_related("membership").first()
-        if not participant or not participant_can_receive_chat_updates(participant):
+        participant = authorized_participant(conversation.pk, user.pk)
+        if not participant:
             return Response({"detail": "You are not an active participant in this conversation."}, status=status.HTTP_403_FORBIDDEN)
 
         attachment_file = request.FILES.get("attachment") if request.FILES else None

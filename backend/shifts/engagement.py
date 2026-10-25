@@ -354,7 +354,7 @@ def _segment_rate_key(day_type, clock_time):
 def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
     # Legal public-holiday scope is owned by shifts.holidays, not the Award
     # minimum-rate calculator or its state-only legacy get_day_type wrapper.
-    from shifts.holidays import holiday_boundaries, resolve_public_holiday
+    from shifts.holidays import day_type as classify_day, holiday_boundaries, resolve_public_holiday
 
     work_date = date.fromisoformat(str(occurrence["date"]))
     start_time = _parse_time(occurrence["start_time"])
@@ -378,6 +378,8 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
     segments = []
     total_hours = Decimal("0")
     total_pay = Decimal("0")
+    holiday_review_reason = None
+    holiday_blocks_payroll = False
     cursor = start_dt
 
     while cursor < end_dt:
@@ -386,23 +388,15 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
         holiday = resolve_public_holiday(
             cursor.date(), state, region, at_time=cursor.time(),
         )
-        if holiday.needs_review:
-            return {
-                "rate": None,
-                "review_required": True,
-                "review_reason": (
-                    "Verify the posting pharmacy's public-holiday district "
-                    "and regional substitution before using an "
-                    "automated MA000012 minimum rate: " + holiday.status
-                ),
-                "segments": segments,
-            }
-        day_type = (
-            "public_holiday" if holiday.is_public_holiday
-            else "saturday" if cursor.weekday() == 5
-            else "sunday" if cursor.weekday() == 6
-            else "weekday"
-        )
+        # The statewide floor still applies; an unresolved local date only
+        # flags payroll review, it never removes the Award minimum.
+        if holiday.needs_review and holiday_review_reason is None:
+            holiday_review_reason = (
+                "Verify the posting pharmacy's public-holiday district "
+                "and regional substitution; statewide minimum applied: " + holiday.status
+            )
+        holiday_blocks_payroll |= holiday.blocks_payroll
+        day_type = classify_day(cursor.date(), holiday)
 
         if day_type == "weekday":
             boundary_times = [time(7, 0), time(8, 0), time(19, 0), time(21, 0)]
@@ -449,9 +443,8 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
             "hours": _money(hours),
             "line_total": _money(line_total),
         }
-        # Ordinary hours keep their historical immutable snapshot shape;
-        # only holiday segments need additional legal provenance.
-        if holiday.scope != "NONE":
+        # Preserve provenance for holidays and unresolved local dates.
+        if holiday.needs_review or holiday.scope != "NONE":
             segment.update({
                 "holiday_scope": holiday.scope,
                 "holiday_status": holiday.status,
@@ -465,8 +458,9 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
         raise ValidationError({"shift_time": "Shift duration must be greater than zero."})
     return {
         "rate": _money(total_pay / total_hours),
-        "review_required": False,
-        "review_reason": None,
+        "review_required": holiday_review_reason is not None,
+        "payroll_blocked": holiday_blocks_payroll,
+        "review_reason": holiday_review_reason,
         "segments": segments,
     }
 
@@ -517,10 +511,11 @@ def _build_tfn_award_terms(*, shift, onboarding, occurrences):
         routed["award_review_required"] = floor["review_required"]
         routed["award_review_reason"] = floor["review_reason"]
 
-        if floor["review_required"]:
+        if floor.get("payroll_blocked", floor["review_required"]):
             payroll_review_required = True
             if floor["review_reason"] and floor["review_reason"] not in review_reasons:
                 review_reasons.append(floor["review_reason"])
+        if floor["rate"] is None:
             if posted_rate is None:
                 raise ValidationError({"agreed_rate": "The final agreed hourly rate must be recorded before accepting this shift."})
             routed["agreed_rate"] = _money(posted_rate)

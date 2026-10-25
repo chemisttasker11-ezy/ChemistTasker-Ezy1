@@ -34,6 +34,7 @@ class ManagerPendingKioskReviewView(APIView):
                 device__pharmacy=pharmacy,
                 processing_status=KioskAttendanceEvent.ProcessingStatus.NEEDS_REVIEW,
                 manager_review__isnull=True,
+                attendance_event__isnull=True,
             ).select_related("device", "employee").order_by("received_at")[:100]
         )
         return Response([
@@ -85,6 +86,9 @@ class ManagerDecideKioskReviewView(APIView):
                         "decision": review.decision, "review_id": review.pk,
                         "attendance_event_id": review.attendance_event_id,
                     })
+                # Legacy NEEDS_REVIEW rows may already have been applied live.
+                if evidence.attendance_event_id:
+                    return Response({"code": "EVENT_ALREADY_APPLIED"}, status=409)
                 effective_time = None
                 live_event = None
                 if decision == KioskAttendanceReview.Decision.APPROVED:

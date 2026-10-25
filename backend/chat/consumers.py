@@ -127,15 +127,13 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         # No immediate send here; signal will broadcast on commit
 
     async def send_json(self, content, close=False):
-        # Do not deliver group messages, edits, reactions or badges to a
-        # disconnected/revoked member even when no explicit signal was sent.
-        if not await self._membership_still_authorized():
-            await self.close(code=4403)
-            return
-        # Backstop for a missed ahpra.suspended event: never deliver to a frozen user.
         now = time.monotonic()
+        # Backstop for missed revocation and ahpra.suspended signals, one DB check per window.
         if now - getattr(self, '_ahpra_checked_at', 0.0) >= self.AHPRA_RECHECK_SECONDS:
             self._ahpra_checked_at = now
+            if not await self._membership_still_authorized():
+                await self.close(code=4403)
+                return
             if await self._ahpra_suspended(self.scope['user']):
                 self._ahpra_frozen = True
         if getattr(self, '_ahpra_frozen', False):

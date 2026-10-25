@@ -176,3 +176,22 @@ class Phase6KioskClockIntegrity(KioskOfflineProtocolTests):
                              "reason": "Foreign"}, format="json")
         self.assertEqual(response.status_code, 403, response.data)
         self.assertEqual(AttendanceEvent.objects.count(), 0)
+
+    def test_b29_legacy_review_row_already_applied_is_hidden_and_not_reapplied(self):
+        from attendance.protocol import _apply_business_event
+        event = self.drift_pending()
+        api = self.review_client(self.owner)
+        pending_url = "/api/v1/attendance/manager/kiosk-review/pending/"
+        listed = api.get(pending_url, {"pharmacy_id": self.pharmacy.pk})
+        self.assertEqual([row["event_id"] for row in listed.data], [event["event_id"]])
+        evidence = KioskAttendanceEvent.objects.get()
+        evidence.attendance_event = _apply_business_event(
+            self.device, evidence.employee, evidence.event_type, timezone.now(), evidence.shift_id,
+        )
+        evidence.save(update_fields=["attendance_event"])
+        self.assertEqual(api.get(pending_url, {"pharmacy_id": self.pharmacy.pk}).data, [])
+        response = api.post("/api/v1/attendance/manager/kiosk-review/decide/", {
+            "event_id": event["event_id"], "decision": "APPROVED", "reason": "Legacy row",
+            "corrected_timestamp": timezone.now().isoformat()}, format="json")
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertEqual(AttendanceEvent.objects.count(), 1)

@@ -84,13 +84,15 @@ class PublicHolidayWorkBaseContracts(SimpleTestCase):
         self.assertEqual(set(x["date"] for x in overnight["segments"]),{"2027-12-24","2027-12-25"})
         self.assertTrue(all(x["day_type"]=="public_holiday" for x in overnight["segments"]))
 
-    def test_pending_2027_local_show_and_unconfigured_region_are_not_certified(self):
+    def test_pending_2027_local_show_and_unconfigured_region_local_date_need_review(self):
         pending=self.classify(date(2027,8,27),"QLD","QLD_GOLD_COAST")
         self.assertEqual(pending.status,"LOCAL_DECLARATION_PENDING")
         self.assertTrue(pending.needs_review)
-        missing=self.classify(date(2027,8,27),"QLD","")
+        self.assertEqual(self.classify(date(2027,8,27),"QLD","").status,"VERIFIED")
+        missing=self.classify(date(2026,8,12),"QLD","")
         self.assertEqual(missing.status,"REGION_REQUIRED")
         self.assertTrue(missing.needs_review)
+        self.assertFalse(missing.is_public_holiday)
         self.assertEqual(holiday_calendar_status("QLD","QLD_GOLD_COAST")["pendingYears"],[2027])
 
     def test_invalid_region_and_uncertified_year_cannot_be_claimed_verified(self):
@@ -98,10 +100,19 @@ class PublicHolidayWorkBaseContracts(SimpleTestCase):
             self.classify(date(2026,8,28),"QLD","NSW_WALCHA")
         self.assertEqual(self.classify(date(2028,8,27),"QLD","QLD_GOLD_COAST").status,"YEAR_NOT_CERTIFIED")
 
-    def test_missing_region_payroll_preview_refuses_guess(self):
-        rate, reason=self.rate(date(2026,8,12),"",payroll=True)
-        self.assertEqual(rate,Decimal("0.00"))
-        self.assertIn("REGION_REQUIRED",reason["error"])
+    def test_region_year_must_be_present_in_its_verified_or_pending_years(self):
+        from copy import deepcopy
+        from unittest.mock import patch
+        from shifts.pricing_data import local_public_holidays
+        data = deepcopy(local_public_holidays())
+        data["regions"]["QLD_BRISBANE"]["verified_years"] = [2027]
+        with patch("shifts.holidays.local_public_holidays", return_value=data):
+            self.assertEqual(self.classify(date(2026,8,12),"QLD","QLD_BRISBANE").status,"YEAR_NOT_CERTIFIED")
+
+    def test_missing_region_payroll_preview_prices_statewide_and_flags(self):
+        rate, meta=self.rate(date(2026,8,12),"",payroll=True)
+        self.assertGreater(rate,Decimal("0.00"),meta)
+        self.assertEqual({s["holiday_status"] for s in meta["segments"]},{"REGION_REQUIRED"})
 
     def test_victorian_melbourne_cup_replacement_not_double_counted(self):
         region="VIC_WARRNAMBOOL"
