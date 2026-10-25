@@ -3,7 +3,7 @@
   "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "reviewer": "gpt6-senior-20261025",
   "review_level": "S1 FULL SOURCE FETCH + ANNOTATED FIRST-PASS; not independent S2 semantic certification or S3 test",
-  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3",
   "source_read_count": 70,
   "files": [
     {
@@ -19,7 +19,8 @@
         "server": false,
         "guards": true,
         "mutations": true
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/e2e/tests/login.e2e.ts",
@@ -34,7 +35,8 @@
         "server": false,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/access/page.tsx",
@@ -49,7 +51,8 @@
         "server": false,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/inventory/page.tsx",
@@ -64,7 +67,8 @@
         "server": false,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/layout.tsx",
@@ -79,7 +83,8 @@
         "server": false,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/new/page.tsx",
@@ -94,7 +99,8 @@
         "server": false,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/page.tsx",
@@ -109,7 +115,8 @@
         "server": false,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/page.tsx",
@@ -124,7 +131,8 @@
         "server": false,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/transfers/page.tsx",
@@ -139,7 +147,8 @@
         "server": false,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/blog/[slug]/page.tsx",
@@ -154,7 +163,8 @@
         "server": true,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/blog/page.tsx",
@@ -169,7 +179,8 @@
         "server": true,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/community/sign-in/page.tsx",
@@ -184,7 +195,8 @@
         "server": false,
         "guards": true,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/community/sign-in/sign-in-form.tsx",
@@ -199,7 +211,8 @@
         "server": false,
         "guards": false,
         "mutations": true
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/components/article-card.tsx",
@@ -214,7 +227,8 @@
         "server": false,
         "guards": false,
         "mutations": false
-      }
+      },
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/components/article-detail.tsx",
@@ -223,7 +237,8 @@
       "note": "51 lines; server/module; direct imports @/components/rich-content, next, next/link; async calls: getArticle, getArticles; read/presentation; local conditional/auth context. JSON-LD script insertion is escaped; verify rich-content sanitization independently. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "33218eb1456c5add1e9c4fb795f1e1c650fe7362",
       "lines": 51,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/components/discussion.tsx",
@@ -232,7 +247,8 @@
       "note": "115 lines; client state/UI; direct imports react, next/link, lucide-react; domain API: publicContent.listArticleComments, publicContent.reactToArticleComment, publicContent.removeArticleCommentReaction, publicContent.deleteArticleComment, publicContent.reportArticleComment, publicContent.createArticleComment, publicContent.getArticle; write-capable UI: verify backend authorization; local conditional/auth context. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "bfc9352a7c816477f690deede2586a9cbaeac1b0",
       "lines": 115,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/components/hub-header.tsx",
@@ -241,7 +257,8 @@
       "note": "3 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "8f6c2b654f1cd2da843a85f82131a364c60ebeeb",
       "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/components/listing.tsx",
@@ -250,7 +267,8 @@
       "note": "39 lines; server/module; direct imports next/link, lucide-react, ../../../lib/hub-server; async calls: getArticles; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "dca9191e97bd5dd7a7f79b5ffe2a73b852aac817",
       "lines": 39,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/components/share-button.tsx",
@@ -259,7 +277,8 @@
       "note": "12 lines; client state/UI; simple delegated Next page or metadata; async calls: navigator.clipboard.writeText; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "9430d1852557217b0dee8d07226983236563536c",
       "lines": 12,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/error.tsx",
@@ -268,7 +287,8 @@
       "note": "5 lines; client state/UI; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "8d23d246217a9bd72950b95426ccbd298ddfce63",
       "lines": 5,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/layout.tsx",
@@ -277,7 +297,8 @@
       "note": "22 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "1f1ef0f3826cc317afcf0aca0c1984197e30f220",
       "lines": 22,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/loading.tsx",
@@ -286,7 +307,8 @@
       "note": "2 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "504965b91def47d2a63396430f77417c8dbfbe1a",
       "lines": 2,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/news/[slug]/page.tsx",
@@ -295,7 +317,8 @@
       "note": "5 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "957a45ed4b762d7164a140b59b9554749b399080",
       "lines": 5,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/news/page.tsx",
@@ -304,7 +327,8 @@
       "note": "9 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "a6943f4743c3e61aef9ed5a6ced14209e824425f",
       "lines": 9,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(hub)/not-found.tsx",
@@ -313,7 +337,8 @@
       "note": "3 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
       "blob_sha": "b082f3cb3fbd126fbc40af565382fdf46ee0a3b1",
       "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/account-deletion/page.tsx",
@@ -322,7 +347,8 @@
       "note": "6 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary.",
       "blob_sha": "e2775985858781241279dc3f1fe2fd86d3df71e3",
       "lines": 6,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/contact-us/page.tsx",
@@ -331,7 +357,8 @@
       "note": "3 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; local conditional/auth context.",
       "blob_sha": "9992de7c23ee94fcf890a540a0bbeb565cedaeee",
       "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/contact/page.tsx",
@@ -340,7 +367,8 @@
       "note": "6 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary.",
       "blob_sha": "188231d8f59d86e5b815a0ac942bd236295ed52d",
       "lines": 6,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/layout.tsx",
@@ -349,7 +377,8 @@
       "blob_sha": "1ffa90ca179eb3a9592d9709989c7d083085cd11",
       "lines": 14,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 14 lines; thin Next route wrapper/delegation; imports @/public/header, @/public/footer; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 14 lines; thin Next route wrapper/delegation; imports @/public/header, @/public/footer; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/learning/page.tsx",
@@ -358,7 +387,8 @@
       "blob_sha": "d58e73674167c5c8638c252cdf7e58faf1f7c21b",
       "lines": 155,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 155 lines; client interactions; imports next/link, react, lucide-react, @/shared/session-provider; call sites chemistTaskerApi.publicContent.listArticles, loadArticles, chemistTaskerApi.marketplace.getListingOptions; read/render; no runtime test or S2 sign-off."
+      "note": "Read 155 lines; client interactions; imports next/link, react, lucide-react, @/shared/session-provider; call sites chemistTaskerApi.publicContent.listArticles, loadArticles, chemistTaskerApi.marketplace.getListingOptions; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/login/page.tsx",
@@ -367,7 +397,8 @@
       "blob_sha": "d33c15847a29af7be956736802e0606141b44f88",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/marketplace/exchanges/page.tsx",
@@ -376,7 +407,8 @@
       "blob_sha": "89858b4bff5e0d487a2e38c2ea061d4aae8dc292",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/workspace; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/workspace; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/marketplace/items/[id]/[slug]/marketplace-item.tsx",
@@ -385,7 +417,12 @@
       "blob_sha": "f95ba00f80fd719af932e48a3eed4c66633159b5",
       "lines": 50,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 50 lines; client interactions; imports next/link, lucide-react, react, @/shared/session-provider; call sites chemistTaskerApi.marketplace.getListing, chemistTaskerApi.marketplace.getAccess, chemistTaskerApi.marketplace.createEnquiry; write UI, backend permissions authoritative; no runtime test or S2 sign-off."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 19-43): The item view fetches approved public listing and user marketplace access; enquiry submits client_request_id UUID with chosen buying_pharmacy. Client dropdown restricts eligible pharmacy but backend must enforce it; concurrent identical enquiries remain C011-N1. Test contract: Negative: edit buying_pharmacy manually and replay same request ID concurrently; positive: one verified enquiry in permitted pharmacy. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        19,
+        43
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/marketplace/items/[id]/[slug]/page.tsx",
@@ -394,7 +431,8 @@
       "blob_sha": "6e0e87afed910d527e2d063f3d5fb8bf9b24ba73",
       "lines": 10,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 10 lines; thin Next route wrapper/delegation; imports next, ./marketplace-item; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 10 lines; thin Next route wrapper/delegation; imports next, ./marketplace-item; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/marketplace/layout.tsx",
@@ -403,7 +441,8 @@
       "blob_sha": "a11a03170840f264dce62c5c8aefe50c17354a61",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports none; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports none; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx",
@@ -412,7 +451,8 @@
       "blob_sha": "7e128ca5d94162779ef3c111bef5cd499133cda9",
       "lines": 29,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 29 lines; client interactions; imports next/link, next/navigation, lucide-react, react; call sites chemistTaskerApi.marketplace.listListings, load; write UI, backend permissions authoritative; no runtime test or S2 sign-off."
+      "note": "Read 29 lines; client interactions; imports next/link, next/navigation, lucide-react, react; call sites chemistTaskerApi.marketplace.listListings, load; write UI, backend permissions authoritative; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/marketplace/medicines/page.tsx",
@@ -421,7 +461,8 @@
       "blob_sha": "7e08aab2ce7b8cbe33d6c601ebd8ebc4f248f287",
       "lines": 11,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 11 lines; server/helper; imports next, next/link, lucide-react; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 11 lines; server/helper; imports next, next/link, lucide-react; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/marketplace/mine/page.tsx",
@@ -430,7 +471,8 @@
       "blob_sha": "5e99840b6b3f0d6ae95435fc86c4c9dd8cc4742c",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/goods-listings-v2; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/goods-listings-v2; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/marketplace/new/page.tsx",
@@ -439,7 +481,8 @@
       "blob_sha": "06ad4740552a5d46f033367c832d95ccd67e5942",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/add-item-wizard; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/add-item-wizard; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/marketplace/page.tsx",
@@ -448,7 +491,8 @@
       "blob_sha": "44bef7459a6c7518c2dcd313d0bf57df6ed85e81",
       "lines": 23,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 23 lines; server/helper; imports next, next/image, next/link, lucide-react; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 23 lines; server/helper; imports next, next/image, next/link, lucide-react; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/mobile-checkout-return/page.tsx",
@@ -457,7 +501,8 @@
       "blob_sha": "dd9cdc9b87c9086dd5975c3d8ec1bee3845f7b78",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/mobile-verify/page.tsx",
@@ -466,7 +511,8 @@
       "blob_sha": "7a82766f7a64ce6c95f2a6c3641f41523882f0e3",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/onboarding/referee-reject/[pk]/[refIndex]/page.tsx",
@@ -475,7 +521,8 @@
       "blob_sha": "a5177d082edfe60901c12d9ed6ce018ca3846aaf",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/organization/[slug]/page.tsx",
@@ -484,7 +531,8 @@
       "blob_sha": "56511ec506fd42920acbba39c356d991d966935d",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/otp-verify/page.tsx",
@@ -493,7 +541,8 @@
       "blob_sha": "8d8cf27cfb7cf6b6695aa12a3cd207f101435808",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/password-reset/page.tsx",
@@ -502,7 +551,8 @@
       "blob_sha": "8bd57a4aed126b3f4adaa1ad5783fd4fa1fcc103",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/pricing/organization/page.tsx",
@@ -511,7 +561,8 @@
       "blob_sha": "b33c9c917ff6946c15fc58ed62af6a4c23950e57",
       "lines": 6,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/pricing/page.tsx",
@@ -520,7 +571,8 @@
       "blob_sha": "112cefca63b9684e4bea325b099a8ade836df599",
       "lines": 6,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/privacy-policy/page.tsx",
@@ -529,7 +581,8 @@
       "blob_sha": "35e9a75269ca81f9207e90f034ab97731d35ede0",
       "lines": 6,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/referee/questionnaire/[token]/page.tsx",
@@ -538,7 +591,8 @@
       "blob_sha": "d6218f329094ffa487d43771f9cd167d41a07268",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/register/page.tsx",
@@ -547,7 +601,8 @@
       "blob_sha": "5e0c47dfe43472b406d2c3da59f757fe574f0705",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/reset-password/[uid]/[token]/page.tsx",
@@ -556,7 +611,8 @@
       "blob_sha": "d17e36bc65972312f6d21fc656dbf34f8186a6ae",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/shifts/link/page.tsx",
@@ -565,7 +621,8 @@
       "blob_sha": "7d00188f62ffce6421926f6e23160a595ef96dc8",
       "lines": 5,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/shifts/public-board/page.tsx",
@@ -574,7 +631,8 @@
       "blob_sha": "b74acf5926f61759b5ae2ae728451f2c66fbcd14",
       "lines": 6,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/talent/public-board/page.tsx",
@@ -583,7 +641,8 @@
       "blob_sha": "09f7b935308803c5b85f8bd6e3f2f824461e5be4",
       "lines": 6,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/(public)/terms-of-service/page.tsx",
@@ -592,7 +651,8 @@
       "blob_sha": "f93539c33c32a75ef4df2d571cab3dcd8ca1bb53",
       "lines": 6,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/api/[...path]/route.ts",
@@ -601,7 +661,12 @@
       "blob_sha": "83be8ae945b1b757fbcbbcb2f12e901ba1e10667",
       "lines": 12,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 12 lines; thin Next route wrapper/delegation; imports next/server, @/lib/platform-proxy; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 1-9): Same-origin canonical /api/v1 facade rejects other first path components and forwards through platformProxy. This route itself does not perform Django object authorization. Endpoint checks belong to backend. Test contract: Negative: non-v1 root and ../ path; positive: authorized canonical request with cookie and CSRF. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        1,
+        9
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/api/hub/[...path]/route.ts",
@@ -610,7 +675,12 @@
       "blob_sha": "633d96dd103cd7a0d2bebb8eec0af81a07b433b6",
       "lines": 14,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 14 lines; thin Next route wrapper/delegation; imports next/server, @/lib/platform-proxy; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 1-14): Hub BFF maps /session GET, POST and DELETE to current-user, login and logout; other hub paths forward to public-hub prefix through platformProxy, optionally using HUB_API_URL. Backend remains source of authentication and content permission. Test contract: Negative: forged origin/CSRF or private post access; positive: same authentication status as Vite. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        1,
+        14
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/api/platform/[...path]/route.ts",
@@ -619,7 +689,8 @@
       "blob_sha": "07e0ca6958eb4d4e06d7d7e392fb7b2abfe92dc4",
       "lines": 6,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next/server, @/lib/platform-proxy; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next/server, @/lib/platform-proxy; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/calculator/page.tsx",
@@ -628,7 +699,8 @@
       "blob_sha": "f625a543fa1bf0d9d2514c46cdcd73f43a039c85",
       "lines": 23,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 23 lines; thin Next route wrapper/delegation; imports @/public/header, @/public/footer, next, @/features/paediatric-calculator/components/calculator; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 23 lines; thin Next route wrapper/delegation; imports @/public/header, @/public/footer, next, @/features/paediatric-calculator/components/calculator; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/content/invite/[token]/accept.tsx",
@@ -637,7 +709,8 @@
       "blob_sha": "ac445a210e34a81714b7371709b7807858e2e5a4",
       "lines": 14,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 14 lines; client interactions; imports react, next/link, @/shared/session-provider, @/shared/browser-session; call sites contentOperations.acceptInvitation, reload, accept, logoutSession; read/render; no runtime test or S2 sign-off."
+      "note": "Read 14 lines; client interactions; imports react, next/link, @/shared/session-provider, @/shared/browser-session; call sites contentOperations.acceptInvitation, reload, accept, logoutSession; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/content/invite/[token]/page.tsx",
@@ -646,7 +719,8 @@
       "blob_sha": "96e7011998a49300fae523beff0fbb3914a39444",
       "lines": 3,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 3 lines; thin Next route wrapper/delegation; imports ./accept; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 3 lines; thin Next route wrapper/delegation; imports ./accept; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/content/layout.tsx",
@@ -655,7 +729,8 @@
       "blob_sha": "a5f9fb2fca443049ad07f4cb9046f552bc217f17",
       "lines": 7,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 7 lines; thin Next route wrapper/delegation; imports next, ../(hub)/components/hub-header; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 7 lines; thin Next route wrapper/delegation; imports next, ../(hub)/components/hub-header; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/content/page.tsx",
@@ -664,7 +739,8 @@
       "blob_sha": "4f42bf944f12975d6594aaa024861f0b26a34d96",
       "lines": 3,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 3 lines; thin Next route wrapper/delegation; imports ./workspace; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 3 lines; thin Next route wrapper/delegation; imports ./workspace; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/content/workspace.tsx",
@@ -673,7 +749,8 @@
       "blob_sha": "fe4672d5a16db5ad489e327735592bf1221f5873",
       "lines": 81,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 81 lines; client interactions; imports react, next/link, lucide-react, @/components/visual-editor; call sites load, save, action, Promise.all, reload, run; write UI, backend permissions authoritative; no runtime test or S2 sign-off."
+      "note": "Read 81 lines; client interactions; imports react, next/link, lucide-react, @/components/visual-editor; call sites load, save, action, Promise.all, reload, run; write UI, backend permissions authoritative; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/dashboard/page.tsx",
@@ -682,7 +759,8 @@
       "blob_sha": "6ac249c3fe3c64c3d8995c9affe453967be89f3c",
       "lines": 7,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 7 lines; thin Next route wrapper/delegation; imports react, @/shared/session-provider, @/shared/browser-session, @/migrated/utils/dashboardPath; call sites reload; read/render; no runtime test or S2 sign-off."
+      "note": "Read 7 lines; thin Next route wrapper/delegation; imports react, @/shared/session-provider, @/shared/browser-session, @/migrated/utils/dashboardPath; call sites reload; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/feature-catalogue.tsx",
@@ -691,7 +769,8 @@
       "blob_sha": "45826449121d73386c3fb01afc6b718793a7cfca",
       "lines": 13,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 13 lines; server/helper; imports none; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 13 lines; server/helper; imports none; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/hubs/[hub]/page.tsx",
@@ -700,7 +779,8 @@
       "blob_sha": "f715b11ff109b2f812ebe654ec59ecc6fccb3f9d",
       "lines": 8,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 8 lines; thin Next route wrapper/delegation; imports next/navigation, @/lib/hub-server, ../community-client, @/lib/hub; no explicit awaits; read/render; no runtime test or S2 sign-off."
+      "note": "Read 8 lines; thin Next route wrapper/delegation; imports next/navigation, @/lib/hub-server, ../community-client, @/lib/hub; no explicit awaits; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/hubs/access-notice.tsx",
@@ -709,7 +789,8 @@
       "blob_sha": "f58dd405c4a1ba0b9781855f209a9cfce448d241",
       "lines": 14,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 14 lines; client interactions; imports next/link, @/shared/session-provider, @/shared/browser-session; call sites reload; read/render; no runtime test or S2 sign-off."
+      "note": "Read 14 lines; client interactions; imports next/link, @/shared/session-provider, @/shared/browser-session; call sites reload; read/render; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/hubs/community-client.tsx",
@@ -718,7 +799,8 @@
       "blob_sha": "95f23e3820f4ec76d8bdc8daf99a6d1e8b1b86ae",
       "lines": 145,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 145 lines; client interactions; imports react, next/link, lucide-react, ./post-entry; call sites chemistTaskerApi.publicContent.listCommunityPosts, chemistTaskerApi.publicContent.listCommunityPolls, chemistTaskerApi.publicContent.createCommunityPost, reload, chemistTaskerApi.publicContent.voteCommunityPoll, loadPolls; write UI, backend permissions authoritative; no runtime test or S2 sign-off."
+      "note": "Read 145 lines; client interactions; imports react, next/link, lucide-react, ./post-entry; call sites chemistTaskerApi.publicContent.listCommunityPosts, chemistTaskerApi.publicContent.listCommunityPolls, chemistTaskerApi.publicContent.createCommunityPost, reload, chemistTaskerApi.publicContent.voteCommunityPoll, loadPolls; write UI, backend permissions authoritative; no runtime test or S2 sign-off.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     }
   ],
   "findings": [],
@@ -728,5 +810,6 @@
     "C010-N1",
     "C016-N1",
     "C016-N2"
-  ]
+  ],
+  "targeted_recheck_files": 3
 }
