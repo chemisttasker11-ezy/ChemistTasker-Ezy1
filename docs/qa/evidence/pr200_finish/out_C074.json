@@ -227,12 +227,14 @@
     },
     {
       "path": "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx",
-      "verdict": "NOTE",
-      "ids": [],
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
       "blob_sha": "f300480151b11600d872a4b98bf28f59ab32d29b",
       "lines": 236,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 18-87): Ethical workspace obtains access contexts and selected pharmacy, then fetches private lots/transfers/listings in that context. UI gates owner-specific actions but cannot stop forged API calls, thus C010-N1 and F10-N4 server bugs remain release-critical. Test contract: Negative: client modifies pharmacy ID and stage/product in draft; positive: isolated private data per admitted pharmacy. This is not a distinct second-reviewer or executed test.",
+      "note": "SOURCE-TRACED ACCOUNT-SWITCH RISK, not runtime reproduced. Ethical getAccess effect depends only on session.status, keeps old contexts/selected/rows; authenticated loading guard only hides if contexts.length===0. After another tab signs in as B, A's contexts/medicine stock can render while access for B is pending, and stale getAccess completion may overwrite fresh context. Server-side tenant checks must still block new unauthorized calls, but client-side retained private data is itself an issue. Tests: authenticated A -> cross-tab login B; block or reorder B access requests; never render A data as B, and success should render only B.",
       "targeted_source_lines": [
         18,
         87
@@ -241,23 +243,27 @@
     },
     {
       "path": "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx",
-      "verdict": "NOTE",
-      "ids": [],
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
       "blob_sha": "74c7d85c15ce88fdcf46217cd7517a5a57ae2824",
       "lines": 25,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "25 lines retrieved. Imports next/link, react, lucide-react, @/shared/browser-session; calls Promise.all, load, session.reload, marketplaceApi.actOnListing, marketplaceApi.updateAudience, marketplaceApi.uploadImage; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+      "note": "SOURCE-TRACED ACCOUNT-SWITCH RISK, not runtime reproduced. GoodsListings load effect depends on session.status; on access/dashboard failure it sets error but leaves previous A rows and access intact. Returning to B authenticated status with load failure can show A listing drafts. Server-side tenant checks must still block new unauthorized calls, but client-side retained private data is itself an issue. Tests: authenticated A -> cross-tab login B; block or reorder B access requests; never render A data as B, and success should render only B.",
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_web/landing_next/features/marketplace/workspace.tsx",
-      "verdict": "NOTE",
-      "ids": [],
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
       "blob_sha": "225d825547e667d00ea37a6101bee6aa3f938b24",
       "lines": 68,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "68 lines retrieved. Imports next/link, lucide-react, react, @/shared/browser-session; calls marketplaceApi.actOnListing, marketplaceApi.uploadImage, act, marketplaceApi.actOnExchange, marketplaceApi.sendExchangeMessage, marketplaceApi.createListing; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+      "note": "SOURCE-TRACED ACCOUNT-SWITCH RISK, not runtime reproduced. GoodsWorkspace keeps previous access, exchange conversations/messages in state and reloads Promise.all only after auth change; there is no purge on identity change or request generation guard, permitting a stale render for B. Server-side tenant checks must still block new unauthorized calls, but client-side retained private data is itself an issue. Tests: authenticated A -> cross-tab login B; block or reorder B access requests; never render A data as B, and success should render only B.",
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_web/landing_next/features/paediatric-calculator/components/calculator.tsx",
@@ -348,6 +354,26 @@
       "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     }
   ],
-  "findings": [],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P1",
+      "area": "Next / cross-account marketplace privacy",
+      "title": "Account switching can display the previous user's private ethical medicine stock or marketplace exchanges before session-specific data is cleared.",
+      "scenario": "Alice has private ethical-stock inventory, listing drafts and marketplace conversations open in a Next tab. In another tab, Bob signs in and the shared session-provider sets this tab to loading then authenticated as Bob. The marketplace components retain Alice's contexts and rows. EthicalWorkspaceV2 hides loading only when contexts is empty, and its getAccess callbacks are not bound to user/session generation. GoodsWorkspace can render old exchanges while reloading; GoodsListingsV2 preserves old rows and access even after Bob's getAccess/dashboard request fails. Bob may momentarily or persistently see Alice's private item names, batches, transfers, listings or messages in the existing tab even though backend requests for Bob would be forbidden.",
+      "evidence": [
+        "frontend_web/landing_next/shared/session-provider.tsx:11",
+        "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:27",
+        "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:78",
+        "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:86",
+        "frontend_web/landing_next/features/marketplace/workspace.tsx:15",
+        "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:14",
+        "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:16"
+      ],
+      "confidence": "high for source-retained-state render possibility; account-switch timing and live UX untested",
+      "verification": "SOURCE_SUPPORTED_SAME_AGENT_NOT_RUNTIME_REPRODUCED",
+      "test_needed": "Two unrelated owner accounts A/B with separate ethical inventories, goods listings and exchanges. Open A's private pages in tab1, log in as B in tab2 while tab1 remains mounted; simulate slow B getAccess and 403/error, and delay old A promises to finish last. Assert tab1 never renders A names, stock levels or messages once B is authenticated; confirm B sees only permitted data on success and old rows are purged immediately on session change. Repeat with same-tab account switch and logout/reauth."
+    }
+  ],
   "targeted_recheck_files": 3
 }
