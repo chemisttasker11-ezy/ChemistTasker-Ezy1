@@ -757,5 +757,29 @@
       "Privacy severity depends intended organisation-wide poll audience; source behaviour directly differs from org posts policy; no external organization involved.",
       "No production/staging exploit, no exact PostgreSQL/adversarial concurrency or second-person whole-file independent S2 certification"
     ]
+  },
+  "B21": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b21_manager_cannot_release_foreign_pharmacy_assignment",
+        "observed": "Owner A with authority only over Pharmacy A called release_worker_from_assignment on a pending request referencing Pharmacy B's assignment. The expected PermissionDenied was not raised. Legitimate owner B GET of same-pharmacy request returned 200, and assignment B existed before forged request.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187352244",
+        "head": "aee112dd7b0541981b1066dd62d6313308ef8788",
+        "environment": "GitHub Ubuntu Django isolated SQLite service test; no production data",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/workforce/roster/worker_actions.py:328-397",
+      "backend/shifts/serialization/worker_requests.py:7-27,77-91",
+      "backend/shifts/worker_requests.py:20-100"
+    ],
+    "runtime_limitations": [
+      "Direct service call with forged but constructible WorkerShiftRequest; request creation via API not separately exercised in this test",
+      "The post-assertion assignment absence assertion was not reached; deletion path is source-visible; stronger HTTP creation-to-approval proof remains open",
+      "No production/staging exploitation"
+    ]
   }
 }
