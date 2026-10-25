@@ -1,0 +1,124 @@
+{
+ "chunk": "V11",
+ "verdicts": [
+  {
+   "id": "C025-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Saving a correction replaces the invoice calculation without reconciling existing payment allocations. The remaining $55 payment allocates zero GST from the corrected calculation, while the cash worksheet still sums the first payment's stored $5 GST. Existing tests cover payments and invoice corrections separately, without covering their interaction.",
+   "evidence": [
+    "backend/worker_finance/services.py:597",
+    "backend/worker_finance/services.py:690",
+    "backend/worker_finance/services.py:968",
+    "backend/worker_finance/calculations.py:147",
+    "backend/worker_finance/views.py:634",
+    "backend/worker_finance/tests/test_api.py:147",
+    "backend/worker_finance/tests/test_api.py:223"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C002-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Each POST chooses the opposite action from the worker's current session state, so a sequential retry reverses the first request. The transition functions' retry guards cannot help because the endpoint calls the opposite function. The web button disables during submission, but a lost response followed by resubmission still reaches this path; native desktop capture uses a separate flow.",
+   "evidence": [
+    "backend/attendance/urls.py:37",
+    "backend/attendance/kiosk_api.py:454",
+    "backend/attendance/kiosk_api.py:467",
+    "backend/attendance/transitions.py:63",
+    "backend/attendance/transitions.py:256",
+    "frontend_web/src/pages/attendance/KioskPage.tsx:679",
+    "backend/attendance_tests/test_attendance_api.py:217"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C010-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "PATCH authorizes the existing pharmacy and product, then saves writable replacement pharmacy and product fields without checking destination access. The save signal derives scope from the replacement pharmacy and enforces audience limits, but does not authorize the caller or reconcile existing lot allocations. The reassigned draft appears in the destination pharmacy's listings; publication remains separately guarded.",
+   "evidence": [
+    "backend/ethical_marketplace/views.py:319",
+    "backend/ethical_marketplace/views.py:324",
+    "backend/ethical_marketplace/serializers.py:60",
+    "backend/ethical_marketplace/serializers.py:68",
+    "backend/ethical_marketplace/signals.py:19",
+    "backend/ethical_marketplace/owner_views.py:37",
+    "backend/ethical_marketplace/views.py:333",
+    "backend/ethical_marketplace/test_finalisation.py:40"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C011-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The recipient helper unconditionally includes the original inviter without checking current pharmacy or organisation authority. Worker acceptance, rejection and quitting call this helper, producing status notifications and emails containing the worker's name and email. Notification delivery checks account activity, which does not exclude an active account whose management access was revoked.",
+   "evidence": [
+    "backend/memberships/notifications.py:73",
+    "backend/memberships/notifications.py:145",
+    "backend/memberships/notifications.py:152",
+    "backend/memberships/notifications.py:175",
+    "backend/memberships/views.py:452",
+    "backend/memberships/views.py:499",
+    "backend/notifications/services.py:76",
+    "backend/memberships/test_membership_workflows_contract.py:493"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C012-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The registered ModelViewSet inherits DELETE without a destroy override or method restriction. Its queryset includes pending, approved and rejected applications within the manager's scope, and the model has no deletion protection or archive mechanism. Deletion therefore removes the submitted snapshot, review changes and decision fields together.",
+   "evidence": [
+    "backend/memberships/urls.py:30",
+    "backend/memberships/views.py:310",
+    "backend/memberships/views.py:324",
+    "backend/memberships/selectors.py:188",
+    "backend/memberships/selectors.py:197",
+    "backend/memberships/models.py:287",
+    "backend/memberships/models.py:308",
+    "backend/client_profile/test_membership_application_integrity.py:118"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F04-N3",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The public create endpoint forwards activate_immediately, which makes an eligible existing worker accepted and active while explicitly skipping email; a contract test expects this behavior. The claim is narrower for PATCH: changing status alone leaves a normal pending invitation inactive, although supplying is_active=true also bypasses worker acceptance. Role compatibility and the membership cap still apply, so this cannot target every registered person; allowing managers to activate eligible workers without consent is a policy decision.",
+   "evidence": [
+    "backend/memberships/views.py:164",
+    "backend/memberships/invites.py:113",
+    "backend/memberships/invites.py:149",
+    "backend/memberships/invites.py:240",
+    "backend/memberships/serializers.py:67",
+    "backend/memberships/serializers.py:246",
+    "backend/memberships/views.py:97",
+    "backend/memberships/test_membership_workflows_contract.py:116"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

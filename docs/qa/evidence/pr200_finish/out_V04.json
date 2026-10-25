@@ -1,0 +1,133 @@
+{
+ "chunk": "V04",
+ "verdicts": [
+  {
+   "id": "F03-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An owner can DELETE an admin's membership through the API without deactivating their PharmacyAdmin record; successful deletion sets its membership link to null. Capability checks and the active admin list continue trusting that record, whereas quitting explicitly deactivates it. The scenario is narrower than reported because both web and mobile staff lists hide pharmacy admins, preventing this removal through the normal staff-list screen.",
+   "evidence": [
+    "backend/memberships/urls.py:21",
+    "backend/memberships/access.py:64",
+    "backend/memberships/views.py:112",
+    "backend/memberships/views.py:494",
+    "backend/organizations/models.py:400",
+    "backend/organizations/access.py:33",
+    "backend/organizations/views.py:386",
+    "frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:144",
+    "frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:148",
+    "backend/memberships/test_membership_workflows_contract.py:315"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C071-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Native logout clears local authentication and the registration flag, but neither its shared request nor the backend logout removes or deactivates a DeviceToken. Future notifications select that user's active tokens and send their titles and bodies to Expo even after successful logout. Registering the same token after Tom logs in reassigns it exclusively to Tom, but nothing protects the signed-out interval.",
+   "evidence": [
+    "frontend_mobile/context/AuthContext.tsx:502",
+    "frontend_mobile/context/AuthContext.tsx:527",
+    "shared-core/src/domains/auth/api.ts:14",
+    "backend/users/urls.py:26",
+    "backend/users/api_auth.py:159",
+    "backend/notifications/services.py:91",
+    "backend/notifications/views.py:67",
+    "backend/notifications/test_api.py:91",
+    "backend/users/test_account_security_contract.py:324"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F09-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Removing Omar's group membership prevents normal group access but leaves his pharmacy membership and post authorship intact. Comment creation passes up to 280 characters to the post-owner notifier, which checks only account activity and whether the author is the commenter. It never checks the recipient's current group access before creating the notification and sending push.",
+   "evidence": [
+    "backend/pharmacy_hub/serialization/groups.py:189",
+    "backend/pharmacy_hub/access.py:271",
+    "backend/pharmacy_hub/access.py:357",
+    "backend/pharmacy_hub/urls.py:58",
+    "backend/pharmacy_hub/posts.py:385",
+    "backend/pharmacy_hub/posts.py:440",
+    "backend/pharmacy_hub/notifications.py:50",
+    "backend/notifications/services.py:94",
+    "backend/pharmacy_hub/test_hub_scope_contract.py:697"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C015-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The leak requires Sara herself to have an OrganizationMembership: pharmacy employment alone does not select organisation administrators. With that additional membership, the notifier selects every REGION_ADMIN in her organisation without checking assigned pharmacies, exposing her name and regulatory status through notifications and email. The message does not explicitly include her pharmacy affiliation, so that part of the claim is overstated; the cross-scope status disclosure remains P1.",
+   "evidence": [
+    "backend/onboarding/verification/state.py:275",
+    "backend/onboarding/verification/state.py:349",
+    "backend/onboarding/verification/state.py:356",
+    "backend/onboarding/verification/state.py:361",
+    "backend/users/org_roles.py:268",
+    "backend/onboarding/test_review3_fixes.py:188"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C051-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The email generates a single-token decline URL, but the web router requires two path parameters, so the emailed URL cannot reach the decline page. The page also calls browserRejectReferee, which posts to the obsolete two-parameter API path rather than the signed-token endpoint. The backend token endpoint exists and has successful source-test coverage; this is a P2 broken decline/reminder workflow, with referees optional under the default verification policy.",
+   "evidence": [
+    "backend/onboarding/emails.py:79",
+    "frontend_web/src/main.tsx:158",
+    "frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:11",
+    "frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:22",
+    "shared-core/src/domains/auth/browserOperations.ts:67",
+    "shared-core/src/constants/endpoints.ts:48",
+    "backend/onboarding/urls.py:41",
+    "backend/onboarding/views.py:163",
+    "backend/onboarding/test_verification_transitions.py:275",
+    "backend/onboarding/verification/policy.py:5"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F05-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An authenticated Explorer can submit interest through the API for an eligible public EXPLORER shift because the queryset permits that role and the onboarding gate handles only PHARMACIST and OTHER_STAFF. The AHPRA gate adds no Explorer verification check, while Talent explicitly requires Explorer verification. However, both web and mobile public-shift apply handlers block unverified users, so the reported ordinary screen flow is prevented; the P1 issue is a backend verification bypass through a direct request.",
+   "evidence": [
+    "backend/shifts/base.py:124",
+    "backend/shifts/base.py:196",
+    "backend/shifts/browse.py:449",
+    "backend/shifts/access.py:86",
+    "backend/shifts/interest.py:40",
+    "backend/onboarding/verification/state.py:153",
+    "backend/onboarding/services/work_profile.py:5",
+    "backend/talent/views/explorer.py:147",
+    "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:279",
+    "frontend_mobile/roles/shared/shifts/PublicShiftsView.tsx:247",
+    "backend/shifts/test_shift_actions_contract.py:146"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

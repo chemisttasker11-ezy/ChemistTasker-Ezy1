@@ -1,0 +1,125 @@
+{
+ "chunk": "V02",
+ "verdicts": [
+  {
+   "id": "F10-N6",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Chain visibility can admit Omar through his authorised pharmacy without granting access to the source pharmacy's inventory. Both listing responses embed StockLotSerializer, exposing the source lot's full balances, storage checks and source reference without another inventory permission check. These extra fields are returned by the API but are not displayed by the listing screen.",
+   "evidence": [
+    "backend/ethical_marketplace/policy.py:94",
+    "backend/ethical_marketplace/policy.py:100",
+    "backend/ethical_marketplace/views.py:229",
+    "backend/ethical_marketplace/views.py:288",
+    "backend/ethical_marketplace/views.py:316",
+    "backend/ethical_marketplace/serializers.py:38",
+    "backend/ethical_marketplace/serializers.py:47",
+    "backend/ethical_marketplace/serializers.py:56"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "F07-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Saving a valid revision changes the live invoice to draft while retaining its Payment rows. The cash worksheet includes payments only when their invoice currently has sent or paid status, so the recorded sales and GST disappear until that status changes again. Existing tests cover payments and revisions separately, without checking the worksheet after a revision.",
+   "evidence": [
+    "backend/worker_finance/views.py:203",
+    "backend/worker_finance/services.py:693",
+    "backend/worker_finance/services.py:702",
+    "backend/worker_finance/services.py:982",
+    "backend/worker_finance/views.py:626",
+    "backend/worker_finance/views.py:634",
+    "backend/worker_finance/tests/test_api.py:147",
+    "backend/worker_finance/tests/test_api.py:173"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F09-N4",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "For an accessible platform poll, both the author's membership ID and Zoe's resolved membership can be null. The management check treats that null-to-null comparison as proof of authorship, allowing PATCH and DELETE; replacing choices explicitly deletes all votes. The serializer hides management controls from Zoe, but that does not protect the mutation endpoints.",
+   "evidence": [
+    "backend/pharmacy_hub/access.py:338",
+    "backend/pharmacy_hub/polls.py:137",
+    "backend/pharmacy_hub/polls.py:143",
+    "backend/pharmacy_hub/polls.py:153",
+    "backend/pharmacy_hub/polls.py:160",
+    "backend/pharmacy_hub/serialization/polls.py:128",
+    "backend/pharmacy_hub/serialization/polls.py:150",
+    "backend/pharmacy_hub/serialization/polls.py:257",
+    "backend/pharmacy_hub/urls.py:35"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F09-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Deleting a group sets its posts' community_group reference to null while retaining their pharmacy and content. Those posts then satisfy the pharmacy-wide feed filter, and comment and attachment access resolves against the pharmacy rather than the deleted group. An ordinary pharmacy member previously excluded from the group can therefore access the retained content.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx:421",
+    "backend/pharmacy_hub/groups.py:153",
+    "backend/pharmacy_hub/models.py:143",
+    "backend/pharmacy_hub/posts.py:234",
+    "backend/pharmacy_hub/scoping.py:156",
+    "backend/pharmacy_hub/access.py:362",
+    "backend/pharmacy_hub/serialization/posts.py:366",
+    "backend/public_hub/attachment_access.py:25"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F07-N4",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The send transaction releases its invoice lock before rendering and sending the email, allowing another request to save version 2 as draft. Completion marks the invoice sent using only its primary key, even though the delivery belongs to version 1. Both recipient visibility and approval accept the live sent status without requiring delivery of the current version, exposing and permitting approval of version 2.",
+   "evidence": [
+    "backend/worker_finance/views.py:272",
+    "backend/worker_finance/views.py:294",
+    "backend/worker_finance/views.py:316",
+    "backend/worker_finance/services.py:702",
+    "backend/worker_finance/services.py:770",
+    "backend/worker_finance/views.py:360",
+    "backend/worker_finance/views.py:471"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C021-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Flexible shifts accept changed hours, and counteroffer acceptance preserves those hours on the worker offer and accepted terms snapshot. Finalisation still links the assignment to the original slot, and invoice generation calculates hours directly from that slot instead of the accepted times. The described 10:00–14:00 agreement therefore produces an eight-hour invoice preview for a 09:00–17:00 slot.",
+   "evidence": [
+    "backend/shifts/serialization/offers.py:123",
+    "backend/shifts/counter_offers.py:163",
+    "backend/shifts/engagement.py:272",
+    "backend/shifts/offers.py:405",
+    "backend/shifts/finalize.py:79",
+    "backend/invoicing/services.py:96",
+    "backend/invoicing/views.py:187"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

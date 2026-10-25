@@ -1,0 +1,115 @@
+{
+ "chunk": "V15",
+ "verdicts": [
+  {
+   "id": "C032-N1",
+   "verdict": "DUPLICATE_OF",
+   "severity": "P1",
+   "duplicate_of": "F01-N2",
+   "reason": "This is the pending-offer consequence of the same slot-replacement defect described in F01-N2. The description-edit form includes slots, saving deletes the original slots, and SET_NULL detaches the pending offer. Acceptance then refuses the offer because its required slot is missing.",
+   "evidence": [
+    "shared-core/src/domains/shifts/postingDraft.ts:46",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+    "backend/shifts/posting.py:189",
+    "backend/shifts/models.py:680",
+    "backend/shifts/offers.py:351"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C039-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The redirect converts ORG_STAFF into orgstaff and PHARMACY_MANAGER into pharmacymanager, neither of which has a dashboard route. Those URLs reach the missing-page route; the valid organization and pharmacy-specific admin routes are different. Severity is P2 because this breaks the shared-link entry point while ordinary dashboard navigation remains available.",
+   "evidence": [
+    "frontend_web/src/pages/SharedShiftLandingPage.tsx:246",
+    "frontend_web/src/main.tsx:151",
+    "frontend_web/src/main.tsx:240",
+    "frontend_web/src/main.tsx:310",
+    "frontend_web/src/main.tsx:589"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C041-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Accepting a selected date processes only that date but marks the entire counter offer ACCEPTED. Both the backend listing and frontend cache then remove it from the pending proposals, leaving the second date without its actionable proposed terms. The backend permits further acceptance with an explicit slot ID, but the normal screen no longer supplies that action.",
+   "evidence": [
+    "backend/shifts/counter_offers.py:131",
+    "backend/shifts/counter_offers.py:143",
+    "backend/shifts/counter_offers.py:29",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:28",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:56",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Dialogs/CounterOfferDialog.tsx:101"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C041-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Slotless full-time postings are supported and remain in Active Shifts. Internal candidate loading makes requests only by iterating dated slots, so an empty slot list produces no request and an empty member list. For a single-worker posting, the backend supports shift-level interest and member status, but the frontend never retrieves them.",
+   "evidence": [
+    "backend/shifts/test_shift_posting_contract.py:363",
+    "backend/shifts/lifecycle.py:54",
+    "backend/shifts/interest.py:103",
+    "backend/shifts/candidates.py:233",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:45",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:196"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F01-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Before payment creates assignments, the edit guard allows slot replacement without resetting accepted offers or enabling decline. Whole-shift finalization books the replacement dates; per-date finalization fails after its slot is detached, rolling back local Stripe payment recording, while Pills are spent before the failure. The web screen actually discards detached per-date payment options after reload, so that part is narrower than reported, although an already-open checkout or an offer-ID payment request still reaches the failure. The booking and payment consequences remain P1.",
+   "evidence": [
+    "backend/shifts/posting.py:157",
+    "backend/shifts/posting.py:189",
+    "backend/shifts/models.py:680",
+    "backend/shifts/offers.py:615",
+    "backend/shifts/finalize.py:30",
+    "backend/shifts/finalize.py:35",
+    "backend/billing/views.py:571",
+    "backend/billing/views.py:973",
+    "backend/rewards/views.py:217",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:239"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F02-N1",
+   "verdict": "REFUTED",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Paid offer finalization sets each confirmed assignment's source_offer. That foreign key uses PROTECT, so deleting the parent shift encounters protected offers during cascading deletion and refuses the operation. The described paid booking therefore does not disappear with a successful 204 response; the generic delete path can instead surface an error.",
+   "evidence": [
+    "backend/shifts/finalize.py:93",
+    "backend/shifts/models.py:506",
+    "backend/shifts/models.py:673",
+    "backend/shifts/base.py:111",
+    "backend/shifts/lifecycle.py:50"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

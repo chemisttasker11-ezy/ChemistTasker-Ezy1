@@ -1,0 +1,119 @@
+{
+ "chunk": "V08",
+ "verdicts": [
+  {
+   "id": "C029-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "For an active agreement, PATCH accepts a null end date without calling the payload builder that enforces the birthday limit. Model validation checks dates, rates and overlapping agreements, but not the birthday boundary. With no overlapping successor, the web form can submit this change, and later payroll assignments select the extended agreement and copy its unchanged rates.",
+   "evidence": [
+    "backend/workforce/views.py:362",
+    "backend/workforce/views.py:377",
+    "backend/workforce/views.py:391",
+    "backend/workforce/views.py:416",
+    "backend/workforce/employment_engagement_service.py:109",
+    "backend/workforce/models.py:145",
+    "backend/shifts/engagement.py:84",
+    "backend/shifts/engagement.py:114",
+    "frontend_web/src/features/workforce/EmploymentEngagementsPanel.tsx:345",
+    "backend/workforce/tests/test_employment.py:314"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C029-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Creating successor terms closes the previous agreement and saves the new one without invalidating existing timesheets; the workforce signals have no EmploymentEngagement receiver. The detail endpoint rebuilds only when needs_rebuild is already true, and locking checks that flag and approval status without comparing current employment terms. Consequently, an otherwise clean approved timesheet can be locked with its old employment snapshot; explicitly rebuilding would detect the change and reopen approval.",
+   "evidence": [
+    "backend/workforce/views.py:325",
+    "backend/workforce/views.py:339",
+    "backend/workforce/signals.py:14",
+    "backend/workforce/views.py:784",
+    "backend/workforce/timesheet_builder.py:148",
+    "backend/workforce/timesheet_builder.py:252",
+    "backend/workforce/timesheet_transitions.py:132",
+    "backend/workforce/timesheet_transitions.py:168",
+    "backend/workforce/tests/test_timesheet_state_machine.py:168"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C018-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The command has no production-settings check and falls back to the first database user for missing author accounts, creating an active content-administrator record if none exists. It overwrites matching articles and version-one revisions, publishes hardcoded news, and creates sample comments and reactions attributed to existing users. Public article queries expose these published records, while the production guard belongs only to the separate seed_hub_preview command.",
+   "evidence": [
+    "backend/public_hub/management/commands/seed_editorial_content.py:16",
+    "backend/public_hub/management/commands/seed_editorial_content.py:52",
+    "backend/public_hub/management/commands/seed_editorial_content.py:65",
+    "backend/public_hub/management/commands/seed_editorial_content.py:78",
+    "backend/public_hub/management/commands/seed_editorial_content.py:432",
+    "backend/public_hub/management/commands/seed_editorial_content.py:464",
+    "backend/public_hub/management/commands/seed_editorial_content.py:499",
+    "backend/public_hub/management/commands/seed_editorial_content.py:526",
+    "backend/public_hub/permissions.py:19",
+    "backend/public_hub/views.py:33",
+    "backend/public_hub/management/commands/seed_hub_preview.py:14"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C036-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The authenticated session payload omits the pharmacy membership identifier, and AuthContext passes that payload through without adding it. MyLeavePage converts the missing id to the string 'undefined', then to NaN; JSON serialization sends null. The leave service requires an existing membership belonging to the worker and returns a permission error, blocking submission through this page.",
+   "evidence": [
+    "backend/users/sessions.py:90",
+    "backend/users/sessions.py:144",
+    "backend/users/api_auth.py:179",
+    "frontend_web/src/contexts/AuthContext.tsx:181",
+    "frontend_web/src/features/workforce/MyLeavePage.tsx:11",
+    "frontend_web/src/features/workforce/MyLeavePage.tsx:12",
+    "shared-core/src/transport/operational.ts:14",
+    "backend/workforce/views.py:610",
+    "backend/workforce/leave_service.py:237",
+    "frontend_web/src/main.tsx:228"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F02-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Both worker screens omit the assignment link, and the serializer accepts and saves the request without inferring one. Web approval therefore creates a separate LOCUM_CASUAL shift and queues an approval notification while preserving the original assignment. Mobile replacement approval rejects the missing link, whereas release records approval and reports success without releasing an assignment or publishing a vacancy; these mobile handlers queue no worker notifications. Existing regression tests explicitly supply the assignment link, so they do not cover the broken screen payloads.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:532",
+    "frontend_mobile/app/my-roster.tsx:208",
+    "backend/shifts/models.py:845",
+    "backend/shifts/serialization/worker_requests.py:83",
+    "backend/shifts/worker_requests.py:239",
+    "backend/shifts/worker_requests.py:254",
+    "backend/shifts/worker_requests.py:294",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:602",
+    "frontend_mobile/features/parity/roster.tsx:642",
+    "backend/workforce/roster/worker_actions.py:275",
+    "backend/workforce/roster/worker_actions.py:353",
+    "backend/workforce/roster/v2_views.py:747",
+    "backend/attendance_tests/test_roster_worker_actions_deterministic.py:314"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

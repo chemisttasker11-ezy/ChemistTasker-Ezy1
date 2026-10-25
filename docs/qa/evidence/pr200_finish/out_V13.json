@@ -1,0 +1,121 @@
+{
+ "chunk": "V13",
+ "verdicts": [
+  {
+   "id": "C043-N1",
+   "verdict": "REFUTED",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "PharmacySerializer.get_claimed returns true for a PENDING claim, even when the pharmacy has no organization. The frontend preserves that flag and counts the pharmacy, satisfying the section's visibility condition. The owner can then load and respond to the pending request.",
+   "evidence": [
+    "backend/organizations/serializers.py:312",
+    "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.model.ts:88",
+    "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:463",
+    "frontend_web/src/pages/dashboard/sidebar/PharmacyClaimsPanels.tsx:245",
+    "backend/organizations/claims.py:459",
+    "backend/client_profile/test_characterization_claims.py:39"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F06-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The builder includes roster routing data in the fingerprint input but omits it from the saved revision snapshot. Locking reads snapshot.roster, receives an empty list, and consequently saves an empty payroll_export even for PAYROLL assignments. Approval does not restore that missing data; the existing lock test asserts an empty export without covering the claimed payroll case.",
+   "evidence": [
+    "backend/shifts/engagement.py:125",
+    "backend/workforce/timesheet_data.py:172",
+    "backend/workforce/timesheet_builder.py:149",
+    "backend/workforce/timesheet_builder.py:183",
+    "backend/workforce/timesheet_transitions.py:147",
+    "backend/workforce/timesheet_transitions.py:182",
+    "backend/workforce/views.py:744",
+    "backend/workforce/tests/test_timesheet_state_machine.py:182"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "F03-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Quitting disables the linked PharmacyAdmin record without deleting it. A subsequent staff invitation reuses the membership, and accepting it unconditionally activates every linked PharmacyAdmin record without checking the new invitation's role. Active admin records then supply their original management capabilities.",
+   "evidence": [
+    "backend/memberships/views.py:494",
+    "backend/memberships/invites.py:123",
+    "backend/memberships/invites.py:163",
+    "backend/memberships/serializers.py:246",
+    "backend/memberships/views.py:447",
+    "backend/organizations/access.py:33",
+    "backend/organizations/models.py:366"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C020-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Manual assignment checks accepted direct employment but does not compare the worker's role with the vacancy before creating the assignment and sending its notification. However, roster publication runs worker_issues and blocks the technician's pharmacist assignment with ROLE_MISMATCH. The confirmed P2 problem is an invalid draft assignment and misleading assignment notification; the normal publication path prevents it becoming a published roster.",
+   "evidence": [
+    "backend/shifts/base.py:412",
+    "backend/shifts/assignment.py:169",
+    "backend/shifts/assignment.py:175",
+    "backend/shifts/assignment.py:191",
+    "backend/shifts/engagement.py:31",
+    "backend/workforce/roster/validation.py:39",
+    "backend/workforce/roster/publication.py:53",
+    "backend/attendance_tests/test_roster_services.py:142"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C027-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Replacement eligibility checks accepted membership, role, conflicts and availability, but does not require direct employment or replacement payment terms. Once unpublished, swap and cover approval change only the assignment's user, preserving the departing worker's settlement and employment snapshot. Rate refresh then explicitly prices STAFF_EMPLOYMENT from that preserved snapshot, and the roster can display the inherited payroll route and rate.",
+   "evidence": [
+    "backend/workforce/roster/validation.py:31",
+    "backend/shifts/models.py:328",
+    "backend/workforce/roster/worker_actions.py:179",
+    "backend/workforce/roster/worker_actions.py:300",
+    "backend/workforce/roster/assignment_rates.py:11",
+    "backend/shifts/pricing.py:392",
+    "backend/workforce/roster/serializers.py:105",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:1227"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C027-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Coverage counts every assignment with any overlap against the entire requirement. One pharmacist working 09:00–10:00 therefore satisfies a minimum of one for 09:00–17:00, producing is_covered=true and shortfall=0. The workspace returns those values directly, and the web panel labels the whole interval covered without checking the remaining hours.",
+   "evidence": [
+    "backend/workforce/roster/revisions.py:85",
+    "backend/workforce/roster/revisions.py:99",
+    "backend/workforce/roster/revisions.py:142",
+    "backend/workforce/views.py:438",
+    "backend/workforce/urls.py:36",
+    "frontend_web/src/features/workforce/RosterCoveragePanel.tsx:112"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

@@ -1,0 +1,129 @@
+{
+ "chunk": "V14",
+ "verdicts": [
+  {
+   "id": "C045-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An active pharmacy member receives coworkers' assignments, and get_leave_request returns their leave type and full note without checking the viewer. The web click handler opens the populated leave dialog before checking whether the assignment belongs to the viewer. The separate workforce-status privacy check does not protect leave details.",
+   "evidence": [
+    "backend/workforce/roster/urls.py:38",
+    "backend/workforce/roster/views.py:552",
+    "backend/workforce/roster/serializers.py:77",
+    "backend/workforce/roster/serializers.py:138",
+    "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:410",
+    "frontend_web/src/pages/dashboard/sidebar/RosterWorkerDialogs.tsx:247"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F02-N3",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The owner queryset includes marketplace assignments, and direct removal or a valid upward escalation deletes assignments without calling the history check or notifying the removed workers. Published-roster guards restrict removal, and invoice-linked assignments have database deletion protection. Active workforce leave and attendance records survive with their assignment links cleared; only legacy LeaveRequest rows cascade, so the claim that newly filed leave is deleted is incorrect. The remaining silent removal of paid bookings still warrants P1.",
+   "evidence": [
+    "backend/workforce/roster/views.py:51",
+    "backend/workforce/roster/views.py:96",
+    "backend/workforce/roster/views.py:420",
+    "backend/workforce/roster/worker_actions.py:364",
+    "backend/workforce/models.py:245",
+    "backend/attendance/models.py:249",
+    "backend/invoicing/models.py:178",
+    "backend/shifts/models.py:805",
+    "backend/workforce/tests/test_roster_escalation.py:69",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:401"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C020-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An eligible pharmacy staff member can claim one selected slot on a non-single-user shift. Every subsequent claim is rejected when any assignment exists anywhere on that shift, before the requested slot is selected or checked for availability. The membership and role guards do not prevent this scenario.",
+   "evidence": [
+    "backend/shifts/urls.py:30",
+    "backend/shifts/browse.py:278",
+    "backend/shifts/browse.py:336",
+    "backend/shifts/browse.py:343",
+    "backend/shifts/browse.py:351",
+    "backend/shifts/browse.py:379",
+    "backend/shifts/test_claim_eligibility.py:44",
+    "shared-core/src/domains/shifts/api.ts:469"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C020-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Posting stores a recurring schedule as one slot with a starting date and recurrence fields; later occurrences are expanded when needed. Community, authenticated public, and anonymous public board queries filter the stored starting date without allowing a future recurring end date. Consequently, an otherwise eligible unassigned recurring vacancy disappears after its starting date passes.",
+   "evidence": [
+    "backend/shifts/posting.py:48",
+    "backend/shifts/posting.py:116",
+    "backend/shifts/pricing.py:444",
+    "backend/shifts/browse.py:75",
+    "backend/shifts/browse.py:440",
+    "backend/shifts/browse.py:565",
+    "backend/shifts/urls.py:63",
+    "backend/shifts/test_shift_listing_contract.py:140"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C020-N5",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The serializer permits a slotless counter offer containing working times without a date, and the web form explicitly supports that input. It persists both slot and slot_date as null. Owner acceptance then evaluates offer_slot.slot_date or slot.date, dereferencing None and raising an exception before creating a worker offer.",
+   "evidence": [
+    "backend/shifts/serialization/offers.py:17",
+    "backend/shifts/serialization/offers.py:100",
+    "backend/shifts/serialization/offers.py:163",
+    "backend/shifts/models.py:738",
+    "backend/shifts/base.py:329",
+    "backend/shifts/base.py:340",
+    "backend/shifts/counter_offers.py:139",
+    "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:285",
+    "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:452"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C020-N6",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Accepting a counter offer for one recurring occurrence preserves that date on the worker offer, and the engagement terms describe that single date. On confirmation, finalization expands the recurring slot and creates assignments for every unfilled occurrence without restricting them to the offered date or accepted occurrence list. This also happens on a non-single-user shift.",
+   "evidence": [
+    "backend/shifts/serialization/offers.py:99",
+    "backend/shifts/counter_offers.py:163",
+    "backend/shifts/counter_offers.py:188",
+    "backend/shifts/engagement.py:268",
+    "backend/shifts/offers.py:360",
+    "backend/shifts/offers.py:405",
+    "backend/shifts/finalize.py:35",
+    "backend/shifts/finalize.py:39",
+    "backend/shifts/finalize.py:79",
+    "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:129"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

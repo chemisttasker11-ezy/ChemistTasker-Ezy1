@@ -1,0 +1,121 @@
+{
+ "chunk": "V07",
+ "verdicts": [
+  {
+   "id": "F01-N3",
+   "verdict": "DUPLICATE_OF",
+   "severity": "P1",
+   "duplicate_of": "B67",
+   "reason": "This is the generic offer DELETE bypass already recorded as B67. Workers can delete their own offers and managers can delete offers in their managed pharmacies, without a status guard. If deletion precedes the payment webhook, the payment is recorded, finalization finds no matching offer, and the notification helper returns without notifying anyone.",
+   "evidence": [
+    "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md:68",
+    "backend/shifts/offers.py:156",
+    "backend/shifts/offers.py:169",
+    "backend/billing/views.py:329",
+    "backend/billing/views.py:848",
+    "backend/shifts/emails.py:279"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F01-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Authenticated workers can retrieve matching public shifts through the shared ShiftSerializer, which includes all assigned workers' names, emails and IDs plus awaiting-payment candidates' identities. Its anonymity handling redacts pharmacy details, and its history guard does not protect worker browsing. The same serializer is embedded in each worker's own offers; the public serializer's removal of these fields does not apply to those authenticated paths.",
+   "evidence": [
+    "backend/shifts/base.py:113",
+    "backend/shifts/browse.py:428",
+    "backend/shifts/lifecycle.py:393",
+    "backend/shifts/serialization/shifts.py:190",
+    "backend/shifts/serialization/shifts.py:434",
+    "backend/shifts/serialization/shifts.py:464",
+    "backend/shifts/serialization/offers.py:215",
+    "backend/shifts/serialization/projections.py:87"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "F07-N6",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Saving a service-invoice revision updates its calculation without updating its existing super request. Editing a super request is explicitly rejected, and creating another returns the existing request unchanged. The finance routes provide no correction or void action, while both clients disable creation once a linked request exists.",
+   "evidence": [
+    "backend/worker_finance/services.py:606",
+    "backend/worker_finance/services.py:691",
+    "backend/worker_finance/services.py:894",
+    "backend/worker_finance/services.py:902",
+    "backend/worker_finance/views.py:203",
+    "backend/worker_finance/views.py:226",
+    "frontend_web/src/pages/finance/FinanceWorkspace.tsx:356",
+    "frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx:159"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C023-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Account deletion anonymizes and deactivates the user but neither deletes nor hides their talent posts. Both feeds select posts without checking whether their author is active or deleted, and visibility checks only moderation and availability expiry. Full-time applications therefore remain visible indefinitely with their saved content and location.",
+   "evidence": [
+    "backend/users/api_account.py:76",
+    "backend/users/account_deletion.py:92",
+    "backend/talent/views/explorer.py:54",
+    "backend/talent/views/explorer.py:172",
+    "backend/talent/views/explorer.py:194",
+    "backend/talent/models.py:119"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F10-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The authenticated feed requires only a signed-in account and uses a serializer that returns author IDs and names without checking is_anonymous or a hiring relationship. Only the public-feed serializer removes those identity fields, leaving the same post ID available to correlate the responses. Under-18 names are shortened, but adult names and account identifiers remain exposed; the owner must decide whether anonymity should extend to unrelated signed-in viewers.",
+   "evidence": [
+    "backend/talent/views/explorer.py:97",
+    "backend/talent/views/explorer.py:184",
+    "backend/talent/serializers/explorer.py:17",
+    "backend/talent/serializers/explorer.py:73",
+    "backend/talent/serializers/explorer.py:81",
+    "backend/talent/serializers/explorer.py:190",
+    "shared-core/src/domains/talent/api.ts:43"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C026-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The birthday limit is enforced by the payload builder, but the started-agreement PATCH branch bypasses that builder and accepts a later or null end date. Model validation checks date ordering and overlap without checking the birthday review date. Before the agreement has ended, an authorized manager can therefore extend it, and later timesheets select its unchanged junior-rate snapshot.",
+   "evidence": [
+    "backend/workforce/employment_engagement_service.py:109",
+    "backend/workforce/views.py:362",
+    "backend/workforce/views.py:377",
+    "backend/workforce/views.py:405",
+    "backend/workforce/models.py:165",
+    "backend/workforce/timesheet_data.py:86",
+    "backend/workforce/timesheet_data.py:110",
+    "frontend_web/src/features/workforce/EmploymentEngagementsPanel.tsx:340"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

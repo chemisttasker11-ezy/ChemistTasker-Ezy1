@@ -1,0 +1,123 @@
+{
+ "chunk": "V05",
+ "verdicts": [
+  {
+   "id": "F07-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Both worker and pharmacy Mark as paid actions change status without creating a Payment. Paid totals, balances and the cash worksheet use Payment records, so an invoice without recorded receipts retains its full balance and contributes no cash sales or GST. The existing partial-payment test explicitly expects only the separately recorded receipt after marking paid.",
+   "evidence": [
+    "frontend_web/src/pages/finance/FinanceWorkspace.tsx:354",
+    "backend/worker_finance/views.py:243",
+    "backend/worker_finance/views.py:498",
+    "backend/worker_finance/services.py:810",
+    "backend/worker_finance/services.py:835",
+    "backend/worker_finance/views.py:634",
+    "backend/worker_finance/tests/test_api.py:147"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F10-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The unauthenticated public endpoint searches pharmacy names and street addresses without excluding anonymous posts from those matches. Anonymization happens during serialization, after the database has selected matching vacancies. Distinctive hidden-field searches therefore reveal which anonymous vacancy belongs to a pharmacy.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:193",
+    "shared-core/src/domains/shifts/api.ts:218",
+    "backend/shifts/urls.py:63",
+    "backend/shifts/browse.py:537",
+    "backend/shifts/browse.py:589",
+    "backend/shifts/serialization/projections.py:129",
+    "backend/shifts/serialization/shifts.py:193",
+    "backend/organizations/serializers.py:56"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F10-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Two first claims can both find no event and each create one because the lookup and insertion have no serialization or matching uniqueness constraint. Awards use the event ID as their idempotency key, so different events receive separate credits. Balance calculation sums both credits, making them spendable; 100 Pills per award is the configurable default.",
+   "evidence": [
+    "backend/rewards/views.py:139",
+    "backend/rewards/services.py:297",
+    "backend/rewards/services.py:333",
+    "backend/rewards/models.py:119",
+    "backend/rewards/services.py:188",
+    "backend/rewards/services.py:56",
+    "backend/rewards/services.py:356",
+    "backend/rewards/test_rewards.py:31"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C044-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Conversion stores the original shift ID, but cancelling the wizard neither clears it nor prevents a later new-post completion from deleting that shift. The deletion succeeds for editable shifts, including individually unpublished shifts. The scope is narrower because published shifts that remain locked are protected by the UI and deletion endpoint; unintended deletion of an editable assigned shift remains P1.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:553",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:852",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:866",
+    "backend/workforce/roster/views.py:137",
+    "backend/workforce/roster/views.py:32"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C045-N1",
+   "verdict": "DUPLICATE_OF",
+   "severity": "P1",
+   "duplicate_of": "C044-N1",
+   "reason": "This is the same pendingDeletionShiftId lifecycle defect as C044-N1. Closing the conversion wizard preserves the original ID, and completing an unrelated post later attempts its deletion, subject to the same published-roster guards.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585",
+    "backend/workforce/roster/views.py:137"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F03-N4",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Membership removal leaves user-linked assignments intact; the manager grid counts them as occupied and worker roster endpoints retain them. Assignment-first eligibility still permits non-provisional attendance through the kiosk's signed QR flow, and timesheets include those sessions. Local kiosk PIN lookup requires active membership, so a removed worker without another eligible membership cannot use that route; the remaining roster and QR impact is P1. The owner must choose how staff removal affects existing assignments while preserving legitimate membership-free locum bookings.",
+   "evidence": [
+    "backend/memberships/views.py:112",
+    "backend/shifts/models.py:463",
+    "backend/workforce/roster/periods.py:71",
+    "backend/workforce/roster/periods.py:135",
+    "backend/workforce/roster/views.py:552",
+    "backend/workforce/roster/publication.py:141",
+    "backend/attendance/credentials.py:637",
+    "backend/attendance/worker_api.py:68",
+    "backend/attendance/eligibility.py:241",
+    "backend/workforce/timesheet_data.py:206"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

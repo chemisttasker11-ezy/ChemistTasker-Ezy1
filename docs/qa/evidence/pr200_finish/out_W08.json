@@ -1,0 +1,122 @@
+{
+ "chunk": "W08",
+ "verdicts": [
+  {
+   "id": "C031-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Every list endpoint is paginated by default at 50 rows (PageNumberPagination). asList() returns only data.results and never follows next, and the roster/shift/hub helpers call the endpoint once. The worker roster endpoint returns the whole pharmacy's assignments for the week, and the mobile screen filters them down to the current user on the client. So once a pharmacy has more than 50 assignments in a week, a worker's own row can sit on page 2 and never appear. Neither RosterOwnerViewSet nor RosterWorkerViewSet overrides pagination_class.",
+   "evidence": [
+    "backend/core/settings.py:360",
+    "backend/core/settings.py:361",
+    "shared-core/src/utils/serialization.ts:54",
+    "shared-core/src/domains/roster/api.ts:94",
+    "backend/workforce/roster/views.py:533",
+    "backend/workforce/roster/views.py:552",
+    "frontend_mobile/app/my-roster.tsx:132",
+    "shared-core/src/domains/shifts/api.ts:302",
+    "shared-core/src/domains/pharmacyHub/api.ts:245",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:139"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C020-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "claim_shift refuses the claim whenever any ShiftSlotAssignment exists for the shift. This check runs before the slot_id branch and the per-slot 'taken' check, so on a shift that is not single_user_only, a second free slot can never be claimed once the first slot is filled. The shift stays visible on the community board, because the unassigned filter only applies on request. Lowered to P2 because it blocks one booking path with no data damage: the owner can still assign the slot or make an offer.",
+   "evidence": [
+    "backend/shifts/browse.py:344",
+    "backend/shifts/browse.py:349",
+    "backend/shifts/browse.py:351",
+    "backend/shifts/browse.py:366"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C020-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "A recurring slot is stored as one ShiftSlot row whose date is the first occurrence, and expand_shift_slots builds the later dates up to recurring_end_date. The shared front end does send real recurring slots. The community, public and public job board querysets only check slots__date >= today (or > today), with no recurring_end_date branch, so the vacancy drops off once its start date passes. The owner lists (lifecycle.py:106, selectors.py:18) and the share-link view (browse.py:691) do include recurring_end_date, which shows the board filters are the odd ones out.",
+   "evidence": [
+    "backend/shifts/browse.py:76",
+    "backend/shifts/browse.py:441",
+    "backend/shifts/browse.py:567",
+    "backend/shifts/posting.py:53",
+    "backend/shifts/pricing.py:444",
+    "backend/shifts/browse.py:691",
+    "backend/shifts/selectors.py:18",
+    "shared-core/src/domains/shifts/draftSlots.ts:31"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C020-N5",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "For a slotless shift the serializer accepts one entry with no slot_id and an optional slot_date (allow_null), so the offer slot is stored with slot=None. In accept_counter_offer, line 139 evaluates `offer_slot.slot_date or slot.date` with slot None, which raises AttributeError. The view does not catch it, so the response is a 500. Even with a slot_date set, line 140 passes slot=None to the lock check and line 166 reads slot.rate. Lowered to P2: it is a clean failure inside a transaction with no data written, but this acceptance path is unusable for slotless FT/PT vacancies.",
+   "evidence": [
+    "backend/shifts/serialization/offers.py:17",
+    "backend/shifts/serialization/offers.py:100",
+    "backend/shifts/serialization/offers.py:163",
+    "backend/shifts/counter_offers.py:137",
+    "backend/shifts/counter_offers.py:139",
+    "backend/shifts/base.py:359"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C020-N6",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Accepting a counter offer creates a ShiftOffer with offered_slot_date set to the one chosen date. The engagement terms the worker sees list only that date (_offer_occurrences). But finalize_shift_offer loops over every expand_shift_slots() entry for that slot and creates an assignment for each unfilled date, ignoring offer.offered_slot_date. Unless the snapshot has a matching rate, it also applies offer.offered_rate to those extra dates. OfferViewSet.accept calls finalize directly, with no date filter in between.",
+   "evidence": [
+    "backend/shifts/counter_offers.py:163",
+    "backend/shifts/counter_offers.py:188",
+    "backend/shifts/engagement.py:268",
+    "backend/shifts/offers.py:405",
+    "backend/shifts/finalize.py:39",
+    "backend/shifts/finalize.py:43",
+    "backend/shifts/finalize.py:79"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C021-N5",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "With USE_TZ=True, timezone.now() is an aware UTC datetime, so now.time() is the UTC clock. date.today() is the Sydney date, because Django sets the process TZ to TIME_ZONE on Unix. Slot end_time is the pharmacy's local wall time. At 20:00 AEDT the UTC clock reads 09:00, so a slot ending at 17:00 today still counts as upcoming. It is also wrong the other way: before about 11:00 Sydney time, today's slots that have not ended yet are treated as finished. The same pattern appears in the active, confirmed and my-confirmed lists, the open-slot serializer and the public boards, and nothing uses the pharmacy's local time except the share view.",
+   "evidence": [
+    "backend/core/settings.py:445",
+    "backend/core/settings.py:449",
+    "backend/shifts/selectors.py:20",
+    "backend/shifts/lifecycle.py:148",
+    "backend/shifts/my_shifts.py:20",
+    "backend/shifts/serialization/shifts.py:373",
+    "backend/shifts/serialization/shifts.py:403",
+    "backend/shifts/browse.py:445",
+    "backend/shifts/browse.py:682"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

@@ -1,0 +1,117 @@
+{
+ "chunk": "W01",
+ "verdicts": [
+  {
+   "id": "F06-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Rejecting provisional attendance only sets the review status to REJECTED. It never clears session.is_provisional, and only approval does that (approvals.py:212). The timesheet builder adds an UNRESOLVED_PROVISIONAL_ATTENDANCE blocker for any session with is_provisional=True, whatever the review status. decide_check refuses to waive or resolve that code, approve_timesheet refuses while a blocker is open, and lock_period needs every timesheet approved, so the whole period can never be locked.",
+   "evidence": [
+    "backend/attendance/approvals.py:274",
+    "backend/attendance/approvals.py:212",
+    "backend/attendance/approvals.py:157",
+    "backend/workforce/timesheet_data.py:241",
+    "backend/workforce/timesheet_transitions.py:103",
+    "backend/workforce/timesheet_transitions.py:67",
+    "backend/workforce/timesheet_transitions.py:139"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F11-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The onboarding update changes user.mobile_number when the current number is unverified, but it leaves mobile_otp_code and mobile_otp_created_at in place. VerifyMobileOTPView only compares the code with the stored hash and never checks which number the code was sent to. Nothing in the model stops two accounts having the same number. Zoe still has to own a phone that receives the code, so this lets her bind someone else's number rather than skip verification entirely. That is a trust and integrity gap, not account takeover.",
+   "evidence": [
+    "backend/core/serializer_lifecycle.py:129",
+    "backend/onboarding/services/basic.py:159",
+    "backend/onboarding/serializers.py:825",
+    "backend/users/api_otp.py:367",
+    "backend/users/api_otp.py:463",
+    "backend/users/models.py:83"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F11-N3",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Login with remember_me=false marks the refresh token remember_me=False and sets session-only cookies. VerifyMobileOTPView then issues a fresh RefreshToken.for_user without that claim and calls _set_auth_cookies with no remember_me. That defaults to persistent=True, so the refresh cookie gets the 90-day REFRESH_TOKEN_LIFETIME max_age. Later refreshes carry remember_me=None, so the session stays persistent. It is real, but it happens only once per account (first mobile verification) and only matters on a shared device.",
+   "evidence": [
+    "frontend_web/src/pages/login.tsx:60",
+    "backend/users/serializers.py:365",
+    "backend/users/api_otp.py:477",
+    "backend/users/api_otp.py:489",
+    "backend/users/sessions.py:43",
+    "backend/users/sessions.py:53",
+    "backend/core/settings.py:495"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "F08-N4",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "OwnerSubscription.staff_count is only written by billing views and webhooks. Neither invite creation nor membership accept compares the number of active staff with it; the only cap is MAX_ACTIVE_PHARMACY_MEMBERSHIPS per worker. The pricing page promises 5 staff per pharmacy plus $5 for each extra, but nothing enforces that. This is lost revenue, not a safety or data issue, and the owner must decide between blocking, auto-charging or a soft warning.",
+   "evidence": [
+    "frontend_web/src/pages/PricingPage.tsx:259",
+    "backend/memberships/invites.py:117",
+    "backend/memberships/invites.py:150",
+    "backend/memberships/views.py:437",
+    "backend/memberships/views.py:443",
+    "backend/billing/views.py:826",
+    "backend/billing/models.py:39"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "DECISION"
+  },
+  {
+   "id": "F08-N5",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "DeleteAccountView anonymises the user, revokes sessions and tokens, and deletes ID documents, with no billing step. Nothing in users/ mentions Stripe or subscriptions. The user is only soft-deleted (is_active=False), so the owner-scoped OwnerSubscription row and both Stripe subscription ids stay, and Stripe keeps charging. The deleted user can no longer reach the billing screen to cancel. This is a different root cause from B13 (shift handover).",
+   "evidence": [
+    "backend/users/api_account.py:76",
+    "backend/users/account_deletion.py:92",
+    "backend/billing/models.py:14",
+    "backend/billing/models.py:36",
+    "backend/billing/views.py:440",
+    "backend/billing/views.py:522"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C030-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The mobile rename sends only roomId and title. participant_ids is undefined, so it is left out of the JSON, and the view turns it into [] via `data.get('participant_ids') or []`, then always passes participants=[] to the update serializer. The field is a ManyRelatedField, which accepts an empty list by default, so update() deletes every participant except the creator's membership. Omar and Mia silently lose the group.",
+   "evidence": [
+    "frontend_mobile/roles/shared/chat/ChatPage.tsx:293",
+    "shared-core/src/domains/chat/api.ts:131",
+    "backend/chat/views.py:416",
+    "backend/chat/views.py:464",
+    "backend/chat/serializers.py:264",
+    "backend/chat/serializers.py:347"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeA-1"
+}

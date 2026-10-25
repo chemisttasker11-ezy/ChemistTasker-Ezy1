@@ -1,0 +1,3907 @@
+{
+ "C039-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Attendance",
+  "title": "Attendance timeline correction modal uses UTC string in local datetime input shifting timestamps",
+  "finder": "agy-g3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The editor strips the timezone from a UTC ISO timestamp and places it in a datetime-local input, then interprets that value as browser-local time on submission. At UTC+10, submitting the initial value moves the event ten hours earlier. Server chronology validation rejects an affected clock-out, while an earlier clock-in can pass and change the timesheet start time.",
+    "evidence": [
+     "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:539",
+     "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:564",
+     "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:237",
+     "backend/attendance/views.py:215",
+     "backend/attendance/approvals.py:338",
+     "backend/attendance/approvals.py:354",
+     "backend/workforce/timesheet_data.py:227"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C004-N3": {
+  "status": "REFUTED",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Billing",
+  "title": "An organisation's free trial depends on which org admin clicks pay, so a newly joined admin makes every shift free.",
+  "finder": "claudeB-1",
+  "duplicate_of": "",
+  "ui_visible": false,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V01",
+    "verdict": "REFUTED",
+    "severity": "P1",
+    "reason": "The acting ORG_ADMIN does become the selected billing contact, but this baseline explicitly sets FREE_TRIAL_DAYS to zero. The trial check requires date_joined.date() to be strictly later than today's cutoff, so an account created today does not qualify. The claimed bypass would become possible with a positive trial window, but the shipped configuration prevents the stated scenario.",
+    "evidence": [
+     "backend/core/settings.py:667",
+     "backend/billing/utils.py:25",
+     "backend/billing/utils.py:29",
+     "backend/billing/utils.py:129",
+     "backend/billing/utils.py:167",
+     "backend/billing/views.py:594"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C004-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Chat",
+  "title": "Anyone with one active membership can pull any pharmacy's staff into a custom group and harvest their names and emails.",
+  "finder": "claudeB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Custom-group creation requires authentication but resolves supplied participant IDs against all active memberships, without checking a shared pharmacy or another relationship. The serializer adds Sara's active membership and the selected foreign memberships, making them eligible for her participant-list response, which includes names, email, photo URL, role and employment type. The pharmacy authorization check applies only to community chats, and the message endpoint accepts Sara because she is now a participant.",
+    "evidence": [
+     "backend/chat/views.py:53",
+     "backend/chat/views.py:419",
+     "backend/chat/views.py:472",
+     "backend/chat/serializers.py:264",
+     "backend/chat/serializers.py:293",
+     "backend/chat/views.py:863",
+     "backend/chat/serializers.py:381",
+     "backend/users/presentation.py:60",
+     "backend/chat/views.py:683"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C030-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Chat",
+  "title": "Renaming a group on mobile silently removes its other members.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Mobile renaming sends only the room ID and title, so JSON serialization omits participant_ids. The backend converts that omission into an empty list and explicitly supplies it to the serializer even for a partial update. The serializer preserves the creator's membership but deletes every other participant, removing their REST access and room visibility.",
+    "evidence": [
+     "frontend_mobile/roles/shared/chat/ChatPage.tsx:293",
+     "shared-core/src/domains/chat/api.ts:131",
+     "shared-core/src/domains/chat/api.ts:40",
+     "backend/chat/views.py:416",
+     "backend/chat/views.py:464",
+     "backend/chat/serializers.py:319",
+     "backend/chat/serializers.py:347",
+     "backend/chat/views.py:60"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The mobile rename sends only roomId and title. participant_ids is undefined, so it is left out of the JSON, and the view turns it into [] via `data.get('participant_ids') or []`, then always passes participants=[] to the update serializer. The field is a ManyRelatedField, which accepts an empty list by default, so update() deletes every participant except the creator's membership. Omar and Mia silently lose the group.",
+    "evidence": [
+     "frontend_mobile/roles/shared/chat/ChatPage.tsx:293",
+     "shared-core/src/domains/chat/api.ts:131",
+     "backend/chat/views.py:416",
+     "backend/chat/views.py:464",
+     "backend/chat/serializers.py:264",
+     "backend/chat/serializers.py:347"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F10-N4": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Ethical marketplace",
+  "title": "Bulk ethical reads bypass the viewer's approved medicine schedules.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Inventory and owned-listing reads authorize the pharmacy and action without passing a product, then serialize every matching pharmacy record. Schedule restrictions run only when a product is supplied, and neither bulk queryset nor serializer filters unauthorized schedules. An otherwise eligible S4-only delegate therefore receives S8 product and quantity details, plus listing amounts, through the web and mobile callers.",
+    "evidence": [
+     "frontend_mobile/features/parity/ethicalMarketplace.tsx:26",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:50",
+     "backend/ethical_marketplace/views.py:163",
+     "backend/ethical_marketplace/views.py:228",
+     "backend/ethical_marketplace/owner_views.py:23",
+     "backend/ethical_marketplace/owner_views.py:36",
+     "backend/ethical_marketplace/policy.py:50",
+     "backend/ethical_marketplace/serializers.py:38",
+     "backend/ethical_marketplace/serializers.py:60"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Lots.get calls admitted_pharmacy(request, 'MANAGE_OWN_STOCK') and MyListings.get calls admitted_pharmacy(..., 'PREPARE_LISTING'). Both pass no product, so evaluate_ethical_access skips the professional schedule, activity, jurisdiction and policy checks, which run only when a product is given. Both views then return every lot or listing for the pharmacy, S8 included. On-hand and reserved quantities, storage checks, source reference and listing amounts are all returned. The single-item endpoints (LotDetail, LotReconcile, Listings.post) pass product= and would refuse S8 to an S4-only professional.",
+    "evidence": [
+     "backend/ethical_marketplace/views.py:229",
+     "backend/ethical_marketplace/views.py:230",
+     "backend/ethical_marketplace/owner_views.py:36",
+     "backend/ethical_marketplace/owner_views.py:37",
+     "backend/ethical_marketplace/policy.py:50",
+     "backend/ethical_marketplace/views.py:247",
+     "backend/ethical_marketplace/serializers.py:38"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F10-N5": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Ethical marketplace",
+  "title": "Valid premises applications fail after saving because the response uses an undefined variable.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The creating variable is local to GET and is neither defined nor available in POST. After saving the approval as PENDING_REVIEW and writing the audit event, POST references creating while constructing its response and raises NameError. No enclosing request transaction is configured to undo those writes, so valid web and mobile submissions persist but return a server error.",
+    "evidence": [
+     "backend/ethical_marketplace/views.py:100",
+     "backend/ethical_marketplace/views.py:102",
+     "backend/ethical_marketplace/views.py:113",
+     "backend/ethical_marketplace/views.py:120",
+     "backend/ethical_marketplace/views.py:121",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:143",
+     "frontend_mobile/features/parity/ethicalMarketplace.tsx:54",
+     "shared-core/src/platformApi.ts:141"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "PharmacyApproval.post uses `creating` at line 121, but that variable is only assigned inside get() (line 100). It is not defined in post or at module level. serializer.save() and the EthicalAuditEvent insert run first, and ATOMIC_REQUESTS is not set, so every valid submission is saved as PENDING_REVIEW and then fails with a NameError, which returns a 500. No test posts to this endpoint; tests.py only calls GET.",
+    "evidence": [
+     "backend/ethical_marketplace/views.py:100",
+     "backend/ethical_marketplace/views.py:113",
+     "backend/ethical_marketplace/views.py:120",
+     "backend/ethical_marketplace/views.py:121",
+     "backend/core/settings.py:240"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F10-N6": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Ethical marketplace",
+  "title": "Ethical offers disclose full stock-lot records to viewers without inventory access.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Chain visibility can admit Omar through his authorised pharmacy without granting access to the source pharmacy's inventory. Both listing responses embed StockLotSerializer, exposing the source lot's full balances, storage checks and source reference without another inventory permission check. These extra fields are returned by the API but are not displayed by the listing screen.",
+    "evidence": [
+     "backend/ethical_marketplace/policy.py:94",
+     "backend/ethical_marketplace/policy.py:100",
+     "backend/ethical_marketplace/views.py:229",
+     "backend/ethical_marketplace/views.py:288",
+     "backend/ethical_marketplace/views.py:316",
+     "backend/ethical_marketplace/serializers.py:38",
+     "backend/ethical_marketplace/serializers.py:47",
+     "backend/ethical_marketplace/serializers.py:56"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Listings.get serializes the visible listings with EthicalListingSerializer. Its lot_allocations field nests ListingLotSerializer.lot_detail, which is the full StockLotSerializer (on_hand_quantity, reserved_quantity, storage_checks, source_reference, version). listing_visible_to admits chain admins who hold only VIEW_CHAIN_ETHICAL on another pharmacy in the chain. For ORGANISATION_OWNERS and PLATFORM_OWNERS circles it also admits other owners. None of them needs MANAGE_OWN_STOCK on the source pharmacy. The leak is wider than the scenario: on non-S8 platform-circle listings, unrelated owners see these lot details too.",
+    "evidence": [
+     "backend/ethical_marketplace/views.py:286",
+     "backend/ethical_marketplace/views.py:288",
+     "backend/ethical_marketplace/serializers.py:38",
+     "backend/ethical_marketplace/serializers.py:47",
+     "backend/ethical_marketplace/serializers.py:56",
+     "backend/ethical_marketplace/policy.py:94",
+     "backend/ethical_marketplace/policy.py:100",
+     "backend/ethical_marketplace/policy.py:114"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F07-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Finance summaries",
+  "title": "Saving an invoice revision removes its recorded receipts from the cash worksheet.",
+  "finder": "codexB-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Saving a valid revision changes the live invoice to draft while retaining its Payment rows. The cash worksheet includes payments only when their invoice currently has sent or paid status, so the recorded sales and GST disappear until that status changes again. Existing tests cover payments and revisions separately, without checking the worksheet after a revision.",
+    "evidence": [
+     "backend/worker_finance/views.py:203",
+     "backend/worker_finance/services.py:693",
+     "backend/worker_finance/services.py:702",
+     "backend/worker_finance/services.py:982",
+     "backend/worker_finance/views.py:626",
+     "backend/worker_finance/views.py:634",
+     "backend/worker_finance/tests/test_api.py:147",
+     "backend/worker_finance/tests/test_api.py:173"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Saving any edit to an existing invoice runs the revision branch of the save service, which sets record.status = 'draft' with no check for recorded payments. On the cash basis, bas_worksheet only counts payments on invoices whose current status is in ['sent','paid']. The Payment rows, with their gst and sales splits, still exist but drop out of the worksheet until the invoice is resent. The root cause is the worksheet's status filter on the cash basis. It differs from B58 (draft visibility) and B59 (payable below payments).",
+    "evidence": [
+     "backend/worker_finance/services.py:605",
+     "backend/worker_finance/services.py:702",
+     "backend/worker_finance/services.py:982",
+     "backend/worker_finance/views.py:626",
+     "backend/worker_finance/views.py:630",
+     "backend/worker_finance/views.py:634"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F09-N4": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Hub permissions",
+  "title": "Users without pharmacy memberships can overwrite or delete each other's Hub polls.",
+  "finder": "codexB-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "For an accessible platform poll, both the author's membership ID and Zoe's resolved membership can be null. The management check treats that null-to-null comparison as proof of authorship, allowing PATCH and DELETE; replacing choices explicitly deletes all votes. The serializer hides management controls from Zoe, but that does not protect the mutation endpoints.",
+    "evidence": [
+     "backend/pharmacy_hub/access.py:338",
+     "backend/pharmacy_hub/polls.py:137",
+     "backend/pharmacy_hub/polls.py:143",
+     "backend/pharmacy_hub/polls.py:153",
+     "backend/pharmacy_hub/polls.py:160",
+     "backend/pharmacy_hub/serialization/polls.py:128",
+     "backend/pharmacy_hub/serialization/polls.py:150",
+     "backend/pharmacy_hub/serialization/polls.py:257",
+     "backend/pharmacy_hub/urls.py:35"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W03",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "When neither user has an active Membership, platform_scope returns request_membership=None, and Sara's poll was saved with created_by_membership=None. _assert_can_manage_poll compares poll.created_by_membership_id (None) with getattr(None,'id',None) (None), so None == None makes Zoe count as the creator. Zoe can PATCH the poll, and new choices delete all votes (serializer update), or she can DELETE it. The same None==None match applies to organisation-role users without a Membership. The UI's can_manage stays false for Zoe, so this is reachable through the API only.",
+    "evidence": [
+     "backend/pharmacy_hub/polls.py:141",
+     "backend/pharmacy_hub/polls.py:143",
+     "backend/pharmacy_hub/polls.py:154",
+     "backend/pharmacy_hub/polls.py:160",
+     "backend/pharmacy_hub/access.py:338",
+     "backend/pharmacy_hub/serialization/polls.py:128",
+     "backend/pharmacy_hub/serialization/polls.py:150"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F09-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Hub privacy",
+  "title": "Deleting a restricted Hub group exposes its posts to the whole pharmacy.",
+  "finder": "codexB-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Deleting a group sets its posts' community_group reference to null while retaining their pharmacy and content. Those posts then satisfy the pharmacy-wide feed filter, and comment and attachment access resolves against the pharmacy rather than the deleted group. An ordinary pharmacy member previously excluded from the group can therefore access the retained content.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx:421",
+     "backend/pharmacy_hub/groups.py:153",
+     "backend/pharmacy_hub/models.py:143",
+     "backend/pharmacy_hub/posts.py:234",
+     "backend/pharmacy_hub/scoping.py:156",
+     "backend/pharmacy_hub/access.py:362",
+     "backend/pharmacy_hub/serialization/posts.py:366",
+     "backend/public_hub/attachment_access.py:25"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W03",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "A group post is saved with both pharmacy and community_group set (posts.py:235-236). PharmacyHubPost.community_group uses on_delete=SET_NULL, and destroy just calls instance.delete() with no signal or cleanup. After the group is deleted, the post matches the pharmacy feed filter (pharmacy=A, community_group null, organization null). from_post then authorises it through pharmacy_scope, so any pharmacy member can read the post, its comments and its attachments.",
+    "evidence": [
+     "backend/pharmacy_hub/models.py:147",
+     "backend/pharmacy_hub/posts.py:235",
+     "backend/pharmacy_hub/groups.py:153",
+     "backend/pharmacy_hub/scoping.py:156",
+     "backend/pharmacy_hub/access.py:362",
+     "frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx:421"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F07-N4": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Invoice delivery",
+  "title": "Finishing an older invoice email can publish a newer unsent revision.",
+  "finder": "codexB-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The send transaction releases its invoice lock before rendering and sending the email, allowing another request to save version 2 as draft. Completion marks the invoice sent using only its primary key, even though the delivery belongs to version 1. Both recipient visibility and approval accept the live sent status without requiring delivery of the current version, exposing and permitting approval of version 2.",
+    "evidence": [
+     "backend/worker_finance/views.py:272",
+     "backend/worker_finance/views.py:294",
+     "backend/worker_finance/views.py:316",
+     "backend/worker_finance/services.py:702",
+     "backend/worker_finance/services.py:770",
+     "backend/worker_finance/views.py:360",
+     "backend/worker_finance/views.py:471"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W03",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "send() releases its row lock before rendering and SMTP. save_draft does not check for a delivery that is still in flight, so it can lock the row and bump the version to v2 with status draft. When the email finishes, the code runs Invoice.objects.filter(pk=...).update(status='sent') with no version check. That marks v2 as sent, and owner_visible_document then shows v2 to the pharmacy. It is real but needs a concurrent save within the few seconds of the SMTP window, so I rate it P2.",
+    "evidence": [
+     "backend/worker_finance/views.py:272",
+     "backend/worker_finance/views.py:307",
+     "backend/worker_finance/views.py:316",
+     "backend/worker_finance/services.py:598",
+     "backend/worker_finance/services.py:693",
+     "backend/worker_finance/services.py:702",
+     "backend/worker_finance/services.py:772"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C021-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Invoicing",
+  "title": "Confirmed counteroffers are invoiced using the original shift hours.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Flexible shifts accept changed hours, and counteroffer acceptance preserves those hours on the worker offer and accepted terms snapshot. Finalisation still links the assignment to the original slot, and invoice generation calculates hours directly from that slot instead of the accepted times. The described 10:00–14:00 agreement therefore produces an eight-hour invoice preview for a 09:00–17:00 slot.",
+    "evidence": [
+     "backend/shifts/serialization/offers.py:123",
+     "backend/shifts/counter_offers.py:163",
+     "backend/shifts/engagement.py:272",
+     "backend/shifts/offers.py:405",
+     "backend/shifts/finalize.py:79",
+     "backend/invoicing/services.py:96",
+     "backend/invoicing/views.py:187"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W03",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Flexible-timing shifts accept counteroffers with different times (offers.py:123). Accepting one stores those times only on ShiftOffer.offered_start/end_time (and in the terms snapshot occurrences). The ShiftSlotAssignment created in finalize has no start or end time fields, and nothing changes the slot. The invoice line computes hours from slot.start_time and slot.end_time, so a 10:00-14:00 agreement on a 09:00-17:00 slot is billed as 8 hours. The rate does use the agreed rate.",
+    "evidence": [
+     "backend/shifts/serialization/offers.py:123",
+     "backend/shifts/counter_offers.py:164",
+     "backend/shifts/engagement.py:272",
+     "backend/shifts/finalize.py:79",
+     "backend/invoicing/services.py:96",
+     "backend/invoicing/services.py:99"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C042-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Invoicing",
+  "title": "Organisation and pharmacy admins are treated as invoice issuers instead of recipients on legacy invoice detail view",
+  "finder": "agy-g3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V03",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The OWNER-only check does render the issuer form for non-owner managers of unmanaged legacy invoices, and the backend rejects their full-field saves. However, the described shift-generated invoice is adopted into finance and redirected to recipient review; the migration also promotes existing legacy invoices. The remaining P2 defect affects unmanaged invoices, which the generic legacy POST can still create.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:42",
+     "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:157",
+     "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:570",
+     "backend/invoicing/views.py:99",
+     "backend/invoicing/services.py:419",
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:60",
+     "backend/invoicing/serializers.py:81"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F07-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Invoicing",
+  "title": "Both invoice editors block saving an invoice prefilled from an accepted shift.",
+  "finder": "codexB-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V03",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Internal prefill returns customer_id 0 with the pharmacy snapshot and source assignment IDs. Both editors reject that zero value before saving and disable customer selection for internal invoices. The backend deliberately supports this payload and creates the pharmacy customer during Save; the existing integrity test verifies that backend flow without exercising either editor.",
+    "evidence": [
+     "backend/worker_finance/services.py:362",
+     "frontend_web/src/pages/finance/InvoiceComposer.tsx:103",
+     "frontend_web/src/pages/finance/InvoiceComposer.tsx:130",
+     "frontend_web/src/pages/finance/InvoiceComposer.tsx:187",
+     "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:199",
+     "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:229",
+     "backend/worker_finance/services.py:631",
+     "backend/invoicing/test_integrity.py:143"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W04",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "internal_invoice_prefill returns customer_id 0 and expects the server to resolve the customer at save time: save_draft accepts 0 and sets the pharmacy's customer. Both editors store the draft as it is, then refuse to save when customer_id is 0. On web this is the check at line 130; on mobile it is the check at line 199. Both disable the customer picker when source_assignment_ids is set, so the user cannot pick one. The web e2e test only checks that the prefill request happens, not that saving works.",
+    "evidence": [
+     "backend/worker_finance/services.py:362",
+     "backend/worker_finance/services.py:632",
+     "frontend_web/src/pages/finance/InvoiceComposer.tsx:103",
+     "frontend_web/src/pages/finance/InvoiceComposer.tsx:130",
+     "frontend_web/src/pages/finance/InvoiceComposer.tsx:187",
+     "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:183",
+     "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:199",
+     "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:229",
+     "frontend_web/e2e/frontend-behaviour.spec.mjs:92"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C064-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Invoicing / Expo",
+  "title": "Legacy Expo invoice generator defaults superannuation to 10% despite Australia's current 12% SG rate.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V03",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The reachable legacy Expo generator starts at 10%, retains it when onboarding supplies no snapshot, and submits that rate. It also creates a 10% super line, which the backend preserves as a manual line; otherwise backend calculation uses the submitted snapshot. The modern helper uses 12% from July 2025, but neither it nor internal-invoice adoption corrects this legacy default. This confirms the conditional stale-default defect, without establishing contractor eligibility or invalidating intentionally agreed rates.",
+    "evidence": [
+     "frontend_mobile/app/pharmacist/invoice/new.tsx:5",
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:115",
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:152",
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:294",
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:392",
+     "backend/invoicing/services.py:166",
+     "backend/invoicing/services.py:332",
+     "backend/worker_finance/services.py:543",
+     "backend/worker_finance/calculations.py:50",
+     "backend/invoicing/test_integrity.py:440"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W04",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The legacy InvoiceGenerate starts superRateSnapshot at 10 and changes it only when onboarding has a super_rate_snapshot. It sends that value, and the legacy service stores it and uses it for the generated super line. Everywhere else the default is 12: the model default and the new finance serializer and defaults. The rate shows in an editable field, this screen is now the legacy tool inside FinanceWorkspace, and a client-chosen rate is allowed by design. So this is a wrong default, not a calculation bug: P2.",
+    "evidence": [
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:115",
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:152",
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:392",
+     "backend/invoicing/services.py:175",
+     "backend/invoicing/services.py:332",
+     "backend/invoicing/models.py:44",
+     "backend/worker_finance/serializers.py:127"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C009-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Marketplace",
+  "title": "Ethical stock imports can still be committed after the inventory write feature is switched off.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V03",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The commit route authenticates the caller and checks pharmacy access and staged status, but never checks ETHICAL_INVENTORY_ENABLED. Its access policy also omits that flag, so an otherwise eligible owner can commit after it is disabled. The transaction then updates or creates stock lots and writes movement records; staging's flag check does not protect this later request.",
+    "evidence": [
+     "backend/ethical_marketplace/urls.py:15",
+     "backend/ethical_marketplace/owner_views.py:60",
+     "backend/ethical_marketplace/policy.py:37",
+     "backend/ethical_marketplace/owner_views.py:100",
+     "backend/ethical_marketplace/owner_views.py:104",
+     "backend/ethical_marketplace/views.py:195",
+     "backend/core/settings.py:242"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W04",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "ImportCommit checks only MANAGE_OWN_STOCK access and the batch status. It never reads ETHICAL_INVENTORY_ENABLED, and the policy does not check it either: the flag is read only in Imports.post and Lots.post. A batch staged while the flag was on can therefore still be committed after it is switched off, changing lots and writing movements. LotReconcile is unguarded in the same way. Only the caller's own pharmacy stock is affected, so this is a broken kill switch at P2, not a cross-tenant P1.",
+    "evidence": [
+     "backend/ethical_marketplace/owner_views.py:57",
+     "backend/ethical_marketplace/owner_views.py:62",
+     "backend/ethical_marketplace/views.py:195",
+     "backend/ethical_marketplace/views.py:234",
+     "backend/ethical_marketplace/views.py:259",
+     "backend/ethical_marketplace/urls.py:15",
+     "backend/core/settings.py:242"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C011-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Marketplace",
+  "title": "Concurrent identical marketplace enquiries can persist duplicate negotiations before the idempotency receipt fails.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V03",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Two eligible requests can both complete the unlocked receipt lookup before either writes its receipt. Each creates a separate exchange and participants before attempting the unique receipt insert, with no enclosing transaction or request-wide atomic setting. The losing receipt insert therefore fails after its exchange has committed, and the seller's exchange list includes both negotiations.",
+    "evidence": [
+     "backend/marketplace/urls.py:17",
+     "backend/marketplace/services.py:44",
+     "backend/marketplace/views.py:297",
+     "backend/marketplace/views.py:300",
+     "backend/marketplace/views.py:309",
+     "backend/marketplace/models.py:329",
+     "backend/marketplace/views.py:324",
+     "backend/core/settings.py:401"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W05",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "Enquiries.post looks up the receipt without a lock (services.py:46), then creates the exchange, its participants, the message and the receipt. None of this runs in a transaction: there is no @transaction.atomic on this view and no ATOMIC_REQUESTS in settings. If two requests with the same UUID arrive at the same moment, both create an exchange; the second then hits uniq_market_request_receipt and returns a 500, but its exchange is already saved. The impact is a duplicate negotiation and an error shown to the buyer. No money moves, and the live-reservation unique constraint still limits reservations to one, so this is P2.",
+    "evidence": [
+     "backend/marketplace/views.py:283",
+     "backend/marketplace/views.py:297",
+     "backend/marketplace/views.py:300",
+     "backend/marketplace/views.py:309",
+     "backend/marketplace/services.py:44",
+     "backend/marketplace/models.py:329",
+     "backend/marketplace/models.py:277"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C012-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Memberships",
+  "title": "Authenticated workers can create applications against expired or unauthorised invitation links by calling the generic applications endpoint.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V03",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The registered ModelViewSet exposes authenticated creation; its manager-scoped queryset does not restrict POST creation. The serializer accepts any existing numeric invite-link ID and checks applicant identity and duplicates, but never checks link validity or possession of its UUID token. Only the separate magic-link view calls is_valid(), so this bypass creates a PENDING application visible to managers; it does not automatically grant membership.",
+    "evidence": [
+     "backend/memberships/urls.py:30",
+     "backend/memberships/views.py:310",
+     "backend/memberships/views.py:317",
+     "backend/memberships/serializers.py:383",
+     "backend/memberships/serializers.py:413",
+     "backend/memberships/serializers.py:526",
+     "backend/memberships/views.py:261",
+     "backend/memberships/models.py:308",
+     "backend/memberships/selectors.py:197"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W05",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "MembershipApplicationViewSet is a ModelViewSet that only requires IsAuthenticated, and it keeps the default create. Its serializer accepts invite_link as an integer primary key from MembershipInviteLink.objects.all() and never calls link.is_valid(), the active and expiry check at models.py:226. This route also skips the magic-link view's pharmacy row lock and its membership-limit check. Sequential IDs let any signed-in worker file a pending application at any pharmacy, using a disabled or expired link. A manager must still approve before a membership exists, so this is P2: an access-control bypass that produces spam applications, not direct membership.",
+    "evidence": [
+     "backend/memberships/views.py:310",
+     "backend/memberships/views.py:317",
+     "backend/memberships/serializers.py:383",
+     "backend/memberships/serializers.py:384",
+     "backend/memberships/serializers.py:423",
+     "backend/memberships/serializers.py:526",
+     "backend/memberships/views.py:261",
+     "backend/memberships/views.py:289",
+     "backend/memberships/models.py:226"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F03-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Memberships / Pharmacy admins",
+  "title": "When the owner removes a staff member who is also a pharmacy admin, their admin rights stay on, but when they quit themselves the rights are switched off.",
+  "finder": "claudeA-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V04",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P1",
+    "reason": "An owner can DELETE an admin's membership through the API without deactivating their PharmacyAdmin record; successful deletion sets its membership link to null. Capability checks and the active admin list continue trusting that record, whereas quitting explicitly deactivates it. The scenario is narrower than reported because both web and mobile staff lists hide pharmacy admins, preventing this removal through the normal staff-list screen.",
+    "evidence": [
+     "backend/memberships/urls.py:21",
+     "backend/memberships/access.py:64",
+     "backend/memberships/views.py:112",
+     "backend/memberships/views.py:494",
+     "backend/organizations/models.py:400",
+     "backend/organizations/access.py:33",
+     "backend/organizations/views.py:386",
+     "frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:144",
+     "frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:148",
+     "backend/memberships/test_membership_workflows_contract.py:315"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C071-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Mobile push privacy",
+  "title": "Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V04",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Native logout clears local authentication and the registration flag, but neither its shared request nor the backend logout removes or deactivates a DeviceToken. Future notifications select that user's active tokens and send their titles and bodies to Expo even after successful logout. Registering the same token after Tom logs in reassigns it exclusively to Tom, but nothing protects the signed-out interval.",
+    "evidence": [
+     "frontend_mobile/context/AuthContext.tsx:502",
+     "frontend_mobile/context/AuthContext.tsx:527",
+     "shared-core/src/domains/auth/api.ts:14",
+     "backend/users/urls.py:26",
+     "backend/users/api_auth.py:159",
+     "backend/notifications/services.py:91",
+     "backend/notifications/views.py:67",
+     "backend/notifications/test_api.py:91",
+     "backend/users/test_account_security_contract.py:324"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W05",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Mobile logout clears local tokens and resets registeredPush, but nothing in frontend_mobile or shared-core ever calls DELETE /device-tokens/. Only registerPushDeviceToken exists. LogoutView only blacklists the refresh token, and notify_users sends to every active DeviceToken the user has. The signed-out phone therefore keeps showing alert titles and bodies until a different account registers the same token (perform_create's upsert).",
+    "evidence": [
+     "frontend_mobile/context/AuthContext.tsx:502",
+     "frontend_mobile/context/AuthContext.tsx:527",
+     "frontend_mobile/utils/pushNotifications.ts:68",
+     "shared-core/src/domains/notifications/api.ts:44",
+     "backend/users/api_auth.py:155",
+     "backend/users/api_auth.py:167",
+     "backend/notifications/views.py:44",
+     "backend/notifications/views.py:67",
+     "backend/notifications/services.py:92"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F09-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Notification privacy",
+  "title": "Removed Hub group members still receive new private comment text.",
+  "finder": "codexB-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V04",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Removing Omar's group membership prevents normal group access but leaves his pharmacy membership and post authorship intact. Comment creation passes up to 280 characters to the post-owner notifier, which checks only account activity and whether the author is the commenter. It never checks the recipient's current group access before creating the notification and sending push.",
+    "evidence": [
+     "backend/pharmacy_hub/serialization/groups.py:189",
+     "backend/pharmacy_hub/access.py:271",
+     "backend/pharmacy_hub/access.py:357",
+     "backend/pharmacy_hub/urls.py:58",
+     "backend/pharmacy_hub/posts.py:385",
+     "backend/pharmacy_hub/posts.py:440",
+     "backend/pharmacy_hub/notifications.py:50",
+     "backend/notifications/services.py:94",
+     "backend/pharmacy_hub/test_hub_scope_contract.py:697"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W06",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The comment-create code always notifies the post author and puts up to 280 characters of the comment in the notification body. _notify_hub_post_owner checks only that the author's account is active and is not the commenter. It never re-checks group access, which the group scope requires through PharmacyCommunityGroupMembership. Removing Omar from the group only deletes his group link, so his post and his active pharmacy membership remain. notify_users then saves the notification, broadcasts it and sends an Expo push with the body. This is not B48 (mentions) or B46 (pending or left memberships), because Omar is still an active employee.",
+    "evidence": [
+     "backend/pharmacy_hub/posts.py:440",
+     "backend/pharmacy_hub/posts.py:444",
+     "backend/pharmacy_hub/notifications.py:50",
+     "backend/pharmacy_hub/notifications.py:54",
+     "backend/pharmacy_hub/access.py:271",
+     "backend/pharmacy_hub/serialization/groups.py:189",
+     "backend/notifications/services.py:88",
+     "backend/notifications/services.py:94"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C015-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Onboarding",
+  "title": "AHPRA suspension notices expose an employee's regulatory status to region administrators outside their assigned pharmacies.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V04",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P1",
+    "reason": "The leak requires Sara herself to have an OrganizationMembership: pharmacy employment alone does not select organisation administrators. With that additional membership, the notifier selects every REGION_ADMIN in her organisation without checking assigned pharmacies, exposing her name and regulatory status through notifications and email. The message does not explicitly include her pharmacy affiliation, so that part of the claim is overstated; the cross-scope status disclosure remains P1.",
+    "evidence": [
+     "backend/onboarding/verification/state.py:275",
+     "backend/onboarding/verification/state.py:349",
+     "backend/onboarding/verification/state.py:356",
+     "backend/onboarding/verification/state.py:361",
+     "backend/users/org_roles.py:268",
+     "backend/onboarding/test_review3_fixes.py:188"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W06",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The organisation-admin branch looks up organisations through the suspended user's own OrganizationMembership. That model only has the roles ORG_ADMIN, CHIEF_ADMIN and REGION_ADMIN, so an ordinary employee like Sara, who has only a pharmacy Membership, sends no organisation admin any notice, and the scenario as written does not happen. The leak happens only when the suspended person is an organisation admin themselves. In that case every ORG_ADMIN, CHIEF_ADMIN or REGION_ADMIN in the organisation gets their name and AHPRA status, whichever pharmacies they are assigned to.",
+    "evidence": [
+     "backend/onboarding/verification/state.py:349",
+     "backend/onboarding/verification/state.py:350",
+     "backend/onboarding/verification/state.py:356",
+     "backend/users/models.py:99"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C051-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Onboarding",
+  "title": "Referee decline link routes to a 404 and invokes an obsolete two-parameter backend path instead of token verification",
+  "finder": "agy-g1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V04",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The email generates a single-token decline URL, but the web router requires two path parameters, so the emailed URL cannot reach the decline page. The page also calls browserRejectReferee, which posts to the obsolete two-parameter API path rather than the signed-token endpoint. The backend token endpoint exists and has successful source-test coverage; this is a P2 broken decline/reminder workflow, with referees optional under the default verification policy.",
+    "evidence": [
+     "backend/onboarding/emails.py:79",
+     "frontend_web/src/main.tsx:158",
+     "frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:11",
+     "frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:22",
+     "shared-core/src/domains/auth/browserOperations.ts:67",
+     "shared-core/src/constants/endpoints.ts:48",
+     "backend/onboarding/urls.py:41",
+     "backend/onboarding/views.py:163",
+     "backend/onboarding/test_verification_transitions.py:275",
+     "backend/onboarding/verification/policy.py:5"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F05-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Onboarding / Public shifts",
+  "title": "A New to pharmacy account can apply for public shifts without ever being verified, though the same profile is blocked from posting on the talent hub.",
+  "finder": "claudeB-1",
+  "duplicate_of": "",
+  "ui_visible": false,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V04",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P1",
+    "reason": "An authenticated Explorer can submit interest through the API for an eligible public EXPLORER shift because the queryset permits that role and the onboarding gate handles only PHARMACIST and OTHER_STAFF. The AHPRA gate adds no Explorer verification check, while Talent explicitly requires Explorer verification. However, both web and mobile public-shift apply handlers block unverified users, so the reported ordinary screen flow is prevented; the P1 issue is a backend verification bypass through a direct request.",
+    "evidence": [
+     "backend/shifts/base.py:124",
+     "backend/shifts/base.py:196",
+     "backend/shifts/browse.py:449",
+     "backend/shifts/access.py:86",
+     "backend/shifts/interest.py:40",
+     "backend/onboarding/verification/state.py:153",
+     "backend/onboarding/services/work_profile.py:5",
+     "backend/talent/views/explorer.py:147",
+     "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:279",
+     "frontend_mobile/roles/shared/shifts/PublicShiftsView.tsx:247",
+     "backend/shifts/test_shift_actions_contract.py:146"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F07-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Payments",
+  "title": "Marking an invoice paid leaves its balance and cash worksheet unchanged.",
+  "finder": "codexB-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V05",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Both worker and pharmacy Mark as paid actions change status without creating a Payment. Paid totals, balances and the cash worksheet use Payment records, so an invoice without recorded receipts retains its full balance and contributes no cash sales or GST. The existing partial-payment test explicitly expects only the separately recorded receipt after marking paid.",
+    "evidence": [
+     "frontend_web/src/pages/finance/FinanceWorkspace.tsx:354",
+     "backend/worker_finance/views.py:243",
+     "backend/worker_finance/views.py:498",
+     "backend/worker_finance/services.py:810",
+     "backend/worker_finance/services.py:835",
+     "backend/worker_finance/views.py:634",
+     "backend/worker_finance/tests/test_api.py:147"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W06",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Both mark-paid actions only set status='paid' (the pharmacy-side one also sets the review status) and never create a Payment row. serialize_record works out `paid` as the sum of Payment amounts and `balance` as payable minus paid, so a paid invoice still shows the full balance and $0 received, and 'Record a payment' stays enabled. The cash-basis GST worksheet adds up only Payment rows, so it leaves out the sales and GST for that invoice. The web menu tells users to use Mark as paid once the full amount has arrived.",
+    "evidence": [
+     "backend/worker_finance/views.py:251",
+     "backend/worker_finance/views.py:506",
+     "backend/worker_finance/services.py:810",
+     "backend/worker_finance/services.py:836",
+     "backend/worker_finance/views.py:634",
+     "frontend_web/src/pages/finance/FinanceWorkspace.tsx:354",
+     "frontend_web/src/pages/dashboard/sidebar/Invoices/invoiceStats.ts:101"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F10-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Public job board",
+  "title": "Public search can identify pharmacies behind anonymous vacancies.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V05",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The unauthenticated public endpoint searches pharmacy names and street addresses without excluding anonymous posts from those matches. Anonymization happens during serialization, after the database has selected matching vacancies. Distinctive hidden-field searches therefore reveal which anonymous vacancy belongs to a pharmacy.",
+    "evidence": [
+     "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:193",
+     "shared-core/src/domains/shifts/api.ts:218",
+     "backend/shifts/urls.py:63",
+     "backend/shifts/browse.py:537",
+     "backend/shifts/browse.py:589",
+     "backend/shifts/serialization/projections.py:129",
+     "backend/shifts/serialization/shifts.py:193",
+     "backend/organizations/serializers.py:56"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W07",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The public job board view lets anyone, without signing in, search on pharmacy__name and pharmacy__street_address. It does not skip shifts posted with post_anonymously. The serializer hides only the name and street in the response ('Anonymous Pharmacy' plus suburb, state and postcode), so a search on a guessed name or address that still returns the anonymous vacancy confirms which pharmacy it is. Nothing skips the hidden fields when the shift is anonymous.",
+    "evidence": [
+     "backend/shifts/browse.py:537",
+     "backend/shifts/browse.py:543",
+     "backend/shifts/browse.py:589",
+     "backend/shifts/browse.py:591",
+     "backend/shifts/browse.py:593",
+     "backend/shifts/serialization/shifts.py:193",
+     "backend/organizations/serializers.py:56"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F10-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Rewards",
+  "title": "Concurrent claims can award multiple rewards for the same referral.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V05",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Two first claims can both find no event and each create one because the lookup and insertion have no serialization or matching uniqueness constraint. Awards use the event ID as their idempotency key, so different events receive separate credits. Balance calculation sums both credits, making them spendable; 100 Pills per award is the configurable default.",
+    "evidence": [
+     "backend/rewards/views.py:139",
+     "backend/rewards/services.py:297",
+     "backend/rewards/services.py:333",
+     "backend/rewards/models.py:119",
+     "backend/rewards/services.py:188",
+     "backend/rewards/services.py:56",
+     "backend/rewards/services.py:356",
+     "backend/rewards/test_rewards.py:31"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W07",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "claim_referral_code checks for an existing event with .filter(...).first() and then calls create(). There is no transaction, no select_for_update and no unique constraint on PillReferralEvent: Meta has only indexes and the migrations add none. Two simultaneous first claims can each create their own event. The ledger idempotency key is referral:{event.id}:award, so each event earns its own 100 Pills. The idempotency check in _create_ledger_entry works per event, so it does not stop this.",
+    "evidence": [
+     "backend/rewards/views.py:139",
+     "backend/rewards/services.py:297",
+     "backend/rewards/services.py:333",
+     "backend/rewards/services.py:188",
+     "backend/rewards/services.py:139",
+     "backend/rewards/models.py:119",
+     "backend/rewards/migrations/0001_initial.py:106"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C044-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Roster",
+  "title": "A cancelled shift replacement can delete the original shift after an unrelated posting.",
+  "finder": "codexB-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V05",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P1",
+    "reason": "Conversion stores the original shift ID, but cancelling the wizard neither clears it nor prevents a later new-post completion from deleting that shift. The deletion succeeds for editable shifts, including individually unpublished shifts. The scope is narrower because published shifts that remain locked are protected by the UI and deletion endpoint; unintended deletion of an editable assigned shift remains P1.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:553",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:852",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:866",
+     "backend/workforce/roster/views.py:137",
+     "backend/workforce/roster/views.py:32"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W07",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Converting a shift to an open shift sets pendingDeletionShiftId. Closing the overlay (handleClosePostShiftModal) does not clear it, and nothing else does except a successful post. handleCreateOpenShift opens the same PostShiftPage overlay with the old value still set. When that unrelated post completes, handlePostShiftCompleted deletes the original shift. Only a published-roster lock on the backend would stop the delete, and that does not cover unpublished weeks.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:553",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:852",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:866"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C045-N1": {
+  "status": "DUPLICATE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Roster",
+  "title": "Cancelling a convert-to-open-shift edit leaves the old shift marked for deletion, so a later, unrelated open-shift post deletes it.",
+  "finder": "claudeB-1",
+  "duplicate_of": "C044-N1",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V05",
+    "verdict": "DUPLICATE_OF",
+    "severity": "P1",
+    "reason": "This is the same pendingDeletionShiftId lifecycle defect as C044-N1. Closing the conversion wizard preserves the original ID, and completing an unrelated post later attempts its deletion, subject to the same published-roster guards.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585",
+     "backend/workforce/roster/views.py:137"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F03-N4": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Roster / Attendance",
+  "title": "Removing a staff member leaves all their future rostered shifts in place, so the roster looks covered and they can still clock in as rostered.",
+  "finder": "claudeA-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V05",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P1",
+    "reason": "Membership removal leaves user-linked assignments intact; the manager grid counts them as occupied and worker roster endpoints retain them. Assignment-first eligibility still permits non-provisional attendance through the kiosk's signed QR flow, and timesheets include those sessions. Local kiosk PIN lookup requires active membership, so a removed worker without another eligible membership cannot use that route; the remaining roster and QR impact is P1. The owner must choose how staff removal affects existing assignments while preserving legitimate membership-free locum bookings.",
+    "evidence": [
+     "backend/memberships/views.py:112",
+     "backend/shifts/models.py:463",
+     "backend/workforce/roster/periods.py:71",
+     "backend/workforce/roster/periods.py:135",
+     "backend/workforce/roster/views.py:552",
+     "backend/workforce/roster/publication.py:141",
+     "backend/attendance/credentials.py:637",
+     "backend/attendance/worker_api.py:68",
+     "backend/attendance/eligibility.py:241",
+     "backend/workforce/timesheet_data.py:206"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C031-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shared-core",
+  "title": "Collection helpers silently discard records after the first page",
+  "finder": "codexB-4",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V06",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P1",
+    "reason": "Roster, membership, pharmacy and history helpers fetch one page and discard its pagination metadata; the default page size is 50. The worker roster can contain pharmacy-wide assignments before mobile filters for the current worker, so that worker's booking can disappear. The Hub-comments claim is false because its backend list explicitly returns every comment without pagination; the organization-specific pharmacy helper also follows subsequent pages.",
+    "evidence": [
+     "backend/core/settings.py:360",
+     "backend/workforce/roster/views.py:552",
+     "shared-core/src/domains/roster/api.ts:90",
+     "frontend_mobile/app/my-roster.tsx:132",
+     "shared-core/src/domains/memberships/api.ts:90",
+     "shared-core/src/domains/organizations/api.ts:25",
+     "shared-core/src/domains/shifts/api.ts:302",
+     "backend/pharmacy_hub/posts.py:413",
+     "shared-core/src/domains/organizations/api.ts:35"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W08",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Every list endpoint is paginated by default at 50 rows (PageNumberPagination). asList() returns only data.results and never follows next, and the roster/shift/hub helpers call the endpoint once. The worker roster endpoint returns the whole pharmacy's assignments for the week, and the mobile screen filters them down to the current user on the client. So once a pharmacy has more than 50 assignments in a week, a worker's own row can sit on page 2 and never appear. Neither RosterOwnerViewSet nor RosterWorkerViewSet overrides pagination_class.",
+    "evidence": [
+     "backend/core/settings.py:360",
+     "backend/core/settings.py:361",
+     "shared-core/src/utils/serialization.ts:54",
+     "shared-core/src/domains/roster/api.ts:94",
+     "backend/workforce/roster/views.py:533",
+     "backend/workforce/roster/views.py:552",
+     "frontend_mobile/app/my-roster.tsx:132",
+     "shared-core/src/domains/shifts/api.ts:302",
+     "shared-core/src/domains/pharmacyHub/api.ts:245",
+     "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:139"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F05-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shift confirmation / Role gate",
+  "title": "Nothing checks that the person confirming an offer holds the role the shift needs, so a technician or intern can be booked into a pharmacist shift.",
+  "finder": "claudeB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V06",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "An authorized manager can offer a pharmacist shift to an arbitrary candidate without checking their role. An external, verified technician with compatible payment setup can pass the AHPRA and engagement checks, accept the required terms, and receive an assignment at the pharmacist shift's rate. The membership-role guard applies to direct pharmacy employees, while external pharmacist engagements bypass the other-staff classification check.",
+    "evidence": [
+     "backend/shifts/base.py:233",
+     "backend/shifts/assignment.py:95",
+     "backend/onboarding/verification/state.py:153",
+     "backend/shifts/interest.py:61",
+     "backend/shifts/offers.py:354",
+     "backend/shifts/engagement.py:528",
+     "backend/shifts/engagement.py:580",
+     "backend/shifts/engagement.py:444",
+     "backend/shifts/finalize.py:79",
+     "backend/shifts/models.py:523"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C021-N5": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Shift lifecycle filters compare pharmacy clock times with UTC.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V06",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "With USE_TZ enabled, timezone.now() supplies UTC, but these filters compare its time directly against local slot end times. At 20:00 Sydney time, a same-day 17:00 slot therefore still qualifies as upcoming in both manager and worker confirmed lists, and an unassigned occurrence can remain active. The listing tests use different calendar days and do not cover this same-day clock mismatch.",
+    "evidence": [
+     "backend/core/settings.py:449",
+     "backend/shifts/lifecycle.py:148",
+     "backend/shifts/selectors.py:20",
+     "backend/shifts/my_shifts.py:20",
+     "backend/shifts/lifecycle.py:81",
+     "backend/shifts/serialization/shifts.py:403",
+     "backend/shifts/test_shift_listing_contract.py:20",
+     "backend/shifts/urls.py:40"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W08",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "With USE_TZ=True, timezone.now() is an aware UTC datetime, so now.time() is the UTC clock. date.today() is the Sydney date, because Django sets the process TZ to TIME_ZONE on Unix. Slot end_time is the pharmacy's local wall time. At 20:00 AEDT the UTC clock reads 09:00, so a slot ending at 17:00 today still counts as upcoming. It is also wrong the other way: before about 11:00 Sydney time, today's slots that have not ended yet are treated as finished. The same pattern appears in the active, confirmed and my-confirmed lists, the open-slot serializer and the public boards, and nothing uses the pharmacy's local time except the share view.",
+    "evidence": [
+     "backend/core/settings.py:445",
+     "backend/core/settings.py:449",
+     "backend/shifts/selectors.py:20",
+     "backend/shifts/lifecycle.py:148",
+     "backend/shifts/my_shifts.py:20",
+     "backend/shifts/serialization/shifts.py:373",
+     "backend/shifts/serialization/shifts.py:403",
+     "backend/shifts/browse.py:445",
+     "backend/shifts/browse.py:682"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C021-N6": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Named public shifts disclose internal pharmacy document links.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": false,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V06",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "An unrelated authenticated worker with the matching role can retrieve a PLATFORM shift through the ordinary shift-detail route. That response nests PharmacySerializer, which returns document URLs, and only anonymous postings receive pharmacy redaction. Shared-link and anonymous job-board responses strip these fields, but that protection is not used by the authenticated detail endpoint.",
+    "evidence": [
+     "backend/shifts/lifecycle.py:393",
+     "backend/shifts/serialization/shifts.py:54",
+     "backend/shifts/serialization/shifts.py:193",
+     "backend/organizations/serializers.py:76",
+     "backend/organizations/serializers.py:139",
+     "backend/organizations/serializers.py:289",
+     "backend/shifts/serialization/projections.py:134",
+     "backend/shifts/urls.py:43"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W09",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "ShiftDetailViewSet lets any signed-in worker read PLATFORM shifts for roles they can do (lifecycle.py:393). Its ShiftSerializer nests the full PharmacySerializer, which returns the URLs of methadone_s8_protocols, qld_sump_docs, sops and induction_guides. to_representation only strips pharmacy_detail when post_anonymously is true, so a named shift sends these links to anyone browsing. Only SharedShiftSerializer, used by the public board, removes these fields (projections.py:110), so the signed-in path has no equivalent guard.",
+    "evidence": [
+     "backend/shifts/lifecycle.py:393",
+     "backend/shifts/serialization/shifts.py:54",
+     "backend/shifts/serialization/shifts.py:193",
+     "backend/organizations/serializers.py:76",
+     "backend/organizations/serializers.py:139",
+     "backend/shifts/serialization/projections.py:110",
+     "backend/shifts/base.py:124"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C022-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Region admins cannot see other managers' shifts or cover requests at their assigned pharmacies.",
+  "finder": "codexB-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V06",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The individual pharmacy-management check recognizes assigned region admins, but managed_pharmacies omits their organization memberships. Active, confirmed and history lists consequently omit other managers' shifts at those pharmacies. Cover-request listing and approval independently omit region authority too; an existing characterization test explicitly records the managed-list discrepancy.",
+    "evidence": [
+     "backend/organizations/access.py:165",
+     "backend/organizations/access.py:194",
+     "backend/organizations/access.py:205",
+     "backend/shifts/selectors.py:13",
+     "backend/shifts/lifecycle.py:97",
+     "backend/shifts/lifecycle.py:153",
+     "backend/shifts/lifecycle.py:176",
+     "backend/shifts/worker_requests.py:49",
+     "backend/shifts/worker_requests.py:384",
+     "backend/shifts/test_access_escalation_contract.py:75"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W09",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "user_can_manage_pharmacy accepts any REGION_ADMIN assigned to the pharmacy. managed_pharmacies only counts the owner, org-wide admin roles and active PharmacyAdmin rows, so the active, confirmed and history lists (via shifts_managed_by) leave out shifts Grace did not create. Cover requests are the same: the list (worker_requests.py:49-61) and approve/reject (worker_requests.py:384-386) ignore region membership. Nothing creates PharmacyAdmin rows for region admins. The gap is already pinned as 'CURRENT BEHAVIOUR ... a separate, deliberate decision' in test_access_escalation_contract.py:75-77. It blocks work but exposes nothing, so P2.",
+    "evidence": [
+     "backend/organizations/access.py:165",
+     "backend/organizations/access.py:194",
+     "backend/organizations/access.py:205",
+     "backend/shifts/selectors.py:13",
+     "backend/shifts/lifecycle.py:97",
+     "backend/shifts/lifecycle.py:153",
+     "backend/shifts/lifecycle.py:176",
+     "backend/shifts/worker_requests.py:49",
+     "backend/shifts/worker_requests.py:57",
+     "backend/shifts/worker_requests.py:384",
+     "backend/shifts/test_access_escalation_contract.py:77"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C079-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Editing a shift replaces its saved per-date rates",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V06",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The edit loader initializes saved per-date rates with dirty=false, while pricing recalculation runs during editing and preserves only dirty overrides. A successful guide calculation therefore replaces the saved rate, and submitting a description change includes that replacement in the slots payload. For an unassigned marketplace shift, the backend accepts and persists those replacement slots; existing payload tests do not exercise edit hydration and recalculation.",
+    "evidence": [
+     "frontend_web/shared/postShift/PostShiftForm.tsx:239",
+     "frontend_web/shared/postShift/useShiftPricing.ts:55",
+     "frontend_web/shared/postShift/useShiftPricing.ts:106",
+     "shared-core/src/domains/shifts/postingDraft.ts:46",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+     "shared-core/src/domains/shifts/api.ts:211",
+     "backend/shifts/posting.py:157",
+     "backend/shifts/posting.py:188",
+     "shared-core/src/domains/shifts/postingDraft.test.ts:19"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W09",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "On edit, PostShiftForm loads the saved per-date rates with dirty:false (PostShiftForm.tsx:239). When expandedSlots first fills, reconcileShiftDraftRateRows runs against an empty previous list and returns blank rows (useShiftPricing.ts:49, draftSlots.ts:36-39). calculateShiftRates then fills every non-dirty row with the calculated guide (useShiftPricing.ts:105-110). Saving only the description therefore resubmits $60 in the slots payload, and revise_shift writes it to the new slots.",
+    "evidence": [
+     "frontend_web/shared/postShift/useShiftPricing.ts:49",
+     "frontend_web/shared/postShift/useShiftPricing.ts:106",
+     "shared-core/src/domains/shifts/draftSlots.ts:38",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:239",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+     "shared-core/src/domains/shifts/postingDraft.ts:46",
+     "backend/shifts/posting.py:189"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F01-N3": {
+  "status": "DUPLICATE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts/Billing",
+  "title": "A worker or manager can silently delete a shift offer, including one that is accepted and waiting for payment, so payment can be taken with nobody booked.",
+  "finder": "claudeA-1",
+  "duplicate_of": "B67",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V07",
+    "verdict": "DUPLICATE_OF",
+    "severity": "P1",
+    "reason": "This is the generic offer DELETE bypass already recorded as B67. Workers can delete their own offers and managers can delete offers in their managed pharmacies, without a status guard. If deletion precedes the payment webhook, the payment is recorded, finalization finds no matching offer, and the notification helper returns without notifying anyone.",
+    "evidence": [
+     "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md:68",
+     "backend/shifts/offers.py:156",
+     "backend/shifts/offers.py:169",
+     "backend/billing/views.py:329",
+     "backend/billing/views.py:848",
+     "backend/shifts/emails.py:279"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F01-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts/Privacy",
+  "title": "Workers browsing shifts can see the names and emails of other workers who are booked on the shift or waiting for payment.",
+  "finder": "claudeA-1",
+  "duplicate_of": "",
+  "ui_visible": false,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V07",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Authenticated workers can retrieve matching public shifts through the shared ShiftSerializer, which includes all assigned workers' names, emails and IDs plus awaiting-payment candidates' identities. Its anonymity handling redacts pharmacy details, and its history guard does not protect worker browsing. The same serializer is embedded in each worker's own offers; the public serializer's removal of these fields does not apply to those authenticated paths.",
+    "evidence": [
+     "backend/shifts/base.py:113",
+     "backend/shifts/browse.py:428",
+     "backend/shifts/lifecycle.py:393",
+     "backend/shifts/serialization/shifts.py:190",
+     "backend/shifts/serialization/shifts.py:434",
+     "backend/shifts/serialization/shifts.py:464",
+     "backend/shifts/serialization/offers.py:215",
+     "backend/shifts/serialization/projections.py:87"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F07-N6": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Superannuation",
+  "title": "A separate super request cannot be corrected when its service invoice changes.",
+  "finder": "codexB-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V07",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Saving a service-invoice revision updates its calculation without updating its existing super request. Editing a super request is explicitly rejected, and creating another returns the existing request unchanged. The finance routes provide no correction or void action, while both clients disable creation once a linked request exists.",
+    "evidence": [
+     "backend/worker_finance/services.py:606",
+     "backend/worker_finance/services.py:691",
+     "backend/worker_finance/services.py:894",
+     "backend/worker_finance/services.py:902",
+     "backend/worker_finance/views.py:203",
+     "backend/worker_finance/views.py:226",
+     "frontend_web/src/pages/finance/FinanceWorkspace.tsx:356",
+     "frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx:159"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W10",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "make_super_document copies the parent's super amount once and returns the same live companion on every later call. save_draft rejects edits to anything other than kind='invoice', and saving the parent never touches the companion. The invoice viewset has no void or delete action, and both web and mobile hide 'Create super request' once super_document_id is set. Parent is a OneToOne, so a second request could not be stored anyway. The $120 request therefore stays wrong next to a $180 invoice. The owner must choose a fix: sync the companion automatically, or allow void and replace.",
+    "evidence": [
+     "backend/worker_finance/services.py:606",
+     "backend/worker_finance/services.py:894",
+     "backend/worker_finance/services.py:902",
+     "backend/worker_finance/services.py:689",
+     "backend/worker_finance/views.py:149",
+     "backend/worker_finance/tests/contracts/invoicing/models.py:38",
+     "frontend_web/src/pages/finance/FinanceWorkspace.tsx:356",
+     "frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx:159"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C023-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Talent",
+  "title": "Deleting an account leaves the person's talent post live on the public and logged-in boards.",
+  "finder": "claudeB-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V07",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Account deletion anonymizes and deactivates the user but neither deletes nor hides their talent posts. Both feeds select posts without checking whether their author is active or deleted, and visibility checks only moderation and availability expiry. Full-time applications therefore remain visible indefinitely with their saved content and location.",
+    "evidence": [
+     "backend/users/api_account.py:76",
+     "backend/users/account_deletion.py:92",
+     "backend/talent/views/explorer.py:54",
+     "backend/talent/views/explorer.py:172",
+     "backend/talent/views/explorer.py:194",
+     "backend/talent/models.py:119"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F10-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Talent",
+  "title": "Any signed-in account can identify authors of anonymous talent posts.",
+  "finder": "codexB-1",
+  "duplicate_of": "",
+  "ui_visible": false,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V07",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The authenticated feed requires only a signed-in account and uses a serializer that returns author IDs and names without checking is_anonymous or a hiring relationship. Only the public-feed serializer removes those identity fields, leaving the same post ID available to correlate the responses. Under-18 names are shortened, but adult names and account identifiers remain exposed; the owner must decide whether anonymity should extend to unrelated signed-in viewers.",
+    "evidence": [
+     "backend/talent/views/explorer.py:97",
+     "backend/talent/views/explorer.py:184",
+     "backend/talent/serializers/explorer.py:17",
+     "backend/talent/serializers/explorer.py:73",
+     "backend/talent/serializers/explorer.py:81",
+     "backend/talent/serializers/explorer.py:190",
+     "shared-core/src/domains/talent/api.ts:43"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W10",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Only PublicExplorerPostReadSerializer hides explorer_name, author_user_id, explorer_user_id and explorer_profile for anonymous posts. The signed-in /feed and /by-profile endpoints use ExplorerPostReadSerializer, which returns the full name and user ids no matter what is_anonymous says. Those endpoints need only IsAuthenticated: no verification and no hiring link. Pharmacist and other-staff posts are always sent with is_anonymous=true, and the web UI never shows the name, so the leak is API-only. The post id and reference_code are the same on the public and signed-in feeds, which ties the two together.",
+    "evidence": [
+     "backend/talent/views/explorer.py:97",
+     "backend/talent/views/explorer.py:184",
+     "backend/talent/serializers/explorer.py:79",
+     "backend/talent/serializers/explorer.py:83",
+     "backend/talent/serializers/explorer.py:190",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:722"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C026-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Timesheets",
+  "title": "Extending an active employment agreement bypasses its junior rate expiry.",
+  "finder": "codexB-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V07",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The birthday limit is enforced by the payload builder, but the started-agreement PATCH branch bypasses that builder and accepts a later or null end date. Model validation checks date ordering and overlap without checking the birthday review date. Before the agreement has ended, an authorized manager can therefore extend it, and later timesheets select its unchanged junior-rate snapshot.",
+    "evidence": [
+     "backend/workforce/employment_engagement_service.py:109",
+     "backend/workforce/views.py:362",
+     "backend/workforce/views.py:377",
+     "backend/workforce/views.py:405",
+     "backend/workforce/models.py:165",
+     "backend/workforce/timesheet_data.py:86",
+     "backend/workforce/timesheet_data.py:110",
+     "frontend_web/src/features/workforce/EmploymentEngagementsPanel.tsx:340"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W10",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "For terms that have already started, the PATCH view only checks that the new effective_to is not in the past and that the old end date is not closed. It then saves without calling build_employment_engagement_payload, which is the only place the next-birthday junior-rate check runs. Model clean() checks only date order and overlap. Tom can therefore set a later end date, or clear it to null. _attach_employment_engagements then matches Mia's later work dates to the frozen junior rates.",
+    "evidence": [
+     "backend/workforce/views.py:362",
+     "backend/workforce/views.py:391",
+     "backend/workforce/views.py:416",
+     "backend/workforce/employment_engagement_service.py:110",
+     "backend/workforce/models.py:165",
+     "backend/workforce/timesheet_data.py:115"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C029-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Timesheets",
+  "title": "Extending an active junior agreement bypasses its birthday rate limit.",
+  "finder": "codexB-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V08",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "For an active agreement, PATCH accepts a null end date without calling the payload builder that enforces the birthday limit. Model validation checks dates, rates and overlapping agreements, but not the birthday boundary. With no overlapping successor, the web form can submit this change, and later payroll assignments select the extended agreement and copy its unchanged rates.",
+    "evidence": [
+     "backend/workforce/views.py:362",
+     "backend/workforce/views.py:377",
+     "backend/workforce/views.py:391",
+     "backend/workforce/views.py:416",
+     "backend/workforce/employment_engagement_service.py:109",
+     "backend/workforce/models.py:145",
+     "backend/shifts/engagement.py:84",
+     "backend/shifts/engagement.py:114",
+     "frontend_web/src/features/workforce/EmploymentEngagementsPanel.tsx:345",
+     "backend/workforce/tests/test_employment.py:314"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W11",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Once an engagement has started, PATCH takes the started branch. That branch only checks that effective_to is not in the past. It then sets row.effective_to, which can be null or any future date, and saves. It never calls build_employment_engagement_payload, which is the only place the junior next-birthday check (next_rate_review_date) runs. The model's clean() checks only date order, rates and overlap, and nothing else reads next_rate_review_date. So removing or extending the end date succeeds, the junior rates stay, and staff_assignment_defaults will pick this engagement for work after the birthday. The only test calls the payload builder directly and never exercises PATCH.",
+    "evidence": [
+     "backend/workforce/views.py:362",
+     "backend/workforce/views.py:377",
+     "backend/workforce/views.py:387",
+     "backend/workforce/views.py:391",
+     "backend/workforce/views.py:416",
+     "backend/workforce/employment_engagement_service.py:109",
+     "backend/workforce/models.py:145",
+     "backend/shifts/engagement.py:84",
+     "backend/workforce/tests/test_employment.py:314"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C029-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Timesheets",
+  "title": "Saving employment terms leaves existing timesheets using stale pay agreements.",
+  "finder": "codexB-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V08",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Creating successor terms closes the previous agreement and saves the new one without invalidating existing timesheets; the workforce signals have no EmploymentEngagement receiver. The detail endpoint rebuilds only when needs_rebuild is already true, and locking checks that flag and approval status without comparing current employment terms. Consequently, an otherwise clean approved timesheet can be locked with its old employment snapshot; explicitly rebuilding would detect the change and reopen approval.",
+    "evidence": [
+     "backend/workforce/views.py:325",
+     "backend/workforce/views.py:339",
+     "backend/workforce/signals.py:14",
+     "backend/workforce/views.py:784",
+     "backend/workforce/timesheet_builder.py:148",
+     "backend/workforce/timesheet_builder.py:252",
+     "backend/workforce/timesheet_transitions.py:132",
+     "backend/workforce/timesheet_transitions.py:168",
+     "backend/workforce/tests/test_timesheet_state_machine.py:168"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W11",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "Creating a successor engagement (or PATCHing one) fires no signal that sets Timesheet.needs_rebuild. signals.py does this for attendance, assignments, leave, MembershipWorkSettings and RosterPeriod, but not for EmploymentEngagement. lock_period only blocks on needs_rebuild=True or on timesheets that are not APPROVED. It then writes the latest revision's stale employment_engagement_public_ids into the manifest and the payroll export. The impact is narrower than claimed: a successor cannot start before today (views.py:311), so only work from today onward in an already-approved open period is affected, usually just today's shift.",
+    "evidence": [
+     "backend/workforce/views.py:311",
+     "backend/workforce/views.py:339",
+     "backend/workforce/views.py:417",
+     "backend/workforce/signals.py:186",
+     "backend/workforce/timesheet_builder.py:66",
+     "backend/workforce/timesheet_builder.py:191",
+     "backend/workforce/timesheet_transitions.py:137",
+     "backend/workforce/timesheet_transitions.py:168"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C018-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Tooling",
+  "title": "The editorial seed command has no production guard and changes admin access, live articles and comments under real users' names.",
+  "finder": "claudeB-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V08",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The command has no production-settings check and falls back to the first database user for missing author accounts, creating an active content-administrator record if none exists. It overwrites matching articles and version-one revisions, publishes hardcoded news, and creates sample comments and reactions attributed to existing users. Public article queries expose these published records, while the production guard belongs only to the separate seed_hub_preview command.",
+    "evidence": [
+     "backend/public_hub/management/commands/seed_editorial_content.py:16",
+     "backend/public_hub/management/commands/seed_editorial_content.py:52",
+     "backend/public_hub/management/commands/seed_editorial_content.py:65",
+     "backend/public_hub/management/commands/seed_editorial_content.py:78",
+     "backend/public_hub/management/commands/seed_editorial_content.py:432",
+     "backend/public_hub/management/commands/seed_editorial_content.py:464",
+     "backend/public_hub/management/commands/seed_editorial_content.py:499",
+     "backend/public_hub/management/commands/seed_editorial_content.py:526",
+     "backend/public_hub/permissions.py:19",
+     "backend/public_hub/views.py:33",
+     "backend/public_hub/management/commands/seed_hub_preview.py:14"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C036-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Web",
+  "title": "Worker leave request submission always fails due to reading nonexistent membership id from session user",
+  "finder": "agy-g3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V08",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The authenticated session payload omits the pharmacy membership identifier, and AuthContext passes that payload through without adding it. MyLeavePage converts the missing id to the string 'undefined', then to NaN; JSON serialization sends null. The leave service requires an existing membership belonging to the worker and returns a permission error, blocking submission through this page.",
+    "evidence": [
+     "backend/users/sessions.py:90",
+     "backend/users/sessions.py:144",
+     "backend/users/api_auth.py:179",
+     "frontend_web/src/contexts/AuthContext.tsx:181",
+     "frontend_web/src/features/workforce/MyLeavePage.tsx:11",
+     "frontend_web/src/features/workforce/MyLeavePage.tsx:12",
+     "shared-core/src/transport/operational.ts:14",
+     "backend/workforce/views.py:610",
+     "backend/workforce/leave_service.py:237",
+     "frontend_web/src/main.tsx:228"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F02-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Workforce/Shifts",
+  "title": "Cover requests from the web and mobile worker screens are never linked to the worker's assignment, so approving one never releases the worker.",
+  "finder": "claudeA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexA-1",
+    "batch": "V08",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Both worker screens omit the assignment link, and the serializer accepts and saves the request without inferring one. Web approval therefore creates a separate LOCUM_CASUAL shift and queues an approval notification while preserving the original assignment. Mobile replacement approval rejects the missing link, whereas release records approval and reports success without releasing an assignment or publishing a vacancy; these mobile handlers queue no worker notifications. Existing regression tests explicitly supply the assignment link, so they do not cover the broken screen payloads.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:532",
+     "frontend_mobile/app/my-roster.tsx:208",
+     "backend/shifts/models.py:845",
+     "backend/shifts/serialization/worker_requests.py:83",
+     "backend/shifts/worker_requests.py:239",
+     "backend/shifts/worker_requests.py:254",
+     "backend/shifts/worker_requests.py:294",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:602",
+     "frontend_mobile/features/parity/roster.tsx:642",
+     "backend/workforce/roster/worker_actions.py:275",
+     "backend/workforce/roster/worker_actions.py:353",
+     "backend/workforce/roster/v2_views.py:747",
+     "backend/attendance_tests/test_roster_worker_actions_deterministic.py:314"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F06-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Attendance and timesheets",
+  "title": "Rejecting provisional attendance permanently blocks the whole timesheet period.",
+  "finder": "codexA-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V09",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Rejection changes the review status but leaves the attendance session provisional, so rebuilding still creates an unresolved provisional blocker. Rejected reviews disappear from pending reviews and cannot subsequently be approved, while this blocker cannot be resolved or waived from the timesheet. The worker's timesheet therefore prevents the whole period from being locked.",
+    "evidence": [
+     "backend/attendance/approvals.py:53",
+     "backend/attendance/approvals.py:157",
+     "backend/attendance/approvals.py:274",
+     "backend/workforce/timesheet_data.py:241",
+     "backend/workforce/timesheet_transitions.py:67",
+     "backend/workforce/timesheet_transitions.py:103",
+     "backend/workforce/timesheet_transitions.py:139",
+     "backend/attendance/test_approval_locking.py:74"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Rejecting provisional attendance only sets the review status to REJECTED. It never clears session.is_provisional, and only approval does that (approvals.py:212). The timesheet builder adds an UNRESOLVED_PROVISIONAL_ATTENDANCE blocker for any session with is_provisional=True, whatever the review status. decide_check refuses to waive or resolve that code, approve_timesheet refuses while a blocker is open, and lock_period needs every timesheet approved, so the whole period can never be locked.",
+    "evidence": [
+     "backend/attendance/approvals.py:274",
+     "backend/attendance/approvals.py:212",
+     "backend/attendance/approvals.py:157",
+     "backend/workforce/timesheet_data.py:241",
+     "backend/workforce/timesheet_transitions.py:103",
+     "backend/workforce/timesheet_transitions.py:67",
+     "backend/workforce/timesheet_transitions.py:139"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C024-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Auth",
+  "title": "Password-reset links are copied into the user's in-app notifications, so anyone holding a signed-in session can take over the account without email access.",
+  "finder": "claudeB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V09",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The public reset endpoint sends the live reset URL through the email helper without suppressing automatic notifications. That helper copies reset_url into a durable notification's action_url, which the user's signed-in session can read and open. Password reset confirmation requires the token and new password, with no current-password or separate mailbox check.",
+    "evidence": [
+     "backend/users/api_passwords.py:60",
+     "backend/users/api_passwords.py:70",
+     "backend/users/tasks.py:65",
+     "backend/users/tasks.py:80",
+     "backend/users/tasks.py:189",
+     "backend/notifications/services.py:80",
+     "backend/notifications/views.py:31",
+     "backend/users/api_passwords.py:43",
+     "frontend_web/src/layouts/TopBarActions.tsx:740"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F11-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Auth",
+  "title": "Changing a pending phone number leaves the previous number's verification code usable.",
+  "finder": "codexA-4",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V09",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Onboarding permits changing an unverified mobile number without clearing its outstanding code or timestamp. Verification checks the stored code and expiry, then marks the current number verified without checking which number received that code. The onboarding permission requires email verification only, so it does not prevent this sequence.",
+    "evidence": [
+     "backend/onboarding/views.py:293",
+     "backend/users/permissions.py:71",
+     "backend/onboarding/serializers.py:825",
+     "backend/onboarding/serializers.py:969",
+     "backend/onboarding/services/basic.py:159",
+     "backend/core/serializer_lifecycle.py:129",
+     "backend/users/otp.py:20",
+     "backend/users/api_otp.py:463",
+     "backend/users/api_otp.py:470"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W01",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The onboarding update changes user.mobile_number when the current number is unverified, but it leaves mobile_otp_code and mobile_otp_created_at in place. VerifyMobileOTPView only compares the code with the stored hash and never checks which number the code was sent to. Nothing in the model stops two accounts having the same number. Zoe still has to own a phone that receives the code, so this lets her bind someone else's number rather than skip verification entirely. That is a trust and integrity gap, not account takeover.",
+    "evidence": [
+     "backend/core/serializer_lifecycle.py:129",
+     "backend/onboarding/services/basic.py:159",
+     "backend/onboarding/serializers.py:825",
+     "backend/users/api_otp.py:367",
+     "backend/users/api_otp.py:463",
+     "backend/users/models.py:83"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F11-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Auth",
+  "title": "Phone verification replaces a browser-only session with a persistent 90-day session.",
+  "finder": "codexA-4",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V09",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Login explicitly preserves remember_me=false as session cookies. Mobile verification creates a fresh refresh token and sets replacement cookies without passing that preference; the cookie helper defaults to persistent cookies with the configured 90-day refresh lifetime. Browser startup restores authentication from cookies, so the frontend's storage preference does not prevent access after reopening.",
+    "evidence": [
+     "frontend_web/src/pages/login.tsx:60",
+     "backend/users/api_auth.py:109",
+     "backend/users/serializers.py:365",
+     "frontend_web/src/pages/MobileOTPVerify.tsx:79",
+     "backend/users/api_otp.py:477",
+     "backend/users/api_otp.py:489",
+     "backend/users/sessions.py:43",
+     "backend/core/settings.py:495",
+     "frontend_web/src/contexts/AuthContext.tsx:217",
+     "backend/users/tests.py:76"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W01",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "Login with remember_me=false marks the refresh token remember_me=False and sets session-only cookies. VerifyMobileOTPView then issues a fresh RefreshToken.for_user without that claim and calls _set_auth_cookies with no remember_me. That defaults to persistent=True, so the refresh cookie gets the 90-day REFRESH_TOKEN_LIFETIME max_age. Later refreshes carry remember_me=None, so the session stays persistent. It is real, but it happens only once per account (first mobile verification) and only matters on a shared device.",
+    "evidence": [
+     "frontend_web/src/pages/login.tsx:60",
+     "backend/users/serializers.py:365",
+     "backend/users/api_otp.py:477",
+     "backend/users/api_otp.py:489",
+     "backend/users/sessions.py:43",
+     "backend/users/sessions.py:53",
+     "backend/core/settings.py:495"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C004-N2": {
+  "status": "DUPLICATE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Billing",
+  "title": "A shift checkout without selected offers charges one fee but confirms every worker waiting for payment.",
+  "finder": "claudeB-1",
+  "duplicate_of": "B04",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V09",
+    "verdict": "DUPLICATE_OF",
+    "severity": "P1",
+    "reason": "The empty-selection undercharge shares B04's documented root cause: checkout charges quantity one without binding payment to selected unpaid offers, and the webhook finalizes all awaiting offers when selection is absent. The same-slot example also overlaps B54: the second assignment is skipped, but its offer still becomes ACCEPTED. These consequences belong with the existing billing findings.",
+    "evidence": [
+     "docs/qa/MAIN_RELEASE_AUDIT_EVIDENCE.md:60",
+     "docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md:32",
+     "backend/billing/views.py:583",
+     "backend/billing/views.py:665",
+     "backend/billing/views.py:329",
+     "backend/billing/views.py:346",
+     "backend/billing/views.py:864",
+     "backend/shifts/finalize.py:43",
+     "backend/shifts/finalize.py:98"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F08-N4": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Billing",
+  "title": "Staff can join beyond the purchased seat count without an additional charge.",
+  "finder": "codexA-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V09",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Invitation validation and acceptance enforce only the worker's maximum number of pharmacy memberships. Acceptance activates the membership without comparing the pharmacy's internal staff count with purchased seats or creating an additional charge. Purchased staff_count is maintained separately by billing, despite pricing explicitly charging for staff beyond five; this differs from B02's inability to adjust an existing seat subscription.",
+    "evidence": [
+     "frontend_web/src/pages/PricingPage.tsx:259",
+     "frontend_web/src/pages/PricingPage.tsx:263",
+     "backend/memberships/invites.py:117",
+     "backend/memberships/serializers.py:133",
+     "backend/memberships/views.py:437",
+     "backend/memberships/views.py:443",
+     "backend/billing/models.py:39",
+     "backend/billing/views.py:826",
+     "backend/memberships/test_membership_workflows_contract.py:493"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W01",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "OwnerSubscription.staff_count is only written by billing views and webhooks. Neither invite creation nor membership accept compares the number of active staff with it; the only cap is MAX_ACTIVE_PHARMACY_MEMBERSHIPS per worker. The pricing page promises 5 staff per pharmacy plus $5 for each extra, but nothing enforces that. This is lost revenue, not a safety or data issue, and the owner must decide between blocking, auto-charging or a soft warning.",
+    "evidence": [
+     "frontend_web/src/pages/PricingPage.tsx:259",
+     "backend/memberships/invites.py:117",
+     "backend/memberships/invites.py:150",
+     "backend/memberships/views.py:437",
+     "backend/memberships/views.py:443",
+     "backend/billing/views.py:826",
+     "backend/billing/models.py:39"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F08-N5": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Billing",
+  "title": "Deleting Tom's account leaves his recurring Stripe charges running.",
+  "finder": "codexA-3",
+  "duplicate_of": "",
+  "ui_visible": false,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V10",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Account deletion deactivates and anonymizes Tom, revokes credentials and returns success without checking or cancelling billing. Base and extra-seat checkout each create recurring Stripe subscriptions, and no deletion helper or user-save hook stops them. The mobile flow then signs Tom out.",
+    "evidence": [
+     "frontend_mobile/roles/owner/profile.tsx:393",
+     "backend/core/api_v1_urls.py:30",
+     "backend/users/api_account.py:76",
+     "backend/users/account_deletion.py:92",
+     "backend/billing/views.py:440",
+     "backend/billing/views.py:522"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W01",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "DeleteAccountView anonymises the user, revokes sessions and tokens, and deletes ID documents, with no billing step. Nothing in users/ mentions Stripe or subscriptions. The user is only soft-deleted (is_active=False), so the owner-scoped OwnerSubscription row and both Stripe subscription ids stay, and Stripe keeps charging. The deleted user can no longer reach the billing screen to cancel. This is a different root cause from B13 (shift handover).",
+    "evidence": [
+     "backend/users/api_account.py:76",
+     "backend/users/account_deletion.py:92",
+     "backend/billing/models.py:14",
+     "backend/billing/models.py:36",
+     "backend/billing/views.py:440",
+     "backend/billing/views.py:522"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C005-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Chat",
+  "title": "Any chat member can rewrite who is in a room through the plain room update, skipping the creator/admin check and the community-chat block.",
+  "finder": "claudeA-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V10",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The standard room PATCH uses the update mixin with authentication and room visibility checks, but no creator/admin authorization. Its serializer accepts any active membership and replaces participants while preserving the creator; the dedicated group action's restrictions are bypassed. Sara can then read historical messages through GET /api/v1/messages/, whose queryset checks participant membership without requiring membership in the conversation's pharmacy.",
+    "evidence": [
+     "backend/chat/urls.py:9",
+     "backend/chat/views.py:50",
+     "backend/chat/views.py:92",
+     "backend/chat/views.py:104",
+     "backend/chat/views.py:453",
+     "backend/chat/views.py:457",
+     "backend/chat/serializers.py:265",
+     "backend/chat/serializers.py:308",
+     "backend/chat/views.py:667"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C047-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Chat",
+  "title": "Reopening a cached conversation hides messages received while it was closed",
+  "finder": "codexA-4",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V10",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Switching rooms closes the previous room socket, so Sara's subsequent message does not enter Tom's cached conversation. Reopening a cached room skips the message fetch and immediately marks it read; socket connection also marks it read without replaying missed messages. The backend advances last_read_at to the current time, clearing unread status for messages Tom has not seen.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:297",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:305",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:350",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:515",
+     "backend/chat/consumers.py:63",
+     "backend/chat/signals.py:63",
+     "backend/chat/views.py:653"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W02",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The web chat opens one WebSocket per active room (/ws/chat/rooms/<id>/), so while Tom is in Omar's room he gets no message.created events for Sara's room. The badge goes to the user group, and the room onmessage handler never touches messagesMap for it. When Tom goes back to Sara's room, messagesMap[Sara] already exists, so the effect skips the refetch and calls markRoomAsReadService straight away. The ws.onopen handler also marks the room read and sets unread_count to 0. The new message stays missing until a full reload, but the conversation shows as read.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:297",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:347",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:351",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:378",
+     "backend/chat/signals.py:62",
+     "backend/chat/realtime.py:42"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C047-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Chat",
+  "title": "Deleted messages remain readable in conversation previews",
+  "finder": "codexA-4",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V10",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The deletion event sets only is_deleted in cached messages, retaining their body and leaving room previews and personal pin snapshots unchanged. Sidebar preview/search and the pinned banner render those retained bodies without checking deletion, while the bubble shows the deletion notice. This is P2 stale client content already delivered to the recipient: the backend clears the stored body and scrubs deleted-message serialization, so a fresh page load removes the old text.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:428",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:578",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:932",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx:122",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ConversationPanel.tsx:327",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ConversationHeader.tsx:73",
+     "backend/chat/views.py:771",
+     "backend/chat/serializers.py:74"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W02",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "On the server the delete is clean: body, original_body and attachment are cleared, and the serializer handles is_deleted. On the client, the message.deleted handler only sets is_deleted=true and keeps the old body in messagesMap. It does not update rooms[].last_message or pinned_message. The sidebar preview and search read getLatestMessage(room.id)?.body first, and the pinned bar reads activeRoom.pinned_message, so the old text stays visible until reload. Tom already received that text, so this is stale UI in his own session, not a new leak. Hence P2.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:440",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:927",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:578",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:932",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx:122",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ConversationPanel.tsx:305",
+     "backend/chat/views.py:771"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C016-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Hub",
+  "title": "Ordinary pharmacy workers can list private hub groups and obtain their full membership rosters without joining them.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V10",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The registered endpoint is /api/v1/hub/groups/, where pharmacy membership permits listing every pharmacy group and include_members=true exposes its active staff roster without group authorization. The group membership guard remains effective for group content, so this is P2 metadata and roster exposure rather than access to private posts. The owner should clarify discovery and roster privacy: existing context tests already expect nonmembers to receive group names.",
+    "evidence": [
+     "backend/pharmacy_hub/urls.py:46",
+     "backend/pharmacy_hub/groups.py:39",
+     "backend/pharmacy_hub/groups.py:101",
+     "backend/pharmacy_hub/groups.py:108",
+     "backend/pharmacy_hub/serialization/groups.py:206",
+     "backend/pharmacy_hub/serialization/groups.py:234",
+     "backend/pharmacy_hub/access.py:271",
+     "backend/pharmacy_hub/test_hub_scope_contract.py:59"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W03",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "Groups have no private or restricted flag (models.py:12-41). The hub context lists every group of the user's pharmacies to all staff by design (context.py:139-162), so seeing the group name and description is intended. The real gap is narrower. With include_members=true, list and retrieve return the full member roster (including members from sister pharmacies) to any staff member of that pharmacy. Group content itself needs group membership (access.py:271). Whether rosters should be limited to group members or admins is an owner decision.",
+    "evidence": [
+     "backend/pharmacy_hub/groups.py:37",
+     "backend/pharmacy_hub/groups.py:42",
+     "backend/pharmacy_hub/groups.py:52",
+     "backend/pharmacy_hub/groups.py:101",
+     "backend/pharmacy_hub/serialization/groups.py:236",
+     "backend/pharmacy_hub/context.py:150",
+     "backend/pharmacy_hub/access.py:271",
+     "shared-core/src/domains/pharmacyHub/api.ts:28"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C025-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Invoicing",
+  "title": "Migration replaces historical invoice billing details with a customer matched only by name.",
+  "finder": "codexA-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V10",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "For legacy invoices without a request key, the migration reuses the first customer matching only the invoice owner and bill-to name. It builds each migrated customer snapshot from that reused customer, overriding the second invoice's original email, address and ABN in the canonical payload. The finance screen/PDF uses that payload, and sending the migrated invoice takes its recipient directly from the incorrect customer snapshot.",
+    "evidence": [
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:60",
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:62",
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:118",
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:136",
+     "backend/worker_finance/urls.py:8",
+     "backend/worker_finance/views.py:277",
+     "backend/worker_finance/services.py:824",
+     "backend/worker_finance/templates/worker_finance/invoice.html:21"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W04",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "For each legacy invoice the migration looks for an existing Customer by owner and name only, and creates one only if none is found. It then builds payload['customer'] from that Customer's email, address and ABN, not from the invoice's own bill_to_email, custom_bill_to_address or bill_to_abn. So the second invoice with the same bill-to name gets the first invoice's details. Migration 0006 freezes that payload as revision 1, and send() reads payload['customer']['email'] as the recipient, so a resend goes to the other pharmacy's contact and the PDF shows the wrong address and ABN.",
+    "evidence": [
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:62",
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:118",
+     "backend/worker_finance/migrations/0006_remove_invoice_record.py:13",
+     "backend/worker_finance/views.py:277"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C025-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Invoicing",
+  "title": "Invoice corrections leave previously recorded payment GST allocations unchanged.",
+  "finder": "codexA-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V11",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Saving a correction replaces the invoice calculation without reconciling existing payment allocations. The remaining $55 payment allocates zero GST from the corrected calculation, while the cash worksheet still sums the first payment's stored $5 GST. Existing tests cover payments and invoice corrections separately, without covering their interaction.",
+    "evidence": [
+     "backend/worker_finance/services.py:597",
+     "backend/worker_finance/services.py:690",
+     "backend/worker_finance/services.py:968",
+     "backend/worker_finance/calculations.py:147",
+     "backend/worker_finance/views.py:634",
+     "backend/worker_finance/tests/test_api.py:147",
+     "backend/worker_finance/tests/test_api.py:223"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W04",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "save_draft lets a part-paid invoice be revised: it never checks for payments and just replaces the calculation. Existing Payment rows keep the gst they were given when recorded. record_payment allocates each new payment against the current calculation['gst'] with a cumulative pro-rata formula, so after a change to GST-free the second payment gets $0 GST while the first payment's $5 stays. The cash worksheet sums Payment.gst, so 1A reports $5 that the corrected invoice does not contain. The same happens in reverse when GST is added. It is lowered to P2 because the worksheet is labelled an estimate and a GST correction on a part-paid invoice is an edge case. The owner must decide whether to reject such edits or re-allocate past payments.",
+    "evidence": [
+     "backend/worker_finance/services.py:690",
+     "backend/worker_finance/services.py:965",
+     "backend/worker_finance/services.py:968",
+     "backend/worker_finance/calculations.py:147",
+     "backend/worker_finance/views.py:634"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C002-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Kiosk",
+  "title": "A repeated kiosk PIN submit flips the worker's clock state instead of being treated as a retry.",
+  "finder": "claudeA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V11",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Each POST chooses the opposite action from the worker's current session state, so a sequential retry reverses the first request. The transition functions' retry guards cannot help because the endpoint calls the opposite function. The web button disables during submission, but a lost response followed by resubmission still reaches this path; native desktop capture uses a separate flow.",
+    "evidence": [
+     "backend/attendance/urls.py:37",
+     "backend/attendance/kiosk_api.py:454",
+     "backend/attendance/kiosk_api.py:467",
+     "backend/attendance/transitions.py:63",
+     "backend/attendance/transitions.py:256",
+     "frontend_web/src/pages/attendance/KioskPage.tsx:679",
+     "backend/attendance_tests/test_attendance_api.py:217"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C010-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Marketplace",
+  "title": "Editing an ethical draft can reassign it to another owner's pharmacy and another product without destination authorization.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V11",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "PATCH authorizes the existing pharmacy and product, then saves writable replacement pharmacy and product fields without checking destination access. The save signal derives scope from the replacement pharmacy and enforces audience limits, but does not authorize the caller or reconcile existing lot allocations. The reassigned draft appears in the destination pharmacy's listings; publication remains separately guarded.",
+    "evidence": [
+     "backend/ethical_marketplace/views.py:319",
+     "backend/ethical_marketplace/views.py:324",
+     "backend/ethical_marketplace/serializers.py:60",
+     "backend/ethical_marketplace/serializers.py:68",
+     "backend/ethical_marketplace/signals.py:19",
+     "backend/ethical_marketplace/owner_views.py:37",
+     "backend/ethical_marketplace/views.py:333",
+     "backend/ethical_marketplace/test_finalisation.py:40"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W04",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "ListingDetail.patch checks PREPARE_LISTING against the listing's current pharmacy and product. It then passes request.data to EthicalListingSerializer, where pharmacy, product and mode are writable. Nothing checks the new pharmacy or product, and the lot allocations to the original pharmacy's lots are kept. The pre_save signal only re-derives the scope fields from the new pharmacy and blocks S8 at the platform circle. The draft then shows in the other pharmacy's MyListings, and that pharmacy's owner can publish it.",
+    "evidence": [
+     "backend/ethical_marketplace/views.py:319",
+     "backend/ethical_marketplace/views.py:322",
+     "backend/ethical_marketplace/views.py:324",
+     "backend/ethical_marketplace/serializers.py:60",
+     "backend/ethical_marketplace/serializers.py:61",
+     "backend/ethical_marketplace/signals.py:20",
+     "backend/ethical_marketplace/owner_views.py:37"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C011-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Memberships",
+  "title": "Revoked invitation sender continues receiving membership response notifications containing staff identities.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V11",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The recipient helper unconditionally includes the original inviter without checking current pharmacy or organisation authority. Worker acceptance, rejection and quitting call this helper, producing status notifications and emails containing the worker's name and email. Notification delivery checks account activity, which does not exclude an active account whose management access was revoked.",
+    "evidence": [
+     "backend/memberships/notifications.py:73",
+     "backend/memberships/notifications.py:145",
+     "backend/memberships/notifications.py:152",
+     "backend/memberships/notifications.py:175",
+     "backend/memberships/views.py:452",
+     "backend/memberships/views.py:499",
+     "backend/notifications/services.py:76",
+     "backend/memberships/test_membership_workflows_contract.py:493"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W05",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "_membership_controller_users always adds membership.invited_by, with no check that the inviter still has a membership or MANAGE_STAFF authority. _notify_membership_response then sends that person the in-app alert and an email that includes the worker's name and email. Only someone who once had authority to invite staff at that pharmacy is exposed, and only to the response of a worker they invited themselves. That is a stale-authority leak of one contact, so P2.",
+    "evidence": [
+     "backend/memberships/notifications.py:66",
+     "backend/memberships/notifications.py:73",
+     "backend/memberships/notifications.py:145",
+     "backend/memberships/notifications.py:152",
+     "backend/memberships/notifications.py:167",
+     "backend/memberships/notifications.py:176"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C012-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Memberships",
+  "title": "A pharmacy administrator can permanently delete pending and decided membership application review records through generic DELETE.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V11",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The registered ModelViewSet inherits DELETE without a destroy override or method restriction. Its queryset includes pending, approved and rejected applications within the manager's scope, and the model has no deletion protection or archive mechanism. Deletion therefore removes the submitted snapshot, review changes and decision fields together.",
+    "evidence": [
+     "backend/memberships/urls.py:30",
+     "backend/memberships/views.py:310",
+     "backend/memberships/views.py:324",
+     "backend/memberships/selectors.py:188",
+     "backend/memberships/selectors.py:197",
+     "backend/memberships/models.py:287",
+     "backend/memberships/models.py:308",
+     "backend/client_profile/test_membership_application_integrity.py:118"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W05",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The viewset has no destroy override and no http_method_names restriction, so DELETE /membership-applications/<id>/ removes the row, including submitted_snapshot and the reviewer fields. The queryset (visible_applications) limits this to managers of that pharmacy, so only an authorised reviewer can delete records they could already see. Shared-core exposes no delete call, so the UI does not offer it. Whether managers may purge applications, for example spam, is a policy choice. The impact is loss of the audit trail inside the manager's own scope (P2). B19's cascade is a different root cause: it comes from deleting the invite link.",
+    "evidence": [
+     "backend/memberships/views.py:310",
+     "backend/memberships/views.py:324",
+     "backend/memberships/selectors.py:153",
+     "backend/memberships/models.py:233",
+     "backend/memberships/models.py:290",
+     "backend/memberships/urls.py:30",
+     "shared-core/src/domains/memberships/api.ts:49"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F04-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Memberships",
+  "title": "A pharmacy manager can silently make any registered person an active staff member, with no invitation, email or consent.",
+  "finder": "claudeB-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V11",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P1",
+    "reason": "The public create endpoint forwards activate_immediately, which makes an eligible existing worker accepted and active while explicitly skipping email; a contract test expects this behavior. The claim is narrower for PATCH: changing status alone leaves a normal pending invitation inactive, although supplying is_active=true also bypasses worker acceptance. Role compatibility and the membership cap still apply, so this cannot target every registered person; allowing managers to activate eligible workers without consent is a policy decision.",
+    "evidence": [
+     "backend/memberships/views.py:164",
+     "backend/memberships/invites.py:113",
+     "backend/memberships/invites.py:149",
+     "backend/memberships/invites.py:240",
+     "backend/memberships/serializers.py:67",
+     "backend/memberships/serializers.py:246",
+     "backend/memberships/views.py:97",
+     "backend/memberships/test_membership_workflows_contract.py:116"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C063-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Mobile",
+  "title": "Mobile chat people search never finds anyone, so New Chat, New Group and Add members do not work in the Expo app.",
+  "finder": "claudeB-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V12",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The API returns membership records with names and email nested under userDetails, but searchParticipants filters only top-level fields. New Chat, New Group and Add members all use that filter, so normal name/email searches return no results. The DM fallback also treats the membership ID as a user ID, although the broken search currently prevents ordinary users from reaching that selection.",
+    "evidence": [
+     "backend/chat/serializers.py:379",
+     "backend/chat/views.py:863",
+     "shared-core/src/domains/chat/mappers.ts:61",
+     "frontend_mobile/roles/shared/chat/hooks.ts:64",
+     "frontend_mobile/roles/shared/chat/NewChatModal.tsx:59",
+     "frontend_mobile/roles/shared/chat/NewGroupModal.tsx:33",
+     "frontend_mobile/roles/shared/chat/GroupManageModal.tsx:77",
+     "backend/chat/views.py:366"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C071-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Mobile authentication",
+  "title": "Concurrent mobile logout and in-flight refresh/profile hydration can resurrect old tokens or overwrite the newly signed-in account.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V12",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Successful startup hydration and profile hydration write session/user state without checking whether login or logout occurred while awaiting their responses. Refresh likewise persists its captured account's tokens after completion, while clearStoredSession neither cancels nor invalidates the pending refresh. The mutation counter protects only a later fallback branch, and subsequent API requests read the overwritten tokens. This differs from B52's acceptance of an unverified cached startup identity.",
+    "evidence": [
+     "frontend_mobile/context/AuthContext.tsx:163",
+     "frontend_mobile/context/AuthContext.tsx:170",
+     "frontend_mobile/context/AuthContext.tsx:191",
+     "frontend_mobile/context/AuthContext.tsx:275",
+     "frontend_mobile/context/AuthContext.tsx:443",
+     "frontend_mobile/context/AuthContext.tsx:523",
+     "frontend_mobile/utils/authSession.ts:217",
+     "frontend_mobile/utils/authSession.ts:268",
+     "frontend_mobile/utils/apiClient.ts:43"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W05",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The bootstrap part of the claim is mostly out of reach. isLoading stays true until the /me success branch finishes, and the layouts and index hide the logout and login actions while loading. The refresh part is real: refreshAccessToken has no generation guard and calls writeStoredSession after its fetch returns. If that fetch is in flight when the user logs out, the rotated refresh token, which logout never blacklisted, is written back after clearStoredSession. On the next launch, bootstrap finds those tokens, calls /me and restores the old account. The race window is narrow, so P2.",
+    "evidence": [
+     "frontend_mobile/utils/authSession.ts:227",
+     "frontend_mobile/utils/authSession.ts:268",
+     "frontend_mobile/utils/authSession.ts:198",
+     "frontend_mobile/utils/authSession.ts:217",
+     "frontend_mobile/context/AuthContext.tsx:502",
+     "frontend_mobile/context/AuthContext.tsx:523",
+     "frontend_mobile/context/AuthContext.tsx:528",
+     "frontend_mobile/context/AuthContext.tsx:161",
+     "frontend_mobile/context/AuthContext.tsx:170",
+     "frontend_mobile/app/index.tsx:63"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C074-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Next / cross-account private workspace privacy",
+  "title": "Next marketplace and publishing workspaces can display the previous account's private stock, messages or unpublished drafts after cross-tab login.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V12",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "SessionProvider changes identity without remounting or clearing the workspace components, whose requests are not tied to an account generation. Ethical contexts survive account changes, GoodsWorkspace retains old exchanges, and GoodsListingsV2 exposes retained rows after a failed reload. The exchange manager copies initial rows into state without synchronizing subsequent props, allowing old messages to persist after successful replacement data arrives. ContentDashboard and its moderation panel do not watch session changes at all; backend access checks cannot remove data already retained in these screens.",
+    "evidence": [
+     "frontend_web/landing_next/shared/session-provider.tsx:11",
+     "frontend_web/landing_next/shared/session-provider.tsx:14",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:27",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:85",
+     "frontend_web/landing_next/features/marketplace/workspace.tsx:15",
+     "frontend_web/landing_next/features/marketplace/workspace.tsx:26",
+     "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:14",
+     "frontend_web/landing_next/app/content/workspace.tsx:25",
+     "frontend_web/landing_next/app/content/workspace.tsx:76",
+     "backend/public_hub/content_views.py:39"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W06",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "When another tab signs in, the session provider sets this tab to loading and then to the new user, but it never reloads the page, and none of these components clear their state when the account changes. GoodsWorkspace (the live /marketplace/exchanges page) shows a loading screen, which unmounts its child, then remounts GoodsExchangeManager with the old account's `data`. That child copies `initial` into state once and never re-reads it, so the old account's exchange messages stay on screen even after the new user's data loads. The same thing happens after Alice logs out and Bob then logs in. GoodsListingsV2 shows old rows for one render and keeps them if Bob's load fails. EthicalWorkspaceV2 clears its rows almost at once through reload(), but it keeps Alice's pharmacy contexts until getAccess succeeds, and for good if it fails. ContentDashboard loads once on mount and never reacts to the session.",
+    "evidence": [
+     "frontend_web/landing_next/shared/session-provider.tsx:13",
+     "frontend_web/landing_next/features/marketplace/workspace.tsx:15",
+     "frontend_web/landing_next/features/marketplace/workspace.tsx:19",
+     "frontend_web/landing_next/features/marketplace/workspace.tsx:26",
+     "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:14",
+     "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:16",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:27",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:44",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:85",
+     "frontend_web/landing_next/app/content/workspace.tsx:25",
+     "frontend_web/landing_next/app/(public)/marketplace/exchanges/page.tsx:4"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F05-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Onboarding / Shift confirmation",
+  "title": "A New to pharmacy person who is offered a shift can never confirm it, because the confirm step looks for a pharmacy team profile they cannot have.",
+  "finder": "claudeB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "DECISION",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V12",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P1",
+    "reason": "Managers can send Explorer candidates offers without checking payment-profile readiness. Acceptance routes an external Explorer through OtherStaffOnboarding and returns the stated 400 when that profile is absent; verified ExplorerOnboarding does not satisfy it. The scope is external newcomers: existing direct staff have a separate branch that can bypass this requirement. The owner must choose a supported newcomer engagement/payment path or prevent these offers before sending them.",
+    "evidence": [
+     "backend/shifts/base.py:255",
+     "backend/shifts/assignment.py:95",
+     "backend/shifts/offers.py:169",
+     "backend/shifts/offers.py:360",
+     "backend/shifts/engagement.py:25",
+     "backend/shifts/engagement.py:245",
+     "backend/shifts/engagement.py:528",
+     "backend/shifts/engagement.py:580",
+     "backend/onboarding/models.py:541"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C023-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Organisations",
+  "title": "Work notes and calendar events can be moved into, or attached to, a pharmacy or organisation the person has no rights over.",
+  "finder": "claudeB-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V12",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Work-note updates authorize the old pharmacy while allowing pharmacy changes, and assignee validation checks the submitted destination pharmacy. An active staff member can therefore move an accessible note into a foreign pharmacy and assign its active members; notifications can follow when enabled. Event creation checks only the pharmacy when both pharmacy and organization are supplied, while organization reads include that saved organization ID. Neither serializer nor model adds a destination authorization or consistency guard.",
+    "evidence": [
+     "backend/team_calendar/views.py:154",
+     "backend/team_calendar/views.py:377",
+     "backend/team_calendar/serializers.py:61",
+     "backend/team_calendar/serializers.py:78",
+     "backend/team_calendar/serializers.py:119",
+     "backend/team_calendar/views.py:241",
+     "backend/team_calendar/views.py:217",
+     "backend/team_calendar/models.py:66",
+     "backend/team_calendar/tasks.py:303"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C041-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Organisations",
+  "title": "Editing chain details removes its pharmacy links",
+  "finder": "codexA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V12",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The edit form sends multipart FormData containing name, email and optional logo, but no pharmacy_ids, using PUT. For a full multipart update, the serializer's many-valued relationship receives an empty list for the omitted field, and the inherited update replaces the pharmacy links with that list. ChainViewSet and the file-handling mixin do not preserve the relationship. This is destructive omission handling, distinct from B17's missing ownership validation for supplied pharmacy IDs.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:159",
+     "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:166",
+     "shared-core/src/domains/organizations/api.ts:150",
+     "backend/organizations/views.py:595",
+     "backend/organizations/serializers.py:585",
+     "backend/core/serializer_lifecycle.py:157",
+     "backend/shifts/candidates.py:263"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W06",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "ChainPage sends a multipart PUT with only name, email and optional logo. ChainSerializer.pharmacy_ids is a writable many-to-many field with source='pharmacies', not marked required=False, and allow_empty is on by default. With HTML form input on a non-partial update, DRF's ManyRelatedField.get_value returns getlist(), which is [] here, so ModelSerializer.update calls pharmacies.set([]). Neither the view nor RemoveOldFilesMixin overrides this. It touches the same field as B17 but is a different bug: links are wiped, not foreign pharmacies attached.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:159",
+     "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:166",
+     "shared-core/src/domains/organizations/api.ts:150",
+     "backend/organizations/serializers.py:585",
+     "backend/organizations/views.py:595",
+     "backend/core/serializer_lifecycle.py:157"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C043-N1": {
+  "status": "REFUTED",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Organisations",
+  "title": "Pharmacy owner cannot view or respond to organization claim requests because the review section is hidden when no pharmacies are already claimed",
+  "finder": "agy-g1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V13",
+    "verdict": "REFUTED",
+    "severity": "P1",
+    "reason": "PharmacySerializer.get_claimed returns true for a PENDING claim, even when the pharmacy has no organization. The frontend preserves that flag and counts the pharmacy, satisfying the section's visibility condition. The owner can then load and respond to the pending request.",
+    "evidence": [
+     "backend/organizations/serializers.py:312",
+     "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.model.ts:88",
+     "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:463",
+     "frontend_web/src/pages/dashboard/sidebar/PharmacyClaimsPanels.tsx:245",
+     "backend/organizations/claims.py:459",
+     "backend/client_profile/test_characterization_claims.py:39"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F06-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Payroll",
+  "title": "Locking a period always produces an empty payroll handoff.",
+  "finder": "codexA-1",
+  "duplicate_of": "",
+  "ui_visible": false,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V13",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The builder includes roster routing data in the fingerprint input but omits it from the saved revision snapshot. Locking reads snapshot.roster, receives an empty list, and consequently saves an empty payroll_export even for PAYROLL assignments. Approval does not restore that missing data; the existing lock test asserts an empty export without covering the claimed payroll case.",
+    "evidence": [
+     "backend/shifts/engagement.py:125",
+     "backend/workforce/timesheet_data.py:172",
+     "backend/workforce/timesheet_builder.py:149",
+     "backend/workforce/timesheet_builder.py:183",
+     "backend/workforce/timesheet_transitions.py:147",
+     "backend/workforce/timesheet_transitions.py:182",
+     "backend/workforce/views.py:744",
+     "backend/workforce/tests/test_timesheet_state_machine.py:182"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W06",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "lock_period reads roster rows from revision.snapshot.get('roster'). The timesheet builder puts 'roster' only in source_payload, which it hashes for the fingerprint. The stored snapshot has the keys worker, pharmacy, period, employment_engagements, days, leave and totals, with no roster. So payroll_assignment_ids is always empty, settlement routing is empty, and payroll_export comes out as [] even when payroll is on and assignments go to PAYROLL. The existing test only checks that payroll_export == [].",
+    "evidence": [
+     "backend/workforce/timesheet_transitions.py:147",
+     "backend/workforce/timesheet_transitions.py:182",
+     "backend/workforce/timesheet_builder.py:149",
+     "backend/workforce/timesheet_builder.py:183",
+     "backend/workforce/tests/test_timesheet_state_machine.py:182",
+     "backend/workforce/views.py:744"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F03-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Re-invite",
+  "title": "Re-inviting someone who left as an admin brings back their old admin role the moment they accept a plain staff invitation.",
+  "finder": "claudeA-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V13",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Quitting disables the linked PharmacyAdmin record without deleting it. A subsequent staff invitation reuses the membership, and accepting it unconditionally activates every linked PharmacyAdmin record without checking the new invitation's role. Active admin records then supply their original management capabilities.",
+    "evidence": [
+     "backend/memberships/views.py:494",
+     "backend/memberships/invites.py:123",
+     "backend/memberships/invites.py:163",
+     "backend/memberships/serializers.py:246",
+     "backend/memberships/views.py:447",
+     "backend/organizations/access.py:33",
+     "backend/organizations/models.py:366"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C020-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Roster",
+  "title": "Manual rostering allows staff to fill a pharmacist vacancy without pharmacist eligibility",
+  "finder": "codexA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V13",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "Manual assignment checks accepted direct employment but does not compare the worker's role with the vacancy before creating the assignment and sending its notification. However, roster publication runs worker_issues and blocks the technician's pharmacist assignment with ROLE_MISMATCH. The confirmed P2 problem is an invalid draft assignment and misleading assignment notification; the normal publication path prevents it becoming a published roster.",
+    "evidence": [
+     "backend/shifts/base.py:412",
+     "backend/shifts/assignment.py:169",
+     "backend/shifts/assignment.py:175",
+     "backend/shifts/assignment.py:191",
+     "backend/shifts/engagement.py:31",
+     "backend/workforce/roster/validation.py:39",
+     "backend/workforce/roster/publication.py:53",
+     "backend/attendance_tests/test_roster_services.py:142"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W07",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "manual-assign calls roster_direct_staff. That function checks only that the person has an active pharmacy membership with a FT/PT/CASUAL employment type, and staff_assignment_defaults adds only the ACCEPTED status and payroll checks. Neither one compares membership.role with shift.role_needed, and ShiftSlotAssignment.save checks only the published-roster lock. The offer path does refuse a role mismatch (engagement.py:531 via staff_membership_can_claim_role), so this is a missing guard rather than a policy choice. Existing tests cover only employment type, dates and locks, not role.",
+    "evidence": [
+     "backend/shifts/base.py:412",
+     "backend/shifts/assignment.py:137",
+     "backend/shifts/assignment.py:169",
+     "backend/shifts/engagement.py:46",
+     "backend/shifts/engagement.py:531",
+     "backend/shifts/access.py:43",
+     "backend/shifts/models.py:523",
+     "backend/shifts/test_shift_actions_contract.py:624"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C027-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Roster",
+  "title": "Replacement approval keeps the departing worker's payment terms",
+  "finder": "codexA-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V13",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Replacement eligibility checks accepted membership, role, conflicts and availability, but does not require direct employment or replacement payment terms. Once unpublished, swap and cover approval change only the assignment's user, preserving the departing worker's settlement and employment snapshot. Rate refresh then explicitly prices STAFF_EMPLOYMENT from that preserved snapshot, and the roster can display the inherited payroll route and rate.",
+    "evidence": [
+     "backend/workforce/roster/validation.py:31",
+     "backend/shifts/models.py:328",
+     "backend/workforce/roster/worker_actions.py:179",
+     "backend/workforce/roster/worker_actions.py:300",
+     "backend/workforce/roster/assignment_rates.py:11",
+     "backend/shifts/pricing.py:392",
+     "backend/workforce/roster/serializers.py:105",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:1227"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W07",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Both swap approval and cover approval change only assignment.user. The old engagement_kind, engagement_terms_snapshot (membership_id, employment_type, payment preference), settlement_channel and payment_preference_snapshot stay on the assignment. validate_worker_replacement_eligibility (worker_issues) needs only an accepted active membership with a matching role, not a staff employment type, so a locum member passes. refresh_assignment_rate then prices the new worker from the old STAFF_EMPLOYMENT terms.",
+    "evidence": [
+     "backend/workforce/roster/worker_actions.py:167",
+     "backend/workforce/roster/worker_actions.py:180",
+     "backend/workforce/roster/worker_actions.py:301",
+     "backend/workforce/roster/validation.py:31",
+     "backend/workforce/roster/assignment_rates.py:11",
+     "backend/workforce/roster/assignment_rates.py:17",
+     "backend/shifts/engagement.py:47"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C027-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Roster",
+  "title": "Coverage checks mark partly staffed intervals as fully covered",
+  "finder": "codexA-3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V13",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Coverage counts every assignment with any overlap against the entire requirement. One pharmacist working 09:00–10:00 therefore satisfies a minimum of one for 09:00–17:00, producing is_covered=true and shortfall=0. The workspace returns those values directly, and the web panel labels the whole interval covered without checking the remaining hours.",
+    "evidence": [
+     "backend/workforce/roster/revisions.py:85",
+     "backend/workforce/roster/revisions.py:99",
+     "backend/workforce/roster/revisions.py:142",
+     "backend/workforce/views.py:438",
+     "backend/workforce/urls.py:36",
+     "frontend_web/src/features/workforce/RosterCoveragePanel.tsx:112"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W07",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "_coverage_for_week counts every assignment that overlaps the requirement window at all (start < req_end and req_start < end). One assignment from 09:00 to 10:00 therefore gives is_covered=true and shortfall 0 for a 09:00-17:00 requirement, and the panel shows 'covered'. The panel is only advice: nothing blocks publishing on it, and the roster grid still shows the real hours. So the harm is a misleading status, not wrong data, which makes it P2.",
+    "evidence": [
+     "backend/workforce/roster/revisions.py:85",
+     "backend/workforce/roster/revisions.py:88",
+     "backend/workforce/roster/revisions.py:99",
+     "backend/workforce/roster/revisions.py:147",
+     "frontend_web/src/features/workforce/RosterCoveragePanel.tsx:112"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C045-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Roster",
+  "title": "Staff on the worker roster can see coworkers' leave type and private leave notes.",
+  "finder": "claudeB-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V14",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "An active pharmacy member receives coworkers' assignments, and get_leave_request returns their leave type and full note without checking the viewer. The web click handler opens the populated leave dialog before checking whether the assignment belongs to the viewer. The separate workforce-status privacy check does not protect leave details.",
+    "evidence": [
+     "backend/workforce/roster/urls.py:38",
+     "backend/workforce/roster/views.py:552",
+     "backend/workforce/roster/serializers.py:77",
+     "backend/workforce/roster/serializers.py:138",
+     "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:410",
+     "frontend_web/src/pages/dashboard/sidebar/RosterWorkerDialogs.tsx:247"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F02-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Roster",
+  "title": "Removing or escalating an assignment from the owner roster page unbooks the worker silently, including paid marketplace bookings, and skips the attendance/leave history check.",
+  "finder": "claudeA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V14",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P1",
+    "reason": "The owner queryset includes marketplace assignments, and direct removal or a valid upward escalation deletes assignments without calling the history check or notifying the removed workers. Published-roster guards restrict removal, and invoice-linked assignments have database deletion protection. Active workforce leave and attendance records survive with their assignment links cleared; only legacy LeaveRequest rows cascade, so the claim that newly filed leave is deleted is incorrect. The remaining silent removal of paid bookings still warrants P1.",
+    "evidence": [
+     "backend/workforce/roster/views.py:51",
+     "backend/workforce/roster/views.py:96",
+     "backend/workforce/roster/views.py:420",
+     "backend/workforce/roster/worker_actions.py:364",
+     "backend/workforce/models.py:245",
+     "backend/attendance/models.py:249",
+     "backend/invoicing/models.py:178",
+     "backend/shifts/models.py:805",
+     "backend/workforce/tests/test_roster_escalation.py:69",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:401"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C020-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "One claimed slot prevents claims on every remaining free slot",
+  "finder": "codexA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V14",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "An eligible pharmacy staff member can claim one selected slot on a non-single-user shift. Every subsequent claim is rejected when any assignment exists anywhere on that shift, before the requested slot is selected or checked for availability. The membership and role guards do not prevent this scenario.",
+    "evidence": [
+     "backend/shifts/urls.py:30",
+     "backend/shifts/browse.py:278",
+     "backend/shifts/browse.py:336",
+     "backend/shifts/browse.py:343",
+     "backend/shifts/browse.py:351",
+     "backend/shifts/browse.py:379",
+     "backend/shifts/test_claim_eligibility.py:44",
+     "shared-core/src/domains/shifts/api.ts:469"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W08",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "claim_shift refuses the claim whenever any ShiftSlotAssignment exists for the shift. This check runs before the slot_id branch and the per-slot 'taken' check, so on a shift that is not single_user_only, a second free slot can never be claimed once the first slot is filled. The shift stays visible on the community board, because the unassigned filter only applies on request. Lowered to P2 because it blocks one booking path with no data damage: the owner can still assign the slot or make an offer.",
+    "evidence": [
+     "backend/shifts/browse.py:344",
+     "backend/shifts/browse.py:349",
+     "backend/shifts/browse.py:351",
+     "backend/shifts/browse.py:366"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C020-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Recurring vacancies disappear from worker boards after their starting date",
+  "finder": "codexA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V14",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Posting stores a recurring schedule as one slot with a starting date and recurrence fields; later occurrences are expanded when needed. Community, authenticated public, and anonymous public board queries filter the stored starting date without allowing a future recurring end date. Consequently, an otherwise eligible unassigned recurring vacancy disappears after its starting date passes.",
+    "evidence": [
+     "backend/shifts/posting.py:48",
+     "backend/shifts/posting.py:116",
+     "backend/shifts/pricing.py:444",
+     "backend/shifts/browse.py:75",
+     "backend/shifts/browse.py:440",
+     "backend/shifts/browse.py:565",
+     "backend/shifts/urls.py:63",
+     "backend/shifts/test_shift_listing_contract.py:140"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W08",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "A recurring slot is stored as one ShiftSlot row whose date is the first occurrence, and expand_shift_slots builds the later dates up to recurring_end_date. The shared front end does send real recurring slots. The community, public and public job board querysets only check slots__date >= today (or > today), with no recurring_end_date branch, so the vacancy drops off once its start date passes. The owner lists (lifecycle.py:106, selectors.py:18) and the share-link view (browse.py:691) do include recurring_end_date, which shows the board filters are the odd ones out.",
+    "evidence": [
+     "backend/shifts/browse.py:76",
+     "backend/shifts/browse.py:441",
+     "backend/shifts/browse.py:567",
+     "backend/shifts/posting.py:53",
+     "backend/shifts/pricing.py:444",
+     "backend/shifts/browse.py:691",
+     "backend/shifts/selectors.py:18",
+     "shared-core/src/domains/shifts/draftSlots.ts:31"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C020-N5": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Accepting a valid counter offer for a vacancy without dated slots crashes",
+  "finder": "codexA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V14",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The serializer permits a slotless counter offer containing working times without a date, and the web form explicitly supports that input. It persists both slot and slot_date as null. Owner acceptance then evaluates offer_slot.slot_date or slot.date, dereferencing None and raising an exception before creating a worker offer.",
+    "evidence": [
+     "backend/shifts/serialization/offers.py:17",
+     "backend/shifts/serialization/offers.py:100",
+     "backend/shifts/serialization/offers.py:163",
+     "backend/shifts/models.py:738",
+     "backend/shifts/base.py:329",
+     "backend/shifts/base.py:340",
+     "backend/shifts/counter_offers.py:139",
+     "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:285",
+     "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:452"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W08",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "For a slotless shift the serializer accepts one entry with no slot_id and an optional slot_date (allow_null), so the offer slot is stored with slot=None. In accept_counter_offer, line 139 evaluates `offer_slot.slot_date or slot.date` with slot None, which raises AttributeError. The view does not catch it, so the response is a 500. Even with a slot_date set, line 140 passes slot=None to the lock check and line 166 reads slot.rate. Lowered to P2: it is a clean failure inside a transaction with no data written, but this acceptance path is unusable for slotless FT/PT vacancies.",
+    "evidence": [
+     "backend/shifts/serialization/offers.py:17",
+     "backend/shifts/serialization/offers.py:100",
+     "backend/shifts/serialization/offers.py:163",
+     "backend/shifts/counter_offers.py:137",
+     "backend/shifts/counter_offers.py:139",
+     "backend/shifts/base.py:359"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C020-N6": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Confirming one recurring date books dates outside the accepted terms",
+  "finder": "codexA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V14",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Accepting a counter offer for one recurring occurrence preserves that date on the worker offer, and the engagement terms describe that single date. On confirmation, finalization expands the recurring slot and creates assignments for every unfilled occurrence without restricting them to the offered date or accepted occurrence list. This also happens on a non-single-user shift.",
+    "evidence": [
+     "backend/shifts/serialization/offers.py:99",
+     "backend/shifts/counter_offers.py:163",
+     "backend/shifts/counter_offers.py:188",
+     "backend/shifts/engagement.py:268",
+     "backend/shifts/offers.py:360",
+     "backend/shifts/offers.py:405",
+     "backend/shifts/finalize.py:35",
+     "backend/shifts/finalize.py:39",
+     "backend/shifts/finalize.py:79",
+     "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:129"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W08",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Accepting a counter offer creates a ShiftOffer with offered_slot_date set to the one chosen date. The engagement terms the worker sees list only that date (_offer_occurrences). But finalize_shift_offer loops over every expand_shift_slots() entry for that slot and creates an assignment for each unfilled date, ignoring offer.offered_slot_date. Unless the snapshot has a matching rate, it also applies offer.offered_rate to those extra dates. OfferViewSet.accept calls finalize directly, with no date filter in between.",
+    "evidence": [
+     "backend/shifts/counter_offers.py:163",
+     "backend/shifts/counter_offers.py:188",
+     "backend/shifts/engagement.py:268",
+     "backend/shifts/offers.py:405",
+     "backend/shifts/finalize.py:39",
+     "backend/shifts/finalize.py:43",
+     "backend/shifts/finalize.py:79"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C032-N1": {
+  "status": "CONFIRMED_SOURCE_ALIAS",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Editing a shift description breaks its pending offers.",
+  "finder": "codexA-2",
+  "duplicate_of": "F01-N2",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V15",
+    "verdict": "DUPLICATE_OF",
+    "severity": "P1",
+    "reason": "This is the pending-offer consequence of the same slot-replacement defect described in F01-N2. The description-edit form includes slots, saving deletes the original slots, and SET_NULL detaches the pending offer. Acceptance then refuses the offer because its required slot is missing.",
+    "evidence": [
+     "shared-core/src/domains/shifts/postingDraft.ts:46",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+     "backend/shifts/posting.py:189",
+     "backend/shifts/models.py:680",
+     "backend/shifts/offers.py:351"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W09",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The web edit form always sends the full slots array (postingDraft.ts:46, PostShiftForm.tsx:457). revise_shift then deletes every slot and creates new ones (posting.py:189-191), blocking this only for roster shifts. ShiftOffer.slot is SET_NULL (models.py:680), so Sara's PENDING offer survives with slot=None. On a multi-slot shift, accept then refuses it with 'Offer is missing slot selection.' (offers.py:351).",
+    "evidence": [
+     "shared-core/src/domains/shifts/postingDraft.ts:46",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+     "backend/shifts/serialization/shifts.py:355",
+     "backend/shifts/posting.py:157",
+     "backend/shifts/posting.py:189",
+     "backend/shifts/models.py:680",
+     "backend/shifts/offers.py:351"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C039-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Shared shift landing redirect produces non-existent dashboard routes for non-standard roles",
+  "finder": "agy-g3",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V15",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The redirect converts ORG_STAFF into orgstaff and PHARMACY_MANAGER into pharmacymanager, neither of which has a dashboard route. Those URLs reach the missing-page route; the valid organization and pharmacy-specific admin routes are different. Severity is P2 because this breaks the shared-link entry point while ordinary dashboard navigation remains available.",
+    "evidence": [
+     "frontend_web/src/pages/SharedShiftLandingPage.tsx:246",
+     "frontend_web/src/main.tsx:151",
+     "frontend_web/src/main.tsx:240",
+     "frontend_web/src/main.tsx:310",
+     "frontend_web/src/main.tsx:589"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C041-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Accepting one date hides the remaining dates of a counter offer",
+  "finder": "codexA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V15",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Accepting a selected date processes only that date but marks the entire counter offer ACCEPTED. Both the backend listing and frontend cache then remove it from the pending proposals, leaving the second date without its actionable proposed terms. The backend permits further acceptance with an explicit slot ID, but the normal screen no longer supplies that action.",
+    "evidence": [
+     "backend/shifts/counter_offers.py:131",
+     "backend/shifts/counter_offers.py:143",
+     "backend/shifts/counter_offers.py:29",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:28",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:56",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Dialogs/CounterOfferDialog.tsx:101"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W09",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "accept_counter_offer turns only one slot into a worker offer: the chosen slot_id, or the first unassigned one when none is given. It still marks the whole counter offer ACCEPTED (counter_offers.py:143). The list endpoint returns only PENDING counter offers (counter_offers.py:29-31), and the web hook filters to PENDING and drops the accepted one from state. Tom therefore can no longer see the second date's proposed terms, even though the backend would accept them per slot (line 124). Tom can still make a direct offer, so the impact is a lost workflow rather than money or data: P2.",
+    "evidence": [
+     "backend/shifts/counter_offers.py:29",
+     "backend/shifts/counter_offers.py:116",
+     "backend/shifts/counter_offers.py:124",
+     "backend/shifts/counter_offers.py:143",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:28",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:56"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C041-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts",
+  "title": "Jobs without dated slots never load internal candidates",
+  "finder": "codexA-2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V15",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Slotless full-time postings are supported and remain in Active Shifts. Internal candidate loading makes requests only by iterating dated slots, so an empty slot list produces no request and an empty member list. For a single-worker posting, the backend supports shift-level interest and member status, but the frontend never retrieves them.",
+    "evidence": [
+     "backend/shifts/test_shift_posting_contract.py:363",
+     "backend/shifts/lifecycle.py:54",
+     "backend/shifts/interest.py:103",
+     "backend/shifts/candidates.py:233",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:45",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:196"
+    ]
+   },
+   {
+    "checker": "claudeA-1",
+    "batch": "W09",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "For non-public tiers, useTabData fetches member status once per entry in shift.slots (useTabData.ts:45-58), so a full- or part-time job with no slots never calls the endpoint. Such jobs are valid (test_shift_posting_contract.py:363) and appear in the active list (lifecycle.py:105). With single_user_only set, the backend would return them without a slot_id, filtering interests on slot null (candidates.py:226,233). The card then shows an empty consolidatedMembers list, so Omar's interest is never shown.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:45",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:65",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:196",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:212",
+     "backend/shifts/candidates.py:226",
+     "backend/shifts/candidates.py:233",
+     "backend/shifts/lifecycle.py:105",
+     "backend/shifts/test_shift_posting_contract.py:363"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F01-N2": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts/Billing",
+  "title": "Editing a shift after a worker has accepted but before payment either locks the worker into new dates they never agreed to, or takes the payment without booking anyone.",
+  "finder": "claudeA-1",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V15",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P1",
+    "reason": "Before payment creates assignments, the edit guard allows slot replacement without resetting accepted offers or enabling decline. Whole-shift finalization books the replacement dates; per-date finalization fails after its slot is detached, rolling back local Stripe payment recording, while Pills are spent before the failure. The web screen actually discards detached per-date payment options after reload, so that part is narrower than reported, although an already-open checkout or an offer-ID payment request still reaches the failure. The booking and payment consequences remain P1.",
+    "evidence": [
+     "backend/shifts/posting.py:157",
+     "backend/shifts/posting.py:189",
+     "backend/shifts/models.py:680",
+     "backend/shifts/offers.py:615",
+     "backend/shifts/finalize.py:30",
+     "backend/shifts/finalize.py:35",
+     "backend/billing/views.py:571",
+     "backend/billing/views.py:973",
+     "backend/rewards/views.py:217",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:239"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "F02-N1": {
+  "status": "REFUTED",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Shifts/Billing",
+  "title": "Deleting a partly filled posting from Active Shifts silently removes the workers already booked on its other dates, with no notice, no cancellation charge and no history check.",
+  "finder": "claudeA-2",
+  "duplicate_of": "",
+  "ui_visible": false,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V15",
+    "verdict": "REFUTED",
+    "severity": "P1",
+    "reason": "Paid offer finalization sets each confirmed assignment's source_offer. That foreign key uses PROTECT, so deleting the parent shift encounters protected offers during cascading deletion and refuses the operation. The described paid booking therefore does not disappear with a successful 204 response; the generic delete path can instead surface an error.",
+    "evidence": [
+     "backend/shifts/finalize.py:93",
+     "backend/shifts/models.py:506",
+     "backend/shifts/models.py:673",
+     "backend/shifts/base.py:111",
+     "backend/shifts/lifecycle.py:50"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C047-N3": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Talent",
+  "title": "Explorers cannot renew their availability after their published dates expire",
+  "finder": "codexA-4",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V16",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Expired availability posts disappear from the feed that the editor uses to find the user's existing post. The editor therefore submits a create request, which the explorer one-post check rejects even when the previous post has expired. Delete Pitch also requires the missing existingPostId; direct API editing remains possible, but this screen provides no recovery.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:486",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:560",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:703",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:811",
+     "backend/talent/views/explorer.py:126",
+     "backend/talent/views/explorer.py:182",
+     "backend/talent/models.py:127",
+     "backend/talent/test_newcomer_rules.py:72",
+     "backend/talent/test_explorer_api.py:60"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W10",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "The web editor finds 'mine' only among the posts returned by /feed. That feed drops posts whose latest availability date has passed (is_talent_board_visible), so existingPostId stays null. Saving then calls createExplorerPost, and _create_newcomer_post rejects it because any ExplorerPost from this explorer still exists. The delete button returns early when existingPostId is null, so Zoe cannot get out of this state from the UI.",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:560",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:703",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:971",
+     "backend/talent/views/explorer.py:126",
+     "backend/talent/views/explorer.py:182",
+     "backend/talent/models.py:127"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C028-N4": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Timesheets",
+  "title": "Overnight attendance corrections leave the next period approved with stale minutes",
+  "finder": "codexA-4",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V16",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Attendance corrections invalidate only periods containing the session's original local clock-in date, although attendance calculations include and clip sessions across period boundaries. The Monday period therefore keeps its old minutes, approval, and false needs_rebuild flag. Neither opening its detail nor locking it checks the source fingerprint again, so the stale approved period can be locked.",
+    "evidence": [
+     "backend/attendance/urls.py:55",
+     "backend/attendance/views.py:228",
+     "backend/attendance/approvals.py:383",
+     "backend/workforce/signals.py:21",
+     "backend/workforce/signals.py:41",
+     "backend/workforce/signals.py:61",
+     "backend/workforce/timesheet_data.py:206",
+     "backend/workforce/timesheet_data.py:256",
+     "backend/workforce/views.py:783",
+     "backend/workforce/timesheet_transitions.py:132",
+     "backend/workforce/tests/test_timesheet_state_machine.py:168"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W10",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Every attendance signal calls _enqueue with _session_date(session), the local date of started_at. Only the period containing the clock-in is marked needs_rebuild. _session_rows clips each session to the period bounds, so Monday's period does include the overnight minutes, but nothing marks it stale after Monday's clock-out is corrected. The attendance app has no other rebuild trigger. lock_period checks only needs_rebuild and APPROVED status, so the next period locks with the old minutes.",
+    "evidence": [
+     "backend/workforce/signals.py:21",
+     "backend/workforce/signals.py:45",
+     "backend/workforce/signals.py:61",
+     "backend/workforce/timesheet_data.py:206",
+     "backend/workforce/timesheet_data.py:256",
+     "backend/workforce/timesheet_transitions.py:137"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C028-N5": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Timesheets",
+  "title": "Archiving a roster removes its scheduled work and approved leave from timesheets",
+  "finder": "codexA-4",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V16",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "An authorized manager can archive a published roster without first locking its timesheets, and saving the archived status invalidates overlapping unlocked timesheets. Rebuilding excludes that week's assignments because roster inputs require PUBLISHED status, so scheduled minutes and leave minutes derived from those assignments disappear. Approved leave records remain approved, while the worker roster explicitly retains archived weeks as published history.",
+    "evidence": [
+     "backend/workforce/roster/urls.py:49",
+     "backend/workforce/roster/v2_views.py:233",
+     "backend/workforce/roster/publication.py:123",
+     "backend/workforce/roster/publication.py:177",
+     "backend/workforce/signals.py:199",
+     "backend/workforce/timesheet_data.py:150",
+     "backend/workforce/timesheet_data.py:182",
+     "backend/workforce/timesheet_builder.py:96",
+     "backend/workforce/timesheet_builder.py:124",
+     "backend/workforce/tests/test_timesheets.py:359"
+    ]
+   },
+   {
+    "checker": "claudeB-1",
+    "batch": "W10",
+    "verdict": "CONFIRMED_SOURCE",
+    "severity": "P1",
+    "reason": "Archiving can be called from v2_views and has no time check. The status save fires roster_period_changed, which rebuilds every timesheet in the matching unlocked periods. _roster_rows keeps only weeks with status PUBLISHED, so an archived week contributes no roster rows. Approved-leave minutes are counted only where leave overlaps roster rows, so both rostered and leave minutes fall to zero, and an approved timesheet moves to REOPENED. Meanwhile get_worker_published_roster still treats ARCHIVED as published history.",
+    "evidence": [
+     "backend/workforce/roster/publication.py:123",
+     "backend/workforce/roster/publication.py:177",
+     "backend/workforce/roster/v2_views.py:243",
+     "backend/workforce/signals.py:199",
+     "backend/workforce/timesheet_data.py:150",
+     "backend/workforce/timesheet_builder.py:96",
+     "backend/workforce/timesheet_builder.py:124"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C038-N1": {
+  "status": "CONFIRMED_SOURCE",
+  "severity": "P2",
+  "claimed_severity": "P1",
+  "area": "Web",
+  "title": "Post-verification and dashboard return links navigate to an unrouted root path, landing users on a 404 page",
+  "finder": "agy-g2",
+  "duplicate_of": "",
+  "ui_visible": true,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "codexB-1",
+    "batch": "V16",
+    "verdict": "CONFIRMED_SOURCE_LOWER",
+    "severity": "P2",
+    "reason": "The cited links reach the wildcard 404 when served by Vite without the public-site handoff, including the production routing configuration with PUBLIC_SITE_ENABLED disabled. The broader claim overlooks the Next /dashboard account gate, staging's explicit routing to that gate, and Vite's optional cross-origin bridge. This is a conditional P2 navigation defect in the standalone or rollback configuration, rather than a universal onboarding failure.",
+    "evidence": [
+     "frontend_web/src/pages/MobileOTPVerify.tsx:97",
+     "frontend_web/src/pages/MembershipApplyPage.tsx:386",
+     "frontend_web/src/pages/PricingPage.tsx:110",
+     "frontend_web/src/main.tsx:589",
+     "frontend_web/src/components/PublicRouteBridge.tsx:11",
+     "frontend_web/landing_next/app/dashboard/page.tsx:6",
+     "frontend_web/landing_next/migrated/utils/dashboardPath.ts:10",
+     "nginx/templates/default.conf.template:13",
+     "nginx/templates/default.conf.template:101",
+     "nginx/staging.conf:56",
+     "RUN-WEB.md:67"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ },
+ "C016-N2": {
+  "status": "REFUTED",
+  "severity": "P1",
+  "claimed_severity": "P1",
+  "area": "Hub",
+  "title": "Hub group PATCH can reassign an existing group to an unrelated pharmacy without checking destination tenant authority.",
+  "finder": "gpt6-senior-20261025",
+  "duplicate_of": "",
+  "ui_visible": false,
+  "kind": "FIX",
+  "checks": [
+   {
+    "checker": "claudeB-1",
+    "batch": "W03",
+    "verdict": "REFUTED",
+    "severity": "P2",
+    "reason": "'pharmacy' is in HubCommunityGroupSerializer.Meta.read_only_fields, so DRF drops any pharmacy value sent in a PATCH. perform_update calls serializer.save() with no pharmacy argument. The group cannot be moved to another pharmacy through this endpoint.",
+    "evidence": [
+     "backend/pharmacy_hub/serialization/groups.py:75",
+     "backend/pharmacy_hub/groups.py:145"
+    ]
+   }
+  ],
+  "s3": "NOT_EXECUTED"
+ }
+}

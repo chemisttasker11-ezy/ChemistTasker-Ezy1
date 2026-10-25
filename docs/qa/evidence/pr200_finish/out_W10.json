@@ -1,0 +1,118 @@
+{
+ "chunk": "W10",
+ "verdicts": [
+  {
+   "id": "F07-N6",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "make_super_document copies the parent's super amount once and returns the same live companion on every later call. save_draft rejects edits to anything other than kind='invoice', and saving the parent never touches the companion. The invoice viewset has no void or delete action, and both web and mobile hide 'Create super request' once super_document_id is set. Parent is a OneToOne, so a second request could not be stored anyway. The $120 request therefore stays wrong next to a $180 invoice. The owner must choose a fix: sync the companion automatically, or allow void and replace.",
+   "evidence": [
+    "backend/worker_finance/services.py:606",
+    "backend/worker_finance/services.py:894",
+    "backend/worker_finance/services.py:902",
+    "backend/worker_finance/services.py:689",
+    "backend/worker_finance/views.py:149",
+    "backend/worker_finance/tests/contracts/invoicing/models.py:38",
+    "frontend_web/src/pages/finance/FinanceWorkspace.tsx:356",
+    "frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx:159"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C047-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The web editor finds 'mine' only among the posts returned by /feed. That feed drops posts whose latest availability date has passed (is_talent_board_visible), so existingPostId stays null. Saving then calls createExplorerPost, and _create_newcomer_post rejects it because any ExplorerPost from this explorer still exists. The delete button returns early when existingPostId is null, so Zoe cannot get out of this state from the UI.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:560",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:703",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:971",
+    "backend/talent/views/explorer.py:126",
+    "backend/talent/views/explorer.py:182",
+    "backend/talent/models.py:127"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F10-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Only PublicExplorerPostReadSerializer hides explorer_name, author_user_id, explorer_user_id and explorer_profile for anonymous posts. The signed-in /feed and /by-profile endpoints use ExplorerPostReadSerializer, which returns the full name and user ids no matter what is_anonymous says. Those endpoints need only IsAuthenticated: no verification and no hiring link. Pharmacist and other-staff posts are always sent with is_anonymous=true, and the web UI never shows the name, so the leak is API-only. The post id and reference_code are the same on the public and signed-in feeds, which ties the two together.",
+   "evidence": [
+    "backend/talent/views/explorer.py:97",
+    "backend/talent/views/explorer.py:184",
+    "backend/talent/serializers/explorer.py:79",
+    "backend/talent/serializers/explorer.py:83",
+    "backend/talent/serializers/explorer.py:190",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:722"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C026-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "For terms that have already started, the PATCH view only checks that the new effective_to is not in the past and that the old end date is not closed. It then saves without calling build_employment_engagement_payload, which is the only place the next-birthday junior-rate check runs. Model clean() checks only date order and overlap. Tom can therefore set a later end date, or clear it to null. _attach_employment_engagements then matches Mia's later work dates to the frozen junior rates.",
+   "evidence": [
+    "backend/workforce/views.py:362",
+    "backend/workforce/views.py:391",
+    "backend/workforce/views.py:416",
+    "backend/workforce/employment_engagement_service.py:110",
+    "backend/workforce/models.py:165",
+    "backend/workforce/timesheet_data.py:115"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C028-N4",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Every attendance signal calls _enqueue with _session_date(session), the local date of started_at. Only the period containing the clock-in is marked needs_rebuild. _session_rows clips each session to the period bounds, so Monday's period does include the overnight minutes, but nothing marks it stale after Monday's clock-out is corrected. The attendance app has no other rebuild trigger. lock_period checks only needs_rebuild and APPROVED status, so the next period locks with the old minutes.",
+   "evidence": [
+    "backend/workforce/signals.py:21",
+    "backend/workforce/signals.py:45",
+    "backend/workforce/signals.py:61",
+    "backend/workforce/timesheet_data.py:206",
+    "backend/workforce/timesheet_data.py:256",
+    "backend/workforce/timesheet_transitions.py:137"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C028-N5",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Archiving can be called from v2_views and has no time check. The status save fires roster_period_changed, which rebuilds every timesheet in the matching unlocked periods. _roster_rows keeps only weeks with status PUBLISHED, so an archived week contributes no roster rows. Approved-leave minutes are counted only where leave overlaps roster rows, so both rostered and leave minutes fall to zero, and an approved timesheet moves to REOPENED. Meanwhile get_worker_published_roster still treats ARCHIVED as published history.",
+   "evidence": [
+    "backend/workforce/roster/publication.py:123",
+    "backend/workforce/roster/publication.py:177",
+    "backend/workforce/roster/v2_views.py:243",
+    "backend/workforce/signals.py:199",
+    "backend/workforce/timesheet_data.py:150",
+    "backend/workforce/timesheet_builder.py:96",
+    "backend/workforce/timesheet_builder.py:124"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

@@ -1,0 +1,117 @@
+{
+ "chunk": "W04",
+ "verdicts": [
+  {
+   "id": "C025-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "For each legacy invoice the migration looks for an existing Customer by owner and name only, and creates one only if none is found. It then builds payload['customer'] from that Customer's email, address and ABN, not from the invoice's own bill_to_email, custom_bill_to_address or bill_to_abn. So the second invoice with the same bill-to name gets the first invoice's details. Migration 0006 freezes that payload as revision 1, and send() reads payload['customer']['email'] as the recipient, so a resend goes to the other pharmacy's contact and the PDF shows the wrong address and ABN.",
+   "evidence": [
+    "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:62",
+    "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:118",
+    "backend/worker_finance/migrations/0006_remove_invoice_record.py:13",
+    "backend/worker_finance/views.py:277"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C025-N3",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "save_draft lets a part-paid invoice be revised: it never checks for payments and just replaces the calculation. Existing Payment rows keep the gst they were given when recorded. record_payment allocates each new payment against the current calculation['gst'] with a cumulative pro-rata formula, so after a change to GST-free the second payment gets $0 GST while the first payment's $5 stays. The cash worksheet sums Payment.gst, so 1A reports $5 that the corrected invoice does not contain. The same happens in reverse when GST is added. It is lowered to P2 because the worksheet is labelled an estimate and a GST correction on a part-paid invoice is an edge case. The owner must decide whether to reject such edits or re-allocate past payments.",
+   "evidence": [
+    "backend/worker_finance/services.py:690",
+    "backend/worker_finance/services.py:965",
+    "backend/worker_finance/services.py:968",
+    "backend/worker_finance/calculations.py:147",
+    "backend/worker_finance/views.py:634"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C064-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The legacy InvoiceGenerate starts superRateSnapshot at 10 and changes it only when onboarding has a super_rate_snapshot. It sends that value, and the legacy service stores it and uses it for the generated super line. Everywhere else the default is 12: the model default and the new finance serializer and defaults. The rate shows in an editable field, this screen is now the legacy tool inside FinanceWorkspace, and a client-chosen rate is allowed by design. So this is a wrong default, not a calculation bug: P2.",
+   "evidence": [
+    "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:115",
+    "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:152",
+    "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:392",
+    "backend/invoicing/services.py:175",
+    "backend/invoicing/services.py:332",
+    "backend/invoicing/models.py:44",
+    "backend/worker_finance/serializers.py:127"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C009-N3",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "ImportCommit checks only MANAGE_OWN_STOCK access and the batch status. It never reads ETHICAL_INVENTORY_ENABLED, and the policy does not check it either: the flag is read only in Imports.post and Lots.post. A batch staged while the flag was on can therefore still be committed after it is switched off, changing lots and writing movements. LotReconcile is unguarded in the same way. Only the caller's own pharmacy stock is affected, so this is a broken kill switch at P2, not a cross-tenant P1.",
+   "evidence": [
+    "backend/ethical_marketplace/owner_views.py:57",
+    "backend/ethical_marketplace/owner_views.py:62",
+    "backend/ethical_marketplace/views.py:195",
+    "backend/ethical_marketplace/views.py:234",
+    "backend/ethical_marketplace/views.py:259",
+    "backend/ethical_marketplace/urls.py:15",
+    "backend/core/settings.py:242"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C010-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "ListingDetail.patch checks PREPARE_LISTING against the listing's current pharmacy and product. It then passes request.data to EthicalListingSerializer, where pharmacy, product and mode are writable. Nothing checks the new pharmacy or product, and the lot allocations to the original pharmacy's lots are kept. The pre_save signal only re-derives the scope fields from the new pharmacy and blocks S8 at the platform circle. The draft then shows in the other pharmacy's MyListings, and that pharmacy's owner can publish it.",
+   "evidence": [
+    "backend/ethical_marketplace/views.py:319",
+    "backend/ethical_marketplace/views.py:322",
+    "backend/ethical_marketplace/views.py:324",
+    "backend/ethical_marketplace/serializers.py:60",
+    "backend/ethical_marketplace/serializers.py:61",
+    "backend/ethical_marketplace/signals.py:20",
+    "backend/ethical_marketplace/owner_views.py:37"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F07-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "internal_invoice_prefill returns customer_id 0 and expects the server to resolve the customer at save time: save_draft accepts 0 and sets the pharmacy's customer. Both editors store the draft as it is, then refuse to save when customer_id is 0. On web this is the check at line 130; on mobile it is the check at line 199. Both disable the customer picker when source_assignment_ids is set, so the user cannot pick one. The web e2e test only checks that the prefill request happens, not that saving works.",
+   "evidence": [
+    "backend/worker_finance/services.py:362",
+    "backend/worker_finance/services.py:632",
+    "frontend_web/src/pages/finance/InvoiceComposer.tsx:103",
+    "frontend_web/src/pages/finance/InvoiceComposer.tsx:130",
+    "frontend_web/src/pages/finance/InvoiceComposer.tsx:187",
+    "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:183",
+    "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:199",
+    "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:229",
+    "frontend_web/e2e/frontend-behaviour.spec.mjs:92"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

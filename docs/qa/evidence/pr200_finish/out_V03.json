@@ -1,0 +1,127 @@
+{
+ "chunk": "V03",
+ "verdicts": [
+  {
+   "id": "C042-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The OWNER-only check does render the issuer form for non-owner managers of unmanaged legacy invoices, and the backend rejects their full-field saves. However, the described shift-generated invoice is adopted into finance and redirected to recipient review; the migration also promotes existing legacy invoices. The remaining P2 defect affects unmanaged invoices, which the generic legacy POST can still create.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:42",
+    "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:157",
+    "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:570",
+    "backend/invoicing/views.py:99",
+    "backend/invoicing/services.py:419",
+    "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:60",
+    "backend/invoicing/serializers.py:81"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F07-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Internal prefill returns customer_id 0 with the pharmacy snapshot and source assignment IDs. Both editors reject that zero value before saving and disable customer selection for internal invoices. The backend deliberately supports this payload and creates the pharmacy customer during Save; the existing integrity test verifies that backend flow without exercising either editor.",
+   "evidence": [
+    "backend/worker_finance/services.py:362",
+    "frontend_web/src/pages/finance/InvoiceComposer.tsx:103",
+    "frontend_web/src/pages/finance/InvoiceComposer.tsx:130",
+    "frontend_web/src/pages/finance/InvoiceComposer.tsx:187",
+    "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:199",
+    "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:229",
+    "backend/worker_finance/services.py:631",
+    "backend/invoicing/test_integrity.py:143"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C064-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The reachable legacy Expo generator starts at 10%, retains it when onboarding supplies no snapshot, and submits that rate. It also creates a 10% super line, which the backend preserves as a manual line; otherwise backend calculation uses the submitted snapshot. The modern helper uses 12% from July 2025, but neither it nor internal-invoice adoption corrects this legacy default. This confirms the conditional stale-default defect, without establishing contractor eligibility or invalidating intentionally agreed rates.",
+   "evidence": [
+    "frontend_mobile/app/pharmacist/invoice/new.tsx:5",
+    "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:115",
+    "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:152",
+    "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:294",
+    "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:392",
+    "backend/invoicing/services.py:166",
+    "backend/invoicing/services.py:332",
+    "backend/worker_finance/services.py:543",
+    "backend/worker_finance/calculations.py:50",
+    "backend/invoicing/test_integrity.py:440"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C009-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The commit route authenticates the caller and checks pharmacy access and staged status, but never checks ETHICAL_INVENTORY_ENABLED. Its access policy also omits that flag, so an otherwise eligible owner can commit after it is disabled. The transaction then updates or creates stock lots and writes movement records; staging's flag check does not protect this later request.",
+   "evidence": [
+    "backend/ethical_marketplace/urls.py:15",
+    "backend/ethical_marketplace/owner_views.py:60",
+    "backend/ethical_marketplace/policy.py:37",
+    "backend/ethical_marketplace/owner_views.py:100",
+    "backend/ethical_marketplace/owner_views.py:104",
+    "backend/ethical_marketplace/views.py:195",
+    "backend/core/settings.py:242"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C011-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Two eligible requests can both complete the unlocked receipt lookup before either writes its receipt. Each creates a separate exchange and participants before attempting the unique receipt insert, with no enclosing transaction or request-wide atomic setting. The losing receipt insert therefore fails after its exchange has committed, and the seller's exchange list includes both negotiations.",
+   "evidence": [
+    "backend/marketplace/urls.py:17",
+    "backend/marketplace/services.py:44",
+    "backend/marketplace/views.py:297",
+    "backend/marketplace/views.py:300",
+    "backend/marketplace/views.py:309",
+    "backend/marketplace/models.py:329",
+    "backend/marketplace/views.py:324",
+    "backend/core/settings.py:401"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C012-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The registered ModelViewSet exposes authenticated creation; its manager-scoped queryset does not restrict POST creation. The serializer accepts any existing numeric invite-link ID and checks applicant identity and duplicates, but never checks link validity or possession of its UUID token. Only the separate magic-link view calls is_valid(), so this bypass creates a PENDING application visible to managers; it does not automatically grant membership.",
+   "evidence": [
+    "backend/memberships/urls.py:30",
+    "backend/memberships/views.py:310",
+    "backend/memberships/views.py:317",
+    "backend/memberships/serializers.py:383",
+    "backend/memberships/serializers.py:413",
+    "backend/memberships/serializers.py:526",
+    "backend/memberships/views.py:261",
+    "backend/memberships/models.py:308",
+    "backend/memberships/selectors.py:197"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

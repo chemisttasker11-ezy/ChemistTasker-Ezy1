@@ -1,0 +1,125 @@
+{
+ "chunk": "V01",
+ "verdicts": [
+  {
+   "id": "C039-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The editor strips the timezone from a UTC ISO timestamp and places it in a datetime-local input, then interprets that value as browser-local time on submission. At UTC+10, submitting the initial value moves the event ten hours earlier. Server chronology validation rejects an affected clock-out, while an earlier clock-in can pass and change the timesheet start time.",
+   "evidence": [
+    "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:539",
+    "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:564",
+    "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:237",
+    "backend/attendance/views.py:215",
+    "backend/attendance/approvals.py:338",
+    "backend/attendance/approvals.py:354",
+    "backend/workforce/timesheet_data.py:227"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C004-N3",
+   "verdict": "REFUTED",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The acting ORG_ADMIN does become the selected billing contact, but this baseline explicitly sets FREE_TRIAL_DAYS to zero. The trial check requires date_joined.date() to be strictly later than today's cutoff, so an account created today does not qualify. The claimed bypass would become possible with a positive trial window, but the shipped configuration prevents the stated scenario.",
+   "evidence": [
+    "backend/core/settings.py:667",
+    "backend/billing/utils.py:25",
+    "backend/billing/utils.py:29",
+    "backend/billing/utils.py:129",
+    "backend/billing/utils.py:167",
+    "backend/billing/views.py:594"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C004-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Custom-group creation requires authentication but resolves supplied participant IDs against all active memberships, without checking a shared pharmacy or another relationship. The serializer adds Sara's active membership and the selected foreign memberships, making them eligible for her participant-list response, which includes names, email, photo URL, role and employment type. The pharmacy authorization check applies only to community chats, and the message endpoint accepts Sara because she is now a participant.",
+   "evidence": [
+    "backend/chat/views.py:53",
+    "backend/chat/views.py:419",
+    "backend/chat/views.py:472",
+    "backend/chat/serializers.py:264",
+    "backend/chat/serializers.py:293",
+    "backend/chat/views.py:863",
+    "backend/chat/serializers.py:381",
+    "backend/users/presentation.py:60",
+    "backend/chat/views.py:683"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C030-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Mobile renaming sends only the room ID and title, so JSON serialization omits participant_ids. The backend converts that omission into an empty list and explicitly supplies it to the serializer even for a partial update. The serializer preserves the creator's membership but deletes every other participant, removing their REST access and room visibility.",
+   "evidence": [
+    "frontend_mobile/roles/shared/chat/ChatPage.tsx:293",
+    "shared-core/src/domains/chat/api.ts:131",
+    "shared-core/src/domains/chat/api.ts:40",
+    "backend/chat/views.py:416",
+    "backend/chat/views.py:464",
+    "backend/chat/serializers.py:319",
+    "backend/chat/serializers.py:347",
+    "backend/chat/views.py:60"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F10-N4",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Inventory and owned-listing reads authorize the pharmacy and action without passing a product, then serialize every matching pharmacy record. Schedule restrictions run only when a product is supplied, and neither bulk queryset nor serializer filters unauthorized schedules. An otherwise eligible S4-only delegate therefore receives S8 product and quantity details, plus listing amounts, through the web and mobile callers.",
+   "evidence": [
+    "frontend_mobile/features/parity/ethicalMarketplace.tsx:26",
+    "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:50",
+    "backend/ethical_marketplace/views.py:163",
+    "backend/ethical_marketplace/views.py:228",
+    "backend/ethical_marketplace/owner_views.py:23",
+    "backend/ethical_marketplace/owner_views.py:36",
+    "backend/ethical_marketplace/policy.py:50",
+    "backend/ethical_marketplace/serializers.py:38",
+    "backend/ethical_marketplace/serializers.py:60"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F10-N5",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The creating variable is local to GET and is neither defined nor available in POST. After saving the approval as PENDING_REVIEW and writing the audit event, POST references creating while constructing its response and raises NameError. No enclosing request transaction is configured to undo those writes, so valid web and mobile submissions persist but return a server error.",
+   "evidence": [
+    "backend/ethical_marketplace/views.py:100",
+    "backend/ethical_marketplace/views.py:102",
+    "backend/ethical_marketplace/views.py:113",
+    "backend/ethical_marketplace/views.py:120",
+    "backend/ethical_marketplace/views.py:121",
+    "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:143",
+    "frontend_mobile/features/parity/ethicalMarketplace.tsx:54",
+    "shared-core/src/platformApi.ts:141"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

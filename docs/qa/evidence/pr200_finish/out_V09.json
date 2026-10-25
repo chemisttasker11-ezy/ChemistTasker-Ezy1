@@ -1,0 +1,132 @@
+{
+ "chunk": "V09",
+ "verdicts": [
+  {
+   "id": "F06-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Rejection changes the review status but leaves the attendance session provisional, so rebuilding still creates an unresolved provisional blocker. Rejected reviews disappear from pending reviews and cannot subsequently be approved, while this blocker cannot be resolved or waived from the timesheet. The worker's timesheet therefore prevents the whole period from being locked.",
+   "evidence": [
+    "backend/attendance/approvals.py:53",
+    "backend/attendance/approvals.py:157",
+    "backend/attendance/approvals.py:274",
+    "backend/workforce/timesheet_data.py:241",
+    "backend/workforce/timesheet_transitions.py:67",
+    "backend/workforce/timesheet_transitions.py:103",
+    "backend/workforce/timesheet_transitions.py:139",
+    "backend/attendance/test_approval_locking.py:74"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C024-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The public reset endpoint sends the live reset URL through the email helper without suppressing automatic notifications. That helper copies reset_url into a durable notification's action_url, which the user's signed-in session can read and open. Password reset confirmation requires the token and new password, with no current-password or separate mailbox check.",
+   "evidence": [
+    "backend/users/api_passwords.py:60",
+    "backend/users/api_passwords.py:70",
+    "backend/users/tasks.py:65",
+    "backend/users/tasks.py:80",
+    "backend/users/tasks.py:189",
+    "backend/notifications/services.py:80",
+    "backend/notifications/views.py:31",
+    "backend/users/api_passwords.py:43",
+    "frontend_web/src/layouts/TopBarActions.tsx:740"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F11-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Onboarding permits changing an unverified mobile number without clearing its outstanding code or timestamp. Verification checks the stored code and expiry, then marks the current number verified without checking which number received that code. The onboarding permission requires email verification only, so it does not prevent this sequence.",
+   "evidence": [
+    "backend/onboarding/views.py:293",
+    "backend/users/permissions.py:71",
+    "backend/onboarding/serializers.py:825",
+    "backend/onboarding/serializers.py:969",
+    "backend/onboarding/services/basic.py:159",
+    "backend/core/serializer_lifecycle.py:129",
+    "backend/users/otp.py:20",
+    "backend/users/api_otp.py:463",
+    "backend/users/api_otp.py:470"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F11-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Login explicitly preserves remember_me=false as session cookies. Mobile verification creates a fresh refresh token and sets replacement cookies without passing that preference; the cookie helper defaults to persistent cookies with the configured 90-day refresh lifetime. Browser startup restores authentication from cookies, so the frontend's storage preference does not prevent access after reopening.",
+   "evidence": [
+    "frontend_web/src/pages/login.tsx:60",
+    "backend/users/api_auth.py:109",
+    "backend/users/serializers.py:365",
+    "frontend_web/src/pages/MobileOTPVerify.tsx:79",
+    "backend/users/api_otp.py:477",
+    "backend/users/api_otp.py:489",
+    "backend/users/sessions.py:43",
+    "backend/core/settings.py:495",
+    "frontend_web/src/contexts/AuthContext.tsx:217",
+    "backend/users/tests.py:76"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C004-N2",
+   "verdict": "DUPLICATE_OF",
+   "severity": "P1",
+   "duplicate_of": "B04",
+   "reason": "The empty-selection undercharge shares B04's documented root cause: checkout charges quantity one without binding payment to selected unpaid offers, and the webhook finalizes all awaiting offers when selection is absent. The same-slot example also overlaps B54: the second assignment is skipped, but its offer still becomes ACCEPTED. These consequences belong with the existing billing findings.",
+   "evidence": [
+    "docs/qa/MAIN_RELEASE_AUDIT_EVIDENCE.md:60",
+    "docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md:32",
+    "backend/billing/views.py:583",
+    "backend/billing/views.py:665",
+    "backend/billing/views.py:329",
+    "backend/billing/views.py:346",
+    "backend/billing/views.py:864",
+    "backend/shifts/finalize.py:43",
+    "backend/shifts/finalize.py:98"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F08-N4",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Invitation validation and acceptance enforce only the worker's maximum number of pharmacy memberships. Acceptance activates the membership without comparing the pharmacy's internal staff count with purchased seats or creating an additional charge. Purchased staff_count is maintained separately by billing, despite pricing explicitly charging for staff beyond five; this differs from B02's inability to adjust an existing seat subscription.",
+   "evidence": [
+    "frontend_web/src/pages/PricingPage.tsx:259",
+    "frontend_web/src/pages/PricingPage.tsx:263",
+    "backend/memberships/invites.py:117",
+    "backend/memberships/serializers.py:133",
+    "backend/memberships/views.py:437",
+    "backend/memberships/views.py:443",
+    "backend/billing/models.py:39",
+    "backend/billing/views.py:826",
+    "backend/memberships/test_membership_workflows_contract.py:493"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

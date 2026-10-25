@@ -1,0 +1,132 @@
+{
+ "chunk": "V06",
+ "verdicts": [
+  {
+   "id": "C031-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Roster, membership, pharmacy and history helpers fetch one page and discard its pagination metadata; the default page size is 50. The worker roster can contain pharmacy-wide assignments before mobile filters for the current worker, so that worker's booking can disappear. The Hub-comments claim is false because its backend list explicitly returns every comment without pagination; the organization-specific pharmacy helper also follows subsequent pages.",
+   "evidence": [
+    "backend/core/settings.py:360",
+    "backend/workforce/roster/views.py:552",
+    "shared-core/src/domains/roster/api.ts:90",
+    "frontend_mobile/app/my-roster.tsx:132",
+    "shared-core/src/domains/memberships/api.ts:90",
+    "shared-core/src/domains/organizations/api.ts:25",
+    "shared-core/src/domains/shifts/api.ts:302",
+    "backend/pharmacy_hub/posts.py:413",
+    "shared-core/src/domains/organizations/api.ts:35"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F05-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An authorized manager can offer a pharmacist shift to an arbitrary candidate without checking their role. An external, verified technician with compatible payment setup can pass the AHPRA and engagement checks, accept the required terms, and receive an assignment at the pharmacist shift's rate. The membership-role guard applies to direct pharmacy employees, while external pharmacist engagements bypass the other-staff classification check.",
+   "evidence": [
+    "backend/shifts/base.py:233",
+    "backend/shifts/assignment.py:95",
+    "backend/onboarding/verification/state.py:153",
+    "backend/shifts/interest.py:61",
+    "backend/shifts/offers.py:354",
+    "backend/shifts/engagement.py:528",
+    "backend/shifts/engagement.py:580",
+    "backend/shifts/engagement.py:444",
+    "backend/shifts/finalize.py:79",
+    "backend/shifts/models.py:523"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C021-N5",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "With USE_TZ enabled, timezone.now() supplies UTC, but these filters compare its time directly against local slot end times. At 20:00 Sydney time, a same-day 17:00 slot therefore still qualifies as upcoming in both manager and worker confirmed lists, and an unassigned occurrence can remain active. The listing tests use different calendar days and do not cover this same-day clock mismatch.",
+   "evidence": [
+    "backend/core/settings.py:449",
+    "backend/shifts/lifecycle.py:148",
+    "backend/shifts/selectors.py:20",
+    "backend/shifts/my_shifts.py:20",
+    "backend/shifts/lifecycle.py:81",
+    "backend/shifts/serialization/shifts.py:403",
+    "backend/shifts/test_shift_listing_contract.py:20",
+    "backend/shifts/urls.py:40"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C021-N6",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An unrelated authenticated worker with the matching role can retrieve a PLATFORM shift through the ordinary shift-detail route. That response nests PharmacySerializer, which returns document URLs, and only anonymous postings receive pharmacy redaction. Shared-link and anonymous job-board responses strip these fields, but that protection is not used by the authenticated detail endpoint.",
+   "evidence": [
+    "backend/shifts/lifecycle.py:393",
+    "backend/shifts/serialization/shifts.py:54",
+    "backend/shifts/serialization/shifts.py:193",
+    "backend/organizations/serializers.py:76",
+    "backend/organizations/serializers.py:139",
+    "backend/organizations/serializers.py:289",
+    "backend/shifts/serialization/projections.py:134",
+    "backend/shifts/urls.py:43"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C022-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The individual pharmacy-management check recognizes assigned region admins, but managed_pharmacies omits their organization memberships. Active, confirmed and history lists consequently omit other managers' shifts at those pharmacies. Cover-request listing and approval independently omit region authority too; an existing characterization test explicitly records the managed-list discrepancy.",
+   "evidence": [
+    "backend/organizations/access.py:165",
+    "backend/organizations/access.py:194",
+    "backend/organizations/access.py:205",
+    "backend/shifts/selectors.py:13",
+    "backend/shifts/lifecycle.py:97",
+    "backend/shifts/lifecycle.py:153",
+    "backend/shifts/lifecycle.py:176",
+    "backend/shifts/worker_requests.py:49",
+    "backend/shifts/worker_requests.py:384",
+    "backend/shifts/test_access_escalation_contract.py:75"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C079-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The edit loader initializes saved per-date rates with dirty=false, while pricing recalculation runs during editing and preserves only dirty overrides. A successful guide calculation therefore replaces the saved rate, and submitting a description change includes that replacement in the slots payload. For an unassigned marketplace shift, the backend accepts and persists those replacement slots; existing payload tests do not exercise edit hydration and recalculation.",
+   "evidence": [
+    "frontend_web/shared/postShift/PostShiftForm.tsx:239",
+    "frontend_web/shared/postShift/useShiftPricing.ts:55",
+    "frontend_web/shared/postShift/useShiftPricing.ts:106",
+    "shared-core/src/domains/shifts/postingDraft.ts:46",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+    "shared-core/src/domains/shifts/api.ts:211",
+    "backend/shifts/posting.py:157",
+    "backend/shifts/posting.py:188",
+    "shared-core/src/domains/shifts/postingDraft.test.ts:19"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

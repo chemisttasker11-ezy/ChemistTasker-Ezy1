@@ -1,0 +1,117 @@
+{
+ "chunk": "W02",
+ "verdicts": [
+  {
+   "id": "C047-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The web chat opens one WebSocket per active room (/ws/chat/rooms/<id>/), so while Tom is in Omar's room he gets no message.created events for Sara's room. The badge goes to the user group, and the room onmessage handler never touches messagesMap for it. When Tom goes back to Sara's room, messagesMap[Sara] already exists, so the effect skips the refetch and calls markRoomAsReadService straight away. The ws.onopen handler also marks the room read and sets unread_count to 0. The new message stays missing until a full reload, but the conversation shows as read.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:297",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:347",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:351",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:378",
+    "backend/chat/signals.py:62",
+    "backend/chat/realtime.py:42"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C047-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "On the server the delete is clean: body, original_body and attachment are cleared, and the serializer handles is_deleted. On the client, the message.deleted handler only sets is_deleted=true and keeps the old body in messagesMap. It does not update rooms[].last_message or pinned_message. The sidebar preview and search read getLatestMessage(room.id)?.body first, and the pinned bar reads activeRoom.pinned_message, so the old text stays visible until reload. Tom already received that text, so this is stale UI in his own session, not a new leak. Hence P2.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:440",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:927",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:578",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:932",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx:122",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ConversationPanel.tsx:305",
+    "backend/chat/views.py:771"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F10-N4",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Lots.get calls admitted_pharmacy(request, 'MANAGE_OWN_STOCK') and MyListings.get calls admitted_pharmacy(..., 'PREPARE_LISTING'). Both pass no product, so evaluate_ethical_access skips the professional schedule, activity, jurisdiction and policy checks, which run only when a product is given. Both views then return every lot or listing for the pharmacy, S8 included. On-hand and reserved quantities, storage checks, source reference and listing amounts are all returned. The single-item endpoints (LotDetail, LotReconcile, Listings.post) pass product= and would refuse S8 to an S4-only professional.",
+   "evidence": [
+    "backend/ethical_marketplace/views.py:229",
+    "backend/ethical_marketplace/views.py:230",
+    "backend/ethical_marketplace/owner_views.py:36",
+    "backend/ethical_marketplace/owner_views.py:37",
+    "backend/ethical_marketplace/policy.py:50",
+    "backend/ethical_marketplace/views.py:247",
+    "backend/ethical_marketplace/serializers.py:38"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F10-N5",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "PharmacyApproval.post uses `creating` at line 121, but that variable is only assigned inside get() (line 100). It is not defined in post or at module level. serializer.save() and the EthicalAuditEvent insert run first, and ATOMIC_REQUESTS is not set, so every valid submission is saved as PENDING_REVIEW and then fails with a NameError, which returns a 500. No test posts to this endpoint; tests.py only calls GET.",
+   "evidence": [
+    "backend/ethical_marketplace/views.py:100",
+    "backend/ethical_marketplace/views.py:113",
+    "backend/ethical_marketplace/views.py:120",
+    "backend/ethical_marketplace/views.py:121",
+    "backend/core/settings.py:240"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F10-N6",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Listings.get serializes the visible listings with EthicalListingSerializer. Its lot_allocations field nests ListingLotSerializer.lot_detail, which is the full StockLotSerializer (on_hand_quantity, reserved_quantity, storage_checks, source_reference, version). listing_visible_to admits chain admins who hold only VIEW_CHAIN_ETHICAL on another pharmacy in the chain. For ORGANISATION_OWNERS and PLATFORM_OWNERS circles it also admits other owners. None of them needs MANAGE_OWN_STOCK on the source pharmacy. The leak is wider than the scenario: on non-S8 platform-circle listings, unrelated owners see these lot details too.",
+   "evidence": [
+    "backend/ethical_marketplace/views.py:286",
+    "backend/ethical_marketplace/views.py:288",
+    "backend/ethical_marketplace/serializers.py:38",
+    "backend/ethical_marketplace/serializers.py:47",
+    "backend/ethical_marketplace/serializers.py:56",
+    "backend/ethical_marketplace/policy.py:94",
+    "backend/ethical_marketplace/policy.py:100",
+    "backend/ethical_marketplace/policy.py:114"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F07-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Saving any edit to an existing invoice runs the revision branch of the save service, which sets record.status = 'draft' with no check for recorded payments. On the cash basis, bas_worksheet only counts payments on invoices whose current status is in ['sent','paid']. The Payment rows, with their gst and sales splits, still exist but drop out of the worksheet until the invoice is resent. The root cause is the worksheet's status filter on the cash basis. It differs from B58 (draft visibility) and B59 (payable below payments).",
+   "evidence": [
+    "backend/worker_finance/services.py:605",
+    "backend/worker_finance/services.py:702",
+    "backend/worker_finance/services.py:982",
+    "backend/worker_finance/views.py:626",
+    "backend/worker_finance/views.py:630",
+    "backend/worker_finance/views.py:634"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

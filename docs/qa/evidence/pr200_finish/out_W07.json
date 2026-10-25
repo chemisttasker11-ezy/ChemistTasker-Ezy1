@@ -1,0 +1,118 @@
+{
+ "chunk": "W07",
+ "verdicts": [
+  {
+   "id": "F10-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The public job board view lets anyone, without signing in, search on pharmacy__name and pharmacy__street_address. It does not skip shifts posted with post_anonymously. The serializer hides only the name and street in the response ('Anonymous Pharmacy' plus suburb, state and postcode), so a search on a guessed name or address that still returns the anonymous vacancy confirms which pharmacy it is. Nothing skips the hidden fields when the shift is anonymous.",
+   "evidence": [
+    "backend/shifts/browse.py:537",
+    "backend/shifts/browse.py:543",
+    "backend/shifts/browse.py:589",
+    "backend/shifts/browse.py:591",
+    "backend/shifts/browse.py:593",
+    "backend/shifts/serialization/shifts.py:193",
+    "backend/organizations/serializers.py:56"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F10-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "claim_referral_code checks for an existing event with .filter(...).first() and then calls create(). There is no transaction, no select_for_update and no unique constraint on PillReferralEvent: Meta has only indexes and the migrations add none. Two simultaneous first claims can each create their own event. The ledger idempotency key is referral:{event.id}:award, so each event earns its own 100 Pills. The idempotency check in _create_ledger_entry works per event, so it does not stop this.",
+   "evidence": [
+    "backend/rewards/views.py:139",
+    "backend/rewards/services.py:297",
+    "backend/rewards/services.py:333",
+    "backend/rewards/services.py:188",
+    "backend/rewards/services.py:139",
+    "backend/rewards/models.py:119",
+    "backend/rewards/migrations/0001_initial.py:106"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C020-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "manual-assign calls roster_direct_staff. That function checks only that the person has an active pharmacy membership with a FT/PT/CASUAL employment type, and staff_assignment_defaults adds only the ACCEPTED status and payroll checks. Neither one compares membership.role with shift.role_needed, and ShiftSlotAssignment.save checks only the published-roster lock. The offer path does refuse a role mismatch (engagement.py:531 via staff_membership_can_claim_role), so this is a missing guard rather than a policy choice. Existing tests cover only employment type, dates and locks, not role.",
+   "evidence": [
+    "backend/shifts/base.py:412",
+    "backend/shifts/assignment.py:137",
+    "backend/shifts/assignment.py:169",
+    "backend/shifts/engagement.py:46",
+    "backend/shifts/engagement.py:531",
+    "backend/shifts/access.py:43",
+    "backend/shifts/models.py:523",
+    "backend/shifts/test_shift_actions_contract.py:624"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C027-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Both swap approval and cover approval change only assignment.user. The old engagement_kind, engagement_terms_snapshot (membership_id, employment_type, payment preference), settlement_channel and payment_preference_snapshot stay on the assignment. validate_worker_replacement_eligibility (worker_issues) needs only an accepted active membership with a matching role, not a staff employment type, so a locum member passes. refresh_assignment_rate then prices the new worker from the old STAFF_EMPLOYMENT terms.",
+   "evidence": [
+    "backend/workforce/roster/worker_actions.py:167",
+    "backend/workforce/roster/worker_actions.py:180",
+    "backend/workforce/roster/worker_actions.py:301",
+    "backend/workforce/roster/validation.py:31",
+    "backend/workforce/roster/assignment_rates.py:11",
+    "backend/workforce/roster/assignment_rates.py:17",
+    "backend/shifts/engagement.py:47"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C027-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "_coverage_for_week counts every assignment that overlaps the requirement window at all (start < req_end and req_start < end). One assignment from 09:00 to 10:00 therefore gives is_covered=true and shortfall 0 for a 09:00-17:00 requirement, and the panel shows 'covered'. The panel is only advice: nothing blocks publishing on it, and the roster grid still shows the real hours. So the harm is a misleading status, not wrong data, which makes it P2.",
+   "evidence": [
+    "backend/workforce/roster/revisions.py:85",
+    "backend/workforce/roster/revisions.py:88",
+    "backend/workforce/roster/revisions.py:99",
+    "backend/workforce/roster/revisions.py:147",
+    "frontend_web/src/features/workforce/RosterCoveragePanel.tsx:112"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C044-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Converting a shift to an open shift sets pendingDeletionShiftId. Closing the overlay (handleClosePostShiftModal) does not clear it, and nothing else does except a successful post. handleCreateOpenShift opens the same PostShiftPage overlay with the old value still set. When that unrelated post completes, handlePostShiftCompleted deletes the original shift. Only a published-roster lock on the backend would stop the delete, and that does not cover unpublished weeks.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:553",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:852",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:866"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeA-1"
+}

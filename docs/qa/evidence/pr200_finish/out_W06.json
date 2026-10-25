@@ -1,0 +1,120 @@
+{
+ "chunk": "W06",
+ "verdicts": [
+  {
+   "id": "C074-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "When another tab signs in, the session provider sets this tab to loading and then to the new user, but it never reloads the page, and none of these components clear their state when the account changes. GoodsWorkspace (the live /marketplace/exchanges page) shows a loading screen, which unmounts its child, then remounts GoodsExchangeManager with the old account's `data`. That child copies `initial` into state once and never re-reads it, so the old account's exchange messages stay on screen even after the new user's data loads. The same thing happens after Alice logs out and Bob then logs in. GoodsListingsV2 shows old rows for one render and keeps them if Bob's load fails. EthicalWorkspaceV2 clears its rows almost at once through reload(), but it keeps Alice's pharmacy contexts until getAccess succeeds, and for good if it fails. ContentDashboard loads once on mount and never reacts to the session.",
+   "evidence": [
+    "frontend_web/landing_next/shared/session-provider.tsx:13",
+    "frontend_web/landing_next/features/marketplace/workspace.tsx:15",
+    "frontend_web/landing_next/features/marketplace/workspace.tsx:19",
+    "frontend_web/landing_next/features/marketplace/workspace.tsx:26",
+    "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:14",
+    "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:16",
+    "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:27",
+    "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:44",
+    "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:85",
+    "frontend_web/landing_next/app/content/workspace.tsx:25",
+    "frontend_web/landing_next/app/(public)/marketplace/exchanges/page.tsx:4"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F09-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The comment-create code always notifies the post author and puts up to 280 characters of the comment in the notification body. _notify_hub_post_owner checks only that the author's account is active and is not the commenter. It never re-checks group access, which the group scope requires through PharmacyCommunityGroupMembership. Removing Omar from the group only deletes his group link, so his post and his active pharmacy membership remain. notify_users then saves the notification, broadcasts it and sends an Expo push with the body. This is not B48 (mentions) or B46 (pending or left memberships), because Omar is still an active employee.",
+   "evidence": [
+    "backend/pharmacy_hub/posts.py:440",
+    "backend/pharmacy_hub/posts.py:444",
+    "backend/pharmacy_hub/notifications.py:50",
+    "backend/pharmacy_hub/notifications.py:54",
+    "backend/pharmacy_hub/access.py:271",
+    "backend/pharmacy_hub/serialization/groups.py:189",
+    "backend/notifications/services.py:88",
+    "backend/notifications/services.py:94"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C015-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The organisation-admin branch looks up organisations through the suspended user's own OrganizationMembership. That model only has the roles ORG_ADMIN, CHIEF_ADMIN and REGION_ADMIN, so an ordinary employee like Sara, who has only a pharmacy Membership, sends no organisation admin any notice, and the scenario as written does not happen. The leak happens only when the suspended person is an organisation admin themselves. In that case every ORG_ADMIN, CHIEF_ADMIN or REGION_ADMIN in the organisation gets their name and AHPRA status, whichever pharmacies they are assigned to.",
+   "evidence": [
+    "backend/onboarding/verification/state.py:349",
+    "backend/onboarding/verification/state.py:350",
+    "backend/onboarding/verification/state.py:356",
+    "backend/users/models.py:99"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C041-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "ChainPage sends a multipart PUT with only name, email and optional logo. ChainSerializer.pharmacy_ids is a writable many-to-many field with source='pharmacies', not marked required=False, and allow_empty is on by default. With HTML form input on a non-partial update, DRF's ManyRelatedField.get_value returns getlist(), which is [] here, so ModelSerializer.update calls pharmacies.set([]). Neither the view nor RemoveOldFilesMixin overrides this. It touches the same field as B17 but is a different bug: links are wiped, not foreign pharmacies attached.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:159",
+    "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:166",
+    "shared-core/src/domains/organizations/api.ts:150",
+    "backend/organizations/serializers.py:585",
+    "backend/organizations/views.py:595",
+    "backend/core/serializer_lifecycle.py:157"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F07-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Both mark-paid actions only set status='paid' (the pharmacy-side one also sets the review status) and never create a Payment row. serialize_record works out `paid` as the sum of Payment amounts and `balance` as payable minus paid, so a paid invoice still shows the full balance and $0 received, and 'Record a payment' stays enabled. The cash-basis GST worksheet adds up only Payment rows, so it leaves out the sales and GST for that invoice. The web menu tells users to use Mark as paid once the full amount has arrived.",
+   "evidence": [
+    "backend/worker_finance/views.py:251",
+    "backend/worker_finance/views.py:506",
+    "backend/worker_finance/services.py:810",
+    "backend/worker_finance/services.py:836",
+    "backend/worker_finance/views.py:634",
+    "frontend_web/src/pages/finance/FinanceWorkspace.tsx:354",
+    "frontend_web/src/pages/dashboard/sidebar/Invoices/invoiceStats.ts:101"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F06-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "lock_period reads roster rows from revision.snapshot.get('roster'). The timesheet builder puts 'roster' only in source_payload, which it hashes for the fingerprint. The stored snapshot has the keys worker, pharmacy, period, employment_engagements, days, leave and totals, with no roster. So payroll_assignment_ids is always empty, settlement routing is empty, and payroll_export comes out as [] even when payroll is on and assignments go to PAYROLL. The existing test only checks that payroll_export == [].",
+   "evidence": [
+    "backend/workforce/timesheet_transitions.py:147",
+    "backend/workforce/timesheet_transitions.py:182",
+    "backend/workforce/timesheet_builder.py:149",
+    "backend/workforce/timesheet_builder.py:183",
+    "backend/workforce/tests/test_timesheet_state_machine.py:182",
+    "backend/workforce/views.py:744"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

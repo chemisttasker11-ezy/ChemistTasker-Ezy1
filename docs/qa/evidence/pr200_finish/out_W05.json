@@ -1,0 +1,126 @@
+{
+ "chunk": "W05",
+ "verdicts": [
+  {
+   "id": "C011-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Enquiries.post looks up the receipt without a lock (services.py:46), then creates the exchange, its participants, the message and the receipt. None of this runs in a transaction: there is no @transaction.atomic on this view and no ATOMIC_REQUESTS in settings. If two requests with the same UUID arrive at the same moment, both create an exchange; the second then hits uniq_market_request_receipt and returns a 500, but its exchange is already saved. The impact is a duplicate negotiation and an error shown to the buyer. No money moves, and the live-reservation unique constraint still limits reservations to one, so this is P2.",
+   "evidence": [
+    "backend/marketplace/views.py:283",
+    "backend/marketplace/views.py:297",
+    "backend/marketplace/views.py:300",
+    "backend/marketplace/views.py:309",
+    "backend/marketplace/services.py:44",
+    "backend/marketplace/models.py:329",
+    "backend/marketplace/models.py:277"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C011-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "_membership_controller_users always adds membership.invited_by, with no check that the inviter still has a membership or MANAGE_STAFF authority. _notify_membership_response then sends that person the in-app alert and an email that includes the worker's name and email. Only someone who once had authority to invite staff at that pharmacy is exposed, and only to the response of a worker they invited themselves. That is a stale-authority leak of one contact, so P2.",
+   "evidence": [
+    "backend/memberships/notifications.py:66",
+    "backend/memberships/notifications.py:73",
+    "backend/memberships/notifications.py:145",
+    "backend/memberships/notifications.py:152",
+    "backend/memberships/notifications.py:167",
+    "backend/memberships/notifications.py:176"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C012-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "MembershipApplicationViewSet is a ModelViewSet that only requires IsAuthenticated, and it keeps the default create. Its serializer accepts invite_link as an integer primary key from MembershipInviteLink.objects.all() and never calls link.is_valid(), the active and expiry check at models.py:226. This route also skips the magic-link view's pharmacy row lock and its membership-limit check. Sequential IDs let any signed-in worker file a pending application at any pharmacy, using a disabled or expired link. A manager must still approve before a membership exists, so this is P2: an access-control bypass that produces spam applications, not direct membership.",
+   "evidence": [
+    "backend/memberships/views.py:310",
+    "backend/memberships/views.py:317",
+    "backend/memberships/serializers.py:383",
+    "backend/memberships/serializers.py:384",
+    "backend/memberships/serializers.py:423",
+    "backend/memberships/serializers.py:526",
+    "backend/memberships/views.py:261",
+    "backend/memberships/views.py:289",
+    "backend/memberships/models.py:226"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C012-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The viewset has no destroy override and no http_method_names restriction, so DELETE /membership-applications/<id>/ removes the row, including submitted_snapshot and the reviewer fields. The queryset (visible_applications) limits this to managers of that pharmacy, so only an authorised reviewer can delete records they could already see. Shared-core exposes no delete call, so the UI does not offer it. Whether managers may purge applications, for example spam, is a policy choice. The impact is loss of the audit trail inside the manager's own scope (P2). B19's cascade is a different root cause: it comes from deleting the invite link.",
+   "evidence": [
+    "backend/memberships/views.py:310",
+    "backend/memberships/views.py:324",
+    "backend/memberships/selectors.py:153",
+    "backend/memberships/models.py:233",
+    "backend/memberships/models.py:290",
+    "backend/memberships/urls.py:30",
+    "shared-core/src/domains/memberships/api.ts:49"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C071-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The bootstrap part of the claim is mostly out of reach. isLoading stays true until the /me success branch finishes, and the layouts and index hide the logout and login actions while loading. The refresh part is real: refreshAccessToken has no generation guard and calls writeStoredSession after its fetch returns. If that fetch is in flight when the user logs out, the rotated refresh token, which logout never blacklisted, is written back after clearStoredSession. On the next launch, bootstrap finds those tokens, calls /me and restores the old account. The race window is narrow, so P2.",
+   "evidence": [
+    "frontend_mobile/utils/authSession.ts:227",
+    "frontend_mobile/utils/authSession.ts:268",
+    "frontend_mobile/utils/authSession.ts:198",
+    "frontend_mobile/utils/authSession.ts:217",
+    "frontend_mobile/context/AuthContext.tsx:502",
+    "frontend_mobile/context/AuthContext.tsx:523",
+    "frontend_mobile/context/AuthContext.tsx:528",
+    "frontend_mobile/context/AuthContext.tsx:161",
+    "frontend_mobile/context/AuthContext.tsx:170",
+    "frontend_mobile/app/index.tsx:63"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C071-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Mobile logout clears local tokens and resets registeredPush, but nothing in frontend_mobile or shared-core ever calls DELETE /device-tokens/. Only registerPushDeviceToken exists. LogoutView only blacklists the refresh token, and notify_users sends to every active DeviceToken the user has. The signed-out phone therefore keeps showing alert titles and bodies until a different account registers the same token (perform_create's upsert).",
+   "evidence": [
+    "frontend_mobile/context/AuthContext.tsx:502",
+    "frontend_mobile/context/AuthContext.tsx:527",
+    "frontend_mobile/utils/pushNotifications.ts:68",
+    "shared-core/src/domains/notifications/api.ts:44",
+    "backend/users/api_auth.py:155",
+    "backend/users/api_auth.py:167",
+    "backend/notifications/views.py:44",
+    "backend/notifications/views.py:67",
+    "backend/notifications/services.py:92"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeA-1"
+}

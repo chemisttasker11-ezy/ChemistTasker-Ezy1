@@ -1,0 +1,124 @@
+{
+ "chunk": "W09",
+ "verdicts": [
+  {
+   "id": "C021-N6",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "ShiftDetailViewSet lets any signed-in worker read PLATFORM shifts for roles they can do (lifecycle.py:393). Its ShiftSerializer nests the full PharmacySerializer, which returns the URLs of methadone_s8_protocols, qld_sump_docs, sops and induction_guides. to_representation only strips pharmacy_detail when post_anonymously is true, so a named shift sends these links to anyone browsing. Only SharedShiftSerializer, used by the public board, removes these fields (projections.py:110), so the signed-in path has no equivalent guard.",
+   "evidence": [
+    "backend/shifts/lifecycle.py:393",
+    "backend/shifts/serialization/shifts.py:54",
+    "backend/shifts/serialization/shifts.py:193",
+    "backend/organizations/serializers.py:76",
+    "backend/organizations/serializers.py:139",
+    "backend/shifts/serialization/projections.py:110",
+    "backend/shifts/base.py:124"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C022-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "user_can_manage_pharmacy accepts any REGION_ADMIN assigned to the pharmacy. managed_pharmacies only counts the owner, org-wide admin roles and active PharmacyAdmin rows, so the active, confirmed and history lists (via shifts_managed_by) leave out shifts Grace did not create. Cover requests are the same: the list (worker_requests.py:49-61) and approve/reject (worker_requests.py:384-386) ignore region membership. Nothing creates PharmacyAdmin rows for region admins. The gap is already pinned as 'CURRENT BEHAVIOUR ... a separate, deliberate decision' in test_access_escalation_contract.py:75-77. It blocks work but exposes nothing, so P2.",
+   "evidence": [
+    "backend/organizations/access.py:165",
+    "backend/organizations/access.py:194",
+    "backend/organizations/access.py:205",
+    "backend/shifts/selectors.py:13",
+    "backend/shifts/lifecycle.py:97",
+    "backend/shifts/lifecycle.py:153",
+    "backend/shifts/lifecycle.py:176",
+    "backend/shifts/worker_requests.py:49",
+    "backend/shifts/worker_requests.py:57",
+    "backend/shifts/worker_requests.py:384",
+    "backend/shifts/test_access_escalation_contract.py:77"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C032-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The web edit form always sends the full slots array (postingDraft.ts:46, PostShiftForm.tsx:457). revise_shift then deletes every slot and creates new ones (posting.py:189-191), blocking this only for roster shifts. ShiftOffer.slot is SET_NULL (models.py:680), so Sara's PENDING offer survives with slot=None. On a multi-slot shift, accept then refuses it with 'Offer is missing slot selection.' (offers.py:351).",
+   "evidence": [
+    "shared-core/src/domains/shifts/postingDraft.ts:46",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+    "backend/shifts/serialization/shifts.py:355",
+    "backend/shifts/posting.py:157",
+    "backend/shifts/posting.py:189",
+    "backend/shifts/models.py:680",
+    "backend/shifts/offers.py:351"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C041-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "accept_counter_offer turns only one slot into a worker offer: the chosen slot_id, or the first unassigned one when none is given. It still marks the whole counter offer ACCEPTED (counter_offers.py:143). The list endpoint returns only PENDING counter offers (counter_offers.py:29-31), and the web hook filters to PENDING and drops the accepted one from state. Tom therefore can no longer see the second date's proposed terms, even though the backend would accept them per slot (line 124). Tom can still make a direct offer, so the impact is a lost workflow rather than money or data: P2.",
+   "evidence": [
+    "backend/shifts/counter_offers.py:29",
+    "backend/shifts/counter_offers.py:116",
+    "backend/shifts/counter_offers.py:124",
+    "backend/shifts/counter_offers.py:143",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:28",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:56"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C041-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "For non-public tiers, useTabData fetches member status once per entry in shift.slots (useTabData.ts:45-58), so a full- or part-time job with no slots never calls the endpoint. Such jobs are valid (test_shift_posting_contract.py:363) and appear in the active list (lifecycle.py:105). With single_user_only set, the backend would return them without a slot_id, filtering interests on slot null (candidates.py:226,233). The card then shows an empty consolidatedMembers list, so Omar's interest is never shown.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:45",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:65",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:196",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:212",
+    "backend/shifts/candidates.py:226",
+    "backend/shifts/candidates.py:233",
+    "backend/shifts/lifecycle.py:105",
+    "backend/shifts/test_shift_posting_contract.py:363"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C079-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "On edit, PostShiftForm loads the saved per-date rates with dirty:false (PostShiftForm.tsx:239). When expandedSlots first fills, reconcileShiftDraftRateRows runs against an empty previous list and returns blank rows (useShiftPricing.ts:49, draftSlots.ts:36-39). calculateShiftRates then fills every non-dirty row with the calculated guide (useShiftPricing.ts:105-110). Saving only the description therefore resubmits $60 in the slots payload, and revise_shift writes it to the new slots.",
+   "evidence": [
+    "frontend_web/shared/postShift/useShiftPricing.ts:49",
+    "frontend_web/shared/postShift/useShiftPricing.ts:106",
+    "shared-core/src/domains/shifts/draftSlots.ts:38",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:239",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+    "shared-core/src/domains/shifts/postingDraft.ts:46",
+    "backend/shifts/posting.py:189"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeA-1"
+}

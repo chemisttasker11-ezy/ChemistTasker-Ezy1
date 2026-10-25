@@ -1,0 +1,114 @@
+{
+ "chunk": "W03",
+ "verdicts": [
+  {
+   "id": "C016-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Groups have no private or restricted flag (models.py:12-41). The hub context lists every group of the user's pharmacies to all staff by design (context.py:139-162), so seeing the group name and description is intended. The real gap is narrower. With include_members=true, list and retrieve return the full member roster (including members from sister pharmacies) to any staff member of that pharmacy. Group content itself needs group membership (access.py:271). Whether rosters should be limited to group members or admins is an owner decision.",
+   "evidence": [
+    "backend/pharmacy_hub/groups.py:37",
+    "backend/pharmacy_hub/groups.py:42",
+    "backend/pharmacy_hub/groups.py:52",
+    "backend/pharmacy_hub/groups.py:101",
+    "backend/pharmacy_hub/serialization/groups.py:236",
+    "backend/pharmacy_hub/context.py:150",
+    "backend/pharmacy_hub/access.py:271",
+    "shared-core/src/domains/pharmacyHub/api.ts:28"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C016-N2",
+   "verdict": "REFUTED",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "'pharmacy' is in HubCommunityGroupSerializer.Meta.read_only_fields, so DRF drops any pharmacy value sent in a PATCH. perform_update calls serializer.save() with no pharmacy argument. The group cannot be moved to another pharmacy through this endpoint.",
+   "evidence": [
+    "backend/pharmacy_hub/serialization/groups.py:75",
+    "backend/pharmacy_hub/groups.py:145"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "F09-N4",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "When neither user has an active Membership, platform_scope returns request_membership=None, and Sara's poll was saved with created_by_membership=None. _assert_can_manage_poll compares poll.created_by_membership_id (None) with getattr(None,'id',None) (None), so None == None makes Zoe count as the creator. Zoe can PATCH the poll, and new choices delete all votes (serializer update), or she can DELETE it. The same None==None match applies to organisation-role users without a Membership. The UI's can_manage stays false for Zoe, so this is reachable through the API only.",
+   "evidence": [
+    "backend/pharmacy_hub/polls.py:141",
+    "backend/pharmacy_hub/polls.py:143",
+    "backend/pharmacy_hub/polls.py:154",
+    "backend/pharmacy_hub/polls.py:160",
+    "backend/pharmacy_hub/access.py:338",
+    "backend/pharmacy_hub/serialization/polls.py:128",
+    "backend/pharmacy_hub/serialization/polls.py:150"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "F09-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "A group post is saved with both pharmacy and community_group set (posts.py:235-236). PharmacyHubPost.community_group uses on_delete=SET_NULL, and destroy just calls instance.delete() with no signal or cleanup. After the group is deleted, the post matches the pharmacy feed filter (pharmacy=A, community_group null, organization null). from_post then authorises it through pharmacy_scope, so any pharmacy member can read the post, its comments and its attachments.",
+   "evidence": [
+    "backend/pharmacy_hub/models.py:147",
+    "backend/pharmacy_hub/posts.py:235",
+    "backend/pharmacy_hub/groups.py:153",
+    "backend/pharmacy_hub/scoping.py:156",
+    "backend/pharmacy_hub/access.py:362",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx:421"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F07-N4",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "send() releases its row lock before rendering and SMTP. save_draft does not check for a delivery that is still in flight, so it can lock the row and bump the version to v2 with status draft. When the email finishes, the code runs Invoice.objects.filter(pk=...).update(status='sent') with no version check. That marks v2 as sent, and owner_visible_document then shows v2 to the pharmacy. It is real but needs a concurrent save within the few seconds of the SMTP window, so I rate it P2.",
+   "evidence": [
+    "backend/worker_finance/views.py:272",
+    "backend/worker_finance/views.py:307",
+    "backend/worker_finance/views.py:316",
+    "backend/worker_finance/services.py:598",
+    "backend/worker_finance/services.py:693",
+    "backend/worker_finance/services.py:702",
+    "backend/worker_finance/services.py:772"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C021-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Flexible-timing shifts accept counteroffers with different times (offers.py:123). Accepting one stores those times only on ShiftOffer.offered_start/end_time (and in the terms snapshot occurrences). The ShiftSlotAssignment created in finalize has no start or end time fields, and nothing changes the slot. The invoice line computes hours from slot.start_time and slot.end_time, so a 10:00-14:00 agreement on a 09:00-17:00 slot is billed as 8 hours. The rate does use the agreed rate.",
+   "evidence": [
+    "backend/shifts/serialization/offers.py:123",
+    "backend/shifts/counter_offers.py:164",
+    "backend/shifts/engagement.py:272",
+    "backend/shifts/finalize.py:79",
+    "backend/invoicing/services.py:96",
+    "backend/invoicing/services.py:99"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

@@ -1,0 +1,47 @@
+{
+ "chunk": "W11",
+ "verdicts": [
+  {
+   "id": "C029-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Once an engagement has started, PATCH takes the started branch. That branch only checks that effective_to is not in the past. It then sets row.effective_to, which can be null or any future date, and saves. It never calls build_employment_engagement_payload, which is the only place the junior next-birthday check (next_rate_review_date) runs. The model's clean() checks only date order, rates and overlap, and nothing else reads next_rate_review_date. So removing or extending the end date succeeds, the junior rates stay, and staff_assignment_defaults will pick this engagement for work after the birthday. The only test calls the payload builder directly and never exercises PATCH.",
+   "evidence": [
+    "backend/workforce/views.py:362",
+    "backend/workforce/views.py:377",
+    "backend/workforce/views.py:387",
+    "backend/workforce/views.py:391",
+    "backend/workforce/views.py:416",
+    "backend/workforce/employment_engagement_service.py:109",
+    "backend/workforce/models.py:145",
+    "backend/shifts/engagement.py:84",
+    "backend/workforce/tests/test_employment.py:314"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C029-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Creating a successor engagement (or PATCHing one) fires no signal that sets Timesheet.needs_rebuild. signals.py does this for attendance, assignments, leave, MembershipWorkSettings and RosterPeriod, but not for EmploymentEngagement. lock_period only blocks on needs_rebuild=True or on timesheets that are not APPROVED. It then writes the latest revision's stale employment_engagement_public_ids into the manifest and the payroll export. The impact is narrower than claimed: a successor cannot start before today (views.py:311), so only work from today onward in an already-approved open period is affected, usually just today's shift.",
+   "evidence": [
+    "backend/workforce/views.py:311",
+    "backend/workforce/views.py:339",
+    "backend/workforce/views.py:417",
+    "backend/workforce/signals.py:186",
+    "backend/workforce/timesheet_builder.py:66",
+    "backend/workforce/timesheet_builder.py:191",
+    "backend/workforce/timesheet_transitions.py:137",
+    "backend/workforce/timesheet_transitions.py:168"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

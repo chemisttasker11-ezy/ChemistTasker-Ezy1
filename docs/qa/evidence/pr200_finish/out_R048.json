@@ -1,0 +1,201 @@
+{
+ "chunk": "R048",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/MessageComposer.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/NewChatModal.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no confirmed problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/chatFormat.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shared formatting re-export."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/types.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Chat types and member cache definitions reviewed."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/useConversationScroll.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; scrolling and pagination state reviewed."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.helpers.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Submission guard, error handling and comment tree reviewed."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "B22",
+    "N1",
+    "N2",
+    "N3"
+   ],
+   "note": "Poll edits erase votes, pagination stops early, and failed poll submissions lose drafts; known organisation poll exposure."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "N3"
+   ],
+   "note": "Poll editor resubmits every choice and clears fields after failed saves."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubGroupModal.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; member selection and edit payload reviewed."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; context selection and group/profile handlers reviewed."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N4"
+   ],
+   "note": "Successful comment submission clears text entered while the request was pending."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N4"
+   ],
+   "note": "Comment and reply fields remain editable, but pending submissions later clear their current contents."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubProfileModals.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; profile updates and error handling reviewed."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubSections.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; scoped feed keys, group actions and member loaders reviewed."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Hub",
+   "title": "Correcting a poll question silently deletes every existing vote.",
+   "scenario": "Tom creates a poll, and Omar and Ali vote. Tom corrects a spelling mistake in the question without changing any choices. Saving the edit deletes both votes without warning.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx:121",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:315",
+    "backend/pharmacy_hub/polls.py:162",
+    "backend/pharmacy_hub/serialization/polls.py:149"
+   ],
+   "confidence": "high",
+   "test_needed": "Edit only the question of a poll with existing votes through the web editor; assert option identities and all votes remain unchanged.",
+   "owner_question": {
+    "question": "When Tom corrects only a poll question, what should happen to Omar's and Ali's votes?",
+    "options": [
+     "Preserve their votes and the existing choices",
+     "Prevent Tom from editing after voting begins",
+     "Erase their votes whenever Tom saves an edit (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Hub",
+   "title": "The web Hub never loads posts or polls beyond the first 50.",
+   "scenario": "Tom publishes 51 updates in the pharmacy Hub. Omar can see only the newest 50 because scrolling never requests older updates. Following a notification to the oldest update also fails to reveal it.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:145",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:170",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:187",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:604",
+    "shared-core/src/domains/pharmacyHub/api.ts:157",
+    "shared-core/src/domains/pharmacyHub/api.ts:163",
+    "backend/pharmacy_hub/posts.py:192",
+    "backend/pharmacy_hub/polls.py:95",
+    "backend/core/settings.py:361"
+   ],
+   "confidence": "high",
+   "test_needed": "Populate a Hub with 51 posts and 51 polls; assert Omar can reach both second pages and open a notification targeting the oldest post.",
+   "owner_question": {
+    "question": "How should Omar access Tom's updates once the pharmacy Hub contains more than 50 posts?",
+    "options": [
+     "Load older updates as Omar scrolls",
+     "Offer pages or a Load more button",
+     "Show only the first 50 updates (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Hub",
+   "title": "A failed poll save erases the question and choices.",
+   "scenario": "Tom writes a poll question and five choices, then submits it during a connection failure. The dialog displays an error but clears everything Tom entered. Tom must recreate the poll before retrying.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:325",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx:126"
+   ],
+   "confidence": "high",
+   "test_needed": "Reject the poll save request and assert the error appears while the original question and every choice remain available for retry.",
+   "owner_question": {
+    "question": "When Tom's poll cannot be saved, what should happen to his question and choices?",
+    "options": [
+     "Keep everything in the dialog for retry",
+     "Preserve a draft that Tom can reopen",
+     "Clear the question and choices (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Hub",
+   "title": "Comment submissions erase text typed while the earlier comment is sending.",
+   "scenario": "Omar submits a comment on Tom's post over a slow connection, then starts typing his next comment in the still-editable field. When the first comment finishes sending, Omar's new text disappears. The same loss occurs with post replies and poll comments.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:165",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:172",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:552",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx:141",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx:142",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx:338"
+   ],
+   "confidence": "high",
+   "test_needed": "Delay a comment response, enter additional text while it is pending, then resolve it; assert the additional text survives for post comments, replies and poll comments.",
+   "owner_question": {
+    "question": "While Omar's comment is sending, how should the comment field behave?",
+    "options": [
+     "Allow typing and preserve any newly entered text",
+     "Disable editing until the submission finishes",
+     "Allow typing but clear it when sending finishes (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-1"
+}

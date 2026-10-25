@@ -1,0 +1,96 @@
+{
+ "chunk": "V16",
+ "verdicts": [
+  {
+   "id": "C047-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Expired availability posts disappear from the feed that the editor uses to find the user's existing post. The editor therefore submits a create request, which the explorer one-post check rejects even when the previous post has expired. Delete Pitch also requires the missing existingPostId; direct API editing remains possible, but this screen provides no recovery.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:486",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:560",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:703",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:811",
+    "backend/talent/views/explorer.py:126",
+    "backend/talent/views/explorer.py:182",
+    "backend/talent/models.py:127",
+    "backend/talent/test_newcomer_rules.py:72",
+    "backend/talent/test_explorer_api.py:60"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C028-N4",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Attendance corrections invalidate only periods containing the session's original local clock-in date, although attendance calculations include and clip sessions across period boundaries. The Monday period therefore keeps its old minutes, approval, and false needs_rebuild flag. Neither opening its detail nor locking it checks the source fingerprint again, so the stale approved period can be locked.",
+   "evidence": [
+    "backend/attendance/urls.py:55",
+    "backend/attendance/views.py:228",
+    "backend/attendance/approvals.py:383",
+    "backend/workforce/signals.py:21",
+    "backend/workforce/signals.py:41",
+    "backend/workforce/signals.py:61",
+    "backend/workforce/timesheet_data.py:206",
+    "backend/workforce/timesheet_data.py:256",
+    "backend/workforce/views.py:783",
+    "backend/workforce/timesheet_transitions.py:132",
+    "backend/workforce/tests/test_timesheet_state_machine.py:168"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C028-N5",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An authorized manager can archive a published roster without first locking its timesheets, and saving the archived status invalidates overlapping unlocked timesheets. Rebuilding excludes that week's assignments because roster inputs require PUBLISHED status, so scheduled minutes and leave minutes derived from those assignments disappear. Approved leave records remain approved, while the worker roster explicitly retains archived weeks as published history.",
+   "evidence": [
+    "backend/workforce/roster/urls.py:49",
+    "backend/workforce/roster/v2_views.py:233",
+    "backend/workforce/roster/publication.py:123",
+    "backend/workforce/roster/publication.py:177",
+    "backend/workforce/signals.py:199",
+    "backend/workforce/timesheet_data.py:150",
+    "backend/workforce/timesheet_data.py:182",
+    "backend/workforce/timesheet_builder.py:96",
+    "backend/workforce/timesheet_builder.py:124",
+    "backend/workforce/tests/test_timesheets.py:359"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C038-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The cited links reach the wildcard 404 when served by Vite without the public-site handoff, including the production routing configuration with PUBLIC_SITE_ENABLED disabled. The broader claim overlooks the Next /dashboard account gate, staging's explicit routing to that gate, and Vite's optional cross-origin bridge. This is a conditional P2 navigation defect in the standalone or rollback configuration, rather than a universal onboarding failure.",
+   "evidence": [
+    "frontend_web/src/pages/MobileOTPVerify.tsx:97",
+    "frontend_web/src/pages/MembershipApplyPage.tsx:386",
+    "frontend_web/src/pages/PricingPage.tsx:110",
+    "frontend_web/src/main.tsx:589",
+    "frontend_web/src/components/PublicRouteBridge.tsx:11",
+    "frontend_web/landing_next/app/dashboard/page.tsx:6",
+    "frontend_web/landing_next/migrated/utils/dashboardPath.ts:10",
+    "nginx/templates/default.conf.template:13",
+    "nginx/templates/default.conf.template:101",
+    "nginx/staging.conf:56",
+    "RUN-WEB.md:67"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

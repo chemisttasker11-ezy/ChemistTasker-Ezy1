@@ -1,0 +1,124 @@
+{
+ "chunk": "V10",
+ "verdicts": [
+  {
+   "id": "F08-N5",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Account deletion deactivates and anonymizes Tom, revokes credentials and returns success without checking or cancelling billing. Base and extra-seat checkout each create recurring Stripe subscriptions, and no deletion helper or user-save hook stops them. The mobile flow then signs Tom out.",
+   "evidence": [
+    "frontend_mobile/roles/owner/profile.tsx:393",
+    "backend/core/api_v1_urls.py:30",
+    "backend/users/api_account.py:76",
+    "backend/users/account_deletion.py:92",
+    "backend/billing/views.py:440",
+    "backend/billing/views.py:522"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "C005-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The standard room PATCH uses the update mixin with authentication and room visibility checks, but no creator/admin authorization. Its serializer accepts any active membership and replaces participants while preserving the creator; the dedicated group action's restrictions are bypassed. Sara can then read historical messages through GET /api/v1/messages/, whose queryset checks participant membership without requiring membership in the conversation's pharmacy.",
+   "evidence": [
+    "backend/chat/urls.py:9",
+    "backend/chat/views.py:50",
+    "backend/chat/views.py:92",
+    "backend/chat/views.py:104",
+    "backend/chat/views.py:453",
+    "backend/chat/views.py:457",
+    "backend/chat/serializers.py:265",
+    "backend/chat/serializers.py:308",
+    "backend/chat/views.py:667"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C047-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Switching rooms closes the previous room socket, so Sara's subsequent message does not enter Tom's cached conversation. Reopening a cached room skips the message fetch and immediately marks it read; socket connection also marks it read without replaying missed messages. The backend advances last_read_at to the current time, clearing unread status for messages Tom has not seen.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:297",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:305",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:350",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:515",
+    "backend/chat/consumers.py:63",
+    "backend/chat/signals.py:63",
+    "backend/chat/views.py:653"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C047-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The deletion event sets only is_deleted in cached messages, retaining their body and leaving room previews and personal pin snapshots unchanged. Sidebar preview/search and the pinned banner render those retained bodies without checking deletion, while the bubble shows the deletion notice. This is P2 stale client content already delivered to the recipient: the backend clears the stored body and scrubs deleted-message serialization, so a fresh page load removes the old text.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:428",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:578",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:932",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx:122",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ConversationPanel.tsx:327",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ConversationHeader.tsx:73",
+    "backend/chat/views.py:771",
+    "backend/chat/serializers.py:74"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C016-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The registered endpoint is /api/v1/hub/groups/, where pharmacy membership permits listing every pharmacy group and include_members=true exposes its active staff roster without group authorization. The group membership guard remains effective for group content, so this is P2 metadata and roster exposure rather than access to private posts. The owner should clarify discovery and roster privacy: existing context tests already expect nonmembers to receive group names.",
+   "evidence": [
+    "backend/pharmacy_hub/urls.py:46",
+    "backend/pharmacy_hub/groups.py:39",
+    "backend/pharmacy_hub/groups.py:101",
+    "backend/pharmacy_hub/groups.py:108",
+    "backend/pharmacy_hub/serialization/groups.py:206",
+    "backend/pharmacy_hub/serialization/groups.py:234",
+    "backend/pharmacy_hub/access.py:271",
+    "backend/pharmacy_hub/test_hub_scope_contract.py:59"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C025-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "For legacy invoices without a request key, the migration reuses the first customer matching only the invoice owner and bill-to name. It builds each migrated customer snapshot from that reused customer, overriding the second invoice's original email, address and ABN in the canonical payload. The finance screen/PDF uses that payload, and sending the migrated invoice takes its recipient directly from the incorrect customer snapshot.",
+   "evidence": [
+    "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:60",
+    "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:62",
+    "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:118",
+    "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:136",
+    "backend/worker_finance/urls.py:8",
+    "backend/worker_finance/views.py:277",
+    "backend/worker_finance/services.py:824",
+    "backend/worker_finance/templates/worker_finance/invoice.html:21"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

@@ -1,0 +1,130 @@
+{
+ "chunk": "V12",
+ "verdicts": [
+  {
+   "id": "C063-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The API returns membership records with names and email nested under userDetails, but searchParticipants filters only top-level fields. New Chat, New Group and Add members all use that filter, so normal name/email searches return no results. The DM fallback also treats the membership ID as a user ID, although the broken search currently prevents ordinary users from reaching that selection.",
+   "evidence": [
+    "backend/chat/serializers.py:379",
+    "backend/chat/views.py:863",
+    "shared-core/src/domains/chat/mappers.ts:61",
+    "frontend_mobile/roles/shared/chat/hooks.ts:64",
+    "frontend_mobile/roles/shared/chat/NewChatModal.tsx:59",
+    "frontend_mobile/roles/shared/chat/NewGroupModal.tsx:33",
+    "frontend_mobile/roles/shared/chat/GroupManageModal.tsx:77",
+    "backend/chat/views.py:366"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C071-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Successful startup hydration and profile hydration write session/user state without checking whether login or logout occurred while awaiting their responses. Refresh likewise persists its captured account's tokens after completion, while clearStoredSession neither cancels nor invalidates the pending refresh. The mutation counter protects only a later fallback branch, and subsequent API requests read the overwritten tokens. This differs from B52's acceptance of an unverified cached startup identity.",
+   "evidence": [
+    "frontend_mobile/context/AuthContext.tsx:163",
+    "frontend_mobile/context/AuthContext.tsx:170",
+    "frontend_mobile/context/AuthContext.tsx:191",
+    "frontend_mobile/context/AuthContext.tsx:275",
+    "frontend_mobile/context/AuthContext.tsx:443",
+    "frontend_mobile/context/AuthContext.tsx:523",
+    "frontend_mobile/utils/authSession.ts:217",
+    "frontend_mobile/utils/authSession.ts:268",
+    "frontend_mobile/utils/apiClient.ts:43"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C074-N1",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "SessionProvider changes identity without remounting or clearing the workspace components, whose requests are not tied to an account generation. Ethical contexts survive account changes, GoodsWorkspace retains old exchanges, and GoodsListingsV2 exposes retained rows after a failed reload. The exchange manager copies initial rows into state without synchronizing subsequent props, allowing old messages to persist after successful replacement data arrives. ContentDashboard and its moderation panel do not watch session changes at all; backend access checks cannot remove data already retained in these screens.",
+   "evidence": [
+    "frontend_web/landing_next/shared/session-provider.tsx:11",
+    "frontend_web/landing_next/shared/session-provider.tsx:14",
+    "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:27",
+    "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:85",
+    "frontend_web/landing_next/features/marketplace/workspace.tsx:15",
+    "frontend_web/landing_next/features/marketplace/workspace.tsx:26",
+    "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:14",
+    "frontend_web/landing_next/app/content/workspace.tsx:25",
+    "frontend_web/landing_next/app/content/workspace.tsx:76",
+    "backend/public_hub/content_views.py:39"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "F05-N2",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Managers can send Explorer candidates offers without checking payment-profile readiness. Acceptance routes an external Explorer through OtherStaffOnboarding and returns the stated 400 when that profile is absent; verified ExplorerOnboarding does not satisfy it. The scope is external newcomers: existing direct staff have a separate branch that can bypass this requirement. The owner must choose a supported newcomer engagement/payment path or prevent these offers before sending them.",
+   "evidence": [
+    "backend/shifts/base.py:255",
+    "backend/shifts/assignment.py:95",
+    "backend/shifts/offers.py:169",
+    "backend/shifts/offers.py:360",
+    "backend/shifts/engagement.py:25",
+    "backend/shifts/engagement.py:245",
+    "backend/shifts/engagement.py:528",
+    "backend/shifts/engagement.py:580",
+    "backend/onboarding/models.py:541"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "C023-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Work-note updates authorize the old pharmacy while allowing pharmacy changes, and assignee validation checks the submitted destination pharmacy. An active staff member can therefore move an accessible note into a foreign pharmacy and assign its active members; notifications can follow when enabled. Event creation checks only the pharmacy when both pharmacy and organization are supplied, while organization reads include that saved organization ID. Neither serializer nor model adds a destination authorization or consistency guard.",
+   "evidence": [
+    "backend/team_calendar/views.py:154",
+    "backend/team_calendar/views.py:377",
+    "backend/team_calendar/serializers.py:61",
+    "backend/team_calendar/serializers.py:78",
+    "backend/team_calendar/serializers.py:119",
+    "backend/team_calendar/views.py:241",
+    "backend/team_calendar/views.py:217",
+    "backend/team_calendar/models.py:66",
+    "backend/team_calendar/tasks.py:303"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C041-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The edit form sends multipart FormData containing name, email and optional logo, but no pharmacy_ids, using PUT. For a full multipart update, the serializer's many-valued relationship receives an empty list for the omitted field, and the inherited update replaces the pharmacy links with that list. ChainViewSet and the file-handling mixin do not preserve the relationship. This is destructive omission handling, distinct from B17's missing ownership validation for supplied pharmacy IDs.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:159",
+    "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:166",
+    "shared-core/src/domains/organizations/api.ts:150",
+    "backend/organizations/views.py:595",
+    "backend/organizations/serializers.py:585",
+    "backend/core/serializer_lifecycle.py:157",
+    "backend/shifts/candidates.py:263"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

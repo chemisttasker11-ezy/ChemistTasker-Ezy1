@@ -15,7 +15,7 @@ const STACK = 'C:\\dev\\my-stack';
 const HOME = process.env.USERPROFILE;
 const TIMEOUT_MIN = 45, CLAIM_MIN = 55;
 // A: keep 5h headroom for the orchestrator session (same account). B: keep its week for the next 3 days.
-const GUARD = { claudeA: { five: 75, week: 99 }, claudeB: { five: 85, week: 50 } };
+const GUARD = { claudeA: { five: 85, week: 96 }, claudeB: { five: 85, week: 50 } };
 const LIMIT_RE = /rate.?limit|usage limit|quota|\b429\b|RESOURCE_EXHAUSTED|\b401\b|logged out|not logged in|hit your limit|hit your session limit|out of credits/i;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -64,7 +64,7 @@ const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf
 const pick = process.argv.includes('--slots') ? process.argv[process.argv.indexOf('--slots') + 1].split(',') : null;
 const ids = list => list.map(c => c.id).filter(id => !only || only.includes(id));
 const Q = { flow: ids(flows), deep: ids(chunks.filter(isDeep)), broad: ids(chunks.filter(c => !isDeep(c))),
-  vA: ids(vbatches.filter(b => b.checker === 'codexA')), vB: ids(vbatches.filter(b => b.checker === 'codexB')),
+  vA: ids(vbatches.filter(b => b.checker === 'codexA')), vB: ids(vbatches.filter(b => b.checker === 'codexB')), vC: ids(vbatches.filter(b => b.checker === 'claude')),
   // F13 = rest of F12 parity; Rxxx = real re-read of chunks the online pass only fetched.
   extra: ['F13', 'R046', 'R048', 'R076', 'R077'].filter(id => !only || only.includes(id)) };
 const attempts = {};
@@ -104,8 +104,8 @@ const RUNNERS = {
 
 // Flow traces are cross-file reasoning: Claude takes them first, Codex helps; agy only gets broad file chunks.
 const SLOTS = [
-  ...[1, 2, 3].map(i => ({ name: `claudeA-${i}`, acct: 'claudeA', queues: [Q.flow, Q.deep, Q.broad], go: RUNNERS.claude('A', 'claude-opus-5-5', 'high') })),
-  ...[1, 2].map(i => ({ name: `claudeB-${i}`, acct: 'claudeB', queues: [Q.deep, Q.flow, Q.broad], go: RUNNERS.claude('B', 'claude-opus-5-5', 'high') })),
+  ...[1, 2, 3].map(i => ({ name: `claudeA-${i}`, acct: 'claudeA', queues: [Q.vC, Q.flow, Q.deep, Q.broad], go: RUNNERS.claude('A', 'claude-opus-5-5', 'high') })),
+  ...[1, 2].map(i => ({ name: `claudeB-${i}`, acct: 'claudeB', queues: [Q.vC, Q.deep, Q.flow, Q.broad], go: RUNNERS.claude('B', 'claude-opus-5-5', 'high') })),
   ...[1, 2, 3, 4].map(i => ({ name: `codexA-${i}`, acct: 'codexA', queues: [Q.vA, Q.extra, Q.deep, Q.flow, Q.broad], go: RUNNERS.codex('A') })),
   ...[1, 2, 3, 4].map(i => ({ name: `codexB-${i}`, acct: 'codexB', queues: [Q.vB, Q.extra, Q.deep, Q.flow, Q.broad], go: RUNNERS.codex('B') })),
   ...['g1', 'g2', 'g3'].flatMap(g => [1, 2].map(i => ({ name: i > 1 ? `agy-${g}-${i}` : `agy-${g}`, acct: `agy${g}`, queues: [Q.broad, Q.deep, Q.flow], go: RUNNERS.agy(g, `C:\\dev\\worktrees\\chemisttasker-pr200-${g}${i > 1 ? '-' + i : ''}`) }))),
