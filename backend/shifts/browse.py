@@ -23,6 +23,7 @@ from django.db.models import Count, F, Q
 from django.utils import timezone
 from shifts.pricing import get_locked_rate_for_slot
 from shifts.engagement import staff_assignment_defaults
+from shifts.selectors import _future_or_current_slot_q
 from shifts.access import staff_membership_can_claim_role
 from shifts.emails import build_roster_email_link, build_shift_email_context
 from django.conf import settings
@@ -73,7 +74,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
             slot_count=Count('slots', distinct=True)
         ).filter(
             Q(employment_type__in=['FULL_TIME', 'PART_TIME'], slot_count=0) |
-            Q(slots__date__gte=date.today())
+            _future_or_current_slot_q(timezone.now(), date.today(), prefix="slots__")
         )
         # Scope by pharmacy when requested
         pharmacy_id = self.request.query_params.get('pharmacy')
@@ -88,7 +89,8 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 start_date = date.fromisoformat(start_date_str)
                 qs = qs.filter(
                     Q(employment_type__in=['FULL_TIME', 'PART_TIME'], slot_count=0) |
-                    Q(slots__date__gte=start_date)
+                    Q(slots__date__gte=start_date) |
+                    Q(slots__is_recurring=True, slots__recurring_end_date__gte=start_date)
                 )
             except ValueError:
                 pass
@@ -115,6 +117,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 pharmacy__memberships__user=user,
                 pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
+                pharmacy__memberships__status=Membership.Status.ACCEPTED,
             )
             |
             # 2. Any active member at this pharmacy (for locum_casual)
@@ -123,6 +126,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 pharmacy__memberships__user=user,
                 pharmacy__memberships__employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
+                pharmacy__memberships__status=Membership.Status.ACCEPTED,
             )
             |
             Q(
@@ -131,6 +135,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 pharmacy__memberships__user=user,
                 pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
+                pharmacy__memberships__status=Membership.Status.ACCEPTED,
             )
             |
             Q(
@@ -141,6 +146,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                     PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES
                 ),
                 pharmacy__memberships__is_active=True,
+                pharmacy__memberships__status=Membership.Status.ACCEPTED,
             )
             |
             # 3. Any active member at any pharmacy with the same owner as the shift’s pharmacy
@@ -149,6 +155,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 pharmacy__owner__in=Pharmacy.objects.filter(
                     memberships__user=user,
                     memberships__is_active=True,
+                    memberships__status=Membership.Status.ACCEPTED,
                     memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 ).values_list('owner', flat=True)
             )
@@ -159,6 +166,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 pharmacy__organization__in=Pharmacy.objects.filter(
                     memberships__user=user,
                     memberships__is_active=True,
+                    memberships__status=Membership.Status.ACCEPTED,
                     memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 ).values_list('organization', flat=True)
             )
@@ -279,6 +287,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 user=user,
                 pharmacy=shift.pharmacy,
                 is_active=True,
+                status=Membership.Status.ACCEPTED,
             ).first()
 
             if not membership:
@@ -438,11 +447,7 @@ class PublicShiftViewSet(BaseShiftViewSet):
             slot_count=Count('slots', distinct=True)
         ).filter(
             Q(employment_type__in=['FULL_TIME', 'PART_TIME'], slot_count=0) |
-            Q(slots__date__gte=date.today())
-        ).filter(
-            Q(employment_type__in=['FULL_TIME', 'PART_TIME'], slot_count=0) |
-            Q(slots__date__gt=today) |
-            Q(slots__date=today, slots__end_time__gt=now.time())
+            _future_or_current_slot_q(now, today, prefix="slots__")
         )
 
         user = self.request.user
@@ -523,7 +528,8 @@ class PublicShiftViewSet(BaseShiftViewSet):
                 end_d = date.fromisoformat(end_date_param) if end_date_param else date(2100, 1, 1)
                 qs = qs.filter(
                     Q(slot_count=0) |
-                    Q(slots__date__range=(start_d, end_d))
+                    Q(slots__date__range=(start_d, end_d)) |
+                    Q(slots__is_recurring=True, slots__date__lte=end_d, slots__recurring_end_date__gte=start_d)
                 )
             except ValueError:
                 pass
@@ -564,8 +570,7 @@ class PublicJobBoardView(generics.ListAPIView):
             Q(assigned_count__lt=F('slot_count'))                              # open, unassigned slots
         ).filter(
             Q(employment_type__in=['FULL_TIME', 'PART_TIME'], slot_count=0) |  # slotless FT/PT
-            Q(slots__date__gt=today) |                                        # future slots
-            Q(slots__date=today, slots__end_time__gt=now.time())              # today but still active
+            _future_or_current_slot_q(now, today, prefix="slots__")
         )
 
         # --- Filters from query params (mirror PublicShiftViewSet but without role gating) ---
@@ -643,7 +648,8 @@ class PublicJobBoardView(generics.ListAPIView):
                 end_d = date.fromisoformat(end_date_param) if end_date_param else date(2100, 1, 1)
                 qs = qs.filter(
                     Q(slot_count=0) |
-                    Q(slots__date__range=(start_d, end_d))
+                    Q(slots__date__range=(start_d, end_d)) |
+                    Q(slots__is_recurring=True, slots__date__lte=end_d, slots__recurring_end_date__gte=start_d)
                 )
             except ValueError:
                 pass

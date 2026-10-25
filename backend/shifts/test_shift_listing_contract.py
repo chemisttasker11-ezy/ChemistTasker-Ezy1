@@ -20,6 +20,108 @@ API = "/api/v1/"
 SOON = date.today() + timedelta(days=7)
 PAST = date.today() - timedelta(days=7)
 
+
+class ShiftVisibilitySafetyTests(TestCase):
+    def setUp(self):
+        self.owner, self.pharmacy = make_owner_with_pharmacy('Visibility safety')
+        self.worker = make_user('PHARMACIST')
+        PharmacistOnboarding.objects.create(user=self.worker, verified=True)
+        self.shift = Shift.objects.create(pharmacy=self.pharmacy, created_by=self.owner, role_needed='PHARMACIST',
+                                          employment_type='LOCUM', visibility='PLATFORM', single_user_only=False)
+        self.slot = ShiftSlot.objects.create(shift=self.shift, date=SOON, start_time=time(9), end_time=time(17))
+
+    def rows(self, user, endpoint):
+        response = client_for(user).get(f'{API}{endpoint}')
+        self.assertEqual(response.status_code, 200, response.data)
+        return response.data.get('results', []) if isinstance(response.data, dict) else response.data
+
+    def test_f01_n1_only_manager_and_the_worker_see_booking_identities(self):
+        from shifts.models import ShiftOffer
+        booked = make_user('PHARMACIST')
+        pending = make_user('PHARMACIST')
+        ShiftSlotAssignment.objects.create(shift=self.shift, slot=self.slot, slot_date=SOON, user=booked)
+        ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=pending,
+                                  status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        for viewer, assigned, awaiting in [(self.worker, [], []), (booked, [booked.id], []),
+                                           (pending, [], [pending.id]), (self.owner, [booked.id], [pending.id])]:
+            response = client_for(viewer).get(f'{API}shifts/{self.shift.id}/')
+            self.assertEqual(response.status_code, 200, response.data)
+            self.assertEqual([row['user_id'] for row in response.data['slot_assignments']], assigned)
+            self.assertEqual([row['candidate_user_id'] for row in response.data['payment_options']], awaiting)
+
+    def test_c021_n6_public_detail_hides_internal_documents_from_browsers(self):
+        self.pharmacy.sops = 'private/sop.pdf'
+        self.pharmacy.induction_guides = 'private/induction.pdf'
+        self.pharmacy.save(update_fields=['sops', 'induction_guides'])
+        for viewer, visible in [(self.worker, False), (self.owner, True)]:
+            response = client_for(viewer).get(f'{API}shifts/{self.shift.id}/')
+            self.assertEqual(response.status_code, 200, response.data)
+            detail = response.data['pharmacy_detail']
+            if visible:
+                self.assertIn('private/sop.pdf', detail['sops'])
+            else:
+                self.assertFalse({'sops', 'induction_guides', 'qld_sump_docs', 'methadone_s8_protocols'} & detail.keys())
+
+    def test_b41_pending_and_rejected_members_cannot_browse_private_shifts(self):
+        self.shift.visibility = 'FULL_PART_TIME'
+        self.shift.save(update_fields=['visibility'])
+        membership = Membership.objects.create(user=self.worker, pharmacy=self.pharmacy, role='PHARMACIST',
+                                               employment_type='FULL_TIME', is_active=True)
+        for state in (Membership.Status.PENDING, Membership.Status.REJECTED, Membership.Status.ACCEPTED):
+            membership.status = state
+            membership.save(update_fields=['status'])
+            response = client_for(self.worker).get(f'{API}shifts/{self.shift.id}/')
+            self.assertEqual(response.status_code, 200 if state == Membership.Status.ACCEPTED else 404)
+            rows = self.rows(self.worker, 'community-shifts/')
+            self.assertEqual([row['id'] for row in rows], [self.shift.id] if state == Membership.Status.ACCEPTED else [])
+
+    def test_b65_pricing_preview_requires_pharmacy_management(self):
+        for user, expected in ((self.worker, 403), (self.owner, 200)):
+            response = client_for(user).post(f'{API}shifts/calculate-rates/',
+                                             {'pharmacyId': self.pharmacy.id, 'role': 'PHARMACIST', 'slots': []}, format='json')
+            self.assertEqual(response.status_code, expected, response.data)
+
+    def test_c020_n3_recurring_vacancy_remains_on_all_boards_after_start_date(self):
+        self.slot.date = PAST - timedelta(days=7)
+        self.slot.is_recurring = True
+        self.slot.recurring_days = list(range(7))
+        self.slot.recurring_end_date = SOON
+        self.slot.save()
+        Membership.objects.create(user=self.worker, pharmacy=self.pharmacy, role='PHARMACIST',
+                                  employment_type='FULL_TIME', status=Membership.Status.ACCEPTED, is_active=True)
+        for endpoint in ('community-shifts/', 'public-shifts/', 'public-job-board/'):
+            self.assertIn(self.shift.id, [row['id'] for row in self.rows(self.worker, endpoint)])
+            dated = f'{endpoint}?start_date={SOON - timedelta(days=1)}&end_date={SOON}'
+            self.assertIn(self.shift.id, [row['id'] for row in self.rows(self.worker, dated)])
+        self.slot.recurring_end_date = PAST
+        self.slot.save(update_fields=['recurring_end_date'])
+        for endpoint in ('community-shifts/', 'public-shifts/', 'public-job-board/'):
+            self.assertNotIn(self.shift.id, [row['id'] for row in self.rows(self.worker, endpoint)])
+
+    def test_c021_n5_boards_and_lifecycle_use_each_pharmacy_clock(self):
+        from datetime import datetime, timezone as dt_timezone
+        stamp = datetime(2026, 10, 26, 9, 0, tzinfo=dt_timezone.utc)
+        self.pharmacy.timezone = 'Australia/Sydney'
+        self.pharmacy.save(update_fields=['timezone'])
+        self.slot.date = stamp.date()
+        self.slot.save(update_fields=['date'])
+        with mock.patch('django.utils.timezone.now', return_value=stamp):
+            for endpoint in ('public-shifts/', 'public-job-board/', 'shifts/active/'):
+                viewer = self.owner if endpoint == 'shifts/active/' else self.worker
+                self.assertNotIn(self.shift.id, [row['id'] for row in self.rows(viewer, endpoint)])
+            assignment = ShiftSlotAssignment.objects.create(shift=self.shift, slot=self.slot,
+                                                             slot_date=self.slot.date, user=self.worker)
+            for endpoint, viewer in (('shifts/confirmed/', self.owner), ('my-confirmed-shifts/', self.worker)):
+                self.assertNotIn(self.shift.id, [row['id'] for row in self.rows(viewer, endpoint)])
+            assignment.delete()
+            self.pharmacy.timezone = 'Australia/Perth'
+            self.pharmacy.save(update_fields=['timezone'])
+            self.slot.end_time = time(18)
+            self.slot.save(update_fields=['end_time'])
+            for endpoint in ('public-shifts/', 'public-job-board/', 'shifts/active/'):
+                viewer = self.owner if endpoint == 'shifts/active/' else self.worker
+                self.assertIn(self.shift.id, [row['id'] for row in self.rows(viewer, endpoint)])
+
 ENDPOINTS = [
     "community-shifts/",
     "public-shifts/",
