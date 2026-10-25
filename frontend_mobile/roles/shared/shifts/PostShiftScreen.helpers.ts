@@ -1,4 +1,4 @@
-import { getPharmacyHolidayInfo } from '@chemisttasker/shared-core';
+import { getPharmacyHoursForDate } from '@chemisttasker/shared-core';
 export const ROLE_OPTIONS = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 export const EMPLOYMENT_TYPES = ['LOCUM', 'PART_TIME', 'FULL_TIME'];
 export const PRIMARY = '#7c3aed';
@@ -94,6 +94,9 @@ export type PharmacyHoursForDate = SlotTime & {
     closed: boolean;
     label: string;
     isPublicHoliday: boolean;
+    holidayNeedsReview: boolean;
+    holidayStatus: string;
+    partDayWindows: import('@chemisttasker/shared-core').PharmacyHolidayWindow[];
 };
 
 export type PharmacyOption = {
@@ -115,67 +118,11 @@ export type ShiftDescriptionTemplate = {
     description: string;
 };
 
-const readPharmacyValue = (pharmacy: any, snake: string, camel?: string) =>
-    pharmacy?.[snake] ?? (camel ? pharmacy?.[camel] : undefined);
-
-const normalizeHour = (value: unknown): string => {
-    if (typeof value !== 'string') return '';
-    return value ? value.slice(0, 5) : '';
-};
-
-const toCamelHoursKey = (prefix: string, suffix: 'start' | 'end' | 'closed') =>
-    `${prefix}_${suffix}`.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
-
 export const pharmacyHoursForDate = (
-    pharmacy: PharmacyOption | undefined,
-    date: string,
-    fallback: SlotTime,
-): PharmacyHoursForDate => {
-    if (!pharmacy || !date) {
-        return { ...fallback, closed: false, label: 'selected day', isPublicHoliday: false };
-    }
-
-    const parsed = new Date(`${date}T00:00:00`);
-    const weekday = Number.isNaN(parsed.getTime()) ? -1 : parsed.getDay();
-    const holiday = getPharmacyHolidayInfo(date, pharmacy);
-    const isPublicHoliday = holiday.fullDay;
-    const prefix = isPublicHoliday
-        ? 'public_holidays'
-        : weekday === 0
-            ? 'sundays'
-            : weekday === 6
-                ? 'saturdays'
-                : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'][weekday - 1] || '';
-    const label = isPublicHoliday
-        ? 'public holiday'
-        : weekday === 0
-            ? 'Sunday'
-            : weekday === 6
-                ? 'Saturday'
-                : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][weekday - 1] || 'selected day';
-
-    if (!prefix) {
-        return { ...fallback, closed: false, label, isPublicHoliday };
-    }
-
-    const start = normalizeHour(
-        readPharmacyValue(pharmacy, `${prefix}_start`, toCamelHoursKey(prefix, 'start')),
-    );
-    const end = normalizeHour(
-        readPharmacyValue(pharmacy, `${prefix}_end`, toCamelHoursKey(prefix, 'end')),
-    );
-    const closed = Boolean(
-        readPharmacyValue(pharmacy, `${prefix}_closed`, toCamelHoursKey(prefix, 'closed')),
-    );
-
-    return {
-        startTime: start || fallback.startTime,
-        endTime: end || fallback.endTime,
-        closed,
-        label: holiday.partDayWindows.length ? `${label} (part-day public holiday)` : label,
-        isPublicHoliday,
-    };
-};
+  pharmacy: PharmacyOption | undefined,
+  date: string,
+  fallback: SlotTime,
+): PharmacyHoursForDate => getPharmacyHoursForDate(pharmacy, date, fallback);
 
 export const toIsoDate = (value: string): Date | null => {
     if (!value) return null;

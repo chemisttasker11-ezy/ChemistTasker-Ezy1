@@ -73,3 +73,79 @@ export function getPharmacyHolidayInfo(
     : status;
   return { fullDay, partDayWindows, requiresReview, status: dateStatus };
 }
+
+export interface PharmacyHours {
+  startTime: string;
+  endTime: string;
+  closed: boolean;
+  label: string;
+  isPublicHoliday: boolean;
+  holidayNeedsReview: boolean;
+  holidayStatus: string;
+  partDayWindows: PharmacyHolidayWindow[];
+}
+
+const normalizeHour = (value: unknown): string =>
+  typeof value === 'string' ? value.slice(0, 5) : '';
+
+const readDayValue = (
+  record: Record<string, unknown>, prefix: string,
+  suffix: 'start' | 'end' | 'closed',
+): unknown => {
+  const snake = `${prefix}_${suffix}`;
+  const camel = snake.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase());
+  return record[snake] ?? record[camel];
+};
+
+/**
+ * Identical pharmacy-hours/holiday presentation for Vite, Next and Expo.
+ * All legal dates, declaration scope and rates arrive from the backend.
+ * This function does not calculate public holiday entitlement or wages.
+ */
+export function getPharmacyHoursForDate(
+  pharmacy: unknown,
+  date: string,
+  fallback: { startTime: string; endTime: string },
+): PharmacyHours {
+  if (!pharmacy || !date) {
+    return {
+      ...fallback, closed: false, label: 'selected day',
+      isPublicHoliday: false, holidayNeedsReview: false,
+      holidayStatus: 'NOT_SELECTED', partDayWindows: [],
+    };
+  }
+  const record = asRecord(pharmacy);
+  const holiday = getPharmacyHolidayInfo(date, pharmacy);
+  const day = new Date(`${date}T00:00:00`);
+  const weekday = Number.isNaN(day.getTime()) ? -1 : day.getDay();
+  const prefix = holiday.fullDay
+    ? 'public_holidays'
+    : weekday === 0
+      ? 'sundays'
+      : weekday === 6
+        ? 'saturdays'
+        : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'][weekday - 1] || '';
+  const name = holiday.fullDay
+    ? 'public holiday'
+    : weekday === 0
+      ? 'Sunday'
+      : weekday === 6
+        ? 'Saturday'
+        : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][weekday - 1] || 'selected day';
+  const details = {
+    label: holiday.partDayWindows.length ? `${name} (part-day public holiday)` : name,
+    isPublicHoliday: holiday.fullDay,
+    holidayNeedsReview: holiday.requiresReview,
+    holidayStatus: holiday.status,
+    partDayWindows: holiday.partDayWindows,
+  };
+  if (!prefix) {
+    return { ...fallback, closed: false, ...details };
+  }
+  return {
+    startTime: normalizeHour(readDayValue(record, prefix, 'start')) || fallback.startTime,
+    endTime: normalizeHour(readDayValue(record, prefix, 'end')) || fallback.endTime,
+    closed: Boolean(readDayValue(record, prefix, 'closed')),
+    ...details,
+  };
+}

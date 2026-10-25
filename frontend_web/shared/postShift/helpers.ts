@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import moment from 'moment';
 import { momentLocalizer } from 'react-big-calendar';
 import type { PharmacySummary } from '@chemisttasker/shared-core';
-import { ORG_ROLES, getPharmacyHolidayInfo } from '@chemisttasker/shared-core';
+import { ORG_ROLES, getPharmacyHoursForDate } from '@chemisttasker/shared-core';
 
 export type PharmacyOption = PharmacySummary & { hasChain?: boolean; claimed?: boolean };
 
@@ -19,6 +19,9 @@ export type PharmacyHoursForDate = SlotTime & {
   closed: boolean;
   label: string;
   isPublicHoliday: boolean;
+  holidayNeedsReview: boolean;
+  holidayStatus: string;
+  partDayWindows: import('@chemisttasker/shared-core').PharmacyHolidayWindow[];
 };
 
 export interface SlotEntry {
@@ -221,67 +224,11 @@ export const describeRecurringDays = (days: number[]) => {
   return ordered.map((day) => DAY_LABELS_SHORT[day]).join(' / ');
 };
 
-const readPharmacyValue = (pharmacy: any, snake: string, camel?: string) =>
-  pharmacy?.[snake] ?? (camel ? pharmacy?.[camel] : undefined);
-
-const normalizeHour = (value: unknown): string => {
-  if (typeof value !== 'string') return '';
-  return value ? value.slice(0, 5) : '';
-};
-
-const toCamelHoursKey = (prefix: string, suffix: 'start' | 'end' | 'closed') =>
-  `${prefix}_${suffix}`.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
-
 export const pharmacyHoursForDate = (
   pharmacy: PharmacyOption | undefined,
   date: string,
   fallback: SlotTime,
-): PharmacyHoursForDate => {
-  if (!pharmacy || !date) {
-    return { ...fallback, closed: false, label: 'selected day', isPublicHoliday: false };
-  }
-
-  const parsed = dayjs(date);
-  const holiday = getPharmacyHolidayInfo(date, pharmacy);
-  const isPublicHoliday = holiday.fullDay;
-  const weekday = parsed.isValid() ? parsed.day() : -1;
-  const prefix = isPublicHoliday
-    ? 'public_holidays'
-    : weekday === 0
-      ? 'sundays'
-      : weekday === 6
-        ? 'saturdays'
-        : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'][weekday - 1] || '';
-  const label = isPublicHoliday
-    ? 'public holiday'
-    : weekday === 0
-      ? 'Sunday'
-      : weekday === 6
-        ? 'Saturday'
-        : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][weekday - 1] || 'selected day';
-
-  if (!prefix) {
-    return { ...fallback, closed: false, label, isPublicHoliday };
-  }
-
-  const start = normalizeHour(
-    readPharmacyValue(pharmacy, `${prefix}_start`, toCamelHoursKey(prefix, 'start')),
-  );
-  const end = normalizeHour(
-    readPharmacyValue(pharmacy, `${prefix}_end`, toCamelHoursKey(prefix, 'end')),
-  );
-  const closed = Boolean(
-    readPharmacyValue(pharmacy, `${prefix}_closed`, toCamelHoursKey(prefix, 'closed')),
-  );
-
-  return {
-    startTime: start || fallback.startTime,
-    endTime: end || fallback.endTime,
-    closed,
-    label: holiday.partDayWindows.length ? `${label} (part-day public holiday)` : label,
-    isPublicHoliday,
-  };
-};
+): PharmacyHoursForDate => getPharmacyHoursForDate(pharmacy, date, fallback);
 
 export const ORG_ROLE_VALUES = ORG_ROLES as readonly string[];
 
