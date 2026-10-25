@@ -170,5 +170,15 @@
     "B71": "Acceptance notification transaction ordering; not completed"
   },
   "policy": "Preserve all source finding IDs with canonical/alias relationships; never silently delete historical candidates; exclude REFUTED_SOURCE from active blocker counts; S3 remains not executed.",
-  "review_update": "2026-10-25 extended duplicate triage from detailed C/F scenarios and overlapping immutable evidence paths; S3 unexecuted; root-group labels not runtime proven"
+  "review_update": "2026-10-25 expanded second source challenges; preserve all aliases and C016-N2 refutation. Source check not S3.",
+  "new_source_challenge_ids": [
+    "B01",
+    "F07-N1",
+    "F08-N3",
+    "F09-N1",
+    "F10-N5",
+    "C064-N1",
+    "F12-N1"
+  ],
+  "distinctness_note": "F07-N1 customer_id=0 editor mismatch; F08-N3 related but distinct from F02-N1 (external payment); F09-N1 restricted group deletion; F10-N5 valid POST NameError; C064-N1 conditional old SG; F12-N1 native failure UX vs backend authorization B51. No new IDs or proven new roots."
 }

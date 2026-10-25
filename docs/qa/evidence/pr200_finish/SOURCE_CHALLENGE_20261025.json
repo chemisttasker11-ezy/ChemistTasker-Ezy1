@@ -153,13 +153,133 @@
       ],
       "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
       "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "B01",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "The fulfillment checkout calculates is_subscriber but selects regular-rate Stripe price IDs regardless. This is source-level price selection only; actual charge not reproduced.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L633",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L651",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/tests.py#L25"
+      ],
+      "negative_test": "Subscribed owner: test Stripe checkout items equal subscriber tier and no double charge on replay.",
+      "positive_test": "Nonsubscriber checkout uses correct standard price and subscription entitlement remains correct.",
+      "existing_test_gap": "Billing tests focus on webhook replay/authority, not subscriber price selection.",
+      "runtime": "NOT_EXECUTED",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "reviewer": "same_online_assistant_20261025"
+    },
+    {
+      "id": "F07-N1",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Internal invoice prefill sends customer_id=0 with pharmacy snapshot; both Vite and Expo editors reject falsy customer_id before save, but server save_draft explicitly accepts 0 for internal assignments, resolving pharmacy Customer. Direct service-level test succeeds and cannot certify the UI.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/worker_finance/services.py#L352",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/worker_finance/services.py#L629",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/finance/InvoiceComposer.tsx#L132",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx#L198",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/invoicing/test_integrity.py#L143"
+      ],
+      "negative_test": "From accepted shift in both editors with no saved Customer, save must reach backend rather than show Select customer; mismatched pharmacy must fail.",
+      "positive_test": "Persist correct pharmacy/customer/source snapshot and create revision once.",
+      "existing_test_gap": "Existing backend service test saves 0 ID directly; browser/native editor test missing.",
+      "runtime": "NOT_EXECUTED",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "reviewer": "same_online_assistant_20261025"
+    },
+    {
+      "id": "F08-N3",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Checkout can remain open after deleting source shift; webhook creates ShiftPayment referencing shift metadata then finalizes if shift exists. Source shows no checkout invalidation tied to deletion; Stripe debit and exact DB result not reproduced.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx#L136",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L839",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/models.py#L85",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/tests.py#L25"
+      ],
+      "negative_test": "Open Stripe checkout then delete shift, complete sandbox checkout and deliver webhook; no unaccounted money, dangling payment or invalid assignment.",
+      "positive_test": "Valid checkout finalizes exactly once with durable payment/assignment and safe replay.",
+      "existing_test_gap": "Webhook retry test exists but does not simulate deleted shift during external checkout.",
+      "runtime": "NOT_EXECUTED",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "reviewer": "same_online_assistant_20261025"
+    },
+    {
+      "id": "F09-N1",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Group deletion calls instance.delete; PharmacyHubPost.community_group FK on_delete SET_NULL; pharmacy-feed queryset includes community_group__isnull=True. A former restricted group post may become visible to other same-pharmacy staff, not a proven cross-pharmacy leak.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/groups.py#L147",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/models.py#L143",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/scoping.py#L156",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx#L420"
+      ],
+      "negative_test": "Create restricted group post, delete group, assert same-pharmacy nonmember cannot list/detail/search former content.",
+      "positive_test": "Appropriately authorized retained members can access according to archival policy; unrelated staff cannot.",
+      "existing_test_gap": "Hub scope tests cover access but not delete-group -> post read widening.",
+      "runtime": "NOT_EXECUTED",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "reviewer": "same_online_assistant_20261025"
+    },
+    {
+      "id": "F10-N5",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "PharmacyApproval.post references 'creating' in response expression, but variable was declared only in get; NameError on valid POST after serializer.save and audit event create. Transaction persistence or rollback must be checked in runtime.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/ethical_marketplace/views.py#L100",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/ethical_marketplace/views.py#L121",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/ethical_marketplace/tests.py#L20"
+      ],
+      "negative_test": "Valid first/second application POST must never 500 or leave indeterminate state; invalid inputs do not mutate audit trail.",
+      "positive_test": "New application returns 201, update returns 200 with exactly one correct approval/audit entry.",
+      "existing_test_gap": "Ethical tests cover application GET and gates, not successful POST.",
+      "runtime": "NOT_EXECUTED",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "reviewer": "same_online_assistant_20261025"
+    },
+    {
+      "id": "C064-N1",
+      "status": "SOURCE_SUPPORTED_CONDITIONAL",
+      "reason": "Legacy Expo InvoiceGenerate defaults super rate to 10, overwriting only when onboarding snapshot is truthy; legacy invoicing services computes generated super from snapshot. SG is generally 12% in 2026 but individual eligibility, historical dates and contract terms matter.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx#L115",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx#L152",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/invoicing/services.py#L175",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/invoices/InvoiceList.tsx#L52"
+      ],
+      "negative_test": "Eligible 2026 user without saved rate must not generate legacy super at stale 10%; verify applicable rate/context.",
+      "positive_test": "Correct eligible 2026 SG or explicit historically valid/noneligible rate; preserve lawful historical invoice states.",
+      "existing_test_gap": "No executed legacy mobile default-rate/eligibility test found.",
+      "runtime": "NOT_EXECUTED",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "reviewer": "same_online_assistant_20261025"
+    },
+    {
+      "id": "F12-N1",
+      "status": "SOURCE_SUPPORTED_UI_SCOPE",
+      "reason": "Expo direct text send catch only console.error and keeps draft without local alert; Vite MessageComposer shows explicit send error. Attachment flow is different; global native error overlay still unverified.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/messages/[id].tsx#L435",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/chat/MessageComposer.tsx#L179",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/chat/api.ts#L112"
+      ],
+      "negative_test": "Offline Expo text send must show visible failure and retain draft; retry when connected should send once.",
+      "positive_test": "Successful native and Vite send appears once with correct room authorization.",
+      "existing_test_gap": "No native offline message UX test executed.",
+      "runtime": "NOT_EXECUTED",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "reviewer": "same_online_assistant_20261025"
     }
   ],
   "summary": {
-    "source_supported": 11,
+    "source_supported": 16,
+    "source_supported_conditional_or_ui": 2,
     "source_supported_duplicate_root": 1,
     "refuted_source": 1,
     "second_agent_certified": 0,
-    "runtime_passed": 0
-  }
+    "runtime_passed": 0,
+    "total_challenged": 20
+  },
+  "review_update": "Second source challenge extended from 13 to 20 entries; source checks by SAME online assistant, no independent P1 reviewer or S3 tests. B-series historical candidate included without creating new finding ID."
 }

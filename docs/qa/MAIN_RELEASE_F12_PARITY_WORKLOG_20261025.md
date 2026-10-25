@@ -1,6 +1,6 @@
 # F12 — cross-client parity evidence, bounded continuation (25 October 2026)
 
-**State: IN PROGRESS / not yet a completed F12 flow.** Frozen source baseline `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. Zero runtime tests; no HTTP/browser/device comparison was run. No app source modified.
+**State: 14/14 requested source comparison actions recorded; full cross-platform parity and security NOT VERIFIED.** Frozen source baseline `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. Zero runtime tests; no HTTP/browser/device comparison was run. No app source modified.
 
 ## Checked semantic slices
 
@@ -19,4 +19,21 @@ Both Vite and Expo source have persisted counter-offer badges; displaying user-f
 
 ## Required finish to close F12
 
-For each seven core actions, capture exact request body, URL, active persona and pharmacy, backend view permission, service/DB side effects, status transition and UI error/result on **Vite, Next and Expo**. Test positive and negative scenarios under fixed fixtures, with Stripe and PostgreSQL concurrency where pertinent. Record test runs with commit and logs; do not infer success from unit-test source. F12 remains explicitly incomplete.
+For all 14 source-compared actions, capture exact request body, URL, active persona and pharmacy, backend view permission, service/DB side effects, status transition and UI error/result on **Vite, Next and Expo**. Test positive and negative scenarios under fixed fixtures, with Stripe and PostgreSQL concurrency where pertinent. Record test runs with commit and logs; do not infer success from unit-test source. F12 remains explicitly incomplete.
+
+
+## Fourteen-action continuation — source comparison, not release signoff
+
+The original seven source comparisons remain. Seven further source traces cover authentication, Stripe/subscriptions, private Hub groups, notification push revocation, talent booking handoff, roster/cover cancellation, and cross-tenant shift edits. **Next private-dashboard parity is not inferred from a public Hub endpoint or an existing Vite handoff.** Test cases and immutable links for all fourteen actions are in [out_F12.json](evidence/pr200_finish/out_F12.json).
+
+| ID | Journey | Vite | Next / handoff | Expo | S3 |
+|---|---|---|---|---|---|
+| F12-A8 | authentication login refresh logout | Vite AuthContext reconciles cookies/bearer and user storage. | Next session-provider generation-guards async reload and logout events; migrated auth context needs browser test. | Expo AuthContext bootstrap/login/refreshUser writes identity after async await without generation guard (C071-N1). | NOT_EXECUTED |
+| F12-A9 | stripe subscription and shift checkout | Web owner billing posts subscription checkout; shift payment redirects via chargeShiftFulfillment. | Next authenticated payment screen not separately verified; dashboard handoff to Vite not equal Next parity. | Expo subscription-seats POSTs same checkout with platform=mobile and Linking.openURL, shift checkout likewise. | NOT_EXECUTED |
+| F12-A10 | hub group posts and privacy | Vite HubPage group delete, edit, feed; same shared Hub domain transport. | Next hub-server is publicContent publishing/reader, not proof authenticated private group Hub parity. | Expo HubScreen group management and HubFeed post/comment/poll via shared Hub API. | NOT_EXECUTED |
+| F12-A11 | notification inbox push logout | Vite notifications facade delegates fetch + mark-read shared API. | Next session provider clears identity on logout; independently tested authenticated notification UI absent from evidence. | Expo registers Expo push DeviceToken on login; logout clears local state but not server DeviceToken. | NOT_EXECUTED |
+| F12-A12 | dedicated talent booking post | Vite dashboard PostShiftForm handles dedicated_user and audience controls. | Next migrated TalentBoard sets dedicated_user then drops embedded before Vite post-shift navigation; not direct Next persistence. | Expo talent board/PostShiftScreen composes draft with audience and date; no exact private booking runtime check. | NOT_EXECUTED |
+| F12-A13 | cover request and roster cancellation | Vite roster worker cover request and owner approve/remove in Roster pages. | No independent authenticated Next cover workflow path verified. | Expo my-roster worker request and parity roster owner approval. | NOT_EXECUTED |
+| F12-A14 | shift edit tenant and payment integrity | Vite editable ShiftForm uses same shared shifts API mutation. | Next migrated board delegates edit / dashboard handoff, no independent protected patch validation. | Expo PostShiftScreen chooses pharmacy/rates, invokes shift APIs. | NOT_EXECUTED |
+
+**Direct source-level differences:** Next counter-offer reconciliation uses concurrent individual calls, Vite a batch and Expo serial individual requests; transport divergence alone is not a defect. Vite shows a visible failed-chat-send error, Expo's direct-text handler only logs it (F12-N1). Invoice prefill customer_id=0 blocks Vite/Expo editor Save even though server can resolve it (F07-N1). Expo logout leaves active push token server-side (C071-N2/F09-N3/F11-N2 one root), and its async refresh bootstrap lacks post-await generation validation (C071-N1). Group delete may widen Hub private-post audience (F09-N1), subject to a same-pharmacy nonmember HTTP test. Next migrated TalentBoard deletes embedded when handing dedicated booking to the Vite post form; do not claim private audience policy is verified. Legacy native invoice super default is a conditional stale 10% (C064-N1). All parity acceptance tests, Stripe sandbox, two-tenant API, browser and Android/iOS runs are **NOT_EXECUTED**.
