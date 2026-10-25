@@ -53,6 +53,7 @@ export interface AttendanceTimeline {
   session_id: number;
   pharmacy_id: number;
   pharmacy_name: string;
+  pharmacy_timezone: string;
   worker_id: number;
   worker_name: string;
   is_provisional: boolean;

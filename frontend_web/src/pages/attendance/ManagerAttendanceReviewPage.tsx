@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import {
   Alert,
   Box,
@@ -35,6 +37,10 @@ import { InitialsAvatar } from "../../components/ui/InitialsAvatar";
 import { Pill } from "../../components/ui/Pill";
 import { type StatusTone } from "../../components/ui/tone";
 import { humanizeEnum } from "../../utils/labels";
+import { correctionTimestamp } from "./correctionTimestamp";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const COVER_TYPES: Record<string, { label: string; tone: StatusTone; hint: string }> = {
   UNROSTERED_LOCAL: { label: "Not on the roster", tone: "blue", hint: "Worked at this pharmacy without a rostered shift." },
@@ -43,7 +49,7 @@ const COVER_TYPES: Record<string, { label: string; tone: StatusTone; hint: strin
 };
 
 const EVENT_TONES: Record<string, StatusTone> = { CLOCK_IN: "green", CLOCK_OUT: "navy" };
-const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const timeOf = (iso: string, timeZone?: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone });
 
 type PendingReview = {
   provisional_id: number;
@@ -74,6 +80,7 @@ type SessionTimelineData = {
   session_id: number;
   pharmacy_id: number;
   pharmacy_name: string;
+  pharmacy_timezone: string;
   worker_id: number;
   worker_name: string;
   is_provisional: boolean;
@@ -102,6 +109,7 @@ export default function ManagerAttendanceReviewPage() {
   // Timeline / Correction Modal
   const [timelineSessionId, setTimelineSessionId] = useState<number | null>(null);
   const [timelineData, setTimelineData] = useState<SessionTimelineData | null>(null);
+  const pharmacyTimezone = timelineData?.pharmacy_timezone;
   const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [timelineFailed, setTimelineFailed] = useState(false);
   const [pharmaciesLoading, setPharmaciesLoading] = useState(true);
@@ -231,11 +239,13 @@ export default function ManagerAttendanceReviewPage() {
   // Submit Manual Event Correction
   const handleSubmitCorrection = async () => {
     if (!editingEventId || !correctedTimestamp || !correctionReason.trim()) return;
+    const original = timelineData?.timeline.find((event) => event.event_id === editingEventId)?.effective_timestamp;
+    if (!original || !pharmacyTimezone) return;
     setSubmittingCorrection(true);
     try {
       await attendance.correct(
         editingEventId,
-        new Date(correctedTimestamp).toISOString(),
+        correctionTimestamp(correctedTimestamp, original, pharmacyTimezone),
         correctionReason.trim()
       );
       setAlertMsg({
@@ -520,11 +530,11 @@ export default function ManagerAttendanceReviewPage() {
                         <TableCell>
                           <Pill tone={EVENT_TONES[ev.event_type] ?? "amber"} label={humanizeEnum(ev.event_type)} />
                         </TableCell>
-                        <TableCell sx={{ fontVariantNumeric: "tabular-nums" }}>{timeOf(ev.original_timestamp)}</TableCell>
+                        <TableCell sx={{ fontVariantNumeric: "tabular-nums" }}>{timeOf(ev.original_timestamp, pharmacyTimezone)}</TableCell>
                         <TableCell sx={{ fontVariantNumeric: "tabular-nums" }}>
                           {ev.is_corrected ? (
                             <Stack spacing={0.5} alignItems="flex-start">
-                              <Box component="span" sx={{ fontWeight: 600, color: "var(--ct-accent-strong)" }}>{timeOf(ev.effective_timestamp)}</Box>
+                              <Box component="span" sx={{ fontWeight: 600, color: "var(--ct-accent-strong)" }}>{timeOf(ev.effective_timestamp, pharmacyTimezone)}</Box>
                               <Pill tone="violet" label="Corrected" title={ev.correction_reason || undefined} />
                             </Stack>
                           ) : (
@@ -537,8 +547,8 @@ export default function ManagerAttendanceReviewPage() {
                               aria-label={`Correct ${humanizeEnum(ev.event_type).toLowerCase()} time`}
                               onClick={() => {
                                 setEditingEventId(ev.event_id);
-                                // datetime-local is wall-clock time: show the same local time as the table, which saving reads back as local.
-                                setCorrectedTimestamp(dayjs(ev.effective_timestamp).format("YYYY-MM-DDTHH:mm"));
+                                // Both directions use pharmacy wall time even when the manager's browser is elsewhere.
+                                setCorrectedTimestamp(dayjs(ev.effective_timestamp).tz(pharmacyTimezone).format("YYYY-MM-DDTHH:mm"));
                                 setCorrectionReason("");
                               }}
                               sx={{ width: 40, height: 40 }}
@@ -569,6 +579,7 @@ export default function ManagerAttendanceReviewPage() {
                         fullWidth
                         size="small"
                         InputLabelProps={{ shrink: true }}
+                        helperText="Unchanged times keep their recorded offset. Edited repeated times use the earlier occurrence."
                       />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
