@@ -3,8 +3,8 @@
   "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "reviewer": "gpt6-senior-20261025",
   "review_level": "S1 FULL SOURCE FETCH + ANNOTATED FIRST-PASS; not independent S2 semantic certification or S3 test",
-  "status": "INCOMPLETE",
-  "source_read_count": 56,
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
+  "source_read_count": 70,
   "files": [
     {
       "path": "frontend_web/e2e/support/start-authenticated-stack.mjs",
@@ -593,6 +593,132 @@
       "lines": 6,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
       "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/api/[...path]/route.ts",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "83be8ae945b1b757fbcbbcb2f12e901ba1e10667",
+      "lines": 12,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 12 lines; thin Next route wrapper/delegation; imports next/server, @/lib/platform-proxy; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/api/hub/[...path]/route.ts",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "633d96dd103cd7a0d2bebb8eec0af81a07b433b6",
+      "lines": 14,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 14 lines; thin Next route wrapper/delegation; imports next/server, @/lib/platform-proxy; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/api/platform/[...path]/route.ts",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "07e0ca6958eb4d4e06d7d7e392fb7b2abfe92dc4",
+      "lines": 6,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next/server, @/lib/platform-proxy; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/calculator/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "f625a543fa1bf0d9d2514c46cdcd73f43a039c85",
+      "lines": 23,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 23 lines; thin Next route wrapper/delegation; imports @/public/header, @/public/footer, next, @/features/paediatric-calculator/components/calculator; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/content/invite/[token]/accept.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ac445a210e34a81714b7371709b7807858e2e5a4",
+      "lines": 14,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 14 lines; client interactions; imports react, next/link, @/shared/session-provider, @/shared/browser-session; call sites contentOperations.acceptInvitation, reload, accept, logoutSession; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/content/invite/[token]/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "96e7011998a49300fae523beff0fbb3914a39444",
+      "lines": 3,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 3 lines; thin Next route wrapper/delegation; imports ./accept; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/content/layout.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "a5f9fb2fca443049ad07f4cb9046f552bc217f17",
+      "lines": 7,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 7 lines; thin Next route wrapper/delegation; imports next, ../(hub)/components/hub-header; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/content/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "4f42bf944f12975d6594aaa024861f0b26a34d96",
+      "lines": 3,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 3 lines; thin Next route wrapper/delegation; imports ./workspace; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/content/workspace.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "fe4672d5a16db5ad489e327735592bf1221f5873",
+      "lines": 81,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 81 lines; client interactions; imports react, next/link, lucide-react, @/components/visual-editor; call sites load, save, action, Promise.all, reload, run; write UI, backend permissions authoritative; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/dashboard/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "6ac249c3fe3c64c3d8995c9affe453967be89f3c",
+      "lines": 7,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 7 lines; thin Next route wrapper/delegation; imports react, @/shared/session-provider, @/shared/browser-session, @/migrated/utils/dashboardPath; call sites reload; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/feature-catalogue.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "45826449121d73386c3fb01afc6b718793a7cfca",
+      "lines": 13,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 13 lines; server/helper; imports none; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/[hub]/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "f715b11ff109b2f812ebe654ec59ecc6fccb3f9d",
+      "lines": 8,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 8 lines; thin Next route wrapper/delegation; imports next/navigation, @/lib/hub-server, ../community-client, @/lib/hub; no explicit awaits; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/access-notice.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f58dd405c4a1ba0b9781855f209a9cfce448d241",
+      "lines": 14,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 14 lines; client interactions; imports next/link, @/shared/session-provider, @/shared/browser-session; call sites reload; read/render; no runtime test or S2 sign-off."
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/community-client.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "95f23e3820f4ec76d8bdc8daf99a6d1e8b1b86ae",
+      "lines": 145,
+      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
+      "note": "Read 145 lines; client interactions; imports react, next/link, lucide-react, ./post-entry; call sites chemistTaskerApi.publicContent.listCommunityPosts, chemistTaskerApi.publicContent.listCommunityPolls, chemistTaskerApi.publicContent.createCommunityPost, reload, chemistTaskerApi.publicContent.voteCommunityPoll, loadPolls; write UI, backend permissions authoritative; no runtime test or S2 sign-off."
     }
   ],
   "findings": [],
