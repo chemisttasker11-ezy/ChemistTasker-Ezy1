@@ -9,6 +9,7 @@ from shifts.escalation import allowed_tiers
 from shifts.pricing import expand_shift_slots
 from datetime import date
 from django.utils import timezone
+from organizations.access import user_can_manage_pharmacy
 from organizations.serializers import anonymize_pharmacy_detail, PharmacySerializer, user_can_view_full_pharmacy
 from shifts.posting import ensure_escalation_stamps, normalize_money_value, normalize_slots_payload, post_shift, revise_shift
 from shifts.travel import haversine_km
@@ -103,7 +104,7 @@ class ShiftSerializer(serializers.ModelSerializer):
             'published_rates_visible',
         ]
         read_only_fields = [
-            'id', 'created_by', 'escalation_level',
+            'id', 'created_by', 'escalation_level', 'payment_status',
             'interested_users_count', 'reveal_count',
             'allowed_escalation_levels']
 
@@ -139,16 +140,9 @@ class ShiftSerializer(serializers.ModelSerializer):
         attrs = super().validate(attrs)
         if self.instance is not None:
             target = attrs.get('pharmacy')
-            if target is not None and target.pk != self.instance.pharmacy_id:
+            if (target is not None and target.pk != self.instance.pharmacy_id
+                    and not user_can_manage_pharmacy(self.context['request'].user, target)):
                 raise serializers.ValidationError({'pharmacy': 'Shift pharmacy cannot change during edit.'})
-            submitted = (getattr(self, 'initial_data', {}) or {}).get('payment_status')
-            if submitted is not None and submitted != self.instance.payment_status:
-                raise serializers.ValidationError({'payment_status': 'Only billing may change payment status.'})
-        else:
-            submitted = (getattr(self, 'initial_data', {}) or {}).get('payment_status')
-            if submitted not in (None, 'NOT_REQUIRED'):
-                raise serializers.ValidationError({'payment_status': 'Only billing may change payment status.'})
-        attrs.pop('payment_status', None)
         role = attrs.get('role_needed') or getattr(self.instance, 'role_needed', None)
         # Revalidate the complete requirement set when the vacancy role changes.
         # PATCH must not keep pharmacist-only requirements on a technician shift.

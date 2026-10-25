@@ -384,6 +384,72 @@ class PostingDefaultsTests(ShiftPostingFixture):
 
 
 class ShiftEditTests(ShiftPostingFixture):
+    def test_payment_status_only_patch_cannot_mark_shift_paid(self):
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST",
+            employment_type="LOCUM", payment_status="PENDING",
+        )
+        response = client_for(self.owner).patch(
+            f"{API}shifts/{shift.pk}/", {"payment_status": "PAID"}, format="json")
+        self.assertIn(response.status_code, (200, 400), response.data)
+        shift.refresh_from_db()
+        self.assertEqual(shift.payment_status, "PENDING")
+
+    def test_owner_can_edit_description_while_payment_status_is_ignored(self):
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST",
+            employment_type="LOCUM", payment_status="PENDING",
+        )
+        with queued_emails():
+            response = client_for(self.owner).patch(f"{API}shifts/{shift.pk}/", {
+                "description": "Updated cover", "payment_status": "PAID",
+            }, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        shift.refresh_from_db()
+        self.assertEqual((shift.description, shift.payment_status), ("Updated cover", "PENDING"))
+
+    def test_move_to_managed_pharmacy_only_updates_destination_rates(self):
+        _, destination = make_owner_with_pharmacy("Managed destination")
+        destination.owner = self.pharmacy.owner
+        destination.save(update_fields=["owner"])
+        _, unrelated = make_owner_with_pharmacy("Unrelated")
+        response, _ = self.post_shift()
+        shift = Shift.objects.get(pk=response.data["id"])
+        originals = {p.pk: (p.default_rate_type, p.default_fixed_rate, p.rate_weekday)
+                     for p in (self.pharmacy, unrelated)}
+        with queued_emails():
+            edited = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
+                "pharmacy": destination.pk, "role_needed": "PHARMACIST", "rate_type": "FIXED",
+                "fixed_rate": "90.00", "rate_weekday": "71.50", "apply_rates_to_pharmacy": True,
+            }, format="json")
+        self.assertEqual(edited.status_code, 200, edited.data)
+        shift.refresh_from_db()
+        destination.refresh_from_db()
+        self.assertEqual(shift.pharmacy_id, destination.pk)
+        self.assertEqual((destination.default_rate_type, destination.default_fixed_rate, destination.rate_weekday),
+                         ("FIXED", Decimal("90.00"), Decimal("71.50")))
+        for pharmacy in (self.pharmacy, unrelated):
+            pharmacy.refresh_from_db()
+            self.assertEqual((pharmacy.default_rate_type, pharmacy.default_fixed_rate, pharmacy.rate_weekday),
+                             originals[pharmacy.pk])
+
+    def test_move_to_unrelated_pharmacy_cannot_update_its_rates(self):
+        _, destination = make_owner_with_pharmacy("Unrelated destination")
+        original = (destination.default_rate_type, destination.default_fixed_rate, destination.rate_weekday)
+        response, _ = self.post_shift()
+        shift = Shift.objects.get(pk=response.data["id"])
+        with queued_emails():
+            refused = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
+                "pharmacy": destination.pk, "role_needed": "PHARMACIST", "rate_type": "FIXED",
+                "fixed_rate": "90.00", "rate_weekday": "71.50", "apply_rates_to_pharmacy": True,
+            }, format="json")
+        self.assertEqual(refused.status_code, 400, refused.data)
+        self.assertIn("pharmacy", refused.data)
+        shift.refresh_from_db()
+        destination.refresh_from_db()
+        self.assertEqual(shift.pharmacy_id, self.pharmacy.pk)
+        self.assertEqual((destination.default_rate_type, destination.default_fixed_rate, destination.rate_weekday), original)
+
     def test_edit_recalculates_escalation_replaces_slots_and_announces(self):
         response, _ = self.post_shift(visibility="FULL_PART_TIME", employment_type="LOCUM")
         shift = Shift.objects.get(pk=response.data["id"])
