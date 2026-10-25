@@ -24,6 +24,37 @@ class PharmacyAdminRevocationTests(TestCase):
         self.assignment = PharmacyAdmin.objects.get(user=self.target, pharmacy=self.pharmacy)
         self.membership = self.assignment.membership
 
+    def test_manager_cannot_patch_assignment_to_an_unrelated_pharmacy(self):
+        accepted = self.target_client.post(f'/api/v1/pharmacy-admins/{self.assignment.pk}/accept-invitation/')
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        _, unrelated = make_owner_with_pharmacy('Unrelated Pharmacy')
+        response = self.target_client.patch(f'/api/v1/pharmacy-admins/{self.assignment.pk}/', {
+            'pharmacy': unrelated.pk,
+        }, format='json')
+        self.assertEqual(response.status_code, 405, response.data)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.pharmacy_id, self.pharmacy.pk)
+        self.assertEqual(self.assignment.membership_id, self.membership.pk)
+        self.assertTrue(self.assignment.is_active)
+
+    def test_manager_cannot_patch_assignment_inactive(self):
+        accepted = self.target_client.post(f'/api/v1/pharmacy-admins/{self.assignment.pk}/accept-invitation/')
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        response = self.target_client.patch(f'/api/v1/pharmacy-admins/{self.assignment.pk}/', {
+            'is_active': False,
+        }, format='json')
+        self.assertEqual(response.status_code, 405, response.data)
+        self.assignment.refresh_from_db()
+        self.assertTrue(self.assignment.is_active)
+        self.assertEqual(self.assignment.membership_id, self.membership.pk)
+
+    def test_owner_cannot_put_assignment(self):
+        response = self.owner_client.put(f'/api/v1/pharmacy-admins/{self.assignment.pk}/', {
+            'user': self.target.pk, 'pharmacy': self.pharmacy.pk,
+            'membership': self.membership.pk, 'staff_role': 'PHARMACIST',
+        }, format='json')
+        self.assertEqual(response.status_code, 405, response.data)
+
     def test_revoke_pending_admin_prevents_membership_acceptance(self):
         self.assertEqual(self.membership.status, Membership.Status.PENDING)
         removed = self.owner_client.delete(f'/api/v1/pharmacy-admins/{self.assignment.pk}/')

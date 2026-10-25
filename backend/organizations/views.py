@@ -301,6 +301,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 class PharmacyAdminViewSet(viewsets.ModelViewSet):
     serializer_class = PharmacyAdminSerializer
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
     STAFF_ROLE_MEMBERSHIP_MAP = {
         "PHARMACIST": "PHARMACIST",
@@ -690,18 +691,7 @@ class ChainViewSet(viewsets.ModelViewSet):
         if not pharm:
             raise NotFound("That pharmacy does not exist.")
 
-        # Owner-chain: pharmacy.owner must match
-        if chain.owner:
-            if pharm.owner != chain.owner:
-                raise PermissionDenied("You don’t own that pharmacy.")
-        # Org-chain: pharmacy.organization must match
-        elif chain.organization:
-            org = chain.organization
-            if pharm.organization != org:
-                raise PermissionDenied("That pharmacy isn't in your organization.")
-        else:
-            # no owner or org on chain
-            raise PermissionDenied("Chain has no owner or organization.")
+        self.get_serializer(chain).validate_pharmacy_ids([pharm])
 
         chain.pharmacies.add(pharm)
         return Response({'status': 'Pharmacy added', 'pharmacy': pharm.name})
