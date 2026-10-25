@@ -4,6 +4,7 @@ from datetime import date
 
 from django.test import TestCase
 
+from organizations.models import Organization
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee, WorkNoteCompletion
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
@@ -40,6 +41,23 @@ class CalendarAuthTests(CalendarBase):
 
 class CalendarEventTests(CalendarBase):
     PAYLOAD = {"title": "Team meeting", "date": "2026-03-11"}
+
+    def test_create_refuses_mismatched_organization(self):
+        foreign = Organization.objects.create(name="Foreign", slug="foreign-calendar")
+        res = client_for(self.owner).post(
+            EVENTS, {**self.PAYLOAD, "pharmacy": self.pharmacy.id, "organization": foreign.id}, format="json")
+        self.assertEqual(res.status_code, 403)
+        self.assertFalse(CalendarEvent.objects.exists())
+
+    def test_create_accepts_matching_organization_or_pharmacy_only(self):
+        org = Organization.objects.create(name="Managed", slug="managed-calendar")
+        self.pharmacy.organization = org
+        self.pharmacy.save(update_fields=["organization"])
+        for scope in ({"pharmacy": self.pharmacy.id}, {"pharmacy": self.pharmacy.id, "organization": org.id}):
+            with self.subTest(scope=scope):
+                res = client_for(self.owner).post(EVENTS, {**self.PAYLOAD, **scope}, format="json")
+                self.assertEqual(res.status_code, 201)
+        self.assertEqual(CalendarEvent.objects.count(), 2)
 
     def test_owner_creates_manual_event_stamped_with_creator(self):
         res = client_for(self.owner).post(EVENTS, {**self.PAYLOAD, "pharmacy": self.pharmacy.id}, format="json")

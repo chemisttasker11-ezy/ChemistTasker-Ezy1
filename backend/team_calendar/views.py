@@ -245,6 +245,8 @@ class CalendarEventViewSet(
         if pharmacy_id:
             if not self.can_manage_calendar(self.request.user, int(pharmacy_id)):
                 raise PermissionDenied("You don't have permission to create events for this pharmacy.")
+            if organization_id and serializer.validated_data['pharmacy'].organization_id != int(organization_id):
+                raise PermissionDenied("Organization must match the pharmacy's organization.")
         elif organization_id:
             # Check org admin permissions
             accessible = self.get_accessible_organization_ids(self.request.user)
