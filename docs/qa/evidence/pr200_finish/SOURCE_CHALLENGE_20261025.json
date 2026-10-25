@@ -1,0 +1,165 @@
+{
+  "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "review_date": "2026-10-25",
+  "review_kind": "ADVERSARIAL_SOURCE_RECHECK_BY_ONLINE_ASSISTANT",
+  "independence": "NOT_A_DISTINCT_SECOND_AGENT; do not count toward required independent second-agent P1 certification",
+  "runtime": "NOT_EXECUTED",
+  "entries": [
+    {
+      "id": "C009-N1",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Dashboard's community_shifts query uses all memberships plus COMMUNITY_LEVELS (including FULL_PART_TIME), bypassing the separate employment-type-aware _worker_visible_pharmacy_shifts filter.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/dashboards/views.py#L132-L161",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/dashboards/views.py#L863-L892",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/escalation.py#L18-L18"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C009-N2",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "The invoice total is aggregated without a monthly date/status filter; pharmacist dashboard queries all user invoices. UI label still needs exact mobile rendering confirmation.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/dashboards/views.py#L480-L493",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/dashboards/views.py#L894-L897"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C009-N3",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Imports POST checks ETHICAL_INVENTORY_ENABLED; ImportCommit performs stock-lot reconciliation without checking it again.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/ethical_marketplace/views.py#L190-L215",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/ethical_marketplace/owner_views.py#L57-L115"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C010-N1",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "PATCH checks current pharmacy/product but serializer allows writing pharmacy and product; there is no target-tenant/product authorization before save.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/ethical_marketplace/views.py#L317-L325",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/ethical_marketplace/serializers.py#L53-L71"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C011-N1",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Enquiry creates an exchange/participants/message before unique idempotency receipt is written; no encompassing transaction is present at endpoint; concurrent duplicates may persist partial effects when receipt uniqueness rejects second request.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/marketplace/views.py#L283-L310",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/marketplace/models.py#L321-L329"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C011-N2",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Membership notification recipient list unconditionally includes invited_by; revoked authorization is not checked before name/status delivery.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/notifications.py#L66-L86",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/notifications.py#L116-L168"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C012-N1",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Standard ModelViewSet create uses unrestricted numeric invite_link PK serializer; serializer validates presence/identity but does not call invite_link.is_valid(). Public magic-link route does validate expiry.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/views.py#L249-L265",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/views.py#L310-L325",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/serializers.py#L382-L425"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C012-N2",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "MembershipApplicationViewSet subclasses ModelViewSet with scoped queryset but no destroy override; scoped managers can invoke inherited hard delete of application history.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/views.py#L310-L338",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/urls.py#L23-L34"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C015-N1",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "AHPRA notifier collects org admin/region admin users for the organization without filtering assigned pharmacy contexts.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/onboarding/verification/state.py#L335-L358"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C016-N1",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Group list for a pharmacy is scoped only by general pharmacy membership, not group membership; serializer get_members exposes complete staff group links regardless of include_members input.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/groups.py#L29-L59",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/groups.py#L108-L118",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/serialization/groups.py#L189-L212"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C016-N2",
+      "status": "REFUTED_SOURCE",
+      "reason": "Reported writable pharmacy claim is false: HubCommunityGroupSerializer.Meta.read_only_fields explicitly includes pharmacy. perform_update calls serializer.save() on validated_data; group reassignment via ordinary PATCH is not supported by this path.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/serialization/groups.py#L53-L82",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/groups.py#L138-L145",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/serialization/groups.py#L155-L162"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C071-N1",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Auth mutation ID is incremented at login/logout, but async bootstrap success path and token-refresh path write user/tokens without post-await generation check; refreshUser and stored-session login also write asynchronously without identity guards.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L115-L175",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L261-L282",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L443-L453",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/utils/authSession.ts#L227-L273"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    },
+    {
+      "id": "C071-N2",
+      "status": "SOURCE_SUPPORTED_DUPLICATE_ROOT",
+      "reason": "Expo logout clears local storage but does not delete DeviceToken; server logout blacklists JWT only; notification service delivers to active tokens. Same underlying issue as F11-N2 and F09-N3.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L502-L529",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/users/api_auth.py#L155-L172",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/notifications/services.py#L79-L94"
+      ],
+      "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+    }
+  ],
+  "summary": {
+    "source_supported": 11,
+    "source_supported_duplicate_root": 1,
+    "refuted_source": 1,
+    "second_agent_certified": 0,
+    "runtime_passed": 0
+  }
+}
