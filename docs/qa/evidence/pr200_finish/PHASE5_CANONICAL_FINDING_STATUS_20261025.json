@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 historical IDs (71 B plus 155 C/F); 44 distinct IDs and 50 cumulative expected-red negative assertions across targeted isolated runs. B24 2 reds and 2 positives (run 40189568324), B29 2 signed drift reds and 1 positive (run 40189842660). No independent 99% S2 certified; no real payroll/provider/PostgreSQL concurrency.",
+  "material": "226 historical IDs preserved; 45 distinct IDs / 53 cumulative expected-red isolated negative assertions. Newly verified: B24 two negative/2 positive; B29 two signed negative/1 positive; B14 three static contract negatives/2 positive; real payroll provider/PostgreSQL/F12 unverified; 99% independent S2 NOT CERTIFIED.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,19 +10,19 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 44,
-  "runtime_failing_scenarios": 50,
+  "runtime_distinct_ids": 45,
+  "runtime_failing_scenarios": 53,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 12,
     "UNVERIFIED_CANDIDATE": 156,
-    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 43,
+    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 44,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
-    "SOURCE_SUPPORTED_CONDITIONAL": 2,
+    "SOURCE_SUPPORTED_CONDITIONAL": 1,
     "SOURCE_SUPPORTED_UI_SCOPE": 1
   },
   "independent_s2_certified_files": null,
@@ -60,8 +60,8 @@
       "negative_failures": 7,
       "errors": 0
     },
-    "cumulative_distinct_findings": 44,
-    "cumulative_failed_negative_assertions": 50,
+    "cumulative_distinct_findings": 45,
+    "cumulative_failed_negative_assertions": 53,
     "warning": "Cumulative from multiple isolated targeted runs; not 45 failures in one suite; B24 error invalid, not counted.",
     "additional_runs": [
       {
@@ -107,6 +107,17 @@
         "fixture_errors": 0,
         "negative_test_failing": true,
         "notes": "Ed25519 signed, integrity flag asserted before expecting no live attendance; no payroll effect proved"
+      },
+      {
+        "id": "B14",
+        "run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189946286",
+        "head": "07bcf99553849e0f2734526f33ef4480f1310975",
+        "tests": 5,
+        "negative_scenarios": 3,
+        "positive_controls": 2,
+        "fixture_errors": 0,
+        "negative_test_failing": true,
+        "note": "Static-data semantics only; no payroll, DB or provider calls; published Fair Work 2026 source."
       }
     ]
   },
@@ -379,21 +390,47 @@
       "severity": "P0",
       "area": "Shift Pricing",
       "title": "Legacy casual award figures and incomplete future holiday data",
-      "status": "SOURCE_SUPPORTED_CONDITIONAL",
-      "evidence_grade": "S2_BOUNDED_SOURCE_AND_PRIMARY_AWARD_COMPARISON",
-      "decision": "BLOCK_UNTIL_PAYFLOW_AND_HOLIDAY_CONTRACT_VERIFIED",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_TARGETED_ISOLATED_PURE_FUNCTION",
+      "decision": "FIX_SEPARATE_REMEDIATION_PR_AFTER_PAYFLOW_MAPPING",
       "root": "B14",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
       "source_proof": [
-        "backend/shifts/data/award_rates_casual_first_level.json:5-94",
-        "backend/workforce/award_rates.py:10-93",
+        "backend/shifts/data/award_rates_casual_first_level.json:1-107",
+        "backend/shifts/data/public_holidays.json",
         "backend/shifts/pricing.py:47-51",
+        "backend/workforce/award_rates.py:10-93",
         "docs/qa/MAIN_RELEASE_B14_AWARD_RATE_SOURCE_CHECK_20261025.md"
       ],
       "test_needed": "Date-effective 2026 shift guide vs Fair Work official casual award across roles plus positive workforce award schedule; 2027 QLD holiday, exact locked employee pay and Vite/Next/Expo visible rates",
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b14_shift_guide_2026_casual_pharmacist_minimum",
+          "observed": "Actual old shift guide Decimal 47.68 < current 2026 Fair Work casual weekday pharmacist 52.18; red.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189946286",
+          "head": "07bcf99553849e0f2734526f33ef4480f1310975",
+          "status": "RED_TEST_FAILED_AS_EXPECTED",
+          "environment": "Django SimpleTestCase, static shift-guide data, no DB or payroll"
+        },
+        {
+          "test": "test_b14_shift_guide_2026_casual_assistant_minimum",
+          "observed": "Actual old shift guide Decimal 33.19 < 2026 Fair Work casual weekday assistant Level 1 34.76; red.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189946286",
+          "head": "07bcf99553849e0f2734526f33ef4480f1310975",
+          "status": "RED_TEST_FAILED_AS_EXPECTED",
+          "environment": "Django SimpleTestCase static data"
+        },
+        {
+          "test": "test_b14_queensland_2027_australia_day",
+          "observed": "Static shift holiday classifier returned False for QLD public holiday on 26 January 2027; red.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189946286",
+          "head": "07bcf99553849e0f2734526f33ef4480f1310975",
+          "status": "RED_TEST_FAILED_AS_EXPECTED",
+          "environment": "Django SimpleTestCase, no DB"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "Separate shifts static casual guide is older than 1 July 2026 Fair Work award rates, while workforce award schedule is current. 2027 public holiday file absent. No observed employee pay underpayment; severity conditional on whether old guide reaches locked award-covered wages and 2027 shifts."
+      "explanation": "2026 shift guide rates and 2027 public holiday classification failed 3 isolated deterministic assertions with 2 passing positive controls. Workforce award data is current. No actual employee payment tested; real underpayment severity requires tracing locked pay path."
     },
     {
       "id": "B15",
