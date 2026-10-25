@@ -1,0 +1,127 @@
+{
+  "chunk": "C080",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "first-pass source retrieval, scripts not executed",
+  "status": "INCOMPLETE",
+  "files": [
+    {
+      "path": "scripts/ahpra_extension/background.js",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "cf40445e7aead58f663ea9cf7d4b2f0feae5a551",
+      "lines": 242,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "242 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_extension/content.js",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "a3550cf456db258d9b834ba7c4773ba5a785d12c",
+      "lines": 88,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "88 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_extension/options.js",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "294fccbb4684e1606072daac0feb58b34647fd88",
+      "lines": 35,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "35 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_extension/parser.js",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "73eb679e533580ed60b093861b867153320c780a",
+      "lines": 74,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "74 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_extension/tests/parser.test.js",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "20a91c91ad814a788072953111e779236790d81a",
+      "lines": 179,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "179 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_verifier/bridge.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "4c6cd4706e12a3dc252e138c4cc38d98f4a4ca22",
+      "lines": 920,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "920 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_verifier/test_bridge.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "56d6b451e6ba7ba648eba712e963bb3dfaa53e23",
+      "lines": 1217,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "1217 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_verifier/test_review_183_repro.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "0694cfad6b758d67e1d70546e112f0eb055ffbc4",
+      "lines": 21,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "21 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-api-v1-cutover.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "cfdee412e4b7111386c017d5ee0e5ff270ce260e",
+      "lines": 81,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "81 lines; architecture/deployment audit script; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-api-v1-cutover.test.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ee9458642d6d9223ca9319e5c2e0381d74011a21",
+      "lines": 39,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "39 lines; architecture/deployment audit script; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-architecture-boundaries.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "014ec03662c7c7febc4b441ced5559d398b32d14",
+      "lines": 51,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "51 lines; architecture/deployment audit script; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-frontend-static-wiring.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "12f26f045792f042187587a0b29e1af1eae7b68a",
+      "lines": 238,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "238 lines; architecture/deployment audit script; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-generated-skill-icons.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b6d32524aac46dbc1dfb860cbea884d717a763af",
+      "lines": 36,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "36 lines; architecture/deployment audit script; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    }
+  ],
+  "findings": []
+}
