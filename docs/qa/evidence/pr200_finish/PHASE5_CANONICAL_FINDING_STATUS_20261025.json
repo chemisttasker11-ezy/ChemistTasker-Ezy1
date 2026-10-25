@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 historical IDs retained. 47 distinct IDs with executed targeted negative evidence; 55 cumulative expected-red assertions, including B01 and B25 (run 40191476067); B35 fixture errors excluded until corrected rerun. 99% independent S2 not certified.",
+  "material": "226 historical finding IDs retained. 48 distinct IDs / 56 cumulative failing negative assertions across targeted tests; B35 new cross-tenant roster-owner HTTP 201 with owner control, B25 entire partial mutation proven. B31 PostgreSQL race and B53 reordered event tests queued/pending; S2 99% NOT CERTIFIED.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,15 +10,15 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 47,
-  "runtime_failing_scenarios": 55,
+  "runtime_distinct_ids": 48,
+  "runtime_failing_scenarios": 56,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 11,
-    "UNVERIFIED_CANDIDATE": 155,
-    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 45,
+    "UNVERIFIED_CANDIDATE": 154,
+    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 46,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
@@ -61,8 +61,8 @@
       "negative_failures": 7,
       "errors": 0
     },
-    "cumulative_distinct_findings": 47,
-    "cumulative_failed_negative_assertions": 55,
+    "cumulative_distinct_findings": 48,
+    "cumulative_failed_negative_assertions": 56,
     "warning": "Cumulative from multiple isolated targeted runs; not 45 failures in one suite; B24 error invalid, not counted.",
     "additional_runs": [
       {
@@ -132,6 +132,17 @@
           "B35"
         ],
         "note": "B35 pay-fields Shift fixture invalid; do not count. B01 and B25 valid red and positive controls."
+      },
+      {
+        "id": "B35+B25_VALID",
+        "run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191740013",
+        "head": "d607de3f91dd97978236f43161a9dc637062418b",
+        "tests": 6,
+        "negative_scenarios": 3,
+        "positive_controls": 3,
+        "fixture_errors": 0,
+        "excluded_previous_errors": 2,
+        "note": "B01/B25 existing valid repeats not double counted; one new distinct B35 and B25 full postconditions confirmed."
       }
     ]
   },
@@ -766,15 +777,15 @@
       "runtime_scenarios": [
         {
           "test": "test_b25_invalid_second_step_rolls_back_everything",
-          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191476067",
-          "head": "b33cdca0263df3554e1c119a47e8f59dbdda1796",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191740013",
+          "head": "d607de3f91dd97978236f43161a9dc637062418b",
           "environment": "GitHub-hosted Django SQLite authenticated marketplace API, verified synthetic owner/pharmacy/identity/terms",
-          "observed": "POST with one valid schedule step and later invalid step returned HTTP 400, but listing.version increased from 1 to 2 (AssertionError: 2 != 1). Other persisted audience/schedule effects remain source-supported until separate postcondition assertion rerun.",
+          "observed": "Fixture-valid invalid-second-step API returned HTTP 400 but all three database postconditions changed: (version, current_circle, ListingEscalationStep.count)=(2, PLATFORM, 1) instead of (1, OWNED_CHAIN, 0); the expected-red tuple assertion failed.",
           "status": "RED_TEST_FAILED_AS_EXPECTED"
         }
       ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "Invalid late schedule POST returns 400 yet persists listing version; exact audience/step postconditions being strengthened. Valid schedule positive control passed; no actual escalation run."
+      "explanation": "Fixture-valid 400 response commits new listing.version=2, audience PLATFORM, and one scheduled escalation step instead of no changes (test CI 40191740013). Valid schedule positive passed."
     },
     {
       "id": "B26",
@@ -955,16 +966,30 @@
       "severity": "P0 candidate",
       "area": "Roster-create cross-tenant writes: RosterOwnerViewSet is an authenticated ModelViewSet with pharmacy-filtered get_queryset but default create/perform_create; RosterA",
       "title": "SOURCE-FINDING",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_TWO_TENANT_AUTHENTICATED_SQLITE_HTTP",
+      "decision": "FIX_ON_SEPARATE_REMEDIATION_PR",
       "root": "B35",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
+      "source_proof": [
+        "backend/workforce/roster/views.py:44-104",
+        "backend/workforce/roster/serializers.py:25-55",
+        "backend/workforce/roster/urls.py:33-42",
+        "backend/qa_release/test_pr200_phase5_wave_next.py:46-85"
+      ],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b35_foreign_owner_cannot_create_roster_assignment",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191740013",
+          "head": "d607de3f91dd97978236f43161a9dc637062418b",
+          "environment": "GitHub hosted synthetic Django/SQLite HTTP, unrelated owner A/B and accepted worker in pharmacy B",
+          "observed": "Owner A GET roster-owner?pharmacy=B returned 200 via scoped read, yet POST with ShiftSlot/Shift/User foreign to owner A returned 201 and serializer disclosed a created assignment in pharmacy B. Negative rejection assertion failed after valid fixture.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Owner A can POST an assignment for owner B's valid ShiftSlot while scoped GET protects reads. Owner B legitimate POST succeeded; 201 B unauthorized. Prior pay-field fixture errors excluded; no staging/production use."
     },
     {
       "id": "B36",

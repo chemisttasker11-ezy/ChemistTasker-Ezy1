@@ -1002,10 +1002,10 @@
     "scenarios": [
       {
         "test": "test_b25_invalid_second_step_rolls_back_everything",
-        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191476067",
-        "head": "b33cdca0263df3554e1c119a47e8f59dbdda1796",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191740013",
+        "head": "d607de3f91dd97978236f43161a9dc637062418b",
         "environment": "GitHub-hosted Django SQLite authenticated marketplace API, verified synthetic owner/pharmacy/identity/terms",
-        "observed": "POST with one valid schedule step and later invalid step returned HTTP 400, but listing.version increased from 1 to 2 (AssertionError: 2 != 1). Other persisted audience/schedule effects remain source-supported until separate postcondition assertion rerun.",
+        "observed": "Fixture-valid invalid-second-step API returned HTTP 400 but all three database postconditions changed: (version, current_circle, ListingEscalationStep.count)=(2, PLATFORM, 1) instead of (1, OWNED_CHAIN, 0); the expected-red tuple assertion failed.",
         "status": "RED_TEST_FAILED_AS_EXPECTED"
       }
     ],
@@ -1013,8 +1013,36 @@
       "test_b25_valid_schedule_positive PASSED: valid owner POST returned 200, version advanced and one step stored"
     ],
     "runtime_limitations": [
-      "Only persisted version mismatch independently asserted on first run; revised test now reports version/circle/step tuple after invalid request.",
-      "No PostgreSQL transaction proof, notification/escalation task execution or unverified-owner denial in this run."
+      "No PostgreSQL transaction proof, notification/escalation task execution or unverified-owner denial in this run.",
+      "No PostgreSQL transaction isolation, live escalation worker execution or other marketplace routes tested."
+    ]
+  },
+  "B35": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/workforce/roster/views.py:44-104",
+      "backend/workforce/roster/serializers.py:25-55",
+      "backend/workforce/roster/urls.py:33-42",
+      "backend/qa_release/test_pr200_phase5_wave_next.py:46-85"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b35_foreign_owner_cannot_create_roster_assignment",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191740013",
+        "head": "d607de3f91dd97978236f43161a9dc637062418b",
+        "environment": "GitHub hosted synthetic Django/SQLite HTTP, unrelated owner A/B and accepted worker in pharmacy B",
+        "observed": "Owner A GET roster-owner?pharmacy=B returned 200 via scoped read, yet POST with ShiftSlot/Shift/User foreign to owner A returned 201 and serializer disclosed a created assignment in pharmacy B. Negative rejection assertion failed after valid fixture.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "positive_controls": [
+      "test_b35_valid_owner_creates_own_roster_assignment PASSED (201 and persisted ShiftSlotAssignment)"
+    ],
+    "runtime_limitations": [
+      "Real authenticated synthetic users under force_authenticate, not production exploit or live worker data.",
+      "Proof covers default roster-owner POST path; B36 shift-create and B38 shift-update are separate entry points and not closed.",
+      "Original shift fixture lacked mandatory pay fields and produced errors in run 40191476067; excluded. Fixed hourly-rate fixture in run 40191740013 with 0 B35 fixture errors."
     ]
   }
 }
