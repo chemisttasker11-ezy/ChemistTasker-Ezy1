@@ -1,0 +1,86 @@
+{
+ "chunk": "Y03",
+ "verdicts": [
+  {
+   "id": "B29",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "_integrity_flags adds CLOCK_MOVED_BACKWARDS, MONOTONIC_ROLLBACK, CLOCK_ANCHOR_DRIFT and SERVER_TIME_DRIFT, and any flag turns the status into NEEDS_REVIEW. But only SEQUENCE_GAP, HASH_CHAIN_MISMATCH, UNEXPECTED_INITIAL_HASH and DEVICE_REVOKED_DRAIN stop _apply_business_event. So the device timestamp still goes into clock_in/clock_out as occurred_at, with no time-sanity check in transitions.clock_in, and a normal AttendanceSession is created. Nothing outside protocol.py and models.py reads NEEDS_REVIEW or integrity_flags: no review queue exists and timesheets are not touched. I lowered it to P1 because it needs a paired, signing native kiosk whose clock is wrong or has been changed, and the flags are kept for audit.",
+   "evidence": [
+    "backend/attendance/protocol.py:103-115",
+    "backend/attendance/protocol.py:242-246",
+    "backend/attendance/protocol.py:255-270",
+    "backend/attendance/protocol.py:120-138",
+    "backend/attendance/transitions.py:53",
+    "backend/attendance/transitions.py:126-140"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "DECISION"
+  },
+  {
+   "id": "B35",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P0",
+   "duplicate_of": "",
+   "reason": "RosterOwnerViewSet is a full ModelViewSet with only IsAuthenticated. get_queryset limits reads and object lookups to managed pharmacies, but create is the default one and is not checked. RosterAssignmentSerializer exposes writable user/slot/shift primary keys with no validate or create override, so any logged-in user can POST /roster-owner/ and create a ShiftSlotAssignment on any pharmacy's slot, for themselves or anyone else. The model save only checks the published-roster lock, and no test covers a cross-tenant POST. PATCH on an assignment the user may manage can also move it to a foreign shift or slot, because perform_update only checks the lock.",
+   "evidence": [
+    "backend/workforce/roster/views.py:44-62",
+    "backend/workforce/roster/views.py:89-94",
+    "backend/workforce/roster/serializers.py:36-59",
+    "backend/workforce/roster/urls.py:37",
+    "backend/shifts/models.py:328-345",
+    "backend/shifts/models.py:523-525"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "B54",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "offer_shift only blocks a new offer when the slot already has an assignment or an ACCEPTED_AWAITING_PAYMENT offer, so several candidates can hold PENDING offers for the same slot. ShiftOfferViewSet.accept has no lock and never re-checks the slot. When payment is required, each acceptance becomes ACCEPTED_AWAITING_PAYMENT without expiring the others. This happens even one after another, with no race needed. Checkout only refuses two offers per slot inside one checkout. With two separate checkouts the owner pays twice and the second webhook finalizes nothing. A checkout by slot or with no filter makes finalize_shift_offer skip the slot that is already assigned and still mark the losing offer ACCEPTED with no assignment. On the free path the race is concurrent only: it either raises an IntegrityError from unique (slot, slot_date) or gives the same ACCEPTED offer with no assignment. I lowered it to P1 because the money lost is one placement fee, not a cross-tenant breach.",
+   "evidence": [
+    "backend/shifts/assignment.py:50-51",
+    "backend/shifts/assignment.py:61-66",
+    "backend/shifts/assignment.py:209-230",
+    "backend/shifts/offers.py:337-342",
+    "backend/shifts/offers.py:395-417",
+    "backend/shifts/finalize.py:43-44",
+    "backend/shifts/finalize.py:98-100",
+    "backend/billing/views.py:329-357",
+    "backend/billing/views.py:571-582",
+    "backend/billing/views.py:665",
+    "backend/billing/views.py:864-871"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B46",
+   "verdict": "REFUTED",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Every Hub access path requires Membership.is_active=True: the pharmacy, group and organisation scopes, the hub context, groups and the directory. Pending invitations are created with is_active=False, and reject and quit set is_active=False along with REJECTED/LEFT, so pending, rejected and left members cannot read or post. ensure_author_membership no longer reactivates memberships for ordinary staff. The only leftover is a manager PATCHing is_active=True on a PENDING membership, since MembershipSerializer exposes both status and is_active as writable to managers. That is a manager's deliberate action, not a bypass, but adding status=ACCEPTED to the hub filters, as directory.py already does, would close it.",
+   "evidence": [
+    "backend/pharmacy_hub/access.py:184-193",
+    "backend/pharmacy_hub/access.py:250-253",
+    "backend/pharmacy_hub/access.py:286-292",
+    "backend/pharmacy_hub/access.py:379-407",
+    "backend/memberships/invites.py:153-155",
+    "backend/memberships/views.py:466-467",
+    "backend/memberships/views.py:490-491",
+    "backend/pharmacy_hub/directory.py:38-42",
+    "backend/memberships/serializers.py:64-90"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

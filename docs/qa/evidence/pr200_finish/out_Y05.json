@@ -1,0 +1,141 @@
+{
+ "chunk": "Y05",
+ "verdicts": [
+  {
+   "id": "B30",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "A separately maintained notification socket remains subscribed after logout or credential revocation because authentication runs only at connection time and logout sends no disconnect event. The deactivation claim is narrower: notification creation and chat badge producers filter inactive users, and the web client closes its own socket during local logout. Those guards do not stop delivery to a retained socket for an active account whose credentials were revoked.",
+   "evidence": [
+    "backend/notifications/consumers.py:12",
+    "backend/notifications/consumers.py:34",
+    "backend/notifications/services.py:31",
+    "backend/notifications/services.py:73",
+    "backend/chat/realtime.py:24",
+    "backend/users/jwt_ws.py:28",
+    "backend/users/api_auth.py:155",
+    "backend/users/api_account.py:76",
+    "frontend_web/src/layouts/TopBarActions.tsx:677",
+    "backend/notifications/test_websocket.py:24"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B32",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "A valid signed kiosk CLOCK_IN forwards shift_id directly as assignment_id. Explicit assignment lookup checks worker, pharmacy and draft status, then returns before checking the event's date or shift window. A current event naming that worker's old non-draft assignment therefore creates a non-provisional session linked to it; neither event storage nor session constraints reject this mismatch.",
+   "evidence": [
+    "backend/attendance/urls.py:38",
+    "backend/attendance/kiosk_api.py:214",
+    "backend/attendance/protocol.py:120",
+    "backend/attendance/protocol.py:261",
+    "backend/attendance/eligibility.py:141",
+    "backend/attendance/eligibility.py:146",
+    "backend/attendance/eligibility.py:241",
+    "backend/attendance/transitions.py:114",
+    "backend/attendance/models.py:282",
+    "backend/attendance/models.py:404",
+    "backend/attendance_tests/test_kiosk_offline_protocol.py:97"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B37",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The authenticated roster endpoint grants pharmacy-wide assignment visibility from is_active alone, without requiring ACCEPTED membership or excluding CONTACT. Membership updates can independently change status and activity, and no database constraint enforces their consistency. Draft and unpublished filters limit which assignments appear, while the serializer's workforce-status guard hides timesheet details but still exposes other workers' emails and unit rates.",
+   "evidence": [
+    "backend/workforce/roster/urls.py:38",
+    "backend/workforce/roster/views.py:533",
+    "backend/workforce/roster/views.py:546",
+    "backend/workforce/roster/views.py:606",
+    "backend/workforce/roster/serializers.py:20",
+    "backend/workforce/roster/serializers.py:49",
+    "backend/workforce/roster/serializers.py:75",
+    "backend/memberships/serializers.py:82",
+    "backend/memberships/serializers.py:246",
+    "backend/attendance_tests/test_roster_worker_actions.py:521"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B39",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "An authorized pharmacist-shift edit with apply_rates_to_pharmacy=true and omitted rate fields reaches the helper, which converts every omission to None and saves all six defaults. No serializer check requires a complete rate payload. This is P2 because it requires explicit opt-in and changes pharmacy defaults rather than existing assignment rates; ordinary edits default the flag to false, and the current web save-defaults action uses a separate pharmacy update.",
+   "evidence": [
+    "backend/shifts/urls.py:43",
+    "backend/shifts/base.py:116",
+    "backend/shifts/serialization/shifts.py:81",
+    "backend/shifts/serialization/shifts.py:338",
+    "backend/shifts/posting.py:193",
+    "backend/shifts/posting.py:222",
+    "backend/shifts/posting.py:244",
+    "backend/shifts/posting.py:262",
+    "backend/shifts/test_shift_posting_contract.py:347",
+    "frontend_web/shared/postShift/useShiftPricing.ts:164"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B52",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Mobile bootstrap swallows identity-request failures and restores the saved user and role when stored credentials remain, allowing AuthGate to retain role-based navigation after a connection failure or an unhandled 403. However, a 401 followed by failed refresh clears storage, and a successful identity response replaces the cached user. The confirmed impact is stale signed-in UI, rated P2; this path does not establish access to server-protected data.",
+   "evidence": [
+    "frontend_mobile/context/AuthContext.tsx:154",
+    "frontend_mobile/context/AuthContext.tsx:163",
+    "frontend_mobile/context/AuthContext.tsx:186",
+    "frontend_mobile/utils/authSession.ts:252",
+    "frontend_mobile/utils/authSession.ts:284",
+    "frontend_mobile/utils/apiClient.ts:85",
+    "frontend_mobile/utils/apiClient.ts:110",
+    "frontend_mobile/app/_layout.tsx:283",
+    "frontend_mobile/roles/owner/dashboard.tsx:91",
+    "frontend_web/src/contexts/AuthContext.tsx:216",
+    "backend/users/api_auth.py:175"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B55",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Two authorized approvals can both load the same unlinked PENDING request before either saves its new status. Each then creates a separate locum Shift and ShiftSlot, with no locked request recheck or uniqueness constraint tying the vacancy to its originating request. The linked-assignment branch has locking, but that protection is bypassed here; approval publishes duplicate vacancies rather than itself charging payment.",
+   "evidence": [
+    "backend/shifts/urls.py:54",
+    "backend/shifts/worker_requests.py:34",
+    "backend/shifts/worker_requests.py:225",
+    "backend/shifts/worker_requests.py:254",
+    "backend/shifts/worker_requests.py:268",
+    "backend/shifts/worker_requests.py:278",
+    "backend/shifts/worker_requests.py:365",
+    "backend/shifts/models.py:883",
+    "backend/workforce/roster/worker_actions.py:340",
+    "backend/attendance_tests/test_roster_worker_actions_deterministic.py:302",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:598"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

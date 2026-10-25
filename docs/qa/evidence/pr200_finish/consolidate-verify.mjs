@@ -6,9 +6,9 @@ import path from 'node:path';
 
 const DIR = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1'));
 const read = f => JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8'));
-const raw = new Map(read('raw_findings.json').map(f => [f.id, f]));
+const raw = new Map([...read('raw_findings.json'), ...(fs.existsSync(path.join(DIR, 'b_findings.json')) ? read('b_findings.json') : [])].map(f => [f.id, f]));
 const checks = {};
-for (const f of fs.readdirSync(DIR).filter(f => /^out_[VWX]\d+\.json$/.test(f))) {
+for (const f of fs.readdirSync(DIR).filter(f => /^out_[VWXY]\d+\.json$/.test(f))) {
   const j = read(f);
   for (const v of j.verdicts) (checks[v.id] ||= []).push({ ...v, checker: j.reviewer, batch: j.chunk });
 }

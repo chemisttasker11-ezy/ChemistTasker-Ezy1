@@ -1,0 +1,123 @@
+{
+ "chunk": "Y08",
+ "verdicts": [
+  {
+   "id": "B05",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An accepted pharmacy participant can connect, then lose membership access while the socket remains subscribed. The membership signal deletes the Participant row but does not disconnect existing sockets; outbound messages recheck only AHPRA suspension. Room broadcasts therefore still deliver new messages to that connection.",
+   "evidence": [
+    "backend/chat/routing.py:7",
+    "backend/chat/consumers.py:41",
+    "backend/chat/consumers.py:122",
+    "backend/chat/signals.py:63",
+    "backend/chat/signals.py:151",
+    "backend/memberships/views.py:490",
+    "backend/chat/test_websocket.py:140"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B09",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Automatic shift escalation is called from BaseShiftViewSet.get_queryset, with no scheduled caller registered for this function. Without a qualifying request, a due shift retains its old audience. Both automatic and manual escalation save visibility without notifying the newly eligible audience; the Shift save signal only updates roster revisions.",
+   "evidence": [
+    "backend/shifts/base.py:153",
+    "backend/shifts/base.py:179",
+    "backend/shifts/escalation.py:61",
+    "backend/shifts/escalation.py:81",
+    "backend/core/celery.py:11",
+    "backend/workforce/signals.py:139",
+    "backend/shifts/test_access_escalation_contract.py:141"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B12",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Both rating creation branches treat any assignment at the relevant pharmacy as a completed relationship, including a future booking. The pending-ratings endpoint filters for past dates, but creation does not apply that restriction. Serializer and model validation check rating shape, stars and uniqueness, without checking completed work.",
+   "evidence": [
+    "backend/ratings/urls.py:9",
+    "backend/ratings/views.py:54",
+    "backend/ratings/views.py:84",
+    "backend/ratings/views.py:110",
+    "backend/ratings/views.py:130",
+    "backend/ratings/views.py:260",
+    "backend/ratings/serializers.py:32",
+    "backend/ratings/models.py:75",
+    "backend/ratings/test_api.py:31"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B20",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An authenticated worker can PATCH an interest or rejection they already own and change its shift to another existing shift. The queryset authorizes access to the original row, while both serializers leave shift writable and provide no reassignment validation. Neither model adds a guard, so destination audience and application rules are bypassed.",
+   "evidence": [
+    "backend/shifts/urls.py:48",
+    "backend/shifts/offers.py:43",
+    "backend/shifts/offers.py:98",
+    "backend/shifts/serialization/interests.py:20",
+    "backend/shifts/serialization/interests.py:123",
+    "backend/shifts/models.py:433",
+    "backend/shifts/models.py:580"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B26",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "An otherwise authorized request saves the draft before rejecting missing lots, an existing foreign lot, or quantity exceeding availability. A valid first allocation also remains when a later allocation fails these checks, because the request has no enclosing transaction. P2: this leaves incomplete drafts and allocation rows, without reserving or deducting stock; nonexistent lot IDs are rejected earlier by nested serializer validation.",
+   "evidence": [
+    "backend/ethical_marketplace/urls.py:19",
+    "backend/ethical_marketplace/views.py:289",
+    "backend/ethical_marketplace/serializers.py:46",
+    "backend/ethical_marketplace/serializers.py:63",
+    "backend/ethical_marketplace/models.py:193",
+    "backend/ethical_marketplace/owner_views.py:35",
+    "backend/core/settings.py:400"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B28",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "A pharmacy manager can resolve or waive an eligible check after its period is LOCKED: neither the endpoint nor decide_check checks period status. This changes the displayed decision and effective warning counts, without changing the frozen payroll snapshot or manifest hash. P2: the demonstrated impact is post-lock review metadata; the owner must decide whether these recorded annotations are allowed or must require the correction workflow.",
+   "evidence": [
+    "backend/workforce/urls.py:61",
+    "backend/workforce/views.py:910",
+    "backend/workforce/timesheet_transitions.py:99",
+    "backend/workforce/timesheet_transitions.py:163",
+    "backend/workforce/timesheet_checks.py:122",
+    "backend/workforce/timesheet_serialization.py:29",
+    "backend/workforce/tests/test_timesheet_state_machine.py:90",
+    "frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:288"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

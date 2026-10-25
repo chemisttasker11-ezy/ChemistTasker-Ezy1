@@ -1,0 +1,722 @@
+[
+ {
+  "id": "B01",
+  "severity": "P0",
+  "area": "Billing",
+  "title": "Subscriber discount omitted from shift checkout",
+  "reviewer": "online-gpt",
+  "scenario": "The fulfillment checkout calculates is_subscriber but selects regular-rate Stripe price IDs regardless. This is source-level price selection only; actual charge not reproduced.",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B02",
+  "severity": "P1",
+  "area": "Billing",
+  "title": "Purchased extra seats cannot subsequently be adjusted",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B04",
+  "severity": "P0",
+  "area": "Billing",
+  "title": "Empty and duplicate shift checkout sessions possible",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B05",
+  "severity": "P1",
+  "area": "Chat",
+  "title": "Already-connected sockets may outlive access revocation",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B08",
+  "severity": "P1",
+  "area": "Shifts/Notifications",
+  "title": "Region Admin notified about unrelated pharmacy shifts",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B09",
+  "severity": "P1",
+  "area": "Shifts/Tasks",
+  "title": "Shift escalation depends on reads and omits audience notification",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B10",
+  "severity": "P0",
+  "area": "Rewards/Shifts",
+  "title": "Multi-offer Pills spend uses one shift-wide ledger key; concurrency risk",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B11",
+  "severity": "P1",
+  "area": "Shifts/Billing",
+  "title": "Abandoned payments can indefinitely reserve slots",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B12",
+  "severity": "P1",
+  "area": "Ratings",
+  "title": "Rating can be submitted before completed work",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B13",
+  "severity": "P1",
+  "area": "Accounts/Shifts",
+  "title": "Account deletion leaves future booked shifts without handover",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B14",
+  "severity": "P0",
+  "area": "Shift Pricing",
+  "title": "Legacy casual award figures and incomplete future holiday data",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B16",
+  "severity": "P0",
+  "area": "Organizations",
+  "title": "Pharmacy Admin update bypasses management privilege",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B17",
+  "severity": "P0",
+  "area": "Organizations/Memberships",
+  "title": "Chain update can attach foreign pharmacy and affect membership deletion",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B18",
+  "severity": "P0",
+  "area": "Claims",
+  "title": "Claim PUT path bypasses owner approval workflow",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B19",
+  "severity": "P0",
+  "area": "Memberships",
+  "title": "Invite links can be retargeted; removal may cascade applications",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B20",
+  "severity": "P1",
+  "area": "Shifts",
+  "title": "Interest/rejection mutation can target a different shift",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B21",
+  "severity": "P0",
+  "area": "Workforce/Shifts",
+  "title": "Cover request scope differs from assignment scope",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B22",
+  "severity": "P0",
+  "area": "Pharmacy Hub",
+  "title": "Org poll aggregation includes private pharmacy polls",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B23",
+  "severity": "P0",
+  "area": "Organizations",
+  "title": "Chief Admin may mutate/delete organization record",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B24",
+  "severity": "P0",
+  "area": "Ordinary marketplace",
+  "title": "Exchange action accepts confirm-completion while still in ENQUIRY / TERMS_PROPOSED, and arbitrary propose-terms/cancel/decline after accepted or completed; buyer can invoke decline. This bypasses accepted terms and reservation lifecycle.",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B25",
+  "severity": "P1",
+  "area": "Marketplace listings",
+  "title": "ListingAudience saves current circle and bumps listing.version before validating every requested schedule item. Invalid later schedule returns 400 after persistent state mutation.",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B26",
+  "severity": "P1",
+  "area": "Ethical marketplace",
+  "title": "EthicalListing draft is persisted before checking lot selection, lot ownership and available quantities; invalid listing create can leave orphan or partially allocated regulated-stock drafts.",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B27",
+  "severity": "P1",
+  "area": "Workforce timesheets",
+  "title": "TimesheetPeriod creation rejects inverted/overlong date ranges but allows overlapping ranges for same pharmacy, while payroll manifests can each represent the same attendance/roster minutes.",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B28",
+  "severity": "P1",
+  "area": "Timesheet controls",
+  "title": "Timesheet check decision path allows new resolved/waived decision on a check belonging to an already LOCKED period without correction/reopen process.",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B29",
+  "severity": "P0",
+  "area": "Attendance/offline kiosk",
+  "title": "Signed offline event integrity flags for clock-anchor drift, backward time, monotonic rollback and seven-day server drift mark evidence NEEDS_REVIEW but still call live attendance mutation, so suspect timestamps can create normal AttendanceSessions.",
+  "reviewer": "online-gpt",
+  "scenario": "Clock drift/backward/monotonic flags mark signed offline kiosk event NEEDS_REVIEW, but only chain/sequence/revocation block _apply_business_event; timestamp still mutates live attendance.",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B30",
+  "severity": "P1",
+  "area": "Notification privacy",
+  "title": "Established notification WebSocket stays subscribed to user group after logout, user deactivation or credential revocation; consumer sends notification and message badge events without checking current account/session eligibility.",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B31",
+  "severity": "P1",
+  "area": "Ethical transfer concurrency",
+  "title": "Ethical listing request verifies PUBLISHED status before transaction but never locks/rechecks listing inside it; two concurrent requests can create two active transfers for one single-reservation listing if they reserve different available lots.",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B32",
+  "severity": "P1",
+  "area": "Offline attendance assignment semantics",
+  "title": "The signed kiosk event field is named shift_id but is forwarded as assignment_id; an explicitly supplied ID shortcut accepts an assignment regardless of event-date shift window, potentially linking old assignments as current attendance.",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B34",
+  "severity": "P1",
+  "area": "Talent board visibility",
+  "title": "ExplorerPostViewSet feed and public-feed filter is_talent_board_visible (moderator hidden and expired), but generic retrieve, list and by-profile/raw view/like handlers inherit an unrestricted queryset; a hidden post can remain readable/reactable by ID and via list.",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B35",
+  "severity": "P0",
+  "area": "Roster-create cross-tenant writes: RosterOwnerViewSet is an authenticated ModelViewSet with pharmacy-filtered get_queryset but default create/perform_create; RosterA",
+  "title": "SOURCE-FINDING",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B37",
+  "severity": "P1",
+  "area": "Worker roster disclosure: RosterWorkerViewSet.get_queryset includes all assignments in pharmacies with is_active membership, but does not require status ACC",
+  "title": "SOURCE-FINDING",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B38",
+  "severity": "P1",
+  "area": "Roster assignment overwrite: RosterShiftManageViewSet.update explicitly permits user_id to update_or_create each ShiftSlotAssignment after serializer update; i",
+  "title": "SOURCE-FINDING",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B39",
+  "severity": "P1",
+  "area": "Rate default destructive update: sync_pharmacy_rate_defaults sets six pharmacy rate fields to None when apply_rates_to_pharmacy is true but caller omits those fiel",
+  "title": "SOURCE-FINDING",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B40",
+  "severity": "P1",
+  "area": "Booking eligibility stale verification: onboarding verification evaluate preserves was_verified when base checks are missing except for specified AHPRA adverse states; th",
+  "title": "SOURCE-FINDING",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B52",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — Expo startup trusts cached identity and role after server rejects or cannot verify account, unlike web",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B53",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — Out-of-order Stripe subscription events may reactivate cancelled base billing or reset purchased seat entitlement",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B54",
+  "severity": "P0",
+  "area": "Historical discovery",
+  "title": "P0-impact / P1 candidate — Two worker confirmations can reserve and pay for the same slot; a paid losing offer can appear ACCEPTED without an assignment",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B55",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — Concurrent approval of *unlinked* cover request publishes multiple paid vacancies",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B56",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — Concurrent manager attendance corrections can violate final clock-in/out order and distort timesheet work minutes",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B57",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 conditional — Refund provider events are acknowledged without reversing/reconciling local paid financial state",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B58",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 conditional — Internal draft becomes pharmacy-visible when worker sets paid status without delivery",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B59",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 conditional — Revisions can reduce payable below recorded payments, producing negative balance",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B60",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 concurrency candidate — Two overlapping distinct PENDING leave requests can both be approved",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B61",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 user-facing accuracy candidate — Expo payroll CSV exports blanks for fields absent from the timesheet API",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B62",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — A Region Admin with communication-only privileges can manage shift operations despite missing roster capability",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B63",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 conditional — Native-kiosk pairing authorization can be redeemed as web-online by declaring a non-native platform",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B64",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 information-handling candidate — Kiosk one-time secrets are persisted to durable notifications and broadcast to app/WebSocket/device push",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B65",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 scoped-information candidate — Authenticated pricing-preview endpoint lets unrelated users derive private pharmacy guide rates",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B41",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — Pending/rejected membership can be treated as private shift audience",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B42",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — Marketplace draft PATCH returns error after partial persistence",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B44",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — Invalid identity tab submission may erase or detach existing verified ID evidence",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B45",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — Incomplete referee questionnaire can be counted as a verified reference",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B46",
+  "severity": "P0",
+  "area": "Historical discovery",
+  "title": "P0/P1 candidate: Pending/left pharmacy memberships can access or author private pharmacy, group and organisation Hub content",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B47",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate / owner role-policy decision: Organization email invitations immediately activate full administrative membership for an existing user",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B48",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate: Pharmacy Hub mention validation can deliver confidential private post text to ineligible locum or non-accepted members",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B49",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — Attachment/document upload type validation trusts client-declared MIME after failed magic-byte detection",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B50",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 candidate — Active but non-accepted pharmacy membership can read community-chat last-message previews",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B51",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 / potentially P0-impact candidate: Revoked pharmacy chat participant can send new messages through direct message endpoint after leaving the pharmacy",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B67",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 booking/financial-evidence candidate: generic shift-offer DELETE bypasses state-machine transitions",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ },
+ {
+  "id": "B71",
+  "severity": "P1",
+  "area": "Historical discovery",
+  "title": "P1 user-flow reliability candidate: shift offer acceptance commits before notification errors can surface to the caller",
+  "reviewer": "online-gpt",
+  "scenario": "No independent completed S2 or executed S3 proof captured",
+  "evidence": [
+   "see docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_*.md for this B-id"
+  ],
+  "test_needed": ""
+ }
+]

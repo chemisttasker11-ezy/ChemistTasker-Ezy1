@@ -1,0 +1,121 @@
+{
+ "chunk": "Y09",
+ "verdicts": [
+  {
+   "id": "B31",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "When ethical transfers are enabled, two requests can both read PUBLISHED before either transaction reserves the listing. Each transaction locks only its selected lots, then creates a transfer and writes RESERVED without rechecking listing status. Distinct lots and request IDs avoid the existing stock and receipt constraints; no constraint limits active transfers per listing. The feature is disabled by default.",
+   "evidence": [
+    "backend/ethical_marketplace/urls.py:21",
+    "backend/ethical_marketplace/views.py:369",
+    "backend/ethical_marketplace/views.py:371",
+    "backend/ethical_marketplace/views.py:390",
+    "backend/ethical_marketplace/views.py:406",
+    "backend/ethical_marketplace/models.py:254",
+    "backend/core/settings.py:243"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B34",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Authenticated list, retrieve, view and like requests use the unrestricted queryset, so moderator-hidden posts remain readable and reactable through those routes. Authentication is their only relevant permission, and serialization does not suppress hidden posts. The claim is narrower than reported because by-profile explicitly applies the visibility filter; an existing test also documents that plain list includes expired posts.",
+   "evidence": [
+    "backend/talent/urls.py:14",
+    "backend/talent/views/explorer.py:54",
+    "backend/talent/views/explorer.py:84",
+    "backend/talent/views/explorer.py:203",
+    "backend/talent/views/explorer.py:216",
+    "backend/talent/views/explorer.py:227",
+    "backend/talent/test_explorer_api.py:68"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B38",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Normal editor requests include slots and enter the guarded in-place editor, which rejects reassignment of invoice-linked assignments. However, a managing user can omit slots and PATCH only user_id after unpublishing the affected shift. That path updates the existing assignment's worker and terms without checking invoice or attendance history; the model guard checks publication status only. The existing invoice regression test covers the guarded slots payload, leaving this alternate payload reachable.",
+   "evidence": [
+    "backend/workforce/roster/urls.py:39",
+    "backend/workforce/roster/views.py:150",
+    "backend/workforce/roster/views.py:207",
+    "backend/workforce/roster/slot_edit.py:61",
+    "backend/shifts/models.py:328",
+    "backend/shifts/models.py:523",
+    "backend/workforce/tests/test_roster_slot_http_contract.py:324"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B40",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "An already-verified worker can resend a mobile OTP, which clears is_mobile_verified without clearing profile.verified; public shift applications still trust the saved profile flag. Marketplace access and staff talent posting independently check mobile verification, so those cited paths do not share the bypass. Preserving verification when base checks are missing is explicitly documented owner policy and covered by a test. Whether requesting another OTP should suspend public booking eligibility is therefore a policy decision, rather than an established P1 authorization defect.",
+   "evidence": [
+    "backend/users/urls.py:42",
+    "backend/users/api_otp.py:525",
+    "backend/onboarding/verification/policy.py:79",
+    "backend/onboarding/test_verification_policy.py:54",
+    "backend/shifts/interest.py:40",
+    "backend/marketplace/policy.py:70",
+    "backend/talent/views/explorer.py:155"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "B53",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "A base subscription deletion sets the local account inactive, but a later invoice.paid for its tracked add-on sets that same account active without checking the base subscription. A delayed base checkout completion also resets staff_count to five even when an add-on is already recorded. Webhook deduplication protects individual event IDs, not ordering between different events, and subscriber pricing trusts this local status. This occurs with matched subscription IDs and does not depend on B68's unmatched-customer fallback.",
+   "evidence": [
+    "backend/billing/urls.py:14",
+    "backend/billing/views.py:822",
+    "backend/billing/views.py:830",
+    "backend/billing/views.py:903",
+    "backend/billing/views.py:914",
+    "backend/billing/views.py:929",
+    "backend/billing/views.py:974",
+    "backend/billing/views.py:637"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B56",
+   "verdict": "REFUTED",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The locking query does not lock only the targeted event: select_for_update() without an of restriction also locks rows joined through select_related, including the shared session and pharmacy. On PostgreSQL, corrections to different events in the same session therefore cannot both proceed through chronology validation concurrently. The waiting transaction reads the opposing correction after acquiring the shared lock, and the chronology check rejects the proposed inversion.",
+   "evidence": [
+    "backend/attendance/urls.py:55",
+    "backend/attendance/approvals.py:315",
+    "backend/attendance/approvals.py:332",
+    "backend/attendance/approvals.py:344",
+    "backend/attendance/approvals.py:354",
+    "backend/attendance/models.py:335",
+    "backend/core/settings.py:411"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

@@ -1,0 +1,83 @@
+{
+ "chunk": "Y11",
+ "verdicts": [
+  {
+   "id": "B47",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "InviteOrgUserView.perform_create looks up an existing user by email. It then creates or updates their OrganizationMembership (role, admin_level, region, pharmacies) at once, before any email is sent. The model has no pending or accepted state, and OrganizationRolePermission and the org dashboard trust that row straight away, so access really is granted without acceptance. The inviter is still held to their own delegation scope by _enforce_org_delegation, so nobody gets more power than the inviter already has. The real gaps are consent and transparency, which makes this an owner policy choice (pharmacy-admin invites, by contrast, wait for acceptance), not a privilege escalation. test_region_delegation.py asserts this immediate behaviour on purpose.",
+   "evidence": [
+    "backend/users/api_organizations.py:83",
+    "backend/users/api_organizations.py:110",
+    "backend/users/api_organizations.py:125",
+    "backend/users/api_organizations.py:153",
+    "backend/users/api_organizations.py:33",
+    "backend/users/permissions.py:39",
+    "backend/dashboards/views.py:556",
+    "backend/users/test_region_delegation.py:46"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "B49",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "validate_uploaded_file uses effective_type = sniffed_type or content_type. When the magic bytes don't match, the client-declared Content-Type decides, so b'NOT A PDF' named x.pdf with content_type application/pdf passes. Chat (both POST paths) and Hub attachments then store it. The filename extension is still limited to the allowed list, so the stored object keeps a .pdf/.docx/image extension. Browser XSS from this is not shown, which makes this a content-integrity or disguised-file risk (P2), not a P1. No test in the repo covers file_validation.",
+   "evidence": [
+    "backend/core/file_validation.py:60",
+    "backend/core/file_validation.py:100",
+    "backend/core/file_validation.py:109",
+    "backend/core/file_validation.py:111",
+    "backend/chat/views.py:629",
+    "backend/chat/views.py:689",
+    "backend/pharmacy_hub/scoping.py:26"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "B51",
+   "verdict": "REFUTED",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "MessageViewSet.create does check only for a Participant row. But a post_save receiver on Membership (sync_membership_to_community_chat) deletes the user's Participant rows in that pharmacy's GROUP conversations whenever a save leaves the membership inactive, not ACCEPTED, or a non-staff employment type. That covers quit (LEFT), reject, the generic PATCH in perform_update, and the ProtectedError fallback in destroy. destroy itself deletes participations explicitly, and no queryset.update() on Membership skips the signal. A revoked member therefore has no Participant row and gets 403. Direct messages surviving after someone leaves is a separate policy question, not this finding.",
+   "evidence": [
+    "backend/chat/signals.py:131",
+    "backend/chat/signals.py:151",
+    "backend/chat/views.py:683",
+    "backend/memberships/views.py:109",
+    "backend/memberships/views.py:124",
+    "backend/memberships/views.py:493"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "B71",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "accept commits the booking inside transaction.atomic, and ATOMIC_REQUESTS is not set. It then calls notify_shift_users and async_task outside any try/except. notify_users -> _broadcast does an uncaught channel-layer group_send, and async_task -> send_task raises if the Celery broker is down. An outage of Redis or the broker after commit therefore returns a 500 to the worker even though the booking is saved, and a retry gets 'Offer is not pending'. Data stays consistent and this only happens during an infrastructure outage, so P2. The codebase already has deliver_email_best_effort for exactly this pattern.",
+   "evidence": [
+    "backend/shifts/offers.py:378",
+    "backend/shifts/offers.py:446",
+    "backend/shifts/offers.py:460",
+    "backend/shifts/offers.py:495",
+    "backend/notifications/services.py:31",
+    "backend/notifications/services.py:88",
+    "backend/core/task_queue.py:105",
+    "backend/users/delivery.py:13"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

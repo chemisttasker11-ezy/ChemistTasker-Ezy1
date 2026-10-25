@@ -15,7 +15,7 @@ const STACK = 'C:\\dev\\my-stack';
 const HOME = process.env.USERPROFILE;
 const TIMEOUT_MIN = 90, CLAIM_MIN = 100;
 // A: keep 5h headroom for the orchestrator session (same account). B: keep its week for the next 3 days.
-const GUARD = { claudeA: { five: 85, week: 96 }, claudeB: { five: 85, week: 50 } };
+const GUARD = { claudeA: { five: 85, week: 96 }, claudeB: { five: 85, week: 60 } };
 const LIMIT_RE = /rate.?limit|usage limit|quota|\b429\b|RESOURCE_EXHAUSTED|\b401\b|logged out|not logged in|hit your limit|hit your session limit|out of credits/i;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -26,6 +26,8 @@ const flowOf = id => flows.find(f => f.id === id);
 const vbatches = fs.existsSync(path.join(DIR, 'verify.json')) ? JSON.parse(fs.readFileSync(path.join(DIR, 'verify.json'), 'utf8')) : [];
 const vOf = id => vbatches.find(b => b.id === id);
 const rawById = new Map(JSON.parse(fs.readFileSync(path.join(DIR, 'raw_findings.json'), 'utf8')).map(f => [f.id, f]));
+// Historical B-series text for Y batches (build-verify-b.mjs).
+if (fs.existsSync(path.join(DIR, 'b_findings.json'))) for (const f of JSON.parse(fs.readFileSync(path.join(DIR, 'b_findings.json'), 'utf8'))) rawById.set(f.id, f);
 const files = id => fs.readFileSync(path.join(DIR, `files_${id}.txt`), 'utf8').trim().split(/\r?\n/);
 const isDeep = c => /^(backend|shared-core)\//.test(c.first);
 

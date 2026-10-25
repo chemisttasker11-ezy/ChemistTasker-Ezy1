@@ -1,0 +1,111 @@
+{
+ "chunk": "Y02",
+ "verdicts": [
+  {
+   "id": "B18",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The viewset mixes in UpdateModelMixin, so PUT goes to the inherited update() and skips the owner-only, PENDING-only checks in partial_update. The serializer leaves status, message and response_message writable. That means an admin of the requesting organization (who is in the queryset through full_org_ids) can PUT {\"status\":\"ACCEPTED\"} on their own claim with no owner approval. PUT never runs _accept_claim, so pharmacy.organization does not change and there is no real takeover. The damage is a fake ACCEPTED claim that appears in the org dashboard's accepted list and blocks other organizations from claiming (claims.py:315-323), a 500 if the unique constraint trips, and the ability to reopen REJECTED claims.",
+   "evidence": [
+    "backend/organizations/claims.py:351-356",
+    "backend/organizations/claims.py:373-394",
+    "backend/organizations/claims.py:459-470",
+    "backend/organizations/serializers.py:497-527",
+    "backend/organizations/claims.py:315-323",
+    "backend/organizations/models.py:296-305",
+    "backend/dashboards/views.py:590-600"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B19",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "MembershipInviteLinkViewSet is a plain ModelViewSet. Only create() checks user_can_invite_members_to_pharmacy, and the serializer leaves pharmacy, category, expires_at and is_active writable. So anyone who can see a link (owner, org scope or MANAGE_STAFF admin) can PATCH it to point at any other pharmacy, and new applications then go to that pharmacy (serializers.py:532, views.py:241,289-295). Deleting a link cascades its MembershipApplication rows (models.py:246). Neither PATCH nor DELETE is called by the shared-core client, and the target pharmacy's owner still has to approve each application, so this is an API-only integrity and spam problem, not P0.",
+   "evidence": [
+    "backend/memberships/views.py:189-222",
+    "backend/memberships/serializers.py:265-269",
+    "backend/memberships/selectors.py:124-150",
+    "backend/memberships/models.py:211-216",
+    "backend/memberships/models.py:246",
+    "backend/memberships/serializers.py:532",
+    "shared-core/src/domains/memberships/api.ts:38-41"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B21",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The serializer accepts pharmacy and shift (a ShiftSlotAssignment) separately and never checks that the assignment belongs to that pharmacy, or that the requester is linked to that pharmacy at all. On approval, _assert_decider_permissions and release_worker_from_assignment check authority only on req.pharmacy. Then they delete req.shift and escalate the visibility of a shift that may belong to a different pharmacy or organization (pharmacy B). The only guard is that the requester must be the current assignee (worker_actions.py:359), so a worker can get their assignment at B released by a manager at A without B's consent. This needs a manager at A to approve, which is why it is P1 and not P0.",
+   "evidence": [
+    "backend/shifts/serialization/worker_requests.py:13-30",
+    "backend/shifts/serialization/worker_requests.py:77-90",
+    "backend/shifts/worker_requests.py:225-253",
+    "backend/shifts/worker_requests.py:365-387",
+    "backend/workforce/roster/worker_actions.py:349-379"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B22",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Polls created in pharmacy scope are saved with pharmacy=P1 and organization=P1.organization (access.py:214-216, serialization/polls.py:121-124). The organization list filter matches Q(organization=org) | Q(pharmacy__organization=org), so every pharmacy-private poll, with its votes and comments, appears in the org hub list. Anyone with a staff membership at any pharmacy in the org can see it, and so can a region admin scoped to other pharmacies (access.py:286-306). Direct retrieve is safe because it re-resolves scope from the poll (polls.py:129-131). The code comment at polls.py:84 shows this was deliberate and it differs from how posts are scoped (scoping.py:162-168), so the owner must decide whether it should change.",
+   "evidence": [
+    "backend/pharmacy_hub/polls.py:74-89",
+    "backend/pharmacy_hub/polls.py:129-131",
+    "backend/pharmacy_hub/scoping.py:151-168",
+    "backend/pharmacy_hub/access.py:213-216",
+    "backend/pharmacy_hub/access.py:284-310",
+    "backend/pharmacy_hub/serialization/polls.py:121-124"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "B23",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Update, partial_update and destroy on OrganizationViewSet use ORG_WIDE_ADMIN_ROLES. That list is built from VIEW_ALL_PHARMACIES, which CHIEF_ADMIN has, so a Chief Admin can edit or delete the organization record. The viewset docstring and the role definition both say Chief Admin is meant to share org-admin powers, so this matches the stated design. The open point is a policy conflict: deleting the whole organization goes further than the rule that a Chief Admin 'cannot create or change organisation admins'. The owner must decide; the code does nothing beyond what it says it does.",
+   "evidence": [
+    "backend/organizations/views.py:55-72",
+    "backend/users/org_roles.py:129-150",
+    "backend/users/org_roles.py:210-214",
+    "backend/users/permissions.py:17-43"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "DECISION"
+  },
+  {
+   "id": "B24",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Apart from accept, ExchangeAction checks only that the caller is a participant and that expected_version matches. It never checks the current state. Buyer or seller can decline, cancel or propose-terms from any state, including ACCEPTED and COMPLETED, and when both confirm-completion from ENQUIRY or TERMS_PROPOSED the exchange and listing become COMPLETED with no reservation or agreed terms. Nothing ever sets a MarketplaceReservation inactive, so cancelling after accept leaves the listing RESERVED for good. The steps are not atomic or locked either. There is no payment movement here and both parties must be participants, so this is P1 and not P0.",
+   "evidence": [
+    "backend/marketplace/views.py:313-316",
+    "backend/marketplace/views.py:347-382",
+    "backend/marketplace/services.py:52-76",
+    "backend/marketplace/models.py:215-232"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

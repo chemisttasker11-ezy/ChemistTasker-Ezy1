@@ -1,0 +1,114 @@
+{
+ "chunk": "Y04",
+ "verdicts": [
+  {
+   "id": "B02",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Successful extra-seat checkout stores stripe_extra_seat_subscription_id, after which the seat endpoint rejects every further quantity change. The billing screen still offers quantity changes and submits them to that endpoint. Billing permissions restrict who can submit, but do not provide an alternative adjustment flow.",
+   "evidence": [
+    "backend/billing/urls.py:9",
+    "backend/billing/views.py:506",
+    "backend/billing/views.py:823",
+    "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:187",
+    "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:438"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B08",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Manager notifications include every active Region Admin belonging to the shift pharmacy's organization, without checking assigned pharmacies. A real interest submission reaches this helper, and notification delivery checks account activity but does not enforce pharmacy scope. The exposure concerns other pharmacies within the same organization; the separate shift-access guard does not prevent receiving the notification contents.",
+   "evidence": [
+    "backend/shifts/base.py:196",
+    "backend/shifts/interest.py:148",
+    "backend/shifts/notifications.py:51",
+    "backend/notifications/services.py:74",
+    "backend/organizations/access.py:165",
+    "backend/shifts/test_access_escalation_contract.py:50"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B11",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Worker acceptance under payment-required billing changes the offer to ACCEPTED_AWAITING_PAYMENT. Slot locking treats that status as reserved without checking expires_at, while automatic expiry handles only PENDING offers and the webhook ignores checkout expiry events. Abandoning payment therefore leaves the reservation without an automatic release deadline; the owner must choose the payment grace period and late-payment policy.",
+   "evidence": [
+    "backend/shifts/urls.py:50",
+    "backend/shifts/offers.py:395",
+    "backend/shifts/assignment.py:218",
+    "backend/shifts/offers.py:177",
+    "backend/shifts/serialization/slots.py:35",
+    "backend/billing/views.py:944"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "B13",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The authenticated deletion endpoint deactivates and anonymizes the user without checking future assignments, releasing bookings, or notifying their managers. Assignments retain their user foreign key because the user row is saved rather than deleted, so those slots remain occupied. Existing deletion tests cover identity cleanup and token revocation, not booked shifts; the owner must choose whether deletion blocks, cancels, or initiates a handover.",
+   "evidence": [
+    "backend/core/api_v1_urls.py:30",
+    "backend/users/api_account.py:76",
+    "backend/users/account_deletion.py:118",
+    "backend/shifts/models.py:481",
+    "backend/shifts/assignment.py:213",
+    "backend/users/test_account_security_contract.py:361"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "B25",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An authorized listing owner can submit valid circles and a schedule whose later entry exceeds the maximum. The handler saves the audience and listing version, and creates earlier schedule entries, before raising the schedule validation error. Neither the handler nor database settings wrap the request in a transaction, and the audience signal validates only the audience fields, so those earlier writes persist despite the 400 response.",
+   "evidence": [
+    "backend/marketplace/urls.py:15",
+    "backend/marketplace/services.py:11",
+    "backend/marketplace/views.py:220",
+    "backend/marketplace/views.py:223",
+    "backend/marketplace/signals.py:21",
+    "backend/core/settings.py:401"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B27",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Period creation validates date order and length but checks uniqueness only for identical pharmacy/date tuples, allowing intersecting windows. Each period independently selects the same dated assignments and attendance, and locking checks approval within that period without excluding evidence exported in another manifest. The web screen can create overlapping fortnights on successive weeks; duplicate exported evidence is established, but automatic duplicate payment is not. The owner must choose whether to prohibit overlapping payroll periods or deduplicate their payable evidence.",
+   "evidence": [
+    "backend/workforce/urls.py:48",
+    "backend/workforce/views.py:657",
+    "backend/workforce/models.py:347",
+    "backend/workforce/timesheet_data.py:134",
+    "backend/workforce/timesheet_data.py:206",
+    "backend/workforce/timesheet_transitions.py:182",
+    "frontend_web/src/features/workforce/TimesheetsPage.tsx:201"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

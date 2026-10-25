@@ -1,0 +1,90 @@
+{
+ "chunk": "Y07",
+ "verdicts": [
+  {
+   "id": "B45",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "A referee with a valid, unused signed link can omit would_rehire because the model allows blank values and the serializer adds no required-answer validation. The submission handler marks every answer except 'no' as confirmed, and verification policy counts both confirmed flags as verified referees. Token and duplicate-submission checks do not prevent an incomplete first submission; the existing response-validation test covers duplicates only.",
+   "evidence": [
+    "backend/onboarding/urls.py:36",
+    "backend/onboarding/models.py:703",
+    "backend/onboarding/serializers.py:179",
+    "backend/onboarding/views.py:55",
+    "backend/onboarding/views.py:98",
+    "backend/onboarding/views.py:139",
+    "backend/onboarding/verification/policy.py:36",
+    "backend/client_profile/test_request_validation.py:103"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B48",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An authorized author can supply an active same-pharmacy locum membership ID directly, although the directory hides locums and the Hub access resolver denies them access. Mention delivery checks account activity but never checks the recipient's Hub access, storing a 280-character body preview and queuing the full body for email. The non-accepted staff case overlaps B46's permissive Hub access, but the locum notification leak independently confirms this finding. Existing tests cover locum read denial and eligible-recipient notifications, not rejection of ineligible mention IDs.",
+   "evidence": [
+    "backend/pharmacy_hub/urls.py:59",
+    "backend/pharmacy_hub/serialization/posts.py:265",
+    "backend/pharmacy_hub/serialization/posts.py:292",
+    "backend/pharmacy_hub/posts.py:255",
+    "backend/pharmacy_hub/posts.py:120",
+    "backend/pharmacy_hub/posts.py:168",
+    "backend/pharmacy_hub/access.py:184",
+    "backend/notifications/services.py:80",
+    "backend/pharmacy_hub/test_api.py:76",
+    "backend/pharmacy_hub/test_hub_scope_contract.py:591"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B50",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The authenticated room list includes pharmacy community rooms for active staff memberships without checking accepted status or participation, and its serializer returns the latest message's first 200 characters. This state is reachable: an authorized manager can activate a pending membership through generic PATCH without changing its status. The participant check protects the separate messages action only; existing community-chat tests do not cover previews for active pending members.",
+   "evidence": [
+    "backend/chat/urls.py:9",
+    "backend/chat/views.py:85",
+    "backend/chat/serializers.py:174",
+    "backend/chat/views.py:606",
+    "backend/memberships/selectors.py:58",
+    "backend/memberships/serializers.py:64",
+    "backend/memberships/views.py:97",
+    "backend/chat/test_api.py:175",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx:121"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B67",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The routed viewset exposes default DELETE to the offer's worker or a permitted pharmacy manager without a status check or custom deletion handler. Payment-required acceptance saves ACCEPTED_AWAITING_PAYMENT without creating an assignment, so assignment-level PROTECT does not stop deletion of that offer and its accepted terms. This bypasses the pending-only decline transition and removes the row billing uses for finalization; it does not establish deletion of an already booked assignment. Existing offer characterization tests cover visibility and blocked creation, not DELETE.",
+   "evidence": [
+    "backend/shifts/urls.py:50",
+    "backend/shifts/offers.py:156",
+    "backend/shifts/offers.py:162",
+    "backend/shifts/offers.py:395",
+    "backend/shifts/offers.py:615",
+    "backend/shifts/models.py:506",
+    "backend/billing/views.py:573",
+    "shared-core/src/domains/shifts/api.ts:106",
+    "backend/client_profile/test_characterization_shift_offers.py:27"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}

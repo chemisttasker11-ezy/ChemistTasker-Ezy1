@@ -1,0 +1,135 @@
+{
+ "chunk": "Y10",
+ "verdicts": [
+  {
+   "id": "B58",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The invoice owner can mark an undelivered internal draft paid, and both the received-invoice query and document visibility helper then expose it to the pharmacy. This also exposes an unsent correction as the current revision. The impact is narrower than payment approval or settlement: no Payment is created, review status remains separate, and visibility stays within the correct pharmacy.",
+   "evidence": [
+    "backend/worker_finance/views.py:152",
+    "backend/worker_finance/views.py:242",
+    "backend/worker_finance/views.py:335",
+    "backend/worker_finance/services.py:760",
+    "backend/worker_finance/urls.py:8",
+    "backend/invoicing/test_integrity.py:233",
+    "frontend_web/src/pages/finance/FinanceWorkspace.tsx:354"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B60",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Overlapping pending requests can be created, and approval locks only the individual leave row. Concurrent approvals of distinct rows can both pass the approved-overlap query before either commits; no database exclusion constraint prevents this. This is an administrative consistency bug, but the timesheet summary merges overlapping leave intervals, so duplicate paid minutes are not established.",
+   "evidence": [
+    "backend/workforce/leave_service.py:235",
+    "backend/workforce/leave_service.py:299",
+    "backend/workforce/leave_service.py:329",
+    "backend/workforce/models.py:281",
+    "backend/workforce/views.py:618",
+    "backend/workforce/urls.py:47",
+    "backend/workforce/timesheet_builder.py:116",
+    "backend/workforce/tests/test_timesheets.py:145"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B62",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "An assigned Region Admin at COMMUNICATION_MANAGER level can create shifts and description templates because the management helper ignores admin_level. Existing-shift mutations additionally depend on queryset visibility, so unrestricted mutation of every assigned pharmacy shift is not established. The claimed workforce contrast is inaccurate: central Region Admin capabilities also add MANAGE_ROSTER regardless of the selected level, while the cited roster-denial tests cover PharmacyAdmin users.",
+   "evidence": [
+    "backend/organizations/access.py:165",
+    "backend/shifts/base.py:128",
+    "backend/shifts/serialization/shifts.py:304",
+    "backend/shifts/description_templates.py:40",
+    "backend/shifts/lifecycle.py:292",
+    "backend/users/org_roles.py:91",
+    "backend/users/org_roles.py:169",
+    "backend/workforce/permissions.py:38",
+    "backend/workforce/tests/test_roster_admin_capabilities.py:42",
+    "backend/billing/tests.py:217",
+    "backend/shifts/urls.py:43"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B64",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Pairing codes and PIN setup OTPs are stored verbatim in notification bodies and payloads, then forwarded without redaction to WebSocket subscribers and active Expo tokens. The pairing test explicitly requires this behavior. Delivery targets the intended user, REST reads are user-scoped, and credential expiry still prevents later redemption; changing notification delivery or retention therefore requires a policy decision.",
+   "evidence": [
+    "backend/attendance/credentials.py:341",
+    "backend/attendance/credentials.py:859",
+    "backend/notifications/services.py:80",
+    "backend/notifications/models.py:27",
+    "backend/notifications/views.py:31",
+    "backend/notifications/consumers.py:34",
+    "backend/attendance/credentials.py:412",
+    "backend/attendance/credentials.py:903",
+    "backend/attendance_tests/test_kiosk_pairing_code.py:160",
+    "frontend_mobile/features/notifications/NotificationsScreen.tsx:191"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "B41",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "Private shift listing, detail access and announcement recipients check active membership without requiring ACCEPTED status. Normal invitations start inactive, but an authorized manager can PATCH a pending membership active without changing its status; status is independently writable as well. This makes the reported state reachable through the API, and serializer output does not add an acceptance guard.",
+   "evidence": [
+    "backend/shifts/browse.py:111",
+    "backend/shifts/lifecycle.py:317",
+    "backend/shifts/announcements.py:29",
+    "backend/shifts/serialization/shifts.py:189",
+    "backend/memberships/invites.py:149",
+    "backend/memberships/serializers.py:62",
+    "backend/memberships/views.py:84",
+    "backend/memberships/access.py:63",
+    "backend/shifts/urls.py:30",
+    "backend/memberships/test_membership_workflows_contract.py:102"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B44",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "A request that reaches identity submission validation can already have deleted replaced or cleared files, saved document changes, and reset verification before returning 400. The reference check protects other profiles' files, but deliberately excludes the profile being edited. This affects the caller's explicitly edited evidence, and an existing test expressly expects draft edits to persist after submission refusal, so changing rollback or evidence-retention behavior requires a product decision.",
+   "evidence": [
+    "backend/onboarding/services/identity.py:39",
+    "backend/onboarding/services/identity.py:57",
+    "backend/onboarding/services/identity.py:138",
+    "backend/onboarding/services/identity.py:148",
+    "backend/onboarding/services/identity.py:192",
+    "backend/core/serializer_lifecycle.py:68",
+    "backend/onboarding/serializers.py:474",
+    "backend/onboarding/views.py:268",
+    "backend/onboarding/urls.py:21",
+    "backend/onboarding/test_tab_capabilities_contract.py:157",
+    "frontend_web/src/pages/onboarding/onboarding_pharmacist/IdentityV2.tsx:85"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  }
+ ],
+ "reviewer": "codexB-1"
+}

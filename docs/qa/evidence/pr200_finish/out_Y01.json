@@ -1,0 +1,119 @@
+{
+ "chunk": "Y01",
+ "verdicts": [
+  {
+   "id": "B01",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P0",
+   "duplicate_of": "",
+   "reason": "charge_shift_fulfillment works out is_subscriber (active OwnerSubscription) but never uses it. price_id is always the standard locum ($30) or PT/FT ($80) price. The comments list the subscriber price IDs ($15/$40), and the pricing pages promise subscribers 50% off fulfilment fees. No test checks which Stripe price is used, so active subscribers are charged full price.",
+   "evidence": [
+    "backend/billing/views.py:635",
+    "backend/billing/views.py:641",
+    "backend/billing/views.py:648",
+    "backend/billing/views.py:664",
+    "frontend_web/landing_next/migrated/pages/PricingPage.tsx:151",
+    "frontend_web/src/pages/PricingPage.tsx:245"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B04",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P0",
+   "duplicate_of": "",
+   "reason": "When no offer_ids or slot_ids are sent, there is no check that any offer is ACCEPTED_AWAITING_PAYMENT, and quantity becomes max(1,0)=1. The shared-core client says the existing callers send a bodyless POST, so this is the normal UI path. Paying finalizes every pending offer for one unit, and a shift with nothing pending still gets a payable session. Nothing stops duplicate sessions: no Stripe idempotency key and no lookup for an open session or payment. The webhook dedupes by event id only and creates a new ShiftPayment for every paid session, even when nothing is finalized.",
+   "evidence": [
+    "backend/billing/views.py:571",
+    "backend/billing/views.py:583",
+    "backend/billing/views.py:665",
+    "backend/billing/views.py:689",
+    "backend/billing/views.py:848",
+    "backend/billing/views.py:329",
+    "shared-core/src/domains/billing/api.ts:48"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B10",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P0",
+   "duplicate_of": "",
+   "reason": "pay_shift calls spend_pills_for_shift_post once per unit, but every call uses the same key f\"shift:{shift.id}:pill-payment\". _create_ledger_entry returns the existing row when that key is found, so only one unit is ever deducted. Because the key is shift-wide, a later payment on the same shift (still PENDING after a partial payment) is free. Separately, the balance is read with no select_for_update, so two concurrent spends on different shifts can both pass. The finalize step also runs in its own transaction, after the spend. This is a deterministic undercharge, not just a concurrency risk.",
+   "evidence": [
+    "backend/rewards/views.py:215",
+    "backend/rewards/views.py:218",
+    "backend/rewards/services.py:366",
+    "backend/rewards/services.py:139",
+    "backend/rewards/services.py:144",
+    "backend/rewards/models.py:177"
+   ],
+   "runtime_test": "Concurrency part only: two parallel pay-shift requests for different shifts against one balance on PostgreSQL. The single-key undercharge needs no runtime proof.",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B14",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "public_holidays.json lists 2026 dates only, and is_public_holiday is an exact string lookup. Any slot from 1 Jan 2027 (New Year, Australia Day) is priced as a weekday by get_locked_rate_for_slot for award-priced non-pharmacist shifts, so the locked rate falls below the holiday rate. VIC also seems to be missing the 2026 AFL Grand Final eve. The 'legacy award figures' half cannot be settled from the code: the single unversioned casual table (e.g. Assistant L1 $33.19) has to be compared with the FWO MA000012 pay guide in force after 1 July 2026. Lowered to P1 because the rate is a suggested or locked figure, not a payment the platform makes.",
+   "evidence": [
+    "backend/shifts/data/public_holidays.json:2",
+    "backend/shifts/pricing.py:47",
+    "backend/shifts/pricing.py:54",
+    "backend/shifts/pricing.py:402",
+    "backend/shifts/data/award_rates_casual_first_level.json:5",
+    "backend/shifts/data/README.md:10"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B16",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P0",
+   "duplicate_of": "",
+   "reason": "PharmacyAdminViewSet is a plain ModelViewSet with no update or partial_update override and only IsAuthenticated. get_queryset lets an admin of any level (including COMMUNICATION_MANAGER) reach every assignment in their pharmacy. The serializer leaves user, pharmacy, membership, is_active and staff_role writable, and pharmacy accepts any Pharmacy id. Its validate() only checks for an existing duplicate and owner demotion. So a low-level admin can PATCH their own assignment's pharmacy to a foreign pharmacy and keep their level there, or re-activate or reassign other rows. The MANAGE_ADMINS check runs only in create() and destroy(), and no test covers PATCH or PUT.",
+   "evidence": [
+    "backend/organizations/views.py:301",
+    "backend/organizations/views.py:384",
+    "backend/organizations/views.py:416",
+    "backend/organizations/access.py:26",
+    "backend/organizations/serializers.py:611",
+    "backend/organizations/serializers.py:628",
+    "backend/organizations/serializers.py:637",
+    "backend/organizations/urls.py:29"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "B17",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P0",
+   "duplicate_of": "",
+   "reason": "ChainSerializer.pharmacy_ids is a writable PrimaryKeyRelatedField over Pharmacy.objects.all(). Create, PUT and PATCH therefore skip the owner/organization match that add_pharmacy enforces. Any owner, or any org-wide admin of any organization, passes check_permissions and can attach a foreign pharmacy to their own chain. remove_user then deletes the first Membership of any user_id in any chain pharmacy, including the foreign one. Chain membership also widens shift escalation and rate visibility (candidates.py, lifecycle.py, rate_visibility.py), and the pharmacies action shows the foreign pharmacy's details.",
+   "evidence": [
+    "backend/organizations/serializers.py:585",
+    "backend/organizations/serializers.py:588",
+    "backend/organizations/views.py:604",
+    "backend/organizations/views.py:679",
+    "backend/organizations/views.py:724",
+    "backend/organizations/views.py:733",
+    "backend/shifts/candidates.py:269",
+    "shared-core/src/domains/organizations/api.ts:150"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

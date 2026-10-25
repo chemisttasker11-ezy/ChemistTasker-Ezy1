@@ -1,0 +1,136 @@
+{
+ "chunk": "Y06",
+ "verdicts": [
+  {
+   "id": "B57",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "A signed refund event falls through the dispatcher and is still marked processed with HTTP 200. The original ShiftPayment and shift payment status remain paid, with no refund reconciliation path found. This confirms stale financial state after a refund; it does not imply that the worker's assignment should automatically be cancelled.",
+   "evidence": [
+    "backend/billing/urls.py:14",
+    "backend/billing/views.py:848",
+    "backend/billing/views.py:888",
+    "backend/billing/views.py:944",
+    "backend/billing/views.py:955",
+    "backend/billing/views.py:989",
+    "backend/billing/models.py:78",
+    "backend/billing/tests.py:25"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B59",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "An invoice owner can revise payable from 880 to 100 after recording an 880 payment: revision validation checks positivity but never compares existing payments. Payments remain attached, and serialization returns a balance of -780, which the document uses as the amount due. P2 because this is an owner-controlled correction with preserved history; the owner must decide whether to reject such revisions or represent an overpayment and its reconciliation explicitly.",
+   "evidence": [
+    "backend/worker_finance/urls.py:8",
+    "backend/worker_finance/views.py:203",
+    "backend/worker_finance/services.py:598",
+    "backend/worker_finance/services.py:645",
+    "backend/worker_finance/services.py:702",
+    "backend/worker_finance/services.py:836",
+    "backend/worker_finance/models.py:80",
+    "backend/worker_finance/tests/test_api.py:191",
+    "frontend_web/src/pages/finance/financeParts.tsx:49",
+    "frontend_web/src/pages/finance/financeParts.tsx:106"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "B61",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The mobile export directly reads hours and pay fields that neither the timesheet serializer nor its shared contract supplies, including every fallback name. An approved timesheet therefore produces four empty numeric columns despite having worked_minutes. P2 because the exported file is incomplete; this path does not itself calculate or submit incorrect wages.",
+   "evidence": [
+    "frontend_mobile/app/workforce/payroll-export.tsx:3",
+    "frontend_mobile/features/parity/workforce.tsx:198",
+    "frontend_mobile/features/parity/workforce.tsx:209",
+    "shared-core/src/domains/workforce/api.ts:32",
+    "backend/workforce/urls.py:53",
+    "backend/workforce/views.py:762",
+    "backend/workforce/views.py:770",
+    "backend/workforce/timesheet_serialization.py:36",
+    "shared-core/src/contracts/workforce.ts:88"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "B63",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "Issued authorizations specify NATIVE_OFFLINE, but an empty or non-native platform skips signing proof and the allowed-client-kind check, creating a WEB_ONLINE device. This is narrower than an offline security bypass: valid unexpired code possession and manager authorization remain required, and offline sync rejects web devices. P2 and a policy decision because the web client and existing tests deliberately support this redemption flow.",
+   "evidence": [
+    "backend/attendance/urls.py:35",
+    "backend/attendance/kiosk_api.py:170",
+    "backend/attendance/credentials.py:325",
+    "backend/attendance/credentials.py:393",
+    "backend/attendance/credentials.py:443",
+    "backend/attendance/credentials.py:464",
+    "backend/attendance/credentials.py:145",
+    "backend/attendance/protocol.py:313",
+    "backend/attendance_tests/test_kiosk_pairing_code.py:186",
+    "frontend_web/src/pages/attendance/KioskPage.tsx:344"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "DECISION"
+  },
+  {
+   "id": "B65",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The calculator requires authentication but bypasses pharmacy-management checks and loads the submitted pharmacy ID directly. A pharmacist FLEXIBLE preview without overrides returns that pharmacy's configured day rate, including to staff whose normal shift responses deliberately remove those defaults. P2 because the demonstrated disclosure concerns pharmacy guide rates, rather than individual wages or agreed assignment terms.",
+   "evidence": [
+    "backend/shifts/urls.py:43",
+    "backend/shifts/base.py:114",
+    "backend/shifts/base.py:124",
+    "backend/shifts/lifecycle.py:204",
+    "backend/shifts/lifecycle.py:219",
+    "backend/shifts/lifecycle.py:275",
+    "backend/shifts/pricing.py:235",
+    "backend/shifts/rate_visibility.py:18",
+    "backend/shifts/test_rate_visibility.py:48",
+    "backend/shifts/test_shift_listing_contract.py:185"
+   ],
+   "runtime_test": "",
+   "ui_visible": false,
+   "kind": "FIX"
+  },
+  {
+   "id": "B42",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "An authorized draft owner can submit a valid title/audience edit with delivery known_cost='1.001': the dictionary validation accepts it, then delivery full_clean rejects its decimal precision after the listing and audience have saved. Neither the PATCH path nor database configuration supplies a surrounding transaction, so those earlier writes persist. P2 because this affects owned drafts/rejected listings; the unhandled Django validation error also means the claimed 400 is not assured.",
+   "evidence": [
+    "backend/marketplace/urls.py:8",
+    "backend/marketplace/services.py:11",
+    "backend/marketplace/views.py:112",
+    "backend/marketplace/serializers.py:64",
+    "backend/marketplace/serializers.py:94",
+    "backend/marketplace/serializers.py:120",
+    "backend/marketplace/serializers.py:129",
+    "backend/marketplace/models.py:164",
+    "backend/core/settings.py:401",
+    "frontend_mobile/features/parity/marketplace.tsx:95",
+    "frontend_mobile/features/parity/marketplace.tsx:104"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "codexA-1"
+}
