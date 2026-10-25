@@ -131,7 +131,7 @@ class Phase5ApplicationProtection(TestCase):
             "first_name": user.first_name,
             "last_name": user.last_name,
             "username": user.username or "phase5user",
-            "mobile_number": "0400000000",
+            "mobile_number": f"04{user.pk:08d}",
             "date_of_birth": "1998-01-04",
             "job_title": "Assistant",
             "email": user.email,
