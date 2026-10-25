@@ -1,11 +1,14 @@
 """Serializers for the chat API."""
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 User = get_user_model()
 
 
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 from memberships.models import Membership
+from memberships.selectors import visible_memberships
 from chat.models import Conversation, Message, MessageReaction, Participant
 from users.presentation import _chat_member_identity
 
@@ -174,7 +177,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
     def get_last_message(self, obj):
         msg = obj.messages.order_by("-created_at").first()
         if not msg: return None
-        return {"id": msg.id, "body": msg.body[:200], "created_at": msg.created_at.isoformat(), "sender": msg.sender_id}
+        return {"id": msg.id, "body": "" if msg.is_deleted else msg.body[:200], "is_deleted": msg.is_deleted, "created_at": msg.created_at.isoformat(), "sender": msg.sender_id}
 
     def get_pinned_message(self, obj):
         request = self.context.get("request")
@@ -272,6 +275,28 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         model = Conversation
         fields = ["id", "type", "title", "participants", "created_by"]
         read_only_fields = ["id", "created_by", "type"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        allowed = Q(id__in=visible_memberships(self.context['request'].user, {}).filter(is_active=True).values('id'))
+        if isinstance(self.instance, Conversation):
+            # Web/mobile edits resend every current member, including ones the editor can no longer see.
+            allowed |= Q(chat_participations__conversation=self.instance)
+        self.fields['participants'].child_relation.queryset = Membership.objects.filter(allowed).distinct()
+
+    def validate(self, attrs):
+        if self.instance:
+            user = self.context['request'].user
+            if (
+                self.instance.type != Conversation.Type.GROUP
+                or self.instance.pharmacy_id
+                or not (
+                    self.instance.created_by_id == user.id
+                    or self.instance.participants.filter(membership__user=user, is_admin=True).exists()
+                )
+            ):
+                raise PermissionDenied("Not authorized to modify this group.")
+        return attrs
 
     def create(self, validated_data):
         participants_data = validated_data.pop("participants", [])

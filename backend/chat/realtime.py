@@ -74,6 +74,13 @@ def participant_can_receive_chat_updates(participant: Participant) -> bool:
     conversation = getattr(participant, "conversation", None)
     if not membership or not conversation:
         return False
+    if not membership.user or not membership.user.is_active:
+        return False
+    # Inactive CONTACT memberships represent legitimate membershipless DM recipients.
+    if not membership.is_active and not (
+        conversation.type == "DM" and membership.employment_type == "CONTACT"
+    ):
+        return False
     if (
         getattr(conversation, "type", None) == "GROUP"
         and getattr(conversation, "pharmacy_id", None)

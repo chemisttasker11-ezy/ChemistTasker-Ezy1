@@ -453,15 +453,12 @@ class ConversationViewSet(mixins.ListModelMixin,
             if conv.pharmacy_id:
                 return Response({"detail": "Use pharmacy_id to manage community chats."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Ensure user is creator or an admin participant
-            is_creator = getattr(conv.created_by, 'id', None) == request.user.id
-            is_admin = Participant.objects.filter(conversation=conv, membership__user=request.user, is_admin=True).exists()
-            if not (is_creator or is_admin):
-                return Response({"detail": "Not authorized to modify this group."}, status=status.HTTP_403_FORBIDDEN)
-
             serializer = ConversationCreateSerializer(
                 conv,
-                data={'title': title or conv.title, 'participants': participant_ids},
+                data={
+                    'title': title or conv.title,
+                    **({'participants': participant_ids} if 'participant_ids' in data else {}),
+                },
                 partial=True,
                 context={'request': request},
             )

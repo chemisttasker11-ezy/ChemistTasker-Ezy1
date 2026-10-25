@@ -516,6 +516,23 @@ class HubReactionTests(HubBase):
 
 
 class HubPollTests(HubBase):
+    def test_question_correction_with_unchanged_options_keeps_votes(self):
+        poll = self.make_poll()
+        url = f"{POLLS}{poll['id']}/"
+        options = poll['options']
+        voted = client_for(self.other_staff).post(url + 'vote/', {'option_id': options[0]['id']}, format='json')
+        self.assertEqual(voted.status_code, 200, voted.content)
+        vote_ids = list(PharmacyHubPollVote.objects.filter(poll_id=poll['id']).values_list('id', flat=True))
+        for labels in (None, [option['label'] for option in options]):
+            payload = {'question': 'Lunch tomorrow?'}
+            if labels is not None:
+                payload['options'] = labels
+            edited = client_for(self.staff).patch(url, payload, format='json')
+            self.assertEqual(edited.status_code, 200, edited.content)
+            self.assertEqual(edited.json()['question'], 'Lunch tomorrow?')
+            self.assertEqual([option['id'] for option in edited.json()['options']], [option['id'] for option in options])
+            self.assertEqual(list(PharmacyHubPollVote.objects.filter(poll_id=poll['id']).values_list('id', flat=True)), vote_ids)
+
     def test_membershipless_user_cannot_modify_another_users_platform_poll(self):
         author = make_user("PHARMACIST", is_otp_verified=True)
         other = make_user("PHARMACIST", is_otp_verified=True)

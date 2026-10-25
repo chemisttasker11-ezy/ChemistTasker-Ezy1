@@ -73,6 +73,10 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_discard(self.user_group_name, self.channel_name)
 
     async def receive_json(self, content, **kwargs):
+        self.membership = await self._get_membership(self.room_id, self.scope['user'].id)
+        if not self.membership:
+            await self.close(code=4403)
+            return
         if getattr(self, '_ahpra_frozen', False) or await self._ahpra_suspended(self.scope['user']):
             await self.ahpra_suspended({})
             return
@@ -120,6 +124,9 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         # No immediate send here; signal will broadcast on commit
 
     async def send_json(self, content, close=False):
+        if not await self._get_membership(self.room_id, self.scope['user'].id):
+            await self.close(code=4403)
+            return
         # Backstop for a missed ahpra.suspended event: never deliver to a frozen user.
         now = time.monotonic()
         if now - getattr(self, '_ahpra_checked_at', 0.0) >= self.AHPRA_RECHECK_SECONDS:
@@ -192,18 +199,18 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _get_membership(self, conversation_id: int, user_id: int):
-        participant = (
+        participants = (
             Participant.objects
             .filter(
                 conversation_id=conversation_id,
                 membership__user_id=user_id,
             )
             .select_related("membership__user", "conversation")
-            .first()
         )
-        if participant and not participant_can_receive_chat_updates(participant):
-            return None
-        return participant.membership if participant else None
+        for participant in participants:
+            if participant_can_receive_chat_updates(participant):
+                return participant.membership
+        return None
 
     @database_sync_to_async
     def _create_message(self, conversation_id: int, membership: Membership, body: str):

@@ -198,6 +198,69 @@ class MessageEndpointTests(ChatBase):
 
 
 class CommunityGroupTests(ChatBase):
+    def test_custom_group_participants_must_be_visible_on_create_and_update(self):
+        _, foreign_pharmacy = make_owner_with_pharmacy("Foreign")
+        _, foreign_member = make_staff_member(foreign_pharmacy)
+        c = client_for(self.alice)
+        for url, field in ((ROOMS, "participants"), (ROOMS + "get-or-create-group/", "participant_ids")):
+            denied = c.post(url, {"title": "Foreign", field: [foreign_member.id]}, format="json")
+            self.assertEqual(denied.status_code, 400, denied.content)
+            self.assertFalse(Participant.objects.filter(membership=foreign_member).exists())
+            allowed = c.post(url, {"title": "Team", field: [self.bob_m.id]}, format="json")
+            self.assertEqual(allowed.status_code, 201, allowed.content)
+            room_id = allowed.json()["id"]
+            denied = c.patch(f"{ROOMS}{room_id}/", {"participants": [foreign_member.id]}, format="json")
+            self.assertEqual(denied.status_code, 400, denied.content)
+            self.assertTrue(Participant.objects.filter(conversation_id=room_id, membership=self.bob_m).exists())
+
+    def test_group_edit_may_resend_existing_members_the_editor_cannot_see(self):
+        _, foreign_pharmacy = make_owner_with_pharmacy("Foreign")
+        _, foreign_member = make_staff_member(foreign_pharmacy)
+        room = Conversation.objects.create(type="GROUP", title="Team", created_by=self.alice)
+        Participant.objects.create(conversation=room, membership=self.alice_m, is_admin=True)
+        Participant.objects.create(conversation=room, membership=foreign_member)
+        res = client_for(self.alice).post(ROOMS + "get-or-create-group/", {"room_id": room.id, "title": "Team", "participant_ids": [foreign_member.id, self.bob_m.id]}, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(room.participants.count(), 3)
+
+    def test_plain_room_update_requires_custom_group_creator_or_admin(self):
+        room = Conversation.objects.create(type="GROUP", title="Team", created_by=self.alice)
+        Participant.objects.create(conversation=room, membership=self.alice_m, is_admin=True)
+        Participant.objects.create(conversation=room, membership=self.bob_m)
+        for method in ("put", "patch"):
+            denied = getattr(client_for(self.bob), method)(f"{ROOMS}{room.id}/", {"title": "Hijack", "participants": [self.bob_m.id]}, format="json")
+            self.assertEqual(denied.status_code, 403, denied.content)
+            self.assertEqual(room.participants.count(), 2)
+        allowed = client_for(self.alice).patch(f"{ROOMS}{room.id}/", {"title": "Renamed", "participants": [self.bob_m.id]}, format="json")
+        self.assertEqual(allowed.status_code, 200, allowed.content)
+        Membership.objects.filter(pk=self.alice_m.pk).update(employment_type="FULL_TIME")
+        room.pharmacy = self.pharmacy
+        room.save(update_fields=["pharmacy"])
+        denied = client_for(self.alice).patch(f"{ROOMS}{room.id}/", {"participants": [self.alice_m.id]}, format="json")
+        self.assertEqual(denied.status_code, 403, denied.content)
+        self.assertEqual(room.participants.count(), 2)
+
+    def test_rename_without_participants_preserves_members_but_explicit_list_updates_them(self):
+        room = client_for(self.alice).post(ROOMS + "get-or-create-group/", {"title": "Team", "participant_ids": [self.bob_m.id]}, format="json").json()["id"]
+        c = client_for(self.alice)
+        renamed = c.post(ROOMS + "get-or-create-group/", {"room_id": room, "title": "New title"}, format="json")
+        self.assertEqual(renamed.status_code, 200, renamed.content)
+        self.assertEqual(Conversation.objects.get(pk=room).title, "New title")
+        self.assertSetEqual(set(Participant.objects.filter(conversation_id=room).values_list("membership_id", flat=True)), {self.alice_m.id, self.bob_m.id})
+        changed = c.post(ROOMS + "get-or-create-group/", {"room_id": room, "participant_ids": []}, format="json")
+        self.assertEqual(changed.status_code, 200, changed.content)
+        self.assertEqual(Participant.objects.filter(conversation_id=room).count(), 1)
+
+    def test_deleted_last_message_preview_is_scrubbed_even_for_legacy_body(self):
+        room_id = self.dm(self.alice, self.bob).json()["id"]
+        msg = Message.objects.create(conversation_id=room_id, sender=self.alice_m, body="Private preview")
+        url = f"{ROOMS}{room_id}/"
+        self.assertEqual(client_for(self.bob).get(url).json()["last_message"]["body"], "Private preview")
+        Message.objects.filter(pk=msg.pk).update(is_deleted=True)
+        preview = client_for(self.bob).get(url).json()["last_message"]
+        self.assertEqual(preview["body"], "")
+        self.assertTrue(preview["is_deleted"])
+
     def test_staff_member_can_get_or_create_the_pharmacy_community_chat(self):
         Membership.objects.filter(pk=self.alice_m.pk).update(employment_type="FULL_TIME")
         c = client_for(self.alice)
