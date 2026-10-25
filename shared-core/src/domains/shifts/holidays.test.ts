@@ -40,6 +40,24 @@ describe('source-labelled pharmacy holidays across Vite/Next/Expo', () => {
     expect(result.requiresReview).toBe(true);
   });
 
+  it('does not falsely flag published 2026 show days when only 2027 is pending', () => {
+    const pharmacy = {
+      public_holiday_dates: ['2026-08-28'],
+      public_holiday_calendar_status: {
+        status: 'LOCAL_DECLARATION_PENDING',
+        pendingYears: [2027],
+        verifiedYears: [2026],
+      },
+    };
+    const published = getPharmacyHolidayInfo('2026-08-28', pharmacy);
+    expect(published.fullDay).toBe(true);
+    expect(published.requiresReview).toBe(false);
+    expect(published.status).toBe('VERIFIED');
+    const awaiting = getPharmacyHolidayInfo('2027-08-27', pharmacy);
+    expect(awaiting.requiresReview).toBe(true);
+    expect(awaiting.status).toBe('LOCAL_DECLARATION_PENDING');
+  });
+
   it('surfaces absent region metadata as not certified, not silently verified', () => {
     const result = getPharmacyHolidayInfo('2027-08-11', {});
     expect(result.requiresReview).toBe(true);

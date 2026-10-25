@@ -62,7 +62,14 @@ export function getPharmacyHolidayInfo(
     ? calendar.status : 'REGION_NOT_CONFIGURED';
   const year = Number(date.slice(0, 4));
   const pendingYears = asArray(calendar.pendingYears ?? calendar.pending_years);
-  const requiresReview = status !== 'VERIFIED' ||
-    pendingYears.some(value => Number(value) === year);
-  return { fullDay, partDayWindows, requiresReview, status };
+  // Region metadata is issued for the full 2026–2027 calendar. A local
+  // region pending only 2027 is still verified for its published 2026 days.
+  const isYearPending = pendingYears.some(value => Number(value) === year);
+  const requiresReview = status === 'LOCAL_DECLARATION_PENDING'
+    ? isYearPending
+    : status !== 'VERIFIED' || isYearPending;
+  const dateStatus = status === 'LOCAL_DECLARATION_PENDING' && !isYearPending
+    ? 'VERIFIED'
+    : status;
+  return { fullDay, partDayWindows, requiresReview, status: dateStatus };
 }
