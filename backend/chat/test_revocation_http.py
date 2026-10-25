@@ -39,7 +39,7 @@ class ChatHttpRevocationContracts(TestCase):
             ChatParticipantView, "get", "/api/v1/chat-participants/", self.alice,
         )
         self.assertEqual(result.status_code, 200, result.data)
-        self.assertTrue(any(row["id"] == self.bob_membership.pk for row in result.data))
+        self.assertTrue(any(row["id"] == self.bob_membership.pk for row in result.data["results"]))
 
     def test_revoked_member_cannot_list_conversation_participants(self):
         Membership.objects.filter(pk=self.alice_membership.pk).update(is_active=False)
@@ -47,7 +47,7 @@ class ChatHttpRevocationContracts(TestCase):
             ChatParticipantView, "get", "/api/v1/chat-participants/", self.alice,
         )
         self.assertEqual(result.status_code, 200, result.data)
-        self.assertEqual(list(result.data), [])
+        self.assertEqual(list(result.data['results']), [])
 
     def test_revoked_member_cannot_react_to_old_messages(self):
         Membership.objects.filter(pk=self.alice_membership.pk).update(is_active=False)
