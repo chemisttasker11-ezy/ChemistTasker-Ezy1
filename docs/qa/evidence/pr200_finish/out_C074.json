@@ -1,0 +1,172 @@
+{
+  "chunk": "C074",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source acquisition and first-pass annotation; S2/S3 pending",
+  "status": "INCOMPLETE",
+  "files": [
+    {
+      "path": "frontend_web/landing_next/app/hubs/error.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "006a969fad3e90f2016d4f9f3660b70a08534dd6",
+      "lines": 3,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "3 lines retrieved. Thin Next wrapper; imports none; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/layout.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "c38f3d6d1ebd58bed757b2ae3b66664a2dbc6dcd",
+      "lines": 17,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "17 lines retrieved. Thin Next wrapper; imports @/public/header, @/public/footer; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/loading.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "de6a69da0247c3f6b27610bd3ca7e017f814c47a",
+      "lines": 2,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "2 lines retrieved. Thin Next wrapper; imports none; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/page.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "4867674c0a7c821bcd4b06a3692d93479f16c5b8",
+      "lines": 7,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "7 lines retrieved. Component/module; imports next/link, lucide-react, @/lib/hub-server, next/navigation; calls getPublicHubs; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/post-entry.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e5e4456aab948f8648939b0bb9adae2f66aed06c",
+      "lines": 37,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "37 lines retrieved. Component/module; imports react, @/shared/session-provider, next/link, lucide-react; calls chemistTaskerApi.client.post, navigator.clipboard.writeText, like, share; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/posts/[id]/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "7761578a48fb0b398370e0dd22dd631e117ce001",
+      "lines": 6,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "6 lines retrieved. Thin Next wrapper; imports next/navigation, @/lib/hub-server, ../../community-client; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/social-format.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "efc995287fd44511cf1e1d483f5773a3e8c914b4",
+      "lines": 34,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "34 lines retrieved. Component/module; imports react; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/journal-teaser.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "fbdf37dfed6719aa5c3645f56b721f8f21705d76",
+      "lines": 6,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "6 lines retrieved. Component/module; imports lucide-react; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/landing-page.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "55a823f64ff2d4c3e953068e29a839b0f75229a8",
+      "lines": 210,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "210 lines retrieved. Component/module; imports @/public/header, next/link, next/image, ./persona-data; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/layout.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "c032e3903ad2cab6a4d6a60e838321a191fa144d",
+      "lines": 18,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "18 lines retrieved. Thin Next wrapper; imports @/shared/session-provider, next; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/not-found.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "72e80df251da305683b1f045924862c0105dbf5f",
+      "lines": 21,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "21 lines retrieved. Component/module; imports next/link, lucide-react; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "31e4e3941d650ebf87a6041263d89c33f814a9bc",
+      "lines": 4,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "4 lines retrieved. Thin Next wrapper; imports @/features/home/home-router; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/persona-data.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3d1f818849fca9b5232412288568bfee06c14bc6",
+      "lines": 93,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "93 lines retrieved. Component/module; imports none; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/robots.ts",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "4f19a329fdbd7455dfc4c52f0eaf368e4b63a9f9",
+      "lines": 4,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "4 lines retrieved. Thin Next wrapper; imports next, ../lib/hub; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/sitemap.ts",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "0429a0e8e077f035603a68b7b358b33d5bb04a49",
+      "lines": 9,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "9 lines retrieved. Thin Next wrapper; imports next, @/lib/hub-server; calls getPublicSitemap; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/app/tier-explainer.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "713ed3e5807847b2db9cfbbafa871f2ad083fb4b",
+      "lines": 79,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "79 lines retrieved. Component/module; imports react, lucide-react; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/components/rich-content.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "81a61eda671088bcdbc8a0ac1d2c908312527929",
+      "lines": 35,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "35 lines retrieved. Component/module; imports react; calls none; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/components/visual-editor.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3a32125e9c06528551dcdd39e85cab2062fd75aa",
+      "lines": 28,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "28 lines retrieved. Component/module; imports react, @tiptap/react, @tiptap/starter-kit, @tiptap/extension-image; calls upload; source confirmation only, S2/S3 not performed."
+    }
+  ],
+  "findings": []
+}
