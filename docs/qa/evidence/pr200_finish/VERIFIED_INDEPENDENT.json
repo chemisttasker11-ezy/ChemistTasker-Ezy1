@@ -4125,7 +4125,7 @@
   "s3": "NOT_EXECUTED"
  },
  "F14-U6": {
-  "status": "NEEDS_RUNTIME",
+  "status": "REFUTED",
   "severity": "P2",
   "claimed_severity": "P2",
   "area": "Web",
@@ -4150,7 +4150,7 @@
     ]
    }
   ],
-  "s3": "NOT_EXECUTED"
+  "s3": "RUNTIME_REFUTED"
  },
  "F14-U1": {
   "status": "CONFIRMED_SOURCE",

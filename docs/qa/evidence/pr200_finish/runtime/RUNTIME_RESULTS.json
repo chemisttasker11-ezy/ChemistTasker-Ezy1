@@ -13,6 +13,14 @@
   "negative": ["test_negative_move_shift_to_unrelated_pharmacy_and_rewrite_rates: owner A PATCH pharmacy=B, apply_rates_to_pharmacy=true, rate_weekday=1.00 -> 200; shift moved A->B and unrelated pharmacy B rate_weekday 50.00 -> 1.00", "test_negative_owner_sets_payment_status_paid: PATCH {payment_status: PAID} -> 200, stored PAID with no payment"],
   "positive_controls": ["owner A edits own shift description (200)", "owner B PATCH on A's shift -> 404"]
  },
- "F03-N1": {"status": "PENDING", "reason": "backend/organizations/views.py differs between ct-local (e3711853) and baseline (PR #198); needs the pr200 baseline stack, whose build is blocked by npm download failures (separate session)."},
- "F14-U6": {"status": "PENDING", "reason": "typed DD/MM/YYYY date in post-shift form; source accepts it, needs a browser check."}
+ "F03-N1": {
+  "status": "RUNTIME_REPRODUCED",
+  "stack": "pr200 (baseline b77e9fd2, code identical byte for byte)",
+  "command": "docker exec pr200-web-1 python manage.py test client_profile.tests_pr200_runtime_f03 -v 2 --noinput",
+  "negative": ["test_negative_removed_admin_cannot_reaccept_old_invitation: owner invites Manager, invitee accepts (200), owner DELETE /api/v1/pharmacy-admins/1/ (204: assignment inactive, membership stays ACCEPTED+active); removed user then sees the old record in my-pending-invitations and POST /api/v1/pharmacy-admins/1/accept-invitation/ -> 200 (expected 404); assignment.is_active=True and /users/me/ shows MANAGER again"],
+  "positive_controls": ["never-invited user -> 404 on accept; genuine invitee sees it once, accepts (200), becomes active"],
+  "not_covered": "a Manager (not the owner) removing another admin",
+  "files": ["tests_pr200_runtime_f03.py", "f03_test_output.txt"]
+ },
+ "F14-U6": {"status": "RUNTIME_REFUTED", "stack": "pr200 (baseline b77e9fd2)", "reason": "agy g1 typed 27102026 and 27/10/2026 into the post-shift date field and pressed Add date: both added ('1 timetable entry added.'); screenshot checked by the orchestrator. The earlier failure came from agy's own script.", "files": ["../runs/agy-u6-g1/u6_digits_only.png", "../runs/agy-u6-g1/u6_with_slashes.png"]}
 }

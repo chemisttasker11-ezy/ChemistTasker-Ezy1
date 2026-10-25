@@ -31,6 +31,13 @@ for (const [id, cs] of Object.entries(checks)) {
     s3: 'NOT_EXECUTED',
   };
 }
+// S3 runtime results override source-only status (runtime/RUNTIME_RESULTS.json).
+const runtime = read('runtime/RUNTIME_RESULTS.json');
+for (const [id, r] of Object.entries(runtime)) {
+  if (!out[id] || !r.status) continue;
+  out[id].s3 = r.status;
+  if (r.status === 'RUNTIME_REFUTED') out[id].status = 'REFUTED';
+}
 fs.writeFileSync(path.join(DIR, 'VERIFIED_INDEPENDENT.json'), JSON.stringify(out, null, 1));
 const tally = k => Object.values(out).reduce((a, v) => ((a[v[k]] = (a[v[k]] || 0) + 1), a), {});
 const conf = Object.values(out).filter(v => v.status.startsWith('CONFIRMED'));

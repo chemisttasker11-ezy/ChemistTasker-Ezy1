@@ -1,0 +1,16 @@
+﻿**F03-N1: REPRODUCED.** A pharmacy admin whose role the owner removed got Manager access back by accepting the old invitation. No new grant from the owner was needed.
+
+- **Command** (run in container `pr200-web-1`; its code matches baseline b77e9fd2 byte for byte): `docker exec pr200-web-1 python manage.py test client_profile.tests_pr200_runtime_f03 -v 2 --noinput`. It ran 2 tests, with 1 failing, and that failure is the expected result.
+- **Negative test, failed as the finding predicts:** `F03N1RemovedAdminReacceptTests.test_negative_removed_admin_cannot_reaccept_old_invitation`
+  - Steps: the owner invites a staff member as Manager, the staff member accepts (200), then the owner removes the role with `DELETE /api/v1/pharmacy-admins/1/`, which returns 204. The admin record is now switched off, but the staff membership stays accepted and active.
+  - Then, logged in as the removed staff member:
+    - `GET my-pending-invitations` lists the old record (id 1) as a pending invitation.
+    - `POST /api/v1/pharmacy-admins/1/accept-invitation/` returns **200**, where it should return 404.
+    - Afterwards the admin record is active again (`assignment.is_active=True`), and `/users/me/` shows her as `MANAGER` of pharmacy 1 again.
+  - The test stopped at its first check: it expected an empty pending list and got the old record.
+- **Positive control, passed:** `test_positive_control_fresh_invite_accepts_and_stranger_is_refused`. A user who was never invited gets 404 on accept. The real invitee sees the invitation once, accepts it (200), and their admin access becomes active.
+- **Files:** the test is `docs/qa/evidence/pr200_finish/runtime/tests_pr200_runtime_f03.py` and the full output is `runtime/f03_test_output.txt`. The copy inside the container has been deleted, and that was checked. No repo files changed; the only new files are in `runtime/`.
+
+**Surprising:** my first delete command for the copied test silently did nothing, because Git Bash rewrote `/app/...` into a Windows path. I re-ran it with `MSYS_NO_PATHCONV=1` and confirmed the file is gone. Any other runtime brief that uses `docker exec` from Git Bash can hit the same problem.
+
+I only tested the owner removing the admin, not a Manager removing another admin. I made no HTTP calls against the seeded stack, since the test database worked. No fixes were made.
