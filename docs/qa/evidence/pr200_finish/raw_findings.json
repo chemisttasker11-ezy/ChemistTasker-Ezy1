@@ -2379,5 +2379,1323 @@
   },
   "chunk": "C079",
   "reviewer": "codexB-1"
+ },
+ {
+  "id": "F01-N1",
+  "severity": "P1",
+  "area": "Shifts/Privacy",
+  "title": "Workers browsing shifts can see the names and emails of other workers who are booked on the shift or waiting for payment.",
+  "scenario": "Tom posts a public multi-day shift. Ben is confirmed for Monday and Omar has accepted Tuesday and is waiting for Tom to pay. When Sara opens the public shift list or the shift detail on web or mobile, the data sent to her phone includes Ben's and Omar's full names, emails and user numbers. This happens even when Tom posted anonymously. The anonymous public job board deliberately strips exactly these fields, but signed-in worker views do not, and neither does each worker's own offer list, which embeds the same shift data.",
+  "evidence": [
+   "backend/shifts/base.py:113",
+   "backend/shifts/browse.py:428",
+   "backend/shifts/lifecycle.py:393",
+   "backend/shifts/serialization/shifts.py:91",
+   "backend/shifts/serialization/shifts.py:434",
+   "backend/shifts/serialization/shifts.py:464",
+   "backend/shifts/serialization/offers.py:215",
+   "backend/shifts/serialization/projections.py:87"
+  ],
+  "confidence": "high",
+  "test_needed": "As Sara (unrelated locum), GET /public-shifts/ and /shifts/{id}/ for a shift where Ben is assigned and Omar is awaiting payment; assert no slot_assignments or payment_options entries and no worker email appear.",
+  "owner_question": {
+   "question": "When Sara looks at Tom's shift, should she see who else is already booked or waiting for payment on it?",
+   "options": [
+    "Sara sees nothing about other workers, only which slots are still open",
+    "Sara sees that a slot is taken, with no names or contact details",
+    "Keep today's behaviour: Sara sees other workers' names and emails"
+   ]
+  },
+  "chunk": "F01",
+  "reviewer": "claudeA-1"
+ },
+ {
+  "id": "F01-N2",
+  "severity": "P1",
+  "area": "Shifts/Billing",
+  "title": "Editing a shift after a worker has accepted but before payment either locks the worker into new dates they never agreed to, or takes the payment without booking anyone.",
+  "scenario": "Sara accepts Tom's two-day shift and is waiting for Tom to pay. Tom then edits the dates or times, and the shift's days are replaced. Sara gets a 'please review' alert, but she can no longer decline because her acceptance is past the 'pending' stage. On a whole-shift booking, Tom pays and Sara is booked onto the new days with no new confirmation. On a per-day shift, Sara's acceptance loses its day but still shows as payable: Tom pays by card, booking fails on every retry so Sara is never assigned and the charge is never recorded; if Tom pays with Pills, the Pills are spent before booking fails.",
+  "evidence": [
+   "backend/shifts/posting.py:157",
+   "backend/shifts/posting.py:188",
+   "backend/shifts/models.py:678",
+   "backend/shifts/offers.py:615",
+   "backend/shifts/serialization/shifts.py:464",
+   "backend/shifts/finalize.py:30",
+   "backend/billing/views.py:860",
+   "backend/billing/views.py:890",
+   "backend/rewards/views.py:217"
+  ],
+  "confidence": "high",
+  "test_needed": "Create an offer in ACCEPTED_AWAITING_PAYMENT on a multi-slot shift, PATCH the shift with a new slots payload, then run the fulfilment webhook for that offer id; assert the edit is refused (or the offer is reset for re-confirmation) rather than the webhook failing or the worker being assigned.",
+  "owner_question": {
+   "question": "Tom changes the dates of a shift after Sara has accepted but before he has paid. What should happen to Sara's acceptance?",
+   "options": [
+    "Tom cannot change the dates or times until he pays or cancels Sara's acceptance",
+    "Sara's acceptance goes back to 'needs confirming' and she must accept the new times again before Tom can pay",
+    "Keep today's behaviour: Sara stays accepted and Tom can pay for the changed shift"
+   ]
+  },
+  "chunk": "F01",
+  "reviewer": "claudeA-1"
+ },
+ {
+  "id": "F01-N3",
+  "severity": "P1",
+  "area": "Shifts/Billing",
+  "title": "A worker or manager can silently delete a shift offer, including one that is accepted and waiting for payment, so payment can be taken with nobody booked.",
+  "scenario": "The shift-offers endpoint still allows a plain delete, and neither web nor mobile uses it. Sara can delete her own accepted offer while Tom is paying at Stripe checkout. Tom's card is charged and the payment is recorded, but there is no offer left to confirm, so nobody is booked and Tom is not told. In the same way, Tom or Grace can delete Sara's accepted offer, and she is never told she lost the booking. Unlike the proper decline action, a delete sends no notice and works on accepted offers too.",
+  "evidence": [
+   "backend/shifts/offers.py:156",
+   "backend/shifts/offers.py:162",
+   "backend/shifts/offers.py:610",
+   "backend/billing/views.py:848",
+   "backend/billing/views.py:864",
+   "shared-core/src/domains/shifts/api.ts:87"
+  ],
+  "confidence": "high",
+  "test_needed": "As Sara, DELETE /shift-offers/{id}/ on her ACCEPTED_AWAITING_PAYMENT offer; assert 405/403 and that the offer still exists.",
+  "owner_question": {
+   "question": "Sara has accepted Tom's shift and Tom is paying. Should anyone be able to make that offer disappear without a trace?",
+   "options": [
+    "No one can delete offers; Sara declines and Tom cancels through the normal steps, which notify the other side",
+    "Only Tom can withdraw an offer, and only before Sara accepts, with a notice to Sara",
+    "Keep today's behaviour: Sara or Tom can delete it silently"
+   ]
+  },
+  "chunk": "F01",
+  "reviewer": "claudeA-1"
+ },
+ {
+  "id": "F01-N4",
+  "severity": "P2",
+  "area": "Shifts/Notifications",
+  "title": "When a worker accepts or declines, the 'payment needed' or 'declined' notice goes to the pharmacy owner, not the admin who posted the shift.",
+  "scenario": "Grace posts a shift for Tom's pharmacy in Lina's organisation and sends Sara an offer. When Sara accepts, the in-app alert and the 'Action Required: payment' email go to Tom as pharmacy owner; Grace gets nothing. If Sara declines, only Tom is told. Interest and counter-offer emails do go to Grace as the poster. So Grace keeps waiting, the shift sits unpaid, and Sara is never locked in.",
+  "evidence": [
+   "backend/shifts/offers.py:183",
+   "backend/shifts/offers.py:474",
+   "backend/shifts/offers.py:626",
+   "backend/shifts/interest.py:160",
+   "backend/shifts/counter_offers.py:64"
+  ],
+  "confidence": "medium",
+  "test_needed": "Region admin creates the shift, worker accepts an offer under PAYMENT_REQUIRED; assert the region admin who created the shift receives the shift_worker_confirmed notification.",
+  "owner_question": {
+   "question": "Grace posted the shift and Sara accepted it. Who should be told that payment is needed, or that Sara declined?",
+   "options": [
+    "Grace (the poster) and every admin who can pay for that pharmacy",
+    "Grace and Tom (the poster and the pharmacy owner)",
+    "Keep today's behaviour: only Tom, the pharmacy owner"
+   ]
+  },
+  "chunk": "F01",
+  "reviewer": "claudeA-1"
+ },
+ {
+  "id": "F01-N5",
+  "severity": "P2",
+  "area": "Billing",
+  "title": "A 'Casual employee' shift is charged the $80 part/full-time job fee instead of the $30 per-shift locum fee.",
+  "scenario": "Tom posts a one-day shift with the employment type 'Casual employee' and books Mia. At checkout Tom is charged $80, the published price for a part-time or full-time job, because only shifts marked 'Locum' get the $30 per-shift price. The pricing pages only list locum shifts and part/full-time jobs, so Tom is charged a price he was never shown for this kind of shift.",
+  "evidence": [
+   "backend/billing/views.py:646",
+   "backend/shifts/models.py:24",
+   "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:268",
+   "shared-core/src/utils/pricing.ts:36"
+  ],
+  "confidence": "medium",
+  "test_needed": "Call charge_shift_fulfillment under PAYMENT_REQUIRED for a CASUAL shift and assert the agreed (per-shift) Stripe price id is used.",
+  "owner_question": {
+   "question": "Tom books Mia for a single casual-employee shift. What fee should Tom pay?",
+   "options": [
+    "The per-shift locum fee ($30, or $15 for subscribers)",
+    "A separate casual fee to be added to the pricing page",
+    "Keep today's behaviour: the $80 part/full-time job fee"
+   ]
+  },
+  "chunk": "F01",
+  "reviewer": "claudeA-1"
+ },
+ {
+  "id": "F02-N1",
+  "severity": "P1",
+  "area": "Shifts/Billing",
+  "title": "Deleting a partly filled posting from Active Shifts silently removes the workers already booked on its other dates, with no notice, no cancellation charge and no history check.",
+  "scenario": "Tom posts a Monday-to-Friday locum shift. Sara is confirmed (and paid for) on Monday and Tuesday, but Wednesday to Friday are still open, so the posting stays in Active Shifts. Tom clicks Delete. The warning only says candidates can no longer apply, but Sara's confirmed days are erased too. Nobody tells Sara, so she may still turn up or turn down other work. Tom's paid fee stays as a payment linked to no shift, and the cancellation-penalty endpoint is never called by any screen. Any leave Sara requested against those days is deleted along with them, and attendance already recorded loses its link to the booking. All of this skips the check that the AHPRA cancellation and roster-release paths run first.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftsDialogs.tsx:29",
+   "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftActions.ts:44",
+   "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts:44",
+   "shared-core/src/domains/shifts/api.ts:121",
+   "backend/shifts/lifecycle.py:53",
+   "backend/shifts/lifecycle.py:111",
+   "backend/shifts/base.py:111",
+   "backend/shifts/models.py:465",
+   "backend/shifts/models.py:805",
+   "backend/billing/models.py:85",
+   "backend/billing/views.py:699",
+   "shared-core/src/domains/billing/api.ts:58",
+   "backend/shifts/history.py:7",
+   "backend/shifts/cancellation.py:48"
+  ],
+  "confidence": "high",
+  "test_needed": "Create a two-date shift where date 1 has a paid, confirmed assignment for Sara and date 2 is open. DELETE /shifts/active/<id>/ as Tom. Assert the request is refused, or that Sara's assignment survives (or she is notified and the penalty/refund rule runs). Today the delete returns 204 and the assignment is gone.",
+  "owner_question": {
+   "question": "Tom deletes a posting where Sara is already confirmed (and paid for) on two of its five days. What should happen to Sara's days?",
+   "options": [
+    "Block the delete until Tom cancels Sara's days one by one (with notice and the cancellation charge)",
+    "Delete only the open days and keep Sara's confirmed days as their own booking",
+    "Allow the full delete but notify Sara, apply the 24/72-hour penalty rule and keep a cancelled-booking record",
+    "Keep today's behaviour (silent removal)"
+   ]
+  },
+  "chunk": "F02",
+  "reviewer": "claudeA-2"
+ },
+ {
+  "id": "F02-N2",
+  "severity": "P1",
+  "area": "Workforce/Shifts",
+  "title": "Cover requests from the web and mobile worker screens are never linked to the worker's assignment, so approving one never releases the worker.",
+  "scenario": "Ali can't work his rostered Saturday and taps 'Request cover' on web or mobile. Both screens send only pharmacy, date, times and role, never the assignment itself. On web, Tom approves: the server sees an unlinked request and publishes a brand-new locum shift, while Ali stays rostered. Ali is emailed that his cover was approved, so Tom may end up paying a locum like Sara plus a booking fee while the roster still expects Ali (or marks him absent). On the mobile manager screen, 'Approve' with a replacement always fails with 'assignment no longer exists'. 'Release worker' marks the request approved and reports the worker as released, but changes nothing and publishes no vacancy. Neither Ali nor a replacement like Mia is notified on the mobile path.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:532",
+   "frontend_mobile/app/my-roster.tsx:208",
+   "backend/shifts/worker_requests.py:97",
+   "backend/shifts/worker_requests.py:239",
+   "backend/shifts/worker_requests.py:254",
+   "backend/shifts/worker_requests.py:284",
+   "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:602",
+   "frontend_mobile/features/parity/roster.tsx:638",
+   "backend/workforce/roster/worker_actions.py:275",
+   "backend/workforce/roster/worker_actions.py:353",
+   "backend/workforce/roster/v2_views.py:747"
+  ],
+  "confidence": "high",
+  "test_needed": "Ali has an assignment. POST /worker-shift-requests/ with the exact web payload (no 'shift'), then approve it as Tom. Assert Ali's assignment is released and no second shift is created. Today Ali stays assigned and a new LOCUM_CASUAL shift appears.",
+  "owner_question": {
+   "question": "Ali asks for cover on a Saturday he's rostered for, and Tom approves. What should happen?",
+   "options": [
+    "Ali is taken off Saturday and that same slot is advertised to locums; Ali is told he's off",
+    "Ali stays rostered until Tom picks a named replacement (e.g. Mia); both are told",
+    "Approval only publishes a new locum shift and Ali stays rostered (today's web behaviour)"
+   ]
+  },
+  "chunk": "F02",
+  "reviewer": "claudeA-2"
+ },
+ {
+  "id": "F02-N3",
+  "severity": "P1",
+  "area": "Roster",
+  "title": "Removing or escalating an assignment from the owner roster page unbooks the worker silently, including paid marketplace bookings, and skips the attendance/leave history check.",
+  "scenario": "The owner roster page lists every assignment in Tom's pharmacy, including Sara's paid marketplace booking. If Tom removes it or clicks Escalate on it, the server deletes the assignment (escalate clears every assignment on that shift) without notifying Sara and without the check the release path runs, which refuses to remove bookings with attendance or leave history. Leave Sara filed against that day is deleted along with it, and Sara only finds out when the shift disappears from her list.",
+  "evidence": [
+   "backend/workforce/roster/views.py:51",
+   "backend/workforce/roster/views.py:96",
+   "backend/workforce/roster/views.py:418",
+   "backend/workforce/roster/worker_actions.py:364",
+   "backend/shifts/history.py:7",
+   "backend/shifts/models.py:805",
+   "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:401",
+   "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:509"
+  ],
+  "confidence": "medium",
+  "test_needed": "Give Sara an assignment with a linked LeaveRequest or AttendanceSession. Call POST /roster-shifts/<shift>/escalate/ (or DELETE /roster-owner/<assignment>/) as Tom. Assert it is refused, or that Sara is notified and the history is kept. Today the assignment and its leave are deleted silently.",
+  "owner_question": {
+   "question": "Tom escalates or removes Sara's already-confirmed Saturday from the roster page. What should Sara experience?",
+   "options": [
+    "Block it for marketplace bookings; Tom must cancel through the booking with notice and charges",
+    "Allow it, but notify Sara immediately and keep a cancelled-booking record",
+    "Keep today's behaviour (silent removal)"
+   ]
+  },
+  "chunk": "F02",
+  "reviewer": "claudeA-2"
+ },
+ {
+  "id": "F03-N1",
+  "severity": "P0",
+  "area": "Pharmacy admins",
+  "title": "A staff member whose admin role was removed can give it back to themselves by accepting it as a pending admin invitation.",
+  "scenario": "Mia is a Manager admin at Tom's pharmacy. Tom takes away her admin role but keeps her on as an assistant. The system switches the admin role off but keeps it on file, and that leftover record looks exactly like a fresh admin invitation to an existing staff member. Mia sees it under her admin invitations, taps Accept, and is a Manager again, able to manage staff, rosters and admins, without Tom knowing.",
+  "evidence": [
+   "backend/organizations/views.py:586",
+   "backend/organizations/views.py:590",
+   "backend/organizations/views.py:313",
+   "backend/organizations/views.py:318",
+   "backend/organizations/views.py:336",
+   "backend/organizations/views.py:341",
+   "backend/organizations/views.py:359",
+   "shared-core/src/domains/organizations/api.ts:134"
+  ],
+  "confidence": "high",
+  "test_needed": "Owner removes the admin role of an accepted staff member; that member's GET my-pending-invitations must be empty and POST accept-invitation on the old record must return 404 and leave the role switched off.",
+  "owner_question": {
+   "question": "Tom took Mia's Manager role away but kept her on staff. If Mia later opens her admin invitations, what should she see?",
+   "options": [
+    "Nothing: a removed admin role is gone, and only a new invite from Tom can bring it back",
+    "The old role, shown as 'removed by Tom', with no way to accept it",
+    "Keep today's behaviour: she can accept it and is a Manager again"
+   ]
+  },
+  "chunk": "F03",
+  "reviewer": "claudeA-3"
+ },
+ {
+  "id": "F03-N2",
+  "severity": "P1",
+  "area": "Memberships / Pharmacy admins",
+  "title": "When the owner removes a staff member who is also a pharmacy admin, their admin rights stay on, but when they quit themselves the rights are switched off.",
+  "scenario": "Mia is an assistant and a Manager admin at Tom's pharmacy. Tom removes her from the staff list. Her staff membership is deleted (or switched off), but her Manager admin record stays on, now with no membership linked to it. Every admin check looks only at that record, so Mia can still manage staff, rosters and admins at the pharmacy she was removed from. If Mia had quit herself, the system would have switched her admin role off.",
+  "evidence": [
+   "backend/memberships/views.py:112",
+   "backend/memberships/views.py:129",
+   "backend/memberships/views.py:131",
+   "backend/memberships/views.py:494",
+   "backend/organizations/models.py:400",
+   "backend/organizations/access.py:33",
+   "backend/organizations/access.py:57",
+   "shared-core/src/domains/memberships/api.ts:30"
+  ],
+  "confidence": "high",
+  "test_needed": "Owner sends DELETE on an admin's staff membership; afterwards that user must fail the manage-staff and manage-roster checks for the pharmacy and must be missing from the active admin list.",
+  "owner_question": {
+   "question": "Tom removes Mia, who is also a Manager admin, from his staff list. What should happen to her admin access?",
+   "options": [
+    "Switched off at the same moment, the same as when she quits",
+    "Tom is asked whether to remove her admin role too before he confirms",
+    "Keep today's behaviour: she stays an admin until it is removed separately"
+   ]
+  },
+  "chunk": "F03",
+  "reviewer": "claudeA-3"
+ },
+ {
+  "id": "F03-N3",
+  "severity": "P1",
+  "area": "Re-invite",
+  "title": "Re-inviting someone who left as an admin brings back their old admin role the moment they accept a plain staff invitation.",
+  "scenario": "Mia was a Manager admin and quit Tom's pharmacy, which switched her admin role off. Months later Tom re-invites her only as an assistant. The re-invite reuses her old membership, and when Mia accepts it, every admin role tied to that membership is switched back on. Mia is a Manager again even though Tom only invited her as an assistant.",
+  "evidence": [
+   "backend/memberships/views.py:494",
+   "backend/memberships/invites.py:123",
+   "backend/memberships/invites.py:163",
+   "backend/memberships/views.py:443",
+   "backend/memberships/views.py:447"
+  ],
+  "confidence": "high",
+  "test_needed": "An admin quits; the owner re-invites them as ASSISTANT; they accept; their old admin record must stay switched off.",
+  "owner_question": {
+   "question": "Mia left as a Manager admin. Tom re-invites her as an assistant and she accepts. What access should she get?",
+   "options": [
+    "Assistant only; admin needs a separate new invite",
+    "Assistant, and Tom is asked whether to give back her old Manager role",
+    "Keep today's behaviour: her old Manager role comes back on its own"
+   ]
+  },
+  "chunk": "F03",
+  "reviewer": "claudeA-3"
+ },
+ {
+  "id": "F03-N4",
+  "severity": "P1",
+  "area": "Roster / Attendance",
+  "title": "Removing a staff member leaves all their future rostered shifts in place, so the roster looks covered and they can still clock in as rostered.",
+  "scenario": "Tom removes Ali on Monday. Ali stays on next week's published roster: Tom's roster view still counts those slots as filled, so no gap or cover request shows up. Ali's own roster still lists the shifts, and if he turns up at the kiosk he is clocked in as normally rostered, not flagged for review, so the hours flow into his timesheet. New roster edits would refuse Ali because he has no active membership, but shifts already on the roster are never checked again.",
+  "evidence": [
+   "backend/memberships/views.py:112",
+   "backend/memberships/views.py:494",
+   "backend/workforce/roster/periods.py:129",
+   "backend/workforce/roster/periods.py:135",
+   "backend/workforce/roster/views.py:552",
+   "backend/attendance/eligibility.py:141",
+   "backend/attendance/eligibility.py:241",
+   "backend/workforce/roster/validation.py:31"
+  ],
+  "confidence": "high",
+  "test_needed": "Owner removes a staff member who has a published future roster assignment; afterwards that slot must show as vacant (or flagged) in the owner's roster, and a clock-in by the removed worker at shift time must not come back as a confirmed assignment.",
+  "owner_question": {
+   "question": "Tom removes Ali, who is rostered for three shifts next week. What should happen to those shifts?",
+   "options": [
+    "They become open gaps straight away and Tom is prompted to find cover",
+    "Tom is shown the shifts and chooses for each one whether to keep Ali or free the slot",
+    "Keep today's behaviour: Ali stays rostered and can still clock in"
+   ]
+  },
+  "chunk": "F03",
+  "reviewer": "claudeA-3"
+ },
+ {
+  "id": "F03-N5",
+  "severity": "P2",
+  "area": "Memberships / Records",
+  "title": "Deleting a staff membership also deletes that person's past work-note completions and their contracted-hours settings.",
+  "scenario": "Tom removes Mia, who ticked off daily pharmacy tasks such as fridge checks for a year. Her membership is fully deleted unless an employment record blocks it, and her task-completion history and contracted-hours settings are deleted with it. Tom's task history no longer shows who did those checks, and timesheet comparisons for her past weeks lose her contracted hours. This is the same pattern as B03 (chat messages), but for task and work records.",
+  "evidence": [
+   "backend/memberships/views.py:129",
+   "backend/team_calendar/models.py:180",
+   "backend/team_calendar/models.py:148",
+   "backend/workforce/models.py:55"
+  ],
+  "confidence": "medium",
+  "test_needed": "Owner removes a staff member who has work-note completion records; those completion records must still exist afterwards.",
+  "owner_question": {
+   "question": "When Tom removes Mia, what should happen to her record of completed pharmacy tasks?",
+   "options": [
+    "Kept, still showing Mia's name as the person who completed each task",
+    "Kept, but with her name replaced by 'former staff'",
+    "Keep today's behaviour: deleted along with her membership"
+   ]
+  },
+  "chunk": "F03",
+  "reviewer": "claudeA-3"
+ },
+ {
+  "id": "F04-N1",
+  "severity": "P0",
+  "area": "Shifts/Privacy",
+  "title": "Any worker who can see a shift can download the staff list of that pharmacy, or of its whole organisation, through the shift's member-status page.",
+  "scenario": "Sara, an external locum, opens one of Tom's public shifts. Using that shift's member-status address with a different team filter, she gets back every pharmacist on Tom's own staff (Omar included): names, user numbers, employment type and how each answered. Anyone with a pending offer also has their email and offered rate exposed. If the shift belongs to one of Lina's organisation pharmacies, the organisation filter returns every pharmacist across Lina's whole organisation. Only the manager's version of this page checks that the caller manages the pharmacy. The general shift page lets anyone in who can merely see the shift, and the team filter is taken from the request without checking it.",
+  "evidence": [
+   "backend/shifts/lifecycle.py:287",
+   "backend/shifts/lifecycle.py:393",
+   "backend/shifts/base.py:124",
+   "backend/shifts/base.py:169",
+   "backend/shifts/candidates.py:212",
+   "backend/shifts/candidates.py:245",
+   "backend/shifts/candidates.py:273",
+   "backend/shifts/candidates.py:448",
+   "backend/shifts/candidates.py:417",
+   "backend/shifts/base.py:316"
+  ],
+  "confidence": "high",
+  "test_needed": "Sara (pharmacist, no membership at Tom's pharmacy) calls GET /api/v1/shifts/<Tom's PLATFORM shift>/member_status/?visibility=FULL_PART_TIME (and ?visibility=ORG_CHAIN on an org pharmacy shift) and must get 403/404, not Omar's row.",
+  "owner_question": {
+   "question": "Sara can see Tom's public shift. Should she ever see which of Tom's staff, or Lina's organisation staff, were offered it and how they answered?",
+   "options": [
+    "No: only Tom and the people who manage that pharmacy can see member status",
+    "Sara sees only her own status on that shift",
+    "Keep today's behaviour"
+   ]
+  },
+  "chunk": "F04",
+  "reviewer": "claudeB-2"
+ },
+ {
+  "id": "F04-N2",
+  "severity": "P0",
+  "area": "Shifts/Organizations",
+  "title": "Editing a shift can move it into another owner's pharmacy and overwrite that pharmacy's saved pay rates.",
+  "scenario": "Tom edits one of his own pharmacist shifts and changes the pharmacy number in the request to a pharmacy in another organisation. The edit check only looks at the pharmacy the shift was in before, so the save goes through. The shift now appears in the other owner's shift lists. If Tom also ticks 'apply these rates to the pharmacy', the other pharmacy's default rates are overwritten with his numbers, or wiped. The same edit also accepts a payment status from the request, so a manager can mark a shift paid or not needing payment.",
+  "evidence": [
+   "backend/shifts/base.py:128",
+   "backend/shifts/base.py:132",
+   "backend/shifts/serialization/shifts.py:49",
+   "backend/shifts/serialization/shifts.py:102",
+   "backend/shifts/serialization/shifts.py:105",
+   "backend/shifts/serialization/shifts.py:338",
+   "backend/shifts/posting.py:182",
+   "backend/shifts/posting.py:193",
+   "backend/shifts/posting.py:262"
+  ],
+  "confidence": "high",
+  "test_needed": "Tom sends PATCH /api/v1/shifts/<his shift>/ with {\"pharmacy\": <another org's pharmacy>, \"apply_rates_to_pharmacy\": true, \"role_needed\": \"PHARMACIST\"} and must get 400/403, and the shift's pharmacy and the other pharmacy's rates must be unchanged.",
+  "owner_question": {
+   "question": "Tom wants a shift to be at a different pharmacy. What should happen?",
+   "options": [
+    "The pharmacy can never change after posting; Tom reposts it",
+    "Tom can move it only between pharmacies he manages himself (for example to Nadia's site)",
+    "Keep today's behaviour"
+   ]
+  },
+  "chunk": "F04",
+  "reviewer": "claudeB-2"
+ },
+ {
+  "id": "F04-N3",
+  "severity": "P1",
+  "area": "Memberships",
+  "title": "A pharmacy manager can silently make any registered person an active staff member, with no invitation, email or consent.",
+  "scenario": "Tom invites Sara by email with the hidden 'activate immediately' flag (meant for approving her own application). Sara becomes an accepted, active member of Tom's pharmacy straight away and gets no email or notice. She is now on Tom's team for rosters, chat and hub, and it uses one of her three pharmacy places, so a genuine pharmacy may be unable to add her. Tom can do the same by editing a pending invite's status to accepted. This is the pharmacy-staff version of B47, through a different endpoint and with no notice at all.",
+  "evidence": [
+   "backend/memberships/views.py:142",
+   "backend/memberships/invites.py:149",
+   "backend/memberships/invites.py:240",
+   "backend/memberships/applications.py:121",
+   "backend/memberships/serializers.py:67",
+   "backend/memberships/views.py:84",
+   "backend/memberships/test_membership_workflows_contract.py:116"
+  ],
+  "confidence": "high",
+  "test_needed": "Tom POSTs /api/v1/memberships/ with Sara's email and activate_immediately=true (and separately PATCHes Sara's pending invite to status ACCEPTED); Sara's membership must stay PENDING until she accepts it from My Memberships.",
+  "owner_question": {
+   "question": "Tom adds Sara, who already has an account, to his pharmacy. Should she join straight away?",
+   "options": [
+    "No: Sara must accept the invitation first; only approving her own application activates her at once",
+    "Activate at once but always notify Sara and let her leave",
+    "Keep today's behaviour"
+   ]
+  },
+  "chunk": "F04",
+  "reviewer": "claudeB-2"
+ },
+ {
+  "id": "F05-N1",
+  "severity": "P1",
+  "area": "Onboarding / Public shifts",
+  "title": "A New to pharmacy account can apply for public shifts without ever being verified, though the same profile is blocked from posting on the talent hub.",
+  "scenario": "Zoe signs up as New to pharmacy from overseas and skips the mobile check. Her photo ID has not been checked, and she could be as young as 15. She opens Public Shifts and expresses interest in Tom's public New to pharmacy shift, and it goes through. The verification rules say being Verified is the gate for applying to public shifts, but the apply check only looks at pharmacists and pharmacy team accounts and skips New to pharmacy completely. The talent hub does block Zoe until she is verified, so the two parts of the app disagree, and Tom gets interest from an unverified and possibly under-age person.",
+  "evidence": [
+   "backend/shifts/interest.py:40-72",
+   "backend/shifts/interest.py:82-84",
+   "backend/onboarding/verification/state.py:153-178",
+   "backend/onboarding/verification/policy.py:3-5",
+   "backend/onboarding/verification/policy.py:44-57",
+   "backend/talent/views/explorer.py:147-151",
+   "backend/shifts/access.py:86-87",
+   "frontend_web/src/navigation.tsx:522-530"
+  ],
+  "confidence": "high",
+  "test_needed": "An EXPLORER user with an unverified ExplorerOnboarding (verified=False, mobile_check_skipped=True, gov_id_verified=False) posts express_interest on a PLATFORM shift with role_needed=EXPLORER and gets 403, not 201.",
+  "owner_question": {
+   "question": "Zoe is New to pharmacy, skipped the mobile check from overseas and has no checked photo ID. She tries to apply for Tom's public New to pharmacy shift. What should happen?",
+   "options": [
+    "Block her until her profile is Verified (mobile, or photo ID if overseas), the same rule as the talent hub",
+    "Let her apply, but show Tom a clear 'not verified' label on her interest",
+    "Keep today's behaviour: any New to pharmacy account can apply"
+   ]
+  },
+  "chunk": "F05",
+  "reviewer": "claudeB-1"
+ },
+ {
+  "id": "F05-N2",
+  "severity": "P1",
+  "area": "Onboarding / Shift confirmation",
+  "title": "A New to pharmacy person who is offered a shift can never confirm it, because the confirm step looks for a pharmacy team profile they cannot have.",
+  "scenario": "Tom sees Zoe's interest in his public New to pharmacy shift, or books her from the Talent Board, and sends her an offer. Zoe gets the offer email and notification and presses Confirm. Every time she is told to 'complete worker onboarding'. The payment and engagement check only reads a pharmacist or pharmacy team profile, and the New to pharmacy profile has no payment settings at all. Her offer sits until it expires after 48 hours, so Tom's slot stays unfilled and he never learns why.",
+  "evidence": [
+   "backend/shifts/engagement.py:25-28",
+   "backend/shifts/engagement.py:245-251",
+   "backend/shifts/engagement.py:580",
+   "backend/shifts/offers.py:354-363",
+   "backend/shifts/assignment.py:95-126",
+   "backend/onboarding/models.py:541-624",
+   "shared-core/src/domains/talent/presentation.test.ts:10"
+  ],
+  "confidence": "high",
+  "test_needed": "Tom accept_users Zoe (EXPLORER, verified ExplorerOnboarding, no OtherStaffOnboarding) on an EXPLORER-role shift; Zoe POSTs the offer accept and must not get the 400 'Complete worker onboarding' error (or Tom must be stopped from sending the offer in the first place).",
+  "owner_question": {
+   "question": "Tom wants to book Zoe, who is New to pharmacy, for a New to pharmacy shift. What should happen when he sends her the offer?",
+   "options": [
+    "Zoe can confirm it; New to pharmacy shifts get their own simple engagement terms with no TFN/ABN step",
+    "Tom is told before sending that Zoe must first upgrade to Pharmacy team and set up payment",
+    "Keep today's behaviour: the offer is sent but Zoe can never confirm it"
+   ]
+  },
+  "chunk": "F05",
+  "reviewer": "claudeB-1"
+ },
+ {
+  "id": "F05-N3",
+  "severity": "P1",
+  "area": "Shift confirmation / Role gate",
+  "title": "Nothing checks that the person confirming an offer holds the role the shift needs, so a technician or intern can be booked into a pharmacist shift.",
+  "scenario": "Tom sends an offer for his public pharmacist shift to Ali (technician) or Jack (intern), for example by picking the wrong person or calling the app directly. Ali confirms, and the check only asks whether Ali's own technician profile is verified. Ali has no AHPRA number, so the AHPRA check reads as 'pending' and lets him through. Ali is now rostered and paid as the pharmacist on duty. The role match exists for browsing, applying and instant claims, but not for sending an offer, confirming it or finalising it.",
+  "evidence": [
+   "backend/shifts/base.py:232-259",
+   "backend/shifts/assignment.py:25-131",
+   "backend/shifts/offers.py:329-405",
+   "backend/onboarding/verification/state.py:153-167",
+   "backend/onboarding/verification/state.py:58-61",
+   "backend/shifts/finalize.py:23-73",
+   "backend/shifts/engagement.py:528-537",
+   "backend/shifts/browse.py:329-334"
+  ],
+  "confidence": "medium",
+  "test_needed": "Tom accept_users Ali (OTHER_STAFF, role_type TECHNICIAN, verified, no AHPRA) on a PLATFORM shift with role_needed=PHARMACIST; Ali's offer accept must be refused, and no ShiftSlotAssignment may be created.",
+  "owner_question": {
+   "question": "Tom sends an offer for a pharmacist shift to Ali, who is a technician, and Ali presses Confirm. What should happen?",
+   "options": [
+    "Block the offer when Tom sends it: only people whose role covers the shift can be offered it",
+    "Let Tom send it, but refuse Ali's confirmation with a clear role message",
+    "Keep today's behaviour: Ali is booked as the pharmacist"
+   ]
+  },
+  "chunk": "F05",
+  "reviewer": "claudeB-1"
+ },
+ {
+  "id": "F06-N1",
+  "severity": "P1",
+  "area": "Payroll",
+  "title": "Locking a period always produces an empty payroll handoff.",
+  "scenario": "Tom enables payroll, publishes Omar's payroll shifts and approves Omar's recorded hours. Tom locks the period successfully from web or mobile, but the saved payroll handoff contains no workers or shifts. The approved hours remain visible in timesheets while the payroll handoff silently omits Omar.",
+  "evidence": [
+   "backend/shifts/engagement.py:125",
+   "backend/workforce/timesheet_data.py:172",
+   "backend/workforce/timesheet_builder.py:183",
+   "backend/workforce/timesheet_builder.py:207",
+   "backend/workforce/timesheet_transitions.py:147",
+   "backend/workforce/timesheet_transitions.py:182",
+   "backend/workforce/views.py:744"
+  ],
+  "confidence": "high",
+  "test_needed": "With payroll enabled and Omar's completed published assignment routed to PAYROLL, build and approve his timesheet, then lock the period; assert that payroll_export contains Omar's assignment and worked day rather than an empty list.",
+  "owner_question": {
+   "question": "When Tom locks approved payroll hours for Omar, what should happen if the payroll handoff would omit Omar?",
+   "options": [
+    "Include Omar's approved payroll shifts in the handoff",
+    "Refuse locking until Omar's payroll rows can be generated",
+    "Allow locking with an empty payroll handoff (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F06",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "F06-N2",
+  "severity": "P1",
+  "area": "Attendance and timesheets",
+  "title": "Rejecting provisional attendance permanently blocks the whole timesheet period.",
+  "scenario": "Omar clocks in without a rostered shift, clocks out, and Tom rejects those hours with a reason. The rejected attendance disappears from Tom's pending reviews but continues to block Omar's timesheet. Tom cannot waive the blocker or approve the rejected attendance, so he cannot lock the period for any staff.",
+  "evidence": [
+   "backend/attendance/approvals.py:53",
+   "backend/attendance/approvals.py:157",
+   "backend/attendance/approvals.py:274",
+   "backend/workforce/timesheet_data.py:241",
+   "backend/workforce/timesheet_transitions.py:67",
+   "backend/workforce/timesheet_transitions.py:103",
+   "backend/workforce/timesheet_transitions.py:139"
+  ],
+  "confidence": "high",
+  "test_needed": "Reject Omar's closed provisional attendance, rebuild his timesheet and attempt period locking after all payable hours are approved; assert that the rejected evidence does not leave an unresolvable approval blocker.",
+  "owner_question": {
+   "question": "After Tom rejects Omar's unrostered attendance, how should Tom finish that pay period?",
+   "options": [
+    "Exclude the rejected hours from payable time while retaining the audit evidence",
+    "Provide an explicit follow-up decision that resolves the rejected hours",
+    "Keep the entire period blocked with no recovery action (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F06",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "F06-N3",
+  "severity": "P1",
+  "area": "Attendance corrections",
+  "title": "Clock corrections across pay-period boundaries can drop worked minutes.",
+  "scenario": "Omar's recorded clock-out is Sunday at 23:50, and Tom corrects it to Monday at 00:10 after confirming when Omar actually finished. Sunday's period counts only up to midnight, but Monday's period still treats Omar's session as having ended on Sunday. Even recalculating both periods loses the ten minutes Omar worked on Monday.",
+  "evidence": [
+   "backend/attendance/approvals.py:383",
+   "backend/workforce/timesheet_data.py:206",
+   "backend/workforce/timesheet_data.py:211",
+   "backend/workforce/timesheet_data.py:223",
+   "backend/workforce/timesheet_data.py:258",
+   "backend/workforce/signals.py:61",
+   "backend/workforce/timesheet_core.py:21"
+  ],
+  "confidence": "high",
+  "test_needed": "Correct Omar's Sunday 23:50 clock-out to Monday 00:10 across adjacent periods, rebuild both periods and assert that their combined worked minutes retain the full corrected duration, including Monday's ten minutes.",
+  "owner_question": {
+   "question": "When Tom corrects Omar's finish across midnight into another pay period, where should those extra ten minutes go?",
+   "options": [
+    "Count them in Omar's next period using the corrected finish",
+    "Require an explicit adjustment before accepting the correction",
+    "Accept the correction but omit those minutes from both periods (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F06",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "F06-N4",
+  "severity": "P2",
+  "area": "Leave notifications",
+  "title": "Requests made through My Leave bypass request and decision notifications.",
+  "scenario": "Omar requests sick leave through My Leave on web or mobile, and Tom receives no email, push or in-app notification. When Tom later opens the leave list and approves it, Omar receives no decision notification either. Notifications are sent only when leave was requested against a particular roster shift, although both routes use the same approval workflow.",
+  "evidence": [
+   "frontend_web/src/features/workforce/MyLeavePage.tsx:12",
+   "frontend_mobile/app/my-leave.tsx:92",
+   "backend/workforce/leave_service.py:85",
+   "backend/workforce/leave_service.py:128",
+   "backend/workforce/leave_service.py:251",
+   "backend/workforce/leave_service.py:263",
+   "backend/workforce/leave_service.py:343",
+   "backend/workforce/signals.py:159"
+  ],
+  "confidence": "high",
+  "test_needed": "Create Omar's membership-based leave without a roster assignment and have Tom approve it; assert that Tom receives a request notification and Omar receives a decision notification.",
+  "owner_question": {
+   "question": "When Omar requests leave through My Leave rather than a roster shift, how should Tom and Omar be notified?",
+   "options": [
+    "Notify Tom of the request and Omar of the decision",
+    "Notify Tom of the request only",
+    "Require both people to check their leave lists manually (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F06",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "F07-N1",
+  "severity": "P1",
+  "area": "Invoicing",
+  "title": "Both invoice editors block saving an invoice prefilled from an accepted shift.",
+  "scenario": "Sara chooses her accepted shift at Tom's pharmacy and the invoice fills in Tom's pharmacy details. Pressing Save tells her to select a customer, but the customer selector is disabled. This happens on both web and mobile, preventing Sara from creating the internal invoice through the intended flow.",
+  "evidence": [
+   "backend/worker_finance/services.py:362",
+   "frontend_web/src/pages/finance/InvoiceComposer.tsx:103",
+   "frontend_web/src/pages/finance/InvoiceComposer.tsx:130",
+   "frontend_web/src/pages/finance/InvoiceComposer.tsx:187",
+   "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:199",
+   "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:229"
+  ],
+  "confidence": "high",
+  "test_needed": "Choose an eligible accepted shift in each editor and save without manually selecting a customer; assert that an internal invoice is created for the shift's pharmacy.",
+  "owner_question": {
+   "question": "When Sara starts an invoice from her accepted shift at Tom's pharmacy, should she be able to save with the pharmacy already selected?",
+   "options": [
+    "Sara saves directly using the shift's pharmacy.",
+    "Sara must confirm an enabled pharmacy selection before saving.",
+    "Sara remains blocked by the locked customer selection (keep today's behaviour)."
+   ]
+  },
+  "chunk": "F07",
+  "reviewer": "codexB-3"
+ },
+ {
+  "id": "F07-N2",
+  "severity": "P1",
+  "area": "Payments",
+  "title": "Marking an invoice paid leaves its balance and cash worksheet unchanged.",
+  "scenario": "Tom pays Sara's $1,100 invoice, and Sara uses Mark as paid as instructed once the full amount arrives. The invoice says Paid, but still shows $1,100 outstanding and zero received; her cash worksheet also includes none of that payment or its GST. Tom's own Mark paid action creates the same discrepancy for Sara.",
+  "evidence": [
+   "frontend_web/src/pages/finance/FinanceWorkspace.tsx:354",
+   "backend/worker_finance/views.py:243",
+   "backend/worker_finance/views.py:498",
+   "backend/worker_finance/services.py:835",
+   "backend/worker_finance/views.py:634",
+   "frontend_web/src/pages/dashboard/sidebar/Invoices/invoiceStats.ts:101"
+  ],
+  "confidence": "high",
+  "test_needed": "Mark an unpaid $1,100 GST invoice paid through each persona's action and assert that the balance becomes zero and the confirmed receipt appears in the appropriate cash worksheet period.",
+  "owner_question": {
+   "question": "When Sara confirms Tom's full payment using Mark as paid, how should her balance and cash worksheet change?",
+   "options": [
+    "Collect a receipt date and record the remaining payment.",
+    "Require Sara to record payment details before marking it paid.",
+    "Change only the Paid label while retaining the outstanding balance (keep today's behaviour)."
+   ]
+  },
+  "chunk": "F07",
+  "reviewer": "codexB-3"
+ },
+ {
+  "id": "F07-N3",
+  "severity": "P1",
+  "area": "Finance summaries",
+  "title": "Saving an invoice revision removes its recorded receipts from the cash worksheet.",
+  "scenario": "Sara sends Tom an invoice and records a partial payment that appears correctly in her cash worksheet. She then corrects only the invoice notes and saves without sending the replacement yet. The payment and its GST disappear from the same worksheet period even though Sara still has the money and the payment history remains.",
+  "evidence": [
+   "backend/worker_finance/services.py:693",
+   "backend/worker_finance/services.py:702",
+   "backend/worker_finance/services.py:982",
+   "backend/worker_finance/views.py:626",
+   "backend/worker_finance/views.py:634"
+  ],
+  "confidence": "high",
+  "test_needed": "Record a partial payment against a sent invoice, save a notes-only revision without resending, and assert that the cash worksheet's sales and GST totals remain unchanged.",
+  "owner_question": {
+   "question": "Should Sara's receipt from Tom remain in her cash worksheet while she prepares an unsent invoice correction?",
+   "options": [
+    "Keep the recorded receipt included throughout the correction.",
+    "Block revision until Sara completes an explicit accounting adjustment.",
+    "Exclude the receipt until the corrected invoice is sent (keep today's behaviour)."
+   ]
+  },
+  "chunk": "F07",
+  "reviewer": "codexB-3"
+ },
+ {
+  "id": "F07-N4",
+  "severity": "P1",
+  "area": "Invoice delivery",
+  "title": "Finishing an older invoice email can publish a newer unsent revision.",
+  "scenario": "Sara sends an invoice to Tom and, while the email is still being processed, saves a correction from another device. When the first email finishes, the corrected invoice is marked Sent even though the email contained the older version. Tom can then see and approve the unsent correction while holding a different invoice in his email.",
+  "evidence": [
+   "backend/worker_finance/views.py:272",
+   "backend/worker_finance/views.py:294",
+   "backend/worker_finance/views.py:315",
+   "backend/worker_finance/services.py:693",
+   "backend/worker_finance/services.py:770"
+  ],
+  "confidence": "high",
+  "test_needed": "Pause email sending for version 1, save version 2, then finish the email; assert that version 2 remains draft and Tom can access only delivered version 1.",
+  "owner_question": {
+   "question": "If Sara saves a correction while an older invoice email to Tom is sending, which version should Tom be allowed to review?",
+   "options": [
+    "Only the emailed version until Sara sends the correction.",
+    "Prevent Sara from saving while delivery is in progress.",
+    "Publish the correction when the older email finishes (keep today's behaviour)."
+   ]
+  },
+  "chunk": "F07",
+  "reviewer": "codexB-3"
+ },
+ {
+  "id": "F07-N5",
+  "severity": "P2",
+  "area": "Invoice documents",
+  "title": "Current finance invoice PDFs are labelled draft even after delivery.",
+  "scenario": "Sara emails her saved invoice to Tom, and the attachment says DRAFT - NOT ISSUED. Downloading the current invoice after successful delivery or payment produces the same label. Tom receives contradictory information about whether Sara has actually issued the bill.",
+  "evidence": [
+   "backend/worker_finance/services.py:827",
+   "backend/worker_finance/templates/worker_finance/invoice.html:16",
+   "backend/worker_finance/documents.py:16",
+   "backend/worker_finance/views.py:294",
+   "backend/worker_finance/views.py:268"
+  ],
+  "confidence": "high",
+  "test_needed": "Send a finance invoice and inspect both its email attachment and subsequent current PDF; assert that neither labels the issued invoice DRAFT - NOT ISSUED.",
+  "owner_question": {
+   "question": "What should Tom see on the invoice PDF that Sara successfully sends?",
+   "options": [
+    "An issued invoice without the draft label.",
+    "An issued invoice explicitly stating its revision remains editable.",
+    "DRAFT - NOT ISSUED on the emailed and current PDFs (keep today's behaviour)."
+   ]
+  },
+  "chunk": "F07",
+  "reviewer": "codexB-3"
+ },
+ {
+  "id": "F07-N6",
+  "severity": "P1",
+  "area": "Superannuation",
+  "title": "A separate super request cannot be corrected when its service invoice changes.",
+  "scenario": "Sara creates a separate $120 super request for an invoice to Tom. She later corrects the work amount, making the invoice's super contribution $180, but the separate request remains $120. Sara cannot revise that request or create a replacement through the available actions, leaving Tom with conflicting contribution amounts.",
+  "evidence": [
+   "backend/worker_finance/services.py:606",
+   "backend/worker_finance/services.py:691",
+   "backend/worker_finance/services.py:894",
+   "backend/worker_finance/services.py:902",
+   "frontend_web/src/pages/finance/FinanceWorkspace.tsx:356",
+   "frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx:159"
+  ],
+  "confidence": "high",
+  "test_needed": "Create a separate super request, revise the parent invoice's eligible amount, and assert that an explicit supported correction produces a matching contribution request rather than permanently returning the old amount.",
+  "owner_question": {
+   "question": "When Sara corrects an invoice to Tom after creating its separate super request, what should happen to that request?",
+   "options": [
+    "Create an audited replacement with the corrected contribution.",
+    "Require an explicit adjustment before saving the invoice correction.",
+    "Keep the original request amount with no correction action (keep today's behaviour)."
+   ]
+  },
+  "chunk": "F07",
+  "reviewer": "codexB-3"
+ },
+ {
+  "id": "F08-N1",
+  "severity": "P1",
+  "area": "Billing",
+  "title": "Repeating subscription setup can create multiple recurring charges for the same plan.",
+  "scenario": "Tom chooses invoice payment for his subscription, then repeats setup while the first invoice is unpaid. Each attempt creates another recurring Stripe subscription, while the app replaces the previous subscription reference and still presents one plan. Tom can receive multiple recurring bills for the same service.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:150",
+   "backend/billing/views.py:388",
+   "backend/billing/views.py:416",
+   "backend/billing/views.py:429",
+   "backend/billing/views.py:431",
+   "backend/billing/models.py:36"
+  ],
+  "confidence": "high",
+  "test_needed": "Submit invoice subscription setup twice before paying the first invoice and assert that the second request cannot create another recurring Stripe subscription.",
+  "owner_question": {
+   "question": "When Tom repeats subscription setup before paying his first invoice, what should happen?",
+   "options": [
+    "Show Tom the existing unpaid invoice without creating another subscription",
+    "Cancel the unpaid subscription before creating its replacement",
+    "Create another recurring subscription for Tom (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F08",
+  "reviewer": "codexA-3"
+ },
+ {
+  "id": "F08-N2",
+  "severity": "P1",
+  "area": "Billing",
+  "title": "Subscriptions remain active after Stripe marks them unpaid.",
+  "scenario": "Tom's subscription renewal fails and Stripe eventually marks the subscription unpaid. The app ignores both the failed-payment notice and the subscription status change, so web and mobile continue showing Tom an active subscription without a payment problem. The local subscription remains active unless a separate cancellation event arrives.",
+  "evidence": [
+   "backend/billing/views.py:897",
+   "backend/billing/views.py:926",
+   "backend/billing/views.py:944",
+   "backend/billing/views.py:249",
+   "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:107",
+   "frontend_mobile/roles/owner/subscription-seats.tsx:44"
+  ],
+  "confidence": "high",
+  "test_needed": "After an active subscription's paid period expires, deliver invoice.payment_failed followed by customer.subscription.updated with status unpaid and assert that the subscription response no longer reports active.",
+  "owner_question": {
+   "question": "After Tom exhausts any payment grace period and Stripe marks his subscription unpaid, what should the app show?",
+   "options": [
+    "Show unpaid status and suspend subscription benefits until Tom pays",
+    "Show unpaid status while retaining benefits for a defined extension",
+    "Continue showing Tom an active subscription without a warning (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F08",
+  "reviewer": "codexA-3"
+ },
+ {
+  "id": "F08-N3",
+  "severity": "P1",
+  "area": "Billing",
+  "title": "An open checkout can charge Tom after its shift has been deleted.",
+  "scenario": "Tom opens checkout to confirm Sara, then deletes the still-unpaid shift from his phone before completing payment in the browser. The open checkout remains payable, so Stripe can take Tom's money after the shift and Sara's offer have disappeared. The payment callback cannot save a payment linked to the deleted shift, leaving Tom charged without a recorded payment or confirmed booking.",
+  "evidence": [
+   "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts:44",
+   "shared-core/src/domains/shifts/api.ts:121",
+   "backend/shifts/base.py:111",
+   "backend/shifts/lifecycle.py:50",
+   "backend/billing/views.py:689",
+   "backend/billing/views.py:848",
+   "backend/billing/models.py:85",
+   "backend/billing/views.py:1011"
+  ],
+  "confidence": "high",
+  "test_needed": "Create checkout for Sara's pending offer, delete the shift, then deliver the paid checkout event and assert that the charge is reconciled or refunded rather than failing permanently against the missing shift.",
+  "owner_question": {
+   "question": "If Tom deletes Sara's shift while its checkout is open, what should happen to a payment completed afterward?",
+   "options": [
+    "Prevent payment where possible and automatically refund any late charge",
+    "Prevent Tom from deleting the shift until checkout is resolved",
+    "Keep the charge without restoring the booking or recording payment (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F08",
+  "reviewer": "codexA-3"
+ },
+ {
+  "id": "F08-N4",
+  "severity": "P1",
+  "area": "Billing",
+  "title": "Staff can join beyond the purchased seat count without an additional charge.",
+  "scenario": "Tom has used all five included internal staff seats at one pharmacy and invites Nadia from his other pharmacy to join it too. Nadia can accept and become active without Tom purchasing another seat or receiving an additional seat charge. The membership checks limit how many pharmacies Nadia joins, but never compare Tom's staff total with his purchased seats.",
+  "evidence": [
+   "frontend_web/src/pages/PricingPage.tsx:259",
+   "frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:440",
+   "shared-core/src/domains/memberships/api.ts:24",
+   "backend/memberships/invites.py:117",
+   "backend/memberships/invites.py:168",
+   "backend/memberships/serializers.py:133",
+   "backend/memberships/views.py:437",
+   "backend/memberships/views.py:443",
+   "backend/billing/views.py:826"
+  ],
+  "confidence": "high",
+  "test_needed": "Give Tom five purchased seats and five active internal staff at one pharmacy, then accept Nadia's sixth internal membership and assert that activation requires another paid seat or creates the corresponding charge.",
+  "owner_question": {
+   "question": "When Nadia would become Tom's sixth internal staff member at a pharmacy with five paid seats, what should happen?",
+   "options": [
+    "Hold Nadia's activation until Tom buys another seat",
+    "Ask Tom to approve the additional recurring seat charge before activation",
+    "Activate Nadia without checking or charging for another seat (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F08",
+  "reviewer": "codexA-3"
+ },
+ {
+  "id": "F08-N5",
+  "severity": "P1",
+  "area": "Billing",
+  "title": "Deleting Tom's account leaves his recurring Stripe charges running.",
+  "scenario": "Tom has an active subscription and extra seats, then deletes his account through the app. The app confirms deletion, disables his login and signs him out, but neither recurring Stripe subscription is cancelled or scheduled to stop. Tom can continue being billed after losing access to the account and its billing screen.",
+  "evidence": [
+   "frontend_mobile/roles/owner/profile.tsx:393",
+   "shared-core/src/domains/auth/api.ts:53",
+   "backend/core/api_v1_urls.py:30",
+   "backend/users/api_account.py:76",
+   "backend/users/account_deletion.py:92",
+   "backend/billing/views.py:440",
+   "backend/billing/views.py:522",
+   "backend/templates/emails/account_deleted.txt:6"
+  ],
+  "confidence": "high",
+  "test_needed": "Delete Tom's account with active base and seat subscriptions and assert that both recurring charges are stopped or that deletion is refused until billing is resolved.",
+  "owner_question": {
+   "question": "When Tom deletes his account while paying for a subscription and extra seats, what should happen to future charges?",
+   "options": [
+    "Stop both subscriptions from renewing as part of deletion",
+    "Require Tom to resolve or cancel both subscriptions before deletion",
+    "Disable Tom's account while both subscriptions keep billing (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F08",
+  "reviewer": "codexA-3"
+ },
+ {
+  "id": "F09-N1",
+  "severity": "P1",
+  "area": "Hub privacy",
+  "title": "Deleting a restricted Hub group exposes its posts to the whole pharmacy.",
+  "scenario": "Tom and Omar share confidential posts and attachments in a restricted Hub group that Mia cannot access. When Tom deletes the group, its posts remain and appear in the pharmacy-wide feed. Mia can now read those posts, their comments and their attachments.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx:421",
+   "backend/pharmacy_hub/groups.py:147",
+   "backend/pharmacy_hub/models.py:143",
+   "backend/pharmacy_hub/scoping.py:156",
+   "backend/pharmacy_hub/serialization/posts.py:366"
+  ],
+  "confidence": "high",
+  "test_needed": "Delete Tom's restricted group containing a post, comment and attachment, then fetch the pharmacy feed as Mia, who was never a group member; verify none of that content becomes accessible.",
+  "owner_question": {
+   "question": "After Tom deletes a restricted Hub group, what should happen to Omar's confidential posts and attachments?",
+   "options": [
+    "Archive them with their restricted audience preserved",
+    "Delete the group's posts and attachments",
+    "Make them visible to Mia and the whole pharmacy (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F09",
+  "reviewer": "codexB-2"
+ },
+ {
+  "id": "F09-N2",
+  "severity": "P1",
+  "area": "Notification privacy",
+  "title": "Removed Hub group members still receive new private comment text.",
+  "scenario": "Omar writes a post in a restricted Hub group, then Tom removes Omar from that group while keeping him employed. Mia subsequently adds a confidential comment to Omar's old post. Omar still receives up to 280 characters of the new comment through notifications and push, even though he can no longer open the group.",
+  "evidence": [
+   "backend/pharmacy_hub/serialization/groups.py:189",
+   "backend/pharmacy_hub/access.py:271",
+   "backend/pharmacy_hub/posts.py:440",
+   "backend/pharmacy_hub/notifications.py:50",
+   "backend/notifications/services.py:88"
+  ],
+  "confidence": "high",
+  "test_needed": "Remove Omar from a restricted group, confirm his post access is denied, then add Mia's comment to his old post and verify no notification or push containing that comment is delivered to Omar.",
+  "owner_question": {
+   "question": "After Tom removes Omar from a restricted Hub group, should Omar receive new comments on posts he previously wrote there?",
+   "options": [
+    "Stop all notifications about subsequent group activity",
+    "Send only a generic alert without private comment text",
+    "Continue sending comment previews to Omar (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F09",
+  "reviewer": "codexB-2"
+ },
+ {
+  "id": "F09-N3",
+  "severity": "P1",
+  "area": "Push notification privacy",
+  "title": "Mobile sign-out leaves private message previews enabled on the signed-out device.",
+  "scenario": "Sara signs out of ChemistTasker on a borrowed phone and returns it to Mia. Tom later sends Sara a private chat message. The phone remains registered for Sara's push notifications, so Mia can see Tom's name and the message preview without signing into Sara's account.",
+  "evidence": [
+   "frontend_mobile/context/AuthContext.tsx:216",
+   "frontend_mobile/context/AuthContext.tsx:502",
+   "backend/users/api_auth.py:155",
+   "backend/notifications/services.py:90",
+   "backend/chat/signals.py:110"
+  ],
+  "confidence": "high",
+  "test_needed": "Register Sara's phone for push, complete a successful mobile logout and close all sockets, then send Sara a new chat message from Tom; verify the signed-out device receives no push.",
+  "owner_question": {
+   "question": "After Sara signs out of the borrowed phone, what should Mia be able to receive on that phone?",
+   "options": [
+    "No further notifications for Sara",
+    "Generic alerts only if Sara explicitly opted in",
+    "Sara's sender names and message previews (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F09",
+  "reviewer": "codexB-2"
+ },
+ {
+  "id": "F09-N4",
+  "severity": "P1",
+  "area": "Hub permissions",
+  "title": "Users without pharmacy memberships can overwrite or delete each other's Hub polls.",
+  "scenario": "Sara creates a public Hub poll while she has no pharmacy membership, and Zoe also has no pharmacy membership. Zoe can replace Sara's question and choices or delete the poll despite having no management rights. Replacing the choices also erases the votes already cast.",
+  "evidence": [
+   "backend/pharmacy_hub/access.py:338",
+   "backend/pharmacy_hub/serialization/polls.py:119",
+   "backend/pharmacy_hub/polls.py:137",
+   "backend/pharmacy_hub/polls.py:157",
+   "backend/pharmacy_hub/serialization/polls.py:149",
+   "backend/pharmacy_hub/serialization/polls.py:257"
+  ],
+  "confidence": "high",
+  "test_needed": "Create Sara's public Hub poll with no author membership and existing votes, then PATCH its choices as Zoe without a membership; expect 403 and unchanged choices and votes.",
+  "owner_question": {
+   "question": "Should Zoe be allowed to change or delete Sara's public Hub poll when neither belongs to a pharmacy?",
+   "options": [
+    "Only Sara and authorized moderators may change it",
+    "Zoe may suggest changes for Sara to approve",
+    "Zoe may directly change or delete it (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F09",
+  "reviewer": "codexB-2"
+ },
+ {
+  "id": "F10-N1",
+  "severity": "P1",
+  "area": "Talent",
+  "title": "Any signed-in account can identify authors of anonymous talent posts.",
+  "scenario": "Sara publishes anonymous availability, and the public board hides her identity. Zoe signs in and can obtain Sara's full name and account identifiers from the signed-in talent feed without any hiring relationship, verification or permission to reveal Sara. The same post number connects Sara's identity to her anonymous public availability.",
+  "evidence": [
+   "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:722",
+   "frontend_mobile/roles/shared/talent-board/hooks/useTalentFeed.ts:45",
+   "shared-core/src/domains/talent/api.ts:43",
+   "backend/talent/views/explorer.py:97",
+   "backend/talent/views/explorer.py:184",
+   "backend/talent/serializers/explorer.py:79",
+   "backend/talent/serializers/explorer.py:83",
+   "backend/talent/serializers/explorer.py:190"
+  ],
+  "confidence": "high",
+  "test_needed": "As unrelated, unverified Zoe, request the authenticated feed containing Sara's anonymous post and assert that Sara's name and identity links remain withheld.",
+  "owner_question": {
+   "question": "When Sara publishes anonymously, when should Zoe or Tom be allowed to learn her identity?",
+   "options": [
+    "After Sara accepts a hiring interaction",
+    "After an explicitly authorised employer reveal",
+    "Immediately after signing in (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F10",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "F10-N2",
+  "severity": "P1",
+  "area": "Public job board",
+  "title": "Public search can identify pharmacies behind anonymous vacancies.",
+  "scenario": "Tom publishes a vacancy anonymously. Zoe searches the public job board using a distinctive part of Tom's pharmacy name or exact street address, and Tom's anonymous vacancy matches that hidden information. By comparing the vacancy across searches, Zoe can identify the pharmacy without signing in.",
+  "evidence": [
+   "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:193",
+   "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:214",
+   "shared-core/src/domains/shifts/api.ts:218",
+   "backend/shifts/browse.py:537",
+   "backend/shifts/browse.py:589",
+   "backend/shifts/serialization/shifts.py:193",
+   "backend/organizations/serializers.py:56"
+  ],
+  "confidence": "high",
+  "test_needed": "Create Tom's anonymous vacancy with a unique pharmacy name and street address; assert that unauthenticated searches matching only those hidden fields do not return it.",
+  "owner_question": {
+   "question": "Should Zoe be able to discover Tom's anonymous vacancy by searching for its hidden pharmacy name or street address?",
+   "options": [
+    "Search only information visible on the anonymous card",
+    "Allow identifying searches only after authorised disclosure",
+    "Allow those public searches (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F10",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "F10-N3",
+  "severity": "P1",
+  "area": "Rewards",
+  "title": "Concurrent claims can award multiple rewards for the same referral.",
+  "scenario": "Verified Sara sends her first claim for Tom's friend-referral code twice at the same time. Both claims can create a separate referral and award Tom 100 Pills, giving him 200 Pills for referring one person. Tom can spend the duplicated credit on a shift payment.",
+  "evidence": [
+   "shared-core/src/domains/rewards/api.ts:36",
+   "backend/rewards/views.py:139",
+   "backend/rewards/services.py:297",
+   "backend/rewards/services.py:333",
+   "backend/rewards/services.py:188",
+   "backend/rewards/models.py:119",
+   "backend/rewards/services.py:356"
+  ],
+  "confidence": "high",
+  "test_needed": "Submit two concurrent first claims by eligible Sara for Tom's same friend-referral code and assert exactly one referral event and one 100-Pill award.",
+  "owner_question": {
+   "question": "If Sara's first claim reaches the service twice simultaneously, how many referral rewards should Tom receive?",
+   "options": [
+    "One reward, with both claims returning the same result",
+    "One reward, with the duplicate claim rejected",
+    "A reward for each simultaneous claim (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F10",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "F10-N4",
+  "severity": "P1",
+  "area": "Ethical marketplace",
+  "title": "Bulk ethical reads bypass the viewer's approved medicine schedules.",
+  "scenario": "Tom delegates inventory and listing access to Omar, whose reviewed professional access covers S4 medicines only. Omar opens the inventory or owned-listings screen and receives S8 stock or listing details too, including quantities and prices where present. Individual product checks would reject that S8 access, but these bulk screens omit them.",
+  "evidence": [
+   "frontend_mobile/features/parity/ethicalMarketplace.tsx:26",
+   "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:50",
+   "shared-core/src/platformApi.ts:150",
+   "backend/ethical_marketplace/views.py:163",
+   "backend/ethical_marketplace/views.py:228",
+   "backend/ethical_marketplace/owner_views.py:36",
+   "backend/ethical_marketplace/policy.py:50",
+   "backend/ethical_marketplace/serializers.py:38"
+  ],
+  "confidence": "high",
+  "test_needed": "Give Omar valid pharmacy grants but professional approval for S4 only, seed S4 and S8 stock and listings, and assert that bulk inventory and owned-listing responses exclude S8 records.",
+  "owner_question": {
+   "question": "When Omar is approved for S4 medicines only, what should he see of Tom's S8 stock?",
+   "options": [
+    "No S8 stock or listing details",
+    "Catalogue names only, with stock and prices withheld",
+    "All stock and listing details (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F10",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "F10-N5",
+  "severity": "P1",
+  "area": "Ethical marketplace",
+  "title": "Valid premises applications fail after saving because the response uses an undefined variable.",
+  "scenario": "Tom submits a valid premises application from the website or mobile app. The application is saved for review, but the app receives a server error instead of confirmation. Every valid submission reaches this failure, so Tom cannot tell whether his application succeeded and is encouraged to retry.",
+  "evidence": [
+   "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:143",
+   "frontend_mobile/features/parity/ethicalMarketplace.tsx:54",
+   "shared-core/src/platformApi.ts:141",
+   "backend/ethical_marketplace/views.py:100",
+   "backend/ethical_marketplace/views.py:102",
+   "backend/ethical_marketplace/views.py:113",
+   "backend/ethical_marketplace/views.py:121"
+  ],
+  "confidence": "high",
+  "test_needed": "Submit Tom's first valid premises application and assert a successful creation response containing the saved pending-review application instead of a server error.",
+  "owner_question": {
+   "question": "What should Tom see after his valid premises application has been saved?",
+   "options": [
+    "Confirmation that the application is pending review",
+    "The saved application with its current status",
+    "An error despite the saved application (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F10",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "F10-N6",
+  "severity": "P1",
+  "area": "Ethical marketplace",
+  "title": "Ethical offers disclose full stock-lot records to viewers without inventory access.",
+  "scenario": "Tom publishes an offer for two packs from the pharmacy where Nadia works to his pharmacy chain. Omar has permission to browse chain offers through Tom's first pharmacy but cannot open Nadia's pharmacy inventory. Viewing the offer nevertheless reveals the lot's entire on-hand and reserved quantities, storage checks and source reference, beyond the two packs offered.",
+  "evidence": [
+   "backend/ethical_marketplace/policy.py:94",
+   "backend/ethical_marketplace/policy.py:100",
+   "backend/ethical_marketplace/views.py:229",
+   "backend/ethical_marketplace/views.py:286",
+   "backend/ethical_marketplace/views.py:288",
+   "backend/ethical_marketplace/serializers.py:38",
+   "backend/ethical_marketplace/serializers.py:47",
+   "backend/ethical_marketplace/serializers.py:56"
+  ],
+  "confidence": "high",
+  "test_needed": "As browse-only Omar, confirm that Nadia's pharmacy inventory request is denied, then retrieve its visible two-pack offer and assert that full lot balances, storage checks and source references are absent.",
+  "owner_question": {
+   "question": "When Omar may browse Tom's chain offer but cannot access Nadia's pharmacy inventory, how much stock information should he receive?",
+   "options": [
+    "Only offered quantities and necessary batch and expiry details",
+    "Additional inventory details after separate authorisation",
+    "The full underlying stock-lot record (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F10",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "F11-N1",
+  "severity": "P1",
+  "area": "Auth",
+  "title": "Changing a pending phone number leaves the previous number's verification code usable.",
+  "scenario": "Zoe requests a verification code on her own phone, then saves Tom's number in her profile before entering that code. The app accepts Zoe's code and marks Tom's number as verified on Zoe's account, although Tom never received or approved a verification request.",
+  "evidence": [
+   "backend/onboarding/views.py:293",
+   "backend/onboarding/serializers.py:825",
+   "backend/onboarding/services/basic.py:159",
+   "backend/core/serializer_lifecycle.py:129",
+   "backend/users/api_otp.py:463",
+   "backend/onboarding/verification/policy.py:57"
+  ],
+  "confidence": "high",
+  "test_needed": "Issue a phone code for Zoe's number, change her phone through the onboarding update to Tom's number, then submit the original code and assert that Tom's number remains unverified.",
+  "owner_question": {
+   "question": "When Zoe changes her phone number while a verification code is pending, what should happen to the old code?",
+   "options": [
+    "Reject the old code and require a new code sent to the replacement number",
+    "Block number changes until Zoe cancels the pending verification",
+    "Let the old code verify the replacement number (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F11",
+  "reviewer": "codexA-4"
+ },
+ {
+  "id": "F11-N2",
+  "severity": "P1",
+  "area": "Auth",
+  "title": "Signing out of Expo leaves private push notifications active on that device.",
+  "scenario": "Sara signs out of the mobile app and hands the phone to Omar. When Tom subsequently sends Sara a private chat message, that phone still receives Sara's notification with Tom's name and a preview of the message. This continues after the app closes because signing out leaves the phone registered for Sara's notifications.",
+  "evidence": [
+   "frontend_mobile/context/AuthContext.tsx:220",
+   "frontend_mobile/context/AuthContext.tsx:502",
+   "backend/users/api_auth.py:159",
+   "backend/notifications/services.py:91",
+   "backend/chat/signals.py:110"
+  ],
+  "confidence": "high",
+  "test_needed": "Register a push token for Sara, successfully log her out, send her a private message from Tom, and assert that the logged-out device token receives no push.",
+  "owner_question": {
+   "question": "After Sara signs out of a phone, should that phone still display previews of her private messages from Tom?",
+   "options": [
+    "Stop Sara's push notifications on that phone until she signs in again",
+    "Send only a generic notification without names or private content",
+    "Continue displaying Sara's private previews (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F11",
+  "reviewer": "codexA-4"
+ },
+ {
+  "id": "F11-N3",
+  "severity": "P1",
+  "area": "Auth",
+  "title": "Phone verification replaces a browser-only session with a persistent 90-day session.",
+  "scenario": "Sara signs in on Tom's shared computer with 'Keep me signed in' unchecked, then completes her first phone verification. Verification silently changes her login into one that persists after the browser closes. Tom can subsequently reopen the browser into Sara's account without her password.",
+  "evidence": [
+   "frontend_web/src/pages/login.tsx:59",
+   "frontend_web/src/pages/MobileOTPVerify.tsx:79",
+   "backend/users/serializers.py:365",
+   "backend/users/api_otp.py:477",
+   "backend/users/api_otp.py:489",
+   "backend/users/sessions.py:43",
+   "backend/core/settings.py:495"
+  ],
+  "confidence": "high",
+  "test_needed": "Log Sara in with remember_me=false, complete phone verification, and assert that the replacement auth cookies remain session cookies rather than gaining a persistent expiry.",
+  "owner_question": {
+   "question": "When Sara completes phone verification after declining 'Keep me signed in', how should her login behave on Tom's computer?",
+   "options": [
+    "Preserve Sara's choice and end the browser session when it closes",
+    "Require Sara to sign in again after verification",
+    "Create a persistent 90-day session (keep today's behaviour)"
+   ]
+  },
+  "chunk": "F11",
+  "reviewer": "codexA-4"
  }
 ]

@@ -91,3 +91,50 @@ C062-N2 | Mobile | Adding several availability dates at once can half-save, show
 C063-N1 | Mobile | Mobile chat people search never finds anyone, so New Chat, New Group and Add members do not work in the Expo app.
 C079-N1 | Shifts | Editing a shift replaces its saved per-date rates
 C079-N2 | Shifts | Manual shift times revert to pharmacy opening hours
+F01-N1 | Shifts/Privacy | Workers browsing shifts can see the names and emails of other workers who are booked on the shift or waiting for payment.
+F01-N2 | Shifts/Billing | Editing a shift after a worker has accepted but before payment either locks the worker into new dates they never agreed to, or takes the payment without booking anyone.
+F01-N3 | Shifts/Billing | A worker or manager can silently delete a shift offer, including one that is accepted and waiting for payment, so payment can be taken with nobody booked.
+F01-N4 | Shifts/Notifications | When a worker accepts or declines, the 'payment needed' or 'declined' notice goes to the pharmacy owner, not the admin who posted the shift.
+F01-N5 | Billing | A 'Casual employee' shift is charged the $80 part/full-time job fee instead of the $30 per-shift locum fee.
+F02-N1 | Shifts/Billing | Deleting a partly filled posting from Active Shifts silently removes the workers already booked on its other dates, with no notice, no cancellation charge and no history check.
+F02-N2 | Workforce/Shifts | Cover requests from the web and mobile worker screens are never linked to the worker's assignment, so approving one never releases the worker.
+F02-N3 | Roster | Removing or escalating an assignment from the owner roster page unbooks the worker silently, including paid marketplace bookings, and skips the attendance/leave history check.
+F03-N1 | Pharmacy admins | A staff member whose admin role was removed can give it back to themselves by accepting it as a pending admin invitation.
+F03-N2 | Memberships / Pharmacy admins | When the owner removes a staff member who is also a pharmacy admin, their admin rights stay on, but when they quit themselves the rights are switched off.
+F03-N3 | Re-invite | Re-inviting someone who left as an admin brings back their old admin role the moment they accept a plain staff invitation.
+F03-N4 | Roster / Attendance | Removing a staff member leaves all their future rostered shifts in place, so the roster looks covered and they can still clock in as rostered.
+F03-N5 | Memberships / Records | Deleting a staff membership also deletes that person's past work-note completions and their contracted-hours settings.
+F04-N1 | Shifts/Privacy | Any worker who can see a shift can download the staff list of that pharmacy, or of its whole organisation, through the shift's member-status page.
+F04-N2 | Shifts/Organizations | Editing a shift can move it into another owner's pharmacy and overwrite that pharmacy's saved pay rates.
+F04-N3 | Memberships | A pharmacy manager can silently make any registered person an active staff member, with no invitation, email or consent.
+F05-N1 | Onboarding / Public shifts | A New to pharmacy account can apply for public shifts without ever being verified, though the same profile is blocked from posting on the talent hub.
+F05-N2 | Onboarding / Shift confirmation | A New to pharmacy person who is offered a shift can never confirm it, because the confirm step looks for a pharmacy team profile they cannot have.
+F05-N3 | Shift confirmation / Role gate | Nothing checks that the person confirming an offer holds the role the shift needs, so a technician or intern can be booked into a pharmacist shift.
+F06-N1 | Payroll | Locking a period always produces an empty payroll handoff.
+F06-N2 | Attendance and timesheets | Rejecting provisional attendance permanently blocks the whole timesheet period.
+F06-N3 | Attendance corrections | Clock corrections across pay-period boundaries can drop worked minutes.
+F06-N4 | Leave notifications | Requests made through My Leave bypass request and decision notifications.
+F07-N1 | Invoicing | Both invoice editors block saving an invoice prefilled from an accepted shift.
+F07-N2 | Payments | Marking an invoice paid leaves its balance and cash worksheet unchanged.
+F07-N3 | Finance summaries | Saving an invoice revision removes its recorded receipts from the cash worksheet.
+F07-N4 | Invoice delivery | Finishing an older invoice email can publish a newer unsent revision.
+F07-N5 | Invoice documents | Current finance invoice PDFs are labelled draft even after delivery.
+F07-N6 | Superannuation | A separate super request cannot be corrected when its service invoice changes.
+F08-N1 | Billing | Repeating subscription setup can create multiple recurring charges for the same plan.
+F08-N2 | Billing | Subscriptions remain active after Stripe marks them unpaid.
+F08-N3 | Billing | An open checkout can charge Tom after its shift has been deleted.
+F08-N4 | Billing | Staff can join beyond the purchased seat count without an additional charge.
+F08-N5 | Billing | Deleting Tom's account leaves his recurring Stripe charges running.
+F09-N1 | Hub privacy | Deleting a restricted Hub group exposes its posts to the whole pharmacy.
+F09-N2 | Notification privacy | Removed Hub group members still receive new private comment text.
+F09-N3 | Push notification privacy | Mobile sign-out leaves private message previews enabled on the signed-out device.
+F09-N4 | Hub permissions | Users without pharmacy memberships can overwrite or delete each other's Hub polls.
+F10-N1 | Talent | Any signed-in account can identify authors of anonymous talent posts.
+F10-N2 | Public job board | Public search can identify pharmacies behind anonymous vacancies.
+F10-N3 | Rewards | Concurrent claims can award multiple rewards for the same referral.
+F10-N4 | Ethical marketplace | Bulk ethical reads bypass the viewer's approved medicine schedules.
+F10-N5 | Ethical marketplace | Valid premises applications fail after saving because the response uses an undefined variable.
+F10-N6 | Ethical marketplace | Ethical offers disclose full stock-lot records to viewers without inventory access.
+F11-N1 | Auth | Changing a pending phone number leaves the previous number's verification code usable.
+F11-N2 | Auth | Signing out of Expo leaves private push notifications active on that device.
+F11-N3 | Auth | Phone verification replaces a browser-only session with a persistent 90-day session.
