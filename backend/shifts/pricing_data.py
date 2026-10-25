@@ -13,6 +13,7 @@ from pathlib import Path
 DATA_DIR = Path(__file__).resolve().parent / "data"
 AWARD_RATES_FILE = DATA_DIR / "award_rates_casual_first_level.json"
 PUBLIC_HOLIDAYS_FILE = DATA_DIR / "public_holidays.json"
+LOCAL_PUBLIC_HOLIDAYS_FILE = DATA_DIR / "public_holidays_local.json"
 
 DAY_TYPES = ("weekday", "saturday", "sunday", "public_holiday")
 TIME_BUCKETS = ("early_morning", "late_night")
@@ -170,6 +171,40 @@ def public_holidays():
     return data
 
 
+@lru_cache(maxsize=1)
+def local_public_holidays():
+    """Declared location-scoped and part-day dates, with explicit pending years."""
+    data = _read_json(LOCAL_PUBLIC_HOLIDAYS_FILE)
+    if not isinstance(data, dict) or data.get("schema_version") != 1:
+        raise PricingDataError(f"{LOCAL_PUBLIC_HOLIDAYS_FILE.name}: unsupported calendar schema")
+    if not isinstance(data.get("regions"), dict) or not isinstance(
+        data.get("statewide_part_days"), list
+    ):
+        raise PricingDataError(f"{LOCAL_PUBLIC_HOLIDAYS_FILE.name}: missing region or part-day data")
+    for region_code, record in data["regions"].items():
+        if (
+            not isinstance(record, dict)
+            or region_code != str(region_code).strip().upper()
+            or record.get("state") not in REQUIRED_STATE_CODES
+            or not region_code.startswith(record["state"] + "_")
+            or not isinstance(record.get("events"), list)
+            or not isinstance(record.get("pending_years"), list)
+            or not isinstance(record.get("verified_years"), list)
+        ):
+            raise PricingDataError(f"{LOCAL_PUBLIC_HOLIDAYS_FILE.name}: invalid region {region_code}")
+        if set(record["pending_years"]) & set(record["verified_years"]):
+            raise PricingDataError(f"{LOCAL_PUBLIC_HOLIDAYS_FILE.name}: conflicting region year {region_code}")
+        for entry in record["events"]:
+            try:
+                parsed = date.fromisoformat(entry["date"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise PricingDataError(f"{LOCAL_PUBLIC_HOLIDAYS_FILE.name}: bad event date in {region_code}") from exc
+            if parsed.year not in record["verified_years"]:
+                raise PricingDataError(f"{LOCAL_PUBLIC_HOLIDAYS_FILE.name}: unverified local event in {region_code}")
+    return data
+
+
 def reset_cache():
     award_rates.cache_clear()
     public_holidays.cache_clear()
+    local_public_holidays.cache_clear()
