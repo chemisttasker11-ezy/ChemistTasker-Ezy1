@@ -8,85 +8,107 @@
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/ActiveShiftCards.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "ActiveShiftCards.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "ActiveShiftCards.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Candidates/CommunityLevelView.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "CommunityLevelView.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "CommunityLevelView.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Candidates/CounterOfferList.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "CounterOfferList.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "CounterOfferList.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Candidates/PublicLevelView.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "PublicLevelView.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "PublicLevelView.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Candidates/SlotSelector.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "SlotSelector.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "SlotSelector.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Candidates/StatusCard.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "StatusCard.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "StatusCard.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Dialogs/CounterOfferDialog.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "CounterOfferDialog.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "CounterOfferDialog.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Dialogs/DeleteConfirmDialog.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "DeleteConfirmDialog.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "DeleteConfirmDialog.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Escalation/EscalationStepper.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "EscalationStepper.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "EscalationStepper.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useCounterOffers.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "useCounterOffers.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 24-83): Per-shift counter-offer review loads and maps offers, resolves slot ID from payload, and calls shared acceptShiftCounterOfferService or rejectShiftCounterOfferService. It must not trust offer slot/user IDs without backend ownership checks. Test contract: Negative: another pharmacy's offer ID and conflicting slot allocation; positive: selected offer accepted for eligible slot once. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        24,
+        83
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useRevealInterest.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "useRevealInterest.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked."
+      "note": "useRevealInterest.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShareShift.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "useShareShift.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked."
+      "note": "useShareShift.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "useShiftActions.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 15-71): Poster actions call shared escalateShiftService, deleteActiveShiftService and acceptShiftCandidateService. The delete call is a direct destructive endpoint, with no local check of paid assignments or attendance and is shared with Vite. Test contract: Negative: delete partly booked/paid or already attended shift, confirm server refusal and correct notice; positive: delete unbooked draft succeeds. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        15,
+        71
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftsData.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "useShiftsData.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked."
+      "note": "useShiftsData.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useTabData.ts",
@@ -94,13 +116,19 @@
       "ids": [
         "F04-N1"
       ],
-      "note": "useTabData.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 20-90): The tab-data hook fetches interests and per-slot member status via fetchShiftMemberStatus. F04-N1 is a backend object-scope bug affecting these member lists even if UI selects the correct visibility. Test contract: Negative: external authenticated worker requests FULL_PART_TIME member_status for public shift; positive: scoped manager sees only own pharmacy. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        20,
+        90
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useWorkerRatings.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "useWorkerRatings.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked."
+      "note": "useWorkerRatings.ts calls canonical shared-core offer, candidate, reveal, escalation or rating services; backend authorization, transaction and refund issues B54/B67-B71 tracked.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx",
@@ -109,20 +137,29 @@
         "B54",
         "B67"
       ],
-      "note": "index.tsx controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 119-149): Poster active shift screen calls payShiftWithPills then loadShifts, or chargeShiftFulfillment and opens the Stripe checkout URL. Payment/slot lock is a server-managed lifecycle; checkout can outlive the shift if it is deleted via the same page, as F08-N3 documents. Test contract: Negative: delete after opening checkout; concurrent payment/offer acceptance; positive: valid paid offer finalized once with durable record. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        119,
+        149
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/styles.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "styles.ts controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "styles.ts controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/theme.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "theme.ts controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests."
+      "note": "theme.ts controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     }
   ],
-  "findings": []
+  "findings": [],
+  "targeted_recheck_files": 4,
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3"
 }
