@@ -30,7 +30,7 @@ class Phase5ManualRosterRole(TestCase):
         shift = Shift.objects.create(
             pharmacy=self.pharmacy, created_by=self.owner,
             role_needed=role, employment_type="FULL_TIME",
-            visibility="FULL_PART_TIME",
+            visibility="FULL_PART_TIME", min_hourly_rate=75, max_hourly_rate=75,
         )
         slot = ShiftSlot.objects.create(
             shift=shift, date=self.day,
@@ -84,6 +84,7 @@ class Phase5OfferPaymentReservation(TestCase):
             pharmacy=pharmacy, created_by=owner,
             role_needed="TECHNICIAN", employment_type="FULL_TIME",
             visibility="FULL_PART_TIME", single_user_only=False,
+            min_hourly_rate=75, max_hourly_rate=75,
         )
         slot = ShiftSlot.objects.create(
             shift=shift, date=day, rate=75,
