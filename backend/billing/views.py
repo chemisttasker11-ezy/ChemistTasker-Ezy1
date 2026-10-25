@@ -873,6 +873,9 @@ def _process_stripe_event(event):
 
                 owner_id = metadata.get('owner_user_id') or metadata.get('billing_contact_user_id') or metadata.get('actor_user_id')
 
+                if not session.get('payment_intent'):
+                    raise ValueError('Paid Stripe checkout missing required payment_intent.')
+
                 # Distinct Stripe webhook event IDs may describe the same
                 # payment intent. Never create a second local paid ledger debit.
                 payment, created = ShiftPayment.objects.get_or_create(

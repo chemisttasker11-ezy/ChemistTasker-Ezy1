@@ -102,6 +102,16 @@ class ShiftPayment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(blank=True, null=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("stripe_payment_intent_id",),
+                condition=models.Q(stripe_payment_intent_id__isnull=False)
+                & ~models.Q(stripe_payment_intent_id=""),
+                name="billing_unique_nonempty_payment_intent",
+            ),
+        ]
+
     def __str__(self):
         return f"{self.get_payment_type_display()} - {self.owner.email} - ${self.amount_aud} ({self.status})"
 
