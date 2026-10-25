@@ -52,6 +52,23 @@ class TenantIsolationContracts(TestCase):
         note.refresh_from_db()
         self.assertEqual(note.pharmacy_id, self.a.pk)
 
+    def test_f04_private_staff_member_status_denies_external_shift_viewer(self):
+        shift = Shift.objects.create(
+            pharmacy=self.b, created_by=self.owner_b,
+            role_needed="PHARMACIST", employment_type="LOCUM",
+            visibility="PLATFORM", single_user_only=True,
+        )
+        member, _membership = make_staff_member(self.b, role="PHARMACIST")
+        outsider = client_for(self.outsider)
+        response = outsider.get(
+            f"/api/v1/shifts/{shift.pk}/member_status/?visibility=FULL_PART_TIME"
+        )
+        self.assertIn(response.status_code, (403, 404), response.data)
+        manager_response = client_for(self.owner_b).get(
+            f"/api/v1/shifts/{shift.pk}/member_status/?visibility=FULL_PART_TIME"
+        )
+        self.assertEqual(manager_response.status_code, 200, manager_response.data)
+
     def invoice_payload(self):
         return {
             "pharmacy": self.b.pk, "external": False, "status": "paid",

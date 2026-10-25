@@ -31,7 +31,7 @@ from shifts.models import (
 )
 from rest_framework.response import Response
 from rest_framework.permissions import SAFE_METHODS
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
 from organizations.access import managed_pharmacies, user_can_manage_pharmacy
@@ -167,6 +167,8 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     _apply_escalation = staticmethod(apply_escalation)
 
     def _build_member_status_response(self, request, shift):
+        if not user_can_manage_pharmacy(request.user, shift.pharmacy):
+            raise PermissionDenied('Only pharmacy managers can view staff response status.')
         return Response(member_status(
             shift=shift,
             requested_visibility=request.query_params.get('visibility'),
