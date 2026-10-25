@@ -1,0 +1,8 @@
+# PR200 Phase 5 — six P0/P1 permission source challenges
+
+## Phase 5 high-priority authorisation challenge — 25 October 2026
+- Exact audit head `16b174666fa122fcba8f641e4eb1e080aebf4604` added six targeted HTTP scenarios in `backend/qa_release/test_pr200_phase5_p0_authz.py` with an independent `pr200_targeted_p0_authz.yml` job; [run 40187156554](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187156554) was IN PROGRESS at this record. Do not upgrade S3 statuses until complete log and passing controls are checked.
+- Source-scope challenges: B16 roster-only manager generic PharmacyAdmin PATCH; B17 owner chain generic pharmacy_ids PATCH foreign pharmacy; B18 organization claimant full PUT bypassing owner-only partial_update; B19 generic link PATCH retarget; B22 organization poll list includes sibling pharmacy poll despite organization post list restricting to org-tagged; B20 self-owned ShiftInterest serializer writable shift FK. These are independently traced source hypotheses; endpoint tests may refute or refine them.
+- No application code, migrations, merge, deploy or separate PR201 modification; source baseline remains `b77e9fd2`. Prior certified test baseline remains **32 isolated runtime IDs / 36 accumulated negative assertions**, with **226 raw historical IDs preserved** until test proof is available. S2 independent 99% NOT CERTIFIED; Phase 5 OPEN, Phase 6 on hold, NO-GO.
+
+Specific negative/positive controls are in the committed Django test. The test must reach endpoint mutation, and fixtures must pass before calling a red failure proof. No synthetic test alone constitutes staged exploitation.
