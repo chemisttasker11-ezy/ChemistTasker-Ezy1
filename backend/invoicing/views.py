@@ -1,7 +1,8 @@
 """Invoice API: list, detail, generation from shifts, preview, PDF, email and issue reports."""
 from rest_framework import generics, permissions, status
 from organizations.models import Pharmacy
-from shifts.models import Shift
+from shifts.models import Shift, ShiftSlotAssignment
+from memberships.models import Membership
 from invoicing.models import Invoice
 from notifications.models import Notification
 from rest_framework.response import Response
@@ -10,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import api_view, permission_classes
-from organizations.access import pharmacies_user_admins
+from organizations.access import pharmacies_user_admins, user_can_manage_pharmacy
 from django.shortcuts import get_object_or_404
 import json
 from django.db.models import F, Q
@@ -29,6 +30,19 @@ from invoicing.navigation import invoice_action_url
 
 
 # Invoices
+def _can_link_invoice_to_pharmacy(user, pharmacy):
+    if user_can_manage_pharmacy(user, pharmacy):
+        return True
+    if Membership.objects.filter(
+        user=user, pharmacy=pharmacy,
+        status=Membership.Status.ACCEPTED, is_active=True,
+    ).exists():
+        return True
+    return ShiftSlotAssignment.objects.filter(
+        user=user, shift__pharmacy=pharmacy,
+    ).exists()
+
+
 def _invoice_queryset_for_user(user):
     if not user or not getattr(user, "is_authenticated", False):
         return Invoice.objects.none()
@@ -65,6 +79,9 @@ class InvoiceListView(generics.ListCreateAPIView):
         return _invoice_queryset_for_user(self.request.user)
 
     def perform_create(self, serializer):
+        pharmacy = serializer.validated_data.get('pharmacy')
+        if pharmacy and not _can_link_invoice_to_pharmacy(self.request.user, pharmacy):
+            raise PermissionDenied("You cannot link an invoice to this pharmacy.")
         serializer.save(user=self.request.user)
 
 
@@ -82,6 +99,9 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
         requested_fields = set(self.request.data.keys())
 
         if invoice.user_id == user.id:
+            destination = serializer.validated_data.get('pharmacy', invoice.pharmacy)
+            if getattr(destination, 'pk', None) != invoice.pharmacy_id:
+                raise PermissionDenied("Invoice pharmacy cannot be changed in the legacy editor.")
             if invoice.request_key is not None:
                 raise PermissionDenied(
                     "This invoice is managed by the new Invoices & finances workspace. "
