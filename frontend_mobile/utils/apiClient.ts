@@ -2,7 +2,7 @@ import { AHPRA_UNREADABLE_MESSAGE, reportAhpraError } from '@chemisttasker/share
 // utils/apiClient.ts
 import axios from 'axios';
 import { Platform } from 'react-native';
-import { clearStoredSession, getValidAccessToken, refreshAccessToken } from './authSession';
+import { clearStoredSession, getSessionGeneration, getValidAccessToken, refreshAccessToken } from './authSession';
 import { getBrowserCsrfToken } from './browserAuth';
 import { resolveApiBaseUrl } from './apiUrl';
 
@@ -34,6 +34,11 @@ const apiClient = axios.create({
 // Cookie-based auth fallback AND Bearer token injection
 apiClient.interceptors.request.use(
     async (config) => {
+        const generation = getSessionGeneration();
+        if ((config as any)._sessionGeneration != null && (config as any)._sessionGeneration !== generation) {
+            throw new axios.CanceledError();
+        }
+        (config as any)._sessionGeneration = generation;
         config.withCredentials = IS_WEB;
         config.headers['X-Client-Platform'] = CLIENT_PLATFORM;
         if (IS_WEB && !['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
@@ -49,6 +54,7 @@ apiClient.interceptors.request.use(
         } catch (e) {
             // Ignore storage errors
         }
+        if (generation !== getSessionGeneration()) throw new axios.CanceledError();
         return config;
     },
     (error) => {
@@ -75,6 +81,8 @@ apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
+        const generation = originalRequest?._sessionGeneration ?? getSessionGeneration();
+        if (generation !== getSessionGeneration()) return Promise.reject(error);
         reportAhpraError(error.response?.data);
         if (error.response?.data?.code === 'ahpra_unreadable') {
           error.message = AHPRA_UNREADABLE_MESSAGE;
@@ -100,6 +108,7 @@ apiClient.interceptors.response.use(
 
             try {
                 const nextToken = await refreshAccessToken(API_BASE_URL);
+                if (generation !== getSessionGeneration()) throw new axios.CanceledError();
                 if (!nextToken) {
                     throw new Error('Refresh failed');
                 }
@@ -109,7 +118,7 @@ apiClient.interceptors.response.use(
                 return apiClient(originalRequest);
             } catch (refreshError) {
                 processQueue(refreshError, null);
-                await clearStoredSession();
+                if (generation === getSessionGeneration()) await clearStoredSession();
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
