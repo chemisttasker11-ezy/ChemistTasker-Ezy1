@@ -76,6 +76,78 @@
       ],
       "status": "NOT_DUPLICATE",
       "reason": "Mobile chat send error UI missing feedback differs from backend authorization defect allowing revoked chat member to send."
+    },
+    {
+      "canonical": "F07-N2",
+      "aliases": [
+        "C026-N1"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same worker_finance invoice mark_paid operation changes status without a payment record; cash worksheet/balance remain unchanged. Both cite backend/worker_finance/views.py ~243/251, 498/506."
+    },
+    {
+      "canonical": "F07-N4",
+      "aliases": [
+        "C026-N2"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same email-send completion vs later invoice revision race in worker_finance/views.py ~272-315; same unsent revision exposure."
+    },
+    {
+      "canonical": "F07-N6",
+      "aliases": [
+        "C025-N2"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same worker_finance separate super_document amount not updated after parent invoice revision; both cite services.py ~606/690/894."
+    },
+    {
+      "canonical": "F06-N1",
+      "aliases": [
+        "C028-N1"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same timesheet_builder payroll manifest empty handoff after locking; F06 and C028 cite timesheet_builder.py:183."
+    },
+    {
+      "canonical": "F01-N1",
+      "aliases": [
+        "C021-N1"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same worker PII projection in public shift response via shifts/lifecycle.py:393 and serialization/shifts.py, including assigned and payment-pending workers."
+    },
+    {
+      "canonical": "F10-N3",
+      "aliases": [
+        "C019-N1"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same concurrent friend-referral claim duplicated Pill reward, both cite rewards/views.py:139 and rewards/services.py:297."
+    },
+    {
+      "canonical": "C020-N6",
+      "aliases": [
+        "C021-N3"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same multi-date recurring offer acceptance/engagement code assigns all recurring occurrences, even when the counteroffer covered only one, both cite shifts/counter_offers.py:188 and engagement.py:268/271."
+    },
+    {
+      "canonical": "C045-N2",
+      "aliases": [
+        "C027-N4"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same worker roster endpoint and serializer exposes coworker leave type/note via workforce/roster/views.py and serializers.py:138."
+    },
+    {
+      "canonical": "C028-N4",
+      "aliases": [
+        "F06-N3"
+      ],
+      "status": "RELATED_DISTINCT_TIME_WINDOW_DEFECTS",
+      "reason": "Both concern overnight corrections, but C028 says signals mark only one period dirty while F06 says timesheet split builder drops minutes even on rebuild; require separate remediation and tests."
     }
   ],
   "refuted": [
@@ -97,5 +169,6 @@
     "B70": "Recurring base and extra-seat subscription creation; source overlap F08-N1",
     "B71": "Acceptance notification transaction ordering; not completed"
   },
-  "policy": "Preserve all source finding IDs with canonical/alias relationships; never silently delete historical candidates; exclude REFUTED_SOURCE from active blocker counts; S3 remains not executed."
+  "policy": "Preserve all source finding IDs with canonical/alias relationships; never silently delete historical candidates; exclude REFUTED_SOURCE from active blocker counts; S3 remains not executed.",
+  "review_update": "2026-10-25 extended duplicate triage from detailed C/F scenarios and overlapping immutable evidence paths; S3 unexecuted; root-group labels not runtime proven"
 }
