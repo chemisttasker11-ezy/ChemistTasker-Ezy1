@@ -134,6 +134,12 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Shift.objects.filter(pharmacy__in=managed_pharmacies_for(self.request.user))
 
+    def perform_create(self, serializer):
+        pharmacy = serializer.validated_data['pharmacy']
+        if not user_can_manage_pharmacy(self.request.user, pharmacy):
+            self.permission_denied(self.request)
+        serializer.save()
+
     def perform_destroy(self, instance):
         if any(_slot_locked_by_published_roster(slot) for slot in instance.slots.select_related("shift")):
             raise DRFValidationError(

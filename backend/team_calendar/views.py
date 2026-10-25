@@ -282,6 +282,11 @@ class CalendarEventViewSet(
             if not is_org_admin:
                 raise PermissionDenied("Only organization admins can edit organization-level events.")
         
+        dest_pharmacy = serializer.validated_data.get('pharmacy', event.pharmacy)
+        dest_organization = serializer.validated_data.get('organization', event.organization)
+        if (getattr(dest_pharmacy, 'pk', None) != event.pharmacy_id
+                or getattr(dest_organization, 'pk', None) != event.organization_id):
+            raise PermissionDenied("Cannot reassign a calendar event to another pharmacy or organization.")
         serializer.save()
     
     def perform_destroy(self, instance):
@@ -380,6 +385,9 @@ class WorkNoteViewSet(
         if not self.can_create_work_notes(self.request.user, note.pharmacy_id):
             raise PermissionDenied("You don't have permission to edit this work note.")
         
+        target = serializer.validated_data.get('pharmacy', note.pharmacy)
+        if getattr(target, 'pk', None) != note.pharmacy_id:
+            raise PermissionDenied("Cannot reassign a work note to another pharmacy.")
         serializer.save()
     
     def perform_destroy(self, instance):
@@ -500,7 +508,9 @@ class CalendarFeedView(CalendarScopeMixin, viewsets.ViewSet):
                 Pharmacy.objects.filter(organization_id=organization_id)
                 .values_list('id', flat=True)
             )
-            work_note_query = work_note_query.filter(pharmacy_id__in=org_pharmacy_ids)
+            work_note_query = work_note_query.filter(
+                pharmacy_id__in=set(org_pharmacy_ids) & set(accessible_pharmacy_ids)
+            )
         else:
             event_query = event_query.filter(
                 Q(pharmacy_id__in=accessible_pharmacy_ids) | 

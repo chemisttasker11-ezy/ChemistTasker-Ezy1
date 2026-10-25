@@ -137,6 +137,18 @@ class ShiftSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        if self.instance is not None:
+            target = attrs.get('pharmacy')
+            if target is not None and target.pk != self.instance.pharmacy_id:
+                raise serializers.ValidationError({'pharmacy': 'Shift pharmacy cannot change during edit.'})
+            submitted = (getattr(self, 'initial_data', {}) or {}).get('payment_status')
+            if submitted is not None and submitted != self.instance.payment_status:
+                raise serializers.ValidationError({'payment_status': 'Only billing may change payment status.'})
+        else:
+            submitted = (getattr(self, 'initial_data', {}) or {}).get('payment_status')
+            if submitted not in (None, 'NOT_REQUIRED'):
+                raise serializers.ValidationError({'payment_status': 'Only billing may change payment status.'})
+        attrs.pop('payment_status', None)
         role = attrs.get('role_needed') or getattr(self.instance, 'role_needed', None)
         # Revalidate the complete requirement set when the vacancy role changes.
         # PATCH must not keep pharmacist-only requirements on a technician shift.
