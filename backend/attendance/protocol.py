@@ -257,6 +257,11 @@ def ingest_offline_event(device, raw_event):
         "HASH_CHAIN_MISMATCH",
         "UNEXPECTED_INITIAL_HASH",
         "DEVICE_REVOKED_DRAIN",
+        # Signed does not imply the kiosk clock is trustworthy. Keep
+        # suspicious evidence provisional until an explicit manager decision.
+        "CLOCK_MOVED_BACKWARDS",
+        "CLOCK_ANCHOR_DRIFT",
+        "SERVER_TIME_DRIFT",
     }
     if employee is not None and employee.is_active and not blocking_flags.intersection(flags):
         try:
