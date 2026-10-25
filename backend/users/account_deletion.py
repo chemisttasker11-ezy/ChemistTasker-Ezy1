@@ -90,6 +90,10 @@ def _revoke_user_tokens(user):
 
 
 def _anonymize_user(user):
+    from django.db.models import Q
+    from talent.models import ExplorerPost
+
+    ExplorerPost.objects.filter(Q(author_user=user) | Q(explorer_profile__user=user)).delete()
     original_email = (user.email or "").strip()
     update_fields = ["is_active", "deleted_at"]
 

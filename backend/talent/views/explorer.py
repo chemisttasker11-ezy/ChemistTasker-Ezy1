@@ -62,7 +62,12 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         from ratings.models import Rating
 
-        return super().get_queryset().annotate(
+        qs = super().get_queryset()
+        if self.action == "list" and self.request.query_params.get("mine") == "true":
+            qs = qs.filter(Q(author_user=self.request.user) | Q(explorer_profile__user=self.request.user))
+        elif self.action not in ("update", "partial_update", "destroy"):
+            qs = qs.filter(pk__in=[post.pk for post in self._visible_posts(qs)])
+        return qs.annotate(
             rating_average=Avg(
                 "author_user__ratings_received_as_worker__stars",
                 filter=Q(author_user__ratings_received_as_worker__direction=Rating.Direction.OWNER_TO_WORKER),
@@ -179,7 +184,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         """
         Newest-first feed. (Extend with follow-graph later if needed.)
         """
-        qs = self._visible_posts(self.filter_queryset(self.get_queryset()))
+        qs = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(qs)
         ser = ExplorerPostReadSerializer(page or qs, many=True, context={"request": request})
         if page is not None:
@@ -191,7 +196,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         """
         Public feed for non-authenticated users.
         """
-        qs = self._visible_posts(self.filter_queryset(self.get_queryset()))
+        qs = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(qs)
         ser = PublicExplorerPostReadSerializer(page or qs, many=True, context={"request": request})
         if page is not None:
@@ -200,7 +205,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path=r"by-profile/(?P<profile_id>[^/.]+)")
     def by_profile(self, request, profile_id=None):
-        qs = self._visible_posts(self.get_queryset().filter(explorer_profile_id=profile_id))
+        qs = self.get_queryset().filter(explorer_profile_id=profile_id)
         page = self.paginate_queryset(qs)
         ser = ExplorerPostReadSerializer(page or qs, many=True, context={"request": request})
         if page is not None:

@@ -468,10 +468,12 @@ class PublicShiftViewSet(BaseShiftViewSet):
 
         if search:
             qs = qs.filter(
-                Q(pharmacy__name__icontains=search) |
                 Q(pharmacy__suburb__icontains=search) |
-                Q(pharmacy__street_address__icontains=search) |
-                Q(role_needed__icontains=search)
+                Q(role_needed__icontains=search) |
+                (Q(post_anonymously=False) & (
+                    Q(pharmacy__name__icontains=search) |
+                    Q(pharmacy__street_address__icontains=search)
+                ))
             )
         if roles:
             qs = qs.filter(role_needed__in=roles)
@@ -588,10 +590,12 @@ class PublicJobBoardView(generics.ListAPIView):
 
         if search:
             qs = qs.filter(
-                Q(pharmacy__name__icontains=search) |
                 Q(pharmacy__suburb__icontains=search) |
-                Q(pharmacy__street_address__icontains=search) |
-                Q(role_needed__icontains=search)
+                Q(role_needed__icontains=search) |
+                (Q(post_anonymously=False) & (
+                    Q(pharmacy__name__icontains=search) |
+                    Q(pharmacy__street_address__icontains=search)
+                ))
             )
         if roles:
             qs = qs.filter(role_needed__in=roles)

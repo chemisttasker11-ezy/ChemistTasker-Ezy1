@@ -65,8 +65,42 @@ class ExplorerVisibilityTests(TestCase):
         rows = body["results"] if isinstance(body, dict) else body
         self.assertEqual(sorted(r["headline"] for r in rows), ["fulltime", "live", "undated"])
 
-    def test_plain_list_is_not_filtered_by_visibility(self):
-        self.assertEqual(len(self._headlines("")), 4)
+    def test_plain_list_uses_the_feed_visibility_rule(self):
+        self.assertEqual(self._headlines(""), ["fulltime", "live", "undated"])
+
+    def test_hidden_and_expired_posts_cannot_be_read_or_reacted_to(self):
+        profile = ExplorerOnboarding.objects.create(user=self.author, verified=True)
+        hidden = post_for(self.author, "hidden", explorer_profile=profile, hidden_at=timezone.now())
+        self.expired.explorer_profile = profile
+        self.expired.save(update_fields=["explorer_profile"])
+        for post in (hidden, self.expired):
+            for suffix in ("", "view/", "like/", "unlike/"):
+                with self.subTest(post=post.headline, suffix=suffix):
+                    client = client_for(self.viewer)
+                    request = client.post if suffix else client.get
+                    self.assertEqual(request(f"{URL}{post.pk}/{suffix}").status_code, 404)
+        self.assertEqual(self._headlines(""), ["fulltime", "live", "undated"])
+        self.assertEqual(self._headlines(f"by-profile/{profile.pk}/"), [])
+        for viewer, path in ((None, "public-feed/"), (self.viewer, "feed/")):
+            response = client_for(viewer).get(URL + path, {"mine": "true"})
+            self.assertEqual({row["headline"] for row in response.data["results"]}, {"fulltime", "live", "undated"})
+        self.assertEqual(client_for(self.viewer).get(f"{URL}{self.live.pk}/").status_code, 200)
+        self.assertEqual(client_for(self.viewer).post(f"{URL}{self.live.pk}/like/").status_code, 200)
+        self.assertEqual(client_for(self.viewer).post(f"{URL}{self.live.pk}/view/").status_code, 200)
+
+    def test_mine_keeps_expired_posts_available_only_to_their_owner(self):
+        profile = ExplorerOnboarding.objects.create(user=self.author, verified=True)
+        legacy = ExplorerPost.objects.create(explorer_profile=profile, headline="legacy", hidden_at=timezone.now())
+        for user, expected in ((self.author, {self.live.pk, self.expired.pk, self.undated.pk, self.fulltime_old.pk, legacy.pk}),
+                               (self.viewer, set())):
+            response = client_for(user).get(URL + "?mine=true")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual({row["id"] for row in response.data["results"]}, expected)
+        response = client_for(self.author).patch(
+            f"{URL}{self.expired.pk}/", {"availability_days": [str(timezone.localdate() + timedelta(days=7))]}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn("expired", self._headlines("feed/"))
+
 
 
 class ExplorerCreatePermissionTests(TestCase):

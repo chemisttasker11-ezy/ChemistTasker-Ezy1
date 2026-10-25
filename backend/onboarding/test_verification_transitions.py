@@ -241,6 +241,28 @@ class VerificationStateTests(TestCase):
 
 
 class NewcomerTransitionTests(TestCase):
+    def test_emailed_decline_requires_a_signed_token_and_cancels_the_reminder(self):
+        from urllib.parse import urlsplit
+        from onboarding.emails import send_referee_emails
+
+        user, profile, post = newcomer(age=30, referee1_name='Dr Lee', referee1_email='lee@example.test')
+        with mock.patch('onboarding.emails.async_task') as send, mock.patch('onboarding.verification.reminders.schedule_referee_reminder'):
+            send_referee_emails(profile)
+        decline_path = urlsplit(send.call_args.kwargs['context']['reject_url']).path
+        token = decline_path.rsplit('/', 1)[-1]
+        self.assertTrue(decline_path.endswith('/onboarding/referee-reject/' + token))
+        with mock.patch('onboarding.views.cancel_referee_reminder') as cancel:
+            response = client_for(None).post(BASE + 'onboarding/referee-reject/' + token + 'forged/', {}, format='json')
+            self.assertEqual(response.status_code, 403)
+            profile.refresh_from_db()
+            self.assertFalse(profile.referee1_rejected)
+            cancel.assert_not_called()
+            response = client_for(None).post(BASE + decline_path.lstrip('/') + '/', {}, format='json')
+            self.assertEqual(response.status_code, 200, response.data)
+            profile.refresh_from_db()
+            self.assertTrue(profile.referee1_rejected)
+            cancel.assert_called_once_with('exploreronboarding', profile.pk, 1)
+
     def test_under_18_name_does_not_depend_on_the_post_link(self):
         user, profile, post = newcomer()
         response = client_for(user).patch(BASE + f'explorer-posts/{post.pk}/', {'explorer_profile': None}, format='json')
