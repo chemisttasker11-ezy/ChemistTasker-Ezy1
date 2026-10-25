@@ -396,7 +396,7 @@
     },
     {
       "id": "B68",
-      "status": "SOURCE_SUPPORTED_CONDITIONAL",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "Stripe invoice.paid does local subscription ID lookup then falls back to any owner subscription sharing customer; marks active and may bind unmatched external subscription ID. Requires provider-side mismatched-ID scenario.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L227",
@@ -408,11 +408,12 @@
       "existing_test_gap": "Signed provider event fixtures needed; existing retry tests don't cover mismatched subscriptions.",
       "reviewer": "gpt6_same_assistant_20261025",
       "independent_second_agent": "NOT_CERTIFIED",
-      "runtime": "NOT_REPRODUCED"
+      "runtime": "Paid invoice with unknown sub ID but matching customer activated unrelated tracked subscription.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029"
     },
     {
       "id": "B69",
-      "status": "SOURCE_SUPPORTED",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "Repeated cancellation penalty requests each create Checkout; webhook dedupes by event ID, while ShiftPayment has no per-obligation/payment-intent unique constraint, permitting separate paid records.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L699",
@@ -424,11 +425,12 @@
       "existing_test_gap": "Same-event idempotency test doesn't cover cross-session duplicate.",
       "reviewer": "gpt6_same_assistant_20261025",
       "independent_second_agent": "NOT_CERTIFIED",
-      "runtime": "NOT_REPRODUCED"
+      "runtime": "Two different webhook event IDs with same payment intent recorded two paid cancellation payments.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029"
     },
     {
       "id": "B70",
-      "status": "SOURCE_SUPPORTED",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "Base subscriber request only blocks active tracked subscription, allowing another pending Stripe Checkout or send_invoice subscription; extra-seat checkout is also repeatable before webhook receipt.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L388",
@@ -441,7 +443,8 @@
       "existing_test_gap": "Existing entitlement tests do not exercise overlapping pending provider creations.",
       "reviewer": "gpt6_same_assistant_20261025",
       "independent_second_agent": "NOT_CERTIFIED",
-      "runtime": "NOT_REPRODUCED"
+      "runtime": "Two sequential POST subscription invoice setup calls each invoked stripe.Subscription.create; two provider IDs returned.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029"
     },
     {
       "id": "F03-N1",
@@ -503,6 +506,42 @@
       "reason": "Expired/inactive invite-link generic POST returned HTTP 400 while valid magic-link positive control returned HTTP 201. Actual rejection cause not inspected; this is not a refutation or P1 closure. Need response body and independent validation path.",
       "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
       "independent_second_agent": "NOT_CERTIFIED"
+    },
+    {
+      "id": "C004-N2",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
+      "reason": "Stripe checkout quantity=1 when 2 accepted-awaiting-payment offers exist and neither offer nor slot is selected.",
+      "runtime": "Stripe checkout quantity=1 when 2 accepted-awaiting-payment offers exist and neither offer nor slot is selected.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_c004_n2_unspecified_offer_checkout_must_not_charge_one_and_book_two"
+    },
+    {
+      "id": "F08-N2",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
+      "reason": "customer.subscription.updated with unpaid state returned 200 but active subscription remained active.",
+      "runtime": "customer.subscription.updated with unpaid state returned 200 but active subscription remained active.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_f08_n2_unpaid_stripe_status_must_deactivate_entitlement"
+    },
+    {
+      "id": "F01-N3",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
+      "reason": "Worker DELETE offer in ACCEPTED_AWAITING_PAYMENT returned 204 and removed offer.",
+      "runtime": "Worker DELETE offer in ACCEPTED_AWAITING_PAYMENT returned 204 and removed offer.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_f01_n3_worker_cannot_delete_payment_waiting_offer"
+    },
+    {
+      "id": "F08-N5",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
+      "reason": "DELETE /api/v1/account/ returned success while local subscription remained active and both recurring subscription IDs populated.",
+      "runtime": "DELETE /api/v1/account/ returned success while local subscription remained active and both recurring subscription IDs populated.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_f08_n5_owner_delete_does_not_leave_active_recurring_billing"
     }
   ],
   "summary": {
@@ -511,8 +550,8 @@
     "duplicate_root": 1,
     "refuted_source": 1,
     "second_agent_certified": 0,
-    "runtime_reproduced_in_audit": 0,
-    "total_challenged": 37,
+    "runtime_reproduced_in_audit": 23,
+    "total_challenged": 41,
     "runtime_reproduced_identifiers": [
       "B07",
       "B33",
@@ -529,9 +568,16 @@
       "C005-N1",
       "C004-N1",
       "C012-N2",
-      "C024-N1"
+      "C024-N1",
+      "C004-N2",
+      "B70",
+      "F08-N2",
+      "B68",
+      "B69",
+      "F01-N3",
+      "F08-N5"
     ],
-    "runtime_reproduced_scenarios": 19
+    "runtime_reproduced_scenarios": 26
   },
   "review_update": "2026-10-25 ten further B-series high-risk challenges: B03 B06 B07 B15 B29 B33 B36 B68 B69 B70; immutable evidence, negative/positive tests, caveated status, no S3 tests or independent second-agent certifications."
 }

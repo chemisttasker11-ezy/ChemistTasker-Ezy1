@@ -311,5 +311,138 @@
     ],
     "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
     "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C004-N2": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c004_n2_unspecified_offer_checkout_must_not_charge_one_and_book_two",
+        "observed": "Stripe checkout quantity=1 when 2 accepted-awaiting-payment offers exist and neither offer nor slot is selected.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "B70": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b70_repeated_invoice_subscription_setup_must_not_create_two_recurring_ids",
+        "observed": "Two sequential POST subscription invoice setup calls each invoked stripe.Subscription.create; two provider IDs returned.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "F08-N2": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_f08_n2_unpaid_stripe_status_must_deactivate_entitlement",
+        "observed": "customer.subscription.updated with unpaid state returned 200 but active subscription remained active.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "B68": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b68_unknown_subscription_on_same_customer_must_not_activate_other_entitlement",
+        "observed": "Paid invoice with unknown sub ID but matching customer activated unrelated tracked subscription.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "B69": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b69_same_cancellation_payment_intent_in_two_events_must_record_once",
+        "observed": "Two different webhook event IDs with same payment intent recorded two paid cancellation payments.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "F01-N3": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_f01_n3_worker_cannot_delete_payment_waiting_offer",
+        "observed": "Worker DELETE offer in ACCEPTED_AWAITING_PAYMENT returned 204 and removed offer.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "F08-N5": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_f08_n5_owner_delete_does_not_leave_active_recurring_billing",
+        "observed": "DELETE /api/v1/account/ returned success while local subscription remained active and both recurring subscription IDs populated.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
   }
 }
