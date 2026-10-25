@@ -251,3 +251,75 @@ class Phase5CoverRequestTenantBoundary(TestCase):
             ShiftSlotAssignment.objects.filter(pk=assignment_b.pk).exists(),
             "Manager for pharmacy A must not release pharmacy B assignment.",
         )
+
+
+class Phase5OrganizationBoundaryPolicy(TestCase):
+    def test_b23_chief_admin_cannot_edit_organization_record(self):
+        org = Organization.objects.create(name="Organization authority baseline")
+        owner_admin = make_user("OWNER")
+        chief_admin = make_user("OTHER_STAFF")
+        OrganizationMembership.objects.create(
+            user=owner_admin, organization=org, role="ORG_ADMIN",
+        )
+        OrganizationMembership.objects.create(
+            user=chief_admin, organization=org, role="CHIEF_ADMIN",
+        )
+        url = f"/api/v1/organizations/{org.pk}/"
+        legitimate = client_for(owner_admin).patch(
+            url, {"name": "Org Admin Renamed It"}, format="json",
+        )
+        self.assertEqual(legitimate.status_code, 200, legitimate.data)
+        org.refresh_from_db()
+        self.assertEqual(org.name, "Org Admin Renamed It")
+        unprivileged = client_for(chief_admin).patch(
+            url, {"name": "Chief Admin Reassigned Organisation"}, format="json",
+        )
+        self.assertIn(unprivileged.status_code, (403, 404), unprivileged.data)
+        org.refresh_from_db()
+        self.assertEqual(org.name, "Org Admin Renamed It")
+
+
+class Phase5MarketplaceExchangeIntegrity(TestCase):
+    def test_b24_enquiry_cannot_be_marked_complete_before_terms_acceptance(self):
+        from marketplace.models import (
+            MarketplaceCategory, MarketplaceListing, MarketplaceExchange,
+        )
+        seller = make_user("OWNER")
+        buyer = make_user("OWNER")
+        category = MarketplaceCategory.objects.create(
+            slug="pr200-fixtures", name="PR200 fixtures",
+            context="BOTH", permitted_modes=["SELL"], maximum_buyer_roles=["OWNER"],
+        )
+        listing = MarketplaceListing.objects.create(
+            creator=seller, seller_context="PERSONAL",
+            category=category, mode="SELL", title="PR200 Fixture Bundle",
+            slug="pr200-fixture-bundle", description="Synthetic audit fixture",
+            condition="Used", amount="250.00", suburb="Brisbane",
+            state="QLD", publication_status="PUBLISHED",
+        )
+        exchange = MarketplaceExchange.objects.create(
+            listing=listing, buyer=buyer, state=MarketplaceExchange.State.ENQUIRY,
+        )
+        base = f"/api/v1/marketplace/exchanges/{exchange.pk}/"
+        self.assertEqual(client_for(buyer).get(base).status_code, 200)
+        self.assertEqual(client_for(seller).get(base).status_code, 200)
+        initial_version = exchange.version
+        buyer_attempt = client_for(buyer).post(
+            base + "confirm-completion/",
+            {"expected_version": initial_version}, format="json",
+        )
+        exchange.refresh_from_db()
+        seller_attempt = client_for(seller).post(
+            base + "confirm-completion/",
+            {"expected_version": exchange.version}, format="json",
+        )
+        exchange.refresh_from_db()
+        listing.refresh_from_db()
+        self.assertIn(buyer_attempt.status_code, (400, 403, 409))
+        self.assertIn(seller_attempt.status_code, (400, 403, 409))
+        self.assertEqual(exchange.state, MarketplaceExchange.State.ENQUIRY)
+        self.assertFalse(exchange.buyer_confirmed)
+        self.assertFalse(exchange.seller_confirmed)
+        self.assertNotEqual(
+            listing.availability_status, MarketplaceListing.Availability.COMPLETED,
+        )
