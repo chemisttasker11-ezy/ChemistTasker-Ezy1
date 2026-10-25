@@ -140,7 +140,7 @@ class HubPollViewSet(
         membership = scope.get("request_membership")
         is_creator = (
             getattr(poll, "created_by_id", None) == getattr(self.request.user, "id", None)
-            or getattr(poll, "created_by_membership_id", None) == getattr(membership, "id", None)
+            or (membership and poll.created_by_membership_id == membership.id)
         )
         if not (
             is_creator

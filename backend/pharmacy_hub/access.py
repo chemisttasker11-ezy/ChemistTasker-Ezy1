@@ -90,6 +90,7 @@ def get_user_pharmacy_permissions(user):
         Membership.objects.filter(
             user=user,
             is_active=True,
+            status=Membership.Status.ACCEPTED,
             employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
         )
         .select_related("pharmacy", "pharmacy__organization", "pharmacy__owner__user")
@@ -186,6 +187,7 @@ class HubScopeResolver:
                 user=self.user,
                 pharmacy=pharmacy,
                 is_active=True,
+                status=Membership.Status.ACCEPTED,
                 employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
             )
             .select_related("user")
@@ -249,6 +251,7 @@ class HubScopeResolver:
             "membership__pharmacy",
         ).filter(
             membership__is_active=True,
+            membership__status=Membership.Status.ACCEPTED,
             membership__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
         )
         if membership:
@@ -287,6 +290,7 @@ class HubScopeResolver:
             Membership.objects.filter(
                 user=self.user,
                 is_active=True,
+                status=Membership.Status.ACCEPTED,
                 employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__organization=organization,
             )
@@ -336,7 +340,7 @@ class HubScopeResolver:
         if platform_hub not in allowed_hubs:
             raise PermissionDenied("You do not have access to this ChemistTasker hub.")
         membership = (
-            Membership.objects.filter(user=self.user, is_active=True)
+            Membership.objects.filter(user=self.user, is_active=True, status=Membership.Status.ACCEPTED)
             .select_related("pharmacy", "pharmacy__organization", "user")
             .order_by("id")
             .first()
@@ -447,6 +451,7 @@ class HubScopeResolver:
             Membership.objects.filter(
                 user=self.user,
                 is_active=True,
+                status=Membership.Status.ACCEPTED,
                 employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__organization=organization,
             )
@@ -465,7 +470,7 @@ class HubScopeResolver:
 
     def _ensure_platform_membership(self, scope):
         membership = (
-            Membership.objects.filter(user=self.user, is_active=True)
+            Membership.objects.filter(user=self.user, is_active=True, status=Membership.Status.ACCEPTED)
             .select_related("pharmacy")
             .order_by("id")
             .first()

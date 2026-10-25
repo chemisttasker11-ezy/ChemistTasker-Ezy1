@@ -516,6 +516,48 @@ class HubReactionTests(HubBase):
 
 
 class HubPollTests(HubBase):
+    def test_membershipless_user_cannot_modify_another_users_platform_poll(self):
+        author = make_user("PHARMACIST", is_otp_verified=True)
+        other = make_user("PHARMACIST", is_otp_verified=True)
+        created = client_for(author).post(
+            POLLS,
+            {"scope": "platform", "platform_hub": "public", "question": "Keep votes?", "choices": ["Yes", "No"]},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        poll_id = created.json()["id"]
+        poll = PharmacyHubPoll.objects.get(pk=poll_id)
+        self.assertIsNone(poll.created_by_membership_id)
+        options = list(poll.options.values_list("id", "label"))
+        url = f"{POLLS}{poll_id}/"
+        vote = client_for(other).post(url + "vote/", {"option_id": options[0][0]}, format="json")
+        self.assertEqual(vote.status_code, 200, vote.content)
+        vote_ids = list(poll.votes.values_list("id", flat=True))
+
+        for method in ("patch", "put"):
+            with self.subTest(method=method):
+                denied = getattr(client_for(other), method)(
+                    url, {"question": "Hijacked", "choices": ["New", "Choices"]}, format="json"
+                )
+                self.assertEqual(denied.status_code, 403, denied.content)
+                poll.refresh_from_db()
+                self.assertEqual(poll.question, "Keep votes?")
+                self.assertEqual(list(poll.options.values_list("id", "label")), options)
+                self.assertEqual(list(poll.votes.values_list("id", flat=True)), vote_ids)
+        self.assertEqual(client_for(other).delete(url).status_code, 403)
+        self.assertTrue(PharmacyHubPoll.objects.filter(pk=poll_id).exists())
+
+        edited = client_for(author).patch(url, {"question": "Author edit"}, format="json")
+        self.assertEqual(edited.status_code, 200, edited.content)
+        self.assertEqual(client_for(author).delete(url).status_code, 204)
+
+    def test_scope_manager_can_modify_another_users_poll(self):
+        poll = self.make_poll()
+        url = f"{POLLS}{poll['id']}/"
+        edited = client_for(self.owner).patch(url, {"question": "Manager edit"}, format="json")
+        self.assertEqual(edited.status_code, 200, edited.content)
+        self.assertEqual(client_for(self.owner).delete(url).status_code, 204)
+
     def make_poll(self, who=None):
         res = client_for(who or self.staff).post(
             POLLS, {**self.scope, "question": "Lunch?", "option_labels": ["Pizza", "Salad"]}, format="json")
