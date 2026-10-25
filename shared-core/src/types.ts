@@ -1144,6 +1144,7 @@ export interface ChatRoomApi {
     last_message?: {
         id: number;
         body: string;
+        is_deleted?: boolean;
         created_at: string;
         sender: number;
     } | null;
@@ -1165,6 +1166,7 @@ export type ChatUserLite = {
 export type ChatLastMessage = {
     id: number;
     body: string;
+    is_deleted?: boolean;
     created_at: string;
     sender: number;
 };

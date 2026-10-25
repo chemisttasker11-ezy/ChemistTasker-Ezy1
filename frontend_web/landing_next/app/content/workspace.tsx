@@ -6,6 +6,7 @@ import VisualEditor from '@/components/visual-editor';
 import RichContent, {emptyDocument, type RichNode} from '@/components/rich-content';
 import {contentOperations} from '@/lib/browser-api';
 import type {Page} from '@/lib/hub';
+import {useSession} from '@/shared/session-provider';
 
 type Grants=Record<string,'writer'|'publisher'>;
 type Me={user_id:number;name:string;administrator:boolean;areas:Grants;area_labels:Record<string,string>};
@@ -18,6 +19,11 @@ const errorText=(e:unknown)=>(e as Error).message||'This action could not be com
 function Pager({page,next,onPage}:{page:number;next:boolean;onPage:(n:number)=>void}){return <div className="ct-pagination"><button disabled={page===1} onClick={()=>onPage(page-1)}>Previous</button><span>Page {page}</span><button disabled={!next} onClick={()=>onPage(page+1)}>Next</button></div>;}
 
 export default function ContentDashboard(){
+ const session=useSession();
+ return <ContentWorkspace key={session.user?.id??'anonymous'}/>;
+}
+
+function ContentWorkspace(){
  const [me,setMe]=useState<Me>();const [loaded,setLoaded]=useState(false);const [error,setError]=useState('');const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);
  const [area,setArea]=useState('');const [tab,setTab]=useState('content');const [rows,setRows]=useState<Page<Document>>();const [page,setPage]=useState(1);
  const [doc,setDoc]=useState<Document|null>(null);const [editing,setEditing]=useState(false);const [form,setForm]=useState<Payload>(fresh);const [dirty,setDirty]=useState(false);const [slugEdited,setSlugEdited]=useState(false);const [preview,setPreview]=useState(false);const [schedule,setSchedule]=useState('');const [feedback,setFeedback]=useState('');

@@ -55,6 +55,11 @@ describe('source-backed wire/domain contracts after extraction',()=>{
     expect(publicApi.attendance).toBe(attendance);
     expect(publicApi.financeApi).toBe(financeApi);
   });
+  it('scrubs deleted chat content but preserves a legitimate message',()=>{
+    const row={id:4,conversation:2,body:'Private preview',original_body:'Original',attachment_url:'/media/private.pdf',attachment_filename:'private.pdf',created_at:'2026-10-26T00:00:00Z',sender:null};
+    expect(mapChatMessage({...row,is_deleted:false})).toMatchObject({body:'Private preview',attachment_url:'/media/private.pdf'});
+    expect(mapChatMessage({...row,is_deleted:true})).toMatchObject({body:'',original_body:null,attachment_url:null,attachment_filename:null});
+  });
   it('retains array query values, false, zero, and query omission',()=>{
     expect(buildQuery({pharmacy:4,role:['PHARMACIST','INTERN'],active:false,page:0,none:null})).toBe('?pharmacy=4&role=PHARMACIST&role=INTERN&active=false&page=0');
   });
