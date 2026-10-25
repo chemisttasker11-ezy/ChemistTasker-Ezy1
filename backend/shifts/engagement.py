@@ -111,6 +111,7 @@ def staff_assignment_defaults(*, user, pharmacy, work_date):
         "pay_basis": engagement.pay_basis,
         "award_code": engagement.award_code,
         "award_classification": engagement.award_classification,
+        "public_holiday_work_base": (engagement.award_rate_snapshot or {}).get("public_holiday_work_base"),
         "rates": {
             "weekday": str(engagement.rate_weekday),
             "saturday": str(engagement.rate_saturday),

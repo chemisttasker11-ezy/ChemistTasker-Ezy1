@@ -569,6 +569,11 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             snapshot = offer.engagement_terms_snapshot or {}
+            if not snapshot.get("public_holiday_work_base"):
+                return Response(
+                    {"detail": "Employee's confirmed holiday work-base is missing from accepted terms. A new reviewed engagement is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             if snapshot.get("award_payroll_review_required"):
                 return Response(
                     {
