@@ -832,18 +832,20 @@ class BookingSafetyTests(ShiftActionFixture):
         shift = self.shift(single_user_only=False)
         offer = self.offer(shift, worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
         slot = shift.slots.get()
-        for payload in ({'role_needed': 'PHARMACIST', 'fixed_rate': '999.00'}, {'slots': []}, {'description': 'Different duties'}):
+        for payload in ({'role_needed': 'PHARMACIST', 'fixed_rate': '999.00'}, {'slots': []}):
             response = self.owner_client.patch(f'{API}shifts/{shift.id}/', payload, format='json')
             self.assertEqual(response.status_code, 400, response.data)
             self.assertIn('awaiting payment', str(response.data))
             self.assertTrue(shift.slots.filter(pk=slot.pk).exists())
             offer.refresh_from_db()
             self.assertEqual(offer.slot_id, slot.id)
-        offer.status = ShiftOffer.Status.DECLINED
-        offer.save(update_fields=['status'])
+        # A description-only edit (2c omits unchanged slots) keeps the offer awaiting payment.
         with mock.patch('shifts.posting.send_shift_updated_notifications'), self.captureOnCommitCallbacks(execute=True):
             response = self.owner_client.patch(f'{API}shifts/{shift.id}/', {'description': 'Different duties'}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
+        offer.refresh_from_db()
+        self.assertEqual((offer.status, offer.slot_id), (ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, slot.id))
+        self.assertTrue(shift.slots.filter(pk=slot.pk).exists())
 
     def test_b71_notification_outage_does_not_fail_confirmation(self):
         from billing.utils import BILLING_STATE_PAYMENT_REQUIRED

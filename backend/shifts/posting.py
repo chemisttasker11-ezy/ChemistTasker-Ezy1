@@ -151,17 +151,6 @@ def revise_shift(
     """Apply a validated edit: recalculate the escalation level when the visibility changes (`allowed_tiers` must
     contain it), replace the slots when `slots_payload` is given, optionally copy the rates to the pharmacy, and
     announce the update after commit."""
-    # Roster slot IDs and accepted assignments are durable identities. They may
-    # only be edited by the in-place roster command, never this marketplace
-    # collection-replacement path (including when individually unpublished).
-    if slots_payload is not None and (
-        instance.is_roster_container
-        or instance.slots.filter(roster_period__isnull=False).exists()
-        or instance.slot_assignments.filter(is_rostered=True).exists()
-    ):
-        raise serializers.ValidationError({
-            "slots": "Use the roster editor to update existing roster slots in place."
-        })
     # Validate the new slots before changing anything, and apply the whole edit atomically.
     protect_direct_booking(validated_data, instance=instance)
     if 'visibility' in validated_data and allowed_tiers is None:
@@ -169,11 +158,22 @@ def revise_shift(
         allowed_tiers = pharmacy_allowed_tiers(instance.pharmacy)
     slots_data = normalize_slots_payload(slots_payload) if slots_payload is not None else None
     with transaction.atomic():
-        Shift.objects.select_for_update().get(pk=instance.pk)
+        instance = Shift.objects.select_for_update().get(pk=instance.pk)
+        # Text-only edits leave the accepted terms intact; anything else waits for payment (F01-N2).
         if instance.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists() and (
-            slots_payload is not None or any(getattr(instance, key) != value for key, value in validated_data.items())
+            slots_payload is not None
+            or any(getattr(instance, key) != value for key, value in validated_data.items() if key != 'description')
         ):
             raise serializers.ValidationError('This shift has an accepted offer awaiting payment. Complete payment before editing its terms.')
+        # Inspect durable identities on the locked shift before replacing any slots.
+        if slots_data is not None and (
+            instance.is_roster_container
+            or instance.slots.filter(roster_period__isnull=False).exists()
+            or instance.slot_assignments.exists()
+        ):
+            raise serializers.ValidationError({
+                "slots": "Use the roster editor to update existing roster slots in place."
+            })
         # If visibility is changing, recalc escalation_level
         if 'visibility' in validated_data:
             new_vis = validated_data['visibility']

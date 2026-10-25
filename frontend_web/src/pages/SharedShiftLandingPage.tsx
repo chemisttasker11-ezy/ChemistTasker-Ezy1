@@ -17,6 +17,7 @@ import { getViewSharedShift, Shift } from '@chemisttasker/shared-core';
 import AuthLayout from '../layouts/AuthLayout';
 import { setCanonical, setJsonLd, setPageMeta, setSocialMeta, setRobotsMeta } from '../utils/seo';
 import ShiftsBoard from './dashboard/sidebar/ShiftsBoard';
+import { resolveDashboardPath } from '../utils/dashboardPath';
 
 const formatClockTime = (value?: string | null) => {
   if (!value) return '';
@@ -243,8 +244,8 @@ const SharedShiftLandingPage: React.FC = () => {
 
             // If user is logged in, redirect them to the internal dashboard page
             if (user && mappedShift) {
-                const rolePath = user.role.toLowerCase().replace('_', '');
-                navigate(`/dashboard/${rolePath}/shifts/${mappedShift.id}`, { replace: true });
+
+                navigate(resolveDashboardPath(user.role, `shifts/${mappedShift.id}`), { replace: true });
             }
         } catch (err: any) {
             setError(err.response?.data?.detail || "Could not load this shift.");

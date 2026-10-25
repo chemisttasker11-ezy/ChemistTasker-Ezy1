@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, SUPER_GUARANTEE_PERCENT, type ShiftPostingDraft } from './postingDraft';
+import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, SUPER_GUARANTEE_PERCENT, type ShiftPostingDraft } from './postingDraft';
 import { expandShiftDraftSlots } from './draftSlots';
 const draft = (): ShiftPostingDraft => ({
   pharmacyId:1, roleNeeded:'PHARMACIST', employmentType:'LOCUM', description:'Review draft',
@@ -16,6 +16,37 @@ const draft = (): ShiftPostingDraft => ({
   notifyPharmacyStaff:true, notifyFavoriteStaff:true, notifyChainMembers:true,
 });
 describe('shared posting payload', () => {
+  it.each([null, ''])('omits slots on a text edit when an originally %j rate was auto-filled', (originalRate) => {
+    const slotRateRows = [{ rate: '90', dirty: false }, { rate: '70', dirty: true }];
+    const input = {
+      ...draft(), editingShiftId: 10, description: 'Updated text', slotsModified: false, slotRateRows,
+      ratesModified: haveShiftPostingSlotRatesChanged([originalRate, '70.00'], slotRateRows),
+    };
+    const payload = buildShiftPostingPayload(input);
+    expect(input.ratesModified).toBe(false);
+    expect(payload).toHaveProperty('description', 'Updated text');
+    expect(payload).not.toHaveProperty('slots');
+    expect(payload).not.toHaveProperty('rate_weekday');
+  });
+  it.each([null, '90.00'])('persists an explicit date rate edit against the originally %j rate', (originalRate) => {
+    const input = { ...draft(), editingShiftId: 10, slotsModified: false };
+    input.expandedSlots = expandShiftDraftSlots(input.slots);
+    const slotRateRows = [{ rate: '105', dirty: true }];
+    expect(buildShiftPostingPayload({
+      ...input, slotRateRows, ratesModified: haveShiftPostingSlotRatesChanged([originalRate], slotRateRows),
+    })).toHaveProperty('slots', [expect.objectContaining({ rate: '105.00' })]);
+    const revertedRows = [{ rate: originalRate ?? '', dirty: true }];
+    expect(buildShiftPostingPayload({
+      ...input, slotRateRows: revertedRows, ratesModified: haveShiftPostingSlotRatesChanged([originalRate], revertedRows),
+    })).not.toHaveProperty('slots');
+  });
+  it('persists a date rate edit even when the timetable is unchanged', () => {
+    const input = { ...draft(), editingShiftId: 10, slotsModified: false, ratesModified: true };
+    input.expandedSlots = expandShiftDraftSlots(input.slots);
+    input.slotRateRows = [{ rate: '105' }];
+    expect(buildShiftPostingPayload(input)).toHaveProperty('slots', [expect.objectContaining({ rate: '105.00' })]);
+    expect(buildShiftPostingPayload({ ...input, ratesModified: false })).not.toHaveProperty('slots');
+  });
   it('keeps the date override above the pharmacy guide and carries extras to every host', () => {
     const input=draft(); input.expandedSlots=expandShiftDraftSlots(input.slots);
     expect(buildShiftPostingPayload(input)).toMatchObject({rate_weekday:'65',slots:[{rate:'90.00'}],has_travel:true,has_accommodation:true,is_urgent:true,flexible_timing:true});
@@ -43,5 +74,19 @@ describe('shared posting payload', () => {
     const preview=buildShiftPostingPreview(input,{name:'Test Pharmacy'});
     expect(preview.slots.map((slot:any)=>[slot.id,slot.date])).toEqual([[1,'2026-10-19'],[2,'2026-10-26'],[3,'2026-11-02']]);
     expect(preview.pharmacyDetail).toEqual({name:'Test Pharmacy'});
+  });
+  it('omits slots and rates when editing description without timetable changes', () => {
+    // Negative test: text-only edit must not resend slots/rates that invalidate pending offers
+    const textEdit = { ...draft(), editingShiftId: 10, description: 'Updated text', slotsModified: false, ratesModified: false };
+    const textPayload = buildShiftPostingPayload(textEdit);
+    expect(textPayload).toHaveProperty('description', 'Updated text');
+    expect(textPayload).not.toHaveProperty('slots');
+    expect(textPayload).not.toHaveProperty('rate_weekday');
+
+    // Positive control: modifying slots on edit or creating new shift sends slots and rates
+    const modifiedEdit = { ...draft(), editingShiftId: 10, slotsModified: true, ratesModified: true };
+    const modifiedPayload = buildShiftPostingPayload(modifiedEdit);
+    expect(modifiedPayload).toHaveProperty('slots');
+    expect(modifiedPayload).toHaveProperty('rate_weekday', '65');
   });
 });

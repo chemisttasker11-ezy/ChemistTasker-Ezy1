@@ -19,4 +19,16 @@ describe('shared shift draft slots', () => {
     const manual={rate:'80',dirty:true};
     expect(reconcileShiftDraftRateRows(previous,[previous[1]],[{rate:'65',dirty:false},manual],()=>({rate:'',dirty:false}))).toEqual([manual]);
   });
+  it('preserves saved date rates on initial edit load when previous occurrences are empty', () => {
+    // Negative test: initial load must not wipe out saved rates with empty defaults
+    const occurrences = expandShiftDraftSlots([recurring]);
+    const savedRates = [{ rate: '80', status: 'success', dirty: true }, { rate: '95', status: 'success', dirty: true }];
+    expect(reconcileShiftDraftRateRows([], occurrences, savedRates, () => ({ rate: '', status: 'idle' }))).toEqual(savedRates);
+
+    // Positive control: uninitialized empty rows receive default values
+    expect(reconcileShiftDraftRateRows([], occurrences, [], () => ({ rate: '', status: 'idle' }))).toEqual([
+      { rate: '', status: 'idle' },
+      { rate: '', status: 'idle' },
+    ]);
+  });
 });

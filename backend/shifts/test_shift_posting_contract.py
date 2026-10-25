@@ -518,3 +518,34 @@ class ShiftEditTests(ShiftPostingFixture):
         self.assertEqual(refused.status_code, 400)
         shift.refresh_from_db()
         self.assertEqual((shift.description, shift.visibility), ("New", "LOCUM_CASUAL"))
+
+    def test_edit_shift_with_confirmed_booking_refuses_slot_replacement_but_allows_text_edit(self):
+        from shifts.models import ShiftSlotAssignment
+        response, _ = self.post_shift()
+        shift = Shift.objects.get(pk=response.data["id"])
+        worker = self.member("LOCUM")
+        slot = shift.slots.first()
+        ShiftSlotAssignment.objects.create(
+            shift=shift,
+            slot=slot,
+            user=worker,
+            slot_date=slot.date,
+        )
+        # Negative test: editing slots must be refused to protect confirmed bookings
+        with queued_emails():
+            refused = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
+                "slots": [{"date": str(DAY + timedelta(days=5)), "start_time": "09:00", "end_time": "17:00"}],
+            }, format="json")
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("Use the roster editor to update existing roster slots in place.", str(refused.data))
+
+        # Positive control: editing text without slots succeeds and retains existing slots and bookings
+        with queued_emails():
+            allowed = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
+                "description": "Updated instructions",
+            }, format="json")
+        self.assertEqual(allowed.status_code, 200)
+        shift.refresh_from_db()
+        self.assertEqual(shift.description, "Updated instructions")
+        self.assertEqual(shift.slot_assignments.count(), 1)
+        self.assertEqual(shift.slots.count(), 2)
