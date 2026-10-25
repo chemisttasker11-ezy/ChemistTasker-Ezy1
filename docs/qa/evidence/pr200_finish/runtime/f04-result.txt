@@ -1,0 +1,20 @@
+﻿Both P0 findings are real: they reproduce at runtime in ct-local. All 4 negative tests fail, meaning the forbidden action succeeded. All 4 positive controls pass.
+
+**F04-N1: REPRODUCED.** Command: `docker exec ct-local-web-1 sh -c 'cd /app && python manage.py test shifts.tests_pr200_runtime -v 2 --noinput'`. It used its own test database, and the copied file was removed from the container afterwards.
+- `F04N1MemberStatusTests.test_negative_outsider_full_part_time`: a verified pharmacist with no membership anywhere called `GET /api/v1/shifts/{id}/member_status/?visibility=FULL_PART_TIME` on another pharmacy's PLATFORM shift. It got **HTTP 200** with that pharmacy's staff row: user_id, name, employment_type, membership_id, pharmacy and organisation name.
+- `test_negative_outsider_org_chain`: the same caller with `visibility=ORG_CHAIN` got **HTTP 200** with staff from both pharmacies in the organisation, including the sibling pharmacy that has nothing to do with the shift.
+- Controls: the owner sees their own staff (200), and the outsider can legitimately view the shift itself (200).
+
+**F04-N2: REPRODUCED.** Same command.
+- `F04N2ShiftPatchTests.test_negative_move_shift_to_unrelated_pharmacy_and_rewrite_rates`: owner A sent `PATCH /api/v1/shifts/{id}/` with `pharmacy=B`, `apply_rates_to_pharmacy=true` and `rate_weekday=1.00`. Response was **HTTP 200**. The shift's pharmacy changed from A to B (9 → 10), and **unrelated pharmacy B's `rate_weekday` changed from 50.00 to 1.00**.
+  - The failing assertion is `10 != 9`. The rate change comes from the test's printed before/after state, because the test stops at the first failed assertion.
+- `test_negative_owner_sets_payment_status_paid`: a `PATCH {"payment_status":"PAID"}` returned **HTTP 200** and the database now holds `PAID` (`'PAID' != 'NOT_REQUIRED'`).
+- Controls: owner A can edit their own shift's description (200), and owner B gets 404 trying to edit A's shift.
+
+Files are in `C:\dev\worktrees\chemisttasker-pr200\docs\qa\evidence\pr200_finish\runtime\`:
+- `tests_pr200_runtime.py` (the test module)
+- `run_output.txt` (full run log)
+
+**What surprised me:** owner B's rates are overwritten in the same request that moves the shift. Setting a shift to PAID needs no cross-pharmacy step at all: any owner can do it to their own shift with a one-field PATCH.
+
+I checked only the `/api/v1/shifts/` routes. I didn't test `shifts/active/{id}/member_status/` or any HTTP calls against the live stack. My first run crashed on a mistake in my own payload (`rate_type=FIXED` without a `fixed_rate`); I fixed it and the results above are from the second run.

@@ -1,0 +1,269 @@
+﻿[INFO 2026-10-25 18:42:08 59650] axes.apps AXES: BEGIN version 7.1.0, blocking by combination of username and ip_address
+Found 8 test(s).
+docker : Creating test database for alias 'default' ('test_chemisttasker_staging')...
+At line:1 char:439
++ ... runtime.py; docker exec ct-local-web-1 sh -c 'cd /app && python manag ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Creating test d...er_staging')...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Operations to perform:
+  Synchronize unmigrated apps: channels, corsheaders, daphne, dashboards, django_otp, drf_spectacular, memberships, messages, onboarding, organizations, rest_framework, rest_framework_simplejwt, shifts, staticfiles, storages
+  Apply all migrations: admin, attendance, auth, axes, billing, chat, client_profile, contenttypes, ethical_marketplace, invoicing, marketplace, notifications, otp_static, otp_totp, pharmacy_hub, public_hub, ratings, rewards, sessions, talent, team_calendar, token_blacklist, two_factor, users, worker_finance, workforce
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying client_profile.0001_squashed_baseline... OK
+  Applying users.0001_squashed_baseline... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying client_profile.0044_roster_v2_and_attendance_v1... OK
+  Applying client_profile.0045_roster_slot_ownership... OK
+  Applying client_profile.0046_kiosk_offline_protocol... OK
+  Applying client_profile.0047_kiosk_event_preserve_unresolved_worker... OK
+  Applying client_profile.0048_kiosk_pairing_authorization... OK
+  Applying client_profile.0049_reclassify_existing_native_kiosks... OK
+  Applying client_profile.0050_align_kiosk_schema_state... OK
+  Applying workforce.0001_initial... OK
+  Applying workforce.0002_employmentengagement... OK
+  Applying workforce.0003_employmentengagement_award_snapshot... OK
+  Applying workforce.0004_employmentengagement_ordinary_hours_pattern... OK
+  Applying worker_finance.0001_initial... OK
+  Applying worker_finance.0002_alter_invoicerecord_parent... OK
+  Applying worker_finance.0003_invoice_revisions_and_review... OK
+  Applying worker_finance.0004_portable_revision_constraint... OK
+  Applying client_profile.0051_kiosk_pairing_recovery_attempt... OK
+  Applying client_profile.0052_membershipapplication_date_of_birth... OK
+  Applying client_profile.0053_shift_engagement_routing... OK
+  Applying client_profile.0054_membership_application_review_payroll_optin... OK
+  Applying client_profile.0055_shift_casual_employment_type... OK
+  Applying client_profile.0056_payroll_activation_invoice_source_snapshot... OK
+  Applying client_profile.0057_shift_roster_container... OK
+  Applying client_profile.0058_ratingreport... OK
+  Applying client_profile.0059_invoice_finance_workspace_state... OK
+  Applying workforce.0005_consolidate_legacy_leave... OK
+  Applying worker_finance.0005_consolidate_invoice_record... OK
+  Applying worker_finance.0006_remove_invoice_record... OK
+  Applying client_profile.0060_owner_marketplace_identity... OK
+  Applying rewards.0001_initial... OK
+  Applying client_profile.0061_move_rewards_out... OK
+  Applying ratings.0001_initial... OK
+  Applying client_profile.0062_move_ratings_out... OK
+  Applying talent.0001_initial... OK
+  Applying client_profile.0063_move_talent_out... OK
+  Applying team_calendar.0001_initial... OK
+  Applying client_profile.0064_move_team_calendar_out... OK
+  Applying notifications.0001_initial... OK
+  Applying client_profile.0065_move_notifications_out... OK
+  Applying chat.0001_initial... OK
+  Applying client_profile.0066_move_chat_out... OK
+  Applying pharmacy_hub.0001_initial... OK
+  Applying client_profile.0067_move_pharmacy_hub_out... OK
+  Applying invoicing.0001_initial... OK
+  Applying worker_finance.0007_repoint_invoicing_relations... OK
+  Applying client_profile.0068_move_invoicing_out... OK
+  Applying attendance.0001_initial... OK
+  Applying workforce.0006_repoint_attendance_relations... OK
+  Applying client_profile.0069_move_attendance_out... OK
+  Applying attendance.0002_clean_table_and_index_names... OK
+  Applying attendance.0003_clean_constraint_names... OK
+  Applying attendance.0004_favourite_cover... OK
+  Applying axes.0001_initial... OK
+  Applying axes.0002_auto_20151217_2044... OK
+  Applying axes.0003_auto_20160322_0929... OK
+  Applying axes.0004_auto_20181024_1538... OK
+  Applying axes.0005_remove_accessattempt_trusted... OK
+  Applying axes.0006_remove_accesslog_trusted... OK
+  Applying axes.0007_alter_accessattempt_unique_together... OK
+  Applying axes.0008_accessfailurelog... OK
+  Applying axes.0009_add_session_hash... OK
+  Applying billing.0001_squashed_baseline... OK
+  Applying billing.0002_stripewebhookevent... OK
+  Applying chat.0002_clean_table_and_index_names... OK
+  Applying chat.0003_clean_constraint_names... OK
+  Applying workforce.0007_move_roster_in... OK
+  Applying client_profile.0070_move_roster_out... OK
+  Applying client_profile.0071_abn_details_for... OK
+  Applying client_profile.0072_shiftslot_unpublished_at... OK
+  Applying client_profile.0073_pharmacy_profile_and_shift_support... OK
+  Applying client_profile.0074_otherstaffonboarding_dispensary_qualification_and_more... OK
+  Applying client_profile.0075_otherstaff_intern_ahpra... OK
+  Applying client_profile.0076_role_labels_pharmacy_team... OK
+  Applying client_profile.0077_new_to_pharmacy_profile... OK
+  Applying client_profile.0078_board_reports... OK
+  Applying client_profile.0079_work_rights... OK
+  Applying client_profile.0080_ahpra_registration...
+  AHPRA numbers registered: 0; legacy duplicate holders kept unchanged: 0
+ OK
+  Applying client_profile.0081_ahpra_check... OK
+  Applying client_profile.0082_ahpra_check_stages... OK
+  Applying client_profile.0083_owner_ahpra_switched_to_manager... OK
+  Applying client_profile.0084_ahpra_check_public_recheck... OK
+  Applying client_profile.0085_ahpra_check_type_not_accepted... OK
+  Applying client_profile.0086_pharmacy_create_idempotency... OK
+  Applying ethical_marketplace.0001_initial... OK
+  Applying ethical_marketplace.0002_ethicalrequestreceipt... OK
+  Applying invoicing.0002_clean_table_and_index_names... OK
+  Applying invoicing.0003_clean_constraint_names... OK
+  Applying marketplace.0001_initial... OK
+  Applying marketplace.0002_marketplacecatalogueimport_and_more... OK
+  Applying notifications.0002_clean_table_and_index_names... OK
+  Applying notifications.0003_clean_constraint_names... OK
+  Applying otp_static.0001_initial... OK
+  Applying otp_static.0002_throttling... OK
+  Applying otp_static.0003_add_timestamps... OK
+  Applying otp_totp.0001_initial... OK
+  Applying otp_totp.0002_auto_20190420_0723... OK
+  Applying otp_totp.0003_add_timestamps... OK
+  Applying pharmacy_hub.0002_clean_table_and_index_names... OK
+  Applying pharmacy_hub.0003_clean_constraint_names... OK
+  Applying pharmacy_hub.0004_role_labels_pharmacy_team... OK
+  Applying public_hub.0001_initial... OK
+  Applying public_hub.0002_article_body_document_communityreport_and_more... OK
+  Applying public_hub.0003_contentmedia... OK
+  Applying public_hub.0004_backfill_editorial_documents... OK
+  Applying public_hub.0005_board_reports... OK
+  Applying ratings.0002_clean_table_and_index_names... OK
+  Applying ratings.0003_clean_constraint_names... OK
+  Applying rewards.0002_clean_table_and_index_names... OK
+  Applying rewards.0003_clean_constraint_names... OK
+  Applying sessions.0001_initial... OK
+  Applying talent.0002_clean_table_and_index_names... OK
+  Applying talent.0003_clean_constraint_names... OK
+  Applying talent.0004_role_labels_pharmacy_team... OK
+  Applying talent.0005_board_reports... OK
+  Applying team_calendar.0002_clean_table_and_index_names... OK
+  Applying team_calendar.0003_clean_constraint_names... OK
+  Applying token_blacklist.0001_initial... OK
+  Applying token_blacklist.0002_outstandingtoken_jti_hex... OK
+  Applying token_blacklist.0003_auto_20171017_2007... OK
+  Applying token_blacklist.0004_auto_20171017_2013... OK
+  Applying token_blacklist.0005_remove_outstandingtoken_jti... OK
+  Applying token_blacklist.0006_auto_20171017_2113... OK
+  Applying token_blacklist.0007_auto_20171017_2214... OK
+  Applying token_blacklist.0008_migrate_to_bigautofield... OK
+  Applying token_blacklist.0010_fix_migrate_to_bigautofield... OK
+  Applying token_blacklist.0011_linearizes_history... OK
+  Applying token_blacklist.0012_alter_outstandingtoken_user... OK
+  Applying token_blacklist.0013_alter_blacklistedtoken_options_and_more... OK
+  Applying two_factor.0001_squashed_0008_delete_phonedevice... OK
+  Applying users.0002_onboarded_pharmacy_managers... OK
+  Applying users.0003_pharmacy_manager_account_type... OK
+  Applying users.0004_role_labels_pharmacy_team... OK
+  Applying users.0005_mobile_check_skipped... OK
+  Applying worker_finance.0008_remove_stale_invoice_record_contenttype... OK
+  Applying workforce.0008_clean_roster_table_and_index_names... OK
+  Applying workforce.0009_clean_roster_constraint_names... OK
+  Applying workforce.0010_roster_shift_republish_audit... OK
+[INFO 2026-10-25 18:43:24 59650] weasyprint.progress Step 2 - Fetching and parsing CSS - CSS string
+[WARNING 2026-10-25 18:43:24 59650] weasyprint Invalid or unsupported selector, '::note-call '
+[WARNING 2026-10-25 18:43:24 59650] weasyprint Invalid or unsupported selector, '::note-marker '
+[WARNING 2026-10-25 18:43:24 59650] weasyprint Invalid or unsupported selector, '::note-callback '
+[INFO 2026-10-25 18:43:24 59650] weasyprint.progress Step 2 - Fetching and parsing CSS - CSS string
+[INFO 2026-10-25 18:43:24 59650] weasyprint.progress Step 2 - Fetching and parsing CSS - CSS string
+System check identified no issues (0 silenced).
+
+[F04-N1 negative] outsider GET FULL_PART_TIME -> 200, rows=[{'user_id': 2, 'name': 'First2 Last2', 'employment_type': 'FULL_TIME', 'membership_id': 1, 'pharmacy_name': 'Victim Pharmacy B', 'organization_name': 'Victim Org X'}]
+test_negative_outsider_full_part_time 
+(shifts.tests_pr200_runtime.F04N1MemberStatusTests.test_negative_outsider_full_part_time) ... FAIL
+
+[F04-N1 negative] outsider GET ORG_CHAIN -> 200, rows=[{'user_id': 7, 'name': 'First7 Last7', 'employment_type': 'PART_TIME', 'membership_id': 4, 'pharmacy_name': 'Sibling Pharmacy C', 'organization_name': 'Victim Org X'}, {'user_id': 6, 'name': 'First6 Last6', 'employment_type': 'FULL_TIME', 'membership_id': 3, 'pharmacy_name': 'Victim Pharmacy B', 'organization_name': 'Victim Org X'}]
+test_negative_outsider_org_chain (shifts.tests_pr200_runtime.F04N1MemberStatusTests.test_negative_outsider_org_chain) 
+... FAIL
+test_positive_control_outsider_can_see_platform_shift 
+(shifts.tests_pr200_runtime.F04N1MemberStatusTests.test_positive_control_outsider_can_see_platform_shift) ... ok
+
+[F04-N1 positive] outsider GET shift detail -> 200
+
+[F04-N1 positive] owner GET FULL_PART_TIME -> 200, user_ids=[14]
+test_positive_control_owner_sees_staff 
+(shifts.tests_pr200_runtime.F04N1MemberStatusTests.test_positive_control_owner_sees_staff) ... ok
+
+[F04-N2 negative move] owner A PATCH pharmacy=B + apply_rates -> 200, before={'shift.pharmacy_id': 9, 'shift.payment_status': 'NOT_REQUIRED', 'B.rate_weekday': '50.00'}, after={'shift.pharmacy_id': 10, 'shift.payment_status': 'NOT_REQUIRED', 'B.rate_weekday': '1.00'}, pharmacy_A=9, pharmacy_B=10
+test_negative_move_shift_to_unrelated_pharmacy_and_rewrite_rates 
+(shifts.tests_pr200_runtime.F04N2ShiftPatchTests.test_negative_move_shift_to_unrelated_pharmacy_and_rewrite_rates) ... 
+FAIL
+test_negative_owner_sets_payment_status_paid 
+(shifts.tests_pr200_runtime.F04N2ShiftPatchTests.test_negative_owner_sets_payment_status_paid) ... FAIL
+
+[F04-N2 negative payment] owner A PATCH payment_status=PAID -> 200, after={'shift.pharmacy_id': 11, 'shift.payment_status': 'PAID', 'B.rate_weekday': '50.00'}
+[WARNING 2026-10-25 18:43:28 59650] django.request Not Found: /api/v1/shifts/7/
+
+[F04-N2 positive] owner B PATCH A's shift -> 404
+test_positive_control_owner_b_cannot_patch_a_shift 
+(shifts.tests_pr200_runtime.F04N2ShiftPatchTests.test_positive_control_owner_b_cannot_patch_a_shift) ... ok
+
+[F04-N2 positive] owner A PATCH description -> 200, description='Updated'
+test_positive_control_owner_edits_own_shift 
+(shifts.tests_pr200_runtime.F04N2ShiftPatchTests.test_positive_control_owner_edits_own_shift) ... ok
+
+======================================================================
+FAIL: test_negative_outsider_full_part_time 
+(shifts.tests_pr200_runtime.F04N1MemberStatusTests.test_negative_outsider_full_part_time)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/app/shifts/tests_pr200_runtime.py", line 81, in test_negative_outsider_full_part_time
+    self.assertFalse(
+AssertionError: [{'user_id': 2, 'name': 'First2 Last2', 'employment_type': 'FULL_TIME', 'membership_id': 1, 
+'pharmacy_name': 'Victim Pharmacy B', 'organization_name': 'Victim Org X'}] is not false : FORBIDDEN SUCCEEDED: 
+unrelated pharmacist got HTTP 200 with staff rows [{'user_id': 2, 'name': 'First2 Last2', 'employment_type': 
+'FULL_TIME', 'membership_id': 1, 'pharmacy_name': 'Victim Pharmacy B', 'organization_name': 'Victim Org X'}]
+
+======================================================================
+FAIL: test_negative_outsider_org_chain 
+(shifts.tests_pr200_runtime.F04N1MemberStatusTests.test_negative_outsider_org_chain)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/app/shifts/tests_pr200_runtime.py", line 88, in test_negative_outsider_org_chain
+    self.assertFalse(
+AssertionError: [{'user_id': 7, 'name': 'First7 Last7', 'employment_type': 'PART_TIME', 'membership_id': 4, 
+'pharmacy_name': 'Sibling Pharmacy C', 'organization_name': 'Victim Org X'}, {'user_id': 6, 'name': 'First6 Last6', 
+'employment_type': 'FULL_TIME', 'membership_id': 3, 'pharmacy_name': 'Victim Pharmacy B', 'organization_name': 'Victim 
+Org X'}] is not false : FORBIDDEN SUCCEEDED: unrelated pharmacist got HTTP 200 with org staff rows [{'user_id': 7, 
+'name': 'First7 Last7', 'employment_type': 'PART_TIME', 'membership_id': 4, 'pharmacy_name': 'Sibling Pharmacy C', 
+'organization_name': 'Victim Org X'}, {'user_id': 6, 'name': 'First6 Last6', 'employment_type': 'FULL_TIME', 
+'membership_id': 3, 'pharmacy_name': 'Victim Pharmacy B', 'organization_name': 'Victim Org X'}]
+
+======================================================================
+FAIL: test_negative_move_shift_to_unrelated_pharmacy_and_rewrite_rates 
+(shifts.tests_pr200_runtime.F04N2ShiftPatchTests.test_negative_move_shift_to_unrelated_pharmacy_and_rewrite_rates)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/app/shifts/tests_pr200_runtime.py", line 131, in 
+test_negative_move_shift_to_unrelated_pharmacy_and_rewrite_rates
+    self.assertEqual(after["shift.pharmacy_id"], self.pharmacy_a.id,
+AssertionError: 10 != 9 : FORBIDDEN SUCCEEDED: HTTP 200, shift moved to unrelated pharmacy B
+
+======================================================================
+FAIL: test_negative_owner_sets_payment_status_paid 
+(shifts.tests_pr200_runtime.F04N2ShiftPatchTests.test_negative_owner_sets_payment_status_paid)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/app/shifts/tests_pr200_runtime.py", line 140, in test_negative_owner_sets_payment_status_paid
+    self.assertEqual(after["shift.payment_status"], "NOT_REQUIRED",
+AssertionError: 'PAID' != 'NOT_REQUIRED'
+- PAID
++ NOT_REQUIRED
+ : FORBIDDEN SUCCEEDED: HTTP 200, payment_status forged to PAID
+
+----------------------------------------------------------------------
+Ran 8 tests in 3.916s
+
+FAILED (failures=4)
+Destroying test database for alias 'default' ('test_chemisttasker_staging')...

@@ -1,0 +1,18 @@
+{
+ "note": "S3 targeted runtime results. Django tests run inside the ct-local backend container (main e3711853; backend/shifts/* identical to baseline b77e9fd2) with their own test database; test file copied in and removed afterwards; no repo changes. Run by Claude B (independent of the finders). Full log: run_output.txt; tests: tests_pr200_runtime.py.",
+ "F04-N1": {
+  "status": "RUNTIME_REPRODUCED",
+  "command": "docker exec ct-local-web-1 sh -c 'cd /app && python manage.py test shifts.tests_pr200_runtime -v 2 --noinput'",
+  "negative": ["test_negative_outsider_full_part_time: unrelated verified pharmacist GET /api/v1/shifts/{id}/member_status/?visibility=FULL_PART_TIME -> 200 with the other pharmacy's staff (user_id, name, employment_type, membership_id, pharmacy/org name)", "test_negative_outsider_org_chain: visibility=ORG_CHAIN -> 200 including a sibling pharmacy unrelated to the shift"],
+  "positive_controls": ["owner sees own staff (200)", "outsider may view the shift itself (200)"],
+  "not_covered": "shifts/active/{id}/member_status/ route"
+ },
+ "F04-N2": {
+  "status": "RUNTIME_REPRODUCED",
+  "command": "docker exec ct-local-web-1 sh -c 'cd /app && python manage.py test shifts.tests_pr200_runtime -v 2 --noinput'",
+  "negative": ["test_negative_move_shift_to_unrelated_pharmacy_and_rewrite_rates: owner A PATCH pharmacy=B, apply_rates_to_pharmacy=true, rate_weekday=1.00 -> 200; shift moved A->B and unrelated pharmacy B rate_weekday 50.00 -> 1.00", "test_negative_owner_sets_payment_status_paid: PATCH {payment_status: PAID} -> 200, stored PAID with no payment"],
+  "positive_controls": ["owner A edits own shift description (200)", "owner B PATCH on A's shift -> 404"]
+ },
+ "F03-N1": {"status": "PENDING", "reason": "backend/organizations/views.py differs between ct-local (e3711853) and baseline (PR #198); needs the pr200 baseline stack, whose build is blocked by npm download failures (separate session)."},
+ "F14-U6": {"status": "PENDING", "reason": "typed DD/MM/YYYY date in post-shift form; source accepts it, needs a browser check."}
+}
