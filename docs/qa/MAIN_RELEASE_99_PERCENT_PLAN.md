@@ -159,3 +159,10 @@ All nine priority backend chunk outputs **C008–C016 are now committed**. See [
 - Earlier [baseline runtime run 40169055953](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953) demonstrated eight failed negative tests over seven distinct IDs; separate [remediation PR #201](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/201) has 17 green targeted tests on an earlier code SHA. **Do not conflate the fix-branch green tests with source-baseline S3 or declare Phase 5 complete.**
 - SOURCE_CHALLENGE currently has 30 challenged entries, 155 C/F candidate rows are in canonical raw findings, plus historical B01–B71. Most P1 candidate records still lack independent verification or runtime contracts. S0 static 2,149/2,149; S1 ledger 2,151 unique (including two audit scripts); S2 cannot honestly be expressed as 99% independent; S3 bounded baseline HTTP/SQLite only. F12 fourteen source comparisons are not native/Next/Vite runtime parity.
 - Phase 5 gate remains **OPEN** pending full P1/root-cause reconciliation, negative/positive checks, per-domain independently verified S2 coverage, definitive test classifications, and corrected canonical status counts. **Release NO-GO.**
+
+
+## Phase 5 verified RED findings — 25 October 2026
+
+- [PR200 run 40174286021](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021) against frozen main yielded **20 Django tests: 12 failing negative assertions, 1 fixture ERROR and 7 passes**. The 8 older failures remain. New verified F03-N1 (both GET/POST old admin invite), F04-N1 (outsider member-status disclosure), F09-N1 (private group deletion widens pharmacy feed) all reproduced in SQLite HTTP tests.
+- B03 chat-retention test was **TEST_INFRA_BLOCKED** by a unique pharmacy conversation fixture, not classified as reproduced. Fixed the test fixture on separate audit commit `13661c46ff9b82699ece08713a2b2bfac1fd7511`; rerun pending.
+- These findings are baseline red tests and not production attacks. They do not establish whole-repository 99% independent S2. Phase 5 still open for unresolved P1s and root checks.

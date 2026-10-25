@@ -207,7 +207,7 @@
     },
     {
       "id": "F09-N1",
-      "status": "SOURCE_SUPPORTED",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "Group deletion calls instance.delete; PharmacyHubPost.community_group FK on_delete SET_NULL; pharmacy-feed queryset includes community_group__isnull=True. A former restricted group post may become visible to other same-pharmacy staff, not a proven cross-pharmacy leak.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/groups.py#L147",
@@ -218,9 +218,10 @@
       "negative_test": "Create restricted group post, delete group, assert same-pharmacy nonmember cannot list/detail/search former content.",
       "positive_test": "Appropriately authorized retained members can access according to archival policy; unrelated staff cannot.",
       "existing_test_gap": "Hub scope tests cover access but not delete-group -> post read widening.",
-      "runtime": "NOT_EXECUTED",
+      "runtime": "Former group-restricted content appeared in pharmacy feed for group non-member after deletion",
       "independent_second_agent": "NOT_CERTIFIED",
-      "reviewer": "same_online_assistant_20261025"
+      "reviewer": "same_online_assistant_20261025",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021"
     },
     {
       "id": "F10-N5",
@@ -438,6 +439,24 @@
       "reviewer": "gpt6_same_assistant_20261025",
       "independent_second_agent": "NOT_CERTIFIED",
       "runtime": "NOT_REPRODUCED"
+    },
+    {
+      "id": "F03-N1",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
+      "reason": "Revoked admin accepted old invitation HTTP 200",
+      "runtime": "Revoked admin invitation returned in list",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_f03_revoked_admin_cannot_accept_old_role"
+    },
+    {
+      "id": "F04-N1",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
+      "reason": "Nonmanager saw pharmacy staff member-status HTTP 200",
+      "runtime": "Nonmanager saw pharmacy staff member-status HTTP 200",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_f04_member_status_hidden_from_external_platform_shift_worker"
     }
   ],
   "summary": {
@@ -447,7 +466,7 @@
     "refuted_source": 1,
     "second_agent_certified": 0,
     "runtime_reproduced_in_audit": 0,
-    "total_challenged": 30,
+    "total_challenged": 32,
     "runtime_reproduced_identifiers": [
       "B07",
       "B33",
@@ -455,9 +474,12 @@
       "F04-N2",
       "B15",
       "F10-N5",
-      "B06"
+      "B06",
+      "F03-N1",
+      "F04-N1",
+      "F09-N1"
     ],
-    "runtime_reproduced_scenarios": 8
+    "runtime_reproduced_scenarios": 12
   },
   "review_update": "2026-10-25 ten further B-series high-risk challenges: B03 B06 B07 B15 B29 B33 B36 B68 B69 B70; immutable evidence, negative/positive tests, caveated status, no S3 tests or independent second-agent certifications."
 }

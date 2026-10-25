@@ -1,6 +1,6 @@
 {
   "F03-N1": {
-    "verdict": "CONFIRMED_SOURCE",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
     "verifier": "gpt6-senior-20261025",
     "independent_of": "claudeA-3",
     "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
@@ -11,13 +11,31 @@
       "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/client_profile/test_admin_invitations.py#L31-L92"
     ],
     "confidence": "high",
-    "runtime_verification": "NOT_EXECUTED",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
     "negative_test": "As owner remove existing accepted staff manager via DELETE /api/v1/pharmacy-admins/{id}/. Authenticate as removed manager; GET my-pending-invitations must exclude old assignment and POST /api/v1/pharmacy-admins/{id}/accept-invitation/ must refuse; is_active stays false.",
     "positive_test": "Newly invited existing accepted staff can accept once; active admin remains usable and a separately reissued invitation succeeds only if current manager explicitly sent it.",
     "impact": "Revoked staff could restore manager authority without fresh consent.",
     "classification": "FIX",
     "severity": "P0 candidate; no exploit run",
-    "status_note": "Source-level verification is not a runtime reproduction, and production exploitability still requires authenticated negative test."
+    "status_note": "Source-level verification is not a runtime reproduction, and production exploitability still requires authenticated negative test.",
+    "scenarios": [
+      {
+        "test": "test_f03_revoked_admin_cannot_accept_old_role",
+        "observed": "Revoked admin accepted old invitation HTTP 200",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
+        "head": "6865b99e3c7ff567e5125d76a01aeaa714715c17",
+        "environment": "Ubuntu Django TestCase SQLite",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      },
+      {
+        "test": "test_f03_revoked_admin_not_listed_as_pending_invitation",
+        "observed": "Revoked admin invitation returned in list",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
+        "head": "6865b99e3c7ff567e5125d76a01aeaa714715c17",
+        "environment": "Ubuntu Django TestCase SQLite",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ]
   },
   "F04-N2": {
     "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
@@ -53,7 +71,7 @@
     ]
   },
   "F04-N1": {
-    "verdict": "CONFIRMED_SOURCE",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
     "verifier": "gpt6-senior-20261025",
     "independent_of": "claudeB-2",
     "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
@@ -66,13 +84,23 @@
       "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/candidates.py#L446-L469"
     ],
     "confidence": "high",
-    "runtime_verification": "NOT_EXECUTED",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
     "negative_test": "External verified PHARMACIST without pharmacy membership requests a PLATFORM PHARMACIST shift member_status with FULL_PART_TIME or ORG_CHAIN visibility; server must refuse or restrict to self without returning any unrelated staff data.",
     "positive_test": "Owner/authorized manager receives permitted staff status, and external worker can see their own permitted shift status through non-leaking worker-facing endpoint.",
     "impact": "An external user who can view a public shift may enumerate staff identity and participation in unrelated pharmacy or organisation.",
     "classification": "FIX",
     "severity": "P0 candidate; no exploit run",
-    "status_note": "Unrestricted filters identified by source, but sensitive-field availability and full response shape need request-based confirmation."
+    "status_note": "Unrestricted filters identified by source, but sensitive-field availability and full response shape need request-based confirmation.",
+    "scenarios": [
+      {
+        "test": "test_f04_member_status_hidden_from_external_platform_shift_worker",
+        "observed": "Nonmanager saw pharmacy staff member-status HTTP 200",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
+        "head": "6865b99e3c7ff567e5125d76a01aeaa714715c17",
+        "environment": "Ubuntu Django TestCase SQLite",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ]
   },
   "B07": {
     "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
@@ -177,5 +205,20 @@
       }
     ],
     "severity": "Historical candidate, assess release impact"
+  },
+  "F09-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_f09_group_delete_must_not_promote_restricted_post_to_pharmacy_feed",
+        "observed": "Former group-restricted content appeared in pharmacy feed for group non-member after deletion",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
+        "head": "6865b99e3c7ff567e5125d76a01aeaa714715c17",
+        "environment": "Ubuntu Django TestCase SQLite",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ]
   }
 }
