@@ -4,7 +4,7 @@
   "reviewer": "gpt6-senior-20261025",
   "review_level": "S1 FULL SOURCE FETCH + ANNOTATED FIRST-PASS; not independent S2 semantic certification or S3 test",
   "status": "INCOMPLETE",
-  "source_read_count": 14,
+  "source_read_count": 28,
   "files": [
     {
       "path": "frontend_web/e2e/support/start-authenticated-stack.mjs",
@@ -215,6 +215,132 @@
         "guards": false,
         "mutations": false
       }
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/components/article-detail.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "note": "51 lines; server/module; direct imports @/components/rich-content, next, next/link; async calls: getArticle, getArticles; read/presentation; local conditional/auth context. JSON-LD script insertion is escaped; verify rich-content sanitization independently. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "33218eb1456c5add1e9c4fb795f1e1c650fe7362",
+      "lines": 51,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/components/discussion.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "note": "115 lines; client state/UI; direct imports react, next/link, lucide-react; domain API: publicContent.listArticleComments, publicContent.reactToArticleComment, publicContent.removeArticleCommentReaction, publicContent.deleteArticleComment, publicContent.reportArticleComment, publicContent.createArticleComment, publicContent.getArticle; write-capable UI: verify backend authorization; local conditional/auth context. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "bfc9352a7c816477f690deede2586a9cbaeac1b0",
+      "lines": 115,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/components/hub-header.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "3 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "8f6c2b654f1cd2da843a85f82131a364c60ebeeb",
+      "lines": 3,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/components/listing.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "note": "39 lines; server/module; direct imports next/link, lucide-react, ../../../lib/hub-server; async calls: getArticles; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "dca9191e97bd5dd7a7f79b5ffe2a73b852aac817",
+      "lines": 39,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/components/share-button.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "12 lines; client state/UI; simple delegated Next page or metadata; async calls: navigator.clipboard.writeText; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "9430d1852557217b0dee8d07226983236563536c",
+      "lines": 12,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/error.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "5 lines; client state/UI; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "8d23d246217a9bd72950b95426ccbd298ddfce63",
+      "lines": 5,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/layout.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "22 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "1f1ef0f3826cc317afcf0aca0c1984197e30f220",
+      "lines": 22,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/loading.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "2 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "504965b91def47d2a63396430f77417c8dbfbe1a",
+      "lines": 2,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/news/[slug]/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "5 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "957a45ed4b762d7164a140b59b9554749b399080",
+      "lines": 5,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/news/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "9 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "a6943f4743c3e61aef9ed5a6ced14209e824425f",
+      "lines": 9,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(hub)/not-found.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "3 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
+      "blob_sha": "b082f3cb3fbd126fbc40af565382fdf46ee0a3b1",
+      "lines": 3,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/account-deletion/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "6 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary.",
+      "blob_sha": "e2775985858781241279dc3f1fe2fd86d3df71e3",
+      "lines": 6,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/contact-us/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "3 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; local conditional/auth context.",
+      "blob_sha": "9992de7c23ee94fcf890a540a0bbeb565cedaeee",
+      "lines": 3,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
+    },
+    {
+      "path": "frontend_web/landing_next/app/(public)/contact/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "note": "6 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary.",
+      "blob_sha": "188231d8f59d86e5b815a0ac942bd236295ed52d",
+      "lines": 6,
+      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1"
     }
   ],
   "findings": [],
