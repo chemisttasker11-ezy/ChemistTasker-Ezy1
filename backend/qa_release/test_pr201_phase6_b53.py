@@ -57,12 +57,12 @@ class B53OutOfOrderSubscriptionEvents(TestCase):
         self.deliver("evt_b53_deleted", "customer.subscription.deleted", {
             "id": "sub_b53", "customer": "cus_b53",
         })
-        self.assertEqual(self.sub.status, "inactive")
+        self.assertEqual(self.sub.status, "canceled")
         self.deliver("evt_b53_late_paid", "invoice.paid", {
             "id": "in_b53_old", "customer": "cus_b53",
             "subscription": "sub_b53", "lines": {"data": []},
         })
         self.assertEqual(
-            self.sub.status, "inactive",
+            self.sub.status, "canceled",
             "Payment for an old invoice must not reverse a later cancellation.",
         )

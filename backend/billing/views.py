@@ -921,9 +921,11 @@ def _process_stripe_event(event):
                 # previously deleted subscription or credit a different plan.
                 if not sub:
                     raise OwnerSubscription.DoesNotExist
-                if sub.status == 'inactive':
-                    logger.info('Ignoring paid invoice for locally inactive Stripe subscription %s', sub_id)
+                if sub.status == 'canceled':
+                    logger.info('Ignoring paid invoice for canceled Stripe subscription %s', sub_id)
                     return
+                # Inactive may represent a recoverable lapsed payment; the
+                # existing canceled state is reserved for deleted subscriptions.
                 sub.status = 'active'
                 period_end = invoice.get('lines', {}).get('data', [])
                 if period_end:
@@ -970,7 +972,7 @@ def _process_stripe_event(event):
         try:
             sub = OwnerSubscription.objects.filter(stripe_subscription_id=sub_id).first()
             if sub:
-                sub.status = 'inactive'
+                sub.status = 'canceled'
                 sub.save(update_fields=['status'])
             else:
                 sub = OwnerSubscription.objects.filter(stripe_extra_seat_subscription_id=sub_id).first()
