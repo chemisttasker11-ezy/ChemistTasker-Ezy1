@@ -3,7 +3,7 @@
   "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "reviewer": "gpt6-senior-20261025",
   "review_level": "source acquisition only S2/S3 pending",
-  "status": "INCOMPLETE",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
   "files": [
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx",
@@ -103,6 +103,105 @@
       "lines": 35,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
       "note": "35 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/rates.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "20a0274cb677c054eb300107f8b1c83b570cb6c1",
+      "lines": 106,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "106 lines retrieved; counter-offer/shift state; calls none; backend permission and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "96172c392f8b4ed267316830482bfb538350bf8d",
+      "lines": 170,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "170 lines retrieved; counter-offer/shift state; calls none; backend permission and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/submitCounterOffer.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3c8cb59c1836b9ad842d12340611363615c18bdb",
+      "lines": 17,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "17 lines retrieved; counter-offer/shift state; calls createShiftCounterOffer; backend permission and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f257b75317a438f83af26a4fbd580ccfc79e00bb",
+      "lines": 247,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "247 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/FiltersSidebar.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "d03cf1bc35972f5b4d1ca36cd1c13397b50b4c21",
+      "lines": 4,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "4 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3f2620ac11f55f6d72bb64009279366b321d5306",
+      "lines": 829,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "829 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/TalentCardV2.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "822eedd587918a6696251a0a71e23e20ea671d0d",
+      "lines": 311,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "311 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/constants.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "71279f635a3be45f9b9463d8b359118d67fe5bc3",
+      "lines": 17,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "17 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "c4ad53ce158e9b3912756c6addc7480cea9892aa",
+      "lines": 2,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "2 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "16f99d49673659d96b62724b51051d66ad99d4e1",
+      "lines": 81,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "81 lines retrieved; talent filters, profile projection and availability UI; calls loadAllTalentPages; backend permission and parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFilters.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e4e60b225ab761a45e321c6a3565651fa04037e1",
+      "lines": 9,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "9 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
     }
   ],
   "findings": []
