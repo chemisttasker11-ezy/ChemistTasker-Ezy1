@@ -103,6 +103,23 @@ class PublicHolidayWorkBaseContracts(SimpleTestCase):
         self.assertEqual(rate,Decimal("0.00"))
         self.assertIn("REGION_REQUIRED",reason["error"])
 
+    def test_victorian_melbourne_cup_replacement_not_double_counted(self):
+        region="VIC_WARRNAMBOOL"
+        self.assertTrue(self.classify(date(2026,5,7),"VIC",region).is_public_holiday)
+        self.assertFalse(self.classify(date(2026,11,3),"VIC",region).is_public_holiday)
+        self.assertTrue(self.classify(date(2026,11,3),"VIC","").is_public_holiday)
+        self.assertEqual(self.classify(date(2027,11,2),"VIC",region).status,"LOCAL_DECLARATION_PENDING")
+
+    def test_nsw_2027_part_day_declared_places_not_other_lga(self):
+        self.assertTrue(self.classify(date(2027,3,19),"NSW","NSW_ALBURY",time(13)).is_public_holiday)
+        self.assertFalse(self.classify(date(2027,3,19),"NSW","NSW_ALBURY",time(11)).is_public_holiday)
+        self.assertFalse(self.classify(date(2027,3,19),"NSW","NSW_WALCHA",time(13)).is_public_holiday)
+
+    def test_2026_qld_townsville_and_2027_pending_status(self):
+        self.assertTrue(self.classify(date(2026,7,6),"QLD","QLD_TOWNSVILLE").is_public_holiday)
+        self.assertFalse(self.classify(date(2026,7,6),"QLD","QLD_BRISBANE").is_public_holiday)
+        self.assertEqual(self.classify(date(2027,7,6),"QLD","QLD_TOWNSVILLE").status,"LOCAL_DECLARATION_PENDING")
+
     def test_all_eight_states_have_both_years_and_kings_birthday_differs(self):
         from shifts.pricing_data import public_holidays
         data=public_holidays()

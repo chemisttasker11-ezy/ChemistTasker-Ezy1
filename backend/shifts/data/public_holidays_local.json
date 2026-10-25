@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "reviewed_on": "2026-10-25",
+  "reviewed_on": "2026-10-26",
   "legal_basis": "https://www.fairwork.gov.au/employment-conditions/public-holidays",
   "award": "https://awards.fairwork.gov.au/MA000012.html",
   "statewide_source_2026": "https://www.fairwork.gov.au/employment-conditions/public-holidays/2026-public-holidays",
@@ -672,6 +672,737 @@
           "start": "00:00",
           "end": "24:00",
           "name": "Coonamble Show"
+        }
+      ]
+    },
+    "NSW_ALBURY": {
+      "state": "NSW",
+      "label": "Albury Gold Cup",
+      "coverage": "Whole City of Albury LGA, part day from midday",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-03-20",
+          "start": "12:00",
+          "end": "24:00",
+          "name": "Albury Gold Cup"
+        },
+        {
+          "date": "2027-03-19",
+          "start": "12:00",
+          "end": "24:00",
+          "name": "Albury Gold Cup"
+        }
+      ]
+    },
+    "NSW_SCONE_DISTRICTS": {
+      "state": "NSW",
+      "label": "Scone Cup - listed Upper Hunter communities",
+      "coverage": "Only Aberdeen, Blandford, Bunnan, Ellerston, Gundy, Moonan Brook, Moonan Flat, Murrurundi, Parkville, Rouchel, Scone, Timor and Wingen",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-05-15",
+          "start": "12:00",
+          "end": "24:00",
+          "name": "Scone Cup"
+        },
+        {
+          "date": "2027-05-14",
+          "start": "12:00",
+          "end": "24:00",
+          "name": "Scone Cup"
+        }
+      ]
+    },
+    "NSW_TRUNDLE": {
+      "state": "NSW",
+      "label": "Trundle Show locality",
+      "coverage": "Only Bogan Gate, Bruie Plains and Trundle within published Parkes Shire council boundary",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-19",
+          "start": "09:00",
+          "end": "17:00",
+          "name": "Trundle Show"
+        },
+        {
+          "date": "2027-08-18",
+          "start": "09:00",
+          "end": "17:00",
+          "name": "Trundle Show"
+        }
+      ]
+    },
+    "NSW_PEAK_HILL": {
+      "state": "NSW",
+      "label": "Peak Hill Show locality",
+      "coverage": "Peak Hill area within council's gazetted mapped boundary only",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-26",
+          "start": "09:00",
+          "end": "17:00",
+          "name": "Peak Hill Show"
+        },
+        {
+          "date": "2027-08-25",
+          "start": "09:00",
+          "end": "17:00",
+          "name": "Peak Hill Show"
+        }
+      ]
+    },
+    "NSW_PARKES_MAPPED": {
+      "state": "NSW",
+      "label": "Parkes Show boundary",
+      "coverage": "Gazetted Parkes show boundary: Alectown, Cooks Myalls, Goonumbla, Gunningbland, Nelungaloo, Parkes, Tichborne and mapped parts of Cookamidgera/Mandagery",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026,
+        2027
+      ],
+      "pending_years": [],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-09-01",
+          "start": "12:00",
+          "end": "17:00",
+          "name": "Parkes Show"
+        },
+        {
+          "date": "2027-08-31",
+          "start": "12:00",
+          "end": "17:00",
+          "name": "Parkes Show"
+        }
+      ]
+    },
+    "NSW_MACLEAN_YAMBA_ILUKA": {
+      "state": "NSW",
+      "label": "Maclean Show police patrol districts",
+      "coverage": "Only Police Patrol Districts of Iluka, Maclean and Yamba, within Clarence Valley; not entire council",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-04-22",
+          "start": "13:00",
+          "end": "17:00",
+          "name": "Maclean Show"
+        }
+      ]
+    },
+    "NSW_YEOVAL_PART": {
+      "state": "NSW",
+      "label": "Yeoval Show mapped part of Cabonne",
+      "coverage": "Only mapped part of Yeoval within Cabonne LGA",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-05-12",
+          "start": "08:30",
+          "end": "19:00",
+          "name": "Yeoval Show"
+        }
+      ]
+    },
+    "NSW_NYNGAN": {
+      "state": "NSW",
+      "label": "Nyngan Show - Bogan LGA",
+      "coverage": "Whole Bogan LGA",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-05-18",
+          "start": "12:00",
+          "end": "24:00",
+          "name": "Nyngan Show"
+        }
+      ]
+    },
+    "NSW_GRAFTON_MAPPED": {
+      "state": "NSW",
+      "label": "Grafton gazetted local public holidays",
+      "coverage": "Only mapped City of Grafton area; not all Clarence Valley",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-07-15",
+          "start": "13:00",
+          "end": "17:00",
+          "name": "Ramornie Race Day"
+        },
+        {
+          "date": "2026-07-16",
+          "start": "13:00",
+          "end": "17:00",
+          "name": "Grafton Cup"
+        },
+        {
+          "date": "2026-11-05",
+          "start": "13:00",
+          "end": "17:00",
+          "name": "Jacaranda Festival"
+        }
+      ]
+    },
+    "NSW_BLAND": {
+      "state": "NSW",
+      "label": "West Wyalong Show",
+      "coverage": "Bland Shire Council LGA",
+      "source": "https://www.nsw.gov.au/about-nsw/public-holidays/local-public-holidays",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-09-09",
+          "start": "12:00",
+          "end": "18:00",
+          "name": "West Wyalong Show"
+        }
+      ]
+    },
+    "QLD_IPSWICH": {
+      "state": "QLD",
+      "label": "Ipswich Annual Show",
+      "coverage": "City of Ipswich",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-05-15",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Ipswich Annual Show"
+        }
+      ]
+    },
+    "QLD_TOWNSVILLE": {
+      "state": "QLD",
+      "label": "Townsville Annual Show",
+      "coverage": "City of Townsville",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-07-06",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Townsville Annual Show"
+        }
+      ]
+    },
+    "QLD_FRASER_COAST": {
+      "state": "QLD",
+      "label": "Fraser Coast Agricultural Show",
+      "coverage": "Fraser Coast region",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-05-22",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Fraser Coast Agricultural Show"
+        }
+      ]
+    },
+    "QLD_ROCKHAMPTON": {
+      "state": "QLD",
+      "label": "Rockhampton Agricultural Show",
+      "coverage": "Rockhampton region",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-06-11",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Rockhampton Agricultural Show"
+        }
+      ]
+    },
+    "QLD_MACKAY": {
+      "state": "QLD",
+      "label": "Mackay Agricultural Show",
+      "coverage": "Mackay region",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-06-18",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Mackay Agricultural Show"
+        }
+      ]
+    },
+    "QLD_MOUNT_ISA": {
+      "state": "QLD",
+      "label": "Mount Isa Agricultural Show",
+      "coverage": "City of Mount Isa",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-06-19",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Mount Isa Agricultural Show"
+        }
+      ]
+    },
+    "QLD_TOOWOOMBA_MAIN": {
+      "state": "QLD",
+      "label": "Toowoomba Royal Agricultural Show",
+      "coverage": "Toowoomba Regional Council excluding Yarraman, Upper Yarraman and Cooyar",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-03-27",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Toowoomba Royal Agricultural Show"
+        }
+      ]
+    },
+    "QLD_SUNSHINE_CALOUNDRA": {
+      "state": "QLD",
+      "label": "Maleny Annual Show",
+      "coverage": "Only former Caloundra City Council area within Sunshine Coast region",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-05-29",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Maleny Annual Show"
+        }
+      ]
+    },
+    "QLD_SUNSHINE_MAROOCHY": {
+      "state": "QLD",
+      "label": "Sunshine Coast Agricultural Show",
+      "coverage": "Only former Maroochy Shire area within Sunshine Coast region",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-06-12",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Sunshine Coast Agricultural Show"
+        }
+      ]
+    },
+    "QLD_BUNDABERG_4671": {
+      "state": "QLD",
+      "label": "Royal Queensland Show (Bundaberg district)",
+      "coverage": "Only Bundaberg region within the officially specified 4671 postcode; verify boundary manually",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-08-10",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Royal Queensland Show (Bundaberg district)"
+        }
+      ]
+    },
+    "QLD_BUNDABERG_DISTRICT": {
+      "state": "QLD",
+      "label": "Bundaberg Annual Show",
+      "coverage": "Only Bundaberg region within listed 4660, 4670 and 4673 postcodes; verify boundary manually",
+      "source": "https://www.qld.gov.au/recreation/travel/holidays/show",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [],
+      "events": [
+        {
+          "date": "2026-05-28",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Bundaberg Annual Show"
+        }
+      ]
+    },
+    "VIC_WARRNAMBOOL": {
+      "state": "VIC",
+      "label": "Warrnambool City",
+      "coverage": "Entire Warrnambool City Council",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-05-07",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Warrnambool City"
+        }
+      ]
+    },
+    "VIC_MOYNE": {
+      "state": "VIC",
+      "label": "Moyne Shire",
+      "coverage": "Entire Moyne Shire Council",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-05-07",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Moyne Shire"
+        }
+      ]
+    },
+    "VIC_GREATER_GEELONG": {
+      "state": "VIC",
+      "label": "Greater Geelong",
+      "coverage": "Entire Greater Geelong municipality",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-10-21",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Greater Geelong"
+        }
+      ]
+    },
+    "VIC_MACEDON_PART": {
+      "state": "VIC",
+      "label": "Macedon Ranges mapped region",
+      "coverage": "Only postcodes 3444, 3446, 3458 and localities Cadello, Carlsruhe",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-11-04",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Macedon Ranges mapped region"
+        }
+      ]
+    },
+    "VIC_WODONGA": {
+      "state": "VIC",
+      "label": "Wodonga Gold Cup",
+      "coverage": "Entire Wodonga City Council",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-11-27",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Wodonga Gold Cup"
+        }
+      ]
+    },
+    "VIC_HINDMARSH_RAINBOW": {
+      "state": "VIC",
+      "label": "Rainbow agricultural holiday",
+      "coverage": "Only localities Rainbow, Albacutya, Kenmare within Hindmarsh Shire",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-10-13",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Rainbow agricultural holiday"
+        }
+      ]
+    },
+    "VIC_HINDMARSH_NHILL": {
+      "state": "VIC",
+      "label": "Nhill district holiday",
+      "coverage": "Only named localities Broughton, Yanac, Netherby, Lorquon, Nhill, Glenlee, Kiata, Gerang Gerung and Little Desert",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-10-15",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Nhill district holiday"
+        }
+      ]
+    },
+    "VIC_YARRIAMBIACK_PART": {
+      "state": "VIC",
+      "label": "Warracknabeal district holiday",
+      "coverage": "Only township Warracknabeal and gazetted district within Yarriambiack Shire",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-10-08",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Warracknabeal district holiday"
+        }
+      ]
+    },
+    "VIC_MOIRA_NUMURKAH": {
+      "state": "VIC",
+      "label": "Numurkah district holiday",
+      "coverage": "Only Numurkah district within Moira Shire",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-10-21",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Numurkah district holiday"
+        }
+      ]
+    },
+    "VIC_MILDURA_WEST": {
+      "state": "VIC",
+      "label": "Mildura western district holiday",
+      "coverage": "Only area westerly from and including Boinka township, south of Murray Sunset National Park",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-10-07",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Mildura western district holiday"
+        }
+      ]
+    },
+    "VIC_BENDIGO_WEST": {
+      "state": "VIC",
+      "label": "Bendigo western district holiday",
+      "coverage": "Only Greater Bendigo areas west of the Campaspe River",
+      "source": "https://business.vic.gov.au/business-information/public-holidays/victorian-non-metropolitan-public-holidays-2026",
+      "verified_years": [
+        2026
+      ],
+      "pending_years": [
+        2027
+      ],
+      "exclude_state_dates": [
+        "2026-11-03"
+      ],
+      "events": [
+        {
+          "date": "2026-10-28",
+          "start": "00:00",
+          "end": "24:00",
+          "name": "Bendigo western district holiday"
         }
       ]
     }
