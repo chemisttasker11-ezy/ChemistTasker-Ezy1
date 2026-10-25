@@ -883,5 +883,40 @@
       "No provider, transactional PostgreSQL or production user exploitation tested.",
       "S2 whole-file independent review not certified."
     ]
+  },
+  "B29": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/attendance/protocol.py:89-117",
+      "backend/attendance/protocol.py:234-301",
+      "backend/qa_release/test_pr200_kiosk_clock_audit.py:1-72"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b29_properly_signed_anchor_drift_must_not_apply_attendance",
+        "observed": "Valid Ed25519 signed event with 10-minute difference between device_timestamp and trusted_time_estimate returned needs_review, but persisted KioskAttendanceEvent.attendance_event_id=2, not NULL. The no-apply negative assertion failed after integrity flag assertion passed.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189842660",
+        "head": "9c0d0f0e658d24c8c2beb2795a429f9659f4dd08",
+        "environment": "Ubuntu isolated standalone attendance_tests SQLite schema, real offline protocol and Ed25519 signed event"
+      },
+      {
+        "test": "test_b29_properly_signed_server_drift_must_not_apply_attendance",
+        "observed": "Valid Ed25519 signed event dated eight days before server time returned needs_review, but persisted attendance_event_id=3, not NULL. No-apply negative assertion failed after SERVER_TIME_DRIFT flag assertion passed.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189842660",
+        "head": "9c0d0f0e658d24c8c2beb2795a429f9659f4dd08",
+        "environment": "Isolated standalone attendance_tests SQLite, real signed protocol"
+      }
+    ],
+    "positive_controls": [
+      "test_b29_normal_clock_positive_control_applies_attendance PASSED; one accepted KioskAttendanceEvent and AttendanceEvent/AttendanceSession"
+    ],
+    "runtime_limitations": [
+      "Two fixture-valid signed-event paths were checked. A manager approval, payroll export/payment and separate kiosk device were not exercised.",
+      "No PostgreSQL concurrency; no physical kiosk; further role-tenant auth and time tamper protections unproven.",
+      "High-impact classification conditional on whether NEEDS_REVIEW events should be excluded from payroll, operational views or subsequent approvals."
+    ]
   }
 }
