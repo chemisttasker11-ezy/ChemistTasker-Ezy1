@@ -138,3 +138,17 @@ F10-N6 | Ethical marketplace | Ethical offers disclose full stock-lot records to
 F11-N1 | Auth | Changing a pending phone number leaves the previous number's verification code usable.
 F11-N2 | Auth | Signing out of Expo leaves private push notifications active on that device.
 F11-N3 | Auth | Phone verification replaces a browser-only session with a persistent 90-day session.
+C009-N1 | Shifts | Worker dashboard exposes community shift IDs and dates to staff outside the vacancy's audience.
+C009-N2 | Invoicing | Mobile dashboards label all-time drafted invoice value as this month's income.
+C009-N3 | Marketplace | Ethical stock imports can still be committed after the inventory write feature is switched off.
+C010-N1 | Marketplace | Editing an ethical draft can reassign it to another owner's pharmacy and another product without destination authorization.
+C011-N1 | Marketplace | Concurrent identical marketplace enquiries can persist duplicate negotiations before the idempotency receipt fails.
+C011-N2 | Memberships | Revoked invitation sender continues receiving membership response notifications containing staff identities.
+C012-N1 | Memberships | Authenticated workers can create applications against expired or unauthorised invitation links by calling the generic applications endpoint.
+C012-N2 | Memberships | A pharmacy administrator can permanently delete pending and decided membership application review records through generic DELETE.
+C015-N1 | Onboarding | AHPRA suspension notices expose an employee's regulatory status to region administrators outside their assigned pharmacies.
+C016-N1 | Hub | Ordinary pharmacy workers can list private hub groups and obtain their full membership rosters without joining them.
+C016-N2 | Hub | Hub group PATCH can reassign an existing group to an unrelated pharmacy without checking destination tenant authority.
+C070-N1 | Expo shift board state | Shared AsyncStorage keys can expose previous account's applied/rejected shift markers after account switching.
+C071-N1 | Mobile authentication | Concurrent mobile logout and in-flight refresh/profile hydration can resurrect old tokens or overwrite the newly signed-in account.
+C071-N2 | Mobile push privacy | Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.

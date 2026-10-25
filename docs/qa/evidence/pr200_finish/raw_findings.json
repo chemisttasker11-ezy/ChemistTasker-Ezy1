@@ -3697,5 +3697,406 @@
   },
   "chunk": "F11",
   "reviewer": "codexA-4"
+ },
+ {
+  "id": "C009-N1",
+  "severity": "P2",
+  "area": "Shifts",
+  "title": "Worker dashboard exposes community shift IDs and dates to staff outside the vacancy's audience.",
+  "scenario": "Ben is Tom's favourite locum and should only be offered favourite-locum shifts, not Tom's internal staff vacancies. The pharmacist dashboard counts and returns a FULL_PART_TIME vacancy to Ben as a community opportunity, including its identifier and date. The normal worker shift listing correctly excludes it.",
+  "evidence": [
+   "backend/dashboards/views.py:816",
+   "backend/dashboards/views.py:873",
+   "backend/dashboards/views.py:884",
+   "backend/dashboards/views.py:132",
+   "backend/shifts/escalation.py:25"
+  ],
+  "confidence": "high",
+  "test_needed": "Ben is an accepted LOCUM member only. Tom creates a FULL_PART_TIME internal pharmacist shift; GET /api/v1/dashboard/pharmacist/?workspace=internal&pharmacy_id=... must exclude its ID and count; Omar (accepted FULL_TIME) must see it.",
+  "owner_question": {
+   "question": "Should favourite locum Ben see counts, dates or IDs of Tom's internal FULL_PART_TIME staff vacancies?",
+   "options": [
+    "No: use the same audience filter as internal shift browsing",
+    "Only show aggregated counts, not identifiers or dates",
+    "Yes: keep current community opportunity listing"
+   ]
+  },
+  "chunk": "C009",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C009-N2",
+  "severity": "P2",
+  "area": "Invoicing",
+  "title": "Mobile dashboards label all-time drafted invoice value as this month's income.",
+  "scenario": "Sara issued an invoice in January, then another in October. The October pharmacist dashboard labels the sum of both invoices 'Total Income This Month', and even counts unsent draft invoices. The backend returns all-time billed amounts without a date or paid-status filter; the other-staff mobile dashboard uses the same label.",
+  "evidence": [
+   "backend/dashboards/views.py:480",
+   "backend/dashboards/views.py:894",
+   "backend/dashboards/views.py:1008",
+   "frontend_mobile/roles/pharmacist/dashboard.tsx:154",
+   "frontend_mobile/roles/otherstaff/dashboard.tsx:150"
+  ],
+  "confidence": "high",
+  "test_needed": "Sara has an old invoice, this-month sent invoice and an unsent draft; load pharmacist dashboard and assert a clearly defined monthly income metric excludes last month and drafts, while all-time billed metric remains separately labelled.",
+  "owner_question": {
+   "question": "What should Sara's 'Income This Month' tile count?",
+   "options": [
+    "Only money actually received during the current calendar month",
+    "Invoices issued this month, labelled 'This Month Invoiced'",
+    "All-time invoice totals, but relabel them accurately"
+   ]
+  },
+  "chunk": "C009",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C009-N3",
+  "severity": "P1",
+  "area": "Marketplace",
+  "title": "Ethical stock imports can still be committed after the inventory write feature is switched off.",
+  "scenario": "Tom stages an ethical stock CSV while the inventory feature is available. An administrator disables ethical inventory writes to stop unsafe stock changes. Tom can still invoke the import-commit endpoint, which changes stock quantities and creates stock-movement records without checking the disabled feature flag.",
+  "evidence": [
+   "backend/ethical_marketplace/owner_views.py:47",
+   "backend/ethical_marketplace/owner_views.py:55",
+   "backend/ethical_marketplace/owner_views.py:65",
+   "backend/ethical_marketplace/views.py:193",
+   "backend/ethical_marketplace/views.py:195",
+   "backend/ethical_marketplace/views.py:234",
+   "backend/core/settings.py:242"
+  ],
+  "confidence": "high",
+  "test_needed": "Stage a valid import as a verified entitled owner with ETHICAL_INVENTORY_ENABLED=True; disable it before POST /api/v1/ethical/inventory/imports/{pk}/commit/; expect 503 and no EthicalStockLot/Movement changes. Positive flag-true commit still succeeds.",
+  "owner_question": {
+   "question": "When ethical inventory writes are disabled, should a previously staged import still update stock?",
+   "options": [
+    "No: block every stock-mutating endpoint including commit",
+    "Allow viewing staged rows but require explicit re-enable to commit",
+    "Allow previously staged imports to commit after writes are disabled"
+   ]
+  },
+  "chunk": "C009",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C010-N1",
+  "severity": "P1",
+  "area": "Marketplace",
+  "title": "Editing an ethical draft can reassign it to another owner's pharmacy and another product without destination authorization.",
+  "scenario": "Tom delegates preparation of his ethical listing to Omar. Omar edits that DRAFT with Nadia's unrelated pharmacy identifier and another approved product. The update saves the reassignment without proving Omar can manage Nadia's pharmacy or that he is approved for the replacement product. Nadia's stock workflow can then contain Tom's unauthorized listing.",
+  "evidence": [
+   "backend/ethical_marketplace/views.py:317",
+   "backend/ethical_marketplace/views.py:318",
+   "backend/ethical_marketplace/views.py:319",
+   "backend/ethical_marketplace/views.py:322",
+   "backend/ethical_marketplace/views.py:324",
+   "backend/ethical_marketplace/serializers.py:60",
+   "backend/ethical_marketplace/serializers.py:63",
+   "backend/ethical_marketplace/signals.py:18"
+  ],
+  "confidence": "high",
+  "test_needed": "Create a draft owned by pharmacy A. As authorized A preparer, PATCH its pharmacy to unrelated B and product to unapproved S8; assert 403/400 and no owner/product/lot/audience changes. Valid description-only update remains allowed.",
+  "owner_question": {
+   "question": "May Omar move a draft ethical medicine listing from Tom's premises to Nadia's unrelated premises without the destination owner authorising it?",
+   "options": [
+    "No; immutable pharmacy and product with fresh draft required for material changes",
+    "Only with explicit authorization from both pharmacy owners and new product policy checks",
+    "Yes; leave the existing draft PATCH behavior"
+   ]
+  },
+  "chunk": "C010",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C011-N1",
+  "severity": "P1",
+  "area": "Marketplace",
+  "title": "Concurrent identical marketplace enquiries can persist duplicate negotiations before the idempotency receipt fails.",
+  "scenario": "Sara sends an enquiry to Tom's listing twice at the same instant. Both requests see no prior idempotency receipt and create separate exchanges, after which the second hits a unique receipt constraint and returns an error. Tom can receive two negotiations for one enquiry.",
+  "evidence": [
+   "backend/marketplace/views.py:283",
+   "backend/marketplace/views.py:297",
+   "backend/marketplace/views.py:300",
+   "backend/marketplace/views.py:309",
+   "backend/marketplace/models.py:321",
+   "backend/marketplace/models.py:329"
+  ],
+  "confidence": "high",
+  "test_needed": "Concurrently submit identical enquiry UUIDs using PostgreSQL and verify exactly one exchange and one receipt, with repeat-safe response.",
+  "owner_question": {
+   "question": "What should happen if Sara accidentally submits her marketplace enquiry to Tom twice simultaneously?",
+   "options": [
+    "Create one negotiation and replay its outcome",
+    "Create one negotiation and safely reject the duplicate",
+    "Create two negotiations with a server error (current race)"
+   ]
+  },
+  "chunk": "C011",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C011-N2",
+  "severity": "P1",
+  "area": "Memberships",
+  "title": "Revoked invitation sender continues receiving membership response notifications containing staff identities.",
+  "scenario": "Lina invites Sara to Tom's pharmacy but subsequently loses her organisation membership and staff-management authority. When Sara responds or leaves, Lina remains a notification recipient through the original inviter link and receives Sara's name and email.",
+  "evidence": [
+   "backend/memberships/notifications.py:66",
+   "backend/memberships/notifications.py:73",
+   "backend/memberships/notifications.py:81",
+   "backend/memberships/notifications.py:116",
+   "backend/memberships/notifications.py:142",
+   "backend/memberships/notifications.py:161"
+  ],
+  "confidence": "high",
+  "test_needed": "After revoking Lina's organisation/pharmacy authority, make Sara accept/leave. Lina receives no email or in-app notification; valid managers still receive it.",
+  "owner_question": {
+   "question": "Should former manager Lina continue receiving Sara's membership notifications after her access is revoked?",
+   "options": [
+    "No, recheck recipient authority for each event",
+    "Only the initial invitation response",
+    "Yes, retain all inviter notifications after removal"
+   ]
+  },
+  "chunk": "C011",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C012-N1",
+  "severity": "P1",
+  "area": "Memberships",
+  "title": "Authenticated workers can create applications against expired or unauthorised invitation links by calling the generic applications endpoint.",
+  "scenario": "Sara has no valid invitation to Tom's pharmacy. She obtains or guesses a numeric invite-link identifier and sends her details to the membership-applications API directly. The create endpoint only requires authentication and its serializer accepts the link ID without checking active status or expiry, bypassing the secure magic-link application route.",
+  "evidence": [
+   "backend/memberships/views.py:310",
+   "backend/memberships/views.py:316",
+   "backend/memberships/serializers.py:382",
+   "backend/memberships/serializers.py:383",
+   "backend/memberships/serializers.py:423",
+   "backend/memberships/serializers.py:526",
+   "backend/memberships/views.py:249",
+   "backend/memberships/views.py:262"
+  ],
+  "confidence": "high",
+  "test_needed": "As unrelated authenticated Sara, POST /api/v1/membership-applications/ with a valid old or disabled invite_link integer, matching her email/DOB/role. Expect refusal and zero application creation; valid UUID magic-link flow must succeed.",
+  "owner_question": {
+   "question": "May Sara apply to Tom's pharmacy using the internal numeric ID of an expired or revoked invitation?",
+   "options": [
+    "No, all application creation must require a valid active token",
+    "Allow only when Tom explicitly re-enables the invitation",
+    "Yes, the numeric ID is sufficient"
+   ]
+  },
+  "chunk": "C012",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C012-N2",
+  "severity": "P1",
+  "area": "Memberships",
+  "title": "A pharmacy administrator can permanently delete pending and decided membership application review records through generic DELETE.",
+  "scenario": "Lina is authorised to review applications for Tom's pharmacy. After deciding an application, she calls DELETE on the application detail endpoint. The default ModelViewSet destroys the application and its submitted snapshot and reviewer decision, removing the employment decision audit trail instead of recording an archival state.",
+  "evidence": [
+   "backend/memberships/views.py:310",
+   "backend/memberships/views.py:318",
+   "backend/memberships/views.py:324",
+   "backend/memberships/models.py:233",
+   "backend/memberships/models.py:283",
+   "backend/memberships/urls.py:22"
+  ],
+  "confidence": "high",
+  "test_needed": "As scoped manager attempt DELETE on approved, rejected and pending applications; require 405/403 or audited soft-archive, preserving submitted/decision history. Verify positive review/approve/reject remains functional.",
+  "owner_question": {
+   "question": "Should Lina be allowed to permanently delete historic membership applications and decisions?",
+   "options": [
+    "No, retain review history and permit only audited archive",
+    "Only permit irreversible deletion by an audited super-admin workflow",
+    "Yes, ordinary managers may delete application history"
+   ]
+  },
+  "chunk": "C012",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C015-N1",
+  "severity": "P1",
+  "area": "Onboarding",
+  "title": "AHPRA suspension notices expose an employee's regulatory status to region administrators outside their assigned pharmacies.",
+  "scenario": "Sara works at Tom's pharmacy and her AHPRA registration is suspended. Grace is a region administrator in the same organisation but assigned only to Nadia's different pharmacy. The suspension notifier delivers Sara's name, pharmacy affiliation and registration status to Grace despite her lacking permission to manage Tom's pharmacy.",
+  "evidence": [
+   "backend/onboarding/verification/state.py:335",
+   "backend/onboarding/verification/state.py:340",
+   "backend/onboarding/verification/state.py:343",
+   "backend/onboarding/verification/state.py:346",
+   "backend/onboarding/verification/state.py:352",
+   "backend/users/org_roles.py:1"
+  ],
+  "confidence": "high",
+  "test_needed": "Create two pharmacies in one organisation; Sara is at A, Grace REGION_ADMIN assigned only B. Trigger Sara AHPRA suspension and assert Grace receives no in-app/email status, while authorized A managers do.",
+  "owner_question": {
+   "question": "Should region administrator Grace receive Sara's AHPRA suspension details when Sara works at a pharmacy Grace cannot manage?",
+   "options": [
+    "No; deliver only to managers scoped to Sara's pharmacy",
+    "Send a generic staffing alert without identity or regulatory detail",
+    "Yes; all regional administrators in the organisation receive detailed suspension notices"
+   ]
+  },
+  "chunk": "C015",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C016-N1",
+  "severity": "P1",
+  "area": "Hub",
+  "title": "Ordinary pharmacy workers can list private hub groups and obtain their full membership rosters without joining them.",
+  "scenario": "Mia works at Tom's pharmacy but is not a member of its restricted managers' group. Mia requests all pharmacy groups with include_members=true. The group list is authorized only against Mia's general pharmacy membership and exposes the managers' group name, description and member details, despite group-specific access forbidding her.",
+  "evidence": [
+   "backend/pharmacy_hub/groups.py:29",
+   "backend/pharmacy_hub/groups.py:35",
+   "backend/pharmacy_hub/groups.py:47",
+   "backend/pharmacy_hub/groups.py:108",
+   "backend/pharmacy_hub/groups.py:114",
+   "backend/pharmacy_hub/serialization/groups.py:29",
+   "backend/pharmacy_hub/serialization/groups.py:140",
+   "backend/pharmacy_hub/access.py:225",
+   "backend/pharmacy_hub/access.py:271"
+  ],
+  "confidence": "high",
+  "test_needed": "Create private manager group G at pharmacy A and ordinary nonmember Mia at A; GET /api/v1/hub/community-groups/?pharmacy_id=A&include_members=true must not return G or its members. Authorized group member and managers still see permitted details.",
+  "owner_question": {
+   "question": "Should Mia see the names, descriptions and member rosters of private groups at Tom's pharmacy when she is not a group member?",
+   "options": [
+    "No, hide restricted groups from nonmembers",
+    "Show group titles only without rosters or descriptions",
+    "Yes, every pharmacy member can view complete group rosters"
+   ]
+  },
+  "chunk": "C016",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C016-N2",
+  "severity": "P1",
+  "area": "Hub",
+  "title": "Hub group PATCH can reassign an existing group to an unrelated pharmacy without checking destination tenant authority.",
+  "scenario": "Tom administers a community group at his own pharmacy. He edits it and includes Nadia's unrelated pharmacy identifier. The group update authorizes only the original group and accepts the serializer's writable pharmacy field, moving the group and its existing memberships into a different pharmacy context without Nadia's consent.",
+  "evidence": [
+   "backend/pharmacy_hub/groups.py:138",
+   "backend/pharmacy_hub/groups.py:139",
+   "backend/pharmacy_hub/groups.py:144",
+   "backend/pharmacy_hub/serialization/groups.py:30",
+   "backend/pharmacy_hub/serialization/groups.py:42",
+   "backend/pharmacy_hub/serialization/groups.py:127",
+   "backend/pharmacy_hub/serialization/groups.py:137"
+  ],
+  "confidence": "high",
+  "test_needed": "As Tom, manage group G in pharmacy A; PATCH G with pharmacy=B owned by unrelated Nadia. Assert mutation rejected and group pharmacy, member links and posts remain in A. Valid same-pharmacy description change succeeds.",
+  "owner_question": {
+   "question": "May Tom move an existing group and its posts into Nadia's unrelated pharmacy using an ordinary group edit?",
+   "options": [
+    "No, pharmacy ownership of a group is immutable",
+    "Only through an explicit, audited two-party transfer workflow",
+    "Yes, source manager authorization is sufficient"
+   ]
+  },
+  "chunk": "C016",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C070-N1",
+  "severity": "P2",
+  "area": "Expo shift board state",
+  "title": "Shared AsyncStorage keys can expose previous account's applied/rejected shift markers after account switching.",
+  "scenario": "Sara uses a shared phone and marks shift IDs applied or rejected; after logout Tom signs in on the same device. The shift board persistence hook hydrates applied/rejected marker IDs from device-global AsyncStorage keys without an account prefix. Tom can briefly see Sara's state as his own until backend data refresh and shift pruning.",
+  "evidence": [
+   "frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts:6",
+   "frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts:7",
+   "frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts:9",
+   "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts:60",
+   "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts:77",
+   "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts:89",
+   "frontend_mobile/roles/shared/shifts/CommunityShiftsView.tsx:552"
+  ],
+  "confidence": "medium",
+  "verification": "SOURCE_ONLY_UNCONFIRMED",
+  "test_needed": "Native shared device: Sara applies/rejects shifts, signs out; Tom signs in and opens community board with slow server results. Assert applied/rejected markers never display Sara's state, and subsequent writes are isolated. Check default disableLocalPersistence behavior and whether backend props override early hydration.",
+  "owner_question": {
+   "question": "Should shift-board saved/applied/rejected status ever be carried between accounts on a shared device?",
+   "options": [
+    "No, scope all persisted markers to authenticated user",
+    "Do not persist applied/rejected locally at all",
+    "Allow local markers to be shared across logins"
+   ]
+  },
+  "chunk": "C070",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C071-N1",
+  "severity": "P1",
+  "area": "Mobile authentication",
+  "title": "Concurrent mobile logout and in-flight refresh/profile hydration can resurrect old tokens or overwrite the newly signed-in account.",
+  "scenario": "Sara opens Expo and an expired access token triggers refresh or /users/me. Sara signs out or switches to Tom before the request finishes. The older success callback unconditionally calls writeStoredSession/setUser, or a late refresh writes Sara's tokens after clearStoredSession. The old identity becomes active on the device even though the user intentionally left it.",
+  "evidence": [
+   "frontend_mobile/context/AuthContext.tsx:115",
+   "frontend_mobile/context/AuthContext.tsx:120",
+   "frontend_mobile/context/AuthContext.tsx:160",
+   "frontend_mobile/context/AuthContext.tsx:163",
+   "frontend_mobile/context/AuthContext.tsx:169",
+   "frontend_mobile/context/AuthContext.tsx:170",
+   "frontend_mobile/context/AuthContext.tsx:191",
+   "frontend_mobile/context/AuthContext.tsx:523",
+   "frontend_mobile/utils/authSession.ts:198",
+   "frontend_mobile/utils/authSession.ts:217",
+   "frontend_mobile/utils/authSession.ts:227",
+   "frontend_mobile/utils/authSession.ts:268"
+  ],
+  "confidence": "high",
+  "verification": "SOURCE_ONLY_UNCONFIRMED",
+  "test_needed": "Defer initial /me success and refresh response; logout or log in as another user before resolving each. Assert no old /me user or refresh token persisted, no old API Authorization and role home remains intended. Repeat native and Expo-web cases, including refresh failures and storage/network exceptions.",
+  "owner_question": {
+   "question": "When Sara logs out while an earlier refresh/profile request is pending, may the app silently restore Sara's saved account or overwrite Tom's subsequent login?",
+   "options": [
+    "No; invalidate all in-flight auth writes on identity change and logout",
+    "Only if the earlier HTTP call was already sent before logout",
+    "Yes; accept current asynchronous restoration behavior"
+   ]
+  },
+  "chunk": "C071",
+  "reviewer": "gpt6-senior-20261025"
+ },
+ {
+  "id": "C071-N2",
+  "severity": "P1",
+  "area": "Mobile push privacy",
+  "title": "Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.",
+  "scenario": "Sara signs out from a shared iPhone. Native logout clears local secure tokens but never deletes/deactivates that device's push registration. The backend logout only blacklists the refresh token. Notifications notify_users still looks up every active DeviceToken for Sara and delivers future alert titles/bodies to the same phone.",
+  "evidence": [
+   "frontend_mobile/context/AuthContext.tsx:502",
+   "frontend_mobile/context/AuthContext.tsx:523",
+   "frontend_mobile/context/AuthContext.tsx:528",
+   "frontend_mobile/utils/pushNotifications.ts:62",
+   "frontend_mobile/utils/pushNotifications.ts:78",
+   "backend/users/api_auth.py:155",
+   "backend/users/api_auth.py:164",
+   "backend/users/api_auth.py:170",
+   "backend/notifications/views.py:44",
+   "backend/notifications/services.py:64",
+   "backend/notifications/services.py:87",
+   "backend/users/models.py:128"
+  ],
+  "confidence": "high",
+  "verification": "SOURCE_ONLY_UNCONFIRMED",
+  "test_needed": "Register an Expo push token while Sara is logged in. Sign out through native app. Trigger a new private message/notification for Sara; assert DeviceToken is inactive or removed and no push sent. Log in as Tom and confirm token belongs only to Tom. Server logout should revoke current device independently of client network reliability.",
+  "owner_question": {
+   "question": "Should Sara's private shift, employment and chat alerts continue displaying on a phone after she signs out?",
+   "options": [
+    "No; revoke the current device's push token on logout server-side",
+    "Only send generic notifications without personal details until next login",
+    "Yes; preserve notifications after signing out"
+   ]
+  },
+  "chunk": "C071",
+  "reviewer": "gpt6-senior-20261025"
  }
 ]
