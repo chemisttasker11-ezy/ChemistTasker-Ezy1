@@ -236,3 +236,11 @@ Six new source-level candidates after checking prior 65: B66 overnight shift can
 
 - Finished and committed [C075](evidence/pr200_finish/out_C075.json), 43 Next.js/BFF/public-route source-file verdicts, at frozen application baseline `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. Reviewed request-origin validation, header allowlisting and cache prevention in `platform-proxy.ts`, browser CSRF/token refresh/logout, and Next public shift/OTP/account pages. No additional novel candidate established; linked historical B43 and F11-N3.
 - **75/89** chunk reports now complete, **14** remain, with F12 still outstanding. Expected post-merge S1 file tally **1,826/2,151 (84.89%)**; generated CSV is still stale and has not been recomputed. No S2 independent assurance, S3 runtime tests, or production source modification. PR remains draft and NOT RELEASE READY.
+
+
+## 25 October 2026 — new bounded Next clinical and F12 parity evidence, plus C086 S1
+
+- [Next clinical release gate and BFF/ethical UI trace](MAIN_RELEASE_NEXT_CALCULATOR_BOUNDARY_REVIEW_20261025.md) committed. Public dosing exposure and lack of independent clinical sign-off are source-supported; incorrect doses and harm are NOT proven. Candidate P1 release-governance action only; requires negative/positive tests and independent clinical validation.
+- [F12 Vite/Next/Expo parity worklog](MAIN_RELEASE_F12_PARITY_WORKLOG_20261025.md) committed, covering partially traced counter-offer, chat, invoice, clocking and accept/cancel call paths. F12 remains INCOMPLETE; do not claim web/mobile semantic equivalence or executed E2E.
+- [C086](evidence/pr200_finish/out_C086.json) commits two first-pass S1 verdicts for design-skill validators and associated test source: **76/89 output chunks; 13 pending**. Expected source-file reports after aggregate rebuild **1,828/2,151 = 84.98%**; existing CSV remains stale and this is **not a measured regenerated figure**. Remaining assigned paths 323. Whole-file S2 and S3 new certifications **zero**; no test run and no product source change.
+- P0 candidates F03-N1/F04-N1/F04-N2 still CONFIRMED_SOURCE only; retain B01–B71 and C/F findings. PR draft and NOT RELEASE READY.
