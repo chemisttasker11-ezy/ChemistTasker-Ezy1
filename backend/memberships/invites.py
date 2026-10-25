@@ -167,6 +167,8 @@ def create_membership_invite(data, inviter, *, request=None):
         try:
             membership_serializer.is_valid(raise_exception=True)
             membership = membership_serializer.save(invited_by=inviter)
+            if existing_membership:
+                membership.revoke_admin_access()
             desired_status = membership_data.get('status', Membership.Status.ACCEPTED)
             desired_active = bool(membership_data.get('is_active', True))
             force_update_fields = []

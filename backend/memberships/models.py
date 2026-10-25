@@ -189,6 +189,12 @@ class Membership(models.Model):
         return self.employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES
 
 
+    def revoke_admin_access(self):
+        # A later staff invitation must not revive a previous admin invitation.
+        PharmacyAdmin.objects.filter(user_id=self.user_id, pharmacy_id=self.pharmacy_id).update(
+            is_active=False, membership=None, updated_at=timezone.now(),
+        )
+
     def __str__(self):
         if self.pharmacy:
             return f"{self.user.email} in {self.pharmacy.name} ({self.role})"

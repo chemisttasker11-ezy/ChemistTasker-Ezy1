@@ -274,6 +274,14 @@ class MembershipInviteLinkSerializer(serializers.ModelSerializer):
         fields = ['id', 'pharmacy', 'created_by', 'category', 'token', 'expires_at', 'is_active', 'created_at']
         read_only_fields = ['id', 'created_by', 'token', 'created_at']
 
+    def validate(self, attrs):
+        if self.instance is not None:
+            if 'pharmacy' in attrs and attrs['pharmacy'].pk != self.instance.pharmacy_id:
+                raise serializers.ValidationError({'pharmacy': 'Invite link pharmacy cannot be changed.'})
+            if 'category' in attrs and attrs['category'] != self.instance.category:
+                raise serializers.ValidationError({'category': 'Invite link category cannot be changed.'})
+        return attrs
+
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
