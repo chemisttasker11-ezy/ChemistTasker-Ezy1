@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 historical IDs preserved. 50 distinct IDs with targeted negative evidence / 58 cumulative intentional failing assertions; B31 PostgreSQL two-connection race conditional on JSON serializer-only test shim, prior unmodified receipt UUID errors excluded; source code unchanged. S2 independent whole-file 99% NOT CERTIFIED.",
+  "material": "226 original IDs preserved; 52 distinct tested IDs / 60 cumulative intended red assertions across different isolated runs. B02/B57 one policy-conditional red each with positive control at 40192399455. B31 PG 2-connection reproduced only under JSON encoding test seam. 99% independent S2 NOT CERTIFIED.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,14 +10,14 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 50,
-  "runtime_failing_scenarios": 58,
+  "runtime_distinct_ids": 52,
+  "runtime_failing_scenarios": 60,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 11,
-    "UNVERIFIED_CANDIDATE": 152,
+    "UNVERIFIED_CANDIDATE": 150,
     "REPRODUCED_RUNTIME_DJANGO_SQLITE": 47,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
@@ -25,7 +25,8 @@
     "SOURCE_SUPPORTED_CONDITIONAL": 1,
     "SOURCE_SUPPORTED_UI_SCOPE": 1,
     "REPRODUCED_ISOLATED_PURE_FUNCTION": 1,
-    "REPRODUCED_POSTGRES_CONDITIONAL_ISOLATED_SEAM": 1
+    "REPRODUCED_POSTGRES_CONDITIONAL_ISOLATED_SEAM": 1,
+    "REPRODUCED_SQLITE_POLICY_CONDITIONAL": 2
   },
   "independent_s2_certified_files": null,
   "s0_static": {
@@ -62,8 +63,8 @@
       "negative_failures": 7,
       "errors": 0
     },
-    "cumulative_distinct_findings": 50,
-    "cumulative_failed_negative_assertions": 58,
+    "cumulative_distinct_findings": 52,
+    "cumulative_failed_negative_assertions": 60,
     "warning": "Cumulative from multiple isolated targeted runs; not 45 failures in one suite; B24 error invalid, not counted.",
     "additional_runs": [
       {
@@ -169,6 +170,17 @@
           "40192054917"
         ],
         "note": "Actual two-connection PG race conditional on test-only JSON-serializable receipt; cannot claim two valid unmodified production HTTP completions."
+      },
+      {
+        "id": "B02+B57",
+        "run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192399455",
+        "head": "9b86345ed03ec23b27e54cc0a1e252cf413beb10",
+        "tests": 4,
+        "negative_scenarios": 2,
+        "positive_controls": 2,
+        "fixture_errors": 0,
+        "negative_test_failing": true,
+        "note": "Both conclusions policy conditional; no provider/true financial reconciliation proven"
       }
     ]
   },
@@ -207,16 +219,29 @@
       "severity": "P1",
       "area": "Billing",
       "title": "Purchased extra seats cannot subsequently be adjusted",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE_POLICY_CONDITIONAL",
+      "decision": "GRILL_POLICY_IMPLEMENTATION_ON_SEPARATE_BRANCH",
       "root": "B02",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
+      "source_proof": [
+        "backend/billing/views.py:476-540",
+        "backend/billing/models.py:1-61",
+        "backend/qa_release/test_pr200_phase5_seats_refunds.py:1-47"
+      ],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b02_existing_addon_seat_quantity_can_be_changed",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192399455",
+          "head": "9b86345ed03ec23b27e54cc0a1e252cf413beb10",
+          "environment": "GitHub Django isolated SQLite/real authenticated API; Stripe Checkout mocked",
+          "observed": "Owner with active base and purchased add-on subscription requested 8 seats; HTTP 400 explicit 'Incremental changes to an existing add-on are not supported' instead of 200. Positive initial two-seat checkout returned 200 and quantity 2.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED_POLICY_GAP"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Owner with active base and purchased add-on subscription requested 8 seats; HTTP 400 explicit 'Incremental changes to an existing add-on are not supported' instead of 200. Positive initial two-seat checkout returned 200 and quantity 2. Policy caveat: Explicitly unsupported product capability, not unauthorized finance or provider malfunction; require owner policy on adjustments/proration."
     },
     {
       "id": "B03",
@@ -1229,16 +1254,29 @@
       "severity": "P1",
       "area": "Historical discovery",
       "title": "P1 conditional — Refund provider events are acknowledged without reversing/reconciling local paid financial state",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE_POLICY_CONDITIONAL",
+      "decision": "VERIFY_OTHER_FINANCE_ADAPTERS_AND_FIX_RECONCILIATION",
       "root": "B57",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
+      "source_proof": [
+        "backend/billing/views.py:805-956",
+        "backend/billing/models.py:61-116",
+        "backend/qa_release/test_pr200_phase5_seats_refunds.py:48-105"
+      ],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b57_refund_callback_cannot_leave_local_unreconciled_paid",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192399455",
+          "head": "9b86345ed03ec23b27e54cc0a1e252cf413beb10",
+          "environment": "GitHub Django isolated SQLite/real webhook and receipt; Stripe signature parser mocked",
+          "observed": "charge.refunded event for the existing paid ShiftPayment intent returned 200 and processed event receipt, but matched ShiftPayment.status stayed 'paid'. Positive unrelated customer.updated callback preserved paid status.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED_CONDITIONAL_RECONCILIATION"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "charge.refunded event for the existing paid ShiftPayment intent returned 200 and processed event receipt, but matched ShiftPayment.status stayed 'paid'. Positive unrelated customer.updated callback preserved paid status. Policy caveat: Refund may be reconciled by external finance ledger or another event; only local ShiftPayment state tested, not legal/accounting final state or actual Stripe refund."
     },
     {
       "id": "B58",

@@ -1098,5 +1098,59 @@
       "No real pharmacy data, provider settlement, controlled-drug distribution or physical stock movement; jurisdiction S4 synthetic only.",
       "PostgreSQL row-locking/transaction overlap genuinely exercised, with disjoint lot locks and two DB connections; no source application code altered."
     ]
+  },
+  "B02": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+    "source_proof": [
+      "backend/billing/views.py:476-540",
+      "backend/billing/models.py:1-61",
+      "backend/qa_release/test_pr200_phase5_seats_refunds.py:1-47"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b02_existing_addon_seat_quantity_can_be_changed",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192399455",
+        "head": "9b86345ed03ec23b27e54cc0a1e252cf413beb10",
+        "environment": "GitHub Django isolated SQLite/real authenticated API; Stripe Checkout mocked",
+        "observed": "Owner with active base and purchased add-on subscription requested 8 seats; HTTP 400 explicit 'Incremental changes to an existing add-on are not supported' instead of 200. Positive initial two-seat checkout returned 200 and quantity 2.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED_POLICY_GAP"
+      }
+    ],
+    "positive_controls": [
+      "test_b02_first_addon_purchase_positive PASSED"
+    ],
+    "runtime_limitations": [
+      "Explicitly unsupported product capability, not unauthorized finance or provider malfunction; require owner policy on adjustments/proration.",
+      "No real Stripe provider network, customer balance or live financial disclosure.",
+      "No independently certified whole-file S2 coverage."
+    ]
+  },
+  "B57": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+    "source_proof": [
+      "backend/billing/views.py:805-956",
+      "backend/billing/models.py:61-116",
+      "backend/qa_release/test_pr200_phase5_seats_refunds.py:48-105"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b57_refund_callback_cannot_leave_local_unreconciled_paid",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192399455",
+        "head": "9b86345ed03ec23b27e54cc0a1e252cf413beb10",
+        "environment": "GitHub Django isolated SQLite/real webhook and receipt; Stripe signature parser mocked",
+        "observed": "charge.refunded event for the existing paid ShiftPayment intent returned 200 and processed event receipt, but matched ShiftPayment.status stayed 'paid'. Positive unrelated customer.updated callback preserved paid status.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED_CONDITIONAL_RECONCILIATION"
+      }
+    ],
+    "positive_controls": [
+      "test_b57_unrelated_callback_keeps_paid_payment_positive PASSED"
+    ],
+    "runtime_limitations": [
+      "Refund may be reconciled by external finance ledger or another event; only local ShiftPayment state tested, not legal/accounting final state or actual Stripe refund.",
+      "No real Stripe provider network, customer balance or live financial disclosure.",
+      "No independently certified whole-file S2 coverage."
+    ]
   }
 }
