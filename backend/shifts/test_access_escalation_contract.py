@@ -21,6 +21,28 @@ from users.models import OrganizationMembership
 
 
 class ManagePharmacyRuleTests(TestCase):
+    def test_b08_manager_notifications_respect_region_scope(self):
+        from shifts.notifications import shift_manager_recipients
+        inside = self.org_member('REGION_ADMIN', [self.pharmacy])
+        outside = self.org_member('REGION_ADMIN', [self.other])
+        shift = Shift.objects.create(pharmacy=self.pharmacy, created_by=self.owner, role_needed='PHARMACIST', employment_type='LOCUM')
+        ids = {user.id for user in shift_manager_recipients(shift)}
+        self.assertIn(inside.id, ids)
+        self.assertIn(self.owner.id, ids)
+        self.assertNotIn(outside.id, ids)
+
+    def test_b41_announcement_audience_requires_accepted_membership(self):
+        from memberships.models import Membership
+        from shifts.announcements import _collect_membership_users
+        shift = Shift.objects.create(pharmacy=self.pharmacy, created_by=self.owner, role_needed='PHARMACIST', employment_type='LOCUM')
+        worker = make_user('PHARMACIST')
+        member = Membership.objects.create(user=worker, pharmacy=self.pharmacy, role='PHARMACIST', employment_type='FULL_TIME', is_active=True)
+        for state in (Membership.Status.PENDING, Membership.Status.REJECTED, Membership.Status.ACCEPTED):
+            member.status = state
+            member.save(update_fields=['status'])
+            recipients = _collect_membership_users(shift, [self.pharmacy.id], ['FULL_TIME'])
+            self.assertEqual([user.id for user in recipients], [worker.id] if state == Membership.Status.ACCEPTED else [])
+
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy("Managed")
         self.organization = Organization.objects.create(name="Org", slug="org-access")

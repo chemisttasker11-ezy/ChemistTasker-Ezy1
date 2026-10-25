@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from core.task_queue import async_task
 from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
-from shifts.access import ShiftActionRefused
+from shifts.access import ShiftActionRefused, _user_can_perform_shift_role, staff_membership_can_claim_role
 from shifts.emails import build_offer_shift_details, build_shift_offer_context
 from shifts.engagement import staff_assignment_defaults
 from shifts.models import ShiftOffer, ShiftSlotAssignment
@@ -25,6 +25,8 @@ OFFER_EXPIRY_HOURS = 48
 def offer_shift(*, shift, candidate, slot_id):
     """Offer the shift (or one slot) to a candidate, who must confirm before any assignment exists. A pending offer
     is refreshed instead of duplicated; an expired one is closed first. Returns the response body."""
+    if not _user_can_perform_shift_role(candidate, shift.role_needed):
+        raise ShiftActionRefused('The candidate role does not cover this shift.')
     # For multi-slot shifts, auto-pick when possible (prefer unassigned)
     if not shift.single_user_only and slot_id is None:
         slots_qs = shift.slots.all()
@@ -145,6 +147,9 @@ def roster_direct_staff(*, shift, candidate, assignments):
             "Only direct full-time, part-time or casual pharmacy staff can be rostered here. "
             "Locum, Shift Hero and external workers must accept a shift offer."
         )
+
+    if not _user_can_perform_shift_role(candidate, shift.role_needed) or not staff_membership_can_claim_role(membership, shift.role_needed):
+        raise ShiftActionRefused('The candidate role does not cover this shift.')
 
     assignment_ids = []
 

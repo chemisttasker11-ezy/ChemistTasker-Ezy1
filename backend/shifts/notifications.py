@@ -5,7 +5,7 @@ from typing import Iterable
 
 from users.models import OrganizationMembership
 
-from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
+from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability, user_can_manage_pharmacy
 from organizations.models import PharmacyAdmin
 from notifications.services import notify_users
 
@@ -52,7 +52,8 @@ def shift_manager_recipients(shift) -> list:
             organization_id=organization_id,
             role__in=["ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN"],
         ).select_related("user"):
-            add(org_membership.user)
+            if user_can_manage_pharmacy(org_membership.user, shift.pharmacy):
+                add(org_membership.user)
 
     return list(users_by_id.values())
 

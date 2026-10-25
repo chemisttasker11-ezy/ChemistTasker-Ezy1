@@ -31,6 +31,7 @@ def _collect_membership_users(shift, pharmacy_ids, employment_types):
         pharmacy_id__in=pharmacy_ids,
         employment_type__in=employment_types,
         is_active=True,
+        status=Membership.Status.ACCEPTED,
         user__is_active=True,
     ).select_related("user")
     users = []

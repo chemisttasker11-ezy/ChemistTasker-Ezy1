@@ -77,7 +77,7 @@ from shifts.selectors import (  # noqa: F401  (historical import path)
     _shift_has_past_slot_exists,
 )
 from shifts.candidates import _log_shift_profile_access, member_status, reveal_candidate  # noqa: F401  (_log_shift_profile_access: historical import path)
-from shifts.interest import express_interest, is_public_shift_member_access, reject_shift
+from shifts.interest import express_interest, is_public_shift_member_access, reject_shift, _require_public_shift_onboarding
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_managers, notify_shift_users
 from shifts.engagement import staff_assignment_defaults
@@ -309,6 +309,10 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if request.method == 'POST':
             from onboarding.verification.state import require_public_ahpra
             require_public_ahpra(request.user, shift)
+            if not _user_can_perform_shift_role(request.user, shift.role_needed):
+                raise ValidationError('Your role does not cover this shift.')
+            if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(request.user, shift):
+                _require_public_shift_onboarding(request.user)
 
         if request.method == 'GET':
             from shifts.counter_offers import visible_counter_offers_for_shift

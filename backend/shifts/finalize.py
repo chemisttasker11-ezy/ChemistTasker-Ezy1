@@ -1,6 +1,6 @@
 """Finalising an accepted shift offer: assignments, rates and notifications."""
 from shifts.pricing import expand_shift_slots, get_locked_rate_for_slot
-from shifts.models import ShiftOffer, ShiftSlotAssignment
+from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from decimal import Decimal
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
@@ -32,15 +32,29 @@ def finalize_shift_offer(offer: ShiftOffer):
 
     assignment_ids = []
     assignment_rates = []
-    slots_to_assign = shift.slots.all() if shift.single_user_only else [slot_obj]
+    slots_to_assign = [slot_obj] if slot_obj else shift.slots.all()
 
     with transaction.atomic():
+        Shift.objects.select_for_update().get(pk=shift.pk)
+        list(ShiftSlot.objects.select_for_update().filter(shift=shift).order_by('pk'))
+        # A whole-shift snapshot lists only each slot's first date, so only slot offers narrow to their occurrences.
+        occurrences = ((offer.engagement_terms_snapshot or {}).get('occurrences') or []) if slot_obj else []
+        accepted_pairs = {(str(entry.get('slot_id')), str(entry.get('date'))) for entry in occurrences}
+        matched_pairs = set()
         for slot in slots_to_assign:
             for entry in expand_shift_slots(shift):
                 if entry["slot"].id != slot.id:
                     continue
                 slot_date = entry["date"]
-                if ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot_date).exists():
+                if accepted_pairs and (str(slot.id), str(slot_date)) not in accepted_pairs:
+                    continue
+                if offer.slot_id and offer.offered_slot_date and slot_date != offer.offered_slot_date:
+                    continue
+                matched_pairs.add((str(slot.id), str(slot_date)))
+                existing = ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot_date).first()
+                if existing and existing.source_offer_id != offer.pk:
+                    raise ValidationError({'detail': 'This shift occurrence is already assigned.'})
+                if existing:
                     continue
 
                 staff_defaults = {}
@@ -95,6 +109,8 @@ def finalize_shift_offer(offer: ShiftOffer):
                 assignment_ids.append(assn.id)
                 assignment_rates.append(assn.unit_rate)
 
+        if shift.slots.exists() and (not matched_pairs or (accepted_pairs and accepted_pairs != matched_pairs)):
+            raise ValidationError({'detail': 'The accepted shift occurrences are no longer available.'})
         if offer.status != ShiftOffer.Status.ACCEPTED:
             offer.status = ShiftOffer.Status.ACCEPTED
             offer.save(update_fields=["status", "updated_at"])

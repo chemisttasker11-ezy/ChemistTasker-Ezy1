@@ -8,7 +8,7 @@ from django.db.models import Count
 from django.utils import timezone
 
 from core.task_queue import async_task
-from shifts.access import ShiftActionRefused
+from shifts.access import ShiftActionRefused, _user_can_perform_shift_role
 from shifts.assignment import OFFER_EXPIRY_HOURS, slot_locked_for_shift_offer
 from shifts.emails import (
     build_counter_offer_shift_details,
@@ -111,6 +111,8 @@ def ensure_interest_for_counter_offer(*, shift, user, offer):
 def accept_counter_offer(*, shift, offer, slot_id, decided_by):
     """Accept a counter offer (for one slot, or the first free one) by turning it into worker offers the candidate
     must confirm. Returns the response body."""
+    if not _user_can_perform_shift_role(offer.user, shift.role_needed):
+        raise ShiftActionRefused('The candidate role does not cover this shift.')
     offer_slot_ids = list(offer.slots.values_list('slot_id', flat=True))
 
     if slot_id is None:
@@ -136,14 +138,9 @@ def accept_counter_offer(*, shift, offer, slot_id, decided_by):
 
     for offer_slot in offer_slots:
         slot = offer_slot.slot
-        slot_date = offer_slot.slot_date or slot.date
+        slot_date = offer_slot.slot_date or getattr(slot, 'date', None)
         if slot_locked_for_shift_offer(shift=shift, slot=slot, slot_date=slot_date, ignore_user=offer.user):
             raise ShiftActionRefused('One or more slots are no longer available.')
-
-    offer.status = ShiftCounterOffer.Status.ACCEPTED
-    offer.decided_by = decided_by
-    offer.decided_at = timezone.now()
-    offer.save(update_fields=['status', 'decided_by', 'decided_at', 'updated_at'])
 
     created_offers = []
     now = timezone.now()
@@ -153,6 +150,7 @@ def accept_counter_offer(*, shift, offer, slot_id, decided_by):
             shift=shift,
             user=offer.user,
             slot=slot,
+            offered_slot_date=offer_slot.slot_date or getattr(slot, 'date', None),
             status=ShiftOffer.Status.PENDING,
         ).first()
         if existing_offer and existing_offer.expires_at and existing_offer.expires_at <= now:
@@ -160,10 +158,10 @@ def accept_counter_offer(*, shift, offer, slot_id, decided_by):
             existing_offer.save(update_fields=["status", "updated_at"])
             existing_offer = None
 
-        effective_date = offer_slot.slot_date or slot.date
-        effective_start = offer_slot.proposed_start_time or slot.start_time
-        effective_end = offer_slot.proposed_end_time or slot.end_time
-        effective_rate = offer_slot.proposed_rate if offer_slot.proposed_rate is not None else slot.rate
+        effective_date = offer_slot.slot_date or getattr(slot, 'date', None)
+        effective_start = offer_slot.proposed_start_time or getattr(slot, 'start_time', None)
+        effective_end = offer_slot.proposed_end_time or getattr(slot, 'end_time', None)
+        effective_rate = offer_slot.proposed_rate if offer_slot.proposed_rate is not None else getattr(slot, 'rate', None)
 
         if existing_offer:
             existing_offer.offered_slot_date = effective_date
@@ -193,6 +191,16 @@ def accept_counter_offer(*, shift, offer, slot_id, decided_by):
                 expires_at=now + timedelta(hours=OFFER_EXPIRY_HOURS),
             )
         created_offers.append(shift_offer)
+
+    generated_pairs = set(ShiftOffer.objects.filter(counter_offer=offer, status__in=[
+        ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, ShiftOffer.Status.ACCEPTED,
+    ]).values_list('slot_id', 'offered_slot_date'))
+    all_pairs = {(entry.slot_id, entry.slot_date or getattr(entry.slot, 'date', None))
+                 for entry in offer.slots.select_related('slot')}
+    offer.status = ShiftCounterOffer.Status.ACCEPTED if all_pairs <= generated_pairs else ShiftCounterOffer.Status.PENDING
+    offer.decided_by = decided_by
+    offer.decided_at = timezone.now()
+    offer.save(update_fields=['status', 'decided_by', 'decided_at', 'updated_at'])
 
     if offer.user and offer.user.email:
         ctx = build_shift_counter_offer_context(shift, offer, recipient=offer.user)

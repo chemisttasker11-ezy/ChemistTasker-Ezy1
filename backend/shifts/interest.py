@@ -9,7 +9,7 @@ from django.conf import settings
 from rest_framework import status
 
 from memberships.models import FAVORITE_STAFF_EMPLOYMENT_TYPES, Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
-from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
+from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
 from core.task_queue import async_task
 from shifts.access import ShiftActionRefused, _user_can_perform_shift_role
 from shifts.emails import build_offer_shift_details, build_shift_email_context, build_shift_interest_context
@@ -38,6 +38,10 @@ def is_public_shift_member_access(user, shift):
 
 
 def _require_public_shift_onboarding(user):
+    if user.role == 'EXPLORER':
+        if not ExplorerOnboarding.objects.filter(user=user, verified=True).exists():
+            raise ShiftActionRefused('Verify your profile before applying for public shifts.', status.HTTP_403_FORBIDDEN)
+        return
     if not settings.AHPRA_ENFORCEMENT_ENABLED:
         from onboarding.services.work_profile import current_worker_profile
         from onboarding.verification.policy import requirements
@@ -78,6 +82,8 @@ def express_interest(*, shift, user, slot_ids=None, slot_id=None):
     Returns `(interests, created_interests)`.
     """
     from onboarding.verification.state import require_public_ahpra
+    if not _user_can_perform_shift_role(user, shift.role_needed):
+        raise ShiftActionRefused('Your role does not cover this shift.')
     # 1) Onboarding required
     if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(user, shift):
         require_public_ahpra(user, shift)
