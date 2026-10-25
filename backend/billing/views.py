@@ -569,8 +569,6 @@ def charge_shift_fulfillment(request, shift_id):
     slot_ids = _normalize_slot_ids(request.data.get('slot_ids') or request.data.get('slotIds'), slot_id)
     offer_ids = _normalize_offer_ids(request.data.get('offer_ids') or request.data.get('offerIds'), request.data.get('offer_id') or request.data.get('offerId'))
 
-    if not offer_ids and not slot_ids and not candidate_id:
-        return Response({'error': 'Select a pending offer or slot before checkout.'}, status=400)
     selected_unit_count = 0
     if candidate_id and not offer_ids and not slot_ids:
         from shifts.models import ShiftOffer
@@ -642,6 +640,15 @@ def charge_shift_fulfillment(request, shift_id):
             'message': 'Free trial applied - shift confirmed for free.',
         })
 
+
+    # The legacy PRE_LIVE/FREE_TRIAL flow legitimately confirms a whole
+    # shift without a selector; paid Stripe checkout must have a bounded
+    # selection so one charged unit cannot finalize an unselected group.
+    if not offer_ids and not slot_ids and not candidate_id:
+        return Response(
+            {'error': 'Select a pending offer or slot before checkout.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     # Price Logic
     # We could also use `shared-core` logic if we had a node backend, 

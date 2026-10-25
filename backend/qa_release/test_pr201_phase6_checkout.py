@@ -39,3 +39,20 @@ class FulfillmentSelectionTests(TestCase):
         result, create = self.checkout({"candidate_id": self.worker1.id})
         self.assertEqual(result.status_code, 200, result.data)
         self.assertEqual(create.call_args.kwargs["line_items"][0]["quantity"], 1)
+
+    def test_free_pre_live_checkout_without_selector_preserved(self):
+        from unittest.mock import patch
+        with (
+            patch("billing.views.get_billing_state_for_account", return_value="PRE_LIVE"),
+            patch("billing.views._finalize_pending_offers_for_shift", return_value=(2, self.offers)) as finalize,
+            patch("shifts.emails.send_shift_payment_finalized_notifications") as notify,
+            patch("billing.views.stripe.checkout.Session.create") as create,
+        ):
+            response = client_for(self.owner).post(
+                f"/api/v1/billing/charge-fulfillment/{self.shift.pk}/", {}, format="json",
+            )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["finalized_offers"], 2)
+        finalize.assert_called_once()
+        notify.assert_called_once()
+        create.assert_not_called()
