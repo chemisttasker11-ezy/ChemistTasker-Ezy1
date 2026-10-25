@@ -5,6 +5,9 @@ on:
     paths:
       - "backend/qa_release/**"
       - "backend/team_calendar/**"
+      - "backend/organizations/**"
+      - "backend/memberships/**"
+      - "backend/client_profile/**"
       - "backend/invoicing/**"
       - "backend/workforce/roster/**"
       - "backend/shifts/**"
