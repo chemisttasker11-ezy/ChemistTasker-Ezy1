@@ -8,7 +8,7 @@ from django.utils import timezone
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 
-from rest_framework_simplejwt.authentication import JWTAuthentication
+from users.authentication import CookieJWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, AuthenticationFailed
 from users.models import WebSocketTicket
 
@@ -23,7 +23,7 @@ class JWTAuthMiddleware:
     """
     def __init__(self, inner):
         self.inner = inner
-        self.jwt_auth = JWTAuthentication()
+        self.jwt_auth = CookieJWTAuthentication()
 
     async def __call__(self, scope, receive, send):
         scope = dict(scope)
@@ -34,9 +34,11 @@ class JWTAuthMiddleware:
         # 1. Try Ticket Auth First (New Secure Method)
         ticket_str = query.get("ticket", [None])[0]
         if ticket_str:
-            user = await self._get_user_from_ticket(ticket_str)
-            if user:
+            result = await self._get_user_from_ticket(ticket_str)
+            if result:
+                user, session_id = result
                 scope["user"] = user
+                scope["session_id"] = session_id
                 return await self.inner(scope, receive, send)
 
         # 2. Fallback to standard token auth (for backwards compatibility just in case)
@@ -47,6 +49,8 @@ class JWTAuthMiddleware:
                 validated = await sync_to_async(self.jwt_auth.get_validated_token, thread_sensitive=True)(token)
                 user = await database_sync_to_async(self.jwt_auth.get_user)(validated)
                 scope["user"] = user
+                scope["auth"] = validated
+                scope["session_id"] = validated.get('sid', '')
             except (InvalidToken, AuthenticationFailed):
                 pass
 
@@ -65,7 +69,7 @@ class JWTAuthMiddleware:
                     and getattr(user, 'deleted_at', None) is None
                 )
                 ticket_obj.delete()
-                return user if valid else None
+                return (user, ticket_obj.session_id) if valid else None
         except WebSocketTicket.DoesNotExist:
             return None
 

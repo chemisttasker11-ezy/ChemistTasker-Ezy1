@@ -15,7 +15,7 @@ import { getBrowserCsrfToken } from '../utils/browserAuth';
 import { resolveApiBaseUrl } from '../utils/apiUrl';
 import { registerForPushNotificationsAsync, registerDeviceTokenWithBackend } from '../utils/pushNotifications';
 import * as Device from 'expo-device';
-import { clearStoredSession, getValidAccessToken, primeInMemorySession, readStoredSession, writeStoredSession } from '../utils/authSession';
+import { clearStoredSession, getSessionGeneration, invalidateSessionGeneration, getValidAccessToken, primeInMemorySession, readStoredSession, writeStoredSession } from '../utils/authSession';
 import {
   addNetworkDiagnostic,
   describeRequestError,
@@ -112,15 +112,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isRefreshingProfile, setIsRefreshingProfile] = useState(false);
   const [triedPhotoRefresh, setTriedPhotoRefresh] = useState(false);
   const [registeredPush, setRegisteredPush] = useState(false);
-  const authMutationIdRef = useRef(0);
+  const pushTokenRef = useRef<string | null>(null);
+  const pushRegistrationRef = useRef<Promise<void> | null>(null);
 
   // Load user from cookie session at app startup
   useEffect(() => {
     const loadStoredAuth = async () => {
-      const bootstrapId = authMutationIdRef.current;
+      const bootstrapId = getSessionGeneration();
       try {
         const baseURL = resolveApiBaseUrl();
         const session = await readStoredSession();
+        if (getSessionGeneration() !== bootstrapId) return;
         const nextAccess = session?.access || session?.tokens?.access || null;
         const nextRefresh = session?.refresh || session?.tokens?.refresh || null;
         const nextUser = session?.user ? normalizeUser(session.user) : null;
@@ -135,9 +137,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
             biometricUser &&
             ((biometricUser.id != null && nextUser.id != null && String(biometricUser.id) === String(nextUser.id)) ||
               (biometricUser.email && nextUser.email && biometricUser.email.toLowerCase() === nextUser.email.toLowerCase()));
+          if (getSessionGeneration() !== bootstrapId) return;
 
           if (availability.available && savedUserMatches) {
             const passed = await authenticateWithBiometrics(availability.label);
+            if (getSessionGeneration() !== bootstrapId) return;
             if (!passed) {
               primeInMemorySession(null);
               setAccess(null);
@@ -151,6 +155,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
 
+        if (getSessionGeneration() !== bootstrapId) return;
         if (nextUser) {
           setUser(nextUser);
         }
@@ -159,19 +164,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (baseURL) {
           const token = await getValidAccessToken(baseURL);
+          if (getSessionGeneration() !== bootstrapId) return;
           if (token) {
             const meResponse = await nativeIdentityTransport.currentUser().catch(() => null);
             if (meResponse?.data) {
               const currentUser = normalizeUser(meResponse.data);
               const refreshedSession = await readStoredSession();
+              if (getSessionGeneration() !== bootstrapId) return;
               setAccess(refreshedSession?.access || refreshedSession?.tokens?.access || token);
               setRefresh(refreshedSession?.refresh || refreshedSession?.tokens?.refresh || nextRefresh);
               setUser(currentUser);
-              await writeStoredSession({
+              const saved = await writeStoredSession({
                 access: refreshedSession?.access || refreshedSession?.tokens?.access || token,
                 refresh: refreshedSession?.refresh || refreshedSession?.tokens?.refresh || nextRefresh,
                 user: currentUser,
-              });
+              }, bootstrapId);
+              if (!saved) return;
               setIsLoading(false);
               return;
             }
@@ -184,18 +192,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Secure storage can fail (e.g. Keychain unavailable/locked). Never leave the app on the
       // loading screen: an unreadable session is treated as signed out.
       const latestSession = await readStoredSession().catch(() => null);
+      if (getSessionGeneration() !== bootstrapId) return;
       const latestAccess = latestSession?.access || latestSession?.tokens?.access || null;
       const latestRefresh = latestSession?.refresh || latestSession?.tokens?.refresh || null;
       const latestUser = latestSession?.user ? normalizeUser(latestSession.user) : null;
-
-      if (authMutationIdRef.current !== bootstrapId && (latestAccess || latestRefresh || latestUser)) {
-        primeInMemorySession(latestSession);
-        setAccess(latestAccess);
-        setRefresh(latestRefresh);
-        setUser(latestUser);
-        setIsLoading(false);
-        return;
-      }
 
       if (latestAccess || latestRefresh || latestUser) {
         primeInMemorySession(latestSession);
@@ -214,20 +214,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   useEffect(() => {
+    const generation = getSessionGeneration();
     const setupPush = async () => {
       if (!user || registeredPush) return;
       try {
         const token = await registerForPushNotificationsAsync();
+        if (token) pushTokenRef.current = token;
+        if (generation !== getSessionGeneration()) return;
         if (token) {
           const platform = Device.osName?.toLowerCase().includes('ios') ? 'ios' : 'android';
           await registerDeviceTokenWithBackend(token, platform as 'ios' | 'android');
         }
-        setRegisteredPush(true);
+        if (generation === getSessionGeneration()) setRegisteredPush(true);
       } catch (err) {
         console.error('Push registration failed', err);
       }
     };
-    void setupPush();
+    pushRegistrationRef.current = (pushRegistrationRef.current ?? Promise.resolve()).then(setupPush);
   }, [access, user, registeredPush]);
 
   const normalizeUser = (u: any): User => {
@@ -259,25 +262,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const login = async (newAccess: string, newRefresh: string | null, userInfo: User) => {
-    authMutationIdRef.current += 1;
+    const generation = invalidateSessionGeneration();
     const baseUser = normalizeUser(userInfo);
-    await writeStoredSession({
+    if (!await writeStoredSession({
       access: newAccess || null,
       refresh: newRefresh || null,
       user: baseUser,
-    });
+    }, generation)) return;
     setAccess(newAccess || null);
     setRefresh(newRefresh || null);
     setUser(baseUser);
+    setIsLoading(false);
+    setRegisteredPush(false);
 
     // Hydrate with onboarding profile if available (adds photo, phone, etc.)
     try {
       const hydrated = await fetchOnboardingProfile(baseUser.role, baseUser);
-      await writeStoredSession({
+      if (!await writeStoredSession({
         access: newAccess || null,
         refresh: newRefresh || null,
         user: hydrated,
-      });
+      }, generation)) return;
       setUser(hydrated);
     } catch (error) {
       const msg = (error as any)?.message || error;
@@ -286,9 +291,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const loginWithCredentials = async (email: string, password: string) => {
+    const generation = invalidateSessionGeneration();
     try {
       addNetworkDiagnostic('login-attempt', { api: process.env.EXPO_PUBLIC_API_URL });
       const response: any = await nativeIdentityTransport.login(email, password);
+      if (generation !== getSessionGeneration()) throw new Error('Sign-in was cancelled.');
       const payload = response?.data ?? response;
       const userData = payload.user || payload.userData || payload.profile;
       const newAccess = payload.access;
@@ -302,6 +309,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await login(newAccess, newRefresh, userData);
       return userData;
     } catch (directError: any) {
+      if (generation !== getSessionGeneration()) throw directError;
       addNetworkDiagnostic('login-axios-error', describeRequestError('axios', directError));
       const status = directError?.response?.status;
       if ([400, 401, 403, 429].includes(status)) {
@@ -314,6 +322,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         // Fallback to shared-core login shape
         const response: any = await sharedLogin({ email, password });
+        if (generation !== getSessionGeneration()) throw new Error('Sign-in was cancelled.');
         const tokens = response.tokens || {};
         const newAccess = tokens.access || response.access;
         const newRefresh = tokens.refresh || response.refresh;
@@ -338,6 +347,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const loginWithStoredSession = async () => {
+    const generation = getSessionGeneration();
     const baseURL = resolveApiBaseUrl();
     if (!baseURL) {
       throw new Error('API URL is not configured.');
@@ -360,11 +370,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       session?.tokens?.refresh ||
       null;
 
-    await writeStoredSession({
+    if (!await writeStoredSession({
       access: nextAccess,
       refresh: nextRefresh,
       user: userData,
-    });
+    }, generation)) throw new Error('Sign-in was cancelled.');
     setAccess(nextAccess);
     setRefresh(nextRefresh);
     setUser(userData);
@@ -441,15 +451,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const refreshUser = async () => {
+    const generation = getSessionGeneration();
     try {
       const hydrated = await fetchOnboardingProfile(user?.role, user);
-      setUser(hydrated as User);
       const session = await readStoredSession();
-      await writeStoredSession({
+      if (!await writeStoredSession({
         access: session?.access || session?.tokens?.access || access,
         refresh: session?.refresh || session?.tokens?.refresh || refresh,
         user: hydrated,
-      });
+      }, generation)) return;
+      setUser(hydrated as User);
     } catch (error) {
       const msg = (error as any)?.message || error;
       console.debug('Error refreshing user (non-fatal):', msg);
@@ -461,31 +472,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const persistUser = async (updates: Partial<User>) => {
     if (!user) return;
+    const generation = getSessionGeneration();
     const updated = { ...user, ...updates };
-    setUser(updated);
     const session = await readStoredSession();
-    await writeStoredSession({
+    if (!await writeStoredSession({
       access: session?.access || session?.tokens?.access || access,
       refresh: session?.refresh || session?.tokens?.refresh || refresh,
       user: updated,
-    });
+    }, generation)) return;
+    setUser(updated);
   };
 
   const updateUserProfilePhoto = async (photoUrl: string) => {
-    if (!user || !photoUrl) return;
-    const updated = {
-      ...user,
+    if (!photoUrl) return;
+    await persistUser({
       profile_photo: photoUrl,
       profile_photo_url: photoUrl,
       profilePhoto: photoUrl,
-    } as User;
-    setUser(updated);
-    const session = await readStoredSession();
-    await writeStoredSession({
-      access: session?.access || session?.tokens?.access || access,
-      refresh: session?.refresh || session?.tokens?.refresh || refresh,
-      user: updated,
-    });
+    } as Partial<User>);
   };
 
   // If we have a token but missing photo, pull a fresh user without forcing users to clear storage
@@ -500,13 +504,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [access, user, isRefreshingProfile, triedPhotoRefresh]);
 
   const logout = async () => {
+    const generation = invalidateSessionGeneration();
     const isWeb = Platform.OS === 'web';
     const baseURL = resolveApiBaseUrl();
-    const session = await readStoredSession();
     try {
+      await pushRegistrationRef.current;
+      const session = await readStoredSession();
+      if (generation !== getSessionGeneration()) return;
       await sharedLogoutSession({
         isBrowser: isWeb,
         refreshToken: session?.refresh ?? session?.tokens?.refresh ?? null,
+        deviceToken: isWeb ? null : pushTokenRef.current,
         csrfToken: isWeb ? await getBrowserCsrfToken(baseURL || '') : null,
       });
     } catch (error) {
@@ -520,11 +528,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       Alert.alert('Sign out', 'Signed out on this device, but the server session could not be revoked.');
     }
-    authMutationIdRef.current += 1;
+    if (generation !== getSessionGeneration()) return;
     setAccess(null);
     setRefresh(null);
     setUser(null);
     setRegisteredPush(false);
+    pushTokenRef.current = null;
+    setIsLoading(false);
     await clearStoredSession();
   };
 

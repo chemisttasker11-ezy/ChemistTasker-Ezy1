@@ -133,7 +133,9 @@ def _update_locked_user_fields(user, user_data):
             errors["phone_number"] = "Verified mobile number is locked and cannot be changed."
         elif user.mobile_number != incoming_mobile:
             user.mobile_number = incoming_mobile
-            changed_user_fields.append("mobile_number")
+            user.mobile_otp_code = None
+            user.mobile_otp_created_at = None
+            changed_user_fields.extend(["mobile_number", "mobile_otp_code", "mobile_otp_created_at"])
 
     if errors:
         raise serializers.ValidationError(errors)
