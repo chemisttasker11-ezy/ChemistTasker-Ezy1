@@ -22,6 +22,7 @@ from workforce.models import EmploymentEngagement
 class PublishedRateVisibilityTests(TestCase):
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy()
+        self.pharmacy.state = 'QLD'
         self.pharmacy.rate_weekday = Decimal('65')
         self.pharmacy.default_fixed_rate = Decimal('65')
         self.pharmacy.save()

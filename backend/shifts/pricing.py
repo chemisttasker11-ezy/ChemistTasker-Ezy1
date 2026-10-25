@@ -1,13 +1,11 @@
 """Shift pricing: award rates, public holidays, day types, slot expansion and locked rates."""
 from datetime import datetime, timedelta, date, time
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.core.exceptions import ValidationError
 from onboarding.models import PharmacistOnboarding
-from shifts.models import Shift
-from memberships.models import Membership
 from shifts.pricing_data import award_rates
 from shifts.holidays import (
-    holiday_boundaries, normalize_state, resolve_public_holiday,
+    day_type as classify_day, holiday_boundaries, normalize_state, resolve_public_holiday,
 )
 
 
@@ -33,35 +31,18 @@ def is_public_holiday(slot_date, state, at_time=None, *, region=None):
 
 
 def get_day_type(slot_date, state, at_time=None, *, region=None):
-    if is_public_holiday(slot_date, state, at_time=at_time, region=region):
-        return "public_holiday"
-    weekday = slot_date.weekday()
-    return "saturday" if weekday == 5 else "sunday" if weekday == 6 else "weekday"
+    return classify_day(slot_date, resolve_public_holiday(
+        slot_date, state, region_code=region, at_time=at_time,
+    ))
 
 
-def _holiday_work_base(shift, terms=None):
-    """Use the registered store that owns this shift, never a worker override.
-
-    The pharmacy's declared locality decides shift holiday classification.
-    The optional terms argument remains for existing callers but cannot
-    change the store. Exceptional legal base/substitution cases require
-    separate employer review, not silent per-worker holiday override.
-    """
+def _store_holiday_location(shift):
+    """Classify the registered store; worker terms cannot override its location."""
     pharmacy = shift.pharmacy
     return (
         getattr(pharmacy, "state", "") or "",
         getattr(pharmacy, "public_holiday_region", "") or "",
     )
-
-
-def _holiday_day_and_status(work_date, at_time, state, region):
-    result = resolve_public_holiday(
-        work_date, state, region_code=region, at_time=at_time,
-    )
-    if result.is_public_holiday:
-        return "public_holiday", result
-    weekday = work_date.weekday()
-    return ("saturday" if weekday == 5 else "sunday" if weekday == 6 else "weekday"), result
 
 
 def _combine_datetime(slot_date, slot_time):
@@ -190,26 +171,13 @@ def _resolve_pharmacist_rate_key(day_type, time_bucket, rate_preference):
     return day_type
 
 
-def _resolve_award_role_key(role_needed):
-    if role_needed == 'TECHNICIAN' and 'TECHNICIAN' not in award_rates():
-        return 'ASSISTANT'
-    return role_needed
-
-
-def _get_first_level_award_profile(role_needed):
-    role_key = _resolve_award_role_key(role_needed)
-    classification_key = FIRST_LEVEL_CLASSIFICATIONS.get(role_needed)
-    if not classification_key:
-        return None, None, None
-    return role_key, classification_key, award_rates().get(role_key, {}).get(classification_key, {}).get('casual')
-
-
-def _get_award_rate_for_segment(role_needed, day_type, time_bucket, *, as_of=None, start_time=None):
-    role_key = _resolve_award_role_key(role_needed)
+def _get_award_rate_for_segment(role_needed, day_type, time_bucket, *, as_of, start_time=None):
+    rates = award_rates(as_of)
+    role_key = 'ASSISTANT' if role_needed == 'TECHNICIAN' and 'TECHNICIAN' not in rates else role_needed
     classification_key = FIRST_LEVEL_CLASSIFICATIONS.get(role_needed)
     if not classification_key:
         raise KeyError(f'No casual award classification for {role_needed}')
-    casual_rates = award_rates(as_of).get(role_key, {}).get(classification_key, {}).get('casual')
+    casual_rates = rates.get(role_key, {}).get(classification_key, {}).get('casual')
     if not casual_rates:
         raise KeyError(f'No casual award rates found for {role_needed}')
 
@@ -325,20 +293,17 @@ def _price_shift_segments(slot_date, start_time, end_time, shift, rate_preferenc
     total_hours = DECIMAL_ZERO
     total_pay = DECIMAL_ZERO
 
-    base_state, base_region = _holiday_work_base(shift)
+    base_state, base_region = _store_holiday_location(shift)
     for day_window in _split_shift_across_days(slot_date, start_time, end_time):
         for segment in _split_day_window_into_segments(
             day_window, state=base_state, region=base_region,
         ):
-            day_type, holiday = _holiday_day_and_status(
-                day_window['date'], segment['start'].time(),
-                base_state, base_region,
+            holiday = resolve_public_holiday(
+                day_window['date'], base_state, base_region, at_time=segment['start'].time(),
             )
-            if holiday.needs_review and getattr(shift.pharmacy, 'use_chemisttasker_payroll', False):
-                raise ValidationError(
-                    'Verify the store public-holiday district and declaration '
-                    'before automatic payroll pricing. ' + holiday.status
-                )
+            day_type = classify_day(segment['date'], holiday)
+            # Unresolved local dates price at the statewide calendar and carry
+            # the holiday_status flag below; only PAYROLL staff pricing blocks.
             if shift.role_needed == 'PHARMACIST':
                 segment_rate, meta = _get_pharmacist_rate_for_segment(
                     shift,
@@ -365,7 +330,7 @@ def _price_shift_segments(slot_date, start_time, end_time, shift, rate_preferenc
                     **award_meta,
                 }
 
-            segment_total = (segment_rate * segment['hours']).quantize(Decimal('0.0001'))
+            segment_total = (segment_rate * segment['hours']).quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP)
             total_hours += segment['hours']
             total_pay += segment_total
             if holiday.needs_review or holiday.scope != "NONE":
@@ -382,17 +347,17 @@ def _price_shift_segments(slot_date, start_time, end_time, shift, rate_preferenc
                 'start_time': segment['start'].time().strftime('%H:%M:%S'),
                 'end_time': segment['end'].time().strftime('%H:%M:%S'),
                 'hours': str(segment['hours']),
-                'rate': str(segment_rate.quantize(Decimal('0.01'))),
-                'line_total': str(segment_total.quantize(Decimal('0.01'))),
+                'rate': str(segment_rate.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+                'line_total': str(segment_total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
                 **meta,
             })
 
     if total_hours <= 0:
         raise ValidationError('Shift duration must be greater than zero.')
 
-    average_rate = (total_pay / total_hours).quantize(Decimal('0.01'))
+    average_rate = (total_pay / total_hours).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     rounded_total_hours = total_hours.quantize(Decimal('0.01'))
-    rounded_total_pay = total_pay.quantize(Decimal('0.01'))
+    rounded_total_pay = total_pay.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     return average_rate, {
         'source': 'Pharmacy' if shift.role_needed == 'PHARMACIST' else 'Award',
         'segments': all_segments,
@@ -412,15 +377,16 @@ def _price_staff_agreement(slot, shift, slot_date, terms):
     hours = DECIMAL_ZERO
     total = DECIMAL_ZERO
     segments = []
-    base_state, base_region = _holiday_work_base(shift, terms)
+    base_state, base_region = _store_holiday_location(shift)
     for window in _split_shift_across_days(slot_date, slot.start_time, slot.end_time):
         for segment in _split_day_window_into_segments(
             window, state=base_state, region=base_region,
         ):
-            day_type, holiday = _holiday_day_and_status(
-                segment['date'], segment['start'].time(), base_state, base_region,
+            holiday = resolve_public_holiday(
+                segment['date'], base_state, base_region, at_time=segment['start'].time(),
             )
-            if holiday.needs_review and terms.get('settlement_channel') == 'PAYROLL':
+            day_type = classify_day(segment['date'], holiday)
+            if holiday.blocks_payroll and terms.get('settlement_channel') == 'PAYROLL':
                 raise ValidationError(
                     'Payroll holiday entitlement needs the store public-holiday '
                     'district verified: ' + holiday.status
@@ -451,10 +417,10 @@ def _price_staff_agreement(slot, shift, slot_date, terms):
             segments.append(segment_meta)
     if hours <= 0:
         raise ValidationError('Shift duration must be greater than zero.')
-    return (total / hours).quantize(Decimal('0.01')), {
+    return (total / hours).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP), {
         'source': 'StaffEmployment', 'calculation_method': 'weighted_segment_average',
         'employment_engagement_public_id': terms.get('employment_engagement_public_id'),
-        'segments': segments, 'total_hours': str(hours), 'total_pay': str(total.quantize(Decimal('0.01'))),
+        'segments': segments, 'total_hours': str(hours), 'total_pay': str(total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
     }
 
 
@@ -475,7 +441,7 @@ def get_locked_rate_for_slot(slot, shift, user, override_date=None, *, staff_ter
     # remains authoritative when claimed/booked; later profile edits must not
     # silently reprice the advertised shift. Worker-provided pricing stays separate.
     if shift.role_needed == 'PHARMACIST' and getattr(shift, 'rate_type', None) != 'PHARMACIST_PROVIDED' and getattr(slot, 'rate', None) is not None:
-        posted = Decimal(str(slot.rate)).quantize(Decimal('0.01'))
+        posted = Decimal(str(slot.rate)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         if posted > 0:
             return posted, {'source': 'PostedShift', 'calculation_method': 'posted_slot_rate', 'date': slot_date.isoformat(), 'description': f'Owner-posted rate ${posted}/hr for this date.'}
     rate_preference = _extract_rate_preference(user) if shift.role_needed == 'PHARMACIST' else {}

@@ -27,6 +27,7 @@ STATE_CODES = {
     "WA": "WA", "WESTERN AUSTRALIA": "WA",
 }
 FAIR_WORK_YEAR_SOURCE = "https://www.fairwork.gov.au/employment-conditions/public-holidays/"
+REGIONAL_HOLIDAY_STATES = frozenset({"QLD", "NSW", "NT", "TAS", "VIC", "WA"})
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,17 @@ class HolidayResolution:
     @property
     def needs_review(self) -> bool:
         return self.status != "VERIFIED"
+
+    @property
+    def blocks_payroll(self) -> bool:
+        # Missing districts use the statewide calendar with a review flag.
+        return self.needs_review and self.status != "REGION_REQUIRED"
+
+
+def day_type(work_date: date, holiday: HolidayResolution) -> str:
+    if holiday.is_public_holiday:
+        return "public_holiday"
+    return {5: "saturday", 6: "sunday"}.get(work_date.weekday(), "weekday")
 
 
 def normalize_state(state: str | None) -> str:
@@ -102,7 +114,9 @@ def resolve_public_holiday(work_date: date, state, region_code="", at_time=None)
     if not state_code:
         return HolidayResolution(False, "NONE", "UNKNOWN_STATE", region=region)
     record = region_details(state_code, region)
-    if work_date.year not in (2026, 2027):
+    if work_date.year not in {date.fromisoformat(day).year for day in public_holidays()[state_code]} or (
+        record and work_date.year not in (*record["verified_years"], *record["pending_years"])
+    ):
         return HolidayResolution(False, "NONE", "YEAR_NOT_CERTIFIED", region=region)
 
     windows = _windows(work_date, state_code, region)
@@ -117,17 +131,21 @@ def resolve_public_holiday(work_date: date, state, region_code="", at_time=None)
         status = "LOCAL_DECLARATION_PENDING"
         note = "This region's local public holidays for the selected year are not yet certified."
     elif record is None:
-        state_regions = [r for r in local_public_holidays()["regions"].values() if r["state"] == state_code]
-        # A missing work-base district cannot be certified, even when no
-        # known regional event is listed on this exact date. Future councils
-        # may publish additional local declarations during the year.
-        candidate = bool(state_regions) or state_code in {"VIC", "WA", "TAS", "NT", "NSW", "QLD"}
-        status = "REGION_REQUIRED" if candidate else "VERIFIED"
+        # Statewide calendar applies; only a date that some district of this
+        # state declares or replaces locally is flagged for district review.
+        day = work_date.isoformat()
+        local_date = any(
+            r["state"] == state_code and (
+                day in r.get("exclude_state_dates", [])
+                or any(item["date"] == day for item in r["events"])
+            )
+            for r in local_public_holidays()["regions"].values()
+        )
+        status = "REGION_REQUIRED" if local_date else "VERIFIED"
         note = (
-            "Local public holidays or regional replacements may apply; "
-            "confirm the registered store's declared district against the "
-            "jurisdiction's official declaration."
-        ) if candidate else ""
+            "A district of this state declares a local public holiday or "
+            "replacement on this date; confirm the registered store's district."
+        ) if local_date else ""
     else:
         status = "VERIFIED"
         note = ""
@@ -189,8 +207,9 @@ def part_day_public_holidays(state, region_code=""):
 
 def holiday_calendar_status(state, region_code=""):
     code = normalize_state(state)
+    years = sorted({date.fromisoformat(day).year for days in public_holidays().values() for day in days})
     if not code:
-        return {"state": "", "region": "", "status": "UNKNOWN_STATE", "pendingYears": [2026, 2027]}
+        return {"state": "", "region": "", "status": "UNKNOWN_STATE", "pendingYears": years}
     record = region_details(code, region_code)
     if record:
         return {
@@ -200,15 +219,15 @@ def holiday_calendar_status(state, region_code=""):
             "verifiedYears": record["verified_years"],
             "source": record["source"],
         }
-    if code not in {"QLD", "NSW", "NT", "TAS", "VIC", "WA"}:
+    if code not in REGIONAL_HOLIDAY_STATES:
         return {
             "state": code, "region": "", "status": "VERIFIED",
-            "pendingYears": [], "verifiedYears": [2026, 2027],
+            "pendingYears": [], "verifiedYears": years,
             "note": "No region-specific calendar required in the current register.",
         }
     return {
         "state": code, "region": "",
         "status": "REGION_NOT_CONFIGURED",
-        "pendingYears": [2026, 2027],
+        "pendingYears": years,
         "note": "Statewide holidays only; regional show/substitution scope requires verification.",
     }

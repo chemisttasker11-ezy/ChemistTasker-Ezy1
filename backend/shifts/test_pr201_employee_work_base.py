@@ -3,11 +3,11 @@
 The legacy module filename is kept for the targeted CI regression command;
 no personal work-base evidence is required for ordinary store-based shifts.
 """
-from datetime import date
+from datetime import date, time
 from types import SimpleNamespace
 from django.test import SimpleTestCase
 from shifts.engagement import _award_floor_for_occurrence
-from shifts.pricing import _holiday_work_base, calculate_shift_rates
+from shifts.pricing import _store_holiday_location, calculate_shift_rates, get_locked_rate_for_slot
 from workforce.award_rates import resolve_award_schedule
 
 
@@ -41,26 +41,30 @@ class ShiftStorePublicHolidayContracts(SimpleTestCase):
         self.assertFalse(result["review_required"], result)
         self.assertTrue(all(x["day_type"] == "weekday" for x in result["segments"]))
 
-    def test_worker_supplied_region_cannot_override_store(self):
+    def test_registered_store_supplies_location(self):
         shift = SimpleNamespace(pharmacy=self.store("QLD_BRISBANE"))
-        untrusted = {"public_holiday_work_base": {"state": "QLD", "region": "QLD_GOLD_COAST"}}
-        self.assertEqual(_holiday_work_base(shift, untrusted), ("QLD", "QLD_BRISBANE"))
+        self.assertEqual(_store_holiday_location(shift), ("QLD", "QLD_BRISBANE"))
         shift.pharmacy = self.store("QLD_GOLD_COAST")
-        self.assertEqual(_holiday_work_base(shift, untrusted), ("QLD", "QLD_GOLD_COAST"))
+        self.assertEqual(_store_holiday_location(shift), ("QLD", "QLD_GOLD_COAST"))
 
     def test_locked_staff_rate_cannot_accept_fake_worker_region(self):
         shift = SimpleNamespace(
             pharmacy=self.store("QLD_BRISBANE"), role_needed="ASSISTANT",
         )
-        self.assertEqual(_holiday_work_base(shift, {
-            "public_holiday_work_base": {"state": "NSW", "region": "NSW_WALCHA"}
-        }), ("QLD", "QLD_BRISBANE"))
+        slot = SimpleNamespace(date=date(2026, 8, 28), start_time=time(9), end_time=time(17))
+        rate, meta = get_locked_rate_for_slot(slot, shift, None, staff_terms={
+            "public_holiday_work_base": {"state": "QLD", "region": "QLD_GOLD_COAST"},
+            "settlement_channel": "PAYROLL", "rates": {"weekday": "40", "public_holiday": "90"},
+        })
+        self.assertEqual(rate, 40)
+        self.assertEqual(meta["segments"][0]["day_type"], "weekday")
 
     def test_store_region_missing_flags_payroll_review_not_worker_evidence(self):
         result = _award_floor_for_occurrence(
             self.award, self.occurrence, self.store(""),
         )
         self.assertTrue(result["review_required"])
+        self.assertIsNotNone(result["rate"])
         self.assertIn("REGION_REQUIRED", result["review_reason"])
 
     def test_store_shift_pricing_uses_pharmacy_region(self):

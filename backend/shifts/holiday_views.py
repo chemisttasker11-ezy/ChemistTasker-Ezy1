@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from shifts.holidays import normalize_state, holiday_calendar_status
+from shifts.holidays import REGIONAL_HOLIDAY_STATES, normalize_state, holiday_calendar_status
 from shifts.pricing_data import local_public_holidays
 
 
@@ -32,7 +32,7 @@ class PublicHolidayRegionsView(APIView):
                     "requiresBoundaryVerification": True,
                 })
         return Response({
-            "state": state, "regionRequired": state in {"QLD", "NSW", "NT", "TAS", "VIC", "WA"},
+            "state": state, "regionRequired": state in REGIONAL_HOLIDAY_STATES,
             "calendar": holiday_calendar_status(state),
             "regions": choices,
             "legalBasis": local_public_holidays()["legal_basis"],
