@@ -3,7 +3,7 @@
   "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "reviewer": "gpt6-senior-20261025",
   "review_level": "first-pass source fetch; S2/S3 pending",
-  "status": "INCOMPLETE",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
   "files": [
     {
       "path": "frontend_web/scripts/render-mobile-skill-symbols.mjs",
@@ -112,6 +112,114 @@
       "lines": 127,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
       "note": "127 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
+    },
+    {
+      "path": "frontend_web/shared/SkillGlyph.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "fff5c6b5723cd5e92cb69a9ce0bb2f8f33d2083e",
+      "lines": 261,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "261 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/SkillSymbolButton.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "5d2422dbe78665e98412c505e98d5f5393c34138",
+      "lines": 54,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "54 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/SoftwareLogo.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3f3223fccb318fb8909dc57d7aad613d4582cf2c",
+      "lines": 33,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "33 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/VerificationBadges.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b1673b034b2b32177fa13cc8f517c4c9cd219299",
+      "lines": 247,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "247 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/WorkerSkills.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "759b922094492219a1f6c7a20dd625a47855690f",
+      "lines": 57,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "57 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/postShift/PostShiftDetailsStep.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "aff8428e6fd156f6c5b5264f8a314b98797eb50f",
+      "lines": 176,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "176 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/postShift/PostShiftForm.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3ee290e4f65473e2c8c68a3f3a6401b2e11c9cb0",
+      "lines": 730,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "730 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/postShift/PostShiftPayStep.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "98d965442d9f1dcb9942b36410d9b3b917f10605",
+      "lines": 270,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "270 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/postShift/PostShiftSkillsStep.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "d23af9342b963a962358f614a43eb5849191b89a",
+      "lines": 35,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "35 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/postShift/PostShiftTimetableStep.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "7ab5a203f1b839646ed0bb393325675e7adc07f0",
+      "lines": 742,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "742 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/postShift/PostShiftVisibilityStep.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "79deeff506ef040f1dbd96a29c9b8aec4592401c",
+      "lines": 205,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "205 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/shared/postShift/PostShiftWizardShell.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3a8457688b76aa84cb3993db6bdd5f8379886825",
+      "lines": 184,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "184 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
     }
   ],
   "findings": []
