@@ -11,25 +11,37 @@
         "B39",
         "F04-N2"
       ],
-      "note": "PostShiftScreen.tsx shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 727-781): Native poster expands recurring slot dates, reconciles per-slot rate rows and calls calculateShiftRates for non-PHARMACIST_PROVIDED rates. Final builder uses shared-core postingDraft. An authorized UI pharmacy selection does not neutralize F04-N2 backend writable pharmacy/payment state during later edits. Test contract: Negative: forged pharmacy/pay state, stale rate callback, recurring date boundaries; positive: same draft payload as Vite for identical days and visibility. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        727,
+        781
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/PostShiftSkillsStep.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "PostShiftSkillsStep.tsx shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply."
+      "note": "PostShiftSkillsStep.tsx shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/PostShiftTimetableStep.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "PostShiftTimetableStep.tsx shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply."
+      "note": "PostShiftTimetableStep.tsx shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "PostShiftVisibilityStep.tsx shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 58-177): Visibility step selects starting audience and optional notifications separately, supports anonymous posting, and configures escalation timers. Backend must enforce the selected audience and notification obligations; B09 says escalation may omit audience notifications. Test contract: Negative: force restricted tier or unauthorized anonymous flag; positive: explicitly chosen audience and notifications reach intended recipients only. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        58,
+        177
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/PublicShiftsView.tsx",
@@ -38,50 +50,68 @@
         "B40",
         "B54"
       ],
-      "note": "PublicShiftsView.tsx worker/public booking, offer confirmation, accepted shifts and history via shared-core; concurrency/eligibility B37/B40/B54/B67."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 146-236): PublicShiftsView fetches public shifts plus the current worker's interests, loads onboarding verification and guides payment profile setup. UI verification/qualification checks are advisory: backend must refuse blocked worker applications. Test contract: Negative: unverified worker and stale onboarding, direct application to hidden shift; positive: verified worker can apply and see server response. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        146,
+        236
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftBoardTabsPage.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "ShiftBoardTabsPage.tsx pure display helpers, typed models, and shift/slot presentation defaults."
+      "note": "ShiftBoardTabsPage.tsx pure display helpers, typed models, and shift/slot presentation defaults.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/components/CounterOfferDialog.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "CounterOfferDialog.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 90-160): Counter-offer dialog collects per-slot proposed rates and optional travel location with Google autocomplete. Shared-core submitShiftCounterOfferService serializes those values. Validate date, numerical cap and authorized shift/slot server-side. Test contract: Negative: forged slot, malformed rate, time span across midnight, unreachable Google API; positive: valid dated slot and travel request. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        90,
+        160
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/components/FiltersSidebar.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "FiltersSidebar.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "FiltersSidebar.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ReviewCounterOfferDialog.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "ReviewCounterOfferDialog.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "ReviewCounterOfferDialog.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ReviewOfferSlotList.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "ReviewOfferSlotList.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "ReviewOfferSlotList.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "ShiftEngagementTermsDialog.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "ShiftEngagementTermsDialog.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftList.model.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "ShiftList.model.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+      "note": "ShiftList.model.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     }
   ],
-  "findings": []
+  "findings": [],
+  "targeted_recheck_files": 4,
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3"
 }
