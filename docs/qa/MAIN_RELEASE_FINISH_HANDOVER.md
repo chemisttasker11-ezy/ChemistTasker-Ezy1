@@ -52,3 +52,11 @@ For F12 use `FLOW_TEMPLATE.md` with the F12 entry from `flows.json`.
 - Real problems and production blockers only; no speculation, no style nits. Zero new findings is a fine result.
 - Ponytail (full) for anything you write: the smallest complete change.
 - Quota (local fleet): one slot per account, cheaper models for plain file reading, Opus only for flow traces and verification. On 25 Oct 19 parallel agents emptied Claude A/B 5-hour windows, Codex A/B and agy g2 within ~25 minutes; do not repeat that. Codex's "Your workspace is out of credits" means its usage limit is reached (the message offers paid top-up); it comes back at its reset.
+
+## Continuation: 25 October 2026 — C008 and P0 verification
+
+- **C008 completed:** all 36 backend/core paths read and recorded as a distinct file-review output in [out_C008.json](evidence/pr200_finish/out_C008.json), commit `0b5d4ed8ce08b77ee64dd4e16ff690f78e812adc`. No new distinct findings; `file_validation.py` attaches existing B49, and `serializer_lifecycle.py` attaches existing B44. Do NOT rework C008.
+- **Three P0 independently SOURCE-CONFIRMED** by a different reviewer: F03-N1, F04-N1 and F04-N2. Recorded in [VERIFIED.json](evidence/pr200_finish/VERIFIED.json), commit `b65af7b41ff9ffd873a910db3a94a26352d28f56`, with exact baseline source links, negative/positive tests and impact. **No HTTP/PostgreSQL/real-user test executed**; do not promote these to runtime-reproduced.
+- The **last regenerated aggregate CSV remains 1,134/2,151** because `merge.mjs` was not run in the GitHub-only continuation. Rebuild the ledger from committed outputs at next local checkout: `node docs/qa/evidence/pr200_finish/merge.mjs`. Expected after correct refresh is **1,170/2,151** full-file agent-reported rows (54.39%); exclude the two audit scripts for frozen-main numerator (1,170/2,149).
+- Done chunks now **52/89**, remaining **37**. Earlier F01–F11 traces unchanged; **F12 still pending**. No application code, tests, migrations or deployment modified.
+- Note: `merge.mjs` does not edit `VERIFIED.json`; preserve the independent verification decisions when regenerating.
