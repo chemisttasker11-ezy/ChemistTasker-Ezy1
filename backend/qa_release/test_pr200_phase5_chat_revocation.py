@@ -92,9 +92,13 @@ class B05RevokedWebsocketStillConnected(TransactionTestCase):
             await a.send_json_to({"type": "message", "body": "revoked must not persist"})
             # The server must recheck effective membership and refuse a message
             # from a connected-but-no-longer-authorized worker.
+            self.assertTrue(
+                await b.receive_nothing(timeout=0.7),
+                "Revoked worker must not trigger a peer message.created event.",
+            )
             self.assertEqual(
                 await _message_count(), 0,
-                "Membership-revoked WebSocket must not create a message.",
+                "Membership-revoked WebSocket must not persist a message.",
             )
         finally:
             await a.disconnect()
@@ -109,6 +113,28 @@ class B05RevokedWebsocketStillConnected(TransactionTestCase):
             self.assertTrue(
                 await b.receive_nothing(timeout=0.7),
                 "Revoked staff socket must not broadcast typing to peers.",
+            )
+        finally:
+            await a.disconnect()
+            await b.disconnect()
+
+    async def test_b05_revoked_socket_cannot_receive_new_peer_message(self):
+        a, b, member = await self._paired("revoked-outbound")
+        try:
+            await _revoke(member.pk)
+            self.assertFalse(await _participant_exists(member.pk))
+            # A is still in the ASGI group unless the consumer revokes its
+            # channel membership. A post-revocation message from the healthy
+            # peer must not be delivered to the revoked recipient.
+            await b.send_json_to({"type": "message", "body": "private after revocation"})
+            import asyncio
+            try:
+                output = await a.receive_output(timeout=0.7)
+            except asyncio.TimeoutError:
+                output = None
+            self.assertTrue(
+                output is None or output.get("type") == "websocket.close",
+                "Revoked worker socket received outbound group content: %r" % output,
             )
         finally:
             await a.disconnect()
