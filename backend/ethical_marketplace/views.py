@@ -422,7 +422,7 @@ class ListingRequests(APIView):
             # The listing row, not individual lot rows, is the exclusivity key.
             # Both requests for different lots must contend on this same lock.
             listing = get_object_or_404(
-                EthicalListing.objects.select_for_update().select_related(
+                EthicalListing.objects.select_for_update(of=("self",)).select_related(
                     "pharmacy", "product", "scope_chain"
                 ),
                 pk=pk,
