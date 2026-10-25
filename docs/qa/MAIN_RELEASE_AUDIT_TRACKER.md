@@ -292,3 +292,20 @@ Six new source-level candidates after checking prior 65: B66 overnight shift can
 - The 2,151 figure is **source report inventory coverage, not 99% independent semantic coverage**; S0 existing static scanner unchanged; S1 existing 1,828 agent-reported records plus 323 new source acquisition/annotation, qualification outstanding; S2 independent cross-file certification remains incomplete, with three separately logged P0 source-supported traces from the earlier review; S3 actual targeted runtime/browser/PostgreSQL/Stripe/native testing NOT EXECUTED in this continuation. The F12 comparative worklog remains unfinished.
 - Previously recorded B01–B71, all C/F candidates and the three P0 source-confirmed candidates remain preserved. The paediatric clinical release gate remains provisional pending independent validation, with no clinically incorrect dose demonstrated. **No production application source, migrations, tests, deployment or merge performed. PR stays DRAFT / NOT RELEASE READY.**
 - Next required substantive gate is independent security/finance workflow causal tracing with second reviewer plus exact-head negative/positive execution. A source-retrieval milestone is not a production readiness approval.
+
+## Independent-check pass and status (25 October 2026, 08:10 UTC, local orchestrator)
+Baseline b77e9fd2, audit-only (no app code, migrations or deployments). Work split: Codex A/B and Claude B reviewed and checked; agy g1/g2 walked the apps in a browser; Claude A orchestrated.
+
+**Coverage**
+- **S1 source review:** 2,151/2,151 paths have a recorded verdict; **2,081 (96.7%) read in full with a semantic verdict**. Re-read in full after a structural-only first pass: C046, C048, C073, C076, C077, C078 (Codex). The 70 remaining structural-only paths are e2e fixtures (C072) and `.agents` skill tooling (C083-C085), labelled as test/tooling code, not app logic.
+- **Flow traces:** F01-F12 plus F13 (web/Next/Expo parity for login, account switch, Stripe booking payment, Hub, notifications) and F14 (agy browser journeys on the Docker stack; every agy claim checked against its screenshot, 4 overstated claims corrected or dropped).
+- **S2 independent checks:** **112 findings** checked by an agent other than the finder (Codex-found by Claude; Claude/agy-found by Codex; the 3 P0s earlier). Evidence: [VERIFIED_INDEPENDENT.json](evidence/pr200_finish/VERIFIED_INDEPENDENT.json), [VERIFIED.json](evidence/pr200_finish/VERIFIED.json). On the 61 findings checked by both Codex and Claude, they agreed on 60 (the 61st was real but a duplicate root).
+- **S3 runtime:** P0 **F04-N1 and F04-N2 REPRODUCED** with Django tests inside the Docker backend ([RUNTIME_RESULTS.json](evidence/pr200_finish/runtime/RUNTIME_RESULTS.json)). F03-N1 pending: its file changed in PR #198 and the baseline Docker stack does not build yet (npm download failures, handled in a separate session).
+
+**Results**
+- **3 P0**, all confirmed in source; 2 reproduced at runtime.
+- **100 more confirmed** (66 P1, 34 P2 after checkers narrowed several claims); **87 FIX**, **13 DECISION** (owner choices, for the grill).
+- 5 refuted, 3 duplicates, 1 needs a browser check (F14-U6 typed date).
+- Not yet merged with the parallel online-agent pass (same branch, separate work); compare and dedupe before the grill.
+
+**Next:** merge with the online agent's results (agreements, disagreements, one-sided findings) -> final dedupe (e.g. C078-N2 = C079-N1) -> F03-N1 runtime test when the stack builds -> GRILL/FIX split for one clean final grill -> fixes on a separate local branch. **Verdict: NOT RELEASE READY** (3 P0 confirmed).

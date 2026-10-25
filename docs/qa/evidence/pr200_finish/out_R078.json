@@ -1,0 +1,233 @@
+{
+ "chunk": "R078",
+ "files": [
+  {
+   "path": "frontend_web/scripts/render-mobile-skill-symbols.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no production problem found."
+  },
+  {
+   "path": "frontend_web/scripts/run-tauri.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no production problem found."
+  },
+  {
+   "path": "frontend_web/scripts/validate-kiosk-build.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; packaged build validation is invoked by its caller."
+  },
+  {
+   "path": "frontend_web/scripts/ws-url.test.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Assertions match the URL helper's expected behavior."
+  },
+  {
+   "path": "frontend_web/shared/PharmacyContext.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/PharmacyProfileFields.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/ReportButton.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/RoleTile.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/ShiftRequirements.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/ShiftRequirementsPicker.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/ShiftSkillPresetControls.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/SignupRolePicker.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/SkillGlyph.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/SkillSymbolButton.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/SoftwareLogo.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/VerificationBadges.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/WorkerSkills.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftDetailsStep.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftForm.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "N2",
+    "N3"
+   ],
+   "note": "Editing fails to restore annual settings, overwrites custom rates, and can delete confirmed bookings."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftPayStep.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; edit-state problems originate in the form."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftSkillsStep.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftTimetableStep.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftVisibilityStep.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftWizardShell.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Annual salary vacancies reopen with incomplete pay settings",
+   "scenario": "Tom posts a full-time vacancy with an annual salary range and 12% super. When he reopens it to change the description, pay defaults to hourly and saving demands hourly rates. Selecting annual pay again restores the salary range but leaves super blank, so he must re-enter existing information.",
+   "evidence": [
+    "frontend_web/shared/postShift/PostShiftForm.tsx:206",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:217",
+    "frontend_web/shared/postShift/useShiftPricing.ts:23",
+    "frontend_web/shared/postShift/useShiftPricing.ts:28",
+    "shared-core/src/domains/shifts/postingDraft.ts:28",
+    "shared-core/src/domains/shifts/postingDraft.ts:29"
+   ],
+   "confidence": "high",
+   "test_needed": "Open an annual-pay vacancy with saved super, change only its description, and verify it saves without pay input or pay changes.",
+   "owner_question": {
+    "question": "When Tom edits only an annual-pay vacancy's description, what should happen to its existing pay settings?",
+    "options": [
+     "Restore and preserve the annual salary and super",
+     "Require Tom to explicitly confirm the existing pay",
+     "Require Tom to select annual pay and re-enter super (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Editing a shift silently replaces custom date rates with calculated rates",
+   "scenario": "Tom uses a $60 hourly guide rate but sets one pharmacist shift date to $80. He later edits only the description. Reopening recalculates that date's rate and saving replaces $80 with $60, changing the advertised pay Sara sees without Tom requesting a pay change.",
+   "evidence": [
+    "frontend_web/shared/postShift/PostShiftForm.tsx:239",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:241",
+    "frontend_web/shared/postShift/useShiftPricing.ts:95",
+    "frontend_web/shared/postShift/useShiftPricing.ts:106",
+    "shared-core/src/domains/shifts/postingDraft.ts:46",
+    "backend/shifts/posting.py:191"
+   ],
+   "confidence": "high",
+   "test_needed": "Load a shift with a saved date rate above its guide rate, allow pricing to finish, change only the description, and assert the saved date rate remains unchanged.",
+   "owner_question": {
+    "question": "When Tom edits a shift's description, what should happen to the custom $80 rate Sara previously saw?",
+    "options": [
+     "Preserve $80 unless Tom changes it",
+     "Ask Tom before replacing it with the calculated rate",
+     "Automatically replace it with $60 (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Saving a partially filled shift can delete its confirmed bookings",
+   "scenario": "Tom posts two future dates and Sara books the first through the marketplace, while the second remains open. Tom opens the shift to change its description and saves. The editor loads only unassigned dates but replaces every stored date, deleting Sara's confirmed booking without a cancellation.",
+   "evidence": [
+    "frontend_web/shared/postShift/PostShiftForm.tsx:175",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:230",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+    "shared-core/src/domains/shifts/postingDraft.ts:46",
+    "backend/shifts/serialization/shifts.py:407",
+    "backend/shifts/posting.py:157",
+    "backend/shifts/posting.py:189",
+    "backend/shifts/models.py:472"
+   ],
+   "confidence": "high",
+   "test_needed": "Create a marketplace shift with one confirmed non-rostered date and one open date, edit only its description through the wizard, and assert the confirmed assignment survives.",
+   "owner_question": {
+    "question": "When Tom edits the remaining vacancy after Sara has booked another date, what should happen to Sara's booking?",
+    "options": [
+     "Preserve Sara's booking and update only the intended details",
+     "Block editing and require a separate cancellation process",
+     "Remove Sara's booking when Tom saves (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-1"
+}

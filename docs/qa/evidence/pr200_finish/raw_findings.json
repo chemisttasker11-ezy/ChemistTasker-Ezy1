@@ -2972,6 +2972,110 @@
   "reviewer": "gpt6-senior-20261025"
  },
  {
+  "id": "C073-N1",
+  "severity": "P1",
+  "area": "Hub",
+  "title": "The publishing workspace leaves private content visible after logout",
+  "scenario": "Tom opens an unpublished draft, then uses Log out without leaving the publishing workspace. Zoe can still read Tom's draft on that screen because signing out changes the account menu but never clears or hides the workspace.",
+  "evidence": [
+   "frontend_web/landing_next/app/content/workspace.tsx:21",
+   "frontend_web/landing_next/app/content/workspace.tsx:25",
+   "frontend_web/landing_next/app/content/workspace.tsx:41",
+   "frontend_web/landing_next/shared/account-controls.tsx:11",
+   "frontend_web/landing_next/shared/session-provider.tsx:11"
+  ],
+  "confidence": "high",
+  "test_needed": "Open Tom's unpublished draft, log out through the header, and assert its content and publishing controls disappear without reloading.",
+  "owner_question": {
+   "question": "When Tom logs out with an unpublished draft open, what should Zoe see on that screen?",
+   "options": [
+    "Hide the workspace immediately and retain the unsaved draft only for Tom",
+    "Hide the workspace immediately and discard unsaved changes",
+    "Leave Tom's draft visible until navigation or reload (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C073",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "C073-N2",
+  "severity": "P2",
+  "area": "Hub",
+  "title": "Saving a publishing draft can silently erase edits made during the save",
+  "scenario": "Lina saves a draft and continues changing its title while the save is still finishing. When the earlier save completes, the older title replaces her newer text and the workspace says the draft is saved. Lina loses the newer change without an unsaved-changes warning.",
+  "evidence": [
+   "frontend_web/landing_next/app/content/workspace.tsx:29",
+   "frontend_web/landing_next/app/content/workspace.tsx:31",
+   "frontend_web/landing_next/app/content/workspace.tsx:33",
+   "frontend_web/landing_next/app/content/workspace.tsx:51",
+   "frontend_web/landing_next/app/content/workspace.tsx:56"
+  ],
+  "confidence": "high",
+  "test_needed": "Delay a draft-save response, change Lina's title while it is pending, complete the response, and assert the newer title remains unsaved.",
+  "owner_question": {
+   "question": "If Lina continues editing while her draft saves, what should happen to those newer changes?",
+   "options": [
+    "Keep Lina's newer changes and mark them unsaved",
+    "Temporarily prevent editing until the save finishes",
+    "Replace newer changes with the completed save (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C073",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "C073-N3",
+  "severity": "P2",
+  "area": "Marketplace",
+  "title": "The public catalogue cannot browse beyond its first 24 matching listings",
+  "scenario": "Tom's approved listing becomes the twenty-fifth result after newer items are published. Sara sees a total of twenty-five approved listings, but only twenty-four cards and no next page or load-more action. She cannot discover Tom's item by continuing through the catalogue.",
+  "evidence": [
+   "frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx:12",
+   "frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx:25",
+   "frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx:27",
+   "backend/marketplace/views.py:57",
+   "backend/marketplace/views.py:59"
+  ],
+  "confidence": "high",
+  "test_needed": "Provide twenty-five matching approved listings and assert Sara can reach the twenty-fifth through catalogue pagination.",
+  "owner_question": {
+   "question": "How should Sara discover Tom's listing when more than twenty-four approved items match her filters?",
+   "options": [
+    "Sara can page through every matching listing",
+    "Clearly label the latest twenty-four and offer search for older items",
+    "Show the full count but only the first twenty-four cards (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C073",
+  "reviewer": "codexA-1"
+ },
+ {
+  "id": "C073-N4",
+  "severity": "P2",
+  "area": "Hub",
+  "title": "New learning resources cannot be published into the Learning page",
+  "scenario": "Lina publishes a new clinical lesson through the publishing workspace. Sara's Learning page never shows it because none of Lina's available topics matches the topic that page requires. The publishing service also rejects that required topic, so Lina cannot publish a new lesson into Learning through the supported workflow.",
+  "evidence": [
+   "frontend_web/landing_next/app/(public)/learning/page.tsx:47",
+   "frontend_web/landing_next/app/content/workspace.tsx:52",
+   "backend/public_hub/editorial.py:15",
+   "backend/public_hub/models.py:17",
+   "backend/public_hub/views.py:49"
+  ],
+  "confidence": "high",
+  "test_needed": "Publish a new learning resource through Lina's editorial workspace and assert it appears on Sara's Learning page.",
+  "owner_question": {
+   "question": "How should Lina publish a resource that Sara can find on the Learning page?",
+   "options": [
+    "Give Lina a supported Learning topic in the editor and publishing service",
+    "Include selected existing topics such as Careers and Pharmacy practice on Learning",
+    "Keep Learning limited to separately seeded resources (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C073",
+  "reviewer": "codexA-1"
+ },
+ {
   "id": "C074-N1",
   "severity": "P1",
   "area": "Next / cross-account private workspace privacy",
@@ -3181,6 +3285,89 @@
   },
   "chunk": "C077",
   "reviewer": "codexA-1"
+ },
+ {
+  "id": "C078-N1",
+  "severity": "P2",
+  "area": "Shifts",
+  "title": "Annual salary vacancies reopen with incomplete pay settings",
+  "scenario": "Tom posts a full-time vacancy with an annual salary range and 12% super. When he reopens it to change the description, pay defaults to hourly and saving demands hourly rates. Selecting annual pay again restores the salary range but leaves super blank, so he must re-enter existing information.",
+  "evidence": [
+   "frontend_web/shared/postShift/PostShiftForm.tsx:206",
+   "frontend_web/shared/postShift/PostShiftForm.tsx:217",
+   "frontend_web/shared/postShift/useShiftPricing.ts:23",
+   "frontend_web/shared/postShift/useShiftPricing.ts:28",
+   "shared-core/src/domains/shifts/postingDraft.ts:28",
+   "shared-core/src/domains/shifts/postingDraft.ts:29"
+  ],
+  "confidence": "high",
+  "test_needed": "Open an annual-pay vacancy with saved super, change only its description, and verify it saves without pay input or pay changes.",
+  "owner_question": {
+   "question": "When Tom edits only an annual-pay vacancy's description, what should happen to its existing pay settings?",
+   "options": [
+    "Restore and preserve the annual salary and super",
+    "Require Tom to explicitly confirm the existing pay",
+    "Require Tom to select annual pay and re-enter super (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C078",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "C078-N2",
+  "severity": "P1",
+  "area": "Shifts",
+  "title": "Editing a shift silently replaces custom date rates with calculated rates",
+  "scenario": "Tom uses a $60 hourly guide rate but sets one pharmacist shift date to $80. He later edits only the description. Reopening recalculates that date's rate and saving replaces $80 with $60, changing the advertised pay Sara sees without Tom requesting a pay change.",
+  "evidence": [
+   "frontend_web/shared/postShift/PostShiftForm.tsx:239",
+   "frontend_web/shared/postShift/PostShiftForm.tsx:241",
+   "frontend_web/shared/postShift/useShiftPricing.ts:95",
+   "frontend_web/shared/postShift/useShiftPricing.ts:106",
+   "shared-core/src/domains/shifts/postingDraft.ts:46",
+   "backend/shifts/posting.py:191"
+  ],
+  "confidence": "high",
+  "test_needed": "Load a shift with a saved date rate above its guide rate, allow pricing to finish, change only the description, and assert the saved date rate remains unchanged.",
+  "owner_question": {
+   "question": "When Tom edits a shift's description, what should happen to the custom $80 rate Sara previously saw?",
+   "options": [
+    "Preserve $80 unless Tom changes it",
+    "Ask Tom before replacing it with the calculated rate",
+    "Automatically replace it with $60 (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C078",
+  "reviewer": "codexB-1"
+ },
+ {
+  "id": "C078-N3",
+  "severity": "P1",
+  "area": "Shifts",
+  "title": "Saving a partially filled shift can delete its confirmed bookings",
+  "scenario": "Tom posts two future dates and Sara books the first through the marketplace, while the second remains open. Tom opens the shift to change its description and saves. The editor loads only unassigned dates but replaces every stored date, deleting Sara's confirmed booking without a cancellation.",
+  "evidence": [
+   "frontend_web/shared/postShift/PostShiftForm.tsx:175",
+   "frontend_web/shared/postShift/PostShiftForm.tsx:230",
+   "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+   "shared-core/src/domains/shifts/postingDraft.ts:46",
+   "backend/shifts/serialization/shifts.py:407",
+   "backend/shifts/posting.py:157",
+   "backend/shifts/posting.py:189",
+   "backend/shifts/models.py:472"
+  ],
+  "confidence": "high",
+  "test_needed": "Create a marketplace shift with one confirmed non-rostered date and one open date, edit only its description through the wizard, and assert the confirmed assignment survives.",
+  "owner_question": {
+   "question": "When Tom edits the remaining vacancy after Sara has booked another date, what should happen to Sara's booking?",
+   "options": [
+    "Preserve Sara's booking and update only the intended details",
+    "Block editing and require a separate cancellation process",
+    "Remove Sara's booking when Tom saves (keep today's behaviour)"
+   ]
+  },
+  "chunk": "C078",
+  "reviewer": "codexB-1"
  },
  {
   "id": "C079-N1",

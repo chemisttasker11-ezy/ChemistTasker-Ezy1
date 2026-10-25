@@ -1,817 +1,533 @@
 {
-  "chunk": "C073",
-  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
-  "reviewer": "gpt6-senior-20261025",
-  "review_level": "S1 FULL SOURCE FETCH + ANNOTATED FIRST-PASS; not independent S2 semantic certification or S3 test",
-  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3",
-  "source_read_count": 70,
-  "files": [
-    {
-      "path": "frontend_web/e2e/support/start-authenticated-stack.mjs",
-      "verdict": "NOTE",
-      "ids": [],
-      "note": "Next server component/helper; 106 lines fetched at frozen SHA; imports node:child_process, node:fs, node:path; await/call paths: fetch; mutation or form interaction present; branch/navigation guard present.",
-      "blob_sha": "484a9f2692f9d2dfa11baab1cc02b101bf7a56e5",
-      "lines": 106,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": true,
-        "mutations": true
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/e2e/tests/login.e2e.ts",
-      "verdict": "NOTE",
-      "ids": [],
-      "note": "browser test case; 25 lines fetched at frozen SHA; imports @e2e-dev/web, e2e; await/call paths: browser.route, app.open, expect, screen.getByRole, app.screenshot; read-only/display path; no local guard (caller/backend still authoritative). No test executed; fixture/mocking and assertion scope require independent QA.",
-      "blob_sha": "1a9ff3c258d9363fc1643b8211c6de9961aa19c8",
-      "lines": 25,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/access/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/workspace; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
-      "blob_sha": "ea2ead4b7408abb376d9a908a52bad662abb396f",
-      "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/inventory/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/ethical-workspace-v2; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
-      "blob_sha": "01c33910fc56cb9f6a2b8d477265fede2ab2924c",
-      "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/layout.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "note": "Next server component/helper; 9 lines fetched at frozen SHA; imports next, next/link, @/public/header; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative).",
-      "blob_sha": "07eff60bb749aa0f7422f826adf5f3ab63e2fdd9",
-      "lines": 9,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/new/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/ethical-workspace-v2; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
-      "blob_sha": "4569f08ba422b5eeb8d8c8de272e3480f46c8508",
-      "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/ethical-workspace-v2; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
-      "blob_sha": "13ab917c95d0989205dfacb3d1f1058e70106699",
-      "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/ethical-workspace-v2; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
-      "blob_sha": "bc61e651049d8856de65d0f2aaba385de70f1c02",
-      "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/transfers/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "Next route/view wrapper; 3 lines fetched at frozen SHA; imports @/features/marketplace/ethical-workspace-v2; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
-      "blob_sha": "262cd602d0ec6a050b929aac66b72c125fa283ee",
-      "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/blog/[slug]/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "Next route/view wrapper; 5 lines fetched at frozen SHA; imports ../../components/article-detail; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
-      "blob_sha": "a504b6631617287aea323051efc3df1a36cd7560",
-      "lines": 5,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": true,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/blog/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "Next route/view wrapper; 9 lines fetched at frozen SHA; imports next, ../components/listing, ../../../lib/hub; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative). Delegation does not prove backend authorization.",
-      "blob_sha": "f88b44f15714eda8dd60cc1671710e0a40485955",
-      "lines": 9,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": true,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/community/sign-in/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "Next route/view wrapper; 4 lines fetched at frozen SHA; imports next/navigation, @/shared/browser-session; no direct asynchronous call detected; read-only/display path; branch/navigation guard present. Delegation does not prove backend authorization.",
-      "blob_sha": "504dc0f08fd59555b0e4cf5b260ffe9ac24c05d7",
-      "lines": 4,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": true,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/community/sign-in/sign-in-form.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "note": "interactive Next client module; 23 lines fetched at frozen SHA; imports react, @/lib/chemisttasker-api, @/shared/browser-session; await/call paths: chemistTaskerApi.account.login; mutation or form interaction present; no local guard (caller/backend still authoritative).",
-      "blob_sha": "eea970bf144b6823d03cfc99ae68b8d70161c4eb",
-      "lines": 23,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": true,
-        "server": false,
-        "guards": false,
-        "mutations": true
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/components/article-card.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "note": "Next server component/helper; 20 lines fetched at frozen SHA; imports next/link, lucide-react, ../../../lib/hub; no direct asynchronous call detected; read-only/display path; no local guard (caller/backend still authoritative).",
-      "blob_sha": "50cad11067a8ca1ba64686b62fbb31aeae98a995",
-      "lines": 20,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "risk_flags": {
-        "client": false,
-        "server": false,
-        "guards": false,
-        "mutations": false
-      },
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/components/article-detail.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "note": "51 lines; server/module; direct imports @/components/rich-content, next, next/link; async calls: getArticle, getArticles; read/presentation; local conditional/auth context. JSON-LD script insertion is escaped; verify rich-content sanitization independently. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "33218eb1456c5add1e9c4fb795f1e1c650fe7362",
-      "lines": 51,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/components/discussion.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "note": "115 lines; client state/UI; direct imports react, next/link, lucide-react; domain API: publicContent.listArticleComments, publicContent.reactToArticleComment, publicContent.removeArticleCommentReaction, publicContent.deleteArticleComment, publicContent.reportArticleComment, publicContent.createArticleComment, publicContent.getArticle; write-capable UI: verify backend authorization; local conditional/auth context. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "bfc9352a7c816477f690deede2586a9cbaeac1b0",
-      "lines": 115,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/components/hub-header.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "3 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "8f6c2b654f1cd2da843a85f82131a364c60ebeeb",
-      "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/components/listing.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "note": "39 lines; server/module; direct imports next/link, lucide-react, ../../../lib/hub-server; async calls: getArticles; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "dca9191e97bd5dd7a7f79b5ffe2a73b852aac817",
-      "lines": 39,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/components/share-button.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "12 lines; client state/UI; simple delegated Next page or metadata; async calls: navigator.clipboard.writeText; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "9430d1852557217b0dee8d07226983236563536c",
-      "lines": 12,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/error.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "5 lines; client state/UI; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "8d23d246217a9bd72950b95426ccbd298ddfce63",
-      "lines": 5,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/layout.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "22 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "1f1ef0f3826cc317afcf0aca0c1984197e30f220",
-      "lines": 22,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/loading.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "2 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "504965b91def47d2a63396430f77417c8dbfbe1a",
-      "lines": 2,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/news/[slug]/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "5 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "957a45ed4b762d7164a140b59b9554749b399080",
-      "lines": 5,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/news/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "9 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "a6943f4743c3e61aef9ed5a6ced14209e824425f",
-      "lines": 9,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(hub)/not-found.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "3 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary. Publishing/community visibility and object scope belong in backend authorization tests.",
-      "blob_sha": "b082f3cb3fbd126fbc40af565382fdf46ee0a3b1",
-      "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/account-deletion/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "6 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary.",
-      "blob_sha": "e2775985858781241279dc3f1fe2fd86d3df71e3",
-      "lines": 6,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/contact-us/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "3 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; local conditional/auth context.",
-      "blob_sha": "9992de7c23ee94fcf890a540a0bbeb565cedaeee",
-      "lines": 3,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/contact/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "note": "6 lines; server/module; simple delegated Next page or metadata; no direct API call; read/presentation; no local auth boundary.",
-      "blob_sha": "188231d8f59d86e5b815a0ac942bd236295ed52d",
-      "lines": 6,
-      "inspection": "FULL_SOURCE_FETCH_ANNOTATED_S1",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/layout.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "1ffa90ca179eb3a9592d9709989c7d083085cd11",
-      "lines": 14,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 14 lines; thin Next route wrapper/delegation; imports @/public/header, @/public/footer; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/learning/page.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "d58e73674167c5c8638c252cdf7e58faf1f7c21b",
-      "lines": 155,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 155 lines; client interactions; imports next/link, react, lucide-react, @/shared/session-provider; call sites chemistTaskerApi.publicContent.listArticles, loadArticles, chemistTaskerApi.marketplace.getListingOptions; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/login/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "d33c15847a29af7be956736802e0606141b44f88",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/marketplace/exchanges/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "89858b4bff5e0d487a2e38c2ea061d4aae8dc292",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/workspace; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/marketplace/items/[id]/[slug]/marketplace-item.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "f95ba00f80fd719af932e48a3eed4c66633159b5",
-      "lines": 50,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 19-43): The item view fetches approved public listing and user marketplace access; enquiry submits client_request_id UUID with chosen buying_pharmacy. Client dropdown restricts eligible pharmacy but backend must enforce it; concurrent identical enquiries remain C011-N1. Test contract: Negative: edit buying_pharmacy manually and replay same request ID concurrently; positive: one verified enquiry in permitted pharmacy. This is not a distinct second-reviewer or executed test.",
-      "targeted_source_lines": [
-        19,
-        43
-      ],
-      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/marketplace/items/[id]/[slug]/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "6e0e87afed910d527e2d063f3d5fb8bf9b24ba73",
-      "lines": 10,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 10 lines; thin Next route wrapper/delegation; imports next, ./marketplace-item; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/marketplace/layout.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "a11a03170840f264dce62c5c8aefe50c17354a61",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports none; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "7e128ca5d94162779ef3c111bef5cd499133cda9",
-      "lines": 29,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 29 lines; client interactions; imports next/link, next/navigation, lucide-react, react; call sites chemistTaskerApi.marketplace.listListings, load; write UI, backend permissions authoritative; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/marketplace/medicines/page.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "7e08aab2ce7b8cbe33d6c601ebd8ebc4f248f287",
-      "lines": 11,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 11 lines; server/helper; imports next, next/link, lucide-react; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/marketplace/mine/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "5e99840b6b3f0d6ae95435fc86c4c9dd8cc4742c",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/goods-listings-v2; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/marketplace/new/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "06ad4740552a5d46f033367c832d95ccd67e5942",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/features/marketplace/add-item-wizard; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/marketplace/page.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "44bef7459a6c7518c2dcd313d0bf57df6ed85e81",
-      "lines": 23,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 23 lines; server/helper; imports next, next/image, next/link, lucide-react; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/mobile-checkout-return/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "dd9cdc9b87c9086dd5975c3d8ec1bee3845f7b78",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/mobile-verify/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "7a82766f7a64ce6c95f2a6c3641f41523882f0e3",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/onboarding/referee-reject/[pk]/[refIndex]/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "a5177d082edfe60901c12d9ed6ce018ca3846aaf",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/organization/[slug]/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "56511ec506fd42920acbba39c356d991d966935d",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/otp-verify/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "8d8cf27cfb7cf6b6695aa12a3cd207f101435808",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/password-reset/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "8bd57a4aed126b3f4adaa1ad5783fd4fa1fcc103",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/pricing/organization/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "b33c9c917ff6946c15fc58ed62af6a4c23950e57",
-      "lines": 6,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/pricing/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "112cefca63b9684e4bea325b099a8ade836df599",
-      "lines": 6,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/privacy-policy/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "35e9a75269ca81f9207e90f034ab97731d35ede0",
-      "lines": 6,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/referee/questionnaire/[token]/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "d6218f329094ffa487d43771f9cd167d41a07268",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/register/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "5e0c47dfe43472b406d2c3da59f757fe574f0705",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/reset-password/[uid]/[token]/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "d17e36bc65972312f6d21fc656dbf34f8186a6ae",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/shifts/link/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "7d00188f62ffce6421926f6e23160a595ef96dc8",
-      "lines": 5,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 5 lines; thin Next route wrapper/delegation; imports next, @/public/entry; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/shifts/public-board/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "b74acf5926f61759b5ae2ae728451f2c66fbcd14",
-      "lines": 6,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/talent/public-board/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "09f7b935308803c5b85f8bd6e3f2f824461e5be4",
-      "lines": 6,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/(public)/terms-of-service/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "f93539c33c32a75ef4df2d571cab3dcd8ca1bb53",
-      "lines": 6,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next, @/public/entry, @/public/hero; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/api/[...path]/route.ts",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "83be8ae945b1b757fbcbbcb2f12e901ba1e10667",
-      "lines": 12,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 1-9): Same-origin canonical /api/v1 facade rejects other first path components and forwards through platformProxy. This route itself does not perform Django object authorization. Endpoint checks belong to backend. Test contract: Negative: non-v1 root and ../ path; positive: authorized canonical request with cookie and CSRF. This is not a distinct second-reviewer or executed test.",
-      "targeted_source_lines": [
-        1,
-        9
-      ],
-      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/api/hub/[...path]/route.ts",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "633d96dd103cd7a0d2bebb8eec0af81a07b433b6",
-      "lines": 14,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 1-14): Hub BFF maps /session GET, POST and DELETE to current-user, login and logout; other hub paths forward to public-hub prefix through platformProxy, optionally using HUB_API_URL. Backend remains source of authentication and content permission. Test contract: Negative: forged origin/CSRF or private post access; positive: same authentication status as Vite. This is not a distinct second-reviewer or executed test.",
-      "targeted_source_lines": [
-        1,
-        14
-      ],
-      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/api/platform/[...path]/route.ts",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "07e0ca6958eb4d4e06d7d7e392fb7b2abfe92dc4",
-      "lines": 6,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 6 lines; thin Next route wrapper/delegation; imports next/server, @/lib/platform-proxy; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/calculator/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "f625a543fa1bf0d9d2514c46cdcd73f43a039c85",
-      "lines": 23,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 23 lines; thin Next route wrapper/delegation; imports @/public/header, @/public/footer, next, @/features/paediatric-calculator/components/calculator; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/content/invite/[token]/accept.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "ac445a210e34a81714b7371709b7807858e2e5a4",
-      "lines": 14,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 14 lines; client interactions; imports react, next/link, @/shared/session-provider, @/shared/browser-session; call sites contentOperations.acceptInvitation, reload, accept, logoutSession; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/content/invite/[token]/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "96e7011998a49300fae523beff0fbb3914a39444",
-      "lines": 3,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 3 lines; thin Next route wrapper/delegation; imports ./accept; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/content/layout.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "a5f9fb2fca443049ad07f4cb9046f552bc217f17",
-      "lines": 7,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 7 lines; thin Next route wrapper/delegation; imports next, ../(hub)/components/hub-header; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/content/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "4f42bf944f12975d6594aaa024861f0b26a34d96",
-      "lines": 3,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 3 lines; thin Next route wrapper/delegation; imports ./workspace; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/content/workspace.tsx",
-      "verdict": "ISSUE",
-      "ids": [
-        "C074-N1"
-      ],
-      "blob_sha": "fe4672d5a16db5ad489e327735592bf1221f5873",
-      "lines": 81,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "SOURCE-CONFIRMED CROSS-ACCOUNT DISPLAY RISK (not executed): ContentDashboard loads contentOperations.currentUser and document rows only in useEffect([]), has no useSession and does not clear docs/editor/moderation drafts on auth events. When another tab signs in as B and shared SessionProvider changes identity, this mounted publisher workspace still renders A's unpublished drafts and moderation data; backend may block B mutations but local disclosure remains. Root grouped under C074-N1. Negative: cross-tab A publisher to B ordinary member, no private content visible; positive: current authorised publisher sees their own drafts.",
-      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/dashboard/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "6ac249c3fe3c64c3d8995c9affe453967be89f3c",
-      "lines": 7,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 7 lines; thin Next route wrapper/delegation; imports react, @/shared/session-provider, @/shared/browser-session, @/migrated/utils/dashboardPath; call sites reload; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/feature-catalogue.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "45826449121d73386c3fb01afc6b718793a7cfca",
-      "lines": 13,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 13 lines; server/helper; imports none; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/hubs/[hub]/page.tsx",
-      "verdict": "NA",
-      "ids": [],
-      "blob_sha": "f715b11ff109b2f812ebe654ec59ecc6fccb3f9d",
-      "lines": 8,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 8 lines; thin Next route wrapper/delegation; imports next/navigation, @/lib/hub-server, ../community-client, @/lib/hub; no explicit awaits; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/hubs/access-notice.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "f58dd405c4a1ba0b9781855f209a9cfce448d241",
-      "lines": 14,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 14 lines; client interactions; imports next/link, @/shared/session-provider, @/shared/browser-session; call sites reload; read/render; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    },
-    {
-      "path": "frontend_web/landing_next/app/hubs/community-client.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "95f23e3820f4ec76d8bdc8daf99a6d1e8b1b86ae",
-      "lines": 145,
-      "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 145 lines; client interactions; imports react, next/link, lucide-react, ./post-entry; call sites chemistTaskerApi.publicContent.listCommunityPosts, chemistTaskerApi.publicContent.listCommunityPolls, chemistTaskerApi.publicContent.createCommunityPost, reload, chemistTaskerApi.publicContent.voteCommunityPoll, loadPolls; write UI, backend permissions authoritative; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
-    }
-  ],
-  "findings": [],
-  "known_findings": [
-    "B43",
-    "F11-N3",
-    "C010-N1",
-    "C016-N1",
-    "C016-N2"
-  ],
-  "targeted_recheck_files": 3
+ "chunk": "C073",
+ "files": [
+  {
+   "path": "frontend_web/e2e/support/start-authenticated-stack.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; disposable stack isolation is explicit."
+  },
+  {
+   "path": "frontend_web/e2e/tests/login.e2e.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; assertions match the stated frontend-only scope."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/access/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates to the access workspace."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/inventory/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; selects the inventory view."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/layout.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; provides private marketplace navigation and metadata."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/new/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; selects the new listing view."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; selects the listings view."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; selects the overview view."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(ethical)/marketplace/ethical/transfers/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; selects the transfers view."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/blog/[slug]/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; passes the slug and article kind consistently."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/blog/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; passes filters to the listing component."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/community/sign-in/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; validates the return destination before redirecting."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/community/sign-in/sign-in-form.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; restricts post-login destinations to local community paths."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/components/article-card.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; renders article summaries and validated cover URLs."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/components/article-detail.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; checks article kind and escapes structured data."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/components/discussion.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no reportable problem found in discussion actions."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/components/hub-header.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates header rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/components/listing.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; validates filters and provides pagination."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/components/share-button.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; clipboard failure has a fallback message."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/error.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; provides an error recovery action."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/layout.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; preview banner is restricted to nonproduction."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/loading.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; renders loading feedback."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/news/[slug]/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; passes the slug and article kind consistently."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/news/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; passes filters to the listing component."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(hub)/not-found.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; provides a return to published articles."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/account-deletion/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates account deletion page rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/contact-us/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; redirects the legacy contact route."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/contact/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates contact page rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/layout.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; provides the public page shell."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/learning/page.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N4"
+   ],
+   "note": "Requires a learning topic unavailable through editorial publishing."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/login/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates login rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/marketplace/exchanges/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; selects the exchanges workspace."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/marketplace/items/[id]/[slug]/marketplace-item.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no reportable problem found in listing display or enquiry submission."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/marketplace/items/[id]/[slug]/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; passes the listing identifier to the client."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/marketplace/layout.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; applies marketplace styles."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N3"
+   ],
+   "note": "Discards pagination and offers no way to browse beyond the first 24 results."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/marketplace/medicines/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; links to the private access workflow."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/marketplace/mine/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates owned listing rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/marketplace/new/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates listing creation to the wizard."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/marketplace/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; validates the initial category and renders the catalogue."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/mobile-checkout-return/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates checkout return rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/mobile-verify/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates mobile verification rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/onboarding/referee-reject/[pk]/[refIndex]/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates reference rejection rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/organization/[slug]/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates public organisation rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/otp-verify/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates email verification rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/password-reset/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates password reset request rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/pricing/organization/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates organisation pricing rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/pricing/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates pricing rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/privacy-policy/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates privacy policy rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/referee/questionnaire/[token]/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates reference questionnaire rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/register/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates registration rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/reset-password/[uid]/[token]/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates password replacement rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/shifts/link/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates shared shift rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/shifts/public-board/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates the public shift board."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/talent/public-board/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates the public talent board."
+  },
+  {
+   "path": "frontend_web/landing_next/app/(public)/terms-of-service/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates terms rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/api/[...path]/route.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; restricts forwarding to the canonical API namespace."
+  },
+  {
+   "path": "frontend_web/landing_next/app/api/hub/[...path]/route.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; session mappings use the shared proxy."
+  },
+  {
+   "path": "frontend_web/landing_next/app/api/platform/[...path]/route.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates path and origin validation to the shared proxy."
+  },
+  {
+   "path": "frontend_web/landing_next/app/calculator/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; renders the calculator entry and metadata."
+  },
+  {
+   "path": "frontend_web/landing_next/app/content/invite/[token]/accept.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; handles account state and invitation acceptance errors."
+  },
+  {
+   "path": "frontend_web/landing_next/app/content/invite/[token]/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; passes the invitation token to the acceptance component."
+  },
+  {
+   "path": "frontend_web/landing_next/app/content/layout.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; applies publishing metadata and no-referrer policy."
+  },
+  {
+   "path": "frontend_web/landing_next/app/content/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegates publishing workspace rendering."
+  },
+  {
+   "path": "frontend_web/landing_next/app/content/workspace.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "N2",
+    "N4"
+   ],
+   "note": "Retains private state after logout, overwrites concurrent edits, and omits the Learning topic."
+  },
+  {
+   "path": "frontend_web/landing_next/app/dashboard/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; redirects according to the current user's dashboard assignment."
+  },
+  {
+   "path": "frontend_web/landing_next/app/feature-catalogue.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; renders static platform capability descriptions."
+  },
+  {
+   "path": "frontend_web/landing_next/app/hubs/[hub]/page.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; validates hub names before loading public posts."
+  },
+  {
+   "path": "frontend_web/landing_next/app/hubs/access-notice.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; distinguishes session loading, failure, and eligibility guidance."
+  },
+  {
+   "path": "frontend_web/landing_next/app/hubs/community-client.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; separates composer and interaction state by account identity."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Hub",
+   "title": "The publishing workspace leaves private content visible after logout",
+   "scenario": "Tom opens an unpublished draft, then uses Log out without leaving the publishing workspace. Zoe can still read Tom's draft on that screen because signing out changes the account menu but never clears or hides the workspace.",
+   "evidence": [
+    "frontend_web/landing_next/app/content/workspace.tsx:21",
+    "frontend_web/landing_next/app/content/workspace.tsx:25",
+    "frontend_web/landing_next/app/content/workspace.tsx:41",
+    "frontend_web/landing_next/shared/account-controls.tsx:11",
+    "frontend_web/landing_next/shared/session-provider.tsx:11"
+   ],
+   "confidence": "high",
+   "test_needed": "Open Tom's unpublished draft, log out through the header, and assert its content and publishing controls disappear without reloading.",
+   "owner_question": {
+    "question": "When Tom logs out with an unpublished draft open, what should Zoe see on that screen?",
+    "options": [
+     "Hide the workspace immediately and retain the unsaved draft only for Tom",
+     "Hide the workspace immediately and discard unsaved changes",
+     "Leave Tom's draft visible until navigation or reload (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Hub",
+   "title": "Saving a publishing draft can silently erase edits made during the save",
+   "scenario": "Lina saves a draft and continues changing its title while the save is still finishing. When the earlier save completes, the older title replaces her newer text and the workspace says the draft is saved. Lina loses the newer change without an unsaved-changes warning.",
+   "evidence": [
+    "frontend_web/landing_next/app/content/workspace.tsx:29",
+    "frontend_web/landing_next/app/content/workspace.tsx:31",
+    "frontend_web/landing_next/app/content/workspace.tsx:33",
+    "frontend_web/landing_next/app/content/workspace.tsx:51",
+    "frontend_web/landing_next/app/content/workspace.tsx:56"
+   ],
+   "confidence": "high",
+   "test_needed": "Delay a draft-save response, change Lina's title while it is pending, complete the response, and assert the newer title remains unsaved.",
+   "owner_question": {
+    "question": "If Lina continues editing while her draft saves, what should happen to those newer changes?",
+    "options": [
+     "Keep Lina's newer changes and mark them unsaved",
+     "Temporarily prevent editing until the save finishes",
+     "Replace newer changes with the completed save (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Marketplace",
+   "title": "The public catalogue cannot browse beyond its first 24 matching listings",
+   "scenario": "Tom's approved listing becomes the twenty-fifth result after newer items are published. Sara sees a total of twenty-five approved listings, but only twenty-four cards and no next page or load-more action. She cannot discover Tom's item by continuing through the catalogue.",
+   "evidence": [
+    "frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx:12",
+    "frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx:25",
+    "frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx:27",
+    "backend/marketplace/views.py:57",
+    "backend/marketplace/views.py:59"
+   ],
+   "confidence": "high",
+   "test_needed": "Provide twenty-five matching approved listings and assert Sara can reach the twenty-fifth through catalogue pagination.",
+   "owner_question": {
+    "question": "How should Sara discover Tom's listing when more than twenty-four approved items match her filters?",
+    "options": [
+     "Sara can page through every matching listing",
+     "Clearly label the latest twenty-four and offer search for older items",
+     "Show the full count but only the first twenty-four cards (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Hub",
+   "title": "New learning resources cannot be published into the Learning page",
+   "scenario": "Lina publishes a new clinical lesson through the publishing workspace. Sara's Learning page never shows it because none of Lina's available topics matches the topic that page requires. The publishing service also rejects that required topic, so Lina cannot publish a new lesson into Learning through the supported workflow.",
+   "evidence": [
+    "frontend_web/landing_next/app/(public)/learning/page.tsx:47",
+    "frontend_web/landing_next/app/content/workspace.tsx:52",
+    "backend/public_hub/editorial.py:15",
+    "backend/public_hub/models.py:17",
+    "backend/public_hub/views.py:49"
+   ],
+   "confidence": "high",
+   "test_needed": "Publish a new learning resource through Lina's editorial workspace and assert it appears on Sara's Learning page.",
+   "owner_question": {
+    "question": "How should Lina publish a resource that Sara can find on the Learning page?",
+    "options": [
+     "Give Lina a supported Learning topic in the editor and publishing service",
+     "Include selected existing topics such as Careers and Pharmacy practice on Learning",
+     "Keep Learning limited to separately seeded resources (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-1",
+ "superseded_note": "Full semantic re-read (R073) by codexA-1 on 2026-10-25 replaces the earlier structural-only pass; see git history."
 }

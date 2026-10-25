@@ -1,0 +1,69 @@
+{
+ "chunk": "X04",
+ "verdicts": [
+  {
+   "id": "C073-N1",
+   "verdict": "CONFIRMED_SOURCE_LOWER",
+   "severity": "P2",
+   "duplicate_of": "",
+   "reason": "The /content layout shows PublicHeader, which contains AccountControls. Its Log out button calls logoutSession(), and that function only POSTs the logout, clears browser storage and announces the event. It does not redirect. ContentDashboard loads `me`, `rows`, `doc` and `form` once and never reads useSession or watchSession, so the open draft and the publish controls stay on screen after logout. This is real, but it only shows text that was already on the screen to someone using the same browser tab. Any later save, publish or list call needs the cleared session and fails, so it is a shared-device problem, not a cross-account data leak. P2.",
+   "evidence": [
+    "frontend_web/landing_next/app/content/layout.tsx:6",
+    "frontend_web/landing_next/app/(hub)/components/hub-header.tsx:2",
+    "frontend_web/landing_next/shared/account-controls.tsx:11",
+    "frontend_web/landing_next/shared/browser-session.ts:89",
+    "frontend_web/landing_next/shared/session-provider.tsx:11",
+    "frontend_web/landing_next/app/content/workspace.tsx:25",
+    "frontend_web/landing_next/app/content/workspace.tsx:41",
+    "frontend_web/landing_next/app/hubs/community-client.tsx:33"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C078-N2",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "When the editor loads a shift, it fills slotRateRows from the saved per-date rates and marks each row dirty:false. Setting the slots changes expandedSlots, and that runs the reconcile effect with previous=[], which resets every row to empty. It also starts calculateShiftRates, which overwrites any row whose dirty flag is not set with the rate worked out from the guide rate (the form's rate_weekday and similar fields). buildShiftDraftSlotPayload then sends that calculated rate, and revise_shift deletes the old slots and recreates them with it. So a saved $80 date becomes $60 when only the description was edited. If the pricing call fails, the rate is saved as null instead.",
+   "evidence": [
+    "frontend_web/shared/postShift/PostShiftForm.tsx:238",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:241",
+    "frontend_web/shared/postShift/useShiftPricing.ts:47",
+    "frontend_web/shared/postShift/useShiftPricing.ts:105",
+    "shared-core/src/domains/shifts/draftSlots.ts:36",
+    "shared-core/src/domains/shifts/postingDraft.ts:46",
+    "backend/shifts/posting.py:189"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  },
+  {
+   "id": "C078-N3",
+   "verdict": "CONFIRMED_SOURCE",
+   "severity": "P1",
+   "duplicate_of": "",
+   "reason": "The editor loads the shift from /shifts/active/{id}/. get_slots on that endpoint drops every (slot, date) pair that already has an assignment, so the form only knows about the open date. On save, the PATCH to /shifts/{id}/ (ShiftDetailViewSet, which has no update override; the only check is manage-pharmacy) sends the slots list. revise_shift then runs instance.slots.all().delete(), and its only refusal is for roster slots or rostered assignments. ShiftSlotAssignment.slot is on_delete=CASCADE, and the pre_delete signal only acts on rostered assignments, so Sara's marketplace booking is deleted without a cancellation flow. The Edit button on ActiveShiftCard is shown with no condition.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:733",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:175",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:230",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+    "shared-core/src/domains/shifts/api.ts:212",
+    "backend/shifts/serialization/shifts.py:407",
+    "backend/shifts/serialization/shifts.py:298",
+    "backend/shifts/posting.py:157",
+    "backend/shifts/posting.py:189",
+    "backend/shifts/models.py:472",
+    "backend/workforce/signals.py:86",
+    "backend/shifts/urls.py:43"
+   ],
+   "runtime_test": "",
+   "ui_visible": true,
+   "kind": "FIX"
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

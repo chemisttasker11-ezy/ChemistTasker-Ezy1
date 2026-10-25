@@ -1,226 +1,234 @@
 {
-  "chunk": "C078",
-  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
-  "reviewer": "gpt6-senior-20261025",
-  "review_level": "first-pass source fetch; S2/S3 pending",
-  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
-  "files": [
-    {
-      "path": "frontend_web/scripts/render-mobile-skill-symbols.mjs",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "e568f0b8801485d2e7de1078f6ad8b7c007b09e0",
-      "lines": 72,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "72 lines; web/kiosk build or check script; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/scripts/run-tauri.mjs",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "efdc77ce31c9a8ad6690f5dd5fd57b6991a9e9ac",
-      "lines": 52,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "52 lines; web/kiosk build or check script; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/scripts/validate-kiosk-build.mjs",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "ee7ba14d715ae02897aa2a375e98ea42581b3c49",
-      "lines": 51,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "51 lines; web/kiosk build or check script; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/scripts/ws-url.test.mjs",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "b9a1e8e522f8d2a99345f7a4b812aa1f3e60f336",
-      "lines": 25,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "25 lines; web/kiosk build or check script; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/shared/PharmacyContext.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "8364447e58b09e89c84e89a899b281b364b851f4",
-      "lines": 50,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "50 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/shared/PharmacyProfileFields.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "fb3fdbf1acadfa6e2a3c62ff92087f4c68c8aaa6",
-      "lines": 92,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "92 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/shared/ReportButton.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "8bee0c9a51bdd264925c3af27ebf3f7e6098e268",
-      "lines": 70,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "70 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/shared/RoleTile.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "6597345037f0a1cf2cd31c28b6c72a5d1ed9a5e7",
-      "lines": 46,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "46 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/shared/ShiftRequirements.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "e4c887ab19442df93fbe2f172665a52f1a66770e",
-      "lines": 49,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "49 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/shared/ShiftRequirementsPicker.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "c2af4b36bc832c761e1513080ae51fd60ca7f6e6",
-      "lines": 201,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "201 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/shared/ShiftSkillPresetControls.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "d0538203a9e8fb915a8ffe8c91ffb3678b6eeaa5",
-      "lines": 86,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "86 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/shared/SignupRolePicker.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "51f6436951e811295384988364892ef8e57c4aba",
-      "lines": 127,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "127 lines; shared front-end context, skill and shift UI; side effects and UI parity require S2/S3."
-    },
-    {
-      "path": "frontend_web/shared/SkillGlyph.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "fff5c6b5723cd5e92cb69a9ce0bb2f8f33d2083e",
-      "lines": 261,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "261 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/SkillSymbolButton.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "5d2422dbe78665e98412c505e98d5f5393c34138",
-      "lines": 54,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "54 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/SoftwareLogo.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "3f3223fccb318fb8909dc57d7aad613d4582cf2c",
-      "lines": 33,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "33 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/VerificationBadges.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "b1673b034b2b32177fa13cc8f517c4c9cd219299",
-      "lines": 247,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "247 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/WorkerSkills.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "759b922094492219a1f6c7a20dd625a47855690f",
-      "lines": 57,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "57 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/postShift/PostShiftDetailsStep.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "aff8428e6fd156f6c5b5264f8a314b98797eb50f",
-      "lines": 176,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "176 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/postShift/PostShiftForm.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "3ee290e4f65473e2c8c68a3f3a6401b2e11c9cb0",
-      "lines": 730,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "730 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/postShift/PostShiftPayStep.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "98d965442d9f1dcb9942b36410d9b3b917f10605",
-      "lines": 270,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "270 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/postShift/PostShiftSkillsStep.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "d23af9342b963a962358f614a43eb5849191b89a",
-      "lines": 35,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "35 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/postShift/PostShiftTimetableStep.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "7ab5a203f1b839646ed0bb393325675e7adc07f0",
-      "lines": 742,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "742 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/postShift/PostShiftVisibilityStep.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "79deeff506ef040f1dbd96a29c9b8aec4592401c",
-      "lines": 205,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "205 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    },
-    {
-      "path": "frontend_web/shared/postShift/PostShiftWizardShell.tsx",
-      "verdict": "NOTE",
-      "ids": [],
-      "blob_sha": "3a8457688b76aa84cb3993db6bdd5f8379886825",
-      "lines": 184,
-      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "184 lines; shift posting UI flow on shared web components, potential payload/rate/visibility and tenant back-end boundary to verify in S2; no tests executed."
-    }
-  ],
-  "findings": []
+ "chunk": "C078",
+ "files": [
+  {
+   "path": "frontend_web/scripts/render-mobile-skill-symbols.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no production problem found."
+  },
+  {
+   "path": "frontend_web/scripts/run-tauri.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no production problem found."
+  },
+  {
+   "path": "frontend_web/scripts/validate-kiosk-build.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; packaged build validation is invoked by its caller."
+  },
+  {
+   "path": "frontend_web/scripts/ws-url.test.mjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Assertions match the URL helper's expected behavior."
+  },
+  {
+   "path": "frontend_web/shared/PharmacyContext.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/PharmacyProfileFields.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/ReportButton.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/RoleTile.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/ShiftRequirements.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/ShiftRequirementsPicker.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/ShiftSkillPresetControls.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/SignupRolePicker.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/SkillGlyph.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/SkillSymbolButton.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/SoftwareLogo.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/VerificationBadges.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/WorkerSkills.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftDetailsStep.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftForm.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "N2",
+    "N3"
+   ],
+   "note": "Editing fails to restore annual settings, overwrites custom rates, and can delete confirmed bookings."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftPayStep.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; edit-state problems originate in the form."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftSkillsStep.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftTimetableStep.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftVisibilityStep.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/PostShiftWizardShell.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Annual salary vacancies reopen with incomplete pay settings",
+   "scenario": "Tom posts a full-time vacancy with an annual salary range and 12% super. When he reopens it to change the description, pay defaults to hourly and saving demands hourly rates. Selecting annual pay again restores the salary range but leaves super blank, so he must re-enter existing information.",
+   "evidence": [
+    "frontend_web/shared/postShift/PostShiftForm.tsx:206",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:217",
+    "frontend_web/shared/postShift/useShiftPricing.ts:23",
+    "frontend_web/shared/postShift/useShiftPricing.ts:28",
+    "shared-core/src/domains/shifts/postingDraft.ts:28",
+    "shared-core/src/domains/shifts/postingDraft.ts:29"
+   ],
+   "confidence": "high",
+   "test_needed": "Open an annual-pay vacancy with saved super, change only its description, and verify it saves without pay input or pay changes.",
+   "owner_question": {
+    "question": "When Tom edits only an annual-pay vacancy's description, what should happen to its existing pay settings?",
+    "options": [
+     "Restore and preserve the annual salary and super",
+     "Require Tom to explicitly confirm the existing pay",
+     "Require Tom to select annual pay and re-enter super (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Editing a shift silently replaces custom date rates with calculated rates",
+   "scenario": "Tom uses a $60 hourly guide rate but sets one pharmacist shift date to $80. He later edits only the description. Reopening recalculates that date's rate and saving replaces $80 with $60, changing the advertised pay Sara sees without Tom requesting a pay change.",
+   "evidence": [
+    "frontend_web/shared/postShift/PostShiftForm.tsx:239",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:241",
+    "frontend_web/shared/postShift/useShiftPricing.ts:95",
+    "frontend_web/shared/postShift/useShiftPricing.ts:106",
+    "shared-core/src/domains/shifts/postingDraft.ts:46",
+    "backend/shifts/posting.py:191"
+   ],
+   "confidence": "high",
+   "test_needed": "Load a shift with a saved date rate above its guide rate, allow pricing to finish, change only the description, and assert the saved date rate remains unchanged.",
+   "owner_question": {
+    "question": "When Tom edits a shift's description, what should happen to the custom $80 rate Sara previously saw?",
+    "options": [
+     "Preserve $80 unless Tom changes it",
+     "Ask Tom before replacing it with the calculated rate",
+     "Automatically replace it with $60 (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Saving a partially filled shift can delete its confirmed bookings",
+   "scenario": "Tom posts two future dates and Sara books the first through the marketplace, while the second remains open. Tom opens the shift to change its description and saves. The editor loads only unassigned dates but replaces every stored date, deleting Sara's confirmed booking without a cancellation.",
+   "evidence": [
+    "frontend_web/shared/postShift/PostShiftForm.tsx:175",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:230",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+    "shared-core/src/domains/shifts/postingDraft.ts:46",
+    "backend/shifts/serialization/shifts.py:407",
+    "backend/shifts/posting.py:157",
+    "backend/shifts/posting.py:189",
+    "backend/shifts/models.py:472"
+   ],
+   "confidence": "high",
+   "test_needed": "Create a marketplace shift with one confirmed non-rostered date and one open date, edit only its description through the wizard, and assert the confirmed assignment survives.",
+   "owner_question": {
+    "question": "When Tom edits the remaining vacancy after Sara has booked another date, what should happen to Sara's booking?",
+    "options": [
+     "Preserve Sara's booking and update only the intended details",
+     "Block editing and require a separate cancellation process",
+     "Remove Sara's booking when Tom saves (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-1",
+ "superseded_note": "Full semantic re-read (R078) by codexB-1 on 2026-10-25 replaces the earlier structural-only pass; see git history."
 }

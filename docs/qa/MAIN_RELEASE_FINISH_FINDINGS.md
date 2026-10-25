@@ -436,6 +436,20 @@ Tom creates a poll, and Omar and Ali vote. Tom corrects a spelling mistake in th
   - Prevent Tom from editing after voting begins
   - Erase their votes whenever Tom saves an edit (keep today's behaviour)
 
+## C073-N1 - P1 - Hub - The publishing workspace leaves private content visible after logout
+
+Tom opens an unpublished draft, then uses Log out without leaving the publishing workspace. Zoe can still read Tom's draft on that screen because signing out changes the account menu but never clears or hides the workspace.
+
+- Evidence: `frontend_web/landing_next/app/content/workspace.tsx:21`, `frontend_web/landing_next/app/content/workspace.tsx:25`, `frontend_web/landing_next/app/content/workspace.tsx:41`, `frontend_web/landing_next/shared/account-controls.tsx:11`, `frontend_web/landing_next/shared/session-provider.tsx:11`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Open Tom's unpublished draft, log out through the header, and assert its content and publishing controls disappear without reloading.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom logs out with an unpublished draft open, what should Zoe see on that screen?
+  - Hide the workspace immediately and retain the unsaved draft only for Tom
+  - Hide the workspace immediately and discard unsaved changes
+  - Leave Tom's draft visible until navigation or reload (keep today's behaviour)
+
 ## F09-N4 - P1 - Hub permissions - Users without pharmacy memberships can overwrite or delete each other's Hub polls.
 
 Sara creates a public Hub poll while she has no pharmacy membership, and Zoe also has no pharmacy membership. Zoe can replace Sara's question and choices or delete the poll despite having no management rights. Replacing the choices also erases the votes already cast.
@@ -1328,6 +1342,34 @@ Tom posts a full-time job without individual dated slots, and Omar expresses int
   - Require dated slots before Tom can publish the job
   - Show an empty internal candidates list (keep today's behaviour)
 
+## C078-N2 - P1 - Shifts - Editing a shift silently replaces custom date rates with calculated rates
+
+Tom uses a $60 hourly guide rate but sets one pharmacist shift date to $80. He later edits only the description. Reopening recalculates that date's rate and saving replaces $80 with $60, changing the advertised pay Sara sees without Tom requesting a pay change.
+
+- Evidence: `frontend_web/shared/postShift/PostShiftForm.tsx:239`, `frontend_web/shared/postShift/PostShiftForm.tsx:241`, `frontend_web/shared/postShift/useShiftPricing.ts:95`, `frontend_web/shared/postShift/useShiftPricing.ts:106`, `shared-core/src/domains/shifts/postingDraft.ts:46`, `backend/shifts/posting.py:191`
+- Confidence: high; found by codexB-1
+- Test that would prove it: Load a shift with a saved date rate above its guide rate, allow pricing to finish, change only the description, and assert the saved date rate remains unchanged.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom edits a shift's description, what should happen to the custom $80 rate Sara previously saw?
+  - Preserve $80 unless Tom changes it
+  - Ask Tom before replacing it with the calculated rate
+  - Automatically replace it with $60 (keep today's behaviour)
+
+## C078-N3 - P1 - Shifts - Saving a partially filled shift can delete its confirmed bookings
+
+Tom posts two future dates and Sara books the first through the marketplace, while the second remains open. Tom opens the shift to change its description and saves. The editor loads only unassigned dates but replaces every stored date, deleting Sara's confirmed booking without a cancellation.
+
+- Evidence: `frontend_web/shared/postShift/PostShiftForm.tsx:175`, `frontend_web/shared/postShift/PostShiftForm.tsx:230`, `frontend_web/shared/postShift/PostShiftForm.tsx:457`, `shared-core/src/domains/shifts/postingDraft.ts:46`, `backend/shifts/serialization/shifts.py:407`, `backend/shifts/posting.py:157`, `backend/shifts/posting.py:189`, `backend/shifts/models.py:472`
+- Confidence: high; found by codexB-1
+- Test that would prove it: Create a marketplace shift with one confirmed non-rostered date and one open date, edit only its description through the wizard, and assert the confirmed assignment survives.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom edits the remaining vacancy after Sara has booked another date, what should happen to Sara's booking?
+  - Preserve Sara's booking and update only the intended details
+  - Block editing and require a separate cancellation process
+  - Remove Sara's booking when Tom saves (keep today's behaviour)
+
 ## C079-N1 - P1 - Shifts - Editing a shift replaces its saved per-date rates
 
 Tom posts a pharmacist shift offering Sara $80 per hour for a particular date, above his $60 pharmacy guide. Later, Tom opens the shift to correct its description. The saved $80 rate is replaced by the calculated $60 guide, and saving the description also submits that lower rate.
@@ -1811,6 +1853,34 @@ Omar submits a comment on Tom's post over a slow connection, then starts typing 
   - Disable editing until the submission finishes
   - Allow typing but clear it when sending finishes (keep today's behaviour)
 
+## C073-N2 - P2 - Hub - Saving a publishing draft can silently erase edits made during the save
+
+Lina saves a draft and continues changing its title while the save is still finishing. When the earlier save completes, the older title replaces her newer text and the workspace says the draft is saved. Lina loses the newer change without an unsaved-changes warning.
+
+- Evidence: `frontend_web/landing_next/app/content/workspace.tsx:29`, `frontend_web/landing_next/app/content/workspace.tsx:31`, `frontend_web/landing_next/app/content/workspace.tsx:33`, `frontend_web/landing_next/app/content/workspace.tsx:51`, `frontend_web/landing_next/app/content/workspace.tsx:56`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Delay a draft-save response, change Lina's title while it is pending, complete the response, and assert the newer title remains unsaved.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: If Lina continues editing while her draft saves, what should happen to those newer changes?
+  - Keep Lina's newer changes and mark them unsaved
+  - Temporarily prevent editing until the save finishes
+  - Replace newer changes with the completed save (keep today's behaviour)
+
+## C073-N4 - P2 - Hub - New learning resources cannot be published into the Learning page
+
+Lina publishes a new clinical lesson through the publishing workspace. Sara's Learning page never shows it because none of Lina's available topics matches the topic that page requires. The publishing service also rejects that required topic, so Lina cannot publish a new lesson into Learning through the supported workflow.
+
+- Evidence: `frontend_web/landing_next/app/(public)/learning/page.tsx:47`, `frontend_web/landing_next/app/content/workspace.tsx:52`, `backend/public_hub/editorial.py:15`, `backend/public_hub/models.py:17`, `backend/public_hub/views.py:49`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Publish a new learning resource through Lina's editorial workspace and assert it appears on Sara's Learning page.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: How should Lina publish a resource that Sara can find on the Learning page?
+  - Give Lina a supported Learning topic in the editor and publishing service
+  - Include selected existing topics such as Careers and Pharmacy practice on Learning
+  - Keep Learning limited to separately seeded resources (keep today's behaviour)
+
 ## F07-N5 - P2 - Invoice documents - Current finance invoice PDFs are labelled draft even after delivery.
 
 Sara emails her saved invoice to Tom, and the attachment says DRAFT - NOT ISSUED. Downloading the current invoice after successful delivery or payment produces the same label. Tom receives contradictory information about whether Sara has actually issued the bill.
@@ -1922,6 +1992,20 @@ Omar requests sick leave through My Leave on web or mobile, and Tom receives no 
   - Notify Tom of the request and Omar of the decision
   - Notify Tom of the request only
   - Require both people to check their leave lists manually (keep today's behaviour)
+
+## C073-N3 - P2 - Marketplace - The public catalogue cannot browse beyond its first 24 matching listings
+
+Tom's approved listing becomes the twenty-fifth result after newer items are published. Sara sees a total of twenty-five approved listings, but only twenty-four cards and no next page or load-more action. She cannot discover Tom's item by continuing through the catalogue.
+
+- Evidence: `frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx:12`, `frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx:25`, `frontend_web/landing_next/app/(public)/marketplace/marketplace-catalogue.tsx:27`, `backend/marketplace/views.py:57`, `backend/marketplace/views.py:59`
+- Confidence: high; found by codexA-1
+- Test that would prove it: Provide twenty-five matching approved listings and assert Sara can reach the twenty-fifth through catalogue pagination.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: How should Sara discover Tom's listing when more than twenty-four approved items match her filters?
+  - Sara can page through every matching listing
+  - Clearly label the latest twenty-four and offer search for older items
+  - Show the full count but only the first twenty-four cards (keep today's behaviour)
 
 ## C049-N1 - P2 - Memberships - The pharmacy applications panel reads only the newest 50 pending applications across every pharmacy the admin manages, so older ones for a given pharmacy vanish.
 
@@ -2284,6 +2368,20 @@ Tom publishes a daily recurring schedule starting tomorrow and lasting 180 days.
   - View and select all published dates
   - Prevent Tom from publishing more than 90 occurrences
   - Keep accepting longer schedules while hiding later dates (keep today's behaviour)
+
+## C078-N1 - P2 - Shifts - Annual salary vacancies reopen with incomplete pay settings
+
+Tom posts a full-time vacancy with an annual salary range and 12% super. When he reopens it to change the description, pay defaults to hourly and saving demands hourly rates. Selecting annual pay again restores the salary range but leaves super blank, so he must re-enter existing information.
+
+- Evidence: `frontend_web/shared/postShift/PostShiftForm.tsx:206`, `frontend_web/shared/postShift/PostShiftForm.tsx:217`, `frontend_web/shared/postShift/useShiftPricing.ts:23`, `frontend_web/shared/postShift/useShiftPricing.ts:28`, `shared-core/src/domains/shifts/postingDraft.ts:28`, `shared-core/src/domains/shifts/postingDraft.ts:29`
+- Confidence: high; found by codexB-1
+- Test that would prove it: Open an annual-pay vacancy with saved super, change only its description, and verify it saves without pay input or pay changes.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom edits only an annual-pay vacancy's description, what should happen to its existing pay settings?
+  - Restore and preserve the annual salary and super
+  - Require Tom to explicitly confirm the existing pay
+  - Require Tom to select annual pay and re-enter super (keep today's behaviour)
 
 ## C079-N2 - P2 - Shifts - Manual shift times revert to pharmacy opening hours
 

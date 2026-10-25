@@ -14,7 +14,7 @@ const todo = raw.filter(f => !old[f.id] && !indep[f.id] && !alias.has(f.id) && (
 const groups = { claude: [], codexA: [], codexB: [] };
 let flip = 0;
 for (const f of todo) (/^(codex|gpt6)/.test(f.reviewer) ? groups.claude : groups[flip++ % 2 ? 'codexB' : 'codexA']).push(f.id);
-let n = 0;
+let n = fs.readdirSync(DIR).filter(f => /^out_X\d+\.json$/.test(f)).length; // never reuse a finished X id
 for (const [checker, ids] of Object.entries(groups))
   for (let i = 0; i < ids.length; i += 6) batches.push({ id: `X${String(++n).padStart(2, '0')}`, checker, ids: ids.slice(i, i + 6) });
 fs.writeFileSync(path.join(DIR, 'verify.json'), JSON.stringify(batches, null, 1));

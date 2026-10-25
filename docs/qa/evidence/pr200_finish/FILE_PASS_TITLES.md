@@ -112,6 +112,10 @@ C064-N1 | Invoicing / Expo | Legacy Expo invoice generator defaults superannuati
 C070-N1 | Expo shift board state | Shared AsyncStorage keys can expose previous account's applied/rejected shift markers after account switching.
 C071-N1 | Mobile authentication | Concurrent mobile logout and in-flight refresh/profile hydration can resurrect old tokens or overwrite the newly signed-in account.
 C071-N2 | Mobile push privacy | Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.
+C073-N1 | Hub | The publishing workspace leaves private content visible after logout
+C073-N2 | Hub | Saving a publishing draft can silently erase edits made during the save
+C073-N3 | Marketplace | The public catalogue cannot browse beyond its first 24 matching listings
+C073-N4 | Hub | New learning resources cannot be published into the Learning page
 C074-N1 | Next / cross-account private workspace privacy | Next marketplace and publishing workspaces can display the previous account's private stock, messages or unpublished drafts after cross-tab login.
 C076-N1 | Shifts | Minimum-rate filtering hides qualifying roles without dated shifts.
 C076-N2 | Shifts | The board hides future pharmacy shifts using the viewer's local clock.
@@ -120,6 +124,9 @@ C076-N4 | Talent | The availability calendar cannot show published dates beyond 
 C077-N1 | Onboarding | Referee decline links do not match the web page or its request
 C077-N2 | Talent | Expired availability prevents Explorers from publishing again
 C077-N3 | Talent | Clearing every engagement choice leaves the previous choices saved
+C078-N1 | Shifts | Annual salary vacancies reopen with incomplete pay settings
+C078-N2 | Shifts | Editing a shift silently replaces custom date rates with calculated rates
+C078-N3 | Shifts | Saving a partially filled shift can delete its confirmed bookings
 C079-N1 | Shifts | Editing a shift replaces its saved per-date rates
 C079-N2 | Shifts | Manual shift times revert to pharmacy opening hours
 F01-N1 | Shifts/Privacy | Workers browsing shifts can see the names and emails of other workers who are booked on the shift or waiting for payment.

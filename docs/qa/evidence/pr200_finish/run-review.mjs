@@ -66,7 +66,7 @@ const ids = list => list.map(c => c.id).filter(id => !only || only.includes(id))
 const Q = { flow: ids(flows), deep: ids(chunks.filter(isDeep)), broad: ids(chunks.filter(c => !isDeep(c))),
   vA: ids(vbatches.filter(b => b.checker === 'codexA')), vB: ids(vbatches.filter(b => b.checker === 'codexB')), vC: ids(vbatches.filter(b => b.checker === 'claude')),
   // F13 = rest of F12 parity; Rxxx = real re-read of chunks the online pass only fetched.
-  extra: ['F13', 'R046', 'R048', 'R076', 'R077'].filter(id => !only || only.includes(id)) };
+  extra: ['F13', 'R046', 'R048', 'R076', 'R077', 'R073', 'R078'].filter(id => !only || only.includes(id)) };
 const attempts = {};
 
 const AGY_PRE = 'Work alone: do not start subagents or parallel research tasks; read only the files this brief names or that you must edit.\nRun every command in the foreground and wait for it to finish before you reply. Never start a command in the background.';
