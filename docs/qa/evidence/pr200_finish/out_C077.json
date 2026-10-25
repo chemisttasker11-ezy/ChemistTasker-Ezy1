@@ -1,0 +1,145 @@
+{
+  "chunk": "C077",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "first-pass source acquisition; S2/S3 pending",
+  "status": "INCOMPLETE",
+  "files": [
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "59154fcd616204ccb5272dbd85ace22c8f707f53",
+      "lines": 81,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "81 lines; Next migrated dashboard or public UI; calls loadAllTalentPages; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFilters.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e4e60b225ab761a45e321c6a3565651fa04037e1",
+      "lines": 9,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "9 lines; Next migrated dashboard or public UI; calls none; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "4fa498d2d44e51080d755c7d6edde4c024ba9f4b",
+      "lines": 1078,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "1078 lines; Next migrated dashboard or public UI; calls unlikeExplorerPost, likeExplorerPost, reload, getOnboarding, checkAccess; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/types.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f1cba8ea53c0e79f1cf2be0f3f7d85230e5ca292",
+      "lines": 61,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "61 lines; Next migrated dashboard or public UI; calls none; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/login.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "a12b6c1ff0608d81df17cfdf11f178c0f3962ecb",
+      "lines": 298,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "298 lines; Next auth/transport critical; calls browserLoginSession, getOwnerSetupStatus; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/onboarding/RefereeQuestionnairePage.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "6064f0c7a557f596c347faecadef16cbe98cc607",
+      "lines": 422,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "422 lines; Next migrated dashboard or public UI; calls none; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ad3c44b57ae4a8947e1792cdedbddeae92aaa5eb",
+      "lines": 68,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "68 lines; Next migrated dashboard or public UI; calls none; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/register.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "058e1e1ca5953e1316320fc61742865eb8621a5c",
+      "lines": 221,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "221 lines; Next migrated dashboard or public UI; calls browserRegisterAccount; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/theme/sleekTheme.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "730fed97acb412f4c69577cbd7aa20be883d5edd",
+      "lines": 326,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "326 lines; Next migrated dashboard or public UI; calls none; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/utils/apiClient.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "9a33d87752737ff6478b83b84a9446ba8c3bf24c",
+      "lines": 82,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "82 lines; Next auth/transport critical; calls csrfToken, refreshCookieSession; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/utils/browserMobileOtp.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "9f4d1519042dfdaa36a358ad637e19e0582ab802",
+      "lines": 14,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "14 lines; Next migrated dashboard or public UI; calls apiClient.post; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/utils/dashboardPath.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b50a5a2272a0a5b105ffd8fac50ff753ff81c017",
+      "lines": 41,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "41 lines; Next migrated dashboard or public UI; calls none; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/utils/ownerSetup.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e3d5a190738022e6352a5125b3b97aaeb166bb5a",
+      "lines": 95,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "95 lines; Next migrated dashboard or public UI; calls getOnboardingDetail, fetchPharmaciesService; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/utils/roleLabels.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "6f58209bcf4753d69053e272cb2cc6172e55634b",
+      "lines": 35,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "35 lines; Next migrated dashboard or public UI; calls none; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/utils/seo.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "42f753ff478ec59140c0d9e9058ceb67f2c38bc1",
+      "lines": 108,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "108 lines; Next migrated dashboard or public UI; calls none; session-generation, CSRF and auth negative tests outstanding."
+    }
+  ],
+  "findings": []
+}
