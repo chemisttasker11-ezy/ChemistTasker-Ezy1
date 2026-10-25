@@ -284,8 +284,8 @@ const isPharmacistProvided = showPublishedRates && shift.rateType === 'PHARMACIS
       const shiftLevelLocked = isShiftApplied || isRejectedShift || hasShiftLevelCounter;
       const slotLevelLocked = isShiftApplied || isRejectedShift;
       const interactionLocked = shiftLevelLocked || hasSlotActions;
-      const shiftActionsDisabled = actionsDisabled || (!disableActionGuards && interactionLocked);
-      const slotActionsDisabled = actionsDisabled || (!disableActionGuards && slotLevelLocked);
+      const shiftActionsDisabled = shift.canApply === false || actionsDisabled || (!disableActionGuards && interactionLocked);
+      const slotActionsDisabled = shift.canApply === false || actionsDisabled || (!disableActionGuards && slotLevelLocked);
       const urgent = getShiftUrgent(shift);
       const rateSummary = getRateSummary(shift);
       const rejectAllowed = rejectActionGuard ? rejectActionGuard(shift) : true;

@@ -6,6 +6,139 @@ import vm from 'node:vm';
 import { bearerBelongsToDifferentUser, safeNext, refreshBrowserSession, logoutSession } from '../landing_next/shared/browser-session.ts';
 import { canAccessRoute } from '../src/components/routeAccess.ts';
 import { safeHubAttachmentUrl } from '../landing_next/lib/safe-hub-attachment.ts';
+import { resolveDashboardPath } from '../src/utils/dashboardPath.ts';
+
+function sessionProviderHarness() {
+  const require = createRequire(import.meta.url);
+  const ts = require('typescript');
+  const source = fs.readFileSync(new URL('../landing_next/shared/session-provider.tsx', import.meta.url), 'utf8');
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  const slots = [], effects = [], listeners = new Map();
+  let index = 0, mounted = false, sessionListener, current = Promise.resolve({ id: 1, role: 'PHARMACIST' });
+  const react = {
+    createContext: () => ({ Provider: 'Provider' }), useContext: () => {},
+    useCallback: fn => fn,
+    useState: initial => { const i = index++; if (!(i in slots)) slots[i] = initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
+    useRef: initial => { const i = index++; return slots[i] ||= { current: initial }; },
+    useEffect: fn => { if (!mounted) effects.push(fn); },
+  };
+  const module = { exports: {} };
+  vm.runInNewContext(compiled, { module, exports: module.exports, window: {
+    addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name),
+  }, require: id => {
+    if (id === 'react') return react;
+    if (id === 'react/jsx-runtime') return { jsx: (type, props, key) => ({ type, props, key }), jsxs: (type, props, key) => ({ type, props, key }) };
+    if (id.includes('browser-session')) return { claimUserBrowserStorage: () => {}, watchSession: fn => { sessionListener = fn; return () => {}; } };
+    if (id.includes('chemisttasker-api')) return { chemistTaskerApi: { account: { getCurrentUser: () => current } } };
+    throw new Error(id);
+  } });
+  const render = () => { index = 0; const tree = module.exports.SessionProvider({ children: 'private workspace' }); if (!mounted) { mounted = true; effects.forEach(fn => fn()); } return tree; };
+  return { render, reply: value => { current = Promise.resolve(value); }, fail: () => { current = Promise.reject(new Error('Offline')); }, event: (action, remote = true) => sessionListener(action, remote), focus: () => listeners.get('focus')() };
+}
+
+test('Next session changes invalidate same-tab state and ignore superseded identity requests', async () => {
+  const app = sessionProviderHarness();
+  app.render(); await new Promise(setImmediate);
+  const alice = app.render();
+  let finishBob;
+  app.reply(new Promise(resolve => { finishBob = resolve; }));
+  app.event('login', false);
+  const waitingForBob = app.render();
+  assert.equal(waitingForBob.props.value.user, null, 'local login clears the previous identity immediately');
+  assert.notEqual(waitingForBob.key, alice.key);
+  let finishCarol;
+  app.reply(new Promise(resolve => { finishCarol = resolve; }));
+  app.event('login');
+  assert.notEqual(app.render().key, waitingForBob.key, 'each login discards any pending workspace state');
+  finishCarol({ id: 3, role: 'OWNER' }); await new Promise(setImmediate);
+  const carol = app.render();
+  finishBob({ id: 2, role: 'OWNER' }); await new Promise(setImmediate);
+  assert.equal(app.render().props.value.user.id, 3);
+  assert.equal(app.render().key, carol.key, 'late responses cannot replace the legitimate current workspace');
+});
+
+test('Next session provider discards private workspace state across remote account changes and failures', async () => {
+  const app = sessionProviderHarness();
+  const loading = app.render(); await new Promise(setImmediate);
+  const alice = app.render();
+  assert.equal(alice.props.value.user.id, 1);
+  assert.equal(alice.key, loading.key, 'first identity check does not remount the page');
+  app.focus(); await new Promise(setImmediate);
+  assert.equal(app.render().key, alice.key, 'same-account refresh preserves legitimate work');
+  app.reply({ id: 2, role: 'OWNER' }); app.event('login');
+  assert.notEqual(app.render().key, alice.key, 'unverified identity must unmount private state immediately');
+  await new Promise(setImmediate);
+  const bob = app.render();
+  assert.equal(bob.props.value.user.id, 2);
+  assert.notEqual(bob.key, alice.key);
+  app.fail(); app.event('login'); await new Promise(setImmediate);
+  const unavailable = app.render();
+  assert.equal(unavailable.props.value.user, null);
+  assert.notEqual(unavailable.key, bob.key);
+  app.event('logout');
+  assert.equal(app.render().props.value.status, 'anonymous');
+  app.reply({ id: 3, role: 'PHARMACIST' }); app.event('login'); await new Promise(setImmediate);
+  const restored = app.render();
+  assert.equal(restored.props.value.user.id, 3);
+  app.fail(); app.focus(); await new Promise(setImmediate);
+  const blip = app.render();
+  assert.equal(blip.props.value.status, 'unavailable');
+  assert.equal(blip.key, restored.key, 'a network blip keeps the same account\'s unsaved work');
+  app.reply({ id: 4, role: 'OWNER' }); app.focus(); await new Promise(setImmediate);
+  assert.notEqual(app.render().key, restored.key, 'a different verified account remounts even without a session event');
+});
+
+test('verification and membership return links use the routed dashboard for the current account', () => {
+  const otp = fs.readFileSync(new URL('../src/pages/MobileOTPVerify.tsx', import.meta.url), 'utf8');
+  const membership = fs.readFileSync(new URL('../src/pages/MembershipApplyPage.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(otp, /location\.assign\('\/dashboard'\)/);
+  assert.match(otp, /resolveDashboardPath\(/);
+  assert.doesNotMatch(membership, /user\?'\/dashboard'/);
+  assert.match(membership, /resolveDashboardPath\(user\.role\)/);
+  const pricing = fs.readFileSync(new URL('../src/pages/PricingPage.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(pricing, /navigate\('\/dashboard'\)/);
+  for (const role of ['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER', 'ORG_ADMIN', 'PHARMACY_MANAGER']) {
+    assert.notEqual(resolveDashboardPath(role), '/dashboard');
+  }
+  assert.match(membership, /:'\/login'/, 'anonymous visitors keep their legitimate login destination');
+});
+
+test('account connection errors reuse the styled recovery state and keep legitimate sessions mounted', () => {
+  const auth = fs.readFileSync(new URL('../src/contexts/AuthContext.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(auth, /<button/);
+  assert.match(auth, /<DashboardContentState[\s\S]*?kind="error"[\s\S]*?actionLabel="Reconnect"/);
+  assert.match(auth, /<Button[\s\S]*?minHeight: ?44[\s\S]*?>Retry logout<\/Button>/);
+  assert.match(auth, /<AhpraProvider[^>]*>[{]children[}]<\/AhpraProvider>/);
+});
+
+for (const root of ['../landing_next/migrated/pages/', '../src/pages/']) test(`role-ineligible public shifts disable both whole-shift and slot application controls (${root})`, () => {
+  const read = path => fs.readFileSync(new URL(root + path, import.meta.url), 'utf8');
+  const board = read('PublicJobBoardPage.tsx');
+  assert.match(board, /canApply: raw\.can_apply \?\? raw\.canApply/);
+  const list = read('dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx');
+  for (const name of ['shiftActionsDisabled', 'slotActionsDisabled']) {
+    const expression = list.match(new RegExp(`const ${name} = (.*);`))[1];
+    const disabled = vm.runInNewContext(`shift => ${expression}`, { actionsDisabled: false, disableActionGuards: true, interactionLocked: false, slotLevelLocked: false });
+    assert.equal(disabled({ canApply: false }), true);
+    assert.equal(disabled({ canApply: true }), false);
+    assert.equal(disabled({}), false, 'anonymous visitors can still start sign-in');
+  }
+});
+
+test('reported phone targets retain at least 44px and desktop shell targets stay 46px', () => {
+  const read = path => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
+  const map = read('../landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx');
+  assert.match(map, /aria-label={`Show map[\s\S]*?sx={{[^}]*minWidth: 44[^}]*minHeight: 44/);
+  const report = read('../shared/ReportButton.tsx');
+  assert.match(report, /minHeight: 44, minWidth: 44/);
+  const css = read('../landing_next/app/globals.css');
+  for (const rule of css.matchAll(/\.hero-personas>a\s*\{([^}]+)\}/g)) {
+    for (const height of rule[1].matchAll(/min-height:\s*(\d+)px/g)) assert.ok(Number(height[1]) >= 44);
+  }
+  const shell = read('../src/layouts/DashboardTopShell.tsx');
+  assert.match(shell, /width: { xs: 44, md: 46 }/);
+  assert.match(shell, /height: { xs: 44, md: 46 }/);
+});
 
 test('return links preserve permitted destinations and reject external or login loops',()=>{
  for(const path of ['/content','/content/invite/example','/hubs/posts/12?reply=4#comments','/dashboard/pharmacist/overview'])assert.equal(safeNext(path),path);

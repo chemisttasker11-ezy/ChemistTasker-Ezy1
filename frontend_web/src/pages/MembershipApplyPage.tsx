@@ -16,6 +16,7 @@ import {
 import AuthLayout from '../layouts/AuthLayout';
 import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import { useAuth } from '../contexts/AuthContext';
+import { resolveDashboardPath } from '../utils/dashboardPath';
 import { API_BASE_URL } from '../constants/api';
 import { browserMagicMembershipInfo, browserSubmitMagicMembership } from '@chemisttasker/shared-core';
 
@@ -383,7 +384,7 @@ export default function MembershipApplyPage() {
             </Typography>
             <Typography variant="body2" sx={{ mt: 1 }}>
               You can also return to{' '}
-              <Link component={RouterLink} to={user?'/dashboard':'/login'} fontWeight="bold" color="#00a99d">
+              <Link component={RouterLink} to={user?resolveDashboardPath(user.role):'/login'} fontWeight="bold" color="#00a99d">
                 {user?'My dashboard':'Log in'}
               </Link>
               .
