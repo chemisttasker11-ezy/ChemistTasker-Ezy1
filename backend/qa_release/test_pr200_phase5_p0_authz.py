@@ -301,8 +301,11 @@ class Phase5MarketplaceExchangeIntegrity(TestCase):
             slug="pr200-fixtures", name="PR200 fixtures",
             context="BOTH", permitted_modes=["SELL"], maximum_buyer_roles=["OWNER"],
         )
-        listing = MarketplaceListing.objects.create(
-            creator=seller, seller_context="PERSONAL",
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        with patch("marketplace.signals.can_list_category", return_value=SimpleNamespace(allowed=True)):
+            listing = MarketplaceListing.objects.create(
+                creator=seller, seller_context="PERSONAL",
             category=category, mode="SELL", title="PR200 Fixture Bundle",
             slug="pr200-fixture-bundle", description="Synthetic audit fixture",
             condition="Used", amount="250.00", suburb="Brisbane",
