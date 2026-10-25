@@ -4,8 +4,51 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from client_profile.models import Membership, Organization, Pharmacy, PharmacyAdmin
 from users.models import OrganizationMembership
+
+
+class PharmacyAdminRevocationTests(TestCase):
+    def setUp(self):
+        self.owner, self.pharmacy = make_owner_with_pharmacy("Revocation Pharmacy")
+        self.target = make_user("PHARMACIST")
+        self.owner_client = client_for(self.owner)
+        self.target_client = client_for(self.target)
+        with patch('organizations.views.async_task'):
+            response = self.owner_client.post('/api/v1/pharmacy-admins/', {
+                'pharmacy': self.pharmacy.pk, 'email': self.target.email,
+                'admin_level': 'MANAGER', 'staff_role': 'PHARMACIST',
+            }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assignment = PharmacyAdmin.objects.get(user=self.target, pharmacy=self.pharmacy)
+        self.membership = self.assignment.membership
+
+    def test_revoke_pending_admin_prevents_membership_acceptance(self):
+        self.assertEqual(self.membership.status, Membership.Status.PENDING)
+        removed = self.owner_client.delete(f'/api/v1/pharmacy-admins/{self.assignment.pk}/')
+        self.assertEqual(removed.status_code, 204)
+        accepted = self.target_client.post(f'/api/v1/my-memberships/{self.membership.pk}/accept/')
+        self.assertEqual(accepted.status_code, 400, accepted.data)
+        self.membership.refresh_from_db()
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.membership.status, Membership.Status.REJECTED)
+        self.assertFalse(self.membership.is_active)
+        self.assertIsNotNone(self.membership.responded_at)
+        self.assertFalse(self.assignment.is_active)
+        self.assertIsNone(self.assignment.membership_id)
+
+    def test_revoke_accepted_admin_preserves_staff_membership(self):
+        accepted = self.target_client.post(f'/api/v1/pharmacy-admins/{self.assignment.pk}/accept-invitation/')
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        self.membership.refresh_from_db()
+        responded_at = self.membership.responded_at
+        removed = self.owner_client.delete(f'/api/v1/pharmacy-admins/{self.assignment.pk}/')
+        self.assertEqual(removed.status_code, 204)
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.status, Membership.Status.ACCEPTED)
+        self.assertTrue(self.membership.is_active)
+        self.assertEqual(self.membership.responded_at, responded_at)
 
 
 class AdditionalAdminInvitationTests(TestCase):

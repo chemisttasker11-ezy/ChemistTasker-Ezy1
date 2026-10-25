@@ -383,7 +383,11 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = PharmacyAdmin.objects.filter(is_active=True).select_related("user", "pharmacy", "membership")
+        qs = PharmacyAdmin.objects.select_related("user", "pharmacy", "membership")
+        if self.action == 'destroy':
+            qs = qs.filter(Q(is_active=True) | Q(membership__status=Membership.Status.PENDING))
+        else:
+            qs = qs.filter(is_active=True)
         pharmacy_id = self.request.query_params.get("pharmacy")
 
         accessible_ids = set()
@@ -587,6 +591,11 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
         assignment: PharmacyAdmin = self.get_object()
         if not assignment.can_be_removed_by(request.user):
             return Response({"detail": "Not allowed to remove this admin."}, status=status.HTTP_403_FORBIDDEN)
+        # Conditional update: a concurrent accept must not be overwritten to REJECTED.
+        now = timezone.now()
+        Membership.objects.filter(pk=assignment.membership_id, status=Membership.Status.PENDING).update(
+            status=Membership.Status.REJECTED, is_active=False, responded_at=now, updated_at=now,
+        )
         # Revocation is not a pending invitation: unlink its membership so
         # my-pending-invitations and accept-invitation cannot resurrect it.
         # Keep the inactive assignment for audit and let a fresh authorized
