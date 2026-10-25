@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 
 from .models import ListingAudiencePolicy, ListingDeliveryTerms, MarketplaceCategory, MarketplaceExchange, MarketplaceListing, MarketplaceMessage
 from .policy import ROLE_LABELS, resolved_role
@@ -111,6 +113,7 @@ class ListingWriteSerializer(serializers.ModelSerializer):
         ListingDeliveryTerms.objects.create(listing=listing, **delivery)
         return listing
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         audience = validated_data.pop("allowed_buyer_roles", None)
         delivery = validated_data.pop("delivery", None)
@@ -126,7 +129,10 @@ class ListingWriteSerializer(serializers.ModelSerializer):
         if delivery is not None:
             for name, value in delivery.items():
                 setattr(instance.delivery, name, value)
-            instance.delivery.full_clean()
+            try:
+                instance.delivery.full_clean()
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({"delivery": exc.message_dict}) from exc
             instance.delivery.save()
         return instance
 

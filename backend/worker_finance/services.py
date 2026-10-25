@@ -953,7 +953,11 @@ def record_payment(owner, record_id, data):
         raise ValidationError("Payments cannot be recorded against a void document.")
     if record.kind == "super_request" and not data.get("fund_payment_confirmed"):
         raise ValidationError("Confirm the payment went to the super fund, not to the worker.")
-    existing = record.payments.filter(request_key=data["request_key"]).first()
+    payment_date = data["date"]
+    if not datetime.fromisoformat(record.payload["invoice_date"]).date() <= payment_date <= timezone.localdate():
+        raise ValidationError("Payment date must be between the invoice date and today. Prepayments require review.")
+    request_key = data.get("request_key") or uuid4()
+    existing = record.payments.filter(request_key=request_key).first()
     if existing:
         if (
             existing.amount != data["amount"]
@@ -963,7 +967,12 @@ def record_payment(owner, record_id, data):
             raise ValidationError("This payment request key was already used for different payment details.")
         return record
     paid = record.payments.aggregate(value=Sum("amount"))["value"] or ZERO
-    amount = Decimal(data["amount"])
+    # Mark-paid settles only the remaining balance through the normal receipt path.
+    amount = Decimal(data["amount"]) if "amount" in data else Decimal(record.calculation["payable"]) - paid
+    if "amount" not in data and amount == ZERO:
+        record.status = "paid"
+        record.save(update_fields=["status"])
+        return record
     try:
         gst = allocate_payment(
             amount=amount,
@@ -981,8 +990,8 @@ def record_payment(owner, record_id, data):
         raise ValidationError(str(exc)) from exc
     Payment.objects.create(
         invoice=record,
-        request_key=data["request_key"],
-        date=data["date"],
+        request_key=request_key,
+        date=payment_date,
         amount=amount,
         gst=gst,
         sales=sales,

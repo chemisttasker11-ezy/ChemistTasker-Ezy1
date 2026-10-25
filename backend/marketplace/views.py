@@ -284,6 +284,7 @@ class ImageDetail(APIView):
 class Enquiries(APIView):
     permission_classes = (IsAuthenticated,)
     throttle_scope = "marketplace_enquiry"
+    @transaction.atomic
     def post(self, request, pk):
         if not settings.MARKETPLACE_CONTACT_ENABLED:
             return Response({"code": "CONTACT_DISABLED"}, status=503)

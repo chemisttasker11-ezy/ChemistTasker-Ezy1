@@ -1,4 +1,8 @@
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
+from django.db import close_old_connections, connection
+from queue import Queue
+from threading import Barrier, BrokenBarrierError, Thread
+from unittest import skipUnless
 from django.utils import timezone
 from rest_framework.test import APIClient
 import uuid
@@ -12,7 +16,126 @@ from .policy import evaluate_marketplace_access
 from .serializers import PublicListingSerializer
 
 
+@skipUnless(connection.vendor == "postgresql", "PostgreSQL row locks required.")
+@override_settings(MARKETPLACE_CONTACT_ENABLED=True)
+class MarketplaceEnquiryConcurrencyTests(TransactionTestCase):
+    def test_identical_concurrent_enquiries_create_one_negotiation(self):
+        from django.db.models.query import QuerySet
+        from .models import MarketplaceExchange, MarketplaceRequestReceipt
+        MarketplaceTestCase.setUp(self)
+        listing = MarketplaceTestCase.listing(self)
+        buyer, pharmacy = MarketplaceTestCase.enquiry_buyer(self)
+        payload = {"buying_pharmacy": pharmacy.pk, "client_request_id": str(uuid.uuid4()), "message": "Still available?"}
+        start, reads, results = Barrier(2), Barrier(2), Queue()
+        first = QuerySet.first
+
+        def synchronized_first(queryset):
+            row = first(queryset)
+            if queryset.model is MarketplaceRequestReceipt and row is None:
+                try:
+                    reads.wait(timeout=2)
+                except BrokenBarrierError:
+                    pass
+            return row
+
+        def enquire():
+            close_old_connections()
+            try:
+                client = APIClient(); client.force_authenticate(buyer)
+                start.wait(timeout=10)
+                response = client.post(f"/api/v1/marketplace/listings/{listing.pk}/enquiries/", payload, format="json")
+                results.put((response.status_code, response.data))
+            except Exception as exc:
+                results.put((500, repr(exc)))
+            finally:
+                close_old_connections()
+
+        with patch.object(QuerySet, "first", synchronized_first):
+            threads = [Thread(target=enquire) for _ in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=20)
+            self.assertFalse(any(thread.is_alive() for thread in threads), "Enquiry race timed out")
+        responses = [results.get(timeout=5) for _ in threads]
+        self.assertCountEqual([status for status, _ in responses], [200, 201], responses)
+        self.assertEqual(responses[0][1]["id"], responses[1][1]["id"])
+        self.assertEqual(MarketplaceExchange.objects.count(), 1)
+        self.assertEqual(MarketplaceRequestReceipt.objects.filter(action="ENQUIRY_CREATE").count(), 1)
+        client = APIClient(); client.force_authenticate(buyer)
+        payload["client_request_id"] = str(uuid.uuid4())
+        self.assertEqual(client.post(f"/api/v1/marketplace/listings/{listing.pk}/enquiries/", payload, format="json").status_code, 201)
+        self.assertEqual(MarketplaceExchange.objects.count(), 2)
+
+
 class MarketplaceTestCase(TestCase):
+    def enquiry_buyer(self):
+        buyer = User.objects.create_user(email="enquiry-buyer@example.test", role="OWNER", is_active=True, is_otp_verified=True, is_mobile_verified=True, mobile_number="0411111111")
+        owner = OwnerOnboarding.objects.create(user=buyer, phone_number="0411111111", role="PHARMACIST", verified=True)
+        pharmacy = Pharmacy.objects.create(name="Buyer", owner=owner, verified=True)
+        IdentityVerification.objects.create(user=buyer, status="VERIFIED", assurance_method="MANUAL")
+        MarketplaceTermsAcceptance.objects.create(user=buyer, version="2026-09")
+        return buyer, pharmacy
+
+    @override_settings(MARKETPLACE_CONTACT_ENABLED=True)
+    def test_enquiry_replay_and_conflicting_payload_do_not_duplicate_negotiations(self):
+        from .models import MarketplaceExchange, MarketplaceRequestReceipt
+        listing = self.listing()
+        buyer, pharmacy = self.enquiry_buyer()
+        client = APIClient(); client.force_authenticate(buyer)
+        path = f"/api/v1/marketplace/listings/{listing.pk}/enquiries/"
+        payload = {"buying_pharmacy": pharmacy.pk, "client_request_id": str(uuid.uuid4()), "message": "Available?"}
+        created = client.post(path, payload, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        replay = client.post(path, payload, format="json")
+        self.assertEqual(replay.status_code, 200, replay.data)
+        self.assertEqual(replay.data["id"], created.data["id"])
+        self.assertEqual(client.post(path, {**payload, "message": "Different"}, format="json").status_code, 400)
+        self.assertEqual(MarketplaceExchange.objects.count(), 1)
+        self.assertEqual(MarketplaceRequestReceipt.objects.filter(action="ENQUIRY_CREATE").count(), 1)
+        payload["client_request_id"] = str(uuid.uuid4())
+        self.assertEqual(client.post(path, payload, format="json").status_code, 201)
+        self.assertEqual(MarketplaceExchange.objects.count(), 2)
+
+    def test_invalid_delivery_patch_rolls_back_title_audience_and_version(self):
+        self.category.maximum_buyer_roles = ["OWNER", "PHARMACIST"]
+        self.category.save(update_fields=("maximum_buyer_roles",))
+        listing = self.listing()
+        listing.publication_status = "DRAFT"
+        listing.save(update_fields=("publication_status",))
+        client = APIClient(); client.force_authenticate(self.user)
+        client.raise_request_exception = False
+        payload = {"title": "Updated shelving", "expected_version": listing.version, "allowed_buyer_roles": ["OWNER", "PHARMACIST"], "delivery": {"method": "POSTAGE", "postage_payer": "SELLER", "postage_organiser": "SELLER", "known_cost": "1.001"}}
+        response = client.patch(f"/api/v1/marketplace/listings/{listing.pk}/", payload, format="json")
+        listing.refresh_from_db()
+        self.assertEqual(listing.title, "Shelving bundle")
+        self.assertEqual(listing.version, 1)
+        self.assertEqual(listing.delivery.postage_payer, "BUYER")
+        self.assertEqual(listing.audience.allowed_buyer_roles, ["OWNER"])
+        self.assertEqual(response.status_code, 400, response.content)
+        payload["delivery"]["known_cost"] = "1.00"
+        response = client.patch(f"/api/v1/marketplace/listings/{listing.pk}/", payload, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        listing.refresh_from_db()
+        self.assertEqual(listing.title, "Updated shelving")
+        self.assertEqual(listing.version, 2)
+        self.assertEqual(listing.delivery.postage_payer, "SELLER")
+        self.assertEqual(listing.audience.allowed_buyer_roles, ["OWNER", "PHARMACIST"])
+
+    def test_listing_options_mobile_gate_clears_after_verification(self):
+        client = APIClient(); client.force_authenticate(self.user)
+        self.user.is_mobile_verified = False
+        self.user.save(update_fields=("is_mobile_verified",))
+        response = client.get("/api/v1/marketplace/me/listing-options/")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn("MOBILE_UNVERIFIED", {row["code"] for row in response.data["blockers"]})
+        self.assertFalse(response.data["can_trade_for_pharmacy"])
+        self.user.is_mobile_verified = True
+        self.user.save(update_fields=("is_mobile_verified",))
+        response = client.get("/api/v1/marketplace/me/listing-options/")
+        self.assertNotIn("MOBILE_UNVERIFIED", {row["code"] for row in response.data["blockers"]})
+        self.assertTrue(response.data["can_trade_for_pharmacy"])
+
     def setUp(self):
         self.user = User.objects.create_user(email="owner@example.test", password="secret", role="OWNER", is_active=True, is_otp_verified=True, mobile_number="0400000000", is_mobile_verified=True)
         self.owner = OwnerOnboarding.objects.create(user=self.user, phone_number="0400000000", role="PHARMACIST", verified=True, ahpra_verified=True)

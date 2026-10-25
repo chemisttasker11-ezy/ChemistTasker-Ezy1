@@ -248,8 +248,10 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
                 check_version(record, version)
             if record.voided_at:
                 raise ValidationError('A void invoice cannot be marked paid.')
-            record.status = 'paid'
-            record.save(update_fields=['status'])
+            record = record_payment(record.user, record.pk, {
+                'date': timezone.localdate(),
+                'fund_payment_confirmed': request.data.get('fund_payment_confirmed') is True,
+            })
             record.refresh_from_db()
             record_revision_state(record)
         return Response(serialize_record(record))
@@ -258,9 +260,6 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     def payments(self, request, pk=None):
         schema = PaymentInput(data=request.data)
         schema.is_valid(raise_exception=True)
-        record = self.owned(request, pk)
-        if not date.fromisoformat(record.payload['invoice_date']) <= schema.validated_data['date'] <= timezone.localdate():
-            raise ValidationError('Payment date must be between the invoice date and today. Prepayments require review.')
         return Response(serialize_record(record_payment(request.user, pk, schema.validated_data)))
 
     @action(detail=True, methods=['get'])
@@ -503,8 +502,10 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             record = self._get(request, pk, lock=True)
             self._require_current_delivered(record)
             check_version(record, request.data.get('version'))
-            record.status = 'paid'
-            record.save(update_fields=['status'])
+            record = record_payment(record.user, record.pk, {
+                'date': timezone.localdate(),
+                'fund_payment_confirmed': request.data.get('fund_payment_confirmed') is True,
+            })
             record.refresh_from_db()
             record.review_status = 'APPROVED_FOR_PAYMENT'
             record.last_review_note = note

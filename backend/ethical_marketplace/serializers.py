@@ -3,6 +3,7 @@ from rest_framework import serializers
 from .models import (EthicalImportBatch, EthicalListing, EthicalListingLot, EthicalMessage,
                      EthicalPharmacyApproval, EthicalPharmacyGrant, EthicalProduct,
                      EthicalStockLot, EthicalTransfer, EthicalTransferLine)
+from .policy import evaluate_ethical_access
 
 
 class ApprovalSerializer(serializers.ModelSerializer):
@@ -49,6 +50,13 @@ class ListingLotSerializer(serializers.ModelSerializer):
         model = EthicalListingLot
         fields = ("id", "lot", "quantity", "lot_detail")
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        if not request or not evaluate_ethical_access(request.user, instance.lot.pharmacy, "MANAGE_OWN_STOCK", product=instance.lot.product).admitted:
+            data.pop("lot_detail", None)
+        return data
+
 
 class EthicalListingSerializer(serializers.ModelSerializer):
     product_detail = ProductSerializer(source="product", read_only=True)
@@ -59,6 +67,14 @@ class EthicalListingSerializer(serializers.ModelSerializer):
         model = EthicalListing
         fields = ("id", "pharmacy", "product", "product_detail", "mode", "amount", "current_circle", "maximum_circle", "scope_chain", "status", "version", "published_at", "lots", "lot_allocations", "expected_version", "created_at", "updated_at")
         read_only_fields = ("id", "status", "version", "published_at", "lot_allocations", "created_at", "updated_at")
+
+    def validate(self, attrs):
+        if self.instance:
+            pharmacy = attrs.get("pharmacy", self.instance.pharmacy)
+            product = attrs.get("product", self.instance.product)
+            if self.instance.lot_allocations.exclude(lot__pharmacy=pharmacy, lot__product=product).exists():
+                raise serializers.ValidationError({"lots": "Existing lots must belong to the listing pharmacy and product."})
+        return attrs
 
     def create(self, validated_data):
         validated_data.pop("lot_allocations", None)
