@@ -478,69 +478,123 @@ def current_subscription(request):
     return Response(payload)
 
 
+def _stripe_object_value(obj, key, default=None):
+    """Read StripeObject/dict safely; Stripe returns both shapes in adapters."""
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_subscription_seats(request):
-    desired_staff_count = int(request.data.get('staff_count', 5))
-    if desired_staff_count < 5:
-        desired_staff_count = 5
-    platform = request.data.get('platform', 'web')
-
-    account, _pharmacy, error_response = _current_account_for_user(
-        request.user,
-        pharmacy_id=request.data.get('pharmacy_id'),
-    )
-    if error_response is not None:
-        return error_response
-
-    subscription = _get_subscription_for_account(account)
-    if not subscription or subscription.status != 'active' or not subscription.stripe_subscription_id:
-        return Response({'error': 'No active subscription found for this billing account.'}, status=status.HTTP_400_BAD_REQUEST)
-
     try:
-        desired_extra_seats = max(0, desired_staff_count - 5)
-        current_extra_seats = max(0, (subscription.staff_count or 5) - 5)
+        desired_staff_count = int(request.data.get('staff_count', 5))
+    except (TypeError, ValueError):
+        return Response({'error': 'staff_count must be a valid integer.'}, status=400)
+    if desired_staff_count < 5:
+        return Response({'error': 'Base subscription includes five seats.'}, status=400)
+    platform = request.data.get('platform', 'web')
+    account, _pharmacy, error = _current_account_for_user(
+        request.user, pharmacy_id=request.data.get('pharmacy_id'),
+    )
+    if error is not None:
+        return error
 
-        if desired_extra_seats <= 0:
-            return Response({'error': 'Base subscription already includes 5 seats. Enter at least 1 extra seat.'}, status=status.HTTP_400_BAD_REQUEST)
+    scope = {'owner': account['owner_user']} if account['scope'] == 'owner' else {
+        'organization': account['organization'],
+    }
+    try:
+        with transaction.atomic():
+            subscription = OwnerSubscription.objects.select_for_update().filter(**scope).first()
+            if not subscription or subscription.status != 'active' or not subscription.stripe_subscription_id:
+                return Response({'error': 'No active subscription found for this billing account.'}, status=400)
+            desired_extra = desired_staff_count - 5
+            current_extra = max(0, (subscription.staff_count or 5) - 5)
 
-        if subscription.stripe_extra_seat_subscription_id:
-            return Response(
-                {'error': 'Extra-seat subscription already exists. Incremental changes to an existing add-on are not supported in this flow yet.'},
-                status=status.HTTP_400_BAD_REQUEST,
+            if subscription.stripe_extra_seat_subscription_id:
+                if desired_extra == current_extra:
+                    payload = _serialize_subscription(subscription)
+                    payload.update({
+                        'message': 'No seat change detected.',
+                        'billingScope': account['scope'],
+                        'accountName': billing_account_display_name(account),
+                    })
+                    return Response(payload)
+
+                # Verify the existing subscription and its item at Stripe:
+                # never mutate a different customer's or unrelated price item.
+                provider = stripe.Subscription.retrieve(subscription.stripe_extra_seat_subscription_id)
+                if _stripe_object_value(provider, 'customer') != subscription.stripe_customer_id:
+                    return Response({'error': 'Stripe subscription customer does not match this billing account.'}, status=409)
+                if _stripe_object_value(provider, 'status') not in ('active', 'trialing'):
+                    return Response({'error': 'Extra-seat subscription is not active at Stripe.'}, status=409)
+                items = _stripe_object_value(_stripe_object_value(provider, 'items', {}), 'data', [])
+                matching = [
+                    item for item in items
+                    if _stripe_object_value(_stripe_object_value(item, 'price', {}), 'id') == EXTRA_SEAT_PRICE
+                ]
+                if len(matching) != 1 or len(items) != 1:
+                    return Response({'error': 'Cannot safely identify the single extra-seat price item.'}, status=409)
+
+                # Stripe creates the appropriate next-invoice proration for
+                # additions/downgrades; base subscription remains untouched.
+                updated = stripe.Subscription.modify(
+                    subscription.stripe_extra_seat_subscription_id,
+                    items=[{'id': _stripe_object_value(matching[0], 'id'),
+                            'quantity': desired_extra}],
+                    proration_behavior='create_prorations',
+                    payment_behavior='error_if_incomplete',
+                )
+                updated_items = _stripe_object_value(_stripe_object_value(updated, 'items', {}), 'data', [])
+                matching_updated = [
+                    item for item in updated_items
+                    if _stripe_object_value(_stripe_object_value(item, 'price', {}), 'id') == EXTRA_SEAT_PRICE
+                ]
+                if (_stripe_object_value(updated, 'status') not in ('active', 'trialing')
+                        or len(matching_updated) != 1
+                        or int(_stripe_object_value(matching_updated[0], 'quantity', -1)) != desired_extra):
+                    raise ValueError('Stripe did not confirm the requested seat quantity.')
+                subscription.staff_count = desired_staff_count
+                subscription.save(update_fields=['staff_count', 'updated_at'])
+                payload = _serialize_subscription(subscription)
+                payload.update({
+                    'message': 'Existing extra-seat subscription quantity updated at Stripe.',
+                    'billingScope': account['scope'],
+                    'accountName': billing_account_display_name(account),
+                })
+                return Response(payload)
+
+            if desired_extra == current_extra:
+                return Response({
+                    **_serialize_subscription(subscription),
+                    'message': 'No seat change detected.',
+                    'billingScope': account['scope'],
+                    'accountName': billing_account_display_name(account),
+                })
+            if desired_extra < 1:
+                return Response({'error': 'No purchased extra-seat subscription exists to resize.'}, status=409)
+            success_url, cancel_url = _extra_seat_return_urls(account, platform=platform)
+            checkout_session = stripe.checkout.Session.create(
+                customer=subscription.stripe_customer_id,
+                payment_method_types=['card'],
+                line_items=[{'price': EXTRA_SEAT_PRICE, 'quantity': desired_extra}],
+                mode='subscription',
+                success_url=success_url, cancel_url=cancel_url,
+                metadata=_build_extra_seat_metadata(
+                    account, actor_user=request.user, extra_seat_count=desired_extra,
+                ),
             )
-
-        if desired_extra_seats == current_extra_seats:
-            payload = _serialize_subscription(subscription)
-            payload.update({
-                'message': 'No seat change detected.',
-                'billingScope': account['scope'],
-                'accountName': billing_account_display_name(account),
+            return Response({
+                'url': checkout_session.url,
+                'message': 'Redirecting to Stripe to purchase extra seats.',
             })
-            return Response(payload)
-
-        success_url, cancel_url = _extra_seat_return_urls(account, platform=platform)
-        checkout_session = stripe.checkout.Session.create(
-            customer=subscription.stripe_customer_id,
-            payment_method_types=['card'],
-            line_items=[{'price': EXTRA_SEAT_PRICE, 'quantity': desired_extra_seats}],
-            mode='subscription',
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata=_build_extra_seat_metadata(
-                account,
-                actor_user=request.user,
-                extra_seat_count=desired_extra_seats,
-            ),
-        )
-
-        return Response({
-            'url': checkout_session.url,
-            'message': 'Redirecting to Stripe to purchase extra seats.',
-        })
+    except stripe.error.StripeError:
+        logger.exception('Stripe extra-seat quantity adjustment failed')
+        return Response({'error': 'Stripe could not update the extra-seat subscription.'}, status=400)
     except Exception:
-        logger.exception('Billing request failed')
-        return Response({'error': 'Unable to complete the billing request.'}, status=status.HTTP_400_BAD_REQUEST)
+        logger.exception('Unexpected extra-seat billing reconciliation error')
+        return Response({'error': 'Unable to confirm the seat adjustment.'}, status=409)
 
 
 @api_view(['POST'])
@@ -936,6 +990,38 @@ def _process_stripe_event(event):
                     # retry instead of permanently acknowledging partial work.
                     raise
 
+
+    elif event.type == 'customer.subscription.updated':
+        provider = event.data.object
+        sub_id = provider.get('id')
+        sub_status = provider.get('status')
+        customer_id = provider.get('customer')
+        # A billing event may only affect the exact local provider subscription.
+        base = OwnerSubscription.objects.select_for_update().filter(
+            stripe_subscription_id=sub_id, stripe_customer_id=customer_id,
+        ).first()
+        if base:
+            if base.status == 'canceled':
+                return
+            base.status = 'active' if sub_status in ('active', 'trialing') else 'inactive'
+            base.save(update_fields=['status', 'updated_at'])
+            return
+        addon = OwnerSubscription.objects.select_for_update().filter(
+            stripe_extra_seat_subscription_id=sub_id, stripe_customer_id=customer_id,
+        ).first()
+        if addon:
+            items = provider.get('items', {}).get('data', [])
+            matched = [
+                item for item in items
+                if _stripe_object_value(_stripe_object_value(item, 'price', {}), 'id') == EXTRA_SEAT_PRICE
+            ]
+            if len(matched) != 1:
+                logger.warning('Stripe extra-seat update contains no unique recognized price.')
+                return
+            quantity = int(_stripe_object_value(matched[0], 'quantity', 0))
+            addon.staff_count = 5 + quantity if sub_status in ('active', 'trialing') else 5
+            addon.save(update_fields=['staff_count', 'updated_at'])
+            return
 
     elif event.type == 'invoice.paid':
         invoice = event.data.object
