@@ -358,9 +358,9 @@
     {
       "id": "N1",
       "severity": "P1",
-      "area": "Next / cross-account marketplace privacy",
-      "title": "Account switching can display the previous user's private ethical medicine stock or marketplace exchanges before session-specific data is cleared.",
-      "scenario": "Alice has private ethical-stock inventory, listing drafts and marketplace conversations open in a Next tab. In another tab, Bob signs in and the shared session-provider sets this tab to loading then authenticated as Bob. The marketplace components retain Alice's contexts and rows. EthicalWorkspaceV2 hides loading only when contexts is empty, and its getAccess callbacks are not bound to user/session generation. GoodsWorkspace can render old exchanges while reloading; GoodsListingsV2 preserves old rows and access even after Bob's getAccess/dashboard request fails. Bob may momentarily or persistently see Alice's private item names, batches, transfers, listings or messages in the existing tab even though backend requests for Bob would be forbidden.",
+      "area": "Next / cross-account private workspace privacy",
+      "title": "Next marketplace and publishing workspaces can display the previous account's private stock, messages or unpublished drafts after cross-tab login.",
+      "scenario": "Alice has private ethical-stock inventory, listing drafts and marketplace conversations open in a Next tab. In another tab, Bob signs in and the shared session-provider sets this tab to loading then authenticated as Bob. The marketplace components retain Alice's contexts and rows. EthicalWorkspaceV2 hides loading only when contexts is empty, and its getAccess callbacks are not bound to user/session generation. GoodsWorkspace can render old exchanges while reloading; GoodsListingsV2 preserves old rows and access even after Bob's getAccess/dashboard request fails. Bob may momentarily or persistently see Alice's private item names, batches, transfers, listings or messages in the existing tab even though backend requests for Bob would be forbidden. The publishing ContentDashboard is also session-insensitive: it loads editor and moderation content once on mount with useEffect([]), does not use the current session or clear its rows on account switch, so the original account's unpublished drafts can remain visible after an unrelated account signs in through another tab. GoodsWorkspace's child listing/exchange managers initialize their own rows from `initial` props and do not resynchronize after new user data arrives, so stale exchange messages can persist even after a successful reload.",
       "evidence": [
         "frontend_web/landing_next/shared/session-provider.tsx:11",
         "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:27",
@@ -368,11 +368,15 @@
         "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:86",
         "frontend_web/landing_next/features/marketplace/workspace.tsx:15",
         "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:14",
-        "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:16"
+        "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:16",
+        "frontend_web/landing_next/app/content/workspace.tsx:20",
+        "frontend_web/landing_next/app/content/workspace.tsx:25",
+        "frontend_web/landing_next/features/marketplace/workspace.tsx:23",
+        "frontend_web/landing_next/features/marketplace/workspace.tsx:26"
       ],
       "confidence": "high for source-retained-state render possibility; account-switch timing and live UX untested",
       "verification": "SOURCE_SUPPORTED_SAME_AGENT_NOT_RUNTIME_REPRODUCED",
-      "test_needed": "Two unrelated owner accounts A/B with separate ethical inventories, goods listings and exchanges. Open A's private pages in tab1, log in as B in tab2 while tab1 remains mounted; simulate slow B getAccess and 403/error, and delay old A promises to finish last. Assert tab1 never renders A names, stock levels or messages once B is authenticated; confirm B sees only permitted data on success and old rows are purged immediately on session change. Repeat with same-tab account switch and logout/reauth."
+      "test_needed": "Two unrelated owner accounts A/B with separate ethical inventories, goods listings and exchanges. Open A's private pages in tab1, log in as B in tab2 while tab1 remains mounted; simulate slow B getAccess and 403/error, and delay old A promises to finish last. Assert tab1 never renders A names, stock levels or messages once B is authenticated; confirm B sees only permitted data on success and old rows are purged immediately on session change. Repeat with same-tab account switch and logout/reauth. Add publisher A and unrelated user B: open A content workspace and moderation queue in tab1, sign in B in tab2; tab1 must purge all A drafts immediately, while B's server requests are denied. Validate child GoodsExchangeManager rows update when initial data changes instead of using stale initial state."
     }
   ],
   "targeted_recheck_files": 3
