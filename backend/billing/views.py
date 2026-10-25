@@ -646,9 +646,15 @@ def charge_shift_fulfillment(request, shift_id):
     is_locum = shift.employment_type == 'LOCUM'
 
     if is_locum:
-        price_id = 'price_1T52jFBQXaySV5ukezd5JmzS'
+        price_id = (
+            'price_1T52jFBQXaySV5ukkXOKPHSV'
+            if is_subscriber else 'price_1T52jFBQXaySV5ukezd5JmzS'
+        )
     else:
-        price_id = 'price_1T52ilBQXaySV5uksvQy2RTk'
+        price_id = (
+            'price_1T52imBQXaySV5ukuwLH3ikI'
+            if is_subscriber else 'price_1T52ilBQXaySV5uksvQy2RTk'
+        )
 
     success_url, cancel_url = _shift_checkout_return_urls(
         shift,
