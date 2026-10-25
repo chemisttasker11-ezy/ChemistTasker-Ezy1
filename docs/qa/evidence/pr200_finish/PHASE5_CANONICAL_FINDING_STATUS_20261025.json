@@ -17,12 +17,12 @@
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 13,
-    "UNVERIFIED_CANDIDATE": 158,
+    "UNVERIFIED_CANDIDATE": 157,
     "REPRODUCED_RUNTIME_DJANGO_SQLITE": 41,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
-    "SOURCE_SUPPORTED_CONDITIONAL": 1,
+    "SOURCE_SUPPORTED_CONDITIONAL": 2,
     "SOURCE_SUPPORTED_UI_SCOPE": 1
   },
   "independent_s2_certified_files": null,
@@ -357,16 +357,21 @@
       "severity": "P0",
       "area": "Shift Pricing",
       "title": "Legacy casual award figures and incomplete future holiday data",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "SOURCE_SUPPORTED_CONDITIONAL",
+      "evidence_grade": "S2_BOUNDED_SOURCE_AND_PRIMARY_AWARD_COMPARISON",
+      "decision": "BLOCK_UNTIL_PAYFLOW_AND_HOLIDAY_CONTRACT_VERIFIED",
       "root": "B14",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
-      "test_needed": null,
+      "source_proof": [
+        "backend/shifts/data/award_rates_casual_first_level.json:5-94",
+        "backend/workforce/award_rates.py:10-93",
+        "backend/shifts/pricing.py:47-51",
+        "docs/qa/MAIN_RELEASE_B14_AWARD_RATE_SOURCE_CHECK_20261025.md"
+      ],
+      "test_needed": "Date-effective 2026 shift guide vs Fair Work official casual award across roles plus positive workforce award schedule; 2027 QLD holiday, exact locked employee pay and Vite/Next/Expo visible rates",
       "runtime_scenarios": [],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Separate shifts static casual guide is older than 1 July 2026 Fair Work award rates, while workforce award schedule is current. 2027 public holiday file absent. No observed employee pay underpayment; severity conditional on whether old guide reaches locked award-covered wages and 2027 shifts."
     },
     {
       "id": "B15",
@@ -706,11 +711,15 @@
       "title": "Signed offline event integrity flags for clock-anchor drift, backward time, monotonic rollback and seven-day server drift mark evidence NEEDS_REVIEW but still call live attendance mutation, so suspect timestamps can create normal AttendanceSessions.",
       "status": "SOURCE_SUPPORTED",
       "evidence_grade": "S2_SAME_ASSISTANT_SOURCE_CHALLENGE",
-      "decision": "VERIFY",
+      "decision": "BLOCK_UNTIL_SIGNED_EVENT_AND_DOWNSTREAM_PAYROLL_PROOF",
       "root": "B29",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
-      "test_needed": null,
+      "source_proof": [
+        "backend/attendance/protocol.py:89-117",
+        "backend/attendance/protocol.py:234-301",
+        "docs/qa/MAIN_RELEASE_B29_KIOSK_CLOCK_SEMANTIC_20261025.md"
+      ],
+      "test_needed": "Properly re-sign anchor drift, backwards clock, monotonic rollback and over-seven-day timestamp events, assert retained audit row and zero live attendance until approval; valid clock positive and downstream payroll gating.",
       "runtime_scenarios": [],
       "reviewer_independence": "NOT_CERTIFIED",
       "explanation": "Clock drift/backward/monotonic flags mark signed offline kiosk event NEEDS_REVIEW, but only chain/sequence/revocation block _apply_business_event; timestamp still mutates live attendance."
