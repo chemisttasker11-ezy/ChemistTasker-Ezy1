@@ -144,10 +144,8 @@ def _find_matching_assignment(
     ).select_related("shift", "slot")
 
     if assignment_id is not None:
-        cand = base_qs.filter(id=assignment_id).first()
-        if cand and is_draft_roster_assignment(cand):
-            return None
-        return cand
+        # An explicit id only narrows the search; the event time must still fall in its shift window.
+        base_qs = base_qs.filter(id=assignment_id)
 
     tz = _get_pharmacy_tz(pharmacy, target_time)
     eval_local = target_time.astimezone(tz) if timezone.is_aware(target_time) and tz else target_time
