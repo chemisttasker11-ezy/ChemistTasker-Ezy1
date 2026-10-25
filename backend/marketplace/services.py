@@ -42,6 +42,8 @@ def buyer_can_contact(user, listing, buying_pharmacy=None):
 
 
 def request_receipt(user, action, request_id, payload):
+    # Lock a stable row before checking for a receipt that may not exist yet.
+    user.__class__.objects.select_for_update().get(pk=user.pk)
     payload_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
     existing = MarketplaceRequestReceipt.objects.filter(actor=user, action=action, client_request_id=request_id).first()
     if existing and existing.payload_hash != payload_hash:

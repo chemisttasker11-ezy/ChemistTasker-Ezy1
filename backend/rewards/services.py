@@ -193,7 +193,8 @@ def award_referral_event(event: PillReferralEvent) -> PillLedgerEntry:
         referral_event=event,
         shift=event.shift,
         description=rule.name,
-        idempotency_key=f"referral:{event.id}:award",
+        idempotency_key=(f"referral:{event.referral_code_id}:{event.referred_user_id}:{event.referral_type}:{event.shift_id}:award"
+                         if event.referred_user_id else f"referral:{event.id}:award"),
     )
     event.status = PillReferralEvent.Status.AWARDED
     event.awarded_at = event.awarded_at or timezone.now()
@@ -282,6 +283,7 @@ def create_shift_referral(*, referrer, shift: Shift, referred_email: str = "") -
     )
 
 
+@transaction.atomic
 def claim_referral_code(
     *,
     referred_user,
@@ -290,7 +292,7 @@ def claim_referral_code(
     referral_event_id: int | None = None,
     award: bool = False,
 ) -> PillReferralEvent:
-    referral_code = PillReferralCode.objects.select_related("user").filter(
+    referral_code = PillReferralCode.objects.select_for_update(of=("self",)).select_related("user").filter(
         code=(code or "").strip().upper(),
         is_active=True,
     ).first()

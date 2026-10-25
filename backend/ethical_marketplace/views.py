@@ -230,6 +230,7 @@ class Lots(APIView):
     def get(self, request):
         pharmacy = admitted_pharmacy(request, "MANAGE_OWN_STOCK")
         rows = EthicalStockLot.objects.filter(pharmacy=pharmacy).select_related("product").prefetch_related("product__identifiers")
+        rows = [row for row in rows if evaluate_ethical_access(request.user, pharmacy, "MANAGE_OWN_STOCK", product=row.product).admitted]
         return private(Response(StockLotSerializer(rows, many=True).data))
     def post(self, request):
         pharmacy = admitted_pharmacy(request, "MANAGE_OWN_STOCK")
@@ -245,6 +246,8 @@ class Lots(APIView):
 class LotDetail(APIView):
     permission_classes = (IsAuthenticated,)
     def patch(self, request, pk):
+        if not settings.ETHICAL_INVENTORY_ENABLED:
+            return Response({"code": "ETHICAL_INVENTORY_DISABLED"}, status=503)
         lot = get_object_or_404(EthicalStockLot.objects.select_related("pharmacy", "product"), pk=pk)
         require(request.user, lot.pharmacy, "MANAGE_OWN_STOCK", product=lot.product)
         if request.data.get("expected_version") != lot.version:
@@ -261,6 +264,8 @@ class LotDetail(APIView):
 class LotReconcile(APIView):
     permission_classes = (IsAuthenticated,)
     def post(self, request, pk):
+        if not settings.ETHICAL_INVENTORY_ENABLED:
+            return Response({"code": "ETHICAL_INVENTORY_DISABLED"}, status=503)
         with transaction.atomic():
             lot = get_object_or_404(EthicalStockLot.objects.select_for_update().select_related("pharmacy", "product"), pk=pk)
             require(request.user, lot.pharmacy, "MANAGE_OWN_STOCK", product=lot.product)
@@ -287,26 +292,31 @@ class Listings(APIView):
         # Candidate set is never serialized before the per-object policy check.
         rows = candidate_listings_for(request.user).filter(status__in=("PUBLISHED", "RESERVED")).select_related("pharmacy", "product", "scope_chain").prefetch_related("product__identifiers", "lot_allocations", "lot_allocations__lot")
         visible = [row for row in rows if listing_visible_to(request.user, row)]
-        return private(Response({"results": EthicalListingSerializer(visible, many=True).data, "context_pharmacy": pharmacy.id}))
+        return private(Response({"results": EthicalListingSerializer(visible, many=True, context={"request": request}).data, "context_pharmacy": pharmacy.id}))
+    @transaction.atomic
     def post(self, request):
         pharmacy = admitted_pharmacy(request, "PREPARE_LISTING")
         product = get_object_or_404(EthicalProduct, pk=request.data.get("product"), status="APPROVED")
         require(request.user, pharmacy, "PREPARE_LISTING", product=product, mode=request.data.get("mode"))
-        serializer = EthicalListingSerializer(data=request.data)
+        serializer = EthicalListingSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         if product.schedule.upper() == "S8" and request.data.get("maximum_circle") == "PLATFORM_OWNERS":
             raise PermissionDenied({"code": "S8_AUDIENCE_CEILING", "detail": "S8 listings cannot reach the platform circle."})
-        listing = serializer.save(pharmacy=pharmacy, accountable_owner=pharmacy.owner.user, prepared_by=request.user, scope_owner_id=pharmacy.owner_id, scope_organization_id=pharmacy.organization_id)
-        allocations = request.data.get("lots", [])
+        allocations = serializer.validated_data.get("lot_allocations", [])
         if not allocations:
             raise ValidationError({"lots": "Select at least one reconciled lot."})
+        seen_lots = set()
         for item in allocations:
-            lot = get_object_or_404(EthicalStockLot, pk=item.get("lot"), pharmacy=pharmacy, product=product, status="AVAILABLE")
-            quantity = int(item.get("quantity", 0))
+            lot, quantity = item["lot"], item["quantity"]
+            if lot.pharmacy_id != pharmacy.pk or lot.product_id != product.pk or lot.status != "AVAILABLE" or lot.pk in seen_lots:
+                raise ValidationError({"lots": "Select distinct available lots for this pharmacy and product."})
             if quantity < 1 or quantity > lot.available_quantity:
                 raise ValidationError({"lots": "Selected quantity exceeds reconciled availability."})
-            EthicalListingLot.objects.create(listing=listing, lot=lot, quantity=quantity)
-        return private(Response(EthicalListingSerializer(listing).data, status=201))
+            seen_lots.add(lot.pk)
+        listing = serializer.save(pharmacy=pharmacy, accountable_owner=pharmacy.owner.user, prepared_by=request.user, scope_owner_id=pharmacy.owner_id, scope_organization_id=pharmacy.organization_id)
+        for item in allocations:
+            EthicalListingLot.objects.create(listing=listing, lot=item["lot"], quantity=item["quantity"])
+        return private(Response(EthicalListingSerializer(listing, context={"request": request}).data, status=201))
 
 
 class ListingDetail(APIView):
@@ -315,14 +325,15 @@ class ListingDetail(APIView):
         listing = get_object_or_404(EthicalListing.objects.select_related("pharmacy", "product", "scope_chain").prefetch_related("product__identifiers", "lot_allocations", "lot_allocations__lot"), pk=pk)
         if not listing_visible_to(request.user, listing):
             raise Http404
-        return private(Response(EthicalListingSerializer(listing).data))
+        return private(Response(EthicalListingSerializer(listing, context={"request": request}).data))
     def patch(self, request, pk):
         listing = get_object_or_404(EthicalListing.objects.select_related("pharmacy", "product"), pk=pk)
         require(request.user, listing.pharmacy, "PREPARE_LISTING", product=listing.product, mode=listing.mode)
         if request.data.get("expected_version") != listing.version or listing.status != "DRAFT":
             return Response({"code": "STALE_OR_IMMUTABLE_LISTING"}, status=409)
-        serializer = EthicalListingSerializer(listing, data=request.data, partial=True)
+        serializer = EthicalListingSerializer(listing, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
+        require(request.user, serializer.validated_data.get("pharmacy", listing.pharmacy), "PREPARE_LISTING", product=serializer.validated_data.get("product", listing.product), mode=serializer.validated_data.get("mode", listing.mode))
         serializer.save(version=listing.version + 1)
         return private(Response(serializer.data))
 
