@@ -3,9 +3,9 @@
 Routes are the ones mounted by core/asgi.py: JWTAuthMiddlewareStack(URLRouter(core.routing...)).
 Tests are async and use TransactionTestCase because the consumer touches the DB from worker threads."""
 from channels.db import database_sync_to_async
-from django.test import TransactionTestCase, override_settings
+from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.utils import timezone
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from chat.models import Conversation, Message, Participant
 from memberships.models import Membership
@@ -13,6 +13,35 @@ from core.websocket_testing import TIMEOUT, connect, make_actors, new_ticket
 from onboarding.models import AhpraCheck, OtherStaffOnboarding
 from onboarding.test_ahpra_desktop import NUMBER, TEST_CACHES, result
 from onboarding.verification.desktop import apply_ahpra_result
+
+
+class RoomDeliveryRecheckTests(SimpleTestCase):
+    async def test_outgoing_burst_reuses_check_then_rechecks_revocation(self):
+        from chat.consumers import RoomConsumer
+        consumer = RoomConsumer()
+        consumer._ahpra_checked_at = 100.0
+        consumer._membership_still_authorized = AsyncMock(side_effect=[True, False])
+        consumer._ahpra_suspended = AsyncMock(return_value=False)
+        consumer.scope = {"user": None}
+        consumer.close = AsyncMock()
+        with patch("chat.consumers.time") as clock, patch(
+            "channels.generic.websocket.AsyncJsonWebsocketConsumer.send_json", new_callable=AsyncMock,
+        ) as send:
+            clock.monotonic.return_value = 101.0
+            for _ in range(20):
+                await consumer.send_json({"type": "typing"})
+            consumer._membership_still_authorized.assert_not_awaited()
+            self.assertEqual(send.await_count, 20)
+            clock.monotonic.return_value = 110.0
+            await consumer.send_json({"type": "typing"})
+            clock.monotonic.return_value = 115.0
+            await consumer.send_json({"type": "typing"})
+            consumer.close.assert_not_awaited()
+            self.assertEqual(consumer._membership_still_authorized.await_count, 1)
+            clock.monotonic.return_value = 120.0
+            await consumer.send_json({"type": "typing"})
+            consumer.close.assert_awaited_once_with(code=4403)
+            self.assertEqual(send.await_count, 22)
 
 
 @database_sync_to_async

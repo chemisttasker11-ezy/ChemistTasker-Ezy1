@@ -81,7 +81,7 @@ def participant_can_receive_chat_updates(participant: Participant) -> bool:
         return False
     if membership.status != Membership.Status.ACCEPTED:
         return False
-    if conversation.type == Conversation.Type.DM and membership.role == "CONTACT":
+    if conversation.type == Conversation.Type.DM and membership.employment_type == "CONTACT":
         # External contacts have intentionally inactive CONTACT memberships,
         # not the same as a revoked pharmacy staff membership.
         return True
@@ -93,6 +93,14 @@ def participant_can_receive_chat_updates(participant: Participant) -> bool:
             and membership.employment_type in PHARMACY_STAFF_EMPLOYMENT_TYPES
         )
     return True
+
+
+def authorized_participant(conversation_id, user_id):
+    """Legacy rooms may have revoked and valid memberships for the same user."""
+    participants = Participant.objects.filter(
+        conversation_id=conversation_id, membership__user_id=user_id,
+    ).select_related("membership__user", "conversation")
+    return next((p for p in participants if participant_can_receive_chat_updates(p)), None)
 
 
 def accessible_conversations_queryset(user):
@@ -111,7 +119,7 @@ def accessible_conversations_queryset(user):
     ).values_list("conversation_id", flat=True)
     contacts = Participant.objects.filter(
         membership__user=user,
-        membership__role="CONTACT",
+        membership__employment_type="CONTACT",
         membership__status=Membership.Status.ACCEPTED,
         conversation__type=Conversation.Type.DM,
     ).values_list("conversation_id", flat=True)

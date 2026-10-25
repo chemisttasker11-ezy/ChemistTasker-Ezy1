@@ -1,4 +1,4 @@
-"""Phase 6: connected sockets lose access immediately on membership revocation.
+"""Writes reject revocation immediately; delivery rechecks at the bounded interval.
 
 These tests intentionally use database QuerySet.update() to bypass model
 signals and prove that stale websocket group membership is insufficient.
@@ -6,6 +6,7 @@ signals and prove that stale websocket group membership is insufficient.
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from django.test import TransactionTestCase
+from unittest.mock import patch
 
 from chat.models import Conversation, Message, Participant
 from core.websocket_testing import TIMEOUT, connect, make_actors, new_ticket
@@ -50,7 +51,9 @@ class RevokedSocketContracts(TransactionTestCase):
         self.assertEqual(await count_messages(), 0)
         await a.disconnect()
 
-    async def test_revoked_member_cannot_receive_typing_from_live_room(self):
+    @patch("chat.consumers.time")
+    async def test_revoked_member_cannot_receive_typing_after_recheck_interval(self, clock):
+        clock.monotonic.return_value = 100.0
         alice, alice_m, bob, bob_m, _ = await make_actors()
         room = await room_for([alice_m, bob_m])
         await new_ticket(alice, "p6-revoked-receive-a")
@@ -61,6 +64,7 @@ class RevokedSocketContracts(TransactionTestCase):
         await a.receive_json_from(timeout=TIMEOUT)
         await b.receive_json_from(timeout=TIMEOUT)
         await disable_membership(alice_m.pk)
+        clock.monotonic.return_value = 111.0
         await b.send_json_to({"type":"typing", "is_typing":True})
         self.assertEqual(await a.receive_output(timeout=TIMEOUT), {"type":"websocket.close", "code":4403})
         self.assertEqual((await b.receive_json_from(timeout=TIMEOUT))["type"], "typing")
