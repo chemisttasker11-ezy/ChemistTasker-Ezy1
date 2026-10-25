@@ -6,10 +6,10 @@ TestCase's default suite; signed events reach the real offline protocol.
 import base64
 from datetime import timedelta
 
+from attendance_tests.test_kiosk_offline_protocol import KioskOfflineProtocolTests
 from django.utils import timezone
 from attendance.protocol import calculate_event_hash, sync_offline_batch
 from attendance.models import AttendanceEvent, AttendanceSession, KioskAttendanceEvent
-from attendance_tests.test_kiosk_offline_protocol import KioskOfflineProtocolTests
 
 
 class Phase5KioskClockIntegrity(KioskOfflineProtocolTests):
