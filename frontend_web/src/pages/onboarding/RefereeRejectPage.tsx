@@ -8,18 +8,18 @@ import { browserRejectReferee } from '@chemisttasker/shared-core';
 import AuthLayout from "../../layouts/AuthLayout";
 
 export default function RefereeRejectPage() {
-  const { pk, refIndex } = useParams<{ pk: string; refIndex: string }>();
+  const { token } = useParams<{ token: string }>();
 
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState<string>("");
 
   useEffect(() => {
-    if (!pk || !refIndex) {
+    if (!token) {
       setStatus("error");
       setMessage("Missing reference information.");
       return;
     }
-    browserRejectReferee({ baseUrl: API_BASE_URL }, pk, refIndex)
+    browserRejectReferee({ baseUrl: API_BASE_URL }, token)
       .then((data) => {
         setStatus("success");
         setMessage(data?.message || "You have declined to be a referee for this candidate.");
@@ -34,7 +34,7 @@ export default function RefereeRejectPage() {
             "Something went wrong."
         );
       });
-  }, [pk, refIndex]);
+  }, [token]);
 
   return (
     <AuthLayout title="Reference Declined">

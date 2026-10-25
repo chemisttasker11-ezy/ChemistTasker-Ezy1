@@ -30,7 +30,6 @@
   "updateOnboardingForm": "domains/onboarding/api.ts",
   "submitRefereeResponse": "domains/onboarding/api.ts",
   "refereeRejectByToken": "domains/onboarding/api.ts",
-  "refereeReject": "domains/onboarding/api.ts",
   "claimOnboarding": "domains/organizations/api.ts",
   "getOrganizations": "domains/organizations/api.ts",
   "getOrganizationById": "domains/organizations/api.ts",

@@ -43,10 +43,6 @@ export const API_ENDPOINTS = {
     refereeRejectByToken: (token: string) =>
         `/onboarding/referee-reject/${token}/`,
 
-    /** @deprecated Django now exposes the token route above. Kept until legacy links are migrated. */
-    refereeReject: (pk: string | number, refIndex: string | number) =>
-        `/onboarding/referee-reject/${pk}/${refIndex}/`,
-
     // invite & claim
     inviteOrgUser: '/users/invite-org-user/',
     organizationMemberships: '/users/organization-memberships/',

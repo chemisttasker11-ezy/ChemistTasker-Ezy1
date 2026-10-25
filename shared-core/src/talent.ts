@@ -1,3 +1,11 @@
+import { getExplorerPosts } from './domains/talent/api';
+import { asList, camelCaseKeysDeep } from './utils/serialization';
+
+export async function getExplorerPostForEditing() {
+  const posts = asList(await getExplorerPosts({ mine: true }));
+  return posts.length ? camelCaseKeysDeep(posts[0]) : null;
+}
+
 export type TalentPage<T> = T[] | { count?: number; results?: T[] };
 
 export type TalentPublishingUser = {
