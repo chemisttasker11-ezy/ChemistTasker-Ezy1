@@ -1,0 +1,2920 @@
+[
+ {
+  "area": "1 Tenancy, permissions, auth",
+  "items": [
+   {
+    "id": "B03",
+    "severity": "P0",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Removing staff cascades historical chat messages",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [],
+    "test": "",
+    "fixed_in_pr201": false
+   },
+   {
+    "id": "B07",
+    "severity": "P0",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Scoped admins can manage out-of-scope calendar items",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [],
+    "test": "",
+    "fixed_in_pr201": true
+   },
+   {
+    "id": "B16",
+    "severity": "P0",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Pharmacy Admin update bypasses management privilege",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/organizations/views.py:301",
+     "backend/organizations/views.py:384",
+     "backend/organizations/views.py:416",
+     "backend/organizations/access.py:26",
+     "backend/organizations/serializers.py:611",
+     "backend/organizations/serializers.py:628",
+     "backend/organizations/serializers.py:637",
+     "backend/organizations/urls.py:29"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": false
+   },
+   {
+    "id": "B17",
+    "severity": "P0",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Chain update can attach foreign pharmacy and affect membership deletion",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/organizations/serializers.py:585",
+     "backend/organizations/serializers.py:588",
+     "backend/organizations/views.py:604",
+     "backend/organizations/views.py:679",
+     "backend/organizations/views.py:724",
+     "backend/organizations/views.py:733",
+     "backend/shifts/candidates.py:269",
+     "shared-core/src/domains/organizations/api.ts:150"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B33",
+    "severity": "P0",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "InvoiceListView.perform_create stamps the caller but accepts arbitrary pharmacy, status, issuer and recipient snapshots via writable InvoiceSerializer. This lets an authenticated unrelated user create a self-authored SENT/PAID invoice referencing a foreign pharmacy, then it is eligible for that pharmacy manager's received-invoice queryset.",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [],
+    "test": "",
+    "fixed_in_pr201": true
+   },
+   {
+    "id": "B35",
+    "severity": "P0",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "SOURCE-FINDING",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/roster/views.py:44-62",
+     "backend/workforce/roster/views.py:89-94",
+     "backend/workforce/roster/serializers.py:36-59",
+     "backend/workforce/roster/urls.py:37",
+     "backend/shifts/models.py:328-345",
+     "backend/shifts/models.py:523-525"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": false
+   },
+   {
+    "id": "B36",
+    "severity": "P0",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "SOURCE-FINDING",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [],
+    "test": "",
+    "fixed_in_pr201": true
+   },
+   {
+    "id": "F03-N1",
+    "severity": "P0",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "A staff member whose admin role was removed can give it back to themselves by accepting it as a pending admin invitation.",
+    "status": "CONFIRMED_SOURCE + RUNTIME_REPRODUCED",
+    "evidence": [
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/organizations/views.py#L313-L361",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/organizations/views.py#L586-L592",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/client_profile/test_admin_invitations.py#L31-L92"
+    ],
+    "test": "Owner removes the admin role of an accepted staff member; that member's GET my-pending-invitations must be empty and POST accept-invitation on the old record must return 404 and leave the role switched off.",
+    "fixed_in_pr201": true
+   },
+   {
+    "id": "F04-N1",
+    "severity": "P0",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Any worker who can see a shift can download the staff list of that pharmacy, or of its whole organisation, through the shift's member-status page.",
+    "status": "CONFIRMED_SOURCE + RUNTIME_REPRODUCED",
+    "evidence": [
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/base.py#L114-L172",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/lifecycle.py#L285-L295",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/lifecycle.py#L384-L399",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/candidates.py#L212-L292",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/candidates.py#L446-L469"
+    ],
+    "test": "Sara (pharmacist, no membership at Tom's pharmacy) calls GET /api/v1/shifts/<Tom's PLATFORM shift>/member_status/?visibility=FULL_PART_TIME (and ?visibility=ORG_CHAIN on an org pharmacy shift) and must get 403/404, not Omar's row.",
+    "fixed_in_pr201": true
+   },
+   {
+    "id": "F04-N2",
+    "severity": "P0",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Editing a shift can move it into another owner's pharmacy and overwrite that pharmacy's saved pay rates.",
+    "status": "CONFIRMED_SOURCE + RUNTIME_REPRODUCED",
+    "evidence": [
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/base.py#L114-L135",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L42-L52",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L97-L110",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L138-L187",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L330-L351",
+     "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L142-L200"
+    ],
+    "test": "Tom sends PATCH /api/v1/shifts/<his shift>/ with {\"pharmacy\": <another org's pharmacy>, \"apply_rates_to_pharmacy\": true, \"role_needed\": \"PHARMACIST\"} and must get 400/403, and the shift's pharmacy and the other pharmacy's rates must be unchanged.",
+    "fixed_in_pr201": true
+   },
+   {
+    "id": "B19",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Invite links can be retargeted; removal may cascade applications",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/memberships/views.py:189-222",
+     "backend/memberships/serializers.py:265-269",
+     "backend/memberships/selectors.py:124-150",
+     "backend/memberships/models.py:211-216",
+     "backend/memberships/models.py:246",
+     "backend/memberships/serializers.py:532",
+     "shared-core/src/domains/memberships/api.ts:38-41"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B30",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Established notification WebSocket stays subscribed to user group after logout, user deactivation or credential revocation; consumer sends notification and message badge events without checking current account/session eligibility.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/notifications/consumers.py:12",
+     "backend/notifications/consumers.py:34",
+     "backend/notifications/services.py:31",
+     "backend/notifications/services.py:73",
+     "backend/chat/realtime.py:24",
+     "backend/users/jwt_ws.py:28",
+     "backend/users/api_auth.py:155",
+     "backend/users/api_account.py:76",
+     "frontend_web/src/layouts/TopBarActions.tsx:677",
+     "backend/notifications/test_websocket.py:24"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B37",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "SOURCE-FINDING",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/roster/urls.py:38",
+     "backend/workforce/roster/views.py:533",
+     "backend/workforce/roster/views.py:546",
+     "backend/workforce/roster/views.py:606",
+     "backend/workforce/roster/serializers.py:20",
+     "backend/workforce/roster/serializers.py:49",
+     "backend/workforce/roster/serializers.py:75",
+     "backend/memberships/serializers.py:82",
+     "backend/memberships/serializers.py:246",
+     "backend/attendance_tests/test_roster_worker_actions.py:521"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C023-N2",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Work notes and calendar events can be moved into, or attached to, a pharmacy or organisation the person has no rights over.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/team_calendar/views.py:154",
+     "backend/team_calendar/views.py:377",
+     "backend/team_calendar/serializers.py:61",
+     "backend/team_calendar/serializers.py:78",
+     "backend/team_calendar/serializers.py:119",
+     "backend/team_calendar/views.py:241",
+     "backend/team_calendar/views.py:217",
+     "backend/team_calendar/models.py:66",
+     "backend/team_calendar/tasks.py:303"
+    ],
+    "test": "A staff member PATCHes a work note with another pharmacy's id (expect 403 or no change); an owner POSTs an event with own pharmacy plus a foreign organisation (expect 403)",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C024-N1",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Password-reset links are copied into the user's in-app notifications, so anyone holding a signed-in session can take over the account without email access.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/users/api_passwords.py:60",
+     "backend/users/api_passwords.py:70",
+     "backend/users/tasks.py:65",
+     "backend/users/tasks.py:80",
+     "backend/users/tasks.py:189",
+     "backend/notifications/services.py:80",
+     "backend/notifications/views.py:31",
+     "backend/users/api_passwords.py:43",
+     "frontend_web/src/layouts/TopBarActions.tsx:740"
+    ],
+    "test": "POST password-reset/ for a known user, then assert that no Notification for that user has an action_url (or payload) containing the uid/token reset path.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C041-N3",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Editing chain details removes its pharmacy links",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:159",
+     "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:166",
+     "shared-core/src/domains/organizations/api.ts:150",
+     "backend/organizations/views.py:595",
+     "backend/organizations/serializers.py:585",
+     "backend/core/serializer_lifecycle.py:157",
+     "backend/shifts/candidates.py:263"
+    ],
+    "test": "Create a chain with two pharmacies, submit the web form's multipart PUT changing only its email, and verify both pharmacy links remain.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C071-N2",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_mobile/context/AuthContext.tsx:502",
+     "frontend_mobile/context/AuthContext.tsx:527",
+     "shared-core/src/domains/auth/api.ts:14",
+     "backend/users/urls.py:26",
+     "backend/users/api_auth.py:159",
+     "backend/notifications/services.py:91",
+     "backend/notifications/views.py:67",
+     "backend/notifications/test_api.py:91",
+     "backend/users/test_account_security_contract.py:324"
+    ],
+    "test": "Register an Expo push token while Sara is logged in. Sign out through native app. Trigger a new private message/notification for Sara; assert DeviceToken is inactive or removed and no push sent. Log in as Tom and confirm token belongs only to Tom. Server logout should revoke current device independently of client network reliability.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C074-N1",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Next marketplace and publishing workspaces can display the previous account's private stock, messages or unpublished drafts after cross-tab login.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/landing_next/shared/session-provider.tsx:11",
+     "frontend_web/landing_next/shared/session-provider.tsx:14",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:27",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:85",
+     "frontend_web/landing_next/features/marketplace/workspace.tsx:15",
+     "frontend_web/landing_next/features/marketplace/workspace.tsx:26",
+     "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:14",
+     "frontend_web/landing_next/app/content/workspace.tsx:25",
+     "frontend_web/landing_next/app/content/workspace.tsx:76",
+     "backend/public_hub/content_views.py:39"
+    ],
+    "test": "Two unrelated owner accounts A/B with separate ethical inventories, goods listings and exchanges. Open A's private pages in tab1, log in as B in tab2 while tab1 remains mounted; simulate slow B getAccess and 403/error, and delay old A promises to finish last. Assert tab1 never renders A names, stock levels or messages once B is authenticated; confirm B sees only permitted data on success and old rows are purged immediately on session change. Repeat with same-tab account switch and logout/reauth. Add publisher A and unrelated user B: open A content workspace and moderation queue in tab1, sign in B in tab2; tab1 must purge all A drafts immediately, while B's server requests are denied. Validate child GoodsExchangeManager rows update when initial data changes instead of using stale initial state.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F01-N1",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Workers browsing shifts can see the names and emails of other workers who are booked on the shift or waiting for payment.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/base.py:113",
+     "backend/shifts/browse.py:428",
+     "backend/shifts/lifecycle.py:393",
+     "backend/shifts/serialization/shifts.py:190",
+     "backend/shifts/serialization/shifts.py:434",
+     "backend/shifts/serialization/shifts.py:464",
+     "backend/shifts/serialization/offers.py:215",
+     "backend/shifts/serialization/projections.py:87"
+    ],
+    "test": "As Sara (unrelated locum), GET /public-shifts/ and /shifts/{id}/ for a shift where Ben is assigned and Omar is awaiting payment; assert no slot_assignments or payment_options entries and no worker email appear.",
+    "fixed_in_pr201": false,
+    "ui_visible": false
+   },
+   {
+    "id": "F03-N2",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "When the owner removes a staff member who is also a pharmacy admin, their admin rights stay on, but when they quit themselves the rights are switched off.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/memberships/urls.py:21",
+     "backend/memberships/access.py:64",
+     "backend/memberships/views.py:112",
+     "backend/memberships/views.py:494",
+     "backend/organizations/models.py:400",
+     "backend/organizations/access.py:33",
+     "backend/organizations/views.py:386",
+     "frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:144",
+     "frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:148",
+     "backend/memberships/test_membership_workflows_contract.py:315"
+    ],
+    "test": "Owner sends DELETE on an admin's staff membership; afterwards that user must fail the manage-staff and manage-roster checks for the pharmacy and must be missing from the active admin list.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F03-N3",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Re-inviting someone who left as an admin brings back their old admin role the moment they accept a plain staff invitation.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/memberships/views.py:494",
+     "backend/memberships/invites.py:123",
+     "backend/memberships/invites.py:163",
+     "backend/memberships/serializers.py:246",
+     "backend/memberships/views.py:447",
+     "backend/organizations/access.py:33",
+     "backend/organizations/models.py:366"
+    ],
+    "test": "An admin quits; the owner re-invites them as ASSISTANT; they accept; their old admin record must stay switched off.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F05-N3",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Nothing checks that the person confirming an offer holds the role the shift needs, so a technician or intern can be booked into a pharmacist shift.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/base.py:233",
+     "backend/shifts/assignment.py:95",
+     "backend/onboarding/verification/state.py:153",
+     "backend/shifts/interest.py:61",
+     "backend/shifts/offers.py:354",
+     "backend/shifts/engagement.py:528",
+     "backend/shifts/engagement.py:580",
+     "backend/shifts/engagement.py:444",
+     "backend/shifts/finalize.py:79",
+     "backend/shifts/models.py:523"
+    ],
+    "test": "Tom accept_users Ali (OTHER_STAFF, role_type TECHNICIAN, verified, no AHPRA) on a PLATFORM shift with role_needed=PHARMACIST; Ali's offer accept must be refused, and no ShiftSlotAssignment may be created.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F09-N1",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Deleting a restricted Hub group exposes its posts to the whole pharmacy.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx:421",
+     "backend/pharmacy_hub/groups.py:153",
+     "backend/pharmacy_hub/models.py:143",
+     "backend/pharmacy_hub/posts.py:234",
+     "backend/pharmacy_hub/scoping.py:156",
+     "backend/pharmacy_hub/access.py:362",
+     "backend/pharmacy_hub/serialization/posts.py:366",
+     "backend/public_hub/attachment_access.py:25"
+    ],
+    "test": "Delete Tom's restricted group containing a post, comment and attachment, then fetch the pharmacy feed as Mia, who was never a group member; verify none of that content becomes accessible.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F09-N2",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Removed Hub group members still receive new private comment text.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/pharmacy_hub/serialization/groups.py:189",
+     "backend/pharmacy_hub/access.py:271",
+     "backend/pharmacy_hub/access.py:357",
+     "backend/pharmacy_hub/urls.py:58",
+     "backend/pharmacy_hub/posts.py:385",
+     "backend/pharmacy_hub/posts.py:440",
+     "backend/pharmacy_hub/notifications.py:50",
+     "backend/notifications/services.py:94",
+     "backend/pharmacy_hub/test_hub_scope_contract.py:697"
+    ],
+    "test": "Remove Omar from a restricted group, confirm his post access is denied, then add Mia's comment to his old post and verify no notification or push containing that comment is delivered to Omar.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F09-N4",
+    "severity": "P1",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Users without pharmacy memberships can overwrite or delete each other's Hub polls.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/pharmacy_hub/access.py:338",
+     "backend/pharmacy_hub/polls.py:137",
+     "backend/pharmacy_hub/polls.py:143",
+     "backend/pharmacy_hub/polls.py:153",
+     "backend/pharmacy_hub/polls.py:160",
+     "backend/pharmacy_hub/serialization/polls.py:128",
+     "backend/pharmacy_hub/serialization/polls.py:150",
+     "backend/pharmacy_hub/serialization/polls.py:257",
+     "backend/pharmacy_hub/urls.py:35"
+    ],
+    "test": "Create Sara's public Hub poll with no author membership and existing votes, then PATCH its choices as Zoe without a membership; expect 403 and unchanged choices and votes.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C011-N2",
+    "severity": "P2",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Revoked invitation sender continues receiving membership response notifications containing staff identities.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/memberships/notifications.py:73",
+     "backend/memberships/notifications.py:145",
+     "backend/memberships/notifications.py:152",
+     "backend/memberships/notifications.py:175",
+     "backend/memberships/views.py:452",
+     "backend/memberships/views.py:499",
+     "backend/notifications/services.py:76",
+     "backend/memberships/test_membership_workflows_contract.py:493"
+    ],
+    "test": "After revoking Lina's organisation/pharmacy authority, make Sara accept/leave. Lina receives no email or in-app notification; valid managers still receive it.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C012-N1",
+    "severity": "P2",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Authenticated workers can create applications against expired or unauthorised invitation links by calling the generic applications endpoint.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/memberships/urls.py:30",
+     "backend/memberships/views.py:310",
+     "backend/memberships/views.py:317",
+     "backend/memberships/serializers.py:383",
+     "backend/memberships/serializers.py:413",
+     "backend/memberships/serializers.py:526",
+     "backend/memberships/views.py:261",
+     "backend/memberships/models.py:308",
+     "backend/memberships/selectors.py:197"
+    ],
+    "test": "As unrelated authenticated Sara, POST /api/v1/membership-applications/ with a valid old or disabled invite_link integer, matching her email/DOB/role. Expect refusal and zero application creation; valid UUID magic-link flow must succeed.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C071-N1",
+    "severity": "P2",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Concurrent mobile logout and in-flight refresh/profile hydration can resurrect old tokens or overwrite the newly signed-in account.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_mobile/context/AuthContext.tsx:163",
+     "frontend_mobile/context/AuthContext.tsx:170",
+     "frontend_mobile/context/AuthContext.tsx:191",
+     "frontend_mobile/context/AuthContext.tsx:275",
+     "frontend_mobile/context/AuthContext.tsx:443",
+     "frontend_mobile/context/AuthContext.tsx:523",
+     "frontend_mobile/utils/authSession.ts:217",
+     "frontend_mobile/utils/authSession.ts:268",
+     "frontend_mobile/utils/apiClient.ts:43"
+    ],
+    "test": "Defer initial /me success and refresh response; logout or log in as another user before resolving each. Assert no old /me user or refresh token persisted, no old API Authorization and role home remains intended. Repeat native and Expo-web cases, including refresh failures and storage/network exceptions.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F11-N1",
+    "severity": "P2",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Changing a pending phone number leaves the previous number's verification code usable.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/onboarding/views.py:293",
+     "backend/users/permissions.py:71",
+     "backend/onboarding/serializers.py:825",
+     "backend/onboarding/serializers.py:969",
+     "backend/onboarding/services/basic.py:159",
+     "backend/core/serializer_lifecycle.py:129",
+     "backend/users/otp.py:20",
+     "backend/users/api_otp.py:463",
+     "backend/users/api_otp.py:470"
+    ],
+    "test": "Issue a phone code for Zoe's number, change her phone through the onboarding update to Tom's number, then submit the original code and assert that Tom's number remains unverified.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F11-N3",
+    "severity": "P2",
+    "area": "1 Tenancy, permissions, auth",
+    "title": "Phone verification replaces a browser-only session with a persistent 90-day session.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/login.tsx:60",
+     "backend/users/api_auth.py:109",
+     "backend/users/serializers.py:365",
+     "frontend_web/src/pages/MobileOTPVerify.tsx:79",
+     "backend/users/api_otp.py:477",
+     "backend/users/api_otp.py:489",
+     "backend/users/sessions.py:43",
+     "backend/core/settings.py:495",
+     "frontend_web/src/contexts/AuthContext.tsx:217",
+     "backend/users/tests.py:76"
+    ],
+    "test": "Log Sara in with remember_me=false, complete phone verification, and assert that the replacement auth cookies remain session cookies rather than gaining a persistent expiry.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   }
+  ]
+ },
+ {
+  "area": "2 Shifts, booking, payments",
+  "items": [
+   {
+    "id": "B10",
+    "severity": "P0",
+    "area": "2 Shifts, booking, payments",
+    "title": "Multi-offer Pills spend uses one shift-wide ledger key; concurrency risk",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/rewards/views.py:215",
+     "backend/rewards/views.py:218",
+     "backend/rewards/services.py:366",
+     "backend/rewards/services.py:139",
+     "backend/rewards/services.py:144",
+     "backend/rewards/models.py:177"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B43",
+    "severity": "P0",
+    "area": "2 Shifts, booking, payments",
+    "title": "P0 candidate — Password reset does not invalidate previously issued JWT refresh tokens",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [
+     "backend/users/api_passwords.py:43-56",
+     "backend/users/api_auth.py:115-152",
+     "backend/users/serializers.py:515-544",
+     "backend/core/settings.py:490-502"
+    ],
+    "test": "Change user's password via valid reset token; old refresh token must reject 401/403 and produce no new access token; verify old access token expiry/revocation policy and normal new login positive control.",
+    "fixed_in_pr201": false
+   },
+   {
+    "id": "B08",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Region Admin notified about unrelated pharmacy shifts",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/base.py:196",
+     "backend/shifts/interest.py:148",
+     "backend/shifts/notifications.py:51",
+     "backend/notifications/services.py:74",
+     "backend/organizations/access.py:165",
+     "backend/shifts/test_access_escalation_contract.py:50"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B09",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Shift escalation depends on reads and omits audience notification",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/base.py:153",
+     "backend/shifts/base.py:179",
+     "backend/shifts/escalation.py:61",
+     "backend/shifts/escalation.py:81",
+     "backend/core/celery.py:11",
+     "backend/workforce/signals.py:139",
+     "backend/shifts/test_access_escalation_contract.py:141"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B14",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Legacy casual award figures and incomplete future holiday data",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/data/public_holidays.json:2",
+     "backend/shifts/pricing.py:47",
+     "backend/shifts/pricing.py:54",
+     "backend/shifts/pricing.py:402",
+     "backend/shifts/data/award_rates_casual_first_level.json:5",
+     "backend/shifts/data/README.md:10"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B20",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Interest/rejection mutation can target a different shift",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/urls.py:48",
+     "backend/shifts/offers.py:43",
+     "backend/shifts/offers.py:98",
+     "backend/shifts/serialization/interests.py:20",
+     "backend/shifts/serialization/interests.py:123",
+     "backend/shifts/models.py:433",
+     "backend/shifts/models.py:580"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B21",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Cover request scope differs from assignment scope",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/serialization/worker_requests.py:13-30",
+     "backend/shifts/serialization/worker_requests.py:77-90",
+     "backend/shifts/worker_requests.py:225-253",
+     "backend/shifts/worker_requests.py:365-387",
+     "backend/workforce/roster/worker_actions.py:349-379"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B38",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "SOURCE-FINDING",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/roster/urls.py:39",
+     "backend/workforce/roster/views.py:150",
+     "backend/workforce/roster/views.py:207",
+     "backend/workforce/roster/slot_edit.py:61",
+     "backend/shifts/models.py:328",
+     "backend/shifts/models.py:523",
+     "backend/workforce/tests/test_roster_slot_http_contract.py:324"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B41",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 candidate — Pending/rejected membership can be treated as private shift audience",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/browse.py:111",
+     "backend/shifts/lifecycle.py:317",
+     "backend/shifts/announcements.py:29",
+     "backend/shifts/serialization/shifts.py:189",
+     "backend/memberships/invites.py:149",
+     "backend/memberships/serializers.py:62",
+     "backend/memberships/views.py:84",
+     "backend/memberships/access.py:63",
+     "backend/shifts/urls.py:30",
+     "backend/memberships/test_membership_workflows_contract.py:102"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B45",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 candidate — Incomplete referee questionnaire can be counted as a verified reference",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/onboarding/urls.py:36",
+     "backend/onboarding/models.py:703",
+     "backend/onboarding/serializers.py:179",
+     "backend/onboarding/views.py:55",
+     "backend/onboarding/views.py:98",
+     "backend/onboarding/views.py:139",
+     "backend/onboarding/verification/policy.py:36",
+     "backend/client_profile/test_request_validation.py:103"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B48",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 candidate: Pharmacy Hub mention validation can deliver confidential private post text to ineligible locum or non-accepted members",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/pharmacy_hub/urls.py:59",
+     "backend/pharmacy_hub/serialization/posts.py:265",
+     "backend/pharmacy_hub/serialization/posts.py:292",
+     "backend/pharmacy_hub/posts.py:255",
+     "backend/pharmacy_hub/posts.py:120",
+     "backend/pharmacy_hub/posts.py:168",
+     "backend/pharmacy_hub/access.py:184",
+     "backend/notifications/services.py:80",
+     "backend/pharmacy_hub/test_api.py:76",
+     "backend/pharmacy_hub/test_hub_scope_contract.py:591"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B50",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 candidate — Active but non-accepted pharmacy membership can read community-chat last-message previews",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/chat/urls.py:9",
+     "backend/chat/views.py:85",
+     "backend/chat/serializers.py:174",
+     "backend/chat/views.py:606",
+     "backend/memberships/selectors.py:58",
+     "backend/memberships/serializers.py:64",
+     "backend/memberships/views.py:97",
+     "backend/chat/test_api.py:175",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx:121"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B53",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 candidate — Out-of-order Stripe subscription events may reactivate cancelled base billing or reset purchased seat entitlement",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/billing/urls.py:14",
+     "backend/billing/views.py:822",
+     "backend/billing/views.py:830",
+     "backend/billing/views.py:903",
+     "backend/billing/views.py:914",
+     "backend/billing/views.py:929",
+     "backend/billing/views.py:974",
+     "backend/billing/views.py:637"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B54",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P0-impact / P1 candidate — Two worker confirmations can reserve and pay for the same slot; a paid losing offer can appear ACCEPTED without an assignment",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/assignment.py:50-51",
+     "backend/shifts/assignment.py:61-66",
+     "backend/shifts/assignment.py:209-230",
+     "backend/shifts/offers.py:337-342",
+     "backend/shifts/offers.py:395-417",
+     "backend/shifts/finalize.py:43-44",
+     "backend/shifts/finalize.py:98-100",
+     "backend/billing/views.py:329-357",
+     "backend/billing/views.py:571-582",
+     "backend/billing/views.py:665",
+     "backend/billing/views.py:864-871"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B55",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 candidate — Concurrent approval of *unlinked* cover request publishes multiple paid vacancies",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/urls.py:54",
+     "backend/shifts/worker_requests.py:34",
+     "backend/shifts/worker_requests.py:225",
+     "backend/shifts/worker_requests.py:254",
+     "backend/shifts/worker_requests.py:268",
+     "backend/shifts/worker_requests.py:278",
+     "backend/shifts/worker_requests.py:365",
+     "backend/shifts/models.py:883",
+     "backend/workforce/roster/worker_actions.py:340",
+     "backend/attendance_tests/test_roster_worker_actions_deterministic.py:302",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:598"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B57",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 conditional — Refund provider events are acknowledged without reversing/reconciling local paid financial state",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/billing/urls.py:14",
+     "backend/billing/views.py:848",
+     "backend/billing/views.py:888",
+     "backend/billing/views.py:944",
+     "backend/billing/views.py:955",
+     "backend/billing/views.py:989",
+     "backend/billing/models.py:78",
+     "backend/billing/tests.py:25"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B62",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 candidate — A Region Admin with communication-only privileges can manage shift operations despite missing roster capability",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/organizations/access.py:165",
+     "backend/shifts/base.py:128",
+     "backend/shifts/serialization/shifts.py:304",
+     "backend/shifts/description_templates.py:40",
+     "backend/shifts/lifecycle.py:292",
+     "backend/users/org_roles.py:91",
+     "backend/users/org_roles.py:169",
+     "backend/workforce/permissions.py:38",
+     "backend/workforce/tests/test_roster_admin_capabilities.py:42",
+     "backend/billing/tests.py:217",
+     "backend/shifts/urls.py:43"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B66",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 money-calculation candidate: overnight assignment produces negative cancellation wage and falsely skips penalty",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [],
+    "test": "",
+    "fixed_in_pr201": false
+   },
+   {
+    "id": "B67",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 booking/financial-evidence candidate: generic shift-offer DELETE bypasses state-machine transitions",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/urls.py:50",
+     "backend/shifts/offers.py:156",
+     "backend/shifts/offers.py:162",
+     "backend/shifts/offers.py:395",
+     "backend/shifts/offers.py:615",
+     "backend/shifts/models.py:506",
+     "backend/billing/views.py:573",
+     "shared-core/src/domains/shifts/api.ts:106",
+     "backend/client_profile/test_characterization_shift_offers.py:27"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B68",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 conditional accounting/entitlement candidate: unrelated Stripe subscription invoice can activate local customer entitlement",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [],
+    "test": "",
+    "fixed_in_pr201": false
+   },
+   {
+    "id": "B69",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 conditional duplicate-charge candidate: cancellation penalty has no durable cancellation obligation or paid-once guard",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [],
+    "test": "",
+    "fixed_in_pr201": false
+   },
+   {
+    "id": "B70",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1/P0-impact candidate: repeated base or extra-seat checkout can create two independent recurring Stripe subscriptions",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [],
+    "test": "",
+    "fixed_in_pr201": false
+   },
+   {
+    "id": "C020-N3",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Recurring vacancies disappear from worker boards after their starting date",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/posting.py:48",
+     "backend/shifts/posting.py:116",
+     "backend/shifts/pricing.py:444",
+     "backend/shifts/browse.py:75",
+     "backend/shifts/browse.py:440",
+     "backend/shifts/browse.py:565",
+     "backend/shifts/urls.py:63",
+     "backend/shifts/test_shift_listing_contract.py:140"
+    ],
+    "test": "Create an unassigned recurring slot starting yesterday with a future occurrence and assert it remains discoverable on worker boards.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C020-N6",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Confirming one recurring date books dates outside the accepted terms",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/serialization/offers.py:99",
+     "backend/shifts/counter_offers.py:163",
+     "backend/shifts/counter_offers.py:188",
+     "backend/shifts/engagement.py:268",
+     "backend/shifts/offers.py:360",
+     "backend/shifts/offers.py:405",
+     "backend/shifts/finalize.py:35",
+     "backend/shifts/finalize.py:39",
+     "backend/shifts/finalize.py:79",
+     "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:129"
+    ],
+    "test": "Confirm an offer targeting one recurring occurrence and assert no assignments exist for any other occurrence.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C021-N5",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Shift lifecycle filters compare pharmacy clock times with UTC.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/core/settings.py:449",
+     "backend/shifts/lifecycle.py:148",
+     "backend/shifts/selectors.py:20",
+     "backend/shifts/my_shifts.py:20",
+     "backend/shifts/lifecycle.py:81",
+     "backend/shifts/serialization/shifts.py:403",
+     "backend/shifts/test_shift_listing_contract.py:20",
+     "backend/shifts/urls.py:40"
+    ],
+    "test": "Freeze time at 20:00 Sydney time for a same-day 17:00 finish and assert the shift is excluded from upcoming and active results.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C021-N6",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Named public shifts disclose internal pharmacy document links.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/lifecycle.py:393",
+     "backend/shifts/serialization/shifts.py:54",
+     "backend/shifts/serialization/shifts.py:193",
+     "backend/organizations/serializers.py:76",
+     "backend/organizations/serializers.py:139",
+     "backend/organizations/serializers.py:289",
+     "backend/shifts/serialization/projections.py:134",
+     "backend/shifts/urls.py:43"
+    ],
+    "test": "Retrieve a named public shift as unrelated Sara and assert pharmacy procedure, protocol, and induction document links are absent.",
+    "fixed_in_pr201": false,
+    "ui_visible": false
+   },
+   {
+    "id": "C027-N1",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Replacement approval keeps the departing worker's payment terms",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/roster/validation.py:31",
+     "backend/shifts/models.py:328",
+     "backend/workforce/roster/worker_actions.py:179",
+     "backend/workforce/roster/worker_actions.py:300",
+     "backend/workforce/roster/assignment_rates.py:11",
+     "backend/shifts/pricing.py:392",
+     "backend/workforce/roster/serializers.py:105",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:1227"
+    ],
+    "test": "Attempt to replace Omar's payroll assignment with Ben's locum membership; verify approval cannot transfer Omar's employment snapshot to Ben.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C032-N1",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Editing a shift description breaks its pending offers.",
+    "status": "CONFIRMED_SOURCE_ALIAS",
+    "evidence": [
+     "shared-core/src/domains/shifts/postingDraft.ts:46",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+     "backend/shifts/posting.py:189",
+     "backend/shifts/models.py:680",
+     "backend/shifts/offers.py:351"
+    ],
+    "test": "Create a pending offer for Sara with single_user_only=false, submit the description-edit payload, and assert its original slot remains linked and accept succeeds.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C041-N2",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Jobs without dated slots never load internal candidates",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/test_shift_posting_contract.py:363",
+     "backend/shifts/lifecycle.py:54",
+     "backend/shifts/interest.py:103",
+     "backend/shifts/candidates.py:233",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:45",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:196"
+    ],
+    "test": "Open a single-worker full-time job with no dated slots and an interested internal member; verify that member appears and can be reviewed.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C044-N1",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "A cancelled shift replacement can delete the original shift after an unrelated posting.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:553",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:852",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:866",
+     "backend/workforce/roster/views.py:137",
+     "backend/workforce/roster/views.py:32"
+    ],
+    "test": "Cancel conversion of Omar's shift, create a separate open shift without leaving the roster page, and assert Omar's original shift and assignment remain.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C045-N2",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Staff on the worker roster can see coworkers' leave type and private leave notes.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/roster/urls.py:38",
+     "backend/workforce/roster/views.py:552",
+     "backend/workforce/roster/serializers.py:77",
+     "backend/workforce/roster/serializers.py:138",
+     "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:410",
+     "frontend_web/src/pages/dashboard/sidebar/RosterWorkerDialogs.tsx:247"
+    ],
+    "test": "As Ali, GET the worker roster for Tom's pharmacy where Omar has a leave request; assert leave_request has no note or leave_type for Omar's assignment.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C078-N2",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Editing a shift silently replaces custom date rates with calculated rates",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/shared/postShift/PostShiftForm.tsx:238",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:241",
+     "frontend_web/shared/postShift/useShiftPricing.ts:47",
+     "frontend_web/shared/postShift/useShiftPricing.ts:105",
+     "shared-core/src/domains/shifts/draftSlots.ts:36",
+     "shared-core/src/domains/shifts/postingDraft.ts:46",
+     "backend/shifts/posting.py:189"
+    ],
+    "test": "Load a shift with a saved date rate above its guide rate, allow pricing to finish, change only the description, and assert the saved date rate remains unchanged.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C078-N3",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Saving a partially filled shift can delete its confirmed bookings",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:733",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:175",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:230",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+     "shared-core/src/domains/shifts/api.ts:212",
+     "backend/shifts/serialization/shifts.py:407",
+     "backend/shifts/serialization/shifts.py:298",
+     "backend/shifts/posting.py:157",
+     "backend/shifts/posting.py:189",
+     "backend/shifts/models.py:472",
+     "backend/workforce/signals.py:86",
+     "backend/shifts/urls.py:43"
+    ],
+    "test": "Create a marketplace shift with one confirmed non-rostered date and one open date, edit only its description through the wizard, and assert the confirmed assignment survives.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C079-N1",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Editing a shift replaces its saved per-date rates",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/shared/postShift/PostShiftForm.tsx:239",
+     "frontend_web/shared/postShift/useShiftPricing.ts:55",
+     "frontend_web/shared/postShift/useShiftPricing.ts:106",
+     "shared-core/src/domains/shifts/postingDraft.ts:46",
+     "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+     "shared-core/src/domains/shifts/api.ts:211",
+     "backend/shifts/posting.py:157",
+     "backend/shifts/posting.py:188",
+     "shared-core/src/domains/shifts/postingDraft.test.ts:19"
+    ],
+    "test": "Load an existing shift with an $80 per-date override and a $60 calculated guide; change only its description and assert the submitted rate remains $80.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F01-N2",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Editing a shift after a worker has accepted but before payment either locks the worker into new dates they never agreed to, or takes the payment without booking anyone.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/posting.py:157",
+     "backend/shifts/posting.py:189",
+     "backend/shifts/models.py:680",
+     "backend/shifts/offers.py:615",
+     "backend/shifts/finalize.py:30",
+     "backend/shifts/finalize.py:35",
+     "backend/billing/views.py:571",
+     "backend/billing/views.py:973",
+     "backend/rewards/views.py:217",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:239"
+    ],
+    "test": "Create an offer in ACCEPTED_AWAITING_PAYMENT on a multi-slot shift, PATCH the shift with a new slots payload, then run the fulfilment webhook for that offer id; assert the edit is refused (or the offer is reset for re-confirmation) rather than the webhook failing or the worker being assigned.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F01-N3",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "A worker or manager can silently delete a shift offer, including one that is accepted and waiting for payment, so payment can be taken with nobody booked.",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [
+     "backend/shifts/offers.py:156",
+     "backend/shifts/offers.py:162",
+     "backend/shifts/offers.py:610",
+     "backend/billing/views.py:848",
+     "backend/billing/views.py:864",
+     "shared-core/src/domains/shifts/api.ts:87"
+    ],
+    "test": "As Sara, DELETE /shift-offers/{id}/ on her ACCEPTED_AWAITING_PAYMENT offer; assert 405/403 and that the offer still exists.",
+    "fixed_in_pr201": false
+   },
+   {
+    "id": "F02-N2",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Cover requests from the web and mobile worker screens are never linked to the worker's assignment, so approving one never releases the worker.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:532",
+     "frontend_mobile/app/my-roster.tsx:208",
+     "backend/shifts/models.py:845",
+     "backend/shifts/serialization/worker_requests.py:83",
+     "backend/shifts/worker_requests.py:239",
+     "backend/shifts/worker_requests.py:254",
+     "backend/shifts/worker_requests.py:294",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:602",
+     "frontend_mobile/features/parity/roster.tsx:642",
+     "backend/workforce/roster/worker_actions.py:275",
+     "backend/workforce/roster/worker_actions.py:353",
+     "backend/workforce/roster/v2_views.py:747",
+     "backend/attendance_tests/test_roster_worker_actions_deterministic.py:314"
+    ],
+    "test": "Ali has an assignment. POST /worker-shift-requests/ with the exact web payload (no 'shift'), then approve it as Tom. Assert Ali's assignment is released and no second shift is created. Today Ali stays assigned and a new LOCUM_CASUAL shift appears.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F02-N3",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "Removing or escalating an assignment from the owner roster page unbooks the worker silently, including paid marketplace bookings, and skips the attendance/leave history check.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/roster/views.py:51",
+     "backend/workforce/roster/views.py:96",
+     "backend/workforce/roster/views.py:420",
+     "backend/workforce/roster/worker_actions.py:364",
+     "backend/workforce/models.py:245",
+     "backend/attendance/models.py:249",
+     "backend/invoicing/models.py:178",
+     "backend/shifts/models.py:805",
+     "backend/workforce/tests/test_roster_escalation.py:69",
+     "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:401"
+    ],
+    "test": "Give Sara an assignment with a linked LeaveRequest or AttendanceSession. Call POST /roster-shifts/<shift>/escalate/ (or DELETE /roster-owner/<assignment>/) as Tom. Assert it is refused, or that Sara is notified and the history is kept. Today the assignment and its leave are deleted silently.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F05-N1",
+    "severity": "P1",
+    "area": "2 Shifts, booking, payments",
+    "title": "A New to pharmacy account can apply for public shifts without ever being verified, though the same profile is blocked from posting on the talent hub.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/base.py:124",
+     "backend/shifts/base.py:196",
+     "backend/shifts/browse.py:449",
+     "backend/shifts/access.py:86",
+     "backend/shifts/interest.py:40",
+     "backend/onboarding/verification/state.py:153",
+     "backend/onboarding/services/work_profile.py:5",
+     "backend/talent/views/explorer.py:147",
+     "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:279",
+     "frontend_mobile/roles/shared/shifts/PublicShiftsView.tsx:247",
+     "backend/shifts/test_shift_actions_contract.py:146"
+    ],
+    "test": "An EXPLORER user with an unverified ExplorerOnboarding (verified=False, mobile_check_skipped=True, gov_id_verified=False) posts express_interest on a PLATFORM shift with role_needed=EXPLORER and gets 403, not 201.",
+    "fixed_in_pr201": false,
+    "ui_visible": false
+   },
+   {
+    "id": "B42",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 candidate — Marketplace draft PATCH returns error after partial persistence",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/marketplace/urls.py:8",
+     "backend/marketplace/services.py:11",
+     "backend/marketplace/views.py:112",
+     "backend/marketplace/serializers.py:64",
+     "backend/marketplace/serializers.py:94",
+     "backend/marketplace/serializers.py:120",
+     "backend/marketplace/serializers.py:129",
+     "backend/marketplace/models.py:164",
+     "backend/core/settings.py:401",
+     "frontend_mobile/features/parity/marketplace.tsx:95",
+     "frontend_mobile/features/parity/marketplace.tsx:104"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B49",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 candidate — Attachment/document upload type validation trusts client-declared MIME after failed magic-byte detection",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/core/file_validation.py:60",
+     "backend/core/file_validation.py:100",
+     "backend/core/file_validation.py:109",
+     "backend/core/file_validation.py:111",
+     "backend/chat/views.py:629",
+     "backend/chat/views.py:689",
+     "backend/pharmacy_hub/scoping.py:26"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": false
+   },
+   {
+    "id": "B52",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 candidate — Expo startup trusts cached identity and role after server rejects or cannot verify account, unlike web",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_mobile/context/AuthContext.tsx:154",
+     "frontend_mobile/context/AuthContext.tsx:163",
+     "frontend_mobile/context/AuthContext.tsx:186",
+     "frontend_mobile/utils/authSession.ts:252",
+     "frontend_mobile/utils/authSession.ts:284",
+     "frontend_mobile/utils/apiClient.ts:85",
+     "frontend_mobile/utils/apiClient.ts:110",
+     "frontend_mobile/app/_layout.tsx:283",
+     "frontend_mobile/roles/owner/dashboard.tsx:91",
+     "frontend_web/src/contexts/AuthContext.tsx:216",
+     "backend/users/api_auth.py:175"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B58",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 conditional — Internal draft becomes pharmacy-visible when worker sets paid status without delivery",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/worker_finance/views.py:152",
+     "backend/worker_finance/views.py:242",
+     "backend/worker_finance/views.py:335",
+     "backend/worker_finance/services.py:760",
+     "backend/worker_finance/urls.py:8",
+     "backend/invoicing/test_integrity.py:233",
+     "frontend_web/src/pages/finance/FinanceWorkspace.tsx:354"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B60",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 concurrency candidate — Two overlapping distinct PENDING leave requests can both be approved",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/leave_service.py:235",
+     "backend/workforce/leave_service.py:299",
+     "backend/workforce/leave_service.py:329",
+     "backend/workforce/models.py:281",
+     "backend/workforce/views.py:618",
+     "backend/workforce/urls.py:47",
+     "backend/workforce/timesheet_builder.py:116",
+     "backend/workforce/tests/test_timesheets.py:145"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B61",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 user-facing accuracy candidate — Expo payroll CSV exports blanks for fields absent from the timesheet API",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_mobile/app/workforce/payroll-export.tsx:3",
+     "frontend_mobile/features/parity/workforce.tsx:198",
+     "frontend_mobile/features/parity/workforce.tsx:209",
+     "shared-core/src/domains/workforce/api.ts:32",
+     "backend/workforce/urls.py:53",
+     "backend/workforce/views.py:762",
+     "backend/workforce/views.py:770",
+     "backend/workforce/timesheet_serialization.py:36",
+     "shared-core/src/contracts/workforce.ts:88"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B65",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 scoped-information candidate — Authenticated pricing-preview endpoint lets unrelated users derive private pharmacy guide rates",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/urls.py:43",
+     "backend/shifts/base.py:114",
+     "backend/shifts/base.py:124",
+     "backend/shifts/lifecycle.py:204",
+     "backend/shifts/lifecycle.py:219",
+     "backend/shifts/lifecycle.py:275",
+     "backend/shifts/pricing.py:235",
+     "backend/shifts/rate_visibility.py:18",
+     "backend/shifts/test_rate_visibility.py:48",
+     "backend/shifts/test_shift_listing_contract.py:185"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": false
+   },
+   {
+    "id": "B71",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "P1 user-flow reliability candidate: shift offer acceptance commits before notification errors can surface to the caller",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/offers.py:378",
+     "backend/shifts/offers.py:446",
+     "backend/shifts/offers.py:460",
+     "backend/shifts/offers.py:495",
+     "backend/notifications/services.py:31",
+     "backend/notifications/services.py:88",
+     "backend/core/task_queue.py:105",
+     "backend/users/delivery.py:13"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C020-N1",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "Manual rostering allows staff to fill a pharmacist vacancy without pharmacist eligibility",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/base.py:412",
+     "backend/shifts/assignment.py:169",
+     "backend/shifts/assignment.py:175",
+     "backend/shifts/assignment.py:191",
+     "backend/shifts/engagement.py:31",
+     "backend/workforce/roster/validation.py:39",
+     "backend/workforce/roster/publication.py:53",
+     "backend/attendance_tests/test_roster_services.py:142"
+    ],
+    "test": "Manually assign accepted technician Ali to a pharmacist vacancy and assert rejection with no assignment created.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C020-N2",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "One claimed slot prevents claims on every remaining free slot",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/urls.py:30",
+     "backend/shifts/browse.py:278",
+     "backend/shifts/browse.py:336",
+     "backend/shifts/browse.py:343",
+     "backend/shifts/browse.py:351",
+     "backend/shifts/browse.py:379",
+     "backend/shifts/test_claim_eligibility.py:44",
+     "shared-core/src/domains/shifts/api.ts:469"
+    ],
+    "test": "Claim one slot in a non-single-user shift, then claim another free slot and assert success.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C020-N5",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "Accepting a valid counter offer for a vacancy without dated slots crashes",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/serialization/offers.py:17",
+     "backend/shifts/serialization/offers.py:100",
+     "backend/shifts/serialization/offers.py:163",
+     "backend/shifts/models.py:738",
+     "backend/shifts/base.py:329",
+     "backend/shifts/base.py:340",
+     "backend/shifts/counter_offers.py:139",
+     "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:285",
+     "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:452"
+    ],
+    "test": "Submit a valid slotless counter offer without slot_date, then accept it and assert a controlled successful response instead of an exception.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C027-N2",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "Coverage checks mark partly staffed intervals as fully covered",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/roster/revisions.py:85",
+     "backend/workforce/roster/revisions.py:99",
+     "backend/workforce/roster/revisions.py:142",
+     "backend/workforce/views.py:438",
+     "backend/workforce/urls.py:36",
+     "frontend_web/src/features/workforce/RosterCoveragePanel.tsx:112"
+    ],
+    "test": "Configure one pharmacist required from 09:00 to 17:00 with Omar assigned only 09:00 to 10:00; verify coverage reports a shortfall.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C039-N2",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "Shared shift landing redirect produces non-existent dashboard routes for non-standard roles",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/SharedShiftLandingPage.tsx:246",
+     "frontend_web/src/main.tsx:151",
+     "frontend_web/src/main.tsx:240",
+     "frontend_web/src/main.tsx:310",
+     "frontend_web/src/main.tsx:589"
+    ],
+    "test": "Assert that an authenticated user with role ORG_STAFF or PHARMACY_MANAGER navigating to /shifts/link?token=... is not redirected to a non-existent route resulting in a 404 error.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C041-N1",
+    "severity": "P2",
+    "area": "2 Shifts, booking, payments",
+    "title": "Accepting one date hides the remaining dates of a counter offer",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/counter_offers.py:131",
+     "backend/shifts/counter_offers.py:143",
+     "backend/shifts/counter_offers.py:29",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:28",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:56",
+     "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Dialogs/CounterOfferDialog.tsx:101"
+    ],
+    "test": "Submit one counter offer covering two independently filled dates, accept only the first, then verify the second remains reviewable and acceptable after reload.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   }
+  ]
+ },
+ {
+  "area": "3 Billing and Stripe",
+  "items": [
+   {
+    "id": "B01",
+    "severity": "P0",
+    "area": "3 Billing and Stripe",
+    "title": "Subscriber discount omitted from shift checkout",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/billing/views.py:635",
+     "backend/billing/views.py:641",
+     "backend/billing/views.py:648",
+     "backend/billing/views.py:664",
+     "frontend_web/landing_next/migrated/pages/PricingPage.tsx:151",
+     "frontend_web/src/pages/PricingPage.tsx:245"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B04",
+    "severity": "P0",
+    "area": "3 Billing and Stripe",
+    "title": "Empty and duplicate shift checkout sessions possible",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/billing/views.py:571",
+     "backend/billing/views.py:583",
+     "backend/billing/views.py:665",
+     "backend/billing/views.py:689",
+     "backend/billing/views.py:848",
+     "backend/billing/views.py:329",
+     "shared-core/src/domains/billing/api.ts:48"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B15",
+    "severity": "P0",
+    "area": "3 Billing and Stripe",
+    "title": "Penalty payment webhook can finalise unrelated offers",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [],
+    "test": "",
+    "fixed_in_pr201": true
+   },
+   {
+    "id": "B02",
+    "severity": "P1",
+    "area": "3 Billing and Stripe",
+    "title": "Purchased extra seats cannot subsequently be adjusted",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/billing/urls.py:9",
+     "backend/billing/views.py:506",
+     "backend/billing/views.py:823",
+     "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:187",
+     "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:438"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C004-N2",
+    "severity": "P1",
+    "area": "3 Billing and Stripe",
+    "title": "A shift checkout without selected offers charges one fee but confirms every worker waiting for payment.",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [
+     "backend/billing/views.py:665",
+     "backend/billing/views.py:334",
+     "backend/billing/views.py:346",
+     "backend/billing/views.py:583",
+     "backend/billing/views.py:864"
+    ],
+    "test": "Shift with 3 awaiting offers on 3 slots: POST charge-fulfillment with {} and expect a 400 or quantity 3, not quantity 1 that finalizes 3.",
+    "fixed_in_pr201": false
+   },
+   {
+    "id": "F07-N2",
+    "severity": "P1",
+    "area": "3 Billing and Stripe",
+    "title": "Marking an invoice paid leaves its balance and cash worksheet unchanged.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/finance/FinanceWorkspace.tsx:354",
+     "backend/worker_finance/views.py:243",
+     "backend/worker_finance/views.py:498",
+     "backend/worker_finance/services.py:810",
+     "backend/worker_finance/services.py:835",
+     "backend/worker_finance/views.py:634",
+     "backend/worker_finance/tests/test_api.py:147"
+    ],
+    "test": "Mark an unpaid $1,100 GST invoice paid through each persona's action and assert that the balance becomes zero and the confirmed receipt appears in the appropriate cash worksheet period.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F08-N2",
+    "severity": "P1",
+    "area": "3 Billing and Stripe",
+    "title": "Subscriptions remain active after Stripe marks them unpaid.",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [
+     "backend/billing/views.py:897",
+     "backend/billing/views.py:926",
+     "backend/billing/views.py:944",
+     "backend/billing/views.py:249",
+     "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:107",
+     "frontend_mobile/roles/owner/subscription-seats.tsx:44"
+    ],
+    "test": "After an active subscription's paid period expires, deliver invoice.payment_failed followed by customer.subscription.updated with status unpaid and assert that the subscription response no longer reports active.",
+    "fixed_in_pr201": false
+   },
+   {
+    "id": "F10-N3",
+    "severity": "P1",
+    "area": "3 Billing and Stripe",
+    "title": "Concurrent claims can award multiple rewards for the same referral.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/rewards/views.py:139",
+     "backend/rewards/services.py:297",
+     "backend/rewards/services.py:333",
+     "backend/rewards/models.py:119",
+     "backend/rewards/services.py:188",
+     "backend/rewards/services.py:56",
+     "backend/rewards/services.py:356",
+     "backend/rewards/test_rewards.py:31"
+    ],
+    "test": "Submit two concurrent first claims by eligible Sara for Tom's same friend-referral code and assert exactly one referral event and one 100-Pill award.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   }
+  ]
+ },
+ {
+  "area": "4 Invoicing and finance",
+  "items": [
+   {
+    "id": "C021-N2",
+    "severity": "P1",
+    "area": "4 Invoicing and finance",
+    "title": "Confirmed counteroffers are invoiced using the original shift hours.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/serialization/offers.py:123",
+     "backend/shifts/counter_offers.py:163",
+     "backend/shifts/engagement.py:272",
+     "backend/shifts/offers.py:405",
+     "backend/shifts/finalize.py:79",
+     "backend/invoicing/services.py:96",
+     "backend/invoicing/views.py:187"
+    ],
+    "test": "Confirm a 10:00–14:00 counteroffer against a 09:00–17:00 slot and assert the booking and invoice use four hours.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C025-N1",
+    "severity": "P1",
+    "area": "4 Invoicing and finance",
+    "title": "Migration replaces historical invoice billing details with a customer matched only by name.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:60",
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:62",
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:118",
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:136",
+     "backend/worker_finance/urls.py:8",
+     "backend/worker_finance/views.py:277",
+     "backend/worker_finance/services.py:824",
+     "backend/worker_finance/templates/worker_finance/invoice.html:21"
+    ],
+    "test": "Migrate two legacy invoices sharing a bill-to name but having different emails, addresses and ABNs; assert each migrated snapshot retains its original details.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F06-N1",
+    "severity": "P1",
+    "area": "4 Invoicing and finance",
+    "title": "Locking a period always produces an empty payroll handoff.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/engagement.py:125",
+     "backend/workforce/timesheet_data.py:172",
+     "backend/workforce/timesheet_builder.py:149",
+     "backend/workforce/timesheet_builder.py:183",
+     "backend/workforce/timesheet_transitions.py:147",
+     "backend/workforce/timesheet_transitions.py:182",
+     "backend/workforce/views.py:744",
+     "backend/workforce/tests/test_timesheet_state_machine.py:182"
+    ],
+    "test": "With payroll enabled and Omar's completed published assignment routed to PAYROLL, build and approve his timesheet, then lock the period; assert that payroll_export contains Omar's assignment and worked day rather than an empty list.",
+    "fixed_in_pr201": false,
+    "ui_visible": false
+   },
+   {
+    "id": "F07-N1",
+    "severity": "P1",
+    "area": "4 Invoicing and finance",
+    "title": "Both invoice editors block saving an invoice prefilled from an accepted shift.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/worker_finance/services.py:362",
+     "frontend_web/src/pages/finance/InvoiceComposer.tsx:103",
+     "frontend_web/src/pages/finance/InvoiceComposer.tsx:130",
+     "frontend_web/src/pages/finance/InvoiceComposer.tsx:187",
+     "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:199",
+     "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:229",
+     "backend/worker_finance/services.py:631",
+     "backend/invoicing/test_integrity.py:143"
+    ],
+    "test": "Choose an eligible accepted shift in each editor and save without manually selecting a customer; assert that an internal invoice is created for the shift's pharmacy.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F07-N3",
+    "severity": "P1",
+    "area": "4 Invoicing and finance",
+    "title": "Saving an invoice revision removes its recorded receipts from the cash worksheet.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/worker_finance/views.py:203",
+     "backend/worker_finance/services.py:693",
+     "backend/worker_finance/services.py:702",
+     "backend/worker_finance/services.py:982",
+     "backend/worker_finance/views.py:626",
+     "backend/worker_finance/views.py:634",
+     "backend/worker_finance/tests/test_api.py:147",
+     "backend/worker_finance/tests/test_api.py:173"
+    ],
+    "test": "Record a partial payment against a sent invoice, save a notes-only revision without resending, and assert that the cash worksheet's sales and GST totals remain unchanged.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C042-N1",
+    "severity": "P2",
+    "area": "4 Invoicing and finance",
+    "title": "Organisation and pharmacy admins are treated as invoice issuers instead of recipients on legacy invoice detail view",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:42",
+     "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:157",
+     "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:570",
+     "backend/invoicing/views.py:99",
+     "backend/invoicing/services.py:419",
+     "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:60",
+     "backend/invoicing/serializers.py:81"
+    ],
+    "test": "An Organisation Admin or delegated Pharmacy Admin viewing a received invoice in their dashboard is rendered the read-only recipient document with payment and issue reporting actions rather than the editable contractor form.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C064-N1",
+    "severity": "P2",
+    "area": "4 Invoicing and finance",
+    "title": "Legacy Expo invoice generator defaults superannuation to 10% despite Australia's current 12% SG rate.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_mobile/app/pharmacist/invoice/new.tsx:5",
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:115",
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:152",
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:294",
+     "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:392",
+     "backend/invoicing/services.py:166",
+     "backend/invoicing/services.py:332",
+     "backend/worker_finance/services.py:543",
+     "backend/worker_finance/calculations.py:50",
+     "backend/invoicing/test_integrity.py:440"
+    ],
+    "test": "New user with no onboarding super_rate_snapshot uses legacy InvoiceGenerate for an eligible 2026 invoice; assert suggested rate is current rate 12% (or explicitly configured award/agreement rate), correctly calculates amount, and backend does not silently accept stale default. Confirm historical invoice dates, contractor eligibility, intentionally different agreed rates and legacy vs new FinanceWorkspace paths.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F07-N4",
+    "severity": "P2",
+    "area": "4 Invoicing and finance",
+    "title": "Finishing an older invoice email can publish a newer unsent revision.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/worker_finance/views.py:272",
+     "backend/worker_finance/views.py:294",
+     "backend/worker_finance/views.py:316",
+     "backend/worker_finance/services.py:702",
+     "backend/worker_finance/services.py:770",
+     "backend/worker_finance/views.py:360",
+     "backend/worker_finance/views.py:471"
+    ],
+    "test": "Pause email sending for version 1, save version 2, then finish the email; assert that version 2 remains draft and Tom can access only delivered version 1.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   }
+  ]
+ },
+ {
+  "area": "5 Attendance, kiosk, timesheets",
+  "items": [
+   {
+    "id": "B32",
+    "severity": "P1",
+    "area": "5 Attendance, kiosk, timesheets",
+    "title": "The signed kiosk event field is named shift_id but is forwarded as assignment_id; an explicitly supplied ID shortcut accepts an assignment regardless of event-date shift window, potentially linking old assignments as current attendance.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/attendance/urls.py:38",
+     "backend/attendance/kiosk_api.py:214",
+     "backend/attendance/protocol.py:120",
+     "backend/attendance/protocol.py:261",
+     "backend/attendance/eligibility.py:141",
+     "backend/attendance/eligibility.py:146",
+     "backend/attendance/eligibility.py:241",
+     "backend/attendance/transitions.py:114",
+     "backend/attendance/models.py:282",
+     "backend/attendance/models.py:404",
+     "backend/attendance_tests/test_kiosk_offline_protocol.py:97"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C002-N1",
+    "severity": "P1",
+    "area": "5 Attendance, kiosk, timesheets",
+    "title": "A repeated kiosk PIN submit flips the worker's clock state instead of being treated as a retry.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/attendance/urls.py:37",
+     "backend/attendance/kiosk_api.py:454",
+     "backend/attendance/kiosk_api.py:467",
+     "backend/attendance/transitions.py:63",
+     "backend/attendance/transitions.py:256",
+     "frontend_web/src/pages/attendance/KioskPage.tsx:679",
+     "backend/attendance_tests/test_attendance_api.py:217"
+    ],
+    "test": "Send POST kiosk/pin-clock/ twice within 5 seconds with the same PIN and check that exactly one CLOCK_IN exists and the session is still open.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C026-N3",
+    "severity": "P1",
+    "area": "5 Attendance, kiosk, timesheets",
+    "title": "Extending an active employment agreement bypasses its junior rate expiry.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/employment_engagement_service.py:109",
+     "backend/workforce/views.py:362",
+     "backend/workforce/views.py:377",
+     "backend/workforce/views.py:405",
+     "backend/workforce/models.py:165",
+     "backend/workforce/timesheet_data.py:86",
+     "backend/workforce/timesheet_data.py:110",
+     "frontend_web/src/features/workforce/EmploymentEngagementsPanel.tsx:340"
+    ],
+    "test": "Patch an already-started junior agreement to end on or after its birthday review date, including a null end date; assert rejection.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C028-N4",
+    "severity": "P1",
+    "area": "5 Attendance, kiosk, timesheets",
+    "title": "Overnight attendance corrections leave the next period approved with stale minutes",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/attendance/urls.py:55",
+     "backend/attendance/views.py:228",
+     "backend/attendance/approvals.py:383",
+     "backend/workforce/signals.py:21",
+     "backend/workforce/signals.py:41",
+     "backend/workforce/signals.py:61",
+     "backend/workforce/timesheet_data.py:206",
+     "backend/workforce/timesheet_data.py:256",
+     "backend/workforce/views.py:783",
+     "backend/workforce/timesheet_transitions.py:132",
+     "backend/workforce/tests/test_timesheet_state_machine.py:168"
+    ],
+    "test": "Approve both periods intersecting Omar's Sunday-to-Monday session, correct Monday's clock-out, and assert Monday's timesheet becomes stale and cannot lock before rebuilding and reapproval.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C028-N5",
+    "severity": "P1",
+    "area": "5 Attendance, kiosk, timesheets",
+    "title": "Archiving a roster removes its scheduled work and approved leave from timesheets",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/roster/urls.py:49",
+     "backend/workforce/roster/v2_views.py:233",
+     "backend/workforce/roster/publication.py:123",
+     "backend/workforce/roster/publication.py:177",
+     "backend/workforce/signals.py:199",
+     "backend/workforce/timesheet_data.py:150",
+     "backend/workforce/timesheet_data.py:182",
+     "backend/workforce/timesheet_builder.py:96",
+     "backend/workforce/timesheet_builder.py:124",
+     "backend/workforce/tests/test_timesheets.py:359"
+    ],
+    "test": "Build a timesheet with approved roster-linked annual leave, archive its published roster week, rebuild, and assert rostered and approved-leave minutes remain unchanged.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C029-N1",
+    "severity": "P1",
+    "area": "5 Attendance, kiosk, timesheets",
+    "title": "Extending an active junior agreement bypasses its birthday rate limit.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/views.py:362",
+     "backend/workforce/views.py:377",
+     "backend/workforce/views.py:391",
+     "backend/workforce/views.py:416",
+     "backend/workforce/employment_engagement_service.py:109",
+     "backend/workforce/models.py:145",
+     "backend/shifts/engagement.py:84",
+     "backend/shifts/engagement.py:114",
+     "frontend_web/src/features/workforce/EmploymentEngagementsPanel.tsx:345",
+     "backend/workforce/tests/test_employment.py:314"
+    ],
+    "test": "For an active junior agreement ending before the next birthday, PATCH effective_to=null and assert rejection with the original end date preserved.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C039-N1",
+    "severity": "P1",
+    "area": "5 Attendance, kiosk, timesheets",
+    "title": "Attendance timeline correction modal uses UTC string in local datetime input shifting timestamps",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:539",
+     "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:564",
+     "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:237",
+     "backend/attendance/views.py:215",
+     "backend/attendance/approvals.py:338",
+     "backend/attendance/approvals.py:354",
+     "backend/workforce/timesheet_data.py:227"
+    ],
+    "test": "In a browser running in Australia/Sydney (UTC+10), opening the correction modal for an event at 17:00 local time and submitting should send an effective timestamp of 17:00 AEST (07:00Z) rather than shifting 10 hours to 07:00 AEST (21:00Z previous day).",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F06-N2",
+    "severity": "P1",
+    "area": "5 Attendance, kiosk, timesheets",
+    "title": "Rejecting provisional attendance permanently blocks the whole timesheet period.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/attendance/approvals.py:53",
+     "backend/attendance/approvals.py:157",
+     "backend/attendance/approvals.py:274",
+     "backend/workforce/timesheet_data.py:241",
+     "backend/workforce/timesheet_transitions.py:67",
+     "backend/workforce/timesheet_transitions.py:103",
+     "backend/workforce/timesheet_transitions.py:139",
+     "backend/attendance/test_approval_locking.py:74"
+    ],
+    "test": "Reject Omar's closed provisional attendance, rebuild his timesheet and attempt period locking after all payable hours are approved; assert that the rejected evidence does not leave an unresolvable approval blocker.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C029-N2",
+    "severity": "P2",
+    "area": "5 Attendance, kiosk, timesheets",
+    "title": "Saving employment terms leaves existing timesheets using stale pay agreements.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/workforce/views.py:325",
+     "backend/workforce/views.py:339",
+     "backend/workforce/signals.py:14",
+     "backend/workforce/views.py:784",
+     "backend/workforce/timesheet_builder.py:148",
+     "backend/workforce/timesheet_builder.py:252",
+     "backend/workforce/timesheet_transitions.py:132",
+     "backend/workforce/timesheet_transitions.py:168",
+     "backend/workforce/tests/test_timesheet_state_machine.py:168"
+    ],
+    "test": "After approving Omar's timesheet containing today's work, create successor terms effective today and assert locking fails until recalculation and renewed approval.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   }
+  ]
+ },
+ {
+  "area": "6 Chat, Hub, notifications",
+  "items": [
+   {
+    "id": "B05",
+    "severity": "P1",
+    "area": "6 Chat, Hub, notifications",
+    "title": "Already-connected sockets may outlive access revocation",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/chat/routing.py:7",
+     "backend/chat/consumers.py:41",
+     "backend/chat/consumers.py:122",
+     "backend/chat/signals.py:63",
+     "backend/chat/signals.py:151",
+     "backend/memberships/views.py:490",
+     "backend/chat/test_websocket.py:140"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C004-N1",
+    "severity": "P1",
+    "area": "6 Chat, Hub, notifications",
+    "title": "Anyone with one active membership can pull any pharmacy's staff into a custom group and harvest their names and emails.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/chat/views.py:53",
+     "backend/chat/views.py:419",
+     "backend/chat/views.py:472",
+     "backend/chat/serializers.py:264",
+     "backend/chat/serializers.py:293",
+     "backend/chat/views.py:863",
+     "backend/chat/serializers.py:381",
+     "backend/users/presentation.py:60",
+     "backend/chat/views.py:683"
+    ],
+    "test": "Sara creates a group with Nadia's membership id from an unrelated pharmacy; expect 400/403 and no Participant row for Nadia.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C005-N1",
+    "severity": "P1",
+    "area": "6 Chat, Hub, notifications",
+    "title": "Any chat member can rewrite who is in a room through the plain room update, skipping the creator/admin check and the community-chat block.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/chat/urls.py:9",
+     "backend/chat/views.py:50",
+     "backend/chat/views.py:92",
+     "backend/chat/views.py:104",
+     "backend/chat/views.py:453",
+     "backend/chat/views.py:457",
+     "backend/chat/serializers.py:265",
+     "backend/chat/serializers.py:308",
+     "backend/chat/views.py:667"
+    ],
+    "test": "As a non-admin, non-creator staff member, PATCH /rooms/<community_chat_id>/ with participants=[outsider_membership_id]. Expect 403, no new Participant row for the outsider, and no change to existing participants.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C030-N2",
+    "severity": "P1",
+    "area": "6 Chat, Hub, notifications",
+    "title": "Renaming a group on mobile silently removes its other members.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_mobile/roles/shared/chat/ChatPage.tsx:293",
+     "shared-core/src/domains/chat/api.ts:131",
+     "shared-core/src/domains/chat/api.ts:40",
+     "backend/chat/views.py:416",
+     "backend/chat/views.py:464",
+     "backend/chat/serializers.py:319",
+     "backend/chat/serializers.py:347",
+     "backend/chat/views.py:60"
+    ],
+    "test": "Rename Tom's group without supplying participants and verify Omar and Mia remain participants.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C047-N1",
+    "severity": "P1",
+    "area": "6 Chat, Hub, notifications",
+    "title": "Reopening a cached conversation hides messages received while it was closed",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:297",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:305",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:350",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:515",
+     "backend/chat/consumers.py:63",
+     "backend/chat/signals.py:63",
+     "backend/chat/views.py:653"
+    ],
+    "test": "Open Tom's conversation with Sara, switch to Omar, send a message from Sara, then reopen Sara and verify the missed message appears before it is marked read.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F13-N1",
+    "severity": "P1",
+    "area": "6 Chat, Hub, notifications",
+    "title": "A Hub with more than 50 posts repeatedly clears and reloads its mobile feed.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/core/settings.py:360",
+     "backend/core/settings.py:361",
+     "backend/pharmacy_hub/posts.py:192",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:511",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:518",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:521",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:526",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:541",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:501",
+     "frontend_mobile/roles/shared/hub/HubFeed.tsx:573",
+     "shared-core/src/domains/pharmacyHub/api.ts:145",
+     "shared-core/src/domains/pharmacyHub/api.ts:149",
+     "shared-core/src/domains/pharmacyHub/mappers.ts:191"
+    ],
+    "test": "Open Omar's mobile Hub containing 51 posts and verify it settles without repeated requests or cleared comment text, then loads the remaining post exactly once.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C047-N2",
+    "severity": "P2",
+    "area": "6 Chat, Hub, notifications",
+    "title": "Deleted messages remain readable in conversation previews",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:428",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:578",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:932",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx:122",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ConversationPanel.tsx:327",
+     "frontend_web/src/pages/dashboard/sidebar/chat/ConversationHeader.tsx:73",
+     "backend/chat/views.py:771",
+     "backend/chat/serializers.py:74"
+    ],
+    "test": "Delete Sara's latest message while Tom views it with a personal pin; verify its text disappears from the bubble, sidebar preview, search results and pinned banner.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C048-N1",
+    "severity": "P2",
+    "area": "6 Chat, Hub, notifications",
+    "title": "Correcting a poll question silently deletes every existing vote.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx:121",
+     "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:315",
+     "shared-core/src/domains/pharmacyHub/api.ts:214",
+     "backend/pharmacy_hub/polls.py:162",
+     "backend/pharmacy_hub/serialization/polls.py:149",
+     "backend/pharmacy_hub/serialization/polls.py:150",
+     "backend/pharmacy_hub/serialization/polls.py:151"
+    ],
+    "test": "Edit only the question of a poll with existing votes through the web editor; assert option identities and all votes remain unchanged.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C073-N1",
+    "severity": "P2",
+    "area": "6 Chat, Hub, notifications",
+    "title": "The publishing workspace leaves private content visible after logout",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/landing_next/app/content/layout.tsx:6",
+     "frontend_web/landing_next/app/(hub)/components/hub-header.tsx:2",
+     "frontend_web/landing_next/shared/account-controls.tsx:11",
+     "frontend_web/landing_next/shared/browser-session.ts:89",
+     "frontend_web/landing_next/shared/session-provider.tsx:11",
+     "frontend_web/landing_next/app/content/workspace.tsx:25",
+     "frontend_web/landing_next/app/content/workspace.tsx:41",
+     "frontend_web/landing_next/app/hubs/community-client.tsx:33"
+    ],
+    "test": "Open Tom's unpublished draft, log out through the header, and assert its content and publishing controls disappear without reloading.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   }
+  ]
+ },
+ {
+  "area": "7 Onboarding and verification",
+  "items": [
+   {
+    "id": "C077-N1",
+    "severity": "P1",
+    "area": "7 Onboarding and verification",
+    "title": "Referee decline links do not match the web page or its request",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/onboarding/emails.py:70",
+     "backend/onboarding/emails.py:79",
+     "frontend_web/landing_next/app/(public)/onboarding/referee-reject/[pk]/[refIndex]/page.tsx:4",
+     "frontend_web/src/main.tsx:158",
+     "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:11",
+     "frontend_web/landing_next/migrated/pages/onboarding/RefereeRejectPage.tsx:22",
+     "shared-core/src/domains/auth/browserOperations.ts:71",
+     "shared-core/src/constants/endpoints.ts:47",
+     "backend/onboarding/urls.py:41",
+     "backend/onboarding/views.py:163"
+    ],
+    "test": "Open the actual signed decline URL generated for Tom; assert it renders, records rejection, and stops reminders.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C051-N1",
+    "severity": "P2",
+    "area": "7 Onboarding and verification",
+    "title": "Referee decline link routes to a 404 and invokes an obsolete two-parameter backend path instead of token verification",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/onboarding/emails.py:79",
+     "frontend_web/src/main.tsx:158",
+     "frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:11",
+     "frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:22",
+     "shared-core/src/domains/auth/browserOperations.ts:67",
+     "shared-core/src/constants/endpoints.ts:48",
+     "backend/onboarding/urls.py:41",
+     "backend/onboarding/views.py:163",
+     "backend/onboarding/test_verification_transitions.py:275",
+     "backend/onboarding/verification/policy.py:5"
+    ],
+    "test": "Navigating to /onboarding/referee-reject/<token> with a valid signed token renders the decline page and sends a POST with the token to /api/v1/onboarding/referee-reject/<token>/, returning 200 rather than 404.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   }
+  ]
+ },
+ {
+  "area": "8 Talent, marketplace, public pages",
+  "items": [
+   {
+    "id": "B12",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Rating can be submitted before completed work",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/ratings/urls.py:9",
+     "backend/ratings/views.py:54",
+     "backend/ratings/views.py:84",
+     "backend/ratings/views.py:110",
+     "backend/ratings/views.py:130",
+     "backend/ratings/views.py:260",
+     "backend/ratings/serializers.py:32",
+     "backend/ratings/models.py:75",
+     "backend/ratings/test_api.py:31"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B24",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Exchange action accepts confirm-completion while still in ENQUIRY / TERMS_PROPOSED, and arbitrary propose-terms/cancel/decline after accepted or completed; buyer can invoke decline. This bypasses accepted terms and reservation lifecycle.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/marketplace/views.py:313-316",
+     "backend/marketplace/views.py:347-382",
+     "backend/marketplace/services.py:52-76",
+     "backend/marketplace/models.py:215-232"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B25",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "ListingAudience saves current circle and bumps listing.version before validating every requested schedule item. Invalid later schedule returns 400 after persistent state mutation.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/marketplace/urls.py:15",
+     "backend/marketplace/services.py:11",
+     "backend/marketplace/views.py:220",
+     "backend/marketplace/views.py:223",
+     "backend/marketplace/signals.py:21",
+     "backend/core/settings.py:401"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B31",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Ethical listing request verifies PUBLISHED status before transaction but never locks/rechecks listing inside it; two concurrent requests can create two active transfers for one single-reservation listing if they reserve different available lots.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/ethical_marketplace/urls.py:21",
+     "backend/ethical_marketplace/views.py:369",
+     "backend/ethical_marketplace/views.py:371",
+     "backend/ethical_marketplace/views.py:390",
+     "backend/ethical_marketplace/views.py:406",
+     "backend/ethical_marketplace/models.py:254",
+     "backend/core/settings.py:243"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B34",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "ExplorerPostViewSet feed and public-feed filter is_talent_board_visible (moderator hidden and expired), but generic retrieve, list and by-profile/raw view/like handlers inherit an unrestricted queryset; a hidden post can remain readable/reactable by ID and via list.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/talent/urls.py:14",
+     "backend/talent/views/explorer.py:54",
+     "backend/talent/views/explorer.py:84",
+     "backend/talent/views/explorer.py:203",
+     "backend/talent/views/explorer.py:216",
+     "backend/talent/views/explorer.py:227",
+     "backend/talent/test_explorer_api.py:68"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C010-N1",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Editing an ethical draft can reassign it to another owner's pharmacy and another product without destination authorization.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/ethical_marketplace/views.py:319",
+     "backend/ethical_marketplace/views.py:324",
+     "backend/ethical_marketplace/serializers.py:60",
+     "backend/ethical_marketplace/serializers.py:68",
+     "backend/ethical_marketplace/signals.py:19",
+     "backend/ethical_marketplace/owner_views.py:37",
+     "backend/ethical_marketplace/views.py:333",
+     "backend/ethical_marketplace/test_finalisation.py:40"
+    ],
+    "test": "Create a draft owned by pharmacy A. As authorized A preparer, PATCH its pharmacy to unrelated B and product to unapproved S8; assert 403/400 and no owner/product/lot/audience changes. Valid description-only update remains allowed.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C023-N3",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Deleting an account leaves the person's talent post live on the public and logged-in boards.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/users/api_account.py:76",
+     "backend/users/account_deletion.py:92",
+     "backend/talent/views/explorer.py:54",
+     "backend/talent/views/explorer.py:172",
+     "backend/talent/views/explorer.py:194",
+     "backend/talent/models.py:119"
+    ],
+    "test": "Delete an account that has an ExplorerPost, then public-feed/ and feed/ must not return that post",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C047-N3",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Explorers cannot renew their availability after their published dates expire",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:486",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:560",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:703",
+     "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx:811",
+     "backend/talent/views/explorer.py:126",
+     "backend/talent/views/explorer.py:182",
+     "backend/talent/models.py:127",
+     "backend/talent/test_newcomer_rules.py:72",
+     "backend/talent/test_explorer_api.py:60"
+    ],
+    "test": "Give Zoe one expired availability post, open the publish dialog and save future dates; verify the existing post is updated successfully.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C077-N2",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Expired availability prevents Explorers from publishing again",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:116",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:540",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:614",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:757",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:1051",
+     "backend/talent/models.py:127",
+     "backend/talent/views/explorer.py:126",
+     "backend/talent/views/explorer.py:174",
+     "backend/talent/views/explorer.py:182"
+    ],
+    "test": "Give Zoe an existing post whose availability ended yesterday; assert she can use the web publishing form to publish future dates.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F10-N2",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Public search can identify pharmacies behind anonymous vacancies.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:193",
+     "shared-core/src/domains/shifts/api.ts:218",
+     "backend/shifts/urls.py:63",
+     "backend/shifts/browse.py:537",
+     "backend/shifts/browse.py:589",
+     "backend/shifts/serialization/projections.py:129",
+     "backend/shifts/serialization/shifts.py:193",
+     "backend/organizations/serializers.py:56"
+    ],
+    "test": "Create Tom's anonymous vacancy with a unique pharmacy name and street address; assert that unauthenticated searches matching only those hidden fields do not return it.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F10-N4",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Bulk ethical reads bypass the viewer's approved medicine schedules.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_mobile/features/parity/ethicalMarketplace.tsx:26",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:50",
+     "backend/ethical_marketplace/views.py:163",
+     "backend/ethical_marketplace/views.py:228",
+     "backend/ethical_marketplace/owner_views.py:23",
+     "backend/ethical_marketplace/owner_views.py:36",
+     "backend/ethical_marketplace/policy.py:50",
+     "backend/ethical_marketplace/serializers.py:38",
+     "backend/ethical_marketplace/serializers.py:60"
+    ],
+    "test": "Give Omar valid pharmacy grants but professional approval for S4 only, seed S4 and S8 stock and listings, and assert that bulk inventory and owned-listing responses exclude S8 records.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F10-N5",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Valid premises applications fail after saving because the response uses an undefined variable.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/ethical_marketplace/views.py:100",
+     "backend/ethical_marketplace/views.py:102",
+     "backend/ethical_marketplace/views.py:113",
+     "backend/ethical_marketplace/views.py:120",
+     "backend/ethical_marketplace/views.py:121",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:143",
+     "frontend_mobile/features/parity/ethicalMarketplace.tsx:54",
+     "shared-core/src/platformApi.ts:141"
+    ],
+    "test": "Submit Tom's first valid premises application and assert a successful creation response containing the saved pending-review application instead of a server error.",
+    "fixed_in_pr201": true,
+    "ui_visible": true
+   },
+   {
+    "id": "F10-N6",
+    "severity": "P1",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Ethical offers disclose full stock-lot records to viewers without inventory access.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/ethical_marketplace/policy.py:94",
+     "backend/ethical_marketplace/policy.py:100",
+     "backend/ethical_marketplace/views.py:229",
+     "backend/ethical_marketplace/views.py:288",
+     "backend/ethical_marketplace/views.py:316",
+     "backend/ethical_marketplace/serializers.py:38",
+     "backend/ethical_marketplace/serializers.py:47",
+     "backend/ethical_marketplace/serializers.py:56"
+    ],
+    "test": "As browse-only Omar, confirm that Nadia's pharmacy inventory request is denied, then retrieve its visible two-pack offer and assert that full lot balances, storage checks and source references are absent.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B26",
+    "severity": "P2",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "EthicalListing draft is persisted before checking lot selection, lot ownership and available quantities; invalid listing create can leave orphan or partially allocated regulated-stock drafts.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/ethical_marketplace/urls.py:19",
+     "backend/ethical_marketplace/views.py:289",
+     "backend/ethical_marketplace/serializers.py:46",
+     "backend/ethical_marketplace/serializers.py:63",
+     "backend/ethical_marketplace/models.py:193",
+     "backend/ethical_marketplace/owner_views.py:35",
+     "backend/core/settings.py:400"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C009-N3",
+    "severity": "P2",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Ethical stock imports can still be committed after the inventory write feature is switched off.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/ethical_marketplace/urls.py:15",
+     "backend/ethical_marketplace/owner_views.py:60",
+     "backend/ethical_marketplace/policy.py:37",
+     "backend/ethical_marketplace/owner_views.py:100",
+     "backend/ethical_marketplace/owner_views.py:104",
+     "backend/ethical_marketplace/views.py:195",
+     "backend/core/settings.py:242"
+    ],
+    "test": "Stage a valid import as a verified entitled owner with ETHICAL_INVENTORY_ENABLED=True; disable it before POST /api/v1/ethical/inventory/imports/{pk}/commit/; expect 503 and no EthicalStockLot/Movement changes. Positive flag-true commit still succeeds.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C011-N1",
+    "severity": "P2",
+    "area": "8 Talent, marketplace, public pages",
+    "title": "Concurrent identical marketplace enquiries can persist duplicate negotiations before the idempotency receipt fails.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/marketplace/urls.py:17",
+     "backend/marketplace/services.py:44",
+     "backend/marketplace/views.py:297",
+     "backend/marketplace/views.py:300",
+     "backend/marketplace/views.py:309",
+     "backend/marketplace/models.py:329",
+     "backend/marketplace/views.py:324",
+     "backend/core/settings.py:401"
+    ],
+    "test": "Concurrently submit identical enquiry UUIDs using PostgreSQL and verify exactly one exchange and one receipt, with repeat-safe response.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   }
+  ]
+ },
+ {
+  "area": "9 Parity and UX",
+  "items": [
+   {
+    "id": "B06",
+    "severity": "P0",
+    "area": "9 Parity and UX",
+    "title": "Org feed may expose another pharmacy's work notes",
+    "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE (online agent)",
+    "evidence": [],
+    "test": "",
+    "fixed_in_pr201": true
+   },
+   {
+    "id": "B18",
+    "severity": "P1",
+    "area": "9 Parity and UX",
+    "title": "Claim PUT path bypasses owner approval workflow",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/organizations/claims.py:351-356",
+     "backend/organizations/claims.py:373-394",
+     "backend/organizations/claims.py:459-470",
+     "backend/organizations/serializers.py:497-527",
+     "backend/organizations/claims.py:315-323",
+     "backend/organizations/models.py:296-305",
+     "backend/dashboards/views.py:590-600"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C018-N1",
+    "severity": "P1",
+    "area": "9 Parity and UX",
+    "title": "The editorial seed command has no production guard and changes admin access, live articles and comments under real users' names.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/public_hub/management/commands/seed_editorial_content.py:16",
+     "backend/public_hub/management/commands/seed_editorial_content.py:52",
+     "backend/public_hub/management/commands/seed_editorial_content.py:65",
+     "backend/public_hub/management/commands/seed_editorial_content.py:78",
+     "backend/public_hub/management/commands/seed_editorial_content.py:432",
+     "backend/public_hub/management/commands/seed_editorial_content.py:464",
+     "backend/public_hub/management/commands/seed_editorial_content.py:499",
+     "backend/public_hub/management/commands/seed_editorial_content.py:526",
+     "backend/public_hub/permissions.py:19",
+     "backend/public_hub/views.py:33",
+     "backend/public_hub/management/commands/seed_hub_preview.py:14"
+    ],
+    "test": "Run seed_editorial_content with production settings (DEBUG off, not public_hub.test_settings) and assert that it raises CommandError and makes no ContentAdministrator, Article or Comment changes.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C031-N1",
+    "severity": "P1",
+    "area": "9 Parity and UX",
+    "title": "Collection helpers silently discard records after the first page",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/core/settings.py:360",
+     "backend/workforce/roster/views.py:552",
+     "shared-core/src/domains/roster/api.ts:90",
+     "frontend_mobile/app/my-roster.tsx:132",
+     "shared-core/src/domains/memberships/api.ts:90",
+     "shared-core/src/domains/organizations/api.ts:25",
+     "shared-core/src/domains/shifts/api.ts:302",
+     "backend/pharmacy_hub/posts.py:413",
+     "shared-core/src/domains/organizations/api.ts:35"
+    ],
+    "test": "Return 50 roster assignments with a next page containing Omar's assignment; assert the complete roster includes his assignment.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C036-N1",
+    "severity": "P1",
+    "area": "9 Parity and UX",
+    "title": "Worker leave request submission always fails due to reading nonexistent membership id from session user",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/users/sessions.py:90",
+     "backend/users/sessions.py:144",
+     "backend/users/api_auth.py:179",
+     "frontend_web/src/contexts/AuthContext.tsx:181",
+     "frontend_web/src/features/workforce/MyLeavePage.tsx:11",
+     "frontend_web/src/features/workforce/MyLeavePage.tsx:12",
+     "shared-core/src/transport/operational.ts:14",
+     "backend/workforce/views.py:610",
+     "backend/workforce/leave_service.py:237",
+     "frontend_web/src/main.tsx:228"
+    ],
+    "test": "Submit a leave request from MyLeavePage using an authenticated worker whose profile memberships contain pharmacy details without an id attribute, asserting that a valid membership identifier is supplied to the API rather than null or NaN.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C063-N1",
+    "severity": "P1",
+    "area": "9 Parity and UX",
+    "title": "Mobile chat people search never finds anyone, so New Chat, New Group and Add members do not work in the Expo app.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/chat/serializers.py:379",
+     "backend/chat/views.py:863",
+     "shared-core/src/domains/chat/mappers.ts:61",
+     "frontend_mobile/roles/shared/chat/hooks.ts:64",
+     "frontend_mobile/roles/shared/chat/NewChatModal.tsx:59",
+     "frontend_mobile/roles/shared/chat/NewGroupModal.tsx:33",
+     "frontend_mobile/roles/shared/chat/GroupManageModal.tsx:77",
+     "backend/chat/views.py:366"
+    ],
+    "test": "Return a participant row {id:7,user_details:{first_name:'Omar'}} from fetchChatParticipants; searchParticipants('omar') must return it, and starting a chat must send membershipId 7, not userId 7.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "B39",
+    "severity": "P2",
+    "area": "9 Parity and UX",
+    "title": "SOURCE-FINDING",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/urls.py:43",
+     "backend/shifts/base.py:116",
+     "backend/shifts/serialization/shifts.py:81",
+     "backend/shifts/serialization/shifts.py:338",
+     "backend/shifts/posting.py:193",
+     "backend/shifts/posting.py:222",
+     "backend/shifts/posting.py:244",
+     "backend/shifts/posting.py:262",
+     "backend/shifts/test_shift_posting_contract.py:347",
+     "frontend_web/shared/postShift/useShiftPricing.ts:164"
+    ],
+    "test": "",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "C038-N1",
+    "severity": "P2",
+    "area": "9 Parity and UX",
+    "title": "Post-verification and dashboard return links navigate to an unrouted root path, landing users on a 404 page",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/src/pages/MobileOTPVerify.tsx:97",
+     "frontend_web/src/pages/MembershipApplyPage.tsx:386",
+     "frontend_web/src/pages/PricingPage.tsx:110",
+     "frontend_web/src/main.tsx:589",
+     "frontend_web/src/components/PublicRouteBridge.tsx:11",
+     "frontend_web/landing_next/app/dashboard/page.tsx:6",
+     "frontend_web/landing_next/migrated/utils/dashboardPath.ts:10",
+     "nginx/templates/default.conf.template:13",
+     "nginx/templates/default.conf.template:101",
+     "nginx/staging.conf:56",
+     "RUN-WEB.md:67"
+    ],
+    "test": "Mount the router at '/dashboard' with an authenticated user and assert that it redirects to the user's role-specific dashboard instead of rendering NotFoundPage.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F14-U1",
+    "severity": "P2",
+    "area": "9 Parity and UX",
+    "title": "The public shift board offers Apply Now on shifts for a role the worker cannot take, then shows only a vague failure toast.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/shifts/browse.py:571",
+     "backend/shifts/browse.py:449",
+     "backend/shifts/access.py:84",
+     "backend/shifts/base.py:197",
+     "backend/shifts/urls.py:31",
+     "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:298",
+     "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:325",
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:480"
+    ],
+    "test": "Log in as a pharmacist, open a technician shift on the public board: the button should be hidden/disabled with the reason, or the error should name the role mismatch.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F14-U2",
+    "severity": "P2",
+    "area": "9 Parity and UX",
+    "title": "The marketplace listing gate lists 'Verify your mobile number' with no way to do it, and the 8-step bar is cut off at desktop width.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "backend/marketplace/policy.py:72",
+     "backend/marketplace/entry_views.py:14",
+     "frontend_web/landing_next/features/marketplace/add-item-wizard.tsx:297",
+     "frontend_web/landing_next/features/marketplace/access-steps.tsx:43",
+     "frontend_web/landing_next/features/marketplace/access-steps.tsx:44",
+     "frontend_web/landing_next/features/marketplace/add-item-wizard.module.css:22",
+     "frontend_web/src/main.tsx:140"
+    ],
+    "test": "Open /marketplace/new as an owner without a verified mobile: each unmet prerequisite should link to where it is completed; step labels fit at 1440px.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F14-U3",
+    "severity": "P2",
+    "area": "9 Parity and UX",
+    "title": "Several phone tap targets are below 44px (public job board map/report buttons, talent board nav links, landing role pills, dashboard top-bar icons).",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx:429",
+     "frontend_web/shared/ReportButton.tsx:42",
+     "frontend_web/landing_next/app/globals.css:440",
+     "frontend_web/landing_next/app/globals.css:513",
+     "frontend_web/src/layouts/DashboardTopShell.tsx:259",
+     "frontend_web/src/layouts/TopBarActions.tsx:933",
+     "frontend_web/landing_next/app/globals.css:54",
+     "frontend_web/landing_next/app/globals.css:78"
+    ],
+    "test": "Measure the named controls at 390px width: each tappable box should be at least 44x44px.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F14-U4",
+    "severity": "P2",
+    "area": "9 Parity and UX",
+    "title": "Ethical marketplace sub-pages keep the generic landing page title, so browser tabs and history cannot be told apart.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "frontend_web/landing_next/app/layout.tsx:12",
+     "frontend_web/landing_next/app/(ethical)/marketplace/ethical/layout.tsx:7",
+     "frontend_web/landing_next/app/(ethical)/marketplace/ethical/inventory/page.tsx:2",
+     "frontend_web/landing_next/app/(ethical)/marketplace/ethical/listings/page.tsx:2",
+     "frontend_web/landing_next/app/(ethical)/marketplace/ethical/transfers/page.tsx:2",
+     "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:74"
+    ],
+    "test": "Open /marketplace/ethical/inventory, /listings, /transfers: each should set its own document title.",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   },
+   {
+    "id": "F14-U7",
+    "severity": "P2",
+    "area": "9 Parity and UX",
+    "title": "If the API cannot be reached at start-up, the web app shows an unstyled error with run-together buttons; Reconnect reloads into the same state and Retry logout has no way out.",
+    "status": "CONFIRMED_SOURCE",
+    "evidence": [
+     "shared-core/src/domains/auth/browserOperations.ts:94",
+     "frontend_web/src/contexts/AuthContext.tsx:234",
+     "frontend_web/src/contexts/AuthContext.tsx:453",
+     "frontend_web/src/contexts/AuthContext.tsx:457",
+     "frontend_web/src/contexts/AuthContext.tsx:501",
+     "frontend_web/src/main.tsx:597",
+     "frontend_web/landing_next/shared/browser-session.ts:91",
+     "frontend_web/landing_next/app/(public)/layout.tsx:8",
+     "frontend_web/landing_next/public/runtime.tsx:35"
+    ],
+    "test": "Start the web app with the API unreachable: the error screen should be styled, buttons separated and at least 44px, and offer a working way back (e.g. to /login).",
+    "fixed_in_pr201": false,
+    "ui_visible": true
+   }
+  ]
+ }
+]
