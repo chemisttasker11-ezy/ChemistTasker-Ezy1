@@ -198,6 +198,20 @@ class InviteTests(MembershipFixture):
 
 
 class MembershipVisibilityTests(MembershipFixture):
+    def test_manager_cannot_activate_a_pending_invitation(self):
+        worker, pending = self.member(status=Membership.Status.PENDING, active=False)
+        manager = self.admin(PharmacyAdmin.AdminLevel.MANAGER)
+        response, _ = self.call(manager, "patch", f"memberships/{pending.id}/", {"is_active": True})
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("is_active", response.data)
+        pending.refresh_from_db()
+        self.assertEqual((pending.status, pending.is_active), (Membership.Status.PENDING, False))
+
+        accepted, _ = self.call(worker, "post", f"my-memberships/{pending.id}/accept/")
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        pending.refresh_from_db()
+        self.assertEqual((pending.status, pending.is_active), (Membership.Status.ACCEPTED, True))
+
     def test_who_sees_and_who_may_change_the_pharmacy_members(self):
         member_user, membership = self.member()
         _, pending = self.member(status=Membership.Status.PENDING, active=False)

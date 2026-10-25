@@ -116,6 +116,12 @@ class MembershipSerializer(serializers.ModelSerializer):
         role = attrs.get('role', getattr(self.instance, 'role', None))
         employment_type = attrs.get('employment_type', getattr(self.instance, 'employment_type', None))
 
+        if (
+            attrs.get('status', getattr(self.instance, 'status', Membership.Status.ACCEPTED)) == Membership.Status.PENDING
+            and attrs.get('is_active', getattr(self.instance, 'is_active', True))
+        ):
+            raise serializers.ValidationError({'is_active': 'Pending invitations cannot be activated before acceptance.'})
+
         if self.instance is not None:
             immutable_errors = {}
             if 'user' in attrs and attrs['user'].pk != self.instance.user_id:

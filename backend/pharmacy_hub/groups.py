@@ -3,7 +3,7 @@ from django.db.models import Count, Q
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.response import Response
-from memberships.models import PHARMACY_STAFF_EMPLOYMENT_TYPES
+from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from pharmacy_hub.models import PharmacyCommunityGroup, PharmacyCommunityGroupMembership
 from pharmacy_hub.serializers import HubCommunityGroupSerializer
 from pharmacy_hub.access import HubScopeResolver, get_user_pharmacy_permissions
@@ -45,6 +45,7 @@ class HubCommunityGroupViewSet(
             PharmacyCommunityGroupMembership.objects.filter(
                 membership__user=self.request.user,
                 membership__is_active=True,
+                membership__status=Membership.Status.ACCEPTED,
                 membership__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
             ).values_list("group_id", flat=True)
         )

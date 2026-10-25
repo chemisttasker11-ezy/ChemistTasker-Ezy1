@@ -319,6 +319,41 @@ class HubFixture(TestCase):
 
 
 class ResolverAndPermissionTests(HubFixture):
+    def test_active_unaccepted_memberships_cannot_access_private_hubs(self):
+        scopes = [
+            {"scope": "pharmacy", "pharmacy_id": self.pharmacy.id},
+            {"scope": "group", "group_id": self.group.id},
+            {"scope": "organization", "organization_id": self.org.id},
+        ]
+        posts = []
+        for scope in scopes:
+            created = client_for(self.owner).post(HUB + "posts/", {**scope, "body": "Private"}, format="json")
+            self.assertEqual(created.status_code, 201, created.content)
+            posts.append(created.json()["id"])
+
+        staff = client_for(self.users["staff"])
+        for status in (Membership.Status.PENDING, Membership.Status.REJECTED, Membership.Status.LEFT):
+            Membership.objects.filter(pk=self.staff_membership.pk).update(status=status)
+            for scope, post_id in zip(scopes, posts):
+                with self.subTest(status=status, scope=scope["scope"]):
+                    self.assertEqual(staff.get(HUB + "posts/", scope).status_code, 403)
+                    self.assertEqual(staff.get(HUB + f"posts/{post_id}/").status_code, 403)
+                    self.assertEqual(staff.post(HUB + "posts/", {**scope, "body": "Denied"}, format="json").status_code, 403)
+            context = staff.get(HUB + "context/").json()
+            self.assertEqual(context["pharmacies"], [])
+            self.assertEqual(context["organizations"], [])
+            self.assertEqual(context["community_groups"], [])
+            self.assertEqual(staff.get(HUB + "groups/").json(), [])
+
+        Membership.objects.filter(pk=self.staff_membership.pk).update(status=Membership.Status.ACCEPTED)
+        for scope, post_id in zip(scopes, posts):
+            with self.subTest(accepted_scope=scope["scope"]):
+                self.assertEqual(staff.get(HUB + "posts/", scope).status_code, 200)
+                self.assertEqual(staff.get(HUB + f"posts/{post_id}/").status_code, 200)
+                self.assertEqual(staff.post(HUB + "posts/", {**scope, "body": "Accepted"}, format="json").status_code, 201)
+        self.assertTrue(staff.get(HUB + "context/").json()["community_groups"])
+        self.assertTrue(staff.get(HUB + "groups/").json())
+
     def test_scope_resolver_answers(self):
         Resolver = resolver_class()
         actual = {}
@@ -676,6 +711,38 @@ class ContextTests(HubFixture):
 
 
 class PostingAcrossScopesTests(HubFixture):
+    def test_removed_group_author_receives_no_comment_or_reaction_notifications(self):
+        author = self.users["staff"]
+        owner = client_for(self.owner)
+        created = client_for(author).post(
+            HUB + "posts/", {"scope": "group", "group_id": self.group.id, "body": "Private"}, format="json"
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        post_id = created.json()["id"]
+        comments = HUB + f"posts/{post_id}/comments/"
+
+        with mock.patch("notifications.services._broadcast") as broadcast, \
+                mock.patch("notifications.services._send_expo_push") as push:
+            control = owner.post(comments, {"body": "Visible comment"}, format="json")
+            self.assertEqual(control.status_code, 201, control.content)
+            self.assertTrue(Notification.objects.filter(user=author, body="Visible comment").exists())
+            self.assertTrue(broadcast.called)
+            self.assertEqual(push.call_args.kwargs["body"], "Visible comment")
+            Notification.objects.filter(user=author).delete()
+            broadcast.reset_mock()
+            push.reset_mock()
+
+            removed = owner.patch(HUB + f"groups/{self.group.id}/", {"member_ids": []}, format="json")
+            self.assertEqual(removed.status_code, 200, removed.content)
+            self.assertEqual(client_for(author).get(HUB + f"posts/{post_id}/").status_code, 403)
+            comment = owner.post(comments, {"body": "Secret after removal"}, format="json")
+            self.assertEqual(comment.status_code, 201, comment.content)
+            reaction = owner.post(HUB + f"posts/{post_id}/reactions/", {"reaction_type": "LIKE"}, format="json")
+            self.assertEqual(reaction.status_code, 200, reaction.content)
+            self.assertFalse(Notification.objects.filter(user=author).exists())
+            broadcast.assert_not_called()
+            push.assert_not_called()
+
     def test_who_may_post_where(self):
         scopes = {
             "pharmacy": {"scope": "pharmacy", "pharmacy_id": self.pharmacy.id},
