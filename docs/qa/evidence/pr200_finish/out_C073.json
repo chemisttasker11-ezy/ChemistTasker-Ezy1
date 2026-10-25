@@ -744,13 +744,15 @@
     },
     {
       "path": "frontend_web/landing_next/app/content/workspace.tsx",
-      "verdict": "NOTE",
-      "ids": [],
+      "verdict": "ISSUE",
+      "ids": [
+        "C074-N1"
+      ],
       "blob_sha": "fe4672d5a16db5ad489e327735592bf1221f5873",
       "lines": 81,
       "inspection": "S1_FULL_SOURCE_FETCH_ANNOTATED",
-      "note": "Read 81 lines; client interactions; imports react, next/link, lucide-react, @/components/visual-editor; call sites load, save, action, Promise.all, reload, run; write UI, backend permissions authoritative; no runtime test or S2 sign-off.",
-      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+      "note": "SOURCE-CONFIRMED CROSS-ACCOUNT DISPLAY RISK (not executed): ContentDashboard loads contentOperations.currentUser and document rows only in useEffect([]), has no useSession and does not clear docs/editor/moderation drafts on auth events. When another tab signs in as B and shared SessionProvider changes identity, this mounted publisher workspace still renders A's unpublished drafts and moderation data; backend may block B mutations but local disclosure remains. Root grouped under C074-N1. Negative: cross-tab A publisher to B ordinary member, no private content visible; positive: current authorised publisher sees their own drafts.",
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_web/landing_next/app/dashboard/page.tsx",
