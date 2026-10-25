@@ -4,7 +4,7 @@ import type { OrganizationApi, PharmacyApi, PharmacyClaimApi, PharmacyAdminApi }
 import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
 import { fetchApi } from '../../transport/application';
-import { asList, buildQuery } from '../../utils/serialization';
+import { asList, buildQuery, fetchAllPages } from '../../utils/serialization';
 import { mapChain, mapPharmacySummaryRecord } from './mappers';
 export function claimOnboarding(data: unknown) {
     return fetchApi('/owner-onboarding/claim/', { method: 'POST', body: JSON.stringify(data) });
@@ -23,8 +23,8 @@ export function getPharmacies(params?: Record<string, unknown>) {
     return fetchApi<Collection<PharmacyApi>>(`/pharmacies/${query}`);
 }
 export async function fetchPharmaciesService(params?: Record<string, unknown>) {
-    const data = await getPharmacies(params);
-    return asList(data).map(mapPharmacySummaryRecord);
+    const rows = await fetchAllPages((page) => getPharmacies({ ...params, page }));
+    return rows.map(mapPharmacySummaryRecord);
 }
 export async function fetchAccessibleOrganizationPharmacies(organizationId: number | string) {
     const id = Number(organizationId);

@@ -56,6 +56,16 @@ export function asList<T>(data: ApiList<T> | null | undefined): T[] {
         return data;
     return data && Array.isArray(data.results) ? data.results : [];
 }
+/** Read every page of a DRF list; callers that need the complete collection must not stop at page 1. */
+export async function fetchAllPages<T>(fetchPage: (page: number) => Promise<ApiList<T> | null | undefined>): Promise<T[]> {
+    const rows: T[] = [];
+    for (let page = 1; ; page += 1) {
+        const data = await fetchPage(page);
+        rows.push(...asList(data));
+        if (!extractNext(data))
+            return rows;
+    }
+}
 export function extractNext(data: unknown): string | null {
     if (data && typeof data === 'object' && 'next' in data)
         return (data as {
