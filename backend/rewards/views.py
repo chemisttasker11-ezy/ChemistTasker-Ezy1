@@ -185,7 +185,7 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
         try:
             with transaction.atomic():
                 shift = get_object_or_404(
-                    Shift.objects.select_for_update().select_related("pharmacy", "pharmacy__owner"),
+                    Shift.objects.select_for_update(of=("self",)).select_related("pharmacy", "pharmacy__owner"),
                     pk=shift_id,
                 )
                 if not user_can_manage_pharmacy(request.user, shift.pharmacy):
