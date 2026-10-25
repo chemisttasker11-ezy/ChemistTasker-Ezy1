@@ -4,27 +4,27 @@ import logging
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models.signals import post_delete, post_save, pre_delete
+from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
 
-from .models import MembershipWorkSettings, Timesheet, TimesheetPeriod, WorkforceLeaveRequest
+from .models import EmploymentEngagement, MembershipWorkSettings, Timesheet, TimesheetPeriod, WorkforceLeaveRequest
 from workforce.roster.revisions import bump_for_assignment, bump_roster_revision
 from .tasks import rebuild_timesheet_task
 
 log = logging.getLogger("workforce.signals")
 
 
-def _enqueue(pharmacy_id, user_id, work_date):
+def _enqueue(pharmacy_id, user_id, work_date, last_date=None):
     if not pharmacy_id or not user_id or not work_date:
         return
     period_ids = list(
         TimesheetPeriod.objects.filter(
             pharmacy_id=pharmacy_id,
-            start_date__lte=work_date,
+            start_date__lte=last_date or work_date,
             end_date__gte=work_date,
         ).exclude(status=TimesheetPeriod.Status.LOCKED).values_list("pk", flat=True)
     )
@@ -38,36 +38,42 @@ def _enqueue(pharmacy_id, user_id, work_date):
         )
 
 
-def _session_date(session):
+def _session_dates(session):
     from organizations.timezone import get_pharmacy_timezone
+    # Timesheets clip a session into every period it touches, so invalidate its whole raw and corrected span.
+    moments = [session.started_at, session.ended_at, *AttendanceCorrection.objects.filter(
+        original_event__session=session,
+    ).values_list("corrected_timestamp", flat=True)]
+    moments = [moment for moment in moments if moment]
     try:
         tz = get_pharmacy_timezone(session.pharmacy)
-        return session.started_at.astimezone(tz).date()
+        dates = [moment.astimezone(tz).date() for moment in moments]
     except Exception:
-        return session.started_at.date()
+        dates = [moment.date() for moment in moments]
+    return min(dates), max(dates)
 
 
 @receiver(post_save, sender=AttendanceSession)
 def attendance_session_changed(sender, instance, **kwargs):
-    _enqueue(instance.pharmacy_id, instance.user_id, _session_date(instance))
+    _enqueue(instance.pharmacy_id, instance.user_id, *_session_dates(instance))
 
 
 @receiver(post_save, sender=AttendanceEvent)
 def attendance_event_changed(sender, instance, **kwargs):
     session = instance.session
-    _enqueue(session.pharmacy_id, session.user_id, _session_date(session))
+    _enqueue(session.pharmacy_id, session.user_id, *_session_dates(session))
 
 
 @receiver(post_save, sender=AttendanceCorrection)
 def attendance_correction_changed(sender, instance, **kwargs):
     session = instance.original_event.session
-    _enqueue(session.pharmacy_id, session.user_id, _session_date(session))
+    _enqueue(session.pharmacy_id, session.user_id, *_session_dates(session))
 
 
 @receiver(post_save, sender=ProvisionalAttendance)
 def provisional_attendance_changed(sender, instance, **kwargs):
     session = instance.session
-    _enqueue(session.pharmacy_id, session.user_id, _session_date(session))
+    _enqueue(session.pharmacy_id, session.user_id, *_session_dates(session))
 
 
 def _assignment_changed(instance):
@@ -194,6 +200,32 @@ def work_settings_changed(sender, instance, **kwargs):
             lambda pid=period_id, uid=membership.user_id: rebuild_timesheet_task.delay(pid, uid),
             robust=True,
         )
+
+
+@receiver(pre_save, sender=EmploymentEngagement)
+def employment_engagement_before_save(sender, instance, using, **kwargs):
+    instance._previous_effective_from = (
+        sender.objects.using(using).filter(pk=instance.pk).values_list("effective_from", flat=True).first()
+        if instance.pk else None
+    )
+
+
+@receiver(post_save, sender=EmploymentEngagement)
+def employment_engagement_changed(sender, instance, **kwargs):
+    membership = instance.membership
+    affected_from = min(instance.effective_from, getattr(instance, "_previous_effective_from", None) or instance.effective_from)
+    for period_id in TimesheetPeriod.objects.filter(
+        pharmacy_id=membership.pharmacy_id,
+        end_date__gte=affected_from,
+    ).exclude(status=TimesheetPeriod.Status.LOCKED).values_list("pk", flat=True):
+        # Approved timesheets keep the terms that were reviewed; locked periods are excluded above.
+        if Timesheet.objects.filter(period_id=period_id, user_id=membership.user_id).exclude(
+            status=Timesheet.Status.APPROVED,
+        ).update(needs_rebuild=True):
+            transaction.on_commit(
+                lambda pid=period_id, uid=membership.user_id: rebuild_timesheet_task.delay(pid, uid),
+                robust=True,
+            )
 
 
 @receiver(post_save, sender=RosterPeriod)

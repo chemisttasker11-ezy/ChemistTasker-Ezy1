@@ -271,6 +271,26 @@ class AttendanceAPITests(unittest.TestCase):
         self.assertEqual(out_retry.data["action"], "CLOCKED_OUT")
         self.assertEqual(AttendanceSession.objects.filter(user=self.worker_user).count(), 1)
 
+    def test_manager_timeline_includes_the_resolved_pharmacy_timezone(self):
+        """C039-N1: correction editors need the site's zone, including the server fallback."""
+        session = AttendanceSession.objects.create(
+            user=self.worker_user, pharmacy=self.pharmacy, source_membership=self.membership,
+            started_at=timezone.now(),
+        )
+        client = APIClient()
+        client.force_authenticate(user=self.worker_user)
+        url = f"/attendance/manager/timeline/{session.pk}/"
+        self.assertEqual(client.get(url).status_code, status.HTTP_403_FORBIDDEN)
+
+        client.force_authenticate(user=self.owner_user)
+        for stored_zone in ("Australia/Perth", None, "invalid-zone"):
+            self.pharmacy.timezone = stored_zone
+            self.pharmacy.save(update_fields=["timezone"])
+            response = client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            expected = stored_zone if stored_zone == "Australia/Perth" else timezone.get_default_timezone_name()
+            self.assertEqual(response.data.get("pharmacy_timezone"), expected)
+
     def test_worker_mobile_qr_and_break_lifecycle(self):
         # Setup kiosk and generate active QR
         device, raw_token = activate_kiosk_device(self.owner_user, self.pharmacy, "Kiosk 1")

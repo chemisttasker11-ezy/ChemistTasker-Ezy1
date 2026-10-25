@@ -4,6 +4,8 @@ import base64
 import os
 import unittest
 import uuid
+from datetime import time, timedelta
+from zoneinfo import ZoneInfo
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
 
@@ -28,7 +30,9 @@ from attendance.credentials import (
 from attendance.transitions import clock_in
 from attendance.protocol import calculate_event_hash, canonical_event_payload, sync_offline_batch
 from attendance.views import KioskOfflineSyncView, KioskWorkerEnrolView
-from client_profile.models import Membership, Organization, OwnerOnboarding, Pharmacy
+from client_profile.models import (
+    Membership, Organization, OwnerOnboarding, Pharmacy, Shift, ShiftSlot, ShiftSlotAssignment,
+)
 from attendance.models import AttendanceEvent, AttendanceSession, KioskAttendanceEvent
 
 
@@ -86,15 +90,18 @@ class KioskOfflineProtocolTests(unittest.TestCase):
             client_kind="NATIVE_OFFLINE",
         )
 
-    def signed_event(self, *, sequence=1, event_type="CLOCK_IN", previous_hash="", employee_id=None):
-        now = timezone.now().isoformat()
+    def signed_event(
+        self, *, sequence=1, event_type="CLOCK_IN", previous_hash="", employee_id=None,
+        shift_id=None, occurred_at=None,
+    ):
+        now = (occurred_at or timezone.now()).isoformat()
         event = {
             "protocol_version": 1,
             "event_id": str(uuid.uuid4()),
             "device_id": str(self.device.installation_id),
             "device_seq": sequence,
             "employee_id": employee_id or self.worker.id,
-            "shift_id": None,
+            "shift_id": shift_id,
             "event_type": event_type,
             "device_timestamp": now,
             "trusted_time_estimate": now,
@@ -108,6 +115,70 @@ class KioskOfflineProtocolTests(unittest.TestCase):
             self.private_key.sign(event_hash.encode("ascii"))
         ).decode("ascii")
         return event
+
+    def create_assignment(self, *, user=None, shift=None, slot_date=None):
+        shift = shift or Shift.objects.create(
+            id=101, pharmacy=self.pharmacy, role_needed="PHARMACIST",
+        )
+        slot_date = slot_date or timezone.now().astimezone(ZoneInfo(self.pharmacy.timezone)).date()
+        slot = ShiftSlot.objects.create(
+            shift=shift, date=slot_date, start_time=time(9), end_time=time(17),
+        )
+        return ShiftSlotAssignment.objects.create(
+            id=202 + shift.slot_assignments.count(),
+            shift=shift, slot=slot, slot_date=slot_date, user=user or self.worker,
+        )
+
+    def test_signed_shift_resolves_unequal_assignment_id_for_event_date(self):
+        assignment = self.create_assignment()
+        self.assertNotEqual(assignment.shift_id, assignment.id)
+        self.create_assignment(shift=assignment.shift, slot_date=assignment.slot_date - timedelta(days=7))
+        occurred_at = timezone.now().astimezone(ZoneInfo(self.pharmacy.timezone)).replace(hour=10)
+        event = self.signed_event(shift_id=assignment.shift_id, occurred_at=occurred_at)
+
+        result = sync_offline_batch(self.device, [event])
+
+        self.assertEqual(result["results"][0]["result"], "accepted")
+        session = AttendanceSession.objects.get()
+        self.assertEqual(session.assignment_id, assignment.id)
+        self.assertFalse(session.is_provisional)
+        stored = KioskAttendanceEvent.objects.get()
+        self.assertEqual(stored.shift_id, assignment.shift_id)
+        self.assertEqual(stored.canonical_payload["shift_id"], assignment.shift_id)
+
+    def test_signed_shift_for_another_worker_is_rejected_even_for_local_staff(self):
+        assignment = self.create_assignment(user=self.owner)
+        occurred_at = timezone.now().astimezone(ZoneInfo(self.pharmacy.timezone)).replace(hour=10)
+        event = self.signed_event(shift_id=assignment.shift_id, occurred_at=occurred_at)
+
+        result = sync_offline_batch(self.device, [event])
+
+        self.assertEqual(result["results"][0]["result"], "rejected")
+        self.assertFalse(AttendanceSession.objects.exists())
+        self.assertIsNone(KioskAttendanceEvent.objects.get().attendance_event)
+
+    def test_signed_shift_with_ambiguous_assignments_is_rejected(self):
+        assignment = self.create_assignment()
+        self.create_assignment(shift=assignment.shift)
+        occurred_at = timezone.now().astimezone(ZoneInfo(self.pharmacy.timezone)).replace(hour=10)
+        event = self.signed_event(shift_id=assignment.shift_id, occurred_at=occurred_at)
+
+        result = sync_offline_batch(self.device, [event])
+
+        self.assertEqual(result["results"][0]["result"], "rejected")
+        self.assertFalse(AttendanceSession.objects.exists())
+        self.assertIsNone(KioskAttendanceEvent.objects.get().attendance_event)
+
+    def test_signed_shift_outside_event_date_is_rejected_even_for_local_staff(self):
+        old_date = timezone.now().astimezone(ZoneInfo(self.pharmacy.timezone)).date() - timedelta(days=7)
+        assignment = self.create_assignment(slot_date=old_date)
+        event = self.signed_event(shift_id=assignment.shift_id)
+
+        result = sync_offline_batch(self.device, [event])
+
+        self.assertEqual(result["results"][0]["result"], "rejected")
+        self.assertFalse(AttendanceSession.objects.exists())
+        self.assertIsNone(KioskAttendanceEvent.objects.get().attendance_event)
 
     def test_signed_batch_applies_existing_business_rules_and_is_idempotent(self):
         event = self.signed_event()

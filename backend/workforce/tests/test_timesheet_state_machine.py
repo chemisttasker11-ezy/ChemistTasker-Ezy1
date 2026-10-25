@@ -250,3 +250,240 @@ class TimesheetStateMachineTests(TestCase):
         self.assertTrue(self.timesheet.needs_rebuild)
         self.assertEqual(self.timesheet.status, Timesheet.Status.APPROVED)
         self.assertEqual(self.timesheet.revisions.count(), revision_count)
+
+    def test_overnight_correction_marks_every_touched_period_stale(self):
+        """C028-N4: correcting Monday's clock-out of a Sunday night session invalidates Monday's period too."""
+        from datetime import datetime, time, timedelta
+        from zoneinfo import ZoneInfo
+
+        from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession
+
+        tz = ZoneInfo("Australia/Brisbane")
+        sunday = self.period.end_date
+        next_period = TimesheetPeriod.objects.create(
+            pharmacy=self.pharmacy, start_date=sunday + timedelta(days=1), end_date=sunday + timedelta(days=7),
+            timezone="Australia/Brisbane", created_by=self.owner,
+        )
+        next_timesheet = Timesheet.objects.create(period=next_period, user=self.worker, membership=self.membership)
+        start = datetime.combine(sunday, time(22, 0), tzinfo=tz)
+        end = start + timedelta(hours=8)
+        session = AttendanceSession.objects.create(
+            pharmacy=self.pharmacy, user=self.worker, source_membership=self.membership,
+            started_at=start, ended_at=end,
+        )
+        AttendanceEvent.objects.create(
+            session=session, event_type=AttendanceEvent.EventType.CLOCK_IN, occurred_at=start,
+            source=AttendanceEvent.Source.QR_KIOSK,
+        )
+        clock_out = AttendanceEvent.objects.create(
+            session=session, event_type=AttendanceEvent.EventType.CLOCK_OUT, occurred_at=end,
+            source=AttendanceEvent.Source.QR_KIOSK,
+        )
+        for timesheet in (self.timesheet, next_timesheet):
+            revision = build_timesheet(timesheet.pk, actor=self.owner, force=True)
+            timesheet.refresh_from_db()
+            approve_timesheet(timesheet, self.owner, revision.revision_number)
+        next_timesheet.refresh_from_db()
+        before_minutes = next_timesheet.worked_minutes
+
+        AttendanceCorrection.objects.create(
+            original_event=clock_out, corrected_timestamp=end + timedelta(hours=1),
+            reason="Worker stayed for delivery", corrected_by=self.owner,
+        )
+
+        next_timesheet.refresh_from_db()
+        self.timesheet.refresh_from_db()
+        self.assertTrue(next_timesheet.needs_rebuild)
+        self.assertTrue(self.timesheet.needs_rebuild)
+        with self.assertRaisesMessage(ValidationError, "Recalculate all timesheets"):
+            lock_period(next_period, self.owner)
+        current = build_timesheet(next_timesheet.pk, actor=self.owner)
+        next_timesheet.refresh_from_db()
+        self.assertEqual(next_timesheet.worked_minutes, before_minutes + 60)
+        self.assertEqual(next_timesheet.status, Timesheet.Status.REOPENED)
+        approve_timesheet(next_timesheet, self.owner, current.revision_number)
+        self.assertEqual(lock_period(next_period, self.owner).period_id, next_period.pk)
+
+    def test_corrections_across_raw_session_bounds_are_projected(self):
+        """C028-N4: both corrected bounds can extend attendance into another week."""
+        from datetime import datetime, time, timedelta
+        from zoneinfo import ZoneInfo
+
+        from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession
+
+        tz = ZoneInfo(self.period.timezone)
+        monday = self.period.end_date + timedelta(days=1)
+        next_period = TimesheetPeriod.objects.create(
+            pharmacy=self.pharmacy, start_date=monday, end_date=monday + timedelta(days=6),
+            timezone=self.period.timezone, created_by=self.owner,
+        )
+        next_timesheet = Timesheet.objects.create(period=next_period, user=self.worker, membership=self.membership)
+        for event_type, start, end, corrected, target in [
+            (AttendanceEvent.EventType.CLOCK_OUT,
+             datetime.combine(monday - timedelta(days=1), time(22), tzinfo=tz),
+             datetime.combine(monday - timedelta(days=1), time(23, 30), tzinfo=tz),
+             datetime.combine(monday, time(0, 30), tzinfo=tz), next_timesheet),
+            (AttendanceEvent.EventType.CLOCK_IN,
+             datetime.combine(monday, time(0, 30), tzinfo=tz),
+             datetime.combine(monday, time(1, 30), tzinfo=tz),
+             datetime.combine(monday - timedelta(days=1), time(23, 30), tzinfo=tz), self.timesheet),
+        ]:
+            with self.subTest(event_type=event_type):
+                session = AttendanceSession.objects.create(
+                    pharmacy=self.pharmacy, user=self.worker, source_membership=self.membership,
+                    started_at=start, ended_at=end,
+                )
+                for kind, occurred_at in [(AttendanceEvent.EventType.CLOCK_IN, start),
+                                          (AttendanceEvent.EventType.CLOCK_OUT, end)]:
+                    event = AttendanceEvent.objects.create(
+                        session=session, event_type=kind, occurred_at=occurred_at,
+                        source=AttendanceEvent.Source.QR_KIOSK,
+                    )
+                    if kind == event_type:
+                        original_event = event
+                before = build_timesheet(target.pk, actor=self.owner, force=True)
+                target.refresh_from_db()
+                self.assertFalse(target.needs_rebuild)
+                AttendanceCorrection.objects.create(
+                    original_event=original_event, corrected_timestamp=corrected,
+                    reason="Correct the recorded boundary", corrected_by=self.owner,
+                )
+                target.refresh_from_db()
+                self.assertTrue(target.needs_rebuild)
+                after = build_timesheet(target.pk, actor=self.owner)
+                self.assertEqual(after.worked_minutes, before.worked_minutes + 30)
+
+    def test_moving_engagement_start_invalidates_old_and_new_ranges_only(self):
+        """C029-N2: moving either way includes the old range and preserves reviewed sheets."""
+        from datetime import timedelta
+
+        from workforce.models import EmploymentEngagement
+
+        old_start = self.period.start_date + timedelta(days=14)
+        new_start = old_start + timedelta(days=14)
+        terms = EmploymentEngagement.objects.create(
+            membership=self.membership, effective_from=old_start, role="PHARMACIST",
+            employment_type="FULL_TIME", pay_basis=EmploymentEngagement.PayBasis.AWARD,
+            rate_weekday="41.74", rate_saturday="52.18", rate_sunday="62.61", rate_public_holiday="93.92",
+            created_by=self.owner, updated_by=self.owner,
+        )
+        sheets = []
+        for offset, status, locked in [
+            (-7, Timesheet.Status.OPEN, False),
+            (0, Timesheet.Status.OPEN, False),
+            (7, Timesheet.Status.APPROVED, False),
+            (14, Timesheet.Status.OPEN, True),
+            (21, Timesheet.Status.OPEN, False),
+        ]:
+            start = old_start + timedelta(days=offset)
+            period = TimesheetPeriod.objects.create(
+                pharmacy=self.pharmacy, start_date=start, end_date=start + timedelta(days=6),
+                timezone=self.period.timezone, created_by=self.owner,
+                status=TimesheetPeriod.Status.LOCKED if locked else TimesheetPeriod.Status.OPEN,
+            )
+            sheets.append(Timesheet.objects.create(
+                period=period, user=self.worker, membership=self.membership, status=status, needs_rebuild=False,
+            ))
+        for start in (new_start, old_start):
+            with self.subTest(start=start), mock.patch("workforce.signals.rebuild_timesheet_task.delay") as task:
+                Timesheet.objects.filter(pk__in=[sheet.pk for sheet in sheets]).update(needs_rebuild=False)
+                terms.effective_from = start
+                with self.captureOnCommitCallbacks(execute=True):
+                    terms.save(update_fields=["effective_from"])
+                for sheet, expected in zip(sheets, [False, True, False, False, True]):
+                    sheet.refresh_from_db()
+                    self.assertEqual(sheet.needs_rebuild, expected, sheet.period.start_date)
+                self.assertCountEqual(task.call_args_list, [
+                    mock.call(sheets[1].period_id, self.worker.pk),
+                    mock.call(sheets[4].period_id, self.worker.pk),
+                ])
+
+    def test_rejected_provisional_attendance_does_not_block_the_period(self):
+        """F06-N2: a rejected provisional session is not payable and must not leave an unresolvable blocker."""
+        from datetime import datetime, time
+        from zoneinfo import ZoneInfo
+
+        from attendance.approvals import reject_provisional_attendance
+        from attendance.models import AttendanceEvent, AttendanceSession, ProvisionalAttendance
+
+        tz = ZoneInfo("Australia/Brisbane")
+        start = datetime.combine(self.work_date, time(17, 0), tzinfo=tz)
+        end = datetime.combine(self.work_date, time(18, 0), tzinfo=tz)
+        session = AttendanceSession.objects.create(
+            pharmacy=self.pharmacy, user=self.worker, source_membership=self.membership,
+            started_at=start, ended_at=end, is_provisional=True,
+        )
+        for event_type, occurred_at in [
+            (AttendanceEvent.EventType.CLOCK_IN, start), (AttendanceEvent.EventType.CLOCK_OUT, end),
+        ]:
+            AttendanceEvent.objects.create(
+                session=session, event_type=event_type, occurred_at=occurred_at,
+                source=AttendanceEvent.Source.QR_KIOSK,
+            )
+        review = ProvisionalAttendance.objects.create(
+            session=session, cover_type=ProvisionalAttendance.CoverType.UNROSTERED_LOCAL,
+        )
+        pending = build_timesheet(self.timesheet.pk, actor=self.owner, force=True)
+        self.assertTrue(pending.checks.filter(code="UNRESOLVED_PROVISIONAL_ATTENDANCE").exists())
+        with self.assertRaises(ValidationError):
+            approve_timesheet(self.timesheet, self.owner, pending.revision_number)
+
+        reject_provisional_attendance(self.owner, review.pk, reason="Not authorised")
+        current = build_timesheet(self.timesheet.pk, actor=self.owner, force=True)
+        self.timesheet.refresh_from_db()
+        self.assertFalse(current.checks.filter(code="UNRESOLVED_PROVISIONAL_ATTENDANCE").exists())
+        self.assertEqual(self.timesheet.worked_minutes, 441)
+        self.assertTrue(AttendanceEvent.objects.filter(session=session).exists())
+        review.refresh_from_db()
+        self.assertEqual(review.status, ProvisionalAttendance.Status.REJECTED)
+        approve_timesheet(self.timesheet, self.owner, current.revision_number)
+        self.assertEqual(lock_period(self.period, self.owner).period_id, self.period.pk)
+
+    def test_new_employment_terms_mark_only_unapproved_timesheets_stale(self):
+        """C029-N2: open timesheets re-snapshot new terms; approved ones keep their reviewed snapshot."""
+        from datetime import timedelta
+
+        from workforce.models import EmploymentEngagement
+
+        self.pharmacy.use_chemisttasker_payroll = True
+        self.pharmacy.save(update_fields=["use_chemisttasker_payroll"])
+
+        def engagement(effective_from):
+            return EmploymentEngagement.objects.create(
+                membership=self.membership, effective_from=effective_from, role="PHARMACIST",
+                employment_type="FULL_TIME", pay_basis=EmploymentEngagement.PayBasis.AWARD,
+                award_classification="PHARMACIST", award_rate_snapshot={}, ordinary_hours_pattern={},
+                rate_weekday="41.74", rate_saturday="52.18", rate_sunday="62.61", rate_public_holiday="93.92",
+                created_by=self.owner, updated_by=self.owner,
+            )
+
+        self.built()
+        self.assertFalse(self.timesheet.needs_rebuild)
+        terms = engagement(self.work_date)
+        self.timesheet.refresh_from_db()
+        self.assertTrue(self.timesheet.needs_rebuild)
+        revision = self.built()
+        self.assertEqual(revision.snapshot["employment_engagements"][0]["public_id"], str(terms.public_id))
+        self.assertEqual(revision.snapshot["employment_engagements"][0]["rates"]["weekday"], "41.74")
+
+        terms.rate_weekday = "45.00"
+        terms.save(update_fields=["rate_weekday"])
+        self.timesheet.refresh_from_db()
+        self.assertTrue(self.timesheet.needs_rebuild)
+        revision = self.built()
+        self.assertEqual(revision.snapshot["employment_engagements"][0]["rates"]["weekday"], "45.00")
+
+        approve_timesheet(self.timesheet, self.owner, revision.revision_number)
+        terms.effective_to = self.period.end_date - timedelta(days=1)
+        terms.save(update_fields=["effective_to"])
+        engagement(self.period.end_date)
+        self.timesheet.refresh_from_db()
+        self.assertEqual((self.timesheet.status, self.timesheet.needs_rebuild), (Timesheet.Status.APPROVED, False))
+        self.assertEqual(self.timesheet.revisions.latest("revision_number").pk, revision.pk)
+
+        lock_period(self.period, self.owner)
+        terms.rate_weekday = "50.00"
+        terms.save(update_fields=["rate_weekday"])
+        self.timesheet.refresh_from_db()
+        self.assertFalse(self.timesheet.needs_rebuild)
+        self.assertEqual(self.timesheet.revisions.latest("revision_number").snapshot, revision.snapshot)
