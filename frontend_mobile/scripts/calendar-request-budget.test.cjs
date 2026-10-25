@@ -7,6 +7,47 @@ const ts = require('typescript');
 
 const calendarModelPath = path.resolve(__dirname, '../roles/shared/calendar/calendarModel.ts');
 
+function hubPagingEnvironment() {
+  const source = fs.readFileSync(path.resolve(__dirname, '../roles/shared/hub/HubFeed.tsx'), 'utf8').replace(/\r\n/g, '\n');
+  const loadBlock = source.slice(source.indexOf('  const load = useCallback('), source.indexOf('  useEffect(() => {\n    setPosts([]);'));
+  const { outputText } = ts.transpileModule(`exports.render = (next: string | null) => { ${loadBlock}; return load; };`, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } });
+  let previous; let posts = []; let next = null;
+  const calls = [];
+  const scope = { type: 'pharmacy', id: 7 };
+  const context = vm.createContext({ exports: {}, stableScope: scope,
+    useCallback: (fn, deps) => {
+      if (previous && deps.every((value, i) => Object.is(value, previous.deps[i]))) return previous.fn;
+      previous = { fn, deps }; return fn;
+    },
+    fetchHubPosts: async (...args) => { calls.push(args); return { posts: [{ id: calls.length }], next: calls.length === 1 ? '/api/v1/hub/posts/?page=2' : null }; },
+    setLoading: () => {}, setPosts: update => { posts = update(posts); }, setNext: value => { next = value; },
+  });
+  vm.runInContext(outputText, context);
+  return { render: context.exports.render, calls, scope, posts: () => posts, next: () => next };
+}
+
+test('Hub page results do not rebuild the loader and restart the mount effect', async () => {
+  const env = hubPagingEnvironment();
+  const first = env.render(null);
+  await first();
+  assert.strictEqual(env.posts().length, 1);
+  assert.ok(env.next());
+  assert.strictEqual(env.render(env.next()), first, 'receiving a next page must not restart the feed');
+});
+
+test('Hub load more follows the cursor in scope and appends a legitimate second page', async () => {
+  const env = hubPagingEnvironment();
+  const load = env.render(null);
+  await load();
+  const cursor = env.next();
+  await load(cursor, true);
+  assert.strictEqual(env.calls[1][0].type, 'pharmacy');
+  assert.strictEqual(env.calls[1][0].id, 7);
+  assert.strictEqual(env.calls[1][1].cursor, cursor);
+  assert.deepStrictEqual(Array.from(env.posts(), post => post.id), [1, 2]);
+  assert.strictEqual(env.next(), null);
+});
+
 function createEnvironment() {
   const tsSource = fs.readFileSync(calendarModelPath, 'utf8');
   const { outputText: jsCode } = ts.transpileModule(tsSource, {

@@ -138,6 +138,52 @@ test('legacy mobile invoice suggests the shared SG rate and preserves an agreed 
   }
 });
 
+test('cached chat activation refreshes missed messages before marking them read', async () => {
+  const source = fs.readFileSync(new URL('../src/pages/dashboard/sidebar/chat/ChatPage.tsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const start = source.indexOf('  useEffect(() => {\n    if (!activeRoomId) return;');
+  const end = source.indexOf('  }, [activeRoomId]);', start) + '  }, [activeRoomId]);'.length;
+  const output = ts.transpileModule(source.slice(start, end), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  const calls = [];
+  let state = { 11: { messages: [{ id: 20, body: 'Seen', created_at: '2026-10-26T00:00:00Z' }], nextUrl: null, hasMore: false } };
+  const context = vm.createContext({ activeRoomId: 11, messagesMap: state,
+    useEffect: fn => fn(), setTypingState: () => {}, setIsLoadingMessages: () => {},
+    setMessagesMap: update => { state = update(state); calls.push('render'); },
+    fetchRoomMessagesService: async () => { calls.push('fetch'); return { messages: [{ id: 21, body: 'Missed', created_at: '2026-10-26T00:01:00Z' }, ...state[11].messages], next: '/page2' }; },
+    fetchRoom: async () => ({ id: 11 }),
+    markRoomAsReadService: async () => { calls.push('read'); return null; },
+    setRooms: () => {}, refreshUnreadCount: () => {}, console,
+  });
+  vm.runInContext(output, context);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(calls, ['fetch', 'render', 'read']);
+  assert.deepEqual(Array.from(state[11].messages, msg => msg.body), ['Seen', 'Missed']);
+  assert.equal(state[11].nextUrl, '/page2');
+  assert.equal(state[11].hasMore, true, 'missed messages beyond the latest page must remain reachable');
+});
+
+test('publishing workspace remounts private state on logout and account switch', () => {
+  let session = { user: { id: 4 }, status: 'authenticated' };
+  const code = fs.readFileSync(new URL('../landing_next/app/content/workspace.tsx', import.meta.url), 'utf8');
+  const output = ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  const module = { exports: {} };
+  const context = vm.createContext({ module, exports: module.exports, require: id => {
+    if (id.includes('session-provider')) return { useSession: () => session };
+    if (id === 'react/jsx-runtime') return { jsx: (type, props, key) => ({ type, props, key }), jsxs: (type, props, key) => ({ type, props, key }) };
+    if (id === 'react') return { useState: value => [typeof value === 'function' ? value() : value, () => {}], useEffect: () => {}, useCallback: value => value };
+    if (id.includes('rich-content')) return { emptyDocument: {} };
+    return {};
+  }});
+  vm.runInContext(output, context);
+  const signedIn = module.exports.default();
+  session = { user: null, status: 'anonymous' };
+  const signedOut = module.exports.default();
+  assert.notEqual(signedIn.key, signedOut.key, 'logout must unmount the private workspace and its pending requests');
+  session = { user: { id: 5 }, status: 'authenticated' };
+  const switched = module.exports.default();
+  assert.notEqual(switched.key, signedIn.key, 'another user must receive a fresh workspace');
+  assert.equal(module.exports.default().key, switched.key, 'the same signed-in user keeps their draft');
+});
+
 function loadTokenService({ localStorage, sessionStorage, window, refreshBrowserSession, watchSession }) {
   const code = fs.readFileSync(new URL('../landing_next/migrated/utils/tokenService.ts', import.meta.url), 'utf8');
   const transpiled = (ts.transpileModule || ts.default?.transpileModule)(code, {

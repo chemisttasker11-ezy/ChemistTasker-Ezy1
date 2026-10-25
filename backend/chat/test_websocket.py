@@ -49,6 +49,57 @@ def make_room_with(users_memberships):
 
 
 class RoomSocketTests(TransactionTestCase):
+    async def test_inactive_contact_can_still_receive_their_direct_messages(self):
+        alice, alice_m, bob, bob_m, _ = await make_actors()
+        room = await make_room_with([(alice, alice_m), (bob, bob_m)])
+        @database_sync_to_async
+        def make_contact():
+            Conversation.objects.filter(pk=room).update(type='DM')
+            Membership.objects.filter(pk=alice_m.pk).update(is_active=False, employment_type='CONTACT')
+        await make_contact()
+        await new_ticket(alice, 'contact-still-valid')
+        a, ok, _ = await connect(f'/ws/chat/rooms/{room}/', '?ticket=contact-still-valid')
+        self.assertTrue(ok)
+        await a.receive_json_from(timeout=TIMEOUT)
+        await a.send_json_to({'type': 'typing', 'is_typing': True})
+        self.assertEqual((await a.receive_json_from(timeout=TIMEOUT))['type'], 'typing')
+        await a.disconnect()
+
+    async def test_revoked_connections_close_before_receive_or_delivery(self):
+        for revocation in ('membership_deleted', 'membership_inactive', 'participant_removed', 'user_inactive'):
+            for direction in ('receive', 'deliver'):
+                with self.subTest(revocation=revocation, direction=direction):
+                    alice, alice_m, bob, bob_m, _ = await make_actors()
+                    room = await make_room_with([(alice, alice_m), (bob, bob_m)])
+                    await new_ticket(alice, f'revoked-{revocation}-{direction}')
+                    a, ok, _ = await connect(f'/ws/chat/rooms/{room}/', f'?ticket=revoked-{revocation}-{direction}')
+                    self.assertTrue(ok)
+                    await a.receive_json_from(timeout=TIMEOUT)
+                    await new_ticket(bob, f'legitimate-{revocation}-{direction}')
+                    b, ok, _ = await connect(f'/ws/chat/rooms/{room}/', f'?ticket=legitimate-{revocation}-{direction}')
+                    self.assertTrue(ok)
+                    await b.receive_json_from(timeout=TIMEOUT)
+                    @database_sync_to_async
+                    def revoke():
+                        if revocation == 'membership_deleted':
+                            Membership.objects.filter(pk=alice_m.pk).delete()
+                        elif revocation == 'membership_inactive':
+                            Membership.objects.filter(pk=alice_m.pk).update(is_active=False)
+                        elif revocation == 'participant_removed':
+                            Participant.objects.filter(conversation_id=room, membership=alice_m).delete()
+                        else:
+                            type(alice).objects.filter(pk=alice.pk).update(is_active=False)
+                    await revoke()
+                    if direction == 'receive':
+                        await a.send_json_to({'type': 'message', 'body': 'must not persist'})
+                    else:
+                        await b.send_json_to({'type': 'typing', 'is_typing': True})
+                        self.assertEqual((await b.receive_json_from(timeout=TIMEOUT))['type'], 'typing')
+                    self.assertEqual(await a.receive_output(timeout=TIMEOUT), {'type': 'websocket.close', 'code': 4403})
+                    self.assertEqual(await message_count(), 0)
+                    await a.disconnect()
+                    await b.disconnect()
+
     async def test_anonymous_is_refused_with_4401(self):
         _, ok, code = await connect("/ws/chat/rooms/1/")
         self.assertFalse(ok)

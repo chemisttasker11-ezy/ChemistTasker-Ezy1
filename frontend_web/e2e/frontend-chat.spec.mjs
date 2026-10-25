@@ -5,12 +5,18 @@ const room = (id, title) => ({ id, title, type: 'GROUP', pharmacy: null, partici
 const message = (id, body = `Message ${id}`) => ({ id, conversation: 11, body, sender: { id: 702, pharmacy: 101, user_details: { id: 4, username: 'pharmacist-breadth', first_name: 'Smoke', last_name: 'Worker' } }, created_at: `2026-10-10T09:${String(id % 60).padStart(2, '0')}:00Z`, attachment_url: null, is_deleted: false });
 const collection = results => ({ count: results.length, results, next: null, previous: null });
 
-async function openChat(page, { messages = [message(20, 'Original message')], failSend = false, paginate = false } = {}) {
+async function openChat(page, { messages = [message(20, 'Original message')], failSend = false, paginate = false, pinnedMessage = null } = {}) {
   const sends = []; const edits = []; let moreCalls = 0;
   await installApiFixture(page, roleUsers.pharmacist, async (route, { path, method, url }) => {
-    if (path.endsWith('/rooms/')) return json(route, collection([room(11, 'Team One'), room(12, 'Team Two')]));
+    if (pinnedMessage && path.endsWith('/users/ws-ticket/')) return json(route, { ticket: 'chat-test-ticket' });
+    if (path.endsWith('/rooms/')) return json(route, collection([{ ...room(11, 'Team One'), pinned_message: pinnedMessage,
+      last_message: messages[0] ? { ...messages[0], sender: messages[0].sender.id } : null }, room(12, 'Team Two')]));
     if (path.endsWith('/chat-participants/')) return json(route, collection([{ id: 702, user_details: { id: 4, first_name: 'Smoke', last_name: 'Worker' } }, { id: 704, user_details: { id: 8, first_name: 'Jane', last_name: 'Colleague' } }]));
-    if (/\/rooms\/\d+\/$/.test(path)) return json(route, room(Number(path.match(/(\d+)\/$/)[1]), 'Team One'));
+    if (/\/rooms\/\d+\/$/.test(path)) {
+      const id = Number(path.match(/(\d+)\/$/)[1]);
+      return json(route, { ...room(id, id === 11 ? 'Team One' : 'Team Two'), pinned_message: id === 11 ? pinnedMessage : null,
+        last_message: id === 11 && messages[0] ? { ...messages[0], sender: messages[0].sender.id } : null });
+    }
     if (path.endsWith('/rooms/11/messages/') && method === 'GET') {
       if (url.searchParams.has('page')) {
         moreCalls += 1;
@@ -35,6 +41,40 @@ async function openChat(page, { messages = [message(20, 'Original message')], fa
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeVisible();
   return { sends, edits, moreCalls: () => moreCalls };
 }
+
+test('reopening a cached room fetches missed messages before marking it read', async ({ page }) => {
+  const messages = [message(20, 'Already seen')];
+  await openChat(page, { messages });
+  await expect(page.getByRole('log').getByText('Already seen', { exact: true })).toBeVisible();
+  await page.getByText('Team Two', { exact: true }).click();
+  await expect(page.getByRole('log').getByText('Already seen', { exact: true })).toHaveCount(0);
+  messages.unshift(message(21, 'Arrived while closed'));
+  await page.getByText('Team One', { exact: true }).click();
+  await expect(page.getByRole('log').getByText('Arrived while closed', { exact: true })).toBeVisible();
+  await expect(page.getByRole('log').getByText('Already seen', { exact: true })).toBeVisible();
+});
+
+test('deletion events clear the message, sidebar preview, search and personal pin', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.chatSockets = [];
+    window.WebSocket = class {
+      static OPEN = 1;
+      readyState = 1;
+      constructor(url) { this.url = url; window.chatSockets.push(this); setTimeout(() => this.onopen?.({}), 0); }
+      send() {}
+      close() { this.readyState = 3; }
+    };
+  });
+  const deleted = message(20, 'Sensitive preview');
+  await openChat(page, { messages: [deleted, message(19, 'Keep this message')], pinnedMessage: deleted });
+  await expect(page.getByRole('log').getByText('Sensitive preview', { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.chatSockets.some(socket => socket.url.includes('/ws/chat/rooms/11/')))).toBe(true);
+  await page.evaluate(() => window.chatSockets.find(socket => socket.url.includes('/ws/chat/rooms/11/')).onmessage({ data: JSON.stringify({ type: 'message.deleted', message_id: 20 }) }));
+  await expect(page.getByText('Sensitive preview', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('log').getByText('Keep this message', { exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Search conversations' }).fill('Sensitive preview');
+  await expect(page.getByRole('button', { name: 'Team One', exact: true })).toHaveCount(0);
+});
 
 test('failed send preserves the draft; retry sends once to the same room and clears it after success', async ({ page }) => {
   const { sends } = await openChat(page, { failSend: true });
