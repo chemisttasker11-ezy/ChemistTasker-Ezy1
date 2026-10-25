@@ -174,7 +174,6 @@ class PillRewardsOfferPaymentTests(TestCase):
         for selection in (
             {"offer_ids": [offer.pk for offer in self.offers]},
             {"slot_ids": [offer.slot_id for offer in self.offers]},
-            {},
         ):
             with self.subTest(selection=selection):
                 PillLedgerEntry.objects.filter(entry_type="SPEND").delete()
@@ -187,6 +186,11 @@ class PillRewardsOfferPaymentTests(TestCase):
                 self.assertEqual(response.status_code, 200, response.data)
                 self.assertEqual(len({entry["id"] for entry in response.data["ledger_entries"]}), 2)
                 self.assertEqual(get_pill_balance(self.owner), 0)
+
+    def test_no_selection_with_several_pending_offers_is_rejected(self):
+        response = self.client.post(URL + "pay-shift/", {"shift_id": self.shift.pk}, format="json")
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(PillLedgerEntry.objects.filter(entry_type="SPEND").exists())
 
     @mock.patch("rewards.views.send_shift_payment_finalized_notifications")
     def test_insufficient_batch_balance_does_not_partially_spend_or_finalize(self, notify):

@@ -34,47 +34,22 @@ class RosterOwnerTenantWriteContracts(TestCase):
             start_time=time(9, 0), end_time=time(17, 0),
         )
 
-    def payload(self):
-        return {
+    def assign(self):
+        # Roster-owner has no POST (B35): assignments come from roster flows, so seed one directly.
+        return ShiftSlotAssignment.objects.create(
+            shift=self.shift_b, slot=self.slot_b, slot_date=self.day, user=self.worker_b, is_rostered=True,
+        )
+
+    def test_owner_cannot_create_assignments_through_roster_owner(self):
+        response = client_for(self.owner_b).post("/api/v1/roster-owner/", {
             "shift": self.shift_b.pk, "slot": self.slot_b.pk,
             "slot_date": self.day.isoformat(), "user": self.worker_b.pk,
-            "is_rostered": True,
-        }
-
-    def test_owner_b_can_assign_eligible_worker(self):
-        response = client_for(self.owner_b).post(
-            "/api/v1/roster-owner/", self.payload(), format="json")
-        self.assertEqual(response.status_code, 201, response.data)
-        self.assertTrue(ShiftSlotAssignment.objects.filter(
-            slot=self.slot_b, user=self.worker_b).exists())
-
-    def test_owner_a_cannot_create_foreign_assignment(self):
-        response = client_for(self.owner_a).post(
-            "/api/v1/roster-owner/", self.payload(), format="json")
-        self.assertIn(response.status_code, (400, 403, 404), response.data)
-        self.assertFalse(ShiftSlotAssignment.objects.filter(slot=self.slot_b).exists())
-
-    def test_owner_cannot_mix_shift_and_slot(self):
-        data = self.payload()
-        data["slot"] = self.slot_a.pk
-        response = client_for(self.owner_b).post(
-            "/api/v1/roster-owner/", data, format="json")
-        self.assertIn(response.status_code, (400, 403, 404), response.data)
-        self.assertFalse(ShiftSlotAssignment.objects.exists())
-
-    def test_owner_cannot_assign_unrelated_pharmacy_worker(self):
-        data = self.payload()
-        data["user"] = self.worker_a.pk
-        response = client_for(self.owner_b).post(
-            "/api/v1/roster-owner/", data, format="json")
-        self.assertIn(response.status_code, (400, 403, 404), response.data)
+        }, format="json")
+        self.assertEqual(response.status_code, 405, response.data)
         self.assertFalse(ShiftSlotAssignment.objects.exists())
 
     def test_foreign_owner_cannot_patch_or_delete_assignment(self):
-        created = client_for(self.owner_b).post(
-            "/api/v1/roster-owner/", self.payload(), format="json")
-        self.assertEqual(created.status_code, 201, created.data)
-        assignment = ShiftSlotAssignment.objects.get(slot=self.slot_b)
+        assignment = self.assign()
         url = f"/api/v1/roster-owner/{assignment.pk}/"
         denied = client_for(self.owner_a).patch(
             url, {"user": self.worker_a.pk}, format="json")
@@ -85,13 +60,19 @@ class RosterOwnerTenantWriteContracts(TestCase):
         self.assertEqual(assignment.user_id, self.worker_b.pk)
 
     def test_authorized_update_cannot_change_assignment_slot(self):
-        created = client_for(self.owner_b).post(
-            "/api/v1/roster-owner/", self.payload(), format="json")
-        self.assertEqual(created.status_code, 201, created.data)
-        assignment = ShiftSlotAssignment.objects.get(slot=self.slot_b)
+        assignment = self.assign()
         response = client_for(self.owner_b).patch(
             f"/api/v1/roster-owner/{assignment.pk}/",
             {"slot": self.slot_a.pk}, format="json")
         self.assertEqual(response.status_code, 400, response.data)
         assignment.refresh_from_db()
         self.assertEqual(assignment.slot_id, self.slot_b.pk)
+
+    def test_update_rejects_date_outside_slot_occurrences(self):
+        assignment = self.assign()
+        response = client_for(self.owner_b).patch(
+            f"/api/v1/roster-owner/{assignment.pk}/",
+            {"slot_date": (self.day + timedelta(days=1)).isoformat()}, format="json")
+        self.assertEqual(response.status_code, 400, response.data)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.slot_date, self.day)
