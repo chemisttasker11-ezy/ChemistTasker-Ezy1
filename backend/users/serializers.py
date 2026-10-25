@@ -6,7 +6,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
-from rest_framework_simplejwt.tokens      import RefreshToken
+from users.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.conf import settings
 from organizations.models import Organization
@@ -351,6 +351,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    token_class = RefreshToken
     remember_me = serializers.BooleanField(write_only=True, required=False)
 
     def validate(self, attrs):
@@ -448,6 +449,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):
+    token_class = RefreshToken
     def _populate_user_payload(self, data, user):
         try:
             org_memberships = OrganizationMembership.objects.filter(user=user)
@@ -542,6 +544,13 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
 
         if not user.is_active:
             raise serializers.ValidationError({'detail': 'Account is inactive.'})
+        from rest_framework_simplejwt.settings import api_settings
+        from rest_framework_simplejwt.utils import get_md5_hash_password
+        # Upgrade pre-fingerprint tokens in place; safe because password resets blacklist every refresh token.
+        fingerprint = get_md5_hash_password(user.password)
+        if original_refresh.payload.setdefault(api_settings.REVOKE_TOKEN_CLAIM, fingerprint) != fingerprint:
+            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
+        attrs = {**attrs, 'refresh': str(original_refresh)}
         data = super().validate(attrs)
         data['remember_me'] = original_refresh.get('remember_me')
         if original_refresh.get('remember_me') is True and data.get('refresh'):

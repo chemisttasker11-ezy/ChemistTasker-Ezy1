@@ -8,6 +8,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework import viewsets, permissions, filters, generics, status
 from rest_framework.response import Response
 from django.conf import settings
+from django.db import transaction
 from rest_framework.views import APIView
 from users.tasks import send_async_email
 from users.delivery import deliver_email_best_effort
@@ -19,6 +20,7 @@ from users.serializers import (
     CustomTokenRefreshSerializer,
 )
 from users.models import WebSocketTicket
+from users.tokens import notify_auth_changed
 from users.login_security import _get_login_attempt_state, _login_failure_response, _login_invalid_credentials_response
 from users.recaptcha import verify_recaptcha
 from users.sessions import _build_authenticated_user_payload, _clear_auth_cookies, _is_web_client, _set_auth_cookies
@@ -166,6 +168,10 @@ class LogoutView(APIView):
             try:
                 refresh = UntypedToken(token)
                 if refresh.get('token_type') == 'refresh':
+                    # Close only this session's sockets; rotation keeps `sid`, so the rotated-away token works too.
+                    sid = refresh.get('sid', refresh['jti'])
+                    WebSocketTicket.objects.filter(session_id=sid).delete()
+                    transaction.on_commit(lambda: notify_auth_changed(refresh['user_id'], sid))
                     device_token = request.data.get('device_token')
                     if isinstance(device_token, str) and device_token:
                         from users.models import DeviceToken
@@ -211,7 +217,8 @@ class WsTicketView(APIView):
         # Save it to the database
         WebSocketTicket.objects.create(
             user=request.user,
-            ticket=ticket_str
+            ticket=ticket_str,
+            session_id=request.auth.get('sid', '') if request.auth else '',
         )
         
         return Response({'ticket': ticket_str})

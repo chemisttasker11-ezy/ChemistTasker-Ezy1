@@ -411,6 +411,7 @@ class SessionTests(TestCase):
                 cookie = response.cookies["ct_refresh"]
                 self.assertEqual(cookie["max-age"], 604800 if remember else "")
                 self.assertEqual(RefreshToken(cookie.value)["remember_me"], remember)
+                self.assertEqual(RefreshToken(cookie.value)['sid'], RefreshToken(login.data['refresh'])['sid'])
 
     def test_password_reset_revokes_existing_refresh_tokens_and_sessions(self):
         user = make_user("PHARMACIST", is_otp_verified=True)

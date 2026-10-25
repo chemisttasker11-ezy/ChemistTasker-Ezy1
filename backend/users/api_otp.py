@@ -4,7 +4,7 @@ Logs go to the historical "users.views" channel that operators filter on."""
 import secrets
 import logging
 import requests
-from rest_framework_simplejwt.tokens import RefreshToken
+from users.tokens import RefreshToken
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -473,7 +473,6 @@ class VerifyMobileOTPView(APIView):
         _reset_mobile_otp_security_state(user)
         user.save()
 
-        from rest_framework_simplejwt.tokens import RefreshToken
         remember_me = request.auth.get('remember_me') if request.auth else None
         cookie_refresh = request.COOKIES.get(getattr(settings, 'JWT_REFRESH_COOKIE', 'ct_refresh'))
         if remember_me is None and cookie_refresh:
@@ -485,6 +484,8 @@ class VerifyMobileOTPView(APIView):
             except TokenError:
                 pass
         refresh = RefreshToken.for_user(user)
+        if request.auth and request.auth.get('sid'):
+            refresh['sid'] = request.auth['sid']
         if remember_me is not None:
             refresh['remember_me'] = remember_me
         if remember_me is True:

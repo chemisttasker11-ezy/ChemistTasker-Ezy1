@@ -20,6 +20,7 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             return
         self.user_id = user.id
         self.password = user.password
+        self.session_id = self.scope.get('session_id', '')
         self.group_name = USER_GROUP_FMT.format(user_id=self.user_id)
         if self.channel_layer:
             try:
@@ -45,6 +46,12 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
                 return False
         # Not the blacklist: routine refresh rotation blacklists tokens too; reset/deletion change password or is_active.
         return True
+
+    async def auth_changed(self, event):
+        # `sid` set = one session logged out; unset = account-wide change (password reset, deletion).
+        if event.get('sid') == self.session_id or not await self._still_authorized():
+            await self.disconnect(4401)
+            await self.close(code=4401)
 
     async def send_json(self, content, close=False):
         if not await self._still_authorized():
