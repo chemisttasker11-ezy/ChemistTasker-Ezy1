@@ -3,7 +3,7 @@
   "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "reviewer": "gpt6-senior-20261025",
   "review_level": "S1 source acquisition and first-pass annotation; S2/S3 pending",
-  "status": "INCOMPLETE",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
   "files": [
     {
       "path": "frontend_web/landing_next/app/hubs/error.tsx",
@@ -166,6 +166,141 @@
       "lines": 28,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
       "note": "28 lines retrieved. Component/module; imports react, @tiptap/react, @tiptap/starter-kit, @tiptap/extension-image; calls upload; source confirmation only, S2/S3 not performed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/home/home-router.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "c513127fe58d61630c744665ceeab3de96ecb2b8",
+      "lines": 20,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "20 lines retrieved. Imports next/link, react, lucide-react, @/app/landing-page; calls chemistTaskerApi.marketplace.getListingOptions, chemistTaskerApi.publicContent.listArticles, chemistTaskerApi.marketplace.listListings; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/access-steps.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "d3effa59cf39a8f128a445cda65588866295d048",
+      "lines": 52,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "52 lines retrieved. Imports next/link, react, ./api; calls marketplaceApi.acceptTerms, onAccepted, accept; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/add-item-wizard.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "8df0cbd5104a699628204d105c2f31b97a0239fa",
+      "lines": 951,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "951 lines retrieved. Imports next/link, next/navigation, react, lucide-react; calls marketplaceApi.getListingOptions, refreshOptions, marketplaceApi.lookupCatalogue, marketplaceApi.createListing, marketplaceApi.updateAudience, marketplaceApi.uploadImage; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/api.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b6912508fa32608880c3f1a5d8a324971feba6f1",
+      "lines": 9,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "9 lines retrieved. Imports @/lib/chemisttasker-api; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f300480151b11600d872a4b98bf28f59ab32d29b",
+      "lines": 236,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "236 lines retrieved. Imports next/link, react, lucide-react, @/shared/browser-session; calls ethicalMarketplaceApi.getLots, ethicalMarketplaceApi.listTransfers, ethicalMarketplaceApi.getMyListings, ethicalMarketplaceApi.listListings, reload, session.reload; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "74c7d85c15ce88fdcf46217cd7517a5a57ae2824",
+      "lines": 25,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "25 lines retrieved. Imports next/link, react, lucide-react, @/shared/browser-session; calls Promise.all, load, session.reload, marketplaceApi.actOnListing, marketplaceApi.updateAudience, marketplaceApi.uploadImage; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/workspace.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "225d825547e667d00ea37a6101bee6aa3f938b24",
+      "lines": 68,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "68 lines retrieved. Imports next/link, lucide-react, react, @/shared/browser-session; calls marketplaceApi.actOnListing, marketplaceApi.uploadImage, act, marketplaceApi.actOnExchange, marketplaceApi.sendExchangeMessage, marketplaceApi.createListing; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/components/calculator.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "af60af0a7ca43f86edbd3e971f3fe76df1ab4a8b",
+      "lines": 163,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "163 lines retrieved. Imports react, ./measuring-cylinder, ./medicine-icons, lucide-react; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/components/measuring-cylinder.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "9d7363b068784ab9b0b792c91bc6ea4be5671b30",
+      "lines": 10,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "10 lines retrieved. Imports none; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/components/medicine-icons.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e30c905d50b922c0b439c36917dc65261862a958",
+      "lines": 15,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "15 lines retrieved. Imports none; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/data/medicines.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "d912e179df834e318ee27e34cc6ff956fd01ade8",
+      "lines": 26,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "26 lines retrieved. Imports @/features/paediatric-calculator/lib/types, ./legacy-regimens.json, ./regimens; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/data/regimens.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "566e8bfa39d41a128b2d225982ddf1bd26b54a08",
+      "lines": 28,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "28 lines retrieved. Imports @/features/paediatric-calculator/lib/types; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/data/sources.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "304b09d734b1e106fed607537205122a6d36a54f",
+      "lines": 21,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "21 lines retrieved. Imports @/features/paediatric-calculator/lib/types; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/lib/engine.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "7c9dd9228e502ef92cc3d9e2309e6b5ba7f3edd3",
+      "lines": 51,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "51 lines retrieved. Imports ./types; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/lib/types.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "830fa32934c73f7b0b5700050eab04f1cd7e2310",
+      "lines": 7,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "7 lines retrieved. Imports none; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed."
     }
   ],
   "findings": []
