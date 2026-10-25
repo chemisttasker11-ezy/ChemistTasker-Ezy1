@@ -3,7 +3,7 @@
   "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "reviewer": "gpt6-senior-20261025",
   "review_level": "first-pass source acquisition; S2/S3 pending",
-  "status": "INCOMPLETE",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
   "files": [
     {
       "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts",
@@ -274,6 +274,105 @@
       "lines": 253,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
       "note": "253 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/shared-ui/shifts/model.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "af6514b20fed625965cadbe4548ec139b613d193",
+      "lines": 26,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "26 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
+    },
+    {
+      "path": "frontend_web/landing_next/shared-ui/talent/FiltersSidebar.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "586fd40403fef8e7ecfa94a160953340bfddf15b",
+      "lines": 200,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "200 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
+    },
+    {
+      "path": "frontend_web/landing_next/shared-ui/talent/RoleTile.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "67eab75a6a885ce78c16dda4564d46a8048a2598",
+      "lines": 2,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "2 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
+    },
+    {
+      "path": "frontend_web/landing_next/shared/account-controls.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "8db6aabfded9e74fc979f9625d00ee99ee8d7d95",
+      "lines": 13,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "13 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
+    },
+    {
+      "path": "frontend_web/landing_next/shared/browser-session.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "d4945458d962cc7db79179fd3204b56bdee4fba6",
+      "lines": 95,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "95 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
+    },
+    {
+      "path": "frontend_web/landing_next/shared/session-provider.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "74ab5f8751a2a4f63e6512e0fb050dbbb37aa831",
+      "lines": 17,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "17 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
+    },
+    {
+      "path": "frontend_web/scripts/audit-dashboard-visual-states.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3cf30b5ab9dd1912daecdf3ebc136d2583b6b181",
+      "lines": 24,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "24 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
+    },
+    {
+      "path": "frontend_web/scripts/audit-ui-boundaries.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "bf2af1e785b8e03ef24bddf86a163be8990440e7",
+      "lines": 73,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "73 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
+    },
+    {
+      "path": "frontend_web/scripts/auth-flow.test.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "9943392415331d02359d71a88849fd3d1e856f6d",
+      "lines": 210,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "210 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
+    },
+    {
+      "path": "frontend_web/scripts/build-kiosk-ui.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3c81f11731dc1c1aa4406e146cbe5730a83ed58e",
+      "lines": 28,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "28 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
+    },
+    {
+      "path": "frontend_web/scripts/dev-all.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f112452d32af4c1a03a7400f808fa7eb0a2c741f",
+      "lines": 58,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "58 lines; public/session interface or web tooling; source retrieved at frozen main; semantics/runtime not independently signed off."
     }
   ],
   "findings": []
