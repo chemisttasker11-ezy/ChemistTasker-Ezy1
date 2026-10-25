@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 total raw IDs (71 historical B plus 155 C/F). Isolated Django SQLite evidence: 27 distinct IDs and 30 RED negative scenarios in 41 tests at audited head 2fe2ce27; 11 passes. B43 confirmed by fresh source+workflow challenge. Independent whole-repository S2 not certified; 99% semantic target remains open.",
+  "material": "226 raw IDs (71 B plus 155 C/F). 42 distinct IDs / 46 cumulative targeted failing negative assertions, including B10 sequential service red at run 40188055560. B24 fixture remains TEST_INVALID pending corrected rerun; no 99% S2 certification.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,15 +10,15 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 41,
-  "runtime_failing_scenarios": 45,
+  "runtime_distinct_ids": 42,
+  "runtime_failing_scenarios": 46,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 13,
-    "UNVERIFIED_CANDIDATE": 159,
-    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 40,
+    "UNVERIFIED_CANDIDATE": 158,
+    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 41,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
@@ -60,8 +60,8 @@
       "negative_failures": 7,
       "errors": 0
     },
-    "cumulative_distinct_findings": 41,
-    "cumulative_failed_negative_assertions": 45,
+    "cumulative_distinct_findings": 42,
+    "cumulative_failed_negative_assertions": 46,
     "warning": "Cumulative from multiple isolated targeted runs; not 45 failures in one suite; B24 error invalid, not counted.",
     "additional_runs": [
       {
@@ -77,6 +77,14 @@
         "head": "a9597b5bd216dfa3086e379ee4d79489b428554d",
         "tests": 1,
         "negative_test_failing": true
+      },
+      {
+        "id": "B10",
+        "run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40188055560",
+        "head": "10c92441453ab36af1b86a00c275a9af07c2431d",
+        "tests": 1,
+        "negative_test_failing": true,
+        "errors": 0
       }
     ]
   },
@@ -275,16 +283,26 @@
       "severity": "P0",
       "area": "Rewards/Shifts",
       "title": "Multi-offer Pills spend uses one shift-wide ledger key; concurrency risk",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE_SERVICE",
+      "decision": "POLICY_CONDITIONAL_REQUIRES_HTTP_AND_UNIT_CONTRACT",
       "root": "B10",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
+      "source_proof": [
+        "backend/rewards/services.py:352-368",
+        "backend/qa_release/test_pr200_phase5_pills.py:10-40"
+      ],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b10_two_distinct_paid_offer_units_require_two_debits",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40188055560",
+          "head": "10c92441453ab36af1b86a00c275a9af07c2431d",
+          "result": "EXPECTED_RED_ASSERTION_FAIL_NO_ERRORS"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Sequential service result reproduced: same shift-wide idempotency key returns same ledger entry for two calls. Conditional as to whether two independent paid units are legitimately required for one shift. API selector/payment ledger and PostgreSQL concurrency not tested."
     },
     {
       "id": "B11",
