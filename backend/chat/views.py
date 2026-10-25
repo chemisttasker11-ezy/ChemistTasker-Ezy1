@@ -775,7 +775,7 @@ class MessageReactionView(APIView):
         message = get_object_or_404(Message, pk=message_id)
 
         # SECURITY FIX: Ensure the user is actually a participant in the conversation
-        if not Participant.objects.filter(conversation=message.conversation, membership__user=request.user).exists():
+        if not accessible_conversations_queryset(request.user).filter(pk=message.conversation_id).exists():
             return Response({'error': 'Not authorized to react to messages in this conversation.'}, status=status.HTTP_403_FORBIDDEN)
 
         reaction_char = request.data.get('reaction')
@@ -838,7 +838,7 @@ class ChatParticipantView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         # Get all conversations the user is in
-        user_conversations = Conversation.objects.filter(participants__membership__user=user)
+        user_conversations = accessible_conversations_queryset(user)
         # Get all memberships participating in those conversations
         participant_memberships = Membership.objects.filter(
             chat_participations__conversation__in=user_conversations
