@@ -1,6 +1,8 @@
 """Hub alerts: telling a post's author about comments and reactions, with a link back to the post."""
 from urllib.parse import urlencode
+from rest_framework.exceptions import PermissionDenied
 from notifications.services import notify_users
+from pharmacy_hub.access import HubScopeResolver
 
 
 def _get_user_display_name(user):
@@ -54,6 +56,10 @@ def _notify_hub_post_owner(*, post, actor_user, title, body="", payload=None):
     if not post_author or not post_author.is_active:
         return
     if actor_user and post_author.id == actor_user.id:
+        return
+    try:
+        HubScopeResolver(post_author).from_post(post)
+    except PermissionDenied:
         return
     final_payload = {
         "post_id": post.id,
