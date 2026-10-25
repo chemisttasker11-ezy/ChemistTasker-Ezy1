@@ -25,7 +25,7 @@ class SeatQuantityContracts(TestCase):
     def update(self, count, provider=None):
         with (
             patch("billing.views.stripe.Subscription.retrieve", return_value=provider or stripe_result(2)) as retrieve,
-            patch("billing.views.stripe.Subscription.modify", return_value=stripe_result(count - 5)) as modify,
+            patch("billing.views.stripe.Subscription.modify", return_value=stripe_result(count - 5 if isinstance(count, int) else 2)) as modify,
         ):
             resp = client_for(self.owner).post(URL, {"staff_count": count}, format="json")
         return resp, retrieve, modify

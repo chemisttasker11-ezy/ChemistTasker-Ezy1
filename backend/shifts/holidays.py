@@ -116,13 +116,16 @@ def resolve_public_holiday(work_date: date, state, region_code="", at_time=None)
         note = "This region's local public holidays for the selected year are not yet certified."
     elif record is None:
         state_regions = [r for r in local_public_holidays()["regions"].values() if r["state"] == state_code]
-        candidate = any(
-            any(x["date"] == work_date.isoformat() for x in r["events"])
-            or work_date.isoformat() in r.get("exclude_state_dates", [])
-            for r in state_regions
-        )
+        # A missing work-base district cannot be certified, even when no
+        # known regional event is listed on this exact date. Future councils
+        # may publish additional local declarations during the year.
+        candidate = bool(state_regions) or state_code in {"VIC", "WA", "TAS", "NT", "NSW", "QLD"}
         status = "REGION_REQUIRED" if candidate else "VERIFIED"
-        note = "A local public holiday or regional replacement may apply; confirm the employee's work base." if candidate else ""
+        note = (
+            "Local public holidays or regional replacements may apply; "
+            "confirm the employee's work-base district against the "
+            "jurisdiction's official declaration."
+        ) if candidate else ""
     else:
         status = "VERIFIED"
         note = ""

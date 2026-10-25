@@ -425,8 +425,13 @@ def _price_staff_agreement(slot, shift, slot_date, terms):
                     'region: ' + holiday.status
                 )
             bucket = segment['time_bucket']
-            value = rates.get(bucket) if bucket != 'daytime' else None
-            value = rates.get(day_type) if value in (None, '') else value
+            # Public holidays take precedence over early and late ordinary
+            # penalties. Never apply a weekday evening rate to an otherwise
+            # public-holiday segment (nor stack ordinary and PH penalties).
+            value = rates.get("public_holiday") if day_type == "public_holiday" else None
+            if value in (None, ""):
+                value = rates.get(bucket) if bucket != "daytime" else None
+                value = rates.get(day_type) if value in (None, "") else value
             if value in (None, ''):
                 raise ValidationError(f'The staff agreement has no {day_type} rate.')
             rate = Decimal(str(value))
