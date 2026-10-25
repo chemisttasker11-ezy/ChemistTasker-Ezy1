@@ -1,5 +1,10 @@
 """Pricing equivalence: a fingerprint of calculate_shift_rates over a representative matrix.
 
+B14 deliberate source-only string change on 26 October 2026:
+the resolver now describes an unconfigured **store district**, not an
+employee-specific base. The reference hash changed because segment metadata
+includes this warning string; dollar amount contracts remained passing.
+
 B14 deliberate change on 26 October 2026: state and regional holiday provenance
 is now emitted in per-segment metadata, and unconfigured regional scope is
 explicitly marked for review. Historical representative money rates remain
@@ -87,7 +92,7 @@ class PricingEquivalenceTests(SimpleTestCase):
         self.assertEqual(rates, EXPECTED_ASSISTANT_DAYTIME)
 
 
-EXPECTED_FINGERPRINT = "2bf25c5417541de8fdff3208ec5de97fddd1382bd174724793bea6ccb66bf33d"
+EXPECTED_FINGERPRINT = "ad683b2ba0f64963fe23a0ea84ffe9b654135357cf3293fc5b7d26d856bd8476"
 EXPECTED_ASSISTANT_DAYTIME = {  # casual first-level assistant, 09:00-17:00, NSW
     date(2026, 1, 27): "33.19",  # weekday
     date(2026, 1, 31): "39.83",  # Saturday
