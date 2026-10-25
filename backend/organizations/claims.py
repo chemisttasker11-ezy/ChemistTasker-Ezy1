@@ -456,7 +456,7 @@ class PharmacyClaimViewSet(mixins.ListModelMixin,
 
         return qs.order_by('-created_at')
 
-    def partial_update(self, request, *args, **kwargs):
+    def update(self, request, *args, **kwargs):
         claim = self.get_object()
         owner_profile = OwnerOnboarding.objects.filter(user=request.user).select_related('user').first()
         if not owner_profile or claim.pharmacy.owner_id != owner_profile.id:

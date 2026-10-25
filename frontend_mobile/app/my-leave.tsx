@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Button, Dialog, Menu, Portal } from 'react-native-paper';
 import { DatePickerInput, TimePickerModal } from 'react-native-paper-dates';
-import { workforce, WORKFORCE_LEAVE_TYPE_OPTIONS, type WorkforceLeaveType } from '@chemisttasker/shared-core';
+import { leaveRequestMemberships, workforce, WORKFORCE_LEAVE_TYPE_OPTIONS, type WorkforceLeaveType } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import {
   ChoiceChips,
@@ -37,14 +37,7 @@ const pharmacyName = (membership: any) =>
 
 export default function MyLeaveScreen() {
   const { user } = useAuth();
-  const memberships = useMemo(
-    () => ((user as any)?.memberships || []).filter((membership: any) =>
-      membership.is_active !== false &&
-      String(membership.status || 'ACCEPTED').toUpperCase() === 'ACCEPTED' &&
-      membership.role !== 'CONTACT'
-    ),
-    [user],
-  );
+  const memberships = useMemo(() => leaveRequestMemberships((user as any)?.memberships), [user]);
   const [rows, setRows] = useState<any[]>([]);
   const [visible, setVisible] = useState(false);
   const [membershipId, setMembershipId] = useState<number | null>(memberships[0]?.id ?? null);

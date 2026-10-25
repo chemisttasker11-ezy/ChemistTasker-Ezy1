@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Container, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Paper, Select, Stack, TextField, Typography } from '@mui/material';
-import { WORKFORCE_LEAVE_TYPE_OPTIONS } from '@chemisttasker/shared-core';
+import { leaveRequestMemberships, WORKFORCE_LEAVE_TYPE_OPTIONS } from '@chemisttasker/shared-core';
 import { useAuth } from '../../contexts/AuthContext';
 import { createWorkforceLeave, decideWorkforceLeave, listWorkforceLeave } from './api';
 export default function MyLeavePage(){
-  const { user }=useAuth(); const memberships=useMemo(()=>((user as any)?.memberships||[]).filter((m:any)=>m.is_active!==false&&String(m.status||'ACCEPTED').toUpperCase()==='ACCEPTED'&&m.role!=='CONTACT'),[user]);
+  const { user }=useAuth(); const memberships=useMemo(()=>leaveRequestMemberships((user as any)?.memberships),[user]);
   const [rows,setRows]=useState<any[]>([]); const [open,setOpen]=useState(false); const [error,setError]=useState('');
   const [form,setForm]=useState({membership_id:'',leave_type:'ANNUAL',start_at:'',end_at:'',note:''});
   const load=useCallback(async()=>{try{setRows(await listWorkforceLeave());}catch(e:any){setError(e?.response?.data?.error||e?.message||'Unable to load leave requests.');}},[]); useEffect(()=>{void load();},[load]);

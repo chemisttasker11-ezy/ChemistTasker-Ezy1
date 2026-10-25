@@ -6,11 +6,16 @@ type Session={user:SessionUser|null;status:'loading'|'authenticated'|'anonymous'
 const Context=createContext<Session>({user:null,status:'loading',reload:async()=>{}});
 export function SessionProvider({children}:{children:React.ReactNode}){
  const [user,setUser]=useState<SessionUser|null>(null),[status,setStatus]=useState<Session['status']>('loading');
- const generation=useRef(0);
- const reload=useCallback(async()=>{const request=++generation.current;try{const current=await chemistTaskerApi.account.getCurrentUser<SessionUser>();if(request!==generation.current)return;claimUserBrowserStorage(current.id);setUser(current);setStatus('authenticated');}catch(error){if(request!==generation.current)return;if((error as {status?:number}).status===401){setUser(null);setStatus('anonymous');}else setStatus('unavailable');}},[]);
- useEffect(()=>{void reload();const stop=watchSession((action,remote)=>{if(action==='logout'){generation.current++;setUser(null);setStatus('anonymous');}else{
-  // Another tab may have signed in as someone else: drop this identity (and its drafts) until the cookie's user is verified.
-  if(remote){generation.current++;setUser(null);setStatus('loading');}void reload();}});const focus=()=>void reload();window.addEventListener('focus',focus);return()=>{stop();window.removeEventListener('focus',focus);};},[reload]);
- return <Context.Provider value={{user,status,reload}}>{children}</Context.Provider>;
+ const [identityVersion,setIdentityVersion]=useState(0);
+ const generation=useRef(0),verifiedId=useRef<number|null>(null);
+ // A different verified account (even without a session event) remounts the tree; first load and network blips do not.
+ const settle=useCallback((id:number|null)=>{if(verifiedId.current!==null&&verifiedId.current!==id)setIdentityVersion(version=>version+1);verifiedId.current=id;},[]);
+ const reload=useCallback(async()=>{const request=++generation.current;try{const current=await chemistTaskerApi.account.getCurrentUser<SessionUser>();if(request!==generation.current)return;settle(current.id);claimUserBrowserStorage(current.id);setUser(current);setStatus('authenticated');}catch(error){if(request!==generation.current)return;if((error as {status?:number}).status===401){settle(null);setUser(null);setStatus('anonymous');}else setStatus('unavailable');}},[settle]);
+ useEffect(()=>{void reload();const stop=watchSession(action=>{
+  generation.current++;verifiedId.current=null;setIdentityVersion(version=>version+1);setUser(null);
+  if(action==='logout'){setStatus('anonymous');}else{setStatus('loading');void reload();}
+ });const focus=()=>void reload();window.addEventListener('focus',focus);return()=>{generation.current++;stop();window.removeEventListener('focus',focus);};},[reload]);
+ // Remount account-scoped descendants before another identity can reuse their private state.
+ return <Context.Provider key={identityVersion} value={{user,status,reload}}>{children}</Context.Provider>;
 }
 export const useSession=()=>useContext(Context);

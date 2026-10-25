@@ -9,7 +9,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from client_profile.characterization_support import make_owner_with_pharmacy, make_user
-from organizations.models import Organization, Pharmacy, PharmacyAdmin
+from organizations.models import Organization, Pharmacy, PharmacyAdmin, PharmacyClaim
 from users.models import OrganizationMembership
 
 
@@ -85,3 +85,27 @@ class PharmacyAccessCharacterizationTests(TestCase):
         self.assertEqual(self.request(self.pharmacy_manager, "PATCH", self.unrelated, {"name": "Blocked"}).status_code, 403)
         self.unrelated.refresh_from_db()
         self.assertEqual(self.unrelated.name, "Unrelated Pharmacy")
+
+    def test_claim_put_requires_owner_and_runs_acceptance_workflow(self):
+        claim = PharmacyClaim.objects.create(
+            pharmacy=self.owned, organization=self.organization, requested_by=self.region_user,
+        )
+        OrganizationMembership.objects.create(
+            user=self.stranger, organization=self.organization, role="ORG_ADMIN",
+        )
+        client = APIClient()
+        url = f"/api/v1/pharmacy-claims/{claim.pk}/"
+        client.force_authenticate(self.stranger)
+        denied = client.put(url, {"status": "ACCEPTED"}, format="json")
+        self.assertEqual(denied.status_code, 403, denied.data)
+        claim.refresh_from_db()
+        self.assertEqual(claim.status, "PENDING")
+
+        client.force_authenticate(self.owner)
+        accepted = client.put(url, {"status": "ACCEPTED"}, format="json")
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        claim.refresh_from_db()
+        self.owned.refresh_from_db()
+        self.assertEqual(claim.responded_by_id, self.owner.pk)
+        self.assertEqual(self.owned.organization_id, self.organization.pk)
+        self.assertEqual(client.put(url, {"status": "REJECTED"}, format="json").status_code, 400)

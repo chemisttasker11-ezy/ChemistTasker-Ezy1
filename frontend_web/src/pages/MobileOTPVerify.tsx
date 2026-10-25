@@ -16,6 +16,7 @@ import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import { verifyBrowserMobileOtp } from '../utils/browserMobileOtp';
 import { mobileRequestOtp, mobileResendOtp } from '@chemisttasker/shared-core';
 import { useAuth } from '../contexts/AuthContext';
+import { resolveDashboardPath } from '../utils/dashboardPath';
 
 export default function MobileOTPVerify() {
   const { user, setUser, login } = useAuth();
@@ -94,7 +95,7 @@ export default function MobileOTPVerify() {
           : data?.user || prev
       );
       setStatus('Mobile verified! Redirecting...');
-      setTimeout(() => window.location.assign('/dashboard'), 800);
+      setTimeout(() => window.location.assign(resolveDashboardPath(data?.user?.role ?? user?.role)), 800);
     } catch (err) {
       setError(extractError(err, 'Verification failed.'));
     } finally {

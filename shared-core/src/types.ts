@@ -836,6 +836,7 @@ export interface ShiftRatingCommentApi {
 }
 
 export interface ShiftApi {
+    can_apply?: boolean | null;
     published_rates_visible?: boolean;
     dedicated_user?: number | null;
     id: number;

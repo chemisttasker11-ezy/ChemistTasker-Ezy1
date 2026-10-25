@@ -4,6 +4,7 @@ import exportOwners from '../contracts/applicationExports.json';
 import { configureApi } from '../transport/application';
 import { camelCaseKeysDeep, buildQuery, toPaginatedList } from '../utils/serialization';
 import { mapShift } from './shifts/mappers';
+import { leaveRequestMemberships } from '../contracts/workforce';
 import { mapMembershipSummary } from './memberships/mappers';
 import { mapChatMessage } from './chat/mappers';
 import { mapPost } from './pharmacyHub/mappers';
@@ -80,6 +81,14 @@ describe('source-backed wire/domain contracts after extraction',()=>{
     const page={count:1,next:null,results:[{id:2,role_needed:'PHARMACIST',pharmacy_detail:null,slots:[]}]};
     responses(page);
     expect(await getPublicJobBoard({organization:3})).toEqual(page);
+  });
+  it('offers leave only for accepted pharmacy memberships with a membership id',()=>{
+    const rows=[{organization_id:1,role:'ORG_ADMIN'},{pharmacy_id:1,role:'OWNER'},{id:3,pharmacy_id:2,role:'PHARMACIST',status:'ACCEPTED',is_active:true},{id:4,pharmacy_id:5,role:'PHARMACIST',status:'PENDING'}];
+    expect(leaveRequestMemberships(rows as any)).toEqual([rows[2]]);
+  });
+  it('preserves role eligibility through public shift mapping',()=>{
+    expect(mapShift({id:2,role_needed:'TECHNICIAN',can_apply:false})).toMatchObject({canApply:false});
+    expect(mapShift({id:3,role_needed:'PHARMACIST',can_apply:true})).toMatchObject({canApply:true});
   });
   it('keeps mapped shifts and stable nested slot and assignment IDs',()=>{
     const row={id:2,role_needed:'PHARMACIST',pharmacy_detail:null,slots:[{id:5,date:'2026-10-12',start_time:'09:00:00',end_time:'17:00:00'}],slot_assignments:[{id:8,slot_id:5,slot_date:'2026-10-12'}]};

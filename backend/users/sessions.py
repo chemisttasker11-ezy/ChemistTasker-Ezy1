@@ -89,6 +89,7 @@ def _build_authenticated_user_payload(user):
     ).select_related("pharmacy")
     pharm_payload = [
         {
+            "id": pm.id,
             "pharmacy_id": pm.pharmacy_id,
             "pharmacy_name": pm.pharmacy.name if pm.pharmacy else None,
             "role": pm.role,

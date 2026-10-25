@@ -39,7 +39,7 @@ export function ReportButton({ kind, id }: { kind: 'talent' | 'jobs'; id: number
   return (
     <>
       <ButtonBase onClick={() => setOpen(true)} aria-label={`Report this ${thing}`}
-        sx={{ gap: 0.5, minHeight: 32, px: 0.75, borderRadius: '8px', fontSize: 12.5, fontWeight: 600, color: 'var(--ct-text-secondary, #445474)',
+        sx={{ gap: 0.5, minHeight: 44, minWidth: 44, px: 0.75, borderRadius: '8px', fontSize: 12.5, fontWeight: 600, color: 'var(--ct-text-secondary, #445474)',
           '& svg': { width: 14, height: 14 }, '&:hover': { color: 'var(--ct-text-primary, #06214A)', bgcolor: 'var(--ct-hover-bg, #F5F8FC)' },
           '&:focus-visible': { outline: '2px solid var(--ct-accent-strong, #3C18A8)', outlineOffset: 2 } }}>
         <Flag aria-hidden />Report

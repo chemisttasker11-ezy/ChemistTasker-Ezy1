@@ -384,6 +384,24 @@ class PostingDefaultsTests(ShiftPostingFixture):
 
 
 class ShiftEditTests(ShiftPostingFixture):
+    def test_copy_partial_rates_preserves_omitted_defaults_and_allows_explicit_clear(self):
+        self.pharmacy.rate_saturday = Decimal('88.00')
+        self.pharmacy.rate_sunday = Decimal('99.00')
+        self.pharmacy.save(update_fields=['rate_saturday', 'rate_sunday'])
+        response, _ = self.post_shift(apply_rates_to_pharmacy=True, rate_weekday='71.50')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.pharmacy.refresh_from_db()
+        self.assertEqual(self.pharmacy.rate_saturday, Decimal('88.00'))
+        self.assertEqual(self.pharmacy.rate_weekday, Decimal('71.50'))
+        with queued_emails():
+            edited = client_for(self.owner).patch(f'{API}shifts/{response.data["id"]}/',
+                {'description': 'Edited', 'apply_rates_to_pharmacy': True, 'rate_saturday': None}, format='json')
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.pharmacy.refresh_from_db()
+        self.assertIsNone(self.pharmacy.rate_saturday)
+        self.assertEqual(self.pharmacy.rate_sunday, Decimal('99.00'))
+        self.assertEqual(self.pharmacy.rate_weekday, Decimal('71.50'))
+
     def test_payment_status_only_patch_cannot_mark_shift_paid(self):
         shift = Shift.objects.create(
             pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST",

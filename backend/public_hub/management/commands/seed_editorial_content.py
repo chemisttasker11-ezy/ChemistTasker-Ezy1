@@ -4,7 +4,7 @@ import os
 import shutil
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from public_hub.content_schema import plain_text
 from public_hub.models import Article, Comment, ContentAdministrator, ContentDocument, ContentRevision, Reaction
@@ -13,7 +13,12 @@ from public_hub.models import Article, Comment, ContentAdministrator, ContentDoc
 class Command(BaseCommand):
     help = 'Seed realistic, high-quality News, Learning, and Blog editorial articles with variety under each class and generated photos.'
 
+    def add_arguments(self, parser):
+        parser.add_argument('--allow-production', action='store_true', help='Explicitly allow changes to production editorial content and administrators.')
+
     def handle(self, *args, **options):
+        if (not settings.DEBUG or 'production' in settings.SETTINGS_MODULE.lower()) and not options.get('allow_production'):
+            raise CommandError('Editorial seeding requires DEBUG or explicit --allow-production approval.')
         User = get_user_model()
 
         # 1. Image management & sync
