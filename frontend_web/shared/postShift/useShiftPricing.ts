@@ -103,7 +103,7 @@ export function useShiftPricing({ employmentType, pharmacyId, roleNeeded, expand
             if (entry.error) return { ...prior, status: 'error' as const, error: String(entry.error) };
             const rateVal = entry.rate ?? entry.rate_per_hour ?? entry.value;
             const nextRate =
-              prior.dirty && prior.rate !== undefined && prior.rate !== null && prior.rate !== ''
+              (prior.dirty || (editingShiftId && Boolean(prior.rate))) && prior.rate !== undefined && prior.rate !== null && prior.rate !== ''
                 ? prior.rate
                 : rateVal != null
                   ? String(rateVal)
@@ -128,6 +128,7 @@ export function useShiftPricing({ employmentType, pharmacyId, roleNeeded, expand
       cancelled = true;
     };
   }, [
+    editingShiftId,
     employmentType,
     expandedSlots,
     pharmacyId,

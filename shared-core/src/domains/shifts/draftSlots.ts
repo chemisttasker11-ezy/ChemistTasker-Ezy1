@@ -36,5 +36,5 @@ export function buildShiftDraftSlotPayload(slots: readonly ShiftDraftSlot[], occ
 export function reconcileShiftDraftRateRows<T extends { rate: string }>(previous: readonly ShiftDraftOccurrence[], next: readonly ShiftDraftOccurrence[], rows: readonly T[], empty: () => T): T[] {
   const key = (slot: ShiftDraftOccurrence) => `${slot.date}:${slot.startTime}:${slot.endTime}`;
   const byDate = new Map(previous.map((slot,index) => [key(slot),rows[index]]));
-  return next.map(slot => byDate.get(key(slot)) ?? empty());
+  return next.map((slot, index) => byDate.get(key(slot)) ?? (previous.length === 0 && rows[index]?.rate ? rows[index] : empty()));
 }

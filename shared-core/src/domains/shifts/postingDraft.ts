@@ -6,6 +6,15 @@ import type { ShiftApi } from '../../types';
 /** Australian Superannuation Guarantee rate from 1 July 2025; the locum "super on top" default. */
 export const SUPER_GUARANTEE_PERCENT = 12;
 
+/** Calculated rates are display defaults; only explicit edits can change loaded slot rates. */
+export function haveShiftPostingSlotRatesChanged(
+  initialRates: readonly (string | number | null | undefined)[],
+  rows: readonly { rate: string; dirty?: boolean }[],
+): boolean {
+  const normalize = (value: string | number | null | undefined) => value == null || value === '' ? null : Number(value);
+  return rows.some((row, index) => row.dirty && normalize(row.rate) !== normalize(initialRates[index]));
+}
+
 /** Pure posting state shared by web and native; host presentation/state stays outside this domain. */
 export interface ShiftPostingDraft {
   pharmacyId: number | ''; roleNeeded: string; employmentType: string; description: string;
@@ -19,6 +28,7 @@ export interface ShiftPostingDraft {
   ftptPayMode: 'HOURLY' | 'ANNUAL'; minHourly: string; maxHourly: string; minAnnual: string; maxAnnual: string; superPercent: string;
   showNotifyPharmacyStaff: boolean; showNotifyFavoriteStaff: boolean; showNotifyChainMembers: boolean;
   notifyPharmacyStaff: boolean; notifyFavoriteStaff: boolean; notifyChainMembers: boolean;
+  slotsModified?: boolean; ratesModified?: boolean;
 }
 
 export function validateShiftPostingDraft(draft: Pick<ShiftPostingDraft, 'pharmacyId'|'roleNeeded'|'employmentType'|'slots'|'ftptPayMode'|'minHourly'|'maxHourly'|'minAnnual'|'maxAnnual'|'superPercent'>): string | null {
@@ -33,6 +43,8 @@ export function validateShiftPostingDraft(draft: Pick<ShiftPostingDraft, 'pharma
 export function buildShiftPostingPayload(draft: ShiftPostingDraft): Record<string, unknown> {
   const privateBooking = isPrivateShiftBooking(draft.dedicatedUserId);
   const locum = ['LOCUM','CASUAL'].includes(draft.employmentType);
+  const includeSlots = !draft.editingShiftId || draft.slotsModified !== false || draft.ratesModified === true;
+  const includeRates = !draft.editingShiftId || draft.ratesModified !== false;
   const payload: Record<string, unknown> = {
     pharmacy: draft.pharmacyId, role_needed: draft.roleNeeded, employment_type: draft.employmentType, description: draft.description,
     workload_tags: draft.workloadTags, support_on_shift: draft.supportOnShift, must_have: draft.mustHave, nice_to_have: draft.niceToHave,
@@ -40,17 +52,17 @@ export function buildShiftPostingPayload(draft: ShiftPostingDraft): Record<strin
     flexible_timing: draft.flexibleTiming, single_user_only: draft.singleUserOnly,
     post_anonymously: !privateBooking && draft.canPostAnonymously && draft.postAnonymously,
     has_travel: draft.hasTravel, has_accommodation: draft.hasAccommodation, is_urgent: draft.isUrgent,
-    rate_type: draft.roleNeeded === 'PHARMACIST' ? draft.rateType : null,
-    owner_adjusted_rate: draft.roleNeeded !== 'PHARMACIST' && draft.ownerBonus ? Number(draft.ownerBonus) : null,
+    ...(includeRates ? { rate_type: draft.roleNeeded === 'PHARMACIST' ? draft.rateType : null, owner_adjusted_rate: draft.roleNeeded !== 'PHARMACIST' && draft.ownerBonus ? Number(draft.ownerBonus) : null } : {}),
+
     payment_preference: locum ? draft.paymentPreference || null : null,
-    slots: buildShiftDraftSlotPayload(draft.slots, draft.expandedSlots, draft.slotRateRows),
+    ...(includeSlots ? { slots: buildShiftDraftSlotPayload(draft.slots, draft.expandedSlots, draft.slotRateRows) } : {}),
   };
   for (const tier of ['LOCUM_CASUAL','OWNER_CHAIN','ORG_CHAIN','PLATFORM']) {
     payload[`escalate_to_${tier.toLowerCase()}`] = privateBooking ? null : draft.escalationDates[tier] || null;
   }
   if (privateBooking) payload.dedicated_user = draft.dedicatedUserId;
   if (locum) payload.super_percent = draft.locumSuperIncluded ? SUPER_GUARANTEE_PERCENT : 0;
-  if (draft.roleNeeded === 'PHARMACIST') {
+  if (includeRates && draft.roleNeeded === 'PHARMACIST') {
     for (const [field,value] of Object.entries({weekday:draft.rateWeekday,saturday:draft.rateSaturday,sunday:draft.rateSunday,public_holiday:draft.ratePublicHoliday,early_morning:draft.rateEarlyMorning,late_night:draft.rateLateNight})) payload[`rate_${field}`] = value || null;
   }
   if (!draft.editingShiftId) {

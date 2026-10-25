@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import { bearerBelongsToDifferentUser, safeNext, refreshBrowserSession, logoutSession } from '../landing_next/shared/browser-session.ts';
 import { canAccessRoute } from '../src/components/routeAccess.ts';
 import { safeHubAttachmentUrl } from '../landing_next/lib/safe-hub-attachment.ts';
+import { resolveDashboardPath } from '../src/utils/dashboardPath.ts';
 
 test('return links preserve permitted destinations and reject external or login loops',()=>{
  for(const path of ['/content','/content/invite/example','/hubs/posts/12?reply=4#comments','/dashboard/pharmacist/overview'])assert.equal(safeNext(path),path);
@@ -135,6 +136,7 @@ test('tokenService restoreTokensFromStorage cleans legacy tokens and retains loc
   await tokenService.restoreTokensFromStorage();
   assert.equal(tokenService.getAccessToken(), 'legacy-local-access');
   assert.equal(tokenService.getRefreshToken(), null);
+
   assert.equal(localMap.has('ct_access'), false);
   assert.equal(localMap.has('ct_refresh'), false);
   assert.equal(sessionMap.has('ct_access'), false);
@@ -168,6 +170,7 @@ test('tokenService restoreTokensFromStorage uses sessionStorage when configured 
   await tokenService.restoreTokensFromStorage();
   assert.equal(tokenService.getAccessToken(), 'session-access-token');
   assert.equal(tokenService.getRefreshToken(), null);
+
   assert.equal(localMap.has('ct_access'), false);
   assert.equal(localMap.has('ct_refresh'), false);
   assert.equal(sessionMap.has('ct_access'), false);
@@ -206,4 +209,26 @@ test('tokenService performs cookie-only refresh and clears in-memory tokens on l
   watchCallback('logout');
   assert.equal(tokenService.getAccessToken(), null);
   assert.equal(tokenService.getRefreshToken(), null);
+});
+
+test('resolveDashboardPath maps roles to valid dashboard routes with optional subpath', () => {
+  // Negative controls: non-standard roles or roles with underscores must not produce broken paths like /dashboard/orgstaff/shifts/123
+  assert.equal(resolveDashboardPath('ORG_STAFF', 'shifts/123'), '/dashboard/organization/shifts/123');
+  assert.equal(resolveDashboardPath('ORG_ADMIN', 'shifts/123'), '/dashboard/organization/shifts/123');
+  assert.equal(resolveDashboardPath('ORG_OWNER', 'shifts/123'), '/dashboard/organization/shifts/123');
+  assert.equal(resolveDashboardPath('CHIEF_ADMIN', 'shifts/123'), '/dashboard/organization/shifts/123');
+  assert.equal(resolveDashboardPath('REGION_ADMIN', 'shifts/123'), '/dashboard/organization/shifts/123');
+  assert.equal(resolveDashboardPath('ORGANIZATION', 'shifts/123'), '/dashboard/organization/shifts/123');
+  assert.equal(resolveDashboardPath('PHARMACY_MANAGER', 'shifts/123'), '/dashboard/admin-invitations');
+
+  // Positive controls: standard roles resolve to their respective dashboard paths
+  assert.equal(resolveDashboardPath('OWNER', 'shifts/123'), '/dashboard/owner/shifts/123');
+  assert.equal(resolveDashboardPath('PHARMACIST', 'shifts/123'), '/dashboard/pharmacist/shifts/123');
+  assert.equal(resolveDashboardPath('OTHER_STAFF', 'shifts/123'), '/dashboard/otherstaff/shifts/123');
+  assert.equal(resolveDashboardPath('EXPLORER', 'shifts/123'), '/dashboard/explorer/shifts/123');
+
+  // Default overview path
+  assert.equal(resolveDashboardPath('PHARMACIST'), '/dashboard/pharmacist/overview');
+  assert.equal(resolveDashboardPath('ORG_STAFF'), '/dashboard/organization/overview');
+  assert.equal(resolveDashboardPath(null), '/dashboard');
 });
