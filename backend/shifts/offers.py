@@ -357,7 +357,10 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             require_acceptance_payload,
         )
         try:
-            engagement_terms = build_shift_engagement_terms(shift=shift, user=offer.user, offer=offer)
+            engagement_terms = build_shift_engagement_terms(
+                shift=shift, user=offer.user, offer=offer,
+                work_base=request.data.get("public_holiday_work_base"),
+            )
             require_acceptance_payload(terms=engagement_terms, data=request.data)
         except DjangoValidationError as exc:
             return Response(getattr(exc, 'message_dict', {'detail': exc.messages}), status=status.HTTP_400_BAD_REQUEST)

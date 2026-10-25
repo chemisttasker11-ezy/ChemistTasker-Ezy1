@@ -210,3 +210,23 @@ def holiday_calendar_status(state, region_code=""):
         "pendingYears": [2026, 2027],
         "note": "Statewide holidays only; regional show/substitution scope requires verification.",
     }
+
+def confirmed_employee_work_base(raw):
+    """Validated employee work base; cannot assume it equals shift location."""
+    from django.core.exceptions import ValidationError
+    if not isinstance(raw, dict) or raw.get("confirmed") is not True:
+        raise ValidationError({"public_holiday_work_base": "Employee must confirm their actual base for work."})
+    state = normalize_state(raw.get("state"))
+    region = str(raw.get("region") or "").strip().upper()
+    if not state:
+        raise ValidationError({"public_holiday_work_base": "Valid Australian state required."})
+    if not region and state in {"QLD", "NSW", "NT", "TAS", "VIC", "WA"}:
+        raise ValidationError({"public_holiday_work_base": "The employee's local work district is required."})
+    try:
+        region_details(state, region)
+    except PricingDataError as exc:
+        raise ValidationError({"public_holiday_work_base": str(exc)}) from exc
+    source = str(raw.get("source") or "").strip()
+    if not source or len(source) > 500:
+        raise ValidationError({"public_holiday_work_base": "Confirmation source is required (500 characters max)."})
+    return {"state": state, "region": region, "source": source, "confirmed": True}
