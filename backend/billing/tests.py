@@ -612,9 +612,9 @@ class PaidOfferLosingOccurrenceContracts(TestCase):
         return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=self.make_user("PHARMACIST"),
                                          status=status, offered_slot_date=day)
 
-    def pay(self, offer, intent):
+    def pay(self, offer, intent, event_id=None):
         event = _StripeObject(
-            id=f"evt_{intent}", type="checkout.session.completed",
+            id=event_id or f"evt_{intent}", type="checkout.session.completed",
             data=_StripeObject(object=_StripeObject(
                 mode="payment", payment_status="paid", amount_total=1500, payment_intent=intent,
                 metadata={"shift_id": str(self.shift.pk), "type": "fulfillment", "offer_ids": str(offer.pk),
@@ -663,3 +663,63 @@ class PaidOfferLosingOccurrenceContracts(TestCase):
         notify.assert_not_called()
         self.shift.refresh_from_db()
         self.assertEqual(self.shift.payment_status, "PAID")
+
+    def test_second_paid_checkout_reconciles_expired_competitor_once(self):
+        from shifts.models import ShiftOffer, ShiftSlotAssignment
+        winner = self.offer(ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, self.day)
+        loser = self.offer(ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, self.day)
+        response, notify = self.pay(winner, "pi_first_checkout")
+        self.assertEqual(response.status_code, 200, response.content)
+        notify.assert_not_called()
+        loser.refresh_from_db()
+        self.assertEqual(loser.status, ShiftOffer.Status.EXPIRED)
+
+        with patch("billing.views.logger.error") as log:
+            response, notify = self.pay(loser, "pi_second_checkout")
+            self.assertEqual(response.status_code, 200, response.content)
+            payment = ShiftPayment.objects.get(stripe_payment_intent_id="pi_second_checkout")
+            self.assertEqual(payment.status, "paid")
+            self.assertEqual(payment.amount_aud, Decimal("15.00"))
+            notify.assert_called_once()
+            self.assertEqual(notify.call_args.kwargs["kind"], "shift_payment_refund_required")
+            self.assertEqual(notify.call_args.kwargs["payload"], {"payment_id": payment.pk, "offer_ids": [loser.pk]})
+            log.assert_called_once()
+            for event_id in (None, "evt_second_checkout_replay"):
+                response, replay_notify = self.pay(loser, "pi_second_checkout", event_id=event_id)
+                self.assertEqual(response.status_code, 200, response.content)
+                replay_notify.assert_not_called()
+            log.assert_called_once()
+
+        self.assertEqual(ShiftPayment.objects.count(), 2)
+        loser.refresh_from_db()
+        self.assertEqual(loser.status, ShiftOffer.Status.EXPIRED)
+        self.assertEqual(list(ShiftSlotAssignment.objects.filter(shift=self.shift).values_list("source_offer_id", flat=True)), [winner.pk])
+
+    def test_paid_expired_offer_is_not_resurrected_on_an_available_date(self):
+        from shifts.models import ShiftOffer, ShiftSlotAssignment
+        expired = self.offer(ShiftOffer.Status.EXPIRED, self.day)
+        response, notify = self.pay(expired, "pi_expired_available_date")
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(ShiftPayment.objects.filter(stripe_payment_intent_id="pi_expired_available_date", status="paid").exists())
+        self.assertFalse(ShiftSlotAssignment.objects.exists())
+        expired.refresh_from_db()
+        self.assertEqual(expired.status, ShiftOffer.Status.EXPIRED)
+        notify.assert_called_once()
+
+    def test_winning_checkout_does_not_flag_unselected_expired_offer(self):
+        from shifts.models import ShiftOffer
+        self.offer(ShiftOffer.Status.EXPIRED, self.day)
+        winner = self.offer(ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, self.day)
+        response, notify = self.pay(winner, "pi_unrelated_expired")
+        self.assertEqual(response.status_code, 200, response.content)
+        winner.refresh_from_db()
+        self.assertEqual(winner.status, ShiftOffer.Status.ACCEPTED)
+        notify.assert_not_called()
+
+    def test_reconciliation_without_explicit_offer_ids_ignores_expired_offers(self):
+        from billing.views import _finalize_pending_offers_for_shift
+        from shifts.models import ShiftOffer
+        self.offer(ShiftOffer.Status.EXPIRED, self.day)
+        unbookable = []
+        self.assertEqual(_finalize_pending_offers_for_shift(self.shift, unbookable=unbookable), 0)
+        self.assertEqual(unbookable, [])

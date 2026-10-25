@@ -333,14 +333,17 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     from shifts.models import ShiftOffer
     from shifts.finalize import finalize_shift_offer
 
+    target_offer_ids = _normalize_offer_ids(offer_ids)
+    statuses = [ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT]
+    if target_offer_ids and unbookable is not None:
+        statuses.append(ShiftOffer.Status.EXPIRED)
     offers = ShiftOffer.objects.filter(
         shift=shift,
-        status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+        status__in=statuses,
     ).order_by("created_at")
 
     if candidate_id:
         offers = offers.filter(user_id=candidate_id)
-    target_offer_ids = _normalize_offer_ids(offer_ids)
     if target_offer_ids:
         offers = offers.filter(id__in=target_offer_ids)
     target_slot_ids = _normalize_slot_ids(slot_ids, slot_id)
@@ -350,6 +353,11 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     finalized = 0
     finalized_offers = []
     for offer in offers:
+        if offer.status == ShiftOffer.Status.EXPIRED:
+            # A competing checkout may have expired this paid offer before its webhook arrived.
+            if not offer.slot_assignments.exists():
+                unbookable.append(offer)
+            continue
         try:
             finalize_shift_offer(offer)  # its own atomic block rolls back a refused offer
         except ValidationError:
