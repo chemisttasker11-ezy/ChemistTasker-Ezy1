@@ -47,6 +47,7 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
     """
     serializer_class = RosterAssignmentSerializer
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
         user = self.request.user
@@ -87,6 +88,10 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_update(self, serializer):
+        for field in ('shift', 'slot'):
+            target = serializer.validated_data.get(field)
+            if target is not None and target.pk != getattr(serializer.instance, f'{field}_id'):
+                raise DRFValidationError({field: 'Cannot reassign a roster assignment to another shift or slot.'})
         if _slot_locked_by_published_roster(serializer.instance.slot):
             raise DRFValidationError(
                 "Unpublish this shift for editing before changing its assignment in a published roster."
@@ -136,7 +141,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         pharmacy = serializer.validated_data['pharmacy']
-        if not user_can_manage_pharmacy(self.request.user, pharmacy):
+        if not managed_pharmacies_for(self.request.user).filter(pk=pharmacy.pk).exists():
             self.permission_denied(self.request)
         serializer.save()
 
