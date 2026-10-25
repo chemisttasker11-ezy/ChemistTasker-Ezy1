@@ -18,7 +18,7 @@ jobs:
   authorization-and-finance:
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    env: &testenv
+    env:
       SECRET_KEY: pr201-synthetic-finance-ci-key
       ADMIN_URL: admin/
       EMAIL_HOST_USER: ci@example.test
@@ -85,7 +85,18 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      <<: *testenv
+      SECRET_KEY: pr201-synthetic-finance-ci-key
+      ADMIN_URL: admin/
+      EMAIL_HOST_USER: ci@example.test
+      EMAIL_HOST_PASSWORD: ci-placeholder
+      DEFAULT_FROM_EMAIL: ci@example.test
+      RECAPTCHA_SECRET_KEY: ci-placeholder
+      AZURE_OCR_ENDPOINT: https://example.test
+      AZURE_OCR_KEY: ci-placeholder
+      SCRAPINGBEE_API_KEY: ci-placeholder
+      MOBILEMESSAGE_USERNAME: ci-placeholder
+      MOBILEMESSAGE_PASSWORD: ci-placeholder
+      MOBILEMESSAGE_SENDER: ChemistTasker
       LOCAL_DB_NAME: chemisttasker_ci
       LOCAL_DB_USER: postgres
       LOCAL_DB_PASSWORD: postgres
