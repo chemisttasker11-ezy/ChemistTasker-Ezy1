@@ -66,3 +66,45 @@ class B53OutOfOrderSubscriptionEvents(TestCase):
             self.sub.status, "canceled",
             "Payment for an old invoice must not reverse a later cancellation.",
         )
+
+    def test_b53_paid_invoice_wrong_customer_is_not_authorized(self):
+        self.sub.status = "inactive"
+        self.sub.save(update_fields=["status"])
+        self.deliver("evt_b53_wrong_cus", "invoice.paid", {
+            "id": "in_wrong_cus", "customer": "cus_other",
+            "subscription": "sub_b53", "lines": {"data": []},
+        })
+        self.assertEqual(self.sub.status, "inactive")
+
+    def test_b53_late_checkout_does_not_resurrect_deleted_plan(self):
+        self.sub.status = "canceled"
+        self.sub.save(update_fields=["status"])
+        self.deliver("evt_b53_late_checkout", "checkout.session.completed", {
+            "mode": "subscription", "customer": "cus_b53",
+            "subscription": "sub_old_checkout",
+            "metadata": {"owner_user_id": str(self.sub.owner_id)},
+        })
+        self.assertEqual(self.sub.status, "canceled")
+        self.assertEqual(self.sub.stripe_subscription_id, "sub_b53")
+
+    def test_subscription_checkout_wrong_customer_cannot_activate_owner(self):
+        self.sub.status = "inactive"
+        self.sub.save(update_fields=["status"])
+        self.deliver("evt_b53_foreign_checkout", "checkout.session.completed", {
+            "mode": "subscription", "customer": "cus_someone_else",
+            "subscription": "sub_foreign",
+            "metadata": {"owner_user_id": str(self.sub.owner_id)},
+        })
+        self.assertEqual(self.sub.status, "inactive")
+        self.assertEqual(self.sub.stripe_subscription_id, "sub_b53")
+
+    def test_subscription_checkout_correct_customer_activates_inactive(self):
+        self.sub.status = "inactive"
+        self.sub.save(update_fields=["status"])
+        self.deliver("evt_b53_current_checkout", "checkout.session.completed", {
+            "mode": "subscription", "customer": "cus_b53",
+            "subscription": "sub_b53_new",
+            "metadata": {"owner_user_id": str(self.sub.owner_id)},
+        })
+        self.assertEqual(self.sub.status, "active")
+        self.assertEqual(self.sub.stripe_subscription_id, "sub_b53_new")

@@ -901,6 +901,14 @@ def _process_stripe_event(event):
                 if not sub:
                     logger.warning('Stripe subscription checkout completed but no local subscription matched.')
                     raise OwnerSubscription.DoesNotExist
+                # A metadata owner ID is not proof of Stripe customer ownership.
+                # Lock the local account and reject late checkouts for a
+                # terminated subscription as well as cross-customer events.
+                sub = OwnerSubscription.objects.select_for_update().get(pk=sub.pk)
+                if (sub.stripe_customer_id != session.get('customer')
+                        or sub.status == 'canceled'):
+                    logger.warning('Ignoring subscription checkout for canceled or mismatched account.')
+                    return
                 if subscription_kind == 'extra_seats':
                     sub.stripe_extra_seat_subscription_id = session.subscription
                     sub.status = 'active'
@@ -1029,11 +1037,14 @@ def _process_stripe_event(event):
         customer_id = invoice.get('customer')
         if sub_id:
             try:
-                sub = OwnerSubscription.objects.filter(stripe_subscription_id=sub_id).first()
-                matched_extra_subscription = False
+                sub = OwnerSubscription.objects.select_for_update().filter(
+                    stripe_subscription_id=sub_id, stripe_customer_id=customer_id,
+                ).first()
                 if not sub:
-                    sub = OwnerSubscription.objects.filter(stripe_extra_seat_subscription_id=sub_id).first()
-                    matched_extra_subscription = sub is not None
+                    sub = OwnerSubscription.objects.select_for_update().filter(
+                        stripe_extra_seat_subscription_id=sub_id,
+                        stripe_customer_id=customer_id,
+                    ).first()
                 # An invoice must belong to the *exact* active local
                 # subscription. Matching on customer alone can resurrect a
                 # previously deleted subscription or credit a different plan.
@@ -1087,13 +1098,20 @@ def _process_stripe_event(event):
 
     elif event.type == 'customer.subscription.deleted':
         sub_id = event.data.object.id
+        customer_id = event.data.object.get('customer')
+        lookup = {'stripe_subscription_id': sub_id}
+        if customer_id:
+            lookup['stripe_customer_id'] = customer_id
         try:
-            sub = OwnerSubscription.objects.filter(stripe_subscription_id=sub_id).first()
+            sub = OwnerSubscription.objects.select_for_update().filter(**lookup).first()
             if sub:
                 sub.status = 'canceled'
                 sub.save(update_fields=['status'])
             else:
-                sub = OwnerSubscription.objects.filter(stripe_extra_seat_subscription_id=sub_id).first()
+                addon_lookup = {'stripe_extra_seat_subscription_id': sub_id}
+                if customer_id:
+                    addon_lookup['stripe_customer_id'] = customer_id
+                sub = OwnerSubscription.objects.select_for_update().filter(**addon_lookup).first()
                 if not sub:
                     raise OwnerSubscription.DoesNotExist
                 sub.stripe_extra_seat_subscription_id = None
