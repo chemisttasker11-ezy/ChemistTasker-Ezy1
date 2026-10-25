@@ -1,0 +1,250 @@
+{
+  "chunk": "C010",
+  "files": [
+    {
+      "path": "backend/ethical_marketplace/policy.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "F10-N4"
+      ],
+      "note": "Bulk stock/listing gates omit per-product schedule checks; matches F10-N4."
+    },
+    {
+      "path": "backend/ethical_marketplace/serializers.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "C010-N1",
+        "F10-N6"
+      ],
+      "note": "Draft listing pharmacy/product writable; listed allocation serializer exposes full stock lot details."
+    },
+    {
+      "path": "backend/ethical_marketplace/signals.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Pre-save enforces maximum audience and S8 ceiling; recalculates scope from current pharmacy."
+    },
+    {
+      "path": "backend/ethical_marketplace/tasks.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Escalation task locks step and checks version, owner authority, product policy and audience ceiling."
+    },
+    {
+      "path": "backend/ethical_marketplace/test_finalisation.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tests S8 circle, chain source forgery and current/max audience invariants."
+    },
+    {
+      "path": "backend/ethical_marketplace/tests.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Includes restricted catalogue, S8 organisation visibility and transfer-document signature test cases."
+    },
+    {
+      "path": "backend/ethical_marketplace/urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Ethical routes separately expose approval, grants, stock, listings, transfer state and documents."
+    },
+    {
+      "path": "backend/ethical_marketplace/views.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B26",
+        "B31",
+        "F10-N4",
+        "F10-N5",
+        "F10-N6",
+        "C010-N1"
+      ],
+      "note": "Draft patch trusts destination pharmacy/product; previously recorded creation, concurrent transfer, policy and privacy issues."
+    },
+    {
+      "path": "backend/invoicing/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Empty Python package initializer."
+    },
+    {
+      "path": "backend/invoicing/admin.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Admin module registers invoice and line item; no independent bypass surfaced."
+    },
+    {
+      "path": "backend/invoicing/apps.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Django AppConfig only."
+    },
+    {
+      "path": "backend/invoicing/migrations/0001_initial.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "State-only invoice model move preserves existing tables and remaps content types."
+    },
+    {
+      "path": "backend/invoicing/migrations/0002_clean_table_and_index_names.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Renames invoice tables and indexes without row transformation."
+    },
+    {
+      "path": "backend/invoicing/migrations/0003_clean_constraint_names.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PostgreSQL constraint/index/sequence rename list; requires exact-head migration rehearsal."
+    },
+    {
+      "path": "backend/invoicing/migrations/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Empty migration initializer."
+    },
+    {
+      "path": "backend/invoicing/models.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Invoice versions, totals, source snapshots and per-assignment unique constraint defined."
+    },
+    {
+      "path": "backend/invoicing/navigation.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Dashboard role-specific paths with no authorization decisions."
+    },
+    {
+      "path": "backend/invoicing/serializers.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B33"
+      ],
+      "note": "Legacy serializer exposes writable pharmacy and status; B33 cross-tenant invoice creation."
+    },
+    {
+      "path": "backend/invoicing/services.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Accepted assignment invoice generation locks assigned work, validates IDs and prices, and recalculates totals."
+    },
+    {
+      "path": "backend/invoicing/test_integrity.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tests invoice accepted rates, revision visibility, anti-duplication, send history and source identity."
+    },
+    {
+      "path": "backend/invoicing/test_navigation.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Invoice action URL mapping tests."
+    },
+    {
+      "path": "backend/invoicing/urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Explicit named invoice generation, preview, detail, PDF, send and issue routes."
+    },
+    {
+      "path": "backend/invoicing/views.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B33",
+        "B58"
+      ],
+      "note": "Creator may assign foreign pharmacy/status; manager may view unsent paid invoices via legacy status."
+    },
+    {
+      "path": "backend/marketplace/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Empty package initializer."
+    },
+    {
+      "path": "backend/marketplace/admin.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Marketplace image and listing moderation registration, with admin-only state updates."
+    },
+    {
+      "path": "backend/marketplace/apps.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Registers marketplace invariant signals at app startup."
+    },
+    {
+      "path": "backend/marketplace/entry_views.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Signed-in listing options and creator-scoped listing dashboard."
+    },
+    {
+      "path": "backend/marketplace/listing_policy.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Distinct pharmacy owner versus personal seller role permissions and medicine exclusion."
+    },
+    {
+      "path": "backend/marketplace/management/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Empty command package marker."
+    },
+    {
+      "path": "backend/marketplace/management/commands/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Empty commands marker."
+    },
+    {
+      "path": "backend/marketplace/management/commands/check_marketplace_release.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Checks migration history, pending migrations and seeded categories; reports switches."
+    },
+    {
+      "path": "backend/marketplace/management/commands/finalize_marketplace_data.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Repairs ordinary marketplace listing audience invariants within transaction."
+    },
+    {
+      "path": "backend/marketplace/management/commands/seed_marketplace_categories.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Seeds explicit role- and context-scoped non-medicine categories."
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P1",
+      "area": "Marketplace",
+      "title": "Editing an ethical draft can reassign it to another owner's pharmacy and another product without destination authorization.",
+      "scenario": "Tom delegates preparation of his ethical listing to Omar. Omar edits that DRAFT with Nadia's unrelated pharmacy identifier and another approved product. The update saves the reassignment without proving Omar can manage Nadia's pharmacy or that he is approved for the replacement product. Nadia's stock workflow can then contain Tom's unauthorized listing.",
+      "evidence": [
+        "backend/ethical_marketplace/views.py:317",
+        "backend/ethical_marketplace/views.py:318",
+        "backend/ethical_marketplace/views.py:319",
+        "backend/ethical_marketplace/views.py:322",
+        "backend/ethical_marketplace/views.py:324",
+        "backend/ethical_marketplace/serializers.py:60",
+        "backend/ethical_marketplace/serializers.py:63",
+        "backend/ethical_marketplace/signals.py:18"
+      ],
+      "confidence": "high",
+      "test_needed": "Create a draft owned by pharmacy A. As authorized A preparer, PATCH its pharmacy to unrelated B and product to unapproved S8; assert 403/400 and no owner/product/lot/audience changes. Valid description-only update remains allowed.",
+      "owner_question": {
+        "question": "May Omar move a draft ethical medicine listing from Tom's premises to Nadia's unrelated premises without the destination owner authorising it?",
+        "options": [
+          "No; immutable pharmacy and product with fresh draft required for material changes",
+          "Only with explicit authorization from both pharmacy owners and new product policy checks",
+          "Yes; leave the existing draft PATCH behavior"
+        ]
+      }
+    }
+  ],
+  "reviewer": "gpt6-senior-20261025"
+}
