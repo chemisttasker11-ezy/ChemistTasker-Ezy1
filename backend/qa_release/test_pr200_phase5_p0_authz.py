@@ -199,3 +199,55 @@ class Phase5PollAndInterestScope(TestCase):
         self.assertIn(changed.status_code, (400, 403), changed.data)
         interest.refresh_from_db()
         self.assertEqual(interest.shift_id, shift_a.pk)
+
+
+class Phase5CoverRequestTenantBoundary(TestCase):
+    def test_b21_manager_cannot_release_foreign_pharmacy_assignment(self):
+        from datetime import time
+        from django.core.exceptions import PermissionDenied
+        from shifts.models import ShiftSlot, ShiftSlotAssignment, WorkerShiftRequest
+        from workforce.roster.worker_actions import release_worker_from_assignment
+
+        owner_a, pharmacy_a = make_owner_with_pharmacy("P5 Cover Authority A")
+        owner_b, pharmacy_b = make_owner_with_pharmacy("P5 Cover Authority B")
+        worker, member_b = make_staff_member(pharmacy_b, role="ASSISTANT")
+        member_b.employment_type = "FULL_TIME"
+        member_b.save(update_fields=["employment_type"])
+        day = timezone.localdate() + timedelta(days=6)
+        shift_b = Shift.objects.create(
+            pharmacy=pharmacy_b, created_by=owner_b,
+            role_needed="ASSISTANT", employment_type="FULL_TIME",
+            min_hourly_rate=45, max_hourly_rate=60,
+            visibility="FULL_PART_TIME",
+        )
+        slot_b = ShiftSlot.objects.create(
+            shift=shift_b, date=day, start_time=time(9, 0), end_time=time(17, 0),
+        )
+        assignment_b = ShiftSlotAssignment.objects.create(
+            shift=shift_b, slot=slot_b, slot_date=day, user=worker,
+        )
+        # Legitimate same-pharmacy authority sees and can manage its own
+        # request; no production employee or third-party service is contacted.
+        local_request = WorkerShiftRequest.objects.create(
+            pharmacy=pharmacy_b, requested_by=worker,
+            shift=assignment_b, role="ASSISTANT",
+            slot_date=day, start_time=time(9, 0), end_time=time(17, 0),
+        )
+        self.assertEqual(
+            client_for(owner_b).get(
+                f"/api/v1/worker-shift-requests/{local_request.pk}/"
+            ).status_code, 200
+        )
+        self.assertTrue(ShiftSlotAssignment.objects.filter(pk=assignment_b.pk).exists())
+
+        forged = WorkerShiftRequest.objects.create(
+            pharmacy=pharmacy_a, requested_by=worker,
+            shift=assignment_b, role="ASSISTANT",
+            slot_date=day, start_time=time(9, 0), end_time=time(17, 0),
+        )
+        with self.assertRaises(PermissionDenied):
+            release_worker_from_assignment(forged, manager=owner_a)
+        self.assertTrue(
+            ShiftSlotAssignment.objects.filter(pk=assignment_b.pk).exists(),
+            "Manager for pharmacy A must not release pharmacy B assignment.",
+        )
