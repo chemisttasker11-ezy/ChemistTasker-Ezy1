@@ -1,3 +1,4 @@
+import { getPharmacyHolidayInfo } from '@chemisttasker/shared-core';
 export const ROLE_OPTIONS = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 export const EMPLOYMENT_TYPES = ['LOCUM', 'PART_TIME', 'FULL_TIME'];
 export const PRIMARY = '#7c3aed';
@@ -125,23 +126,6 @@ const normalizeHour = (value: unknown): string => {
 const toCamelHoursKey = (prefix: string, suffix: 'start' | 'end' | 'closed') =>
     `${prefix}_${suffix}`.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
 
-const pharmacyPublicHolidayDates = (pharmacy: any): string[] => {
-    const raw =
-        pharmacy?.public_holiday_dates ??
-        pharmacy?.publicHolidayDates ??
-        pharmacy?.public_holidays_dates ??
-        pharmacy?.publicHolidaysDates ??
-        pharmacy?.public_holidays ??
-        pharmacy?.publicHolidays;
-    if (!Array.isArray(raw)) return [];
-    return raw
-        .map((value) => (typeof value === 'string' ? value.slice(0, 10) : ''))
-        .filter(Boolean);
-};
-
-const isPublicHolidayDate = (date: string, pharmacy: any) =>
-    pharmacyPublicHolidayDates(pharmacy).includes(date);
-
 export const pharmacyHoursForDate = (
     pharmacy: PharmacyOption | undefined,
     date: string,
@@ -153,7 +137,8 @@ export const pharmacyHoursForDate = (
 
     const parsed = new Date(`${date}T00:00:00`);
     const weekday = Number.isNaN(parsed.getTime()) ? -1 : parsed.getDay();
-    const isPublicHoliday = isPublicHolidayDate(date, pharmacy);
+    const holiday = getPharmacyHolidayInfo(date, pharmacy);
+    const isPublicHoliday = holiday.fullDay;
     const prefix = isPublicHoliday
         ? 'public_holidays'
         : weekday === 0
@@ -187,7 +172,7 @@ export const pharmacyHoursForDate = (
         startTime: start || fallback.startTime,
         endTime: end || fallback.endTime,
         closed,
-        label,
+        label: holiday.partDayWindows.length ? `${label} (part-day public holiday)` : label,
         isPublicHoliday,
     };
 };

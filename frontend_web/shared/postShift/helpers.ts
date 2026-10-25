@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import moment from 'moment';
 import { momentLocalizer } from 'react-big-calendar';
 import type { PharmacySummary } from '@chemisttasker/shared-core';
-import { ORG_ROLES } from '@chemisttasker/shared-core';
+import { ORG_ROLES, getPharmacyHolidayInfo } from '@chemisttasker/shared-core';
 
 export type PharmacyOption = PharmacySummary & { hasChain?: boolean; claimed?: boolean };
 
@@ -232,23 +232,6 @@ const normalizeHour = (value: unknown): string => {
 const toCamelHoursKey = (prefix: string, suffix: 'start' | 'end' | 'closed') =>
   `${prefix}_${suffix}`.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
 
-const pharmacyPublicHolidayDates = (pharmacy: any): string[] => {
-  const raw =
-    pharmacy?.public_holiday_dates ??
-    pharmacy?.publicHolidayDates ??
-    pharmacy?.public_holidays_dates ??
-    pharmacy?.publicHolidaysDates ??
-    pharmacy?.public_holidays ??
-    pharmacy?.publicHolidays;
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((value) => (typeof value === 'string' ? value.slice(0, 10) : ''))
-    .filter(Boolean);
-};
-
-const isPublicHolidayDate = (date: string, pharmacy: any) =>
-  pharmacyPublicHolidayDates(pharmacy).includes(date);
-
 export const pharmacyHoursForDate = (
   pharmacy: PharmacyOption | undefined,
   date: string,
@@ -259,7 +242,8 @@ export const pharmacyHoursForDate = (
   }
 
   const parsed = dayjs(date);
-  const isPublicHoliday = isPublicHolidayDate(date, pharmacy);
+  const holiday = getPharmacyHolidayInfo(date, pharmacy);
+  const isPublicHoliday = holiday.fullDay;
   const weekday = parsed.isValid() ? parsed.day() : -1;
   const prefix = isPublicHoliday
     ? 'public_holidays'
@@ -294,7 +278,7 @@ export const pharmacyHoursForDate = (
     startTime: start || fallback.startTime,
     endTime: end || fallback.endTime,
     closed,
-    label,
+    label: holiday.partDayWindows.length ? `${label} (part-day public holiday)` : label,
     isPublicHoliday,
   };
 };
