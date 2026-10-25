@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureApi } from '../../transport/application';
-import { rosterV2 } from './api';
+import { fetchRosterWorkerAssignments, fetchWorkerShiftRequestsService, rosterV2 } from './api';
 
 let mockedFetch: ReturnType<typeof vi.fn>;
 const success = (value: unknown) => new Response(JSON.stringify(value), {
@@ -42,5 +42,33 @@ describe('roster V2 shared wire parity', () => {
         await rosterV2.applyTemplate({ template_id: 12, target_week_start: '2026-10-26', include_assignments: true, overwrite: false });
         expect(lastCall()[0].pathname).toBe('/api/v1/attendance/roster/templates/apply/');
         expect(requestBody()).toEqual({ template_id: 12, target_week_start: '2026-10-26', include_assignments: true, overwrite: false });
+    });
+});
+
+describe('roster collections', () => {
+    it('reads cover requests beyond page one while preserving roster scope', async () => {
+        mockedFetch.mockImplementation(async (url: URL) => success(url.searchParams.get('page') === '2'
+            ? { results: [{ id: 51 }], next: null }
+            : { results: [{ id: 1 }], next: '?page=2' }));
+        const rows = await fetchWorkerShiftRequestsService({ pharmacyId: 7, startDate: '2026-10-19', endDate: '2026-10-25' });
+        expect(rows.map((item) => item.id)).toEqual([1, 51]);
+        expect(mockedFetch).toHaveBeenCalledTimes(2);
+        expect(lastCall()[0].searchParams.get('pharmacy')).toBe('7');
+        expect(lastCall()[0].searchParams.get('start_date')).toBe('2026-10-19');
+        expect(lastCall()[0].searchParams.get('end_date')).toBe('2026-10-25');
+    });
+    it('retains an unpaginated cover-request response without extra fetches', async () => {
+        mockedFetch.mockResolvedValue(success([{ id: 9 }]));
+        expect((await fetchWorkerShiftRequestsService()).map((item) => item.id)).toEqual([9]);
+        expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+    it('reads every page so a worker on page 2 is not dropped', async () => {
+        const row = (id: number) => ({ id, slot_date: '2026-10-26', user: id });
+        mockedFetch.mockImplementation(async (url: URL) => success(url.searchParams.get('page') === '2'
+            ? { results: [row(51)], next: null }
+            : { results: [row(1)], next: 'https://example.test/api/v1/roster-worker/?page=2' }));
+        const rows = await fetchRosterWorkerAssignments({ pharmacyId: 7 });
+        expect(rows.map((item) => item.id)).toEqual([1, 51]);
+        expect(lastCall()[0].searchParams.get('pharmacy')).toBe('7');
     });
 });

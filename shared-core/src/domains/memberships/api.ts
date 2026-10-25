@@ -3,7 +3,7 @@ import type { MembershipRecordApi, MembershipInviteLinkApi } from '../../contrac
 import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
 import { fetchApi } from '../../transport/application';
-import { buildQuery, camelCaseKeysDeep } from '../../utils/serialization';
+import { buildQuery, camelCaseKeysDeep, fetchAllPages } from '../../utils/serialization';
 import { mapMembershipApplication, mapMembershipSummary } from './mappers';
 export function getMemberships(params?: Record<string, unknown>) {
     const query = buildQuery(params);
@@ -79,21 +79,11 @@ export function applyMagicMembership(token: string, data: unknown) {
     return fetchApi(`/magic/memberships/${token}/apply/`, { method: 'POST', body: JSON.stringify(data) });
 }
 export async function fetchMyMemberships(params?: Record<string, unknown>) {
-    const data = await getMyMemberships(params);
-    const list = Array.isArray(data?.results)
-        ? data.results
-        : Array.isArray(data)
-            ? data
-            : [];
+    const list = await fetchAllPages((page) => getMyMemberships({ ...params, page }));
     return list.map(mapMembershipSummary);
 }
 export async function fetchMembershipsByPharmacy(pharmacyId: number | string) {
-    const data = await getMemberships({ pharmacy_id: pharmacyId, page_size: 500 });
-    const list = Array.isArray(data?.results)
-        ? data.results
-        : Array.isArray(data)
-            ? data
-            : [];
+    const list = await fetchAllPages((page) => getMemberships({ pharmacy_id: pharmacyId, page }));
     return list.map(mapMembershipSummary);
 }
 export async function fetchMembershipApplicationsService(params?: Record<string, unknown>) {

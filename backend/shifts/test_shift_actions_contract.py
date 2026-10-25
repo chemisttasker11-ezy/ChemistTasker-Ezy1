@@ -1010,3 +1010,112 @@ class OfferConfirmationRaceTests(TransactionTestCase):
             self.assertEqual(shift.offers.filter(status__in=[ShiftOffer.Status.ACCEPTED,
                                                            ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT]).count(), 1)
             self.assertEqual(shift.slot_assignments.count(), 0 if payment else 1)
+
+
+# ============================================================================
+# B21 / B55: Worker cover request scope & unlinked concurrency contracts
+# ============================================================================
+from queue import Queue
+from threading import Barrier, Thread
+from unittest import skipUnless
+from django.db import close_old_connections, connection
+from django.test import TransactionTestCase
+from shifts.models import WorkerShiftRequest
+from users.models import User
+
+WORKER_REQUEST_URL = API + "worker-shift-requests/"
+
+
+class CoverRequestScopeTests(TestCase):
+    def setUp(self):
+        self.owner_a, self.pharmacy_a = make_owner_with_pharmacy("Cover A")
+        self.owner_b, self.pharmacy_b = make_owner_with_pharmacy("Cover B")
+        self.worker, _ = make_staff_member(self.pharmacy_b, role="ASSISTANT")
+        self.day = timezone.localdate() + timedelta(days=14)
+        from client_profile.characterization_support import make_assignment
+        _, _, self.assignment = make_assignment(self.pharmacy_b, self.owner_b, self.worker, day=self.day)
+
+    def payload(self, pharmacy, assignment):
+        return {"pharmacy": pharmacy.pk, "shift": assignment.pk, "role": "ASSISTANT",
+                "slot_date": self.day.isoformat(), "start_time": "09:00", "end_time": "17:00"}
+
+    def test_request_cannot_point_at_an_assignment_in_another_pharmacy(self):
+        with mock.patch("shifts.worker_requests.async_task"):
+            res = client_for(self.worker).post(WORKER_REQUEST_URL, self.payload(self.pharmacy_a, self.assignment), format="json")
+        self.assertEqual(res.status_code, 400, res.data)
+        self.assertFalse(WorkerShiftRequest.objects.exists())
+
+    def test_request_cannot_point_at_someone_elses_assignment(self):
+        other, _ = make_staff_member(self.pharmacy_b, role="ASSISTANT")
+        with mock.patch("shifts.worker_requests.async_task"):
+            res = client_for(other).post(WORKER_REQUEST_URL, self.payload(self.pharmacy_b, self.assignment), format="json")
+        self.assertEqual(res.status_code, 400, res.data)
+        self.assertFalse(WorkerShiftRequest.objects.exists())
+
+    def test_foreign_manager_cannot_release_the_assignment(self):
+        req = WorkerShiftRequest.objects.create(
+            pharmacy=self.pharmacy_a, requested_by=self.worker, shift=self.assignment, role="ASSISTANT",
+            slot_date=self.day, start_time=time(9), end_time=time(17))
+        with mock.patch("shifts.worker_requests.async_task"):
+            res = client_for(self.owner_a).post(f"{WORKER_REQUEST_URL}{req.pk}/approve/")
+        self.assertEqual(res.status_code, 400, res.data)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).exists())
+
+    def test_own_assignment_request_is_accepted(self):
+        with mock.patch("shifts.worker_requests.async_task"):
+            res = client_for(self.worker).post(WORKER_REQUEST_URL, self.payload(self.pharmacy_b, self.assignment), format="json")
+        self.assertEqual(res.status_code, 201, res.data)
+        self.assertEqual(WorkerShiftRequest.objects.get().shift_id, self.assignment.pk)
+
+
+class UnlinkedCoverFixture:
+    def setUp(self):
+        self.owner, self.pharmacy = make_owner_with_pharmacy("Unlinked Cover")
+        self.worker, _ = make_staff_member(self.pharmacy, role="ASSISTANT")
+        self.req = WorkerShiftRequest.objects.create(
+            pharmacy=self.pharmacy, requested_by=self.worker, role="ASSISTANT",
+            slot_date=timezone.localdate() + timedelta(days=7), start_time=time(9), end_time=time(17))
+
+
+class UnlinkedCoverApprovalTests(UnlinkedCoverFixture, TestCase):
+    def test_single_approval_publishes_one_vacancy_and_replay_is_refused(self):
+        with mock.patch("shifts.worker_requests.async_task") as task:
+            first = client_for(self.owner).post(f"{WORKER_REQUEST_URL}{self.req.pk}/approve/")
+            replay = client_for(self.owner).post(f"{WORKER_REQUEST_URL}{self.req.pk}/approve/")
+        self.assertEqual(first.status_code, 200, first.data)
+        self.assertEqual(replay.status_code, 400, replay.data)
+        self.assertEqual(Shift.objects.filter(pharmacy=self.pharmacy).count(), 1)
+        self.assertEqual(task.call_count, 1)
+
+
+@skipUnless(connection.vendor == "postgresql", "Requires independent PostgreSQL transactions and row locks.")
+class UnlinkedCoverApprovalPostgresTests(UnlinkedCoverFixture, TransactionTestCase):
+    def test_concurrent_approvals_publish_one_vacancy(self):
+        barrier = Barrier(2)
+        results = Queue()
+
+        def approve():
+            close_old_connections()
+            try:
+                manager = User.objects.get(pk=self.owner.pk)
+                with mock.patch("shifts.worker_requests.async_task"), mock.patch(
+                    "shifts.worker_requests.WorkerShiftRequestViewSet._assert_decider_permissions",
+                    side_effect=lambda req: barrier.wait(timeout=10),
+                ):
+                    res = client_for(manager).post(f"{WORKER_REQUEST_URL}{self.req.pk}/approve/")
+                results.put(res.status_code)
+            except Exception as exc:
+                results.put(repr(exc))
+            finally:
+                connection.close()
+
+        threads = [Thread(target=approve, daemon=True) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+        outcomes = sorted(str(results.get(timeout=2)) for _ in threads)
+        self.assertEqual(outcomes, ["200", "400"])
+        self.assertEqual(Shift.objects.filter(pharmacy=self.pharmacy).count(), 1)
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, "AUTO_PUBLISHED")

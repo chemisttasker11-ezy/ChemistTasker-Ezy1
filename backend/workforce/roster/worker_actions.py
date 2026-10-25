@@ -52,6 +52,21 @@ def validate_worker_replacement_eligibility(
     return True
 
 
+def _reassign(assignment, user):
+    """Hand an assignment to a replacement worker under that worker's own staff terms, never the departing worker's."""
+    from shifts.engagement import staff_assignment_defaults
+    from workforce.roster.services import _protect_assignment_history, refresh_assignment_rate
+    _protect_assignment_history(assignment)
+    defaults = staff_assignment_defaults(
+        user=user, pharmacy=assignment.shift.pharmacy, work_date=assignment.slot_date or assignment.slot.date,
+    )
+    assignment.user = user
+    for field, value in defaults.items():
+        setattr(assignment, field, value)
+    assignment.save(update_fields=["user", *defaults])
+    refresh_assignment_rate(assignment)
+
+
 def request_direct_swap(
     assignment: ShiftSlotAssignment,
     requesting_user,
@@ -152,6 +167,8 @@ def approve_direct_swap(
         # Stale request protection: requester must still be the current assignee!
         if assignment.user_id != req.requested_by_id:
             raise ValidationError("Stale request: the requesting worker is no longer assigned to this shift.")
+        if assignment.shift.pharmacy_id != pharmacy.pk:
+            raise ValidationError("This request does not belong to the assignment's pharmacy.")
 
         swap_audit = RosterActionAudit.objects.filter(
             details__request_id=req.pk, shift_assignment=assignment,
@@ -177,10 +194,7 @@ def approve_direct_swap(
         previous_user_id = assignment.user_id
 
         # Atomic transfer of assignment
-        assignment.user = target_user
-        assignment.save(update_fields=["user"])
-        from workforce.roster.services import refresh_assignment_rate
-        refresh_assignment_rate(assignment)
+        _reassign(assignment, target_user)
 
         # Mark request approved
         req.status = "APPROVED"
@@ -283,6 +297,8 @@ def approve_cover_replacement(
         # Stale request protection: requester must still be the current assignee!
         if assignment.user_id != req.requested_by_id:
             raise ValidationError("Stale request: the requesting worker is no longer assigned to this shift.")
+        if assignment.shift.pharmacy_id != pharmacy.pk:
+            raise ValidationError("This request does not belong to the assignment's pharmacy.")
 
         # Validate replacement worker eligibility
         validate_worker_replacement_eligibility(
@@ -298,10 +314,7 @@ def approve_cover_replacement(
         previous_user_id = assignment.user_id
 
         # Atomic reassignment
-        assignment.user = replacement_user
-        assignment.save(update_fields=["user"])
-        from workforce.roster.services import refresh_assignment_rate
-        refresh_assignment_rate(assignment)
+        _reassign(assignment, replacement_user)
 
         # Mark request approved
         req.status = "APPROVED"
@@ -358,6 +371,9 @@ def release_worker_from_assignment(
             # Stale request protection: requester must still be the current assignee!
             if assignment.user_id != req.requested_by_id:
                 raise ValidationError("Stale request: the requesting worker is no longer assigned to this shift.")
+            # Managers are authorized on the request's pharmacy, so it must own the assignment.
+            if assignment.shift.pharmacy_id != pharmacy.pk:
+                raise ValidationError("This request does not belong to the assignment's pharmacy.")
 
             shift = assignment.shift
             # Explicit deletion of the filled slot assignment

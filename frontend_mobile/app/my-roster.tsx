@@ -206,6 +206,8 @@ export default function MyRosterScreen() {
   };
 
   const coverPayload = (assignment: any) => ({
+    // Link the worker's own assignment so approval releases it instead of posting a second shift.
+    ...(assignment?.id ? { shift: assignment.id } : {}),
     pharmacy: pharmacyId,
     role: assignmentRole(assignment),
     slot_date: assignmentDate(assignment),

@@ -555,6 +555,8 @@ export default function RosterOwnerPage() {
       showSnackbar("Please ensure role, date, and times are selected."); return;
     }
 
+    // Cancel any stale shift replacement before opening an independent post flow.
+    setPendingDeletionShiftId(null);
     setPreviousSearch(location.search);
 
     const params = new URLSearchParams();
@@ -575,18 +577,21 @@ export default function RosterOwnerPage() {
   };
 
   const handleClosePostShiftModal = useCallback(() => {
+    // Closing or cancelling the wizard abandons any pending deletion.
+    setPendingDeletionShiftId(null);
     navigate({ pathname: location.pathname, search: previousSearch || '' }, { replace: true });
     setIsPostShiftModalOpen(false);
   }, [navigate, location.pathname, previousSearch]);
 
   const handlePostShiftCompleted = useCallback(() => {
+    const shiftToDelete = pendingDeletionShiftId;
+    setPendingDeletionShiftId(null);
     handleClosePostShiftModal();
     // delete old shift if we were replacing it via open-shift flow
-    if (pendingDeletionShiftId) {
-      deleteRosterShiftService(pendingDeletionShiftId)
+    if (shiftToDelete) {
+      deleteRosterShiftService(shiftToDelete)
         .catch((err: any) => showSnackbar(`Failed to remove old shift: ${err?.response?.data?.detail || err?.message || 'Unknown error'}`))
         .finally(() => {
-          setPendingDeletionShiftId(null);
           reloadAssignments();
         });
       return;

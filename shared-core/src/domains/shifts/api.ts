@@ -10,7 +10,7 @@ import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
 import { API_ENDPOINTS } from '../../constants/endpoints';
 import { fetchApi } from '../../transport/application';
-import { asList, buildQuery, camelCaseKeysDeep, toPaginatedList } from '../../utils/serialization';
+import { asList, buildQuery, camelCaseKeysDeep, fetchAllPages, toPaginatedList } from '../../utils/serialization';
 import { mapOwnerShiftSummary, mapShift, mapShiftCounterOffer, mapShiftInterest, mapShiftMemberStatus, mapShiftShareLink } from './mappers';
 import type { ShiftOfferAcceptancePayload } from '../../types';
 export function calculateShiftRates(payload: unknown) {
@@ -36,11 +36,11 @@ export function getActiveShifts() {
 export function getConfirmedShifts() {
     return fetchApi<Collection<ShiftApi>>('/shifts/confirmed/');
 }
-export function getHistoryShifts() {
-    return fetchApi<Collection<ShiftApi>>('/shifts/history/');
+export function getHistoryShifts(params?: Record<string, unknown>) {
+    return fetchApi<Collection<ShiftApi>>(`/shifts/history/${buildQuery(params)}`);
 }
-export function getMyConfirmedShifts() {
-    return fetchApi<Collection<ShiftApi>>('/my-confirmed-shifts/');
+export function getMyConfirmedShifts(params?: Record<string, unknown>) {
+    return fetchApi<Collection<ShiftApi>>(`/my-confirmed-shifts/${buildQuery(params)}`);
 }
 export function getMyHistoryShifts(params?: Record<string, unknown>) {
     const query = buildQuery(params);
@@ -292,16 +292,13 @@ export async function fetchConfirmedShiftDetailService(shiftId: number | string)
     return mapShift(data);
 }
 export async function fetchHistoryShifts() {
-    const data = await getHistoryShifts();
-    return asList(data).map(mapShift);
+    return (await fetchAllPages((page) => getHistoryShifts({ page }))).map(mapShift);
 }
 export async function fetchMyConfirmedShifts() {
-    const data = await getMyConfirmedShifts();
-    return asList(data).map(mapShift);
+    return (await fetchAllPages((page) => getMyConfirmedShifts({ page }))).map(mapShift);
 }
 export async function fetchMyHistoryShifts() {
-    const data = await getMyHistoryShifts();
-    return asList(data).map(mapShift);
+    return (await fetchAllPages((page) => getMyHistoryShifts({ page }))).map(mapShift);
 }
 export async function fetchWorkerShiftDetailService(shiftId: number | string) {
     const data = await getWorkerShiftDetail(shiftId);

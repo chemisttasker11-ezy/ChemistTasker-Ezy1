@@ -27,6 +27,7 @@ from datetime import timedelta
 from users.models import User
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.escalation import PUBLIC_LEVEL, apply_escalation, resolve_current_index
+from shifts.history import _protect_assignment_history
 
 
 def _slot_locked_by_published_roster(slot):
@@ -38,6 +39,26 @@ def _slot_locked_by_published_roster(slot):
         week_start=week_start,
         status=RosterPeriod.Status.PUBLISHED,
     ).exists()
+
+
+def _protect_removed_assignments(assignments):
+    try:
+        for assignment in assignments:
+            _protect_assignment_history(assignment)
+    except DjangoValidationError as exc:
+        raise DRFValidationError({"detail": exc.messages}) from exc
+
+
+def _notify_unassigned(assignments):
+    for assignment in assignments:
+        notify_shift_users(
+            [assignment.user],
+            shift=assignment.shift,
+            title="Shift unassigned",
+            body=f"You are no longer assigned to the {assignment.slot_date or assignment.slot.date} shift at {assignment.shift.pharmacy.name}.",
+            kind="shift_unassigned",
+            payload={"slot_id": assignment.slot_id},
+        )
 
 
 # Roster
@@ -122,7 +143,9 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
             raise DRFValidationError(
                 "Unpublish this shift for editing before removing its assignment from a published roster."
             )
+        _protect_removed_assignments([instance])
         super().perform_destroy(instance)
+        _notify_unassigned([instance])
 
     @action(detail=False, methods=['get'], url_path='members-for-roster')
     def members_for_roster(self, request):
@@ -207,10 +230,15 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
             new_user_id = request.data.get('user_id')
             if new_user_id in (None, '', 'null'):
                 # Explicit clear requested by caller.
+                _protect_removed_assignments(existing_assignments.values())
                 shift_instance.slot_assignments.all().delete()
                 return response
 
             newly_assigned_user = get_object_or_404(User, pk=new_user_id)
+            # Worked, invoiced or leave-linked rows must not be handed to someone else.
+            _protect_removed_assignments(
+                a for a in existing_assignments.values() if a.user_id != newly_assigned_user.pk
+            )
             desired_keys = set()
 
             # Build the desired assignment state first, then remove obsolete rows.
@@ -445,12 +473,15 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         if next_visibility == PUBLIC_LEVEL:
             enforce_public_shift_daily_limit(shift.pharmacy)
 
+        removed = list(shift.slot_assignments.select_related('user', 'slot', 'shift__pharmacy'))
+        _protect_removed_assignments(removed)
         try:
             with transaction.atomic():   # the assignments are cleared together with the escalation, or not at all
                 shift.slot_assignments.all().delete()
                 visibility = apply_escalation(shift, allowed_tiers, target_index)
         except DjangoValidationError as exc:   # e.g. the shift belongs to a published roster
             raise DRFValidationError(getattr(exc, "message_dict", {"detail": exc.messages})) from exc
+        _notify_unassigned(removed)
         detail_prefix = f'Shift escalated to {visibility}'.rstrip('.')
         return Response({'detail': f'{detail_prefix} and is now unassigned.'}, status=status.HTTP_200_OK)
 
@@ -572,10 +603,10 @@ class RosterWorkerViewSet(viewsets.ReadOnlyModelViewSet):
         """
         user = self.request.user
         
-        # Get all pharmacies where the user has an active membership
+        # Only accepted staff see a pharmacy's roster; pending, rejected and contact rows do not.
         member_pharmacy_ids = list(Membership.objects.filter(
-            user=user, is_active=True
-        ).values_list('pharmacy_id', flat=True))
+            user=user, is_active=True, status=Membership.Status.ACCEPTED,
+        ).exclude(role="CONTACT").values_list('pharmacy_id', flat=True))
         
         # Start with a base queryset of all assignments either in those pharmacies
         # OR explicitly assigned to the current user (to surface public-pool assignments).

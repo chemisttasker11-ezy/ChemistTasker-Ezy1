@@ -400,6 +400,10 @@ const reloadAssignments = async () => {
       setIsEditingSwapRequest(false);
       return;
     }
+    if (!isMyShift) {
+      setSnackbar({ open: true, message: 'You can only manage your own assigned shifts.', severity: 'info' });
+      return;
+    }
     setIsActionDialogOpen(false);
     if (assignment.isSwapRequest && assignment.swap_request) {
       setIsEditingSwapRequest(true);
@@ -412,10 +416,6 @@ const reloadAssignments = async () => {
       setLeaveType(assignment.leave_request.leave_type || '');
       setLeaveNote(assignment.leave_request.note || '');
       setIsLeaveDialogOpen(true);
-      return;
-    }
-    if (!isMyShift) {
-      setSnackbar({ open: true, message: 'You can only manage your own assigned shifts.', severity: 'info' });
       return;
     }
     setIsEditingLeaveRequest(false);
@@ -530,6 +530,8 @@ const handleSubmitLeaveRequest = async () => {
     setIsSubmitting(true);
     try {
       const payload = {
+        // Link the worker's own assignment so approval releases it instead of posting a second shift.
+        ...(typeof selectedAssignment?.id === 'number' ? { shift: selectedAssignment.id } : {}),
         pharmacy: targetPharmacy,
         role: roleNeeded,
         slot_date: slotDate,

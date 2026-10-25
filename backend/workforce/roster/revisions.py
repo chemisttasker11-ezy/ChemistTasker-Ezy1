@@ -82,11 +82,13 @@ def _coverage_for_week(pharmacy, week_start: date, assignments: list[ShiftSlotAs
         work_date = week_start + timedelta(days=offset)
         for requirement in [r for r in requirements if r.weekday == work_date.weekday()]:
             req_start, req_end = work_interval(pharmacy, work_date, requirement.start_time, requirement.end_time)
-            overlapping = [
-                assignment_id
-                for start, end, assignment_id in by_day_role[(work_date, requirement.role)]
-                if start < req_end and req_start < end
-            ]
+            hits = [(start, end, assignment_id)
+                    for start, end, assignment_id in by_day_role[(work_date, requirement.role)]
+                    if start < req_end and req_start < end]
+            overlapping = [assignment_id for _, _, assignment_id in hits]
+            # Staffing is the lowest headcount at any moment of the window, not anyone touching it.
+            edges = sorted({req_start, req_end, *(max(s, req_start) for s, _, _ in hits), *(min(e, req_end) for _, e, _ in hits)})
+            staffed = min(sum(1 for s, e, _ in hits if s <= a and b <= e) for a, b in zip(edges, edges[1:]))
             rows.append({
                 "requirement_id": requirement.pk,
                 "date": str(work_date),
@@ -94,10 +96,10 @@ def _coverage_for_week(pharmacy, week_start: date, assignments: list[ShiftSlotAs
                 "start_time": requirement.start_time.isoformat(timespec="minutes"),
                 "end_time": requirement.end_time.isoformat(timespec="minutes"),
                 "minimum_staff": requirement.minimum_staff,
-                "scheduled_staff": len(overlapping),
+                "scheduled_staff": staffed,
                 "assignment_ids": overlapping,
-                "is_covered": len(overlapping) >= requirement.minimum_staff,
-                "shortfall": max(requirement.minimum_staff - len(overlapping), 0),
+                "is_covered": staffed >= requirement.minimum_staff,
+                "shortfall": max(requirement.minimum_staff - staffed, 0),
             })
     return rows
 
