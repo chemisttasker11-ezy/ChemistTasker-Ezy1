@@ -10,15 +10,15 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 27,
-  "runtime_failing_scenarios": 30,
+  "runtime_distinct_ids": 30,
+  "runtime_failing_scenarios": 34,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 13,
-    "UNVERIFIED_CANDIDATE": 173,
-    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 26,
+    "UNVERIFIED_CANDIDATE": 170,
+    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 29,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
@@ -41,12 +41,12 @@
     "claim": "NOT_CERTIFIED"
   },
   "s3": {
-    "negative_tests_failed": 30,
+    "negative_tests_failed": 34,
     "positive_or_nonnegative_passed": 11,
-    "tests_executed": 41,
-    "environment": "Django SQLite; synthetic Stripe mocks; actual JWT refresh for B43; NOT production release acceptance",
-    "exact_audited_head": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-    "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179425592"
+    "tests_executed": 45,
+    "environment": "Django SQLite, synthetic mocks, not production release acceptance",
+    "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636",
+    "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c"
   },
   "entries": [
     {
@@ -1073,16 +1073,31 @@
       "severity": "P0",
       "area": "Historical discovery",
       "title": "P0/P1 candidate: Pending/left pharmacy memberships can access or author private pharmacy, group and organisation Hub content",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE",
+      "decision": "FIX",
       "root": "B46",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
       "source_proof": [],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b46_pending_staff_cannot_read_private_pharmacy_post",
+          "observed": "PENDING active FULL_TIME membership received HTTP 200 and private post content instead of denial; accepted staff positive control succeeded.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636",
+          "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        },
+        {
+          "test": "test_b46_pending_staff_cannot_publish_private_hub_posts",
+          "observed": "PENDING active FULL_TIME membership created private post with HTTP 201 instead of 403; accepted staff posting control succeeded.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636",
+          "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "PENDING active FULL_TIME membership received HTTP 200 and private post content instead of denial; accepted staff positive control succeeded. PENDING active FULL_TIME membership created private post with HTTP 201 instead of 403; accepted staff posting control succeeded. B46 is state-conditional; do not infer that all pending invitations are active."
     },
     {
       "id": "B47",
@@ -1105,16 +1120,24 @@
       "severity": "P1",
       "area": "Historical discovery",
       "title": "P1 candidate: Pharmacy Hub mention validation can deliver confidential private post text to ineligible locum or non-accepted members",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE",
+      "decision": "FIX",
       "root": "B48",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
       "source_proof": [],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b48_private_mention_cannot_notify_ineligible_locum",
+          "observed": "Pharmacy post with tagged LOCUM membership returned HTTP 201 instead of rejection. Recipient is explicitly denied pharmacy Hub GET; valid accepted-staff mention notification control passed.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636",
+          "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Pharmacy post with tagged LOCUM membership returned HTTP 201 instead of rejection. Recipient is explicitly denied pharmacy Hub GET; valid accepted-staff mention notification control passed. B46 is state-conditional; do not infer that all pending invitations are active."
     },
     {
       "id": "B49",
@@ -1153,16 +1176,24 @@
       "severity": "P1",
       "area": "Historical discovery",
       "title": "P1 / potentially P0-impact candidate: Revoked pharmacy chat participant can send new messages through direct message endpoint after leaving the pharmacy",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE",
+      "decision": "FIX",
       "root": "F12-N1",
       "root_relation": "RELATED_ROOT",
       "source_proof": [],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b51_revoked_group_participant_cannot_post_new_message",
+          "observed": "After is_active=False,status=LEFT, retained group participant POST /api/v1/messages/ returned 201 instead of 403. Active sender control passed.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636",
+          "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "After is_active=False,status=LEFT, retained group participant POST /api/v1/messages/ returned 201 instead of 403. Active sender control passed. B46 is state-conditional; do not infer that all pending invitations are active."
     },
     {
       "id": "B66",
