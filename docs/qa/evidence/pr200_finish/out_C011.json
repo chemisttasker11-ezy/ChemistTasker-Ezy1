@@ -1,0 +1,213 @@
+{
+  "chunk": "C011",
+  "files": [
+    {
+      "path": "backend/marketplace/migrations/0001_initial.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Initial marketplace state schema and uniqueness constraints"
+    },
+    {
+      "path": "backend/marketplace/migrations/0002_marketplacecatalogueimport_and_more.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Catalogue and delivery schema with separate uniqueness constraints"
+    },
+    {
+      "path": "backend/marketplace/migrations/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Empty package marker"
+    },
+    {
+      "path": "backend/marketplace/models.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Marketplace listing, exchange, receipt and reservation state constraints"
+    },
+    {
+      "path": "backend/marketplace/policy.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Marketplace account validation and owner pharmacy permissions"
+    },
+    {
+      "path": "backend/marketplace/serializers.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B42"
+      ],
+      "note": "Listing serializer writes and public projection"
+    },
+    {
+      "path": "backend/marketplace/services.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Exchange acceptance locks listing, checks version and one active reservation"
+    },
+    {
+      "path": "backend/marketplace/signals.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Seller eligibility and audience policy validation at save"
+    },
+    {
+      "path": "backend/marketplace/tasks.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Scheduled escalation validates version, owner and maximum audience"
+    },
+    {
+      "path": "backend/marketplace/test_listing_policy.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Role-specific seller and pharmacy-audience assertions"
+    },
+    {
+      "path": "backend/marketplace/tests.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Access, consent, public projection and idempotency cases"
+    },
+    {
+      "path": "backend/marketplace/urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Authentication and public marketplace route mapping"
+    },
+    {
+      "path": "backend/marketplace/views.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B24",
+        "B25",
+        "N1"
+      ],
+      "note": "Enquiry idempotency, exchange transitions and listing actions"
+    },
+    {
+      "path": "backend/memberships/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Package marker"
+    },
+    {
+      "path": "backend/memberships/access.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Staff management scope, owner and scoped organisation capabilities"
+    },
+    {
+      "path": "backend/memberships/admin.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Membership admin model registration"
+    },
+    {
+      "path": "backend/memberships/applications.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Atomic pending application approval and workforce terms checks"
+    },
+    {
+      "path": "backend/memberships/apps.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "App registration"
+    },
+    {
+      "path": "backend/memberships/invites.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B19",
+        "F04-N3"
+      ],
+      "note": "Invite creation, accepted/pending activation and bulk row reports"
+    },
+    {
+      "path": "backend/memberships/labels.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Static member role label map"
+    },
+    {
+      "path": "backend/memberships/models.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Membership model, invite and application field constraints"
+    },
+    {
+      "path": "backend/memberships/notifications.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "N2"
+      ],
+      "note": "Membership response notification recipients and outbound email"
+    },
+    {
+      "path": "backend/memberships/role_resolution.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Pharmacist/intern profile-role constraints"
+    },
+    {
+      "path": "backend/memberships/selectors.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tenant-scoped membership, application and invite selectors"
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P1",
+      "area": "Marketplace",
+      "title": "Concurrent identical marketplace enquiries can persist duplicate negotiations before the idempotency receipt fails.",
+      "scenario": "Sara sends an enquiry to Tom's listing twice at the same instant. Both requests see no prior idempotency receipt and create separate exchanges, after which the second hits a unique receipt constraint and returns an error. Tom can receive two negotiations for one enquiry.",
+      "evidence": [
+        "backend/marketplace/views.py:283",
+        "backend/marketplace/views.py:297",
+        "backend/marketplace/views.py:300",
+        "backend/marketplace/views.py:309",
+        "backend/marketplace/models.py:321",
+        "backend/marketplace/models.py:329"
+      ],
+      "confidence": "high",
+      "test_needed": "Concurrently submit identical enquiry UUIDs using PostgreSQL and verify exactly one exchange and one receipt, with repeat-safe response.",
+      "owner_question": {
+        "question": "What should happen if Sara accidentally submits her marketplace enquiry to Tom twice simultaneously?",
+        "options": [
+          "Create one negotiation and replay its outcome",
+          "Create one negotiation and safely reject the duplicate",
+          "Create two negotiations with a server error (current race)"
+        ]
+      }
+    },
+    {
+      "id": "N2",
+      "severity": "P1",
+      "area": "Memberships",
+      "title": "Revoked invitation sender continues receiving membership response notifications containing staff identities.",
+      "scenario": "Lina invites Sara to Tom's pharmacy but subsequently loses her organisation membership and staff-management authority. When Sara responds or leaves, Lina remains a notification recipient through the original inviter link and receives Sara's name and email.",
+      "evidence": [
+        "backend/memberships/notifications.py:66",
+        "backend/memberships/notifications.py:73",
+        "backend/memberships/notifications.py:81",
+        "backend/memberships/notifications.py:116",
+        "backend/memberships/notifications.py:142",
+        "backend/memberships/notifications.py:161"
+      ],
+      "confidence": "high",
+      "test_needed": "After revoking Lina's organisation/pharmacy authority, make Sara accept/leave. Lina receives no email or in-app notification; valid managers still receive it.",
+      "owner_question": {
+        "question": "Should former manager Lina continue receiving Sara's membership notifications after her access is revoked?",
+        "options": [
+          "No, recheck recipient authority for each event",
+          "Only the initial invitation response",
+          "Yes, retain all inviter notifications after removal"
+        ]
+      }
+    }
+  ],
+  "reviewer": "gpt6-senior-20261025"
+}
