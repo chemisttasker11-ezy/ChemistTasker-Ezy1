@@ -1,13 +1,14 @@
 import json
 import logging
-from decimal import Decimal
-from datetime import datetime, timezone as dt_timezone
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime, timedelta, timezone as dt_timezone
 from hashlib import sha256
 from urllib.parse import urlencode
 import stripe
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -793,7 +794,7 @@ def charge_penalty(request, shift_id):
 
     # Calculate expected wage
     assignments = ShiftSlotAssignment.objects.filter(shift=shift)
-    total_wage = 0.0
+    total_wage = Decimal('0')
 
     now = timezone.now()
     earliest_start = None
@@ -806,12 +807,14 @@ def charge_penalty(request, shift_id):
         from datetime import datetime
         start_dt = timezone.make_aware(datetime.combine(slot_date, slot.start_time))
         end_dt = timezone.make_aware(datetime.combine(slot_date, slot.end_time))
+        if slot.end_time <= slot.start_time:
+            end_dt += timedelta(days=1)
         
         if not earliest_start or start_dt < earliest_start:
             earliest_start = start_dt
 
-        hours = (end_dt - start_dt).total_seconds() / 3600.0
-        rate = float(assignment.unit_rate or 0)
+        hours = Decimal(str((end_dt - start_dt).total_seconds())) / Decimal('3600')
+        rate = assignment.unit_rate or Decimal('0')
         total_wage += (hours * rate)
 
     if not earliest_start or total_wage <= 0:
@@ -820,17 +823,18 @@ def charge_penalty(request, shift_id):
     # Calculate Penalty Percentage
     hours_until_shift = (earliest_start - now).total_seconds() / 3600.0
 
-    penalty_percentage = 0.0
+    penalty_percentage = Decimal('0')
     if hours_until_shift <= 24:
-        penalty_percentage = 0.20
+        penalty_percentage = Decimal('0.20')
     elif hours_until_shift <= 72:
-        penalty_percentage = 0.10
+        penalty_percentage = Decimal('0.10')
 
-    if penalty_percentage == 0.0:
+    if penalty_percentage == 0:
         return Response({'message': 'No penalty required, cancelled > 72 hours in advance.'})
 
     penalty_amount_aud = total_wage * penalty_percentage
-    penalty_amount_cents = int(penalty_amount_aud * 100)
+    # Round once at the Stripe boundary so half cents are not truncated.
+    penalty_amount_cents = int((penalty_amount_aud * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     success_url, cancel_url = _shift_checkout_return_urls(
         shift,
         acting_user=user,
@@ -922,9 +926,9 @@ def _process_stripe_event(event):
             shift_id = metadata.get('shift_id')
             payment_type = metadata.get('type')
             if shift_id and payment_type in ('fulfillment', 'cancellation'):
-                amount_aud = 0
+                amount_aud = Decimal('0')
                 if session.amount_total is not None:
-                    amount_aud = session.amount_total / 100.0
+                    amount_aud = Decimal(session.amount_total) / Decimal('100')
 
                 owner_id = metadata.get('owner_user_id') or metadata.get('billing_contact_user_id') or metadata.get('actor_user_id')
 
@@ -972,12 +976,13 @@ def _process_stripe_event(event):
                         )
                         from users.models import User
                         paid_by_user = User.objects.filter(id=metadata.get('actor_user_id')).first()
-                        send_shift_payment_finalized_notifications(
+                        # Notifications must see committed payment and offer changes.
+                        transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
                             shift=shift_obj,
                             offers=finalized_offers,
                             paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
                             payment_method='stripe',
-                        )
+                        ), robust=True)
                         from shifts.models import ShiftOffer
                         has_pending_payment = ShiftOffer.objects.filter(
                             shift=shift_obj,

@@ -1,4 +1,6 @@
 from unittest.mock import patch
+from datetime import datetime, time, timedelta
+from decimal import Decimal
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -485,3 +487,104 @@ class StripePaymentIsolationContracts(TestCase):
         finalize.assert_not_called()
         shift.refresh_from_db()
         self.assertEqual(shift.payment_status, "PENDING")
+
+
+class PenaltyMoneyContracts(TestCase):
+    def setUp(self):
+        from client_profile.characterization_support import make_assignment, make_user
+
+        self.owner, pharmacy = make_owner_with_pharmacy("Penalty rounding")
+        day = timezone.localdate() + timedelta(days=1)
+        self.now = timezone.make_aware(datetime.combine(day, time(8)))
+        self.shift, self.slot, self.assignment = make_assignment(
+            pharmacy, self.owner, make_user("PHARMACIST"), day=day,
+        )
+        self.slot.end_time = time(9, 30)
+        self.slot.save(update_fields=["end_time"])
+        self.url = reverse("api_v1:billing:charge_penalty", args=[self.shift.pk])
+
+    def penalty(self, rate):
+        self.assignment.unit_rate = Decimal(rate)
+        self.assignment.save(update_fields=["unit_rate"])
+        with (
+            patch("billing.views.timezone.now", return_value=self.now),
+            patch("billing.views.stripe.checkout.Session.create", return_value=_StripeObject(url="https://checkout.example.test")) as checkout,
+        ):
+            response = client_for(self.owner).post(self.url, {}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        cents = checkout.call_args.kwargs["line_items"][0]["price_data"]["unit_amount"]
+        self.assertIsInstance(cents, int)
+        return cents
+
+    def test_fractional_cent_penalty_rounds_half_up(self):
+        self.assertEqual(self.penalty("0.05"), 1)
+
+    def test_exact_cent_penalty_positive_control(self):
+        self.assertEqual(self.penalty("1.00"), 10)
+
+    def test_fractional_cent_below_half_rounds_down(self):
+        self.assertEqual(self.penalty("0.04"), 0)
+
+
+@override_settings(STRIPE_WEBHOOK_SECRET="whsec-payment-commit")
+class PaymentWebhookCommitContracts(TestCase):
+    def setUp(self):
+        self.owner, pharmacy = make_owner_with_pharmacy("Payment commit")
+        self.shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=self.owner,
+            role_needed="PHARMACIST", employment_type="LOCUM", payment_status="PENDING",
+        )
+        self.event = _StripeObject(
+            id="evt_payment_commit", type="checkout.session.completed",
+            data=_StripeObject(object=_StripeObject(
+                mode="payment", payment_status="paid", amount_total=12345,
+                payment_intent="pi_payment_commit",
+                metadata={"shift_id": str(self.shift.pk), "type": "fulfillment", "owner_user_id": str(self.owner.pk)},
+            )),
+        )
+        for target, value in (
+            ("billing.views.stripe.Webhook.construct_event", self.event),
+            ("billing.views._finalize_pending_offers_for_shift", (0, [])),
+        ):
+            mock = patch(target, return_value=value)
+            mock.start()
+            self.addCleanup(mock.stop)
+
+    def deliver(self):
+        return self.client.post(reverse("api_v1:billing:stripe_webhook"), b"{}", content_type="application/json")
+
+    def test_checkout_ledger_uses_decimal_before_database_conversion(self):
+        with patch.object(ShiftPayment.objects, "get_or_create", wraps=ShiftPayment.objects.get_or_create) as create:
+            response = self.deliver()
+        self.assertEqual(response.status_code, 200)
+        amount = create.call_args.kwargs["defaults"]["amount_aud"]
+        self.assertIsInstance(amount, Decimal)
+        self.assertEqual(amount, Decimal("123.45"))
+        self.assertEqual(ShiftPayment.objects.get().amount_aud, Decimal("123.45"))
+
+    def test_checkout_exact_dollar_positive_control(self):
+        self.event.data.object['amount_total'] = 1200
+        self.assertEqual(self.deliver().status_code, 200)
+        self.assertEqual(ShiftPayment.objects.get().amount_aud, Decimal("12.00"))
+
+    def test_notification_waits_until_commit_with_finalized_state(self):
+        with patch("shifts.emails.send_shift_payment_finalized_notifications") as notify:
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                self.assertEqual(self.deliver().status_code, 200)
+                notify.assert_not_called()
+            self.assertEqual(len(callbacks), 1)
+            notify.assert_called_once()
+            self.assertEqual(notify.call_args.kwargs["shift"].payment_status, "PAID")
+
+    def test_rollback_discards_notification_and_payment(self):
+        with (
+            patch("shifts.emails.send_shift_payment_finalized_notifications") as notify,
+            patch.object(Shift, "save", side_effect=RuntimeError("payment status update failed")),
+            self.captureOnCommitCallbacks(execute=True) as callbacks,
+        ):
+            self.assertEqual(self.deliver().status_code, 500)
+            notify.assert_not_called()
+        self.assertEqual(callbacks, [])
+        self.assertFalse(ShiftPayment.objects.exists())
+        self.shift.refresh_from_db()
+        self.assertEqual(self.shift.payment_status, "PENDING")
