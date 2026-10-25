@@ -1,5 +1,6 @@
 """Invoice generation: preview and create invoices from accepted shifts, recalculate totals, render the PDF."""
 import json
+from datetime import time
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Pharmacy
 from shifts.models import ShiftSlotAssignment
@@ -93,7 +94,13 @@ def _accepted_invoice_rate(assignment, slot_date):
 def _invoice_line_from_assignment(assignment):
     slot = assignment.slot
     slot_date = assignment.slot_date
-    start_dt, end_dt = _resolve_shift_bounds(slot_date, slot.start_time, slot.end_time)
+    start_time, end_time = slot.start_time, slot.end_time
+    for occurrence in (assignment.engagement_terms_snapshot or {}).get('occurrences') or []:
+        if str(occurrence.get('slot_id')) == str(slot.id) and str(occurrence.get('date')) == str(slot_date):
+            start_time = time.fromisoformat(occurrence['start_time']) if occurrence.get('start_time') else start_time
+            end_time = time.fromisoformat(occurrence['end_time']) if occurrence.get('end_time') else end_time
+            break
+    start_dt, end_dt = _resolve_shift_bounds(slot_date, start_time, end_time)
     # InvoiceLineItem.quantity is a 2-decimal field. Freeze the billed hours
     # at that precision before calculating money so DB, workspace and PDF agree.
     hours = _decimal_hours(start_dt, end_dt).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -106,9 +113,9 @@ def _invoice_line_from_assignment(assignment):
         "shiftId": assignment.shift_id,
         "shiftSlotId": slot.id,
         "date": str(slot_date),
-        "start_time": slot.start_time.strftime("%H:%M:%S"),
-        "end_time": slot.end_time.strftime("%H:%M:%S"),
-        "description": f"{str(slot_date)} {slot.start_time.strftime('%H:%M')}-{slot.end_time.strftime('%H:%M')}",
+        "start_time": start_time.strftime("%H:%M:%S"),
+        "end_time": end_time.strftime("%H:%M:%S"),
+        "description": f"{str(slot_date)} {start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')}",
         "category": "ProfessionalServices",
         "category_code": "ProfessionalServices",
         "unit": "Hours",

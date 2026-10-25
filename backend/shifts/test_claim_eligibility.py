@@ -20,6 +20,22 @@ API = "/api/v1/"
 
 
 class ClaimEligibilityTests(TestCase):
+    def test_c020_n2_other_free_slots_can_be_claimed_but_taken_slot_cannot(self):
+        worker = make_user('PHARMACIST')
+        Membership.objects.create(user=worker, pharmacy=self.pharmacy, role='PHARMACIST', employment_type='FULL_TIME',
+                                  status=Membership.Status.ACCEPTED, is_active=True)
+        shift = Shift.objects.create(pharmacy=self.pharmacy, created_by=self.owner, role_needed='PHARMACIST',
+                                     employment_type='LOCUM', visibility='FULL_PART_TIME', single_user_only=False)
+        slots = [ShiftSlot.objects.create(shift=shift, date=date.today() + timedelta(days=7 + i),
+                                          start_time=time(9), end_time=time(17)) for i in range(2)]
+        ShiftSlotAssignment.objects.create(shift=shift, slot=slots[0], slot_date=slots[0].date, user=make_user('PHARMACIST'))
+        with mock.patch('shifts.browse.async_task'):
+            refused = client_for(worker).post(f'{API}community-shifts/{shift.id}/claim-shift/', {'slot_id': slots[0].id}, format='json')
+            allowed = client_for(worker).post(f'{API}community-shifts/{shift.id}/claim-shift/', {'slot_id': slots[1].id}, format='json')
+        self.assertEqual(refused.status_code, 400, refused.data)
+        self.assertEqual(allowed.status_code, 201, allowed.data)
+        self.assertEqual(shift.slot_assignments.count(), 2)
+
     def test_assistant_claim_does_not_replace_pharmacy_approved_technician_employment_role(self):
         from onboarding.models import OtherStaffOnboarding
         worker = make_user('OTHER_STAFF')

@@ -14,7 +14,7 @@ from shifts.assignment import offer_dedicated_shift
 from shifts.emails import send_shift_updated_notifications
 from shifts.escalation import ESCALATION_FIELD_MAP
 from shifts.limits import enforce_public_shift_daily_limit
-from shifts.models import Shift, ShiftSlot
+from shifts.models import Shift, ShiftOffer, ShiftSlot
 
 
 def normalize_money_value(value, *, field_name, slot_index):
@@ -169,6 +169,11 @@ def revise_shift(
         allowed_tiers = pharmacy_allowed_tiers(instance.pharmacy)
     slots_data = normalize_slots_payload(slots_payload) if slots_payload is not None else None
     with transaction.atomic():
+        Shift.objects.select_for_update().get(pk=instance.pk)
+        if instance.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists() and (
+            slots_payload is not None or any(getattr(instance, key) != value for key, value in validated_data.items())
+        ):
+            raise serializers.ValidationError('This shift has an accepted offer awaiting payment. Complete payment before editing its terms.')
         # If visibility is changing, recalc escalation_level
         if 'visibility' in validated_data:
             new_vis = validated_data['visibility']

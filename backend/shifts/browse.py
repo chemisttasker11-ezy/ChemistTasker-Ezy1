@@ -23,6 +23,7 @@ from django.db.models import Count, F, Q
 from django.utils import timezone
 from shifts.pricing import get_locked_rate_for_slot
 from shifts.engagement import staff_assignment_defaults
+from shifts.assignment import slot_locked_for_shift_offer
 from shifts.selectors import _future_or_current_slot_q
 from shifts.access import staff_membership_can_claim_role
 from shifts.emails import build_roster_email_link, build_shift_email_context
@@ -350,18 +351,19 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 )
 
             # --- 5. Check if shift already taken ---
-            any_assigned = ShiftSlotAssignment.objects.filter(shift=shift).exists()
+            Shift.objects.select_for_update().get(pk=shift.pk)
+            any_assigned = shift.single_user_only and ShiftSlotAssignment.objects.filter(shift=shift).exists()
             if any_assigned:
                 return Response({"detail": "This shift is no longer available."}, status=status.HTTP_400_BAD_REQUEST)
 
             # --- 6. Slot selection ---
             if shift.single_user_only:
-                slots_to_claim = list(shift.slots.all())
+                slots_to_claim = list(shift.slots.select_for_update().order_by("pk"))
             elif slot_id:
-                slot = get_object_or_404(ShiftSlot, pk=slot_id, shift=shift)
+                slot = get_object_or_404(ShiftSlot.objects.select_for_update(), pk=slot_id, shift=shift)
                 slots_to_claim = [slot]
             else:
-                slots_to_claim = list(shift.slots.all())
+                slots_to_claim = list(shift.slots.select_for_update().order_by("pk"))
 
             if not slots_to_claim:
                 return Response(
@@ -372,7 +374,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
             # --- 7. Create assignments ---
             assignment_ids = []
             for slot in slots_to_claim:
-                taken = ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot.date).exists()
+                taken = slot_locked_for_shift_offer(shift=shift, slot=slot, slot_date=slot.date)
                 if taken:
                     continue
 
@@ -396,6 +398,9 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                     **defaults,
                 )
                 assignment_ids.append(assignment.id)
+
+            if not assignment_ids:
+                return Response({"detail": "This shift is no longer available."}, status=status.HTTP_400_BAD_REQUEST)
 
         # --- 8. Cleanup and notification ---
         ShiftInterest.objects.filter(shift=shift, user=user).delete()

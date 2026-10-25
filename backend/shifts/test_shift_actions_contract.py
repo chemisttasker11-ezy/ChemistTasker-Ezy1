@@ -11,7 +11,11 @@ from datetime import date, time, timedelta
 from decimal import Decimal
 from unittest import mock
 
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
+from django.db import close_old_connections, connection
+from unittest import skipUnless
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from django.utils import timezone
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_staff_member, make_user
@@ -721,3 +725,288 @@ class ShiftTenantIsolationContracts(TestCase):
         shift.refresh_from_db()
         self.assertEqual(shift.pharmacy_id, self.a.pk)
         self.assertEqual(shift.payment_status, "PENDING")
+
+
+class BookingSafetyTests(ShiftActionFixture):
+    def offer(self, shift, worker, **extra):
+        slot = shift.slots.first() if not shift.single_user_only else None
+        return ShiftOffer.objects.create(shift=shift, slot=slot, user=worker, **extra)
+
+    def accept(self, offer, payment=True):
+        from billing.utils import BILLING_STATE_PAYMENT_REQUIRED
+        with mock.patch('shifts.engagement.build_shift_engagement_terms', return_value={}), \
+                mock.patch('billing.utils.get_billing_state_for_pharmacy',
+                           return_value=BILLING_STATE_PAYMENT_REQUIRED if payment else 'FREE'), \
+                mock.patch('shifts.offers.notify_shift_users'), mock.patch('shifts.offers.async_task'), \
+                mock.patch('shifts.offers.send_shift_payment_finalized_notifications'), \
+                self.captureOnCommitCallbacks(execute=True):
+            return client_for(offer.user).post(f'{API}shift-offers/{offer.id}/accept/', {}, format='json')
+
+    def test_b54_second_confirmation_cannot_reserve_the_same_occurrence(self):
+        for payment in (True, False):
+            with self.subTest(payment=payment):
+                shift = self.shift(single_user_only=False)
+                first = self.offer(shift, self.worker())
+                second = self.offer(shift, self.worker())
+                self.assertEqual(self.accept(first, payment).status_code, 200)
+                refused = self.accept(second, payment)
+                self.assertEqual(refused.status_code, 400, refused.data)
+                second.refresh_from_db()
+                self.assertNotIn(second.status, [ShiftOffer.Status.ACCEPTED, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT])
+
+    def test_b54_a_different_occurrence_remains_available(self):
+        shift = self.shift(single_user_only=False, slots=2)
+        first, second = shift.slots.order_by('id')
+        reserved = self.offer(shift, self.worker(), status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                              offered_slot_date=first.date)
+        offer = ShiftOffer.objects.create(shift=shift, slot=second, user=self.worker(), offered_slot_date=second.date)
+        self.assertEqual(self.accept(offer).status_code, 200)
+        reserved.refresh_from_db()
+        self.assertEqual(reserved.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+    def test_b54_another_date_of_the_same_recurring_slot_remains_available(self):
+        shift = self.shift(single_user_only=False)
+        slot = shift.slots.get()
+        slot.is_recurring = True
+        slot.recurring_days = list(range(7))
+        slot.recurring_end_date = slot.date + timedelta(days=7)
+        slot.save()
+        reserved = self.offer(shift, self.worker(), status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                              offered_slot_date=slot.date)
+        next_date = self.offer(shift, self.worker(), offered_slot_date=slot.date + timedelta(days=7))
+        self.assertEqual(self.accept(next_date).status_code, 200)
+        reserved.refresh_from_db()
+        self.assertEqual(reserved.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+    def test_b54_single_worker_shift_keeps_remaining_dates_for_the_same_worker(self):
+        shift = self.shift(single_user_only=True, slots=3)
+        worker, other = self.worker(), self.worker()
+        first, second, third = shift.slots.order_by('id')
+        for candidate, slot, expected in ((worker, first, 200), (other, second, 400), (worker, third, 200)):
+            offer = ShiftOffer.objects.create(shift=shift, user=candidate, slot=slot, offered_slot_date=slot.date)
+            self.assertEqual(self.accept(offer).status_code, expected)
+
+    def test_b54_finalization_refuses_a_losing_offer_and_is_idempotent_for_the_winner(self):
+        from shifts.finalize import finalize_shift_offer
+        from rest_framework.exceptions import ValidationError
+        shift = self.shift(single_user_only=False)
+        winner = self.offer(shift, self.worker(), offered_rate=Decimal('70'))
+        loser = self.offer(shift, self.worker(), offered_rate=Decimal('70'))
+        with mock.patch('shifts.finalize.get_locked_rate_for_slot', return_value=(Decimal('70'), {})):
+            self.assertEqual(len(finalize_shift_offer(winner)[0]), 1)
+            self.assertEqual(finalize_shift_offer(winner)[0], [])
+            with self.assertRaises(ValidationError):
+                finalize_shift_offer(loser)
+        loser.refresh_from_db()
+        self.assertEqual(loser.status, ShiftOffer.Status.PENDING)
+
+    def test_b20_interest_and_rejection_cannot_be_moved_to_another_shift_or_slot(self):
+        worker = self.worker()
+        shift, other = self.shift(single_user_only=False), self.shift(single_user_only=False)
+        for model, endpoint in [(ShiftInterest, 'shift-interests'), (ShiftRejection, 'shift-rejections')]:
+            row = model.objects.create(shift=shift, slot=shift.slots.get(), user=worker)
+            response = client_for(worker).patch(f'{API}{endpoint}/{row.id}/',
+                                               {'shift': other.id, 'slot': other.slots.get().id}, format='json')
+            self.assertIn(response.status_code, (400, 405), response.data)
+            row.refresh_from_db()
+            self.assertEqual((row.shift_id, row.slot_id), (shift.id, shift.slots.get().id))
+            self.assertEqual(client_for(worker).get(f'{API}{endpoint}/?shift={shift.id}').status_code, 200)
+            action = 'express_interest' if model is ShiftInterest else 'reject'
+            legitimate, _ = self.post(worker, f'shifts/{shift.id}/{action}/', {'slot_id': row.slot_id})
+            self.assertIn(legitimate.status_code, (200, 201), legitimate.data)
+
+    def test_b67_generic_offer_delete_is_disabled_but_pending_decline_works(self):
+        worker = self.worker()
+        shift = self.shift()
+        for user in (worker, self.owner):
+            offer = self.offer(shift, worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+            response = client_for(user).delete(f'{API}shift-offers/{offer.id}/')
+            self.assertEqual(response.status_code, 405)
+            self.assertTrue(ShiftOffer.objects.filter(pk=offer.pk).exists())
+        pending = self.offer(shift, worker)
+        response, _ = self.post(worker, f'shift-offers/{pending.id}/decline/')
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_f01_n2_pending_payment_blocks_terms_and_slot_replacement(self):
+        worker = self.worker()
+        shift = self.shift(single_user_only=False)
+        offer = self.offer(shift, worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        slot = shift.slots.get()
+        for payload in ({'role_needed': 'PHARMACIST', 'fixed_rate': '999.00'}, {'slots': []}, {'description': 'Different duties'}):
+            response = self.owner_client.patch(f'{API}shifts/{shift.id}/', payload, format='json')
+            self.assertEqual(response.status_code, 400, response.data)
+            self.assertIn('awaiting payment', str(response.data))
+            self.assertTrue(shift.slots.filter(pk=slot.pk).exists())
+            offer.refresh_from_db()
+            self.assertEqual(offer.slot_id, slot.id)
+        offer.status = ShiftOffer.Status.DECLINED
+        offer.save(update_fields=['status'])
+        with mock.patch('shifts.posting.send_shift_updated_notifications'), self.captureOnCommitCallbacks(execute=True):
+            response = self.owner_client.patch(f'{API}shifts/{shift.id}/', {'description': 'Different duties'}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_b71_notification_outage_does_not_fail_confirmation(self):
+        from billing.utils import BILLING_STATE_PAYMENT_REQUIRED
+        for broken in (False, True):
+            offer = self.offer(self.shift(), self.worker())
+            with mock.patch('shifts.engagement.build_shift_engagement_terms', return_value={}), \
+                    mock.patch('billing.utils.get_billing_state_for_pharmacy', return_value=BILLING_STATE_PAYMENT_REQUIRED), \
+                    mock.patch('shifts.offers.notify_shift_users', side_effect=RuntimeError('offline') if broken else None) as notice, \
+                    mock.patch('shifts.offers.async_task'), self.captureOnCommitCallbacks(execute=True):
+                response = client_for(offer.user).post(f'{API}shift-offers/{offer.id}/accept/', {}, format='json')
+            self.assertEqual(response.status_code, 200, response.data)
+            offer.refresh_from_db()
+            self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+            self.assertTrue(notice.called)
+
+    def test_c020_n1_f05_n3_wrong_role_cannot_be_rostered_offered_or_confirmed(self):
+        from onboarding.models import OtherStaffOnboarding
+        technician = make_user('OTHER_STAFF')
+        OtherStaffOnboarding.objects.create(user=technician, role_type='TECHNICIAN', verified=True)
+        Membership.objects.create(user=technician, pharmacy=self.pharmacy, role='TECHNICIAN',
+                                  employment_type='FULL_TIME', status=Membership.Status.ACCEPTED, is_active=True)
+        pharmacist = self.worker('FULL_TIME')
+        for worker, expected in ((technician, 400), (pharmacist, 200)):
+            shift = self.shift(single_user_only=False)
+            slot = shift.slots.get()
+            for action, payload in [('accept_user', {'user_id': worker.id, 'slot_id': slot.id}),
+                                    ('manual-assign', {'user_id': worker.id, 'assignments': [
+                                        {'slot_id': slot.id, 'slot_date': str(slot.date)}]})]:
+                response, _ = self.post(self.owner, f'shifts/{shift.id}/{action}/', payload)
+                self.assertEqual(response.status_code, expected, response.data)
+            offer = self.offer(self.shift(single_user_only=False), worker)
+            self.assertEqual(self.accept(offer).status_code, expected)
+
+    def test_f05_n1_explorer_requires_verification_to_apply(self):
+        from onboarding.models import ExplorerOnboarding
+        worker = make_user('EXPLORER')
+        profile = ExplorerOnboarding.objects.create(user=worker, verified=False)
+        shift = self.shift(visibility='PLATFORM')
+        shift.role_needed = 'EXPLORER'
+        shift.save(update_fields=['role_needed'])
+        response, _ = self.post(worker, f'public-shifts/{shift.id}/express_interest/')
+        self.assertEqual(response.status_code, 403, response.data)
+        self.assertFalse(shift.interests.exists())
+        counter_payload = {'slots': [{'slot_id': shift.slots.get().id, 'proposed_start_time': '09:00:00',
+                                     'proposed_end_time': '17:00:00', 'proposed_rate': '60.00'}]}
+        response, _ = self.post(worker, f'public-shifts/{shift.id}/counter-offers/', counter_payload)
+        self.assertEqual(response.status_code, 403, response.data)
+        self.assertFalse(shift.counter_offers.exists())
+        profile.verified = True
+        profile.save(update_fields=['verified'])
+        response, _ = self.post(worker, f'public-shifts/{shift.id}/express_interest/')
+        self.assertEqual(response.status_code, 201, response.data)
+        response, _ = self.post(worker, f'public-shifts/{shift.id}/counter-offers/', counter_payload)
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_c020_n5_slotless_counteroffer_acceptance(self):
+        worker = self.worker()
+        shift = self.shift(slots=0)
+        shift.employment_type = 'FULL_TIME'
+        shift.min_hourly_rate = Decimal('40.00')
+        shift.max_hourly_rate = Decimal('50.00')
+        shift.save(update_fields=['employment_type', 'min_hourly_rate', 'max_hourly_rate'])
+        counter = ShiftCounterOffer.objects.create(shift=shift, user=worker)
+        ShiftCounterOfferSlot.objects.create(offer=counter, proposed_start_time=time(10),
+                                             proposed_end_time=time(14), proposed_rate=Decimal('70'))
+        outsider = self.worker()
+        refused, _ = self.post(outsider, f'shifts/{shift.id}/counter-offers/{counter.id}/accept/')
+        self.assertIn(refused.status_code, (403, 404))
+        response, _ = self.post(self.owner, f'shifts/{shift.id}/counter-offers/{counter.id}/accept/')
+        self.assertEqual(response.status_code, 200, response.data)
+        offer = ShiftOffer.objects.get(counter_offer=counter)
+        self.assertEqual((offer.slot_id, offer.offered_slot_date, offer.offered_start_time,
+                          offer.offered_end_time, offer.offered_rate), (None, None, time(10), time(14), Decimal('70')))
+
+    def test_c020_n6_finalization_books_only_the_accepted_occurrence(self):
+        from shifts.finalize import finalize_shift_offer
+        from rest_framework.exceptions import ValidationError
+        worker = self.worker()
+        shift = self.shift(single_user_only=False)
+        slot = shift.slots.get()
+        slot.is_recurring = True
+        slot.recurring_days = [(slot.date.weekday() + 1) % 7]
+        slot.recurring_end_date = slot.date + timedelta(days=14)
+        slot.save()
+        offer = self.offer(shift, worker, offered_slot_date=slot.date + timedelta(days=7), offered_rate=Decimal('70'))
+        with mock.patch('shifts.finalize.get_locked_rate_for_slot', return_value=(Decimal('70'), {})):
+            ids, _ = finalize_shift_offer(offer)
+        self.assertEqual(list(ShiftSlotAssignment.objects.filter(id__in=ids).values_list('slot_date', flat=True)),
+                         [offer.offered_slot_date])
+        self.assertEqual(ShiftSlotAssignment.objects.filter(shift=shift).count(), 1)
+        offer.offered_slot_date = slot.date + timedelta(days=21)
+        with self.assertRaises(ValidationError):
+            finalize_shift_offer(offer)
+        self.assertEqual(ShiftSlotAssignment.objects.filter(shift=shift).count(), 1)
+
+    def test_c020_n6_whole_shift_offer_still_books_every_recurring_date(self):
+        from shifts.engagement import _offer_occurrences
+        from shifts.finalize import finalize_shift_offer
+        shift = self.shift()
+        slot = shift.slots.get()
+        slot.is_recurring = True
+        slot.recurring_days = list(range(7))
+        slot.recurring_end_date = slot.date + timedelta(days=2)
+        slot.save()
+        offer = self.offer(shift, self.worker(), engagement_terms_snapshot={'occurrences': _offer_occurrences(shift)})
+        with mock.patch('shifts.finalize.get_locked_rate_for_slot', return_value=(Decimal('70'), {})):
+            ids, _ = finalize_shift_offer(offer)
+        self.assertEqual(len(ids), 3)
+
+    def test_c041_n1_partial_counteroffer_stays_actionable_until_all_dates_are_offered(self):
+        worker = self.worker()
+        shift = self.shift(single_user_only=False, slots=2)
+        counter = ShiftCounterOffer.objects.create(shift=shift, user=worker)
+        slots = list(shift.slots.order_by('id'))
+        for slot in slots:
+            ShiftCounterOfferSlot.objects.create(offer=counter, slot=slot, slot_date=slot.date,
+                                                 proposed_start_time=time(9), proposed_end_time=time(17))
+        for index, slot in enumerate(slots):
+            response, _ = self.post(self.owner, f'shifts/{shift.id}/counter-offers/{counter.id}/accept/', {'slot_id': slot.id})
+            self.assertEqual(response.status_code, 200, response.data)
+            listed = self.owner_client.get(f'{API}shifts/{shift.id}/counter-offers/')
+            self.assertEqual([row['id'] for row in listed.data], [counter.id] if index == 0 else [])
+            if index == 0:
+                self.assertEqual([entry['slot']['id'] for entry in listed.data[0]['slots']], [slots[1].id])
+        self.assertEqual(ShiftOffer.objects.filter(counter_offer=counter).count(), 2)
+
+
+@skipUnless(connection.vendor == 'postgresql', 'Requires PostgreSQL row locks')
+class OfferConfirmationRaceTests(TransactionTestCase):
+    def test_b54_only_one_simultaneous_worker_reserves_or_books_the_occurrence(self):
+        from billing.utils import BILLING_STATE_PAYMENT_REQUIRED
+        from shifts.offers import ShiftOfferViewSet
+        for payment in (True, False):
+            owner, pharmacy = make_owner_with_pharmacy('Race pharmacy')
+            shift = Shift.objects.create(pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+                                         employment_type='LOCUM', visibility='LOCUM_CASUAL', single_user_only=False)
+            slot = ShiftSlot.objects.create(shift=shift, date=DAY, start_time=time(9), end_time=time(17), rate=Decimal('70'))
+            workers = [make_user('PHARMACIST') for _ in range(2)]
+            offers = [ShiftOffer.objects.create(shift=shift, slot=slot, user=worker, offered_slot_date=DAY) for worker in workers]
+            barrier = Barrier(2)
+            original_get = ShiftOfferViewSet.get_object
+
+            def read_pending_together(view):
+                offer = original_get(view)
+                barrier.wait(timeout=15)
+                return offer
+
+            def confirm(offer):
+                close_old_connections()
+                try:
+                    return client_for(offer.user).post(f'{API}shift-offers/{offer.id}/accept/', {}, format='json').status_code
+                finally:
+                    close_old_connections()
+
+            with mock.patch.object(ShiftOfferViewSet, 'get_object', read_pending_together), \
+                    mock.patch('shifts.engagement.build_shift_engagement_terms', return_value={}), \
+                    mock.patch('billing.utils.get_billing_state_for_pharmacy',
+                               return_value=BILLING_STATE_PAYMENT_REQUIRED if payment else 'FREE'), \
+                    mock.patch('shifts.offers.notify_shift_users'), mock.patch('shifts.offers.async_task'), \
+                    mock.patch('shifts.offers.send_shift_payment_finalized_notifications'), \
+                    ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(confirm, offers))
+            self.assertEqual(sorted(results), [200, 400])
+            self.assertEqual(shift.offers.filter(status__in=[ShiftOffer.Status.ACCEPTED,
+                                                           ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT]).count(), 1)
+            self.assertEqual(shift.slot_assignments.count(), 0 if payment else 1)

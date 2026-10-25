@@ -31,6 +31,21 @@ User = get_user_model()
 
 
 class AcceptedShiftInvoiceIntegrityTests(TestCase):
+    def test_c021_n2_invoices_use_the_accepted_hours_and_keep_other_occurrences_unchanged(self):
+        from invoicing.services import generate_preview_invoice_lines
+        occurrence = self.assignment.engagement_terms_snapshot['occurrences'][0]
+        occurrence.update(start_time='10:00:00', end_time='14:00:00')
+        self.assignment.save(update_fields=['engagement_terms_snapshot'])
+        [line] = generate_preview_invoice_lines(self.shift, self.worker)
+        self.assertEqual((line['start_time'], line['end_time'], line['quantity'], line['total']),
+                         ('10:00:00', '14:00:00', 4.0, 280.0))
+        invoice = self._generate()
+        self.assertEqual(invoice.line_items.get(category_code='ProfessionalServices').quantity, Decimal('4.00'))
+        occurrence.update(date=str(self.slot.date + timedelta(days=1)))
+        self.assignment.save(update_fields=['engagement_terms_snapshot'])
+        [original] = generate_preview_invoice_lines(self.shift, self.worker)
+        self.assertEqual((original['quantity'], original['total']), (8.0, 560.0))
+
     def setUp(self):
         self.worker = User.objects.create_user(
             email="invoice-integrity@example.com",
