@@ -1,0 +1,232 @@
+{
+  "chunk": "C009",
+  "files": [
+    {
+      "path": "backend/core/test_task_contracts.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Covers task identity, queues, ABN, verification retries, reminders and temporary-file privacy."
+    },
+    {
+      "path": "backend/core/test_task_dispatch_registration.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Fresh subprocess verifies task imports and concurrent first-dispatch registration."
+    },
+    {
+      "path": "backend/core/two_factor_views.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Admin OTP setup redirects apply to staff without confirmed OTP devices."
+    },
+    {
+      "path": "backend/core/uploads.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Generated upload paths include UUID and preserve lowercase extensions."
+    },
+    {
+      "path": "backend/core/urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "API v1, admin OTP, sitemap and explicitly protected media routes composed."
+    },
+    {
+      "path": "backend/core/websocket_testing.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Test fixture helpers create tickets, actors and WebSocket communicators."
+    },
+    {
+      "path": "backend/core/wsgi.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Standard WSGI application bootstrap."
+    },
+    {
+      "path": "backend/dashboards/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Package metadata only."
+    },
+    {
+      "path": "backend/dashboards/apps.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "AppConfig declaration only."
+    },
+    {
+      "path": "backend/dashboards/test_finance_scope.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Checks owner and org billing visibility; does not check monthly income or audience leakage."
+    },
+    {
+      "path": "backend/dashboards/test_owner_upcoming_order.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Checks earliest future slot ordering for multi-slot shifts."
+    },
+    {
+      "path": "backend/dashboards/test_ownership.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Model-free dashboard application registry assertion."
+    },
+    {
+      "path": "backend/dashboards/test_urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Confirms route resolution but not end-to-end permission or list audience."
+    },
+    {
+      "path": "backend/dashboards/test_worker_personalization.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tests role recommendations and slot statuses; no negative test of community audience scope."
+    },
+    {
+      "path": "backend/dashboards/urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Contains scoped organisation detail endpoint and role dashboard routes; org root fails closed without ID."
+    },
+    {
+      "path": "backend/dashboards/views.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1",
+        "N2",
+        "B41"
+      ],
+      "note": "Community shift listing bypasses audience rules; mobile displays lifetime invoice totals as monthly income."
+    },
+    {
+      "path": "backend/ethical_marketplace/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Empty package marker."
+    },
+    {
+      "path": "backend/ethical_marketplace/admin.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Scoped model admin registrations; no action override."
+    },
+    {
+      "path": "backend/ethical_marketplace/apps.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Registers application signals on readiness."
+    },
+    {
+      "path": "backend/ethical_marketplace/migrations/0001_initial.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Creates ethical stock, grants, listings, transfer and audit schema with key uniqueness constraints."
+    },
+    {
+      "path": "backend/ethical_marketplace/migrations/0002_ethicalrequestreceipt.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Adds unique per-user action/request idempotency receipt."
+    },
+    {
+      "path": "backend/ethical_marketplace/migrations/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Empty migrations package marker."
+    },
+    {
+      "path": "backend/ethical_marketplace/models.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Stock reservation constraint and grant uniqueness inspected; no new model-level issue."
+    },
+    {
+      "path": "backend/ethical_marketplace/owner_views.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "N3"
+      ],
+      "note": "Import commit lacks the inventory kill-switch check used by staging and stock mutation endpoints."
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P2",
+      "area": "Shifts",
+      "title": "Worker dashboard exposes community shift IDs and dates to staff outside the vacancy's audience.",
+      "scenario": "Ben is Tom's favourite locum and should only be offered favourite-locum shifts, not Tom's internal staff vacancies. The pharmacist dashboard counts and returns a FULL_PART_TIME vacancy to Ben as a community opportunity, including its identifier and date. The normal worker shift listing correctly excludes it.",
+      "evidence": [
+        "backend/dashboards/views.py:816",
+        "backend/dashboards/views.py:873",
+        "backend/dashboards/views.py:884",
+        "backend/dashboards/views.py:132",
+        "backend/shifts/escalation.py:25"
+      ],
+      "confidence": "high",
+      "test_needed": "Ben is an accepted LOCUM member only. Tom creates a FULL_PART_TIME internal pharmacist shift; GET /api/v1/dashboard/pharmacist/?workspace=internal&pharmacy_id=... must exclude its ID and count; Omar (accepted FULL_TIME) must see it.",
+      "owner_question": {
+        "question": "Should favourite locum Ben see counts, dates or IDs of Tom's internal FULL_PART_TIME staff vacancies?",
+        "options": [
+          "No: use the same audience filter as internal shift browsing",
+          "Only show aggregated counts, not identifiers or dates",
+          "Yes: keep current community opportunity listing"
+        ]
+      }
+    },
+    {
+      "id": "N2",
+      "severity": "P2",
+      "area": "Invoicing",
+      "title": "Mobile dashboards label all-time drafted invoice value as this month's income.",
+      "scenario": "Sara issued an invoice in January, then another in October. The October pharmacist dashboard labels the sum of both invoices 'Total Income This Month', and even counts unsent draft invoices. The backend returns all-time billed amounts without a date or paid-status filter; the other-staff mobile dashboard uses the same label.",
+      "evidence": [
+        "backend/dashboards/views.py:480",
+        "backend/dashboards/views.py:894",
+        "backend/dashboards/views.py:1008",
+        "frontend_mobile/roles/pharmacist/dashboard.tsx:154",
+        "frontend_mobile/roles/otherstaff/dashboard.tsx:150"
+      ],
+      "confidence": "high",
+      "test_needed": "Sara has an old invoice, this-month sent invoice and an unsent draft; load pharmacist dashboard and assert a clearly defined monthly income metric excludes last month and drafts, while all-time billed metric remains separately labelled.",
+      "owner_question": {
+        "question": "What should Sara's 'Income This Month' tile count?",
+        "options": [
+          "Only money actually received during the current calendar month",
+          "Invoices issued this month, labelled 'This Month Invoiced'",
+          "All-time invoice totals, but relabel them accurately"
+        ]
+      }
+    },
+    {
+      "id": "N3",
+      "severity": "P1",
+      "area": "Marketplace",
+      "title": "Ethical stock imports can still be committed after the inventory write feature is switched off.",
+      "scenario": "Tom stages an ethical stock CSV while the inventory feature is available. An administrator disables ethical inventory writes to stop unsafe stock changes. Tom can still invoke the import-commit endpoint, which changes stock quantities and creates stock-movement records without checking the disabled feature flag.",
+      "evidence": [
+        "backend/ethical_marketplace/owner_views.py:47",
+        "backend/ethical_marketplace/owner_views.py:55",
+        "backend/ethical_marketplace/owner_views.py:65",
+        "backend/ethical_marketplace/views.py:193",
+        "backend/ethical_marketplace/views.py:195",
+        "backend/ethical_marketplace/views.py:234",
+        "backend/core/settings.py:242"
+      ],
+      "confidence": "high",
+      "test_needed": "Stage a valid import as a verified entitled owner with ETHICAL_INVENTORY_ENABLED=True; disable it before POST /api/v1/ethical/inventory/imports/{pk}/commit/; expect 503 and no EthicalStockLot/Movement changes. Positive flag-true commit still succeeds.",
+      "owner_question": {
+        "question": "When ethical inventory writes are disabled, should a previously staged import still update stock?",
+        "options": [
+          "No: block every stock-mutating endpoint including commit",
+          "Allow viewing staged rows but require explicit re-enable to commit",
+          "Allow previously staged imports to commit after writes are disabled"
+        ]
+      }
+    }
+  ],
+  "reviewer": "gpt6-senior-20261025"
+}
