@@ -1,0 +1,49 @@
+{
+  "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "ci_head": "c8fe2c8e0414976a8c53818eed17556b34febe55",
+  "run_id": 40166190041,
+  "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40166190041",
+  "run_status": "completed",
+  "run_conclusion": "failure",
+  "observed_jobs": {
+    "mobile": "FAILURE",
+    "release-gate": "FAILURE",
+    "backend": "SUCCESS",
+    "postgres-concurrency": "SUCCESS",
+    "web-next": "SUCCESS",
+    "web-vite": "SUCCESS",
+    "shared-core": "SUCCESS",
+    "kiosk": "SUCCESS",
+    "architecture-audit": "SUCCESS",
+    "boundary-audit": "SUCCESS"
+  },
+  "other_runs": {
+    "CodeQL": "SUCCESS",
+    "Public Repository Security": "SUCCESS",
+    "iOS Native Repair Acceptance": "SKIPPED"
+  },
+  "mobile_failure": {
+    "job": 121087811719,
+    "step": "Verify patched runtime dependencies and reject new advisories",
+    "error": "Unresolved advisory GHSA-w74x-v6f9-j3xg",
+    "lock": "frontend_mobile/package-lock.json",
+    "lock_line": 8321,
+    "installed": "fast-uri@3.1.8",
+    "published_fixed": "fast-uri@3.1.9",
+    "via": [
+      "expo-build-properties/ajv",
+      "expo-dev-launcher/ajv"
+    ],
+    "severity": "MODERATE according to GitHub advisory",
+    "impact": "Dependency advisory/CI gate; app exploitation not reproduced"
+  },
+  "runtime_interpretation": "Existing CI executed but is not PR200 negative-test reproduction. No browser/mobile/Stripe adversarial test run by this reviewer.",
+  "new_targeted_source_challenges": 10,
+  "total_source_challenges": 30,
+  "p0_independently_source_confirmed": [
+    "F03-N1",
+    "F04-N1",
+    "F04-N2"
+  ],
+  "source_notes": "Old dedicated booking notify-widening claim refuted narrowly by backend protection. No P1 independent second-agent certification. S3 business scenarios not reproduced."
+}
