@@ -74,15 +74,17 @@
     },
     {
       "id": "C012-N1",
-      "status": "SOURCE_SUPPORTED",
-      "reason": "Standard ModelViewSet create uses unrestricted numeric invite_link PK serializer; serializer validates presence/identity but does not call invite_link.is_valid(). Public magic-link route does validate expiry.",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
+      "reason": "After fixing unique mobile/DOB fixture, expired inactive invite-link integer POST persisted a membership application with HTTP 201; valid UUID magic-link positive control HTTP 201.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/views.py#L249-L265",
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/views.py#L310-L325",
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/serializers.py#L382-L425"
       ],
       "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
-      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results.",
+      "runtime": "After fixing unique mobile/DOB fixture, expired inactive invite-link integer POST persisted a membership application with HTTP 201; valid UUID magic-link positive control HTTP 201.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885"
     },
     {
       "id": "C012-N2",
@@ -146,15 +148,17 @@
     },
     {
       "id": "C071-N2",
-      "status": "SOURCE_SUPPORTED_DUPLICATE_ROOT",
-      "reason": "Expo logout clears local storage but does not delete DeviceToken; server logout blacklists JWT only; notification service delivers to active tokens. Same underlying issue as F11-N2 and F09-N3.",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
+      "reason": "A real user-registered synthetic Android DeviceToken remained active after server logout with valid refresh token; signed-out device still eligible for private pushes.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L502-L529",
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/users/api_auth.py#L155-L172",
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/notifications/services.py#L79-L94"
       ],
       "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
-      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results.",
+      "runtime": "A real user-registered synthetic Android DeviceToken remained active after server logout with valid refresh token; signed-out device still eligible for private pushes.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885"
     },
     {
       "id": "B01",
@@ -542,6 +546,15 @@
       "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
       "independent_second_agent": "NOT_CERTIFIED",
       "negative_test": "test_f08_n5_owner_delete_does_not_leave_active_recurring_billing"
+    },
+    {
+      "id": "B66",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
+      "reason": "22:00–06:00 future assigned shift returned no penalty due negative computed wage; equivalent same-day positive control generated a nonzero checkout.",
+      "runtime": "22:00–06:00 future assigned shift returned no penalty due negative computed wage; equivalent same-day positive control generated a nonzero checkout.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_b66_overnight_assigned_work_must_have_nonzero_cancellation_wage"
     }
   ],
   "summary": {
@@ -550,8 +563,8 @@
     "duplicate_root": 1,
     "refuted_source": 1,
     "second_agent_certified": 0,
-    "runtime_reproduced_in_audit": 23,
-    "total_challenged": 41,
+    "runtime_reproduced_in_audit": 26,
+    "total_challenged": 42,
     "runtime_reproduced_identifiers": [
       "B07",
       "B33",
@@ -575,9 +588,12 @@
       "B68",
       "B69",
       "F01-N3",
-      "F08-N5"
+      "F08-N5",
+      "C012-N1",
+      "B66",
+      "C071-N2"
     ],
-    "runtime_reproduced_scenarios": 26
+    "runtime_reproduced_scenarios": 29
   },
   "review_update": "2026-10-25 ten further B-series high-risk challenges: B03 B06 B07 B15 B29 B33 B36 B68 B69 B70; immutable evidence, negative/positive tests, caveated status, no S3 tests or independent second-agent certifications."
 }

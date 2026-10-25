@@ -444,5 +444,47 @@
       "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
       "No PostgreSQL concurrent requests or real financial settlement"
     ]
+  },
+  "C012-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c012_n1_generic_create_rejects_expired_numeric_link",
+        "observed": "After fixing unique mobile/DOB fixture, expired inactive invite-link integer POST persisted a membership application with HTTP 201; valid UUID magic-link positive control HTTP 201.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885",
+        "head": "ce5609527e256fc228914e7d2e3d11d277a54947",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "B66": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b66_overnight_assigned_work_must_have_nonzero_cancellation_wage",
+        "observed": "22:00–06:00 future assigned shift returned no penalty due negative computed wage; equivalent same-day positive control generated a nonzero checkout.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885",
+        "head": "ce5609527e256fc228914e7d2e3d11d277a54947",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C071-N2": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c071_n2_logging_out_revokes_previous_device_push_token",
+        "observed": "A real user-registered synthetic Android DeviceToken remained active after server logout with valid refresh token; signed-out device still eligible for private pushes.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885",
+        "head": "ce5609527e256fc228914e7d2e3d11d277a54947",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
   }
 }
