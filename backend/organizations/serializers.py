@@ -93,6 +93,8 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
     claim_status = serializers.SerializerMethodField()
     claim_request_id = serializers.SerializerMethodField()
     public_holiday_dates = serializers.SerializerMethodField()
+    public_holiday_windows = serializers.SerializerMethodField()
+    public_holiday_calendar_status = serializers.SerializerMethodField()
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     submitted_for_verification = serializers.BooleanField(write_only=True, required=False)
     file_fields = [
@@ -123,6 +125,7 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             "latitude",
             "longitude",
             "state",
+            "public_holiday_region",
             "owner",
             "organization",
             "verified",
@@ -171,6 +174,8 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             "public_holidays_end",
             "public_holidays_closed",
             "public_holiday_dates",
+            "public_holiday_windows",
+            "public_holiday_calendar_status",
             # arrays:
             "employment_types",
             "roles_needed",
@@ -214,11 +219,25 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
     _hours_day_names = _weekday_day_names + ("saturdays", "sundays", "public_holidays")
 
     def get_public_holiday_dates(self, obj):
-        from shifts.pricing import _normalize_state_code
-        from shifts.pricing_data import public_holidays
+        from shifts.holidays import full_day_public_holidays
+        return full_day_public_holidays(
+            getattr(obj, "state", ""), getattr(obj, "public_holiday_region", ""),
+        )
 
-        state_code = _normalize_state_code(getattr(obj, "state", ""))
-        return public_holidays().get(state_code, [])
+    def get_public_holiday_windows(self, obj):
+        from shifts.holidays import part_day_public_holidays
+        return part_day_public_holidays(
+            getattr(obj, "state", ""), getattr(obj, "public_holiday_region", ""),
+        )
+
+    def get_public_holiday_calendar_status(self, obj):
+        from shifts.holidays import holiday_calendar_status
+        return holiday_calendar_status(
+            getattr(obj, "state", ""), getattr(obj, "public_holiday_region", ""),
+        )
+
+    def validate_public_holiday_region(self, value):
+        return str(value or "").strip().upper()
 
     def _apply_weekday_hours_compat(self, attrs):
         weekday_start = attrs.get("weekdays_start", serializers.empty)
@@ -286,6 +305,20 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
                 raise serializers.ValidationError(
                     {"abn": ["This ABN is locked after verification and confirmation."]}
                 )
+        from shifts.holidays import region_details
+        from shifts.pricing_data import PricingDataError
+
+        state = attrs.get("state", getattr(self.instance, "state", None))
+        region = attrs.get(
+            "public_holiday_region",
+            getattr(self.instance, "public_holiday_region", ""),
+        )
+        if region:
+            try:
+                region_details(state, region)
+            except PricingDataError as exc:
+                raise serializers.ValidationError({"public_holiday_region": str(exc)}) from exc
+
         attrs = self._apply_weekday_hours_compat(attrs)
         return self._clear_closed_day_hours(attrs)
 

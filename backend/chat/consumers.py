@@ -51,8 +51,8 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         else:
             log.error("No channel_layer on consumer!")
 
-        # Catch a suspension committed between the initial check and joining the user group.
-        if await self._ahpra_suspended(user):
+        # Catch a suspension or revocation committed after joining a group.
+        if not await self._membership_still_authorized() or await self._ahpra_suspended(user):
             await self.close(code=4403)
             return
         self._last_typing_emit = 0.0
@@ -75,6 +75,9 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
     async def receive_json(self, content, **kwargs):
         if getattr(self, '_ahpra_frozen', False) or await self._ahpra_suspended(self.scope['user']):
             await self.ahpra_suspended({})
+            return
+        if not await self._membership_still_authorized():
+            await self.close(code=4403)
             return
         if content.get("type") == "typing":
             if not getattr(self, "membership", None):
@@ -115,11 +118,20 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             return
 
         msg = await self._create_message(self.room_id, self.membership, body)
+        if msg is None:
+            # Revocation won the race after the receive-side check.
+            await self.close(code=4403)
+            return
         log.debug("Created message id=%s", msg.id)
         print(f"[WS] CREATED message id={msg.id}", flush=True)
         # No immediate send here; signal will broadcast on commit
 
     async def send_json(self, content, close=False):
+        # Do not deliver group messages, edits, reactions or badges to a
+        # disconnected/revoked member even when no explicit signal was sent.
+        if not await self._membership_still_authorized():
+            await self.close(code=4403)
+            return
         # Backstop for a missed ahpra.suspended event: never deliver to a frozen user.
         now = time.monotonic()
         if now - getattr(self, '_ahpra_checked_at', 0.0) >= self.AHPRA_RECHECK_SECONDS:
@@ -192,25 +204,45 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _get_membership(self, conversation_id: int, user_id: int):
-        participant = (
-            Participant.objects
-            .filter(
+        # A legacy room can contain multiple memberships for the same user.
+        # Never choose a revoked row ahead of a valid membership.
+        for participant in (
+            Participant.objects.filter(
                 conversation_id=conversation_id,
                 membership__user_id=user_id,
-            )
-            .select_related("membership__user", "conversation")
-            .first()
-        )
-        if participant and not participant_can_receive_chat_updates(participant):
-            return None
-        return participant.membership if participant else None
+            ).select_related("membership__user", "conversation")
+        ):
+            if participant_can_receive_chat_updates(participant):
+                return participant.membership
+        return None
+
+    @database_sync_to_async
+    def _membership_still_authorized(self):
+        if not getattr(self, "membership", None):
+            return False
+        participant = Participant.objects.filter(
+            conversation_id=self.room_id,
+            membership_id=self.membership.pk,
+        ).select_related("membership__user", "conversation").first()
+        return bool(participant and participant_can_receive_chat_updates(participant))
 
     @database_sync_to_async
     def _create_message(self, conversation_id: int, membership: Membership, body: str):
-        msg = Message.objects.create(
-            conversation_id=conversation_id,
-            sender=membership,
-            body=body,
-        )
-        Conversation.objects.filter(pk=conversation_id).update(updated_at=msg.created_at)
-        return msg
+        from django.db import transaction
+        with transaction.atomic():
+            # Serialize against an ordinary membership.save() revocation.
+            locked = Membership.objects.select_for_update().filter(pk=membership.pk).first()
+            participant = (
+                Participant.objects.select_related("membership__user", "conversation")
+                .filter(conversation_id=conversation_id, membership_id=membership.pk)
+                .first()
+            )
+            if not locked or not participant or not participant_can_receive_chat_updates(participant):
+                return None
+            msg = Message.objects.create(
+                conversation_id=conversation_id,
+                sender=locked,
+                body=body,
+            )
+            Conversation.objects.filter(pk=conversation_id).update(updated_at=msg.created_at)
+            return msg

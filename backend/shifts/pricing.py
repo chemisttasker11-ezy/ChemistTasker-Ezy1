@@ -5,7 +5,10 @@ from django.core.exceptions import ValidationError
 from onboarding.models import PharmacistOnboarding
 from shifts.models import Shift
 from memberships.models import Membership
-from shifts.pricing_data import award_rates, public_holidays
+from shifts.pricing_data import award_rates
+from shifts.holidays import (
+    holiday_boundaries, normalize_state, resolve_public_holiday,
+)
 
 
 EARLY_MORNING_END = time(8, 0)
@@ -18,48 +21,47 @@ FIRST_LEVEL_CLASSIFICATIONS = {
     'INTERN': 'FIRST_HALF',
     'PHARMACIST': 'PHARMACIST',
 }
-STATE_CODE_ALIASES = {
-    'ACT': 'ACT',
-    'AUSTRALIAN CAPITAL TERRITORY': 'ACT',
-    'NSW': 'NSW',
-    'NEW SOUTH WALES': 'NSW',
-    'NT': 'NT',
-    'NORTHERN TERRITORY': 'NT',
-    'QLD': 'QLD',
-    'QUEENSLAND': 'QLD',
-    'SA': 'SA',
-    'SOUTH AUSTRALIA': 'SA',
-    'TAS': 'TAS',
-    'TASMANIA': 'TAS',
-    'VIC': 'VIC',
-    'VICTORIA': 'VIC',
-    'WA': 'WA',
-    'WESTERN AUSTRALIA': 'WA',
-}
-
 def _normalize_state_code(state):
-    normalized = (state or '').strip().upper()
-    if not normalized:
-        return ''
-    return STATE_CODE_ALIASES.get(normalized, normalized)
+    """Legacy state-alias API; the holiday domain owns canonical resolution."""
+    return normalize_state(state)
 
 
-def is_public_holiday(slot_date, state):
-    state_code = _normalize_state_code(state)
-    if not state_code:
-        return False
-    return str(slot_date) in public_holidays().get(state_code, [])
+def is_public_holiday(slot_date, state, at_time=None, *, region=None):
+    return resolve_public_holiday(
+        slot_date, state, region_code=region, at_time=at_time,
+    ).is_public_holiday
 
 
-def get_day_type(slot_date, state):
-    if is_public_holiday(slot_date, state):
-        return 'public_holiday'
+def get_day_type(slot_date, state, at_time=None, *, region=None):
+    if is_public_holiday(slot_date, state, at_time=at_time, region=region):
+        return "public_holiday"
     weekday = slot_date.weekday()
-    if weekday == 5:
-        return 'saturday'
-    if weekday == 6:
-        return 'sunday'
-    return 'weekday'
+    return "saturday" if weekday == 5 else "sunday" if weekday == 6 else "weekday"
+
+
+def _holiday_work_base(shift, terms=None):
+    """Use the registered store that owns this shift, never a worker override.
+
+    The pharmacy's declared locality decides shift holiday classification.
+    The optional terms argument remains for existing callers but cannot
+    change the store. Exceptional legal base/substitution cases require
+    separate employer review, not silent per-worker holiday override.
+    """
+    pharmacy = shift.pharmacy
+    return (
+        getattr(pharmacy, "state", "") or "",
+        getattr(pharmacy, "public_holiday_region", "") or "",
+    )
+
+
+def _holiday_day_and_status(work_date, at_time, state, region):
+    result = resolve_public_holiday(
+        work_date, state, region_code=region, at_time=at_time,
+    )
+    if result.is_public_holiday:
+        return "public_holiday", result
+    weekday = work_date.weekday()
+    return ("saturday" if weekday == 5 else "sunday" if weekday == 6 else "weekday"), result
 
 
 def _combine_datetime(slot_date, slot_time):
@@ -109,7 +111,7 @@ def _resolve_time_bucket(segment_start, segment_end):
     return 'daytime'
 
 
-def _split_day_window_into_segments(day_window):
+def _split_day_window_into_segments(day_window, *, state='', region=''):
     current_date = day_window['date']
     boundaries = [
         day_window['start'],
@@ -117,6 +119,18 @@ def _split_day_window_into_segments(day_window):
         datetime.combine(current_date, LATE_NIGHT_START),
         day_window['end'],
     ]
+    # Current MA000012 distinguishes 07:00, 18:00 Saturday and 21:00
+    # boundaries. Historical pricing snapshots retain their original windows.
+    if current_date >= date(2026, 7, 1):
+        boundaries.extend([
+            datetime.combine(current_date, time(7, 0)),
+            datetime.combine(current_date, time(18, 0)),
+            datetime.combine(current_date, time(21, 0)),
+        ])
+    # Regional and statewide part-day holidays can start/end at 09:00,
+    # midday, 17:00, 18:00 or 19:00. Boundaries are data driven.
+    for cutoff in holiday_boundaries(current_date, state, region):
+        boundaries.append(datetime.combine(current_date, cutoff))
     sorted_points = []
     for point in boundaries:
         if day_window['start'] <= point <= day_window['end']:
@@ -190,26 +204,46 @@ def _get_first_level_award_profile(role_needed):
     return role_key, classification_key, award_rates().get(role_key, {}).get(classification_key, {}).get('casual')
 
 
-def _get_award_rate_for_segment(role_needed, day_type, time_bucket):
-    role_key, classification_key, casual_rates = _get_first_level_award_profile(role_needed)
+def _get_award_rate_for_segment(role_needed, day_type, time_bucket, *, as_of=None, start_time=None):
+    role_key = _resolve_award_role_key(role_needed)
+    classification_key = FIRST_LEVEL_CLASSIFICATIONS.get(role_needed)
+    if not classification_key:
+        raise KeyError(f'No casual award classification for {role_needed}')
+    casual_rates = award_rates(as_of).get(role_key, {}).get(classification_key, {}).get('casual')
     if not casual_rates:
         raise KeyError(f'No casual award rates found for {role_needed}')
 
-    if time_bucket == 'daytime':
+    window_key = None
+    if as_of is not None and as_of >= date(2026, 7, 1) and start_time is not None:
+        # Canonical 1 July 2026 Schedule B bands, including Saturday 18:00
+        # and Sunday after 21:00. Before 07:00 uses the published outer
+        # penalty band; overtime eligibility must be evaluated separately.
+        if day_type == 'weekday':
+            window_key = ('early_07_08' if start_time < time(8)
+                          else 'daytime_08_19' if start_time < time(19)
+                          else 'evening_19_21' if start_time < time(21)
+                          else 'late_21_24')
+        elif day_type == 'saturday':
+            window_key = ('early_07_08' if start_time < time(8)
+                          else 'daytime_08_18' if start_time < time(18)
+                          else 'evening_18_21' if start_time < time(21)
+                          else 'late_21_24')
+        elif day_type == 'sunday':
+            window_key = 'outside_07_21' if start_time < time(7) or start_time >= time(21) else 'daytime_07_21'
+        else:
+            window_key = 'all_day'
+        rate_value = casual_rates['award_windows'][day_type][window_key]
+    elif time_bucket == 'daytime':
         rate_value = casual_rates.get(day_type)
     else:
-        bucket_rates = casual_rates.get(time_bucket) or {}
-        rate_value = bucket_rates.get(day_type)
-
+        rate_value = (casual_rates.get(time_bucket) or {}).get(day_type)
     if rate_value is None:
         raise KeyError(f'No {time_bucket} rate configured for {role_needed} on {day_type}')
-
     return Decimal(str(rate_value)), {
-        'role_key': role_key,
-        'classification_key': classification_key,
-        'employment': 'casual',
-        'time_bucket': time_bucket,
-        'day_type': day_type,
+        'role_key': role_key, 'classification_key': classification_key,
+        'employment': 'casual', 'time_bucket': time_bucket, 'day_type': day_type,
+        'award_effective_from': '2026-07-01' if as_of and as_of >= date(2026, 7, 1) else 'historical',
+        'award_window': window_key,
     }
 
 
@@ -291,9 +325,20 @@ def _price_shift_segments(slot_date, start_time, end_time, shift, rate_preferenc
     total_hours = DECIMAL_ZERO
     total_pay = DECIMAL_ZERO
 
+    base_state, base_region = _holiday_work_base(shift)
     for day_window in _split_shift_across_days(slot_date, start_time, end_time):
-        day_type = get_day_type(day_window['date'], getattr(shift.pharmacy, 'state', '') or '')
-        for segment in _split_day_window_into_segments(day_window):
+        for segment in _split_day_window_into_segments(
+            day_window, state=base_state, region=base_region,
+        ):
+            day_type, holiday = _holiday_day_and_status(
+                day_window['date'], segment['start'].time(),
+                base_state, base_region,
+            )
+            if holiday.needs_review and getattr(shift.pharmacy, 'use_chemisttasker_payroll', False):
+                raise ValidationError(
+                    'Verify the store public-holiday district and declaration '
+                    'before automatic payroll pricing. ' + holiday.status
+                )
             if shift.role_needed == 'PHARMACIST':
                 segment_rate, meta = _get_pharmacist_rate_for_segment(
                     shift,
@@ -306,6 +351,8 @@ def _price_shift_segments(slot_date, start_time, end_time, shift, rate_preferenc
                     shift.role_needed,
                     day_type,
                     segment['time_bucket'],
+                    as_of=day_window['date'],
+                    start_time=segment['start'].time(),
                 )
                 owner_bonus = getattr(shift, 'owner_adjusted_rate', None) or DECIMAL_ZERO
                 if owner_bonus > 0:
@@ -321,6 +368,15 @@ def _price_shift_segments(slot_date, start_time, end_time, shift, rate_preferenc
             segment_total = (segment_rate * segment['hours']).quantize(Decimal('0.0001'))
             total_hours += segment['hours']
             total_pay += segment_total
+            if holiday.needs_review or holiday.scope != "NONE":
+                meta.update({
+                    "holiday_scope": holiday.scope,
+                    "holiday_status": holiday.status,
+                    "holiday_source": holiday.source,
+                    "holiday_region": holiday.region,
+                    "holiday_name": holiday.name,
+                    "holiday_note": holiday.note,
+                })
             all_segments.append({
                 'date': str(segment['date']),
                 'start_time': segment['start'].time().strftime('%H:%M:%S'),
@@ -356,19 +412,43 @@ def _price_staff_agreement(slot, shift, slot_date, terms):
     hours = DECIMAL_ZERO
     total = DECIMAL_ZERO
     segments = []
+    base_state, base_region = _holiday_work_base(shift, terms)
     for window in _split_shift_across_days(slot_date, slot.start_time, slot.end_time):
-        for segment in _split_day_window_into_segments(window):
-            day_type = get_day_type(segment['date'], shift.pharmacy.state)
+        for segment in _split_day_window_into_segments(
+            window, state=base_state, region=base_region,
+        ):
+            day_type, holiday = _holiday_day_and_status(
+                segment['date'], segment['start'].time(), base_state, base_region,
+            )
+            if holiday.needs_review and terms.get('settlement_channel') == 'PAYROLL':
+                raise ValidationError(
+                    'Payroll holiday entitlement needs the store public-holiday '
+                    'district verified: ' + holiday.status
+                )
             bucket = segment['time_bucket']
-            value = rates.get(bucket) if bucket != 'daytime' else None
-            value = rates.get(day_type) if value in (None, '') else value
+            # Public holidays take precedence over early and late ordinary
+            # penalties. Never apply a weekday evening rate to an otherwise
+            # public-holiday segment (nor stack ordinary and PH penalties).
+            value = rates.get("public_holiday") if day_type == "public_holiday" else None
+            if value in (None, ""):
+                value = rates.get(bucket) if bucket != "daytime" else None
+                value = rates.get(day_type) if value in (None, "") else value
             if value in (None, ''):
                 raise ValidationError(f'The staff agreement has no {day_type} rate.')
             rate = Decimal(str(value))
             hours += segment['hours']
             total += rate * segment['hours']
-            segments.append({'date': str(segment['date']), 'day_type': day_type, 'time_bucket': bucket,
-                             'hours': str(segment['hours']), 'rate': str(rate)})
+            segment_meta = {
+                'date': str(segment['date']), 'day_type': day_type,
+                'time_bucket': bucket, 'hours': str(segment['hours']),
+                'rate': str(rate),
+            }
+            if holiday.needs_review or holiday.scope != "NONE":
+                segment_meta.update({
+                    'holiday_scope': holiday.scope, 'holiday_status': holiday.status,
+                    'holiday_source': holiday.source, 'holiday_region': holiday.region,
+                })
+            segments.append(segment_meta)
     if hours <= 0:
         raise ValidationError('Shift duration must be greater than zero.')
     return (total / hours).quantize(Decimal('0.01')), {

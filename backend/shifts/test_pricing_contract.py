@@ -1,5 +1,15 @@
 """Pricing equivalence: a fingerprint of calculate_shift_rates over a representative matrix.
 
+B14 deliberate source-only string change on 26 October 2026:
+the resolver now describes an unconfigured **store district**, not an
+employee-specific base. The reference hash changed because segment metadata
+includes this warning string; dollar amount contracts remained passing.
+
+B14 deliberate change on 26 October 2026: state and regional holiday provenance
+is now emitted in per-segment metadata, and unconfigured regional scope is
+explicitly marked for review. Historical representative money rates remain
+asserted separately, but this changes the canonical JSON fingerprint.
+
 Covers award roles (casual first-level rates, owner bonus), pharmacist shifts priced from pharmacy rates and from the
 pharmacist's own rate preference, three states, weekday / Saturday / Sunday / public holiday, and early-morning,
 daytime, late-night and overnight times. Any change to the award data, the holiday data or the calculation changes the
@@ -82,7 +92,7 @@ class PricingEquivalenceTests(SimpleTestCase):
         self.assertEqual(rates, EXPECTED_ASSISTANT_DAYTIME)
 
 
-EXPECTED_FINGERPRINT = "e28fcfd3cd9c2b7ad17e5d448555841721d5d99c04009e05341a47376a2bef79"
+EXPECTED_FINGERPRINT = "ad683b2ba0f64963fe23a0ea84ffe9b654135357cf3293fc5b7d26d856bd8476"
 EXPECTED_ASSISTANT_DAYTIME = {  # casual first-level assistant, 09:00-17:00, NSW
     date(2026, 1, 27): "33.19",  # weekday
     date(2026, 1, 31): "39.83",  # Saturday

@@ -87,11 +87,30 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
                 pass
         return qs
 
-    def perform_update(self, serializer):
+    def _validate_assignment_scope(self, serializer):
+        """A PATCHed assignment must stay inside the caller's roster capability and slot."""
+        from workforce.permissions import can_manage_roster_pharmacy
+
+        instance = serializer.instance
         for field in ('shift', 'slot'):
             target = serializer.validated_data.get(field)
-            if target is not None and target.pk != getattr(serializer.instance, f'{field}_id'):
+            if target is not None and target.pk != getattr(instance, f'{field}_id'):
                 raise DRFValidationError({field: 'Cannot reassign a roster assignment to another shift or slot.'})
+        shift, slot = instance.shift, instance.slot
+        slot_date = serializer.validated_data.get("slot_date", instance.slot_date)
+        if not can_manage_roster_pharmacy(self.request.user, shift.pharmacy):
+            self.permission_denied(self.request)
+        if slot_date is None:
+            raise DRFValidationError({"slot_date": "A roster occurrence date is required."})
+        if slot_date != slot.date and not (
+            slot.is_recurring and slot.recurring_end_date
+            and slot.date <= slot_date <= slot.recurring_end_date
+            and slot_date.weekday() in slot.recurring_days
+        ):
+            raise DRFValidationError({"slot_date": "Date is not a valid slot occurrence."})
+
+    def perform_update(self, serializer):
+        self._validate_assignment_scope(serializer)
         if _slot_locked_by_published_roster(serializer.instance.slot):
             raise DRFValidationError(
                 "Unpublish this shift for editing before changing its assignment in a published roster."

@@ -136,12 +136,19 @@ def _create_ledger_entry(
     if amount == 0:
         raise RewardError("Pill ledger amount cannot be zero.")
 
+    # Lock the payer before *both* the idempotency check and balance sum.
+    # Other entry points (referral credits, manual awards and separate shifts)
+    # use the same central ledger helper; a view-only lock is not sufficient.
     with transaction.atomic():
-        # The ledger has no wallet row, so serialize balance changes on its owner.
         User.objects.select_for_update().get(pk=user.pk)
         existing = PillLedgerEntry.objects.filter(idempotency_key=idempotency_key).first()
         if existing:
+            if (existing.user_id != user.pk
+                    or existing.source != source
+                    or existing.shift_id != (shift.pk if shift is not None else None)):
+                raise RewardError("Pill transaction idempotency key conflicts with another transaction.")
             return existing
+
         current_balance = get_pill_balance(user)
         next_balance = current_balance + amount
         if next_balance < 0:

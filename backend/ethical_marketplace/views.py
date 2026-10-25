@@ -12,6 +12,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -366,48 +367,116 @@ class ListingAction(APIView):
 class ListingRequests(APIView):
     permission_classes = (IsAuthenticated,)
     throttle_scope = "ethical_transfer"
+
     def post(self, request, pk):
         if not settings.ETHICAL_NEW_TRANSFERS_ENABLED:
             return Response({"code": "ETHICAL_NEW_TRANSFERS_DISABLED"}, status=503)
-        listing = get_object_or_404(EthicalListing.objects.select_related("pharmacy", "product", "scope_chain"), pk=pk, status="PUBLISHED")
+
+        listing = get_object_or_404(
+            EthicalListing.objects.select_related("pharmacy", "product", "scope_chain"),
+            pk=pk,
+        )
         if not listing_visible_to(request.user, listing):
             raise Http404
         destination = pharmacy_or_404(request.data.get("destination_pharmacy"))
         require(request.user, destination, "REQUEST_TRANSFER", product=listing.product, mode=listing.mode)
         if destination.id == listing.pharmacy_id:
             raise PermissionDenied("Source and destination premises must differ.")
-        if listing.product.schedule.upper() == "S8" and (not listing.pharmacy.organization_id or listing.pharmacy.organization_id != destination.organization_id):
+        if listing.product.schedule.upper() == "S8" and (
+            not listing.pharmacy.organization_id
+            or listing.pharmacy.organization_id != destination.organization_id
+        ):
             raise PermissionDenied({"code": "S8_ORGANISATION_CEILING"})
+
         request_id = request.data.get("client_request_id")
         if not request_id:
             raise ValidationError({"client_request_id": "Required."})
-        payload_hash = hashlib.sha256(json.dumps(request.data, sort_keys=True, default=str).encode()).hexdigest()
-        receipt = EthicalRequestReceipt.objects.filter(actor=request.user, action="TRANSFER_REQUEST", client_request_id=request_id).first()
-        if receipt:
-            if receipt.payload_hash != payload_hash:
+        payload_hash = hashlib.sha256(
+            json.dumps(request.data, sort_keys=True, default=str).encode()
+        ).hexdigest()
+
+        def receipt_response(receipt):
+            if receipt.payload_hash != payload_hash or str(receipt.outcome.get("listing")) != str(listing.pk):
                 return Response({"code": "REQUEST_ID_REUSED_WITH_DIFFERENT_PAYLOAD"}, status=409)
             return private(Response(receipt.outcome))
-        quantities = {str(row["lot"]): int(row["quantity"]) for row in request.data.get("lines", [])}
+
+        # Preserve idempotent replay even if the first successful reservation
+        # has advanced the listing out of PUBLISHED.
+        receipt = EthicalRequestReceipt.objects.filter(
+            actor=request.user, action="TRANSFER_REQUEST", client_request_id=request_id
+        ).first()
+        if receipt:
+            return receipt_response(receipt)
+
+        try:
+            quantities = {
+                str(row["lot"]): int(row["quantity"])
+                for row in request.data.get("lines", [])
+            }
+        except (TypeError, ValueError, KeyError):
+            raise ValidationError({"lines": "Each line requires a valid lot and integer quantity."})
+        if not quantities or any(quantity < 1 for quantity in quantities.values()):
+            raise ValidationError({"lines": "Choose a positive quantity from an allocated lot."})
+
         with transaction.atomic():
-            transfer = EthicalTransfer.objects.create(listing=listing, source_pharmacy=listing.pharmacy, destination_pharmacy=destination, requested_by=request.user, mode=listing.mode, terms=request.data.get("terms", {}))
-            for allocation in listing.lot_allocations.select_related("lot"):
+            # The listing row, not individual lot rows, is the exclusivity key.
+            # Both requests for different lots must contend on this same lock.
+            listing = get_object_or_404(
+                EthicalListing.objects.select_for_update(of=("self",)).select_related(
+                    "pharmacy", "product", "scope_chain"
+                ),
+                pk=pk,
+            )
+            # A concurrent identical request can finish while this request
+            # waits for the listing lock. Re-check its receipt before rejecting
+            # an already reserved listing.
+            receipt = EthicalRequestReceipt.objects.filter(
+                actor=request.user, action="TRANSFER_REQUEST", client_request_id=request_id
+            ).first()
+            if receipt:
+                return receipt_response(receipt)
+            if listing.status != EthicalListing.Status.PUBLISHED:
+                return Response({"code": "LISTING_NOT_AVAILABLE"}, status=409)
+            if not listing_visible_to(request.user, listing):
+                raise Http404
+            require(request.user, destination, "REQUEST_TRANSFER", product=listing.product, mode=listing.mode)
+
+            allocations = list(listing.lot_allocations.select_related("lot"))
+            allowed_lot_ids = {str(allocation.lot_id) for allocation in allocations}
+            if not set(quantities).issubset(allowed_lot_ids):
+                raise ValidationError({"lines": "Only lots allocated to this listing can be requested."})
+            transfer = EthicalTransfer.objects.create(
+                listing=listing, source_pharmacy=listing.pharmacy,
+                destination_pharmacy=destination, requested_by=request.user,
+                mode=listing.mode, terms=request.data.get("terms", {}),
+            )
+            for allocation in allocations:
                 wanted = quantities.get(str(allocation.lot_id), 0)
                 if not wanted:
                     continue
                 lot = EthicalStockLot.objects.select_for_update().get(pk=allocation.lot_id)
                 if wanted > allocation.quantity or wanted > lot.available_quantity:
                     raise ValidationError({"lines": "Requested quantity is no longer available."})
-                line = EthicalTransferLine.objects.create(transfer=transfer, lot=lot, quantity=wanted, unit_amount=listing.amount)
+                line = EthicalTransferLine.objects.create(
+                    transfer=transfer, lot=lot, quantity=wanted, unit_amount=listing.amount
+                )
                 EthicalReservation.objects.create(transfer_line=line, lot=lot, quantity=wanted)
                 lot.reserved_quantity += wanted
                 lot.version += 1
                 lot.save(update_fields=("reserved_quantity", "version", "updated_at"))
             if not transfer.lines.exists():
                 raise ValidationError({"lines": "At least one positive lot quantity is required."})
-            listing.status = "RESERVED"
+            listing.status = EthicalListing.Status.RESERVED
             listing.save(update_fields=("status", "updated_at"))
-            outcome = TransferSerializer(transfer).data
-            EthicalRequestReceipt.objects.create(actor=request.user, action="TRANSFER_REQUEST", client_request_id=request_id, payload_hash=payload_hash, outcome=outcome)
+
+            # DRF serializer output can contain UUID/Decimal/date objects.
+            # Convert once through the same renderer used for the API before
+            # storing in JSONField, without a test-only serializer substitution.
+            outcome = json.loads(JSONRenderer().render(TransferSerializer(transfer).data))
+            EthicalRequestReceipt.objects.create(
+                actor=request.user, action="TRANSFER_REQUEST",
+                client_request_id=request_id, payload_hash=payload_hash, outcome=outcome,
+            )
         return private(Response(outcome, status=201))
 
 

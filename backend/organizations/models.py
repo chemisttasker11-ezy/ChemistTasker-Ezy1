@@ -108,6 +108,14 @@ class Pharmacy(models.Model):
 
     # state = models.CharField(max_length=3, choices=STATE_CHOICES, blank=True, null=True)
     state = models.CharField(max_length=50, blank=True, null=True)
+    public_holiday_region = models.CharField(
+        max_length=64, blank=True, default="",
+        help_text=(
+            "Verified declared holiday district for this pharmacy's ordinary "
+            "work base (e.g. QLD_GOLD_COAST). Empty means local scope is "
+            "unverified, never that local holidays do not apply."
+        ),
+    )
 
     owner                  = models.ForeignKey(
                                 OwnerOnboarding,

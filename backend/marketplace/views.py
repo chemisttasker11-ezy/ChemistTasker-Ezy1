@@ -197,8 +197,9 @@ class ListingAction(APIView):
 
 class ListingAudience(APIView):
     permission_classes = (IsAuthenticated,)
+    @transaction.atomic
     def post(self, request, pk):
-        listing = get_object_or_404(MarketplaceListing.objects.select_related("pharmacy", "audience"), pk=pk)
+        listing = get_object_or_404(MarketplaceListing.objects.select_for_update().select_related("pharmacy", "audience"), pk=pk)
         assert_listing_manager(request.user, listing)
         if request.data.get("expected_version") != listing.version:
             return Response({"code": "STALE_VERSION"}, status=409)
@@ -367,6 +368,11 @@ class ExchangeAction(APIView):
             if action == "propose-terms":
                 exchange.proposed_terms = request.data.get("terms", {})
         elif action == "confirm-completion":
+            if exchange.state not in (
+                MarketplaceExchange.State.ACCEPTED,
+                MarketplaceExchange.State.AWAITING_COMPLETION,
+            ):
+                return Response({"code": "INVALID_TRANSITION"}, status=409)
             if request.user.id == exchange.buyer_id:
                 exchange.buyer_confirmed = True
             else:
