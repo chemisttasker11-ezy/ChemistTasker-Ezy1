@@ -22,6 +22,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const chunks = JSON.parse(fs.readFileSync(path.join(DIR, 'chunks.json'), 'utf8'));
 const flows = JSON.parse(fs.readFileSync(path.join(DIR, 'flows.json'), 'utf8'));
 const flowOf = id => flows.find(f => f.id === id);
+// Independent-check batches (build-verify.mjs) and the findings they check.
+const vbatches = fs.existsSync(path.join(DIR, 'verify.json')) ? JSON.parse(fs.readFileSync(path.join(DIR, 'verify.json'), 'utf8')) : [];
+const vOf = id => vbatches.find(b => b.id === id);
+const rawById = new Map(JSON.parse(fs.readFileSync(path.join(DIR, 'raw_findings.json'), 'utf8')).map(f => [f.id, f]));
 const files = id => fs.readFileSync(path.join(DIR, `files_${id}.txt`), 'utf8').trim().split(/\r?\n/);
 const isDeep = c => /^(backend|shared-core)\//.test(c.first);
 
@@ -31,6 +35,11 @@ function parse(text) {
 }
 function validate(id, j) {
   if (flowOf(id)) return { ok: Array.isArray(j.findings) && (j.paths_read || []).length >= 5, missing: [] };
+  if (vOf(id)) {
+    const got = new Set((j.verdicts || []).filter(v => /^(CONFIRMED_SOURCE|CONFIRMED_SOURCE_LOWER|REFUTED|DUPLICATE_OF|NEEDS_RUNTIME)$/.test(v.verdict)).map(v => v.id));
+    const missing = vOf(id).ids.filter(i => !got.has(i));
+    return { ok: missing.length === 0, missing };
+  }
   const want = new Set(files(id));
   const got = new Set((j.files || []).filter(f => /^(OK|ISSUE|NOTE|NA)$/.test(f.verdict)).map(f => f.path));
   const missing = [...want].filter(p => !got.has(p));
@@ -54,7 +63,10 @@ function salvage() {
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;
 const pick = process.argv.includes('--slots') ? process.argv[process.argv.indexOf('--slots') + 1].split(',') : null;
 const ids = list => list.map(c => c.id).filter(id => !only || only.includes(id));
-const Q = { flow: ids(flows), deep: ids(chunks.filter(isDeep)), broad: ids(chunks.filter(c => !isDeep(c))) };
+const Q = { flow: ids(flows), deep: ids(chunks.filter(isDeep)), broad: ids(chunks.filter(c => !isDeep(c))),
+  vA: ids(vbatches.filter(b => b.checker === 'codexA')), vB: ids(vbatches.filter(b => b.checker === 'codexB')),
+  // F13 = rest of F12 parity; Rxxx = real re-read of chunks the online pass only fetched.
+  extra: ['F13', 'R046', 'R048', 'R076', 'R077'].filter(id => !only || only.includes(id)) };
 const attempts = {};
 
 const AGY_PRE = 'Work alone: do not start subagents or parallel research tasks; read only the files this brief names or that you must edit.\nRun every command in the foreground and wait for it to finish before you reply. Never start a command in the background.';
@@ -62,6 +74,9 @@ const CODEX_PRE = 'Work alone.\nReview by reading code only. Do not run builds, 
 const CLAUDE_PRE = 'Work alone: do not start subagents; read only the files this brief names, the known-findings list, and files you must open to understand them.';
 
 function brief(id, pre) {
+  const vb = vOf(id);
+  if (vb) return fs.readFileSync(path.join(DIR, 'VERIFY_TEMPLATE.md'), 'utf8').replace('{{PREAMBLE}}', pre).replaceAll('{{CHUNK}}', id)
+    .replace('{{FINDINGS}}', vb.ids.map(i => { const f = rawById.get(i); return `### ${f.id} (${f.severity}, ${f.area}; reported by ${f.reviewer})\n${f.title}\n\n${f.scenario}\n\nEvidence: ${(f.evidence || []).join(', ')}\nClaimed test: ${f.test_needed}`; }).join('\n\n'));
   const fl = flowOf(id);
   if (fl) return fs.readFileSync(path.join(DIR, 'FLOW_TEMPLATE.md'), 'utf8').replace('{{PREAMBLE}}', pre)
     .replaceAll('{{CHUNK}}', id).replace('{{TITLE}}', fl.title).replace('{{SCOPE}}', fl.scope).replace('{{AREA}}', fl.area);
@@ -91,8 +106,8 @@ const RUNNERS = {
 const SLOTS = [
   ...[1, 2, 3].map(i => ({ name: `claudeA-${i}`, acct: 'claudeA', queues: [Q.flow, Q.deep, Q.broad], go: RUNNERS.claude('A', 'claude-opus-5-5', 'high') })),
   ...[1, 2].map(i => ({ name: `claudeB-${i}`, acct: 'claudeB', queues: [Q.deep, Q.flow, Q.broad], go: RUNNERS.claude('B', 'claude-opus-5-5', 'high') })),
-  ...[1, 2, 3, 4].map(i => ({ name: `codexA-${i}`, acct: 'codexA', queues: [Q.deep, Q.flow, Q.broad], go: RUNNERS.codex('A') })),
-  ...[1, 2, 3, 4].map(i => ({ name: `codexB-${i}`, acct: 'codexB', queues: [Q.deep, Q.flow, Q.broad], go: RUNNERS.codex('B') })),
+  ...[1, 2, 3, 4].map(i => ({ name: `codexA-${i}`, acct: 'codexA', queues: [Q.vA, Q.extra, Q.deep, Q.flow, Q.broad], go: RUNNERS.codex('A') })),
+  ...[1, 2, 3, 4].map(i => ({ name: `codexB-${i}`, acct: 'codexB', queues: [Q.vB, Q.extra, Q.deep, Q.flow, Q.broad], go: RUNNERS.codex('B') })),
   ...['g1', 'g2', 'g3'].flatMap(g => [1, 2].map(i => ({ name: i > 1 ? `agy-${g}-${i}` : `agy-${g}`, acct: `agy${g}`, queues: [Q.broad, Q.deep, Q.flow], go: RUNNERS.agy(g, `C:\\dev\\worktrees\\chemisttasker-pr200-${g}${i > 1 ? '-' + i : ''}`) }))),
 ];
 

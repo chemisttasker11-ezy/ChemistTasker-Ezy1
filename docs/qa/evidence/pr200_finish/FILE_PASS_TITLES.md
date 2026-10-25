@@ -104,6 +104,7 @@ C064-N1 | Invoicing / Expo | Legacy Expo invoice generator defaults superannuati
 C070-N1 | Expo shift board state | Shared AsyncStorage keys can expose previous account's applied/rejected shift markers after account switching.
 C071-N1 | Mobile authentication | Concurrent mobile logout and in-flight refresh/profile hydration can resurrect old tokens or overwrite the newly signed-in account.
 C071-N2 | Mobile push privacy | Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.
+C074-N1 | Next / cross-account private workspace privacy | Next marketplace and publishing workspaces can display the previous account's private stock, messages or unpublished drafts after cross-tab login.
 C079-N1 | Shifts | Editing a shift replaces its saved per-date rates
 C079-N2 | Shifts | Manual shift times revert to pharmacy opening hours
 F01-N1 | Shifts/Privacy | Workers browsing shifts can see the names and emails of other workers who are booked on the shift or waiting for payment.
