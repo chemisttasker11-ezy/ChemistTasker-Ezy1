@@ -1,0 +1,82 @@
+{
+  "chunk": "C065",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection, service-boundary and scoped interaction review; S2/S3 pending",
+  "files": [
+    {
+      "path": "frontend_mobile/roles/shared/messages/[id].tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B51"
+      ],
+      "note": "[id].tsx: Room messaging and WebSocket events use tickets and shared-core message APIs; revocation B05/B30/B51."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/messages/useLiveMessages.ts",
+      "verdict": "ISSUE",
+      "ids": [
+        "B05",
+        "B30"
+      ],
+      "note": "useLiveMessages.ts: Room messaging and WebSocket events use tickets and shared-core message APIs; revocation B05/B30/B51."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/GooglePlacesInput.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "GooglePlacesInput.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/LocumManager.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "LocumManager.tsx: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/MembershipApplicationReviewDialog.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "MembershipApplicationReviewDialog.tsx: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/MembershipApplicationsPanel.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "MembershipApplicationsPanel.tsx: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmaciesListView.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmaciesListView.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyAdmins.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "F03-N1"
+      ],
+      "note": "PharmacyAdmins.tsx: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyDetailView.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacyDetailView.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyForm.config.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacyForm.config.ts: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyForm.styles.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacyForm.styles.ts: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+    }
+  ],
+  "findings": []
+}
