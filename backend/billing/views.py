@@ -909,12 +909,14 @@ def _process_stripe_event(event):
                 if not sub:
                     sub = OwnerSubscription.objects.filter(stripe_extra_seat_subscription_id=sub_id).first()
                     matched_extra_subscription = sub is not None
-                if not sub:
-                    sub = _get_subscription_from_customer(customer_id)
+                # An invoice must belong to the *exact* active local
+                # subscription. Matching on customer alone can resurrect a
+                # previously deleted subscription or credit a different plan.
                 if not sub:
                     raise OwnerSubscription.DoesNotExist
-                if not matched_extra_subscription and not sub.stripe_subscription_id:
-                    sub.stripe_subscription_id = sub_id
+                if sub.status == 'inactive':
+                    logger.info('Ignoring paid invoice for locally inactive Stripe subscription %s', sub_id)
+                    return
                 sub.status = 'active'
                 period_end = invoice.get('lines', {}).get('data', [])
                 if period_end:
