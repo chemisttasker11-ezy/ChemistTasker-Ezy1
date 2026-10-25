@@ -139,6 +139,141 @@
       "lines": 108,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
       "note": "108 lines; Next migrated dashboard or public UI; calls none; session-generation, CSRF and auth negative tests outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/utils/tokenService.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "7909aea9b402d50a0218e267a1b2cc41c7020c1d",
+      "lines": 136,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "136 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/next-env.d.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ce4e94a6b10f160ee021fe18939af160d2927dcf",
+      "lines": 8,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "8 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/next.config.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "043136b0d40ab0511d4cb9c3b718bed6c498a346",
+      "lines": 72,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "72 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/postcss.config.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "7b78353d6ef2efb4e94b5a942c19701a6c45601d",
+      "lines": 13,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "13 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/public/entry.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "97c7eb93b6474300d4730b72371579a7ba159a45",
+      "lines": 8,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "8 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/public/footer.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "72eae1b9817d5c05487bcd1fede9759280a033af",
+      "lines": 68,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "68 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/public/header.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f5172f8e9c93dbaa60f2dfef664e6c0a76befee3",
+      "lines": 123,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "123 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/public/hero.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "5ab4aeb22372241874b7bee113232dd048aded7c",
+      "lines": 6,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "6 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/public/navigation.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "4387fc75dcaf41d88a04df1ac9886bff2e9952c3",
+      "lines": 37,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "37 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/public/routes.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "630e89e007654dda09cd6b9db8180ceed841bca2",
+      "lines": 25,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "25 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/public/runtime.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "8ed63b9a87fa809318fedf3380f06e3406dfc6dc",
+      "lines": 36,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "36 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/public/skill-icon.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "5b7c53a67b27dd8c8a094fc8b0bdc09b54cade12",
+      "lines": 10,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "10 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/public/theme.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "a45d8f70e7e50382302ce248b4d641337110f935",
+      "lines": 78,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "78 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/shared-ui/filterParts.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "65c791585c20245ae57d5ab55cb2dbdedcb618c5",
+      "lines": 109,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "109 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
+    },
+    {
+      "path": "frontend_web/landing_next/shared-ui/shifts/FiltersSidebar.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "9f40c7879dc2ae300b89e9cc9887022fd865eb59",
+      "lines": 253,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "253 lines; Next configuration, session or public presentation. Critical auth/client contract and Vite parity S2/S3 outstanding."
     }
   ],
   "findings": []
