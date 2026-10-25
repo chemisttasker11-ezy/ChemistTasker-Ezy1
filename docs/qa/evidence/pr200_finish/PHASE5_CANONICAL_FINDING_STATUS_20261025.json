@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 raw IDs (71 B plus 155 C/F). 42 distinct IDs / 46 cumulative targeted failing negative assertions, including B10 sequential service red at run 40188055560. B24 fixture remains TEST_INVALID pending corrected rerun; no 99% S2 certification.",
+  "material": "226 historical IDs: 71 B and 155 C/F. 43 distinct runtime IDs / 48 cumulative expected-red isolated Django SQLite negative assertions across runs. B24 fixture corrected and two state transitions reproduced with two passing positives at run 40189568324, head 51db9da3. 99% independent S2 NOT CERTIFIED.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,15 +10,15 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 42,
-  "runtime_failing_scenarios": 46,
+  "runtime_distinct_ids": 43,
+  "runtime_failing_scenarios": 48,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 13,
-    "UNVERIFIED_CANDIDATE": 157,
-    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 41,
+    "UNVERIFIED_CANDIDATE": 156,
+    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 42,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
@@ -60,8 +60,8 @@
       "negative_failures": 7,
       "errors": 0
     },
-    "cumulative_distinct_findings": 42,
-    "cumulative_failed_negative_assertions": 46,
+    "cumulative_distinct_findings": 43,
+    "cumulative_failed_negative_assertions": 48,
     "warning": "Cumulative from multiple isolated targeted runs; not 45 failures in one suite; B24 error invalid, not counted.",
     "additional_runs": [
       {
@@ -85,6 +85,17 @@
         "tests": 1,
         "negative_test_failing": true,
         "errors": 0
+      },
+      {
+        "id": "B24",
+        "run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189568324",
+        "head": "51db9da375c2555490c07d0a87e752709bca1d57",
+        "tests": 12,
+        "negative_test_failing": true,
+        "negative_scenarios": 2,
+        "positive_controls": 2,
+        "fixture_errors": 0,
+        "note": "Focused suite contains other intentionally expected-red failures; B24 4 cases: 2 RED negatives and 2 PASS positives"
       }
     ]
   },
@@ -629,16 +640,37 @@
       "severity": "P0",
       "area": "Ordinary marketplace",
       "title": "Exchange action accepts confirm-completion while still in ENQUIRY / TERMS_PROPOSED, and arbitrary propose-terms/cancel/decline after accepted or completed; buyer can invoke decline. This bypasses accepted terms and reservation lifecycle.",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE_API_WITH_POSITIVE_CONTROLS",
+      "decision": "FIX_ON_SEPARATE_REMEDIATION_PR",
       "root": "B24",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
+      "source_proof": [
+        "backend/marketplace/views.py:347-382",
+        "backend/marketplace/services.py:52-76",
+        "backend/qa_release/test_pr200_phase5_p0_authz.py:283-406"
+      ],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b24_enquiry_cannot_be_marked_complete_before_terms_acceptance",
+          "observed": "Buyer confirmation returned HTTP 200 from ENQUIRY rather than rejection, asserting invalid transition; all synthetic setup completed.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED",
+          "environment": "Django SQLite hosted CI, two-sided real API requests; mock seller policy only for synthetic listing validation",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189568324",
+          "head": "51db9da375c2555490c07d0a87e752709bca1d57"
+        },
+        {
+          "test": "test_b24_proposed_unaccepted_terms_cannot_be_completed",
+          "observed": "Buyer confirmation returned HTTP 200 from TERMS_PROPOSED rather than rejection; no accepted terms.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED",
+          "environment": "Django SQLite hosted CI",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189568324",
+          "head": "51db9da375c2555490c07d0a87e752709bca1d57"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "ENQUIRY and TERMS_PROPOSED state records both allowed buyer confirm-completion (HTTP 200) without seller accept. Legitimate ACCEPTED two-party completion and unrelated user 404 controls passed. Authenticated simulated users, synthetic seller policy mock at listing save. No real money or PostgreSQL concurrency."
     },
     {
       "id": "B25",
