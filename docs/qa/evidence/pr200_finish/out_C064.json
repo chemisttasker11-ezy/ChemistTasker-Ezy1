@@ -60,9 +60,11 @@
     },
     {
       "path": "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx",
-      "verdict": "OK",
-      "ids": [],
-      "note": "InvoiceGenerate.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
+      "note": "Legacy Expo InvoiceGenerate initializes superRateSnapshot to 10% (line 115) and only changes it when onboarding.super_rate_snapshot is truthy (lines 138-154). POST generateInvoice passes it as super_rate_snapshot (line 392); backend invoicing.services persists exact value (line 332), calculates super_base * rate/100 (lines 172-178). As at 2026 the Australian SG rate is 12%, but contractual super liability varies. Stale 10% default is a conditional financial accuracy issue in an exposed legacy invoice tool. Server currently does not replace with current statutory rate. S3 financial examples and legal classification needed."
     },
     {
       "path": "frontend_mobile/roles/shared/invoices/InvoiceList.tsx",
@@ -89,5 +91,33 @@
       "note": "invoiceStats.ts: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
     }
   ],
-  "findings": []
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P1",
+      "area": "Invoicing / Expo",
+      "title": "Legacy Expo invoice generator defaults superannuation to 10% despite Australia's current 12% SG rate.",
+      "scenario": "An eligible contractor or worker opens the legacy Expo invoice generator without an existing onboarding super-rate snapshot. The form starts at 10%. The app sends that percentage in the invoice payload; the legacy invoicing service trusts and persists it and calculates the generated superannuation line using that 10%. The actual 2026 standard SG rate is 12%, so a user who relies on the default may generate a short super request. This is a conditional calculation issue, not proof every contractor is SG-eligible or that every custom invoice must charge statutory SG.",
+      "evidence": [
+        "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:115",
+        "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:152",
+        "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:392",
+        "backend/invoicing/services.py:175",
+        "backend/invoicing/services.py:332",
+        "frontend_mobile/roles/shared/invoices/InvoiceList.tsx:52"
+      ],
+      "confidence": "high for hardcoded default/source calculation; legal applicability conditional",
+      "verification": "SOURCE_ONLY_UNCONFIRMED",
+      "test_needed": "New user with no onboarding super_rate_snapshot uses legacy InvoiceGenerate for an eligible 2026 invoice; assert suggested rate is current rate 12% (or explicitly configured award/agreement rate), correctly calculates amount, and backend does not silently accept stale default. Confirm historical invoice dates, contractor eligibility, intentionally different agreed rates and legacy vs new FinanceWorkspace paths.",
+      "reference": "https://www.ato.gov.au/api/public/content/0-1cca4d23-4e4a-4642-96f8-eb229b882fb3",
+      "owner_question": {
+        "question": "Should the legacy Expo invoice generator continue pre-populating a 10% superannuation rate for 2026 invoices?",
+        "options": [
+          "Use a documented current 12% default for applicable 2026 invoices, with eligibility/rate checks",
+          "Hide legacy generator in favour of independently validated canonical finance flow",
+          "Keep the old 10% default"
+        ]
+      }
+    }
+  ]
 }
