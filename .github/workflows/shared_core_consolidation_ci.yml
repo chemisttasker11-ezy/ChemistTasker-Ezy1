@@ -226,9 +226,9 @@ jobs:
       - name: Migration drift check
         run: python backend/manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
       - name: Auth and account contracts
-        run: python backend/manage.py test users billing.tests --settings=core.contract_test_settings
+        run: python backend/manage.py test users billing --settings=core.contract_test_settings
       - name: Marketplace contracts
-        run: python backend/manage.py test marketplace.tests marketplace.test_listing_policy ethical_marketplace.tests ethical_marketplace.test_finalisation --settings=core.contract_test_settings
+        run: python backend/manage.py test marketplace.tests marketplace.test_listing_policy ethical_marketplace.tests ethical_marketplace.test_finalisation marketplace.test_pr201_b24_b25 --settings=core.contract_test_settings
       - name: Large-module ratchet
         run: python backend/manage.py test core.test_module_size_ratchet --settings=core.contract_test_settings
       - name: Public content contracts
@@ -258,6 +258,7 @@ jobs:
           python -m unittest attendance_tests.test_kiosk_qr_pin_security
           python -m unittest attendance_tests.test_kiosk_offline_protocol
           python -m unittest attendance_tests.test_kiosk_release_blockers
+          python -m unittest attendance_tests.test_pr201_b29_kiosk
           python -m unittest attendance_tests.test_kiosk_staff_breaks
           python -m unittest attendance_tests.test_pharmacy_pin_scope
           python -m unittest attendance_tests.test_worker_pin_setup
@@ -305,7 +306,7 @@ jobs:
       - name: PostgreSQL migration rehearsal
         run: python backend/manage.py migrate --noinput --settings=core.postgres_test_settings
       - name: PostgreSQL concurrency contracts
-        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards.PillSpendPostgresConcurrencyTests --settings=core.postgres_test_settings
+        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards.PillSpendPostgresConcurrencyTests billing.test_pr201_finance_pg ethical_marketplace.test_pr201_b31_pg --settings=core.postgres_test_settings
 
   boundary-audit:
     runs-on: ubuntu-latest

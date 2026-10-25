@@ -10,4 +10,4 @@ Date 26 October 2026; source PR201 branch before this batch f8e33f82. This is a 
 - Still to verify: employee-specific override in direct-staff timesheet/export and effective-dated work-base changes, activation after an employee's base changes, and staging UI evidence. Until these gates pass, do not certify payroll.
 - No migration, deploy, or changes to audit PR200. Release NO-GO.
 
-Mandatory acceptance: run `python backend/manage.py test qa_release.test_pr201_phase6_employee_work_base qa_release.test_pr201_phase6_award_floor qa_release.test_pr201_phase6_holidays`, then check exact-head shared-core, Vite, Next, Expo and PostgreSQL gates; inspect the deployed staging revision before claiming staging has the fixes.
+Mandatory acceptance: run `python backend/manage.py test shifts.test_pr201_employee_work_base shifts.test_pr201_award_floor shifts.test_pr201_holidays`, then check exact-head shared-core, Vite, Next, Expo and PostgreSQL gates; inspect the deployed staging revision before claiming staging has the fixes.

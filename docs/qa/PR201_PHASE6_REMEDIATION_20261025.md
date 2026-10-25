@@ -7,6 +7,6 @@ Source finding: authenticated owner of a different pharmacy could POST an assign
 
 Repair: use the roster capability authority, reject cross-shift slot references, mismatched worker roles/memberships and invalid occurrence dates; prevent moving existing assignments to other shifts/slots. Existing published-roster lock and read permissions remain.
 
-Added six Django positive/negative regression cases in `backend/qa_release/test_pr201_phase6_roster.py`, wired into `release_blocker_regressions.yml`. Status: **IMPLEMENTED, awaiting exact-head CI verification**. No migration or deployment.
+Added six Django positive/negative regression cases in `backend/workforce/tests/test_pr201_roster.py`, wired into `release_blocker_regressions.yml`. Status: **IMPLEMENTED, awaiting exact-head CI verification**. No migration or deployment.
 
 Next: B24 exchange state guard, B25 audience atomicity, B31 ethical receipt serialization + real PG locking; retain NO-GO.

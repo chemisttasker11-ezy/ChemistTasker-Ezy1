@@ -12,6 +12,6 @@ Architecture: `shifts.holidays` is the sole date/scope/window resolver. `shifts.
 
 Tests added for state/region/part-day split, 2026/2027, WA substitute, unconfigured work base, pending declarations and complete state keys. Run:
 `python backend/shifts/data/reconcile_public_holidays.py --check`
-`python backend/manage.py test qa_release.test_pr201_phase6_b14 qa_release.test_pr201_phase6_holidays shifts.test_pricing_contract`
+`python backend/manage.py test shifts.test_pr201_b14 shifts.test_pr201_holidays shifts.test_pricing_contract`
 
 **No staging/production migration or payroll changes applied.** Exact-head CI required, local 2027 pending declarations and unverified venue-specific industrial entitlements remain acceptance blockers; release NO-GO.
