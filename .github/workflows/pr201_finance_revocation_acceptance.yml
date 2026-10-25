@@ -52,7 +52,7 @@ jobs:
         run: |
           set -o pipefail
           python backend/manage.py test \
-            chat.test_revocation_contracts chat.test_revocation_http chat.test_websocket \
+            qa_release.test_pr201_phase6_scoped_roles chat.test_revocation_contracts chat.test_revocation_http chat.test_websocket \
             notifications.test_websocket \
             qa_release.test_pr201_phase6_b53 qa_release.test_pr201_phase6_b57 \
             qa_release.test_pr201_phase6_b69 qa_release.test_pr201_phase6_b10 \

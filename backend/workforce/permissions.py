@@ -11,7 +11,8 @@ def _is_owner_or_superuser(user, pharmacy) -> bool:
 
 
 def _org_has_capability(user, pharmacy, capability: str) -> bool:
-    if not user or not pharmacy or not getattr(pharmacy, "organization_id", None):
+    from organizations.access import _is_active_actor
+    if not _is_active_actor(user) or not pharmacy or not getattr(pharmacy, "organization_id", None):
         return False
 
     from users.models import OrganizationMembership
@@ -36,6 +37,8 @@ def _org_has_capability(user, pharmacy, capability: str) -> bool:
 
 
 def can_manage_roster_pharmacy(user, pharmacy) -> bool:
+    if not user or not getattr(user, "is_active", False):
+        return False
     if _is_owner_or_superuser(user, pharmacy):
         return True
     from organizations.access import can_manage_roster
@@ -48,6 +51,8 @@ def can_manage_roster_pharmacy(user, pharmacy) -> bool:
 
 
 def can_manage_staff_pharmacy(user, pharmacy) -> bool:
+    if not user or not getattr(user, "is_active", False):
+        return False
     if _is_owner_or_superuser(user, pharmacy):
         return True
     from organizations.access import can_manage_staff
@@ -85,6 +90,8 @@ def require_manage_pharmacy(user, pharmacy):
 
 
 def can_view_worker_timesheet(user, timesheet) -> bool:
-    if user and user.is_authenticated and user.pk == timesheet.user_id:
+    if not user or not getattr(user, "is_active", False):
+        return False
+    if user.is_authenticated and user.pk == timesheet.user_id:
         return True
     return can_manage_roster_pharmacy(user, timesheet.period.pharmacy)

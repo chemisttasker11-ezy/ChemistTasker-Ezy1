@@ -266,7 +266,7 @@ def membership_visible_pharmacies(membership):
         return Pharmacy.objects.filter(organization=membership.organization)
 
     if membership.role == 'REGION_ADMIN':
-        return membership.pharmacies.all()
+        return membership.pharmacies.filter(organization_id=membership.organization_id)
 
     return Pharmacy.objects.none()
 
