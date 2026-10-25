@@ -110,21 +110,13 @@ class MembershipViewSet(viewsets.ModelViewSet):
 
 
     def destroy(self, request, *args, **kwargs):
-        """
-        Permanently deletes a membership.
-        First, it removes the member from any chat rooms they are a part of to satisfy the PROTECT rule.
-        Then, it deletes the membership record itself.
-        WARNING: This will also delete all messages sent by this member.
-        """
+        """Remove membership access while preserving historical chat messages."""
         membership = self.get_object()
 
         with transaction.atomic():
-            # Step 1: Delete the protecting Participant records first.
-            # The related_name on the Participant model is 'chat_participations'.
+            # Remove chat access before deleting or deactivating the membership.
             membership.chat_participations.all().delete()
 
-            # Step 2: Now that the protection is removed, delete the membership.
-            # This will also cascade-delete all of their messages.
             try:
                 membership.delete()
             except ProtectedError:

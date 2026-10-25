@@ -102,7 +102,8 @@ class Message(models.Model):
                                      on_delete=models.CASCADE,
                                      related_name='messages')
     sender = models.ForeignKey('client_profile.Membership',
-                               on_delete=models.CASCADE,
+                               on_delete=models.SET_NULL,
+                               null=True, blank=True,
                                related_name='sent_messages')
     body = models.TextField(blank=True)
     attachment = models.FileField(upload_to=chat_upload_path, null=True, blank=True)

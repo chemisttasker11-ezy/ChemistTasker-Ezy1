@@ -89,6 +89,31 @@ class RoomMessageTests(ChatBase):
         super().setUp()
         self.room = self.dm(self.alice, self.bob).json()["id"]
 
+    def test_removing_staff_keeps_their_messages_visible_to_other_participants(self):
+        sent = client_for(self.alice).post(
+            f"{ROOMS}{self.room}/messages/", {"body": "Keep this history"}, format="json")
+        self.assertEqual(sent.status_code, 201, sent.data)
+        removed = client_for(self.owner).delete(f"{BASE}memberships/{self.alice_m.pk}/")
+        self.assertEqual(removed.status_code, 204)
+        self.assertFalse(Membership.objects.filter(pk=self.alice_m.pk).exists())
+        self.assertTrue(Message.objects.filter(pk=sent.data["id"]).exists())
+        self.assertIsNone(Message.objects.get(pk=sent.data["id"]).sender_id)
+        listing = client_for(self.bob).get(f"{ROOMS}{self.room}/messages/")
+        self.assertEqual(listing.status_code, 200, listing.data)
+        self.assertEqual([(m["id"], m["body"], m["sender"]) for m in self.rows(listing)],
+                         [(sent.data["id"], "Keep this history", None)])
+
+    def test_removing_staff_revokes_their_conversation_access(self):
+        self.assertEqual(client_for(self.alice).get(f"{ROOMS}{self.room}/").status_code, 200)
+        removed = client_for(self.owner).delete(f"{BASE}memberships/{self.alice_m.pk}/")
+        self.assertEqual(removed.status_code, 204)
+        self.assertFalse(Participant.objects.filter(membership_id=self.alice_m.pk).exists())
+        self.assertEqual(client_for(self.alice).get(f"{ROOMS}{self.room}/").status_code, 404)
+        self.assertEqual(client_for(self.alice).get(f"{ROOMS}{self.room}/messages/").status_code, 404)
+        self.assertEqual(client_for(self.alice).post(
+            f"{ROOMS}{self.room}/messages/", {"body": "No access"}, format="json").status_code, 404)
+        self.assertEqual(client_for(self.bob).get(f"{ROOMS}{self.room}/").status_code, 200)
+
     def test_post_and_list_messages_in_a_room(self):
         res = client_for(self.alice).post(f"{ROOMS}{self.room}/messages/", {"body": "hello"}, format="json")
         self.assertEqual(res.status_code, 201)
