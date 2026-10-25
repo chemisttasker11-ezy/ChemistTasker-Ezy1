@@ -918,5 +918,51 @@
       "No PostgreSQL concurrency; no physical kiosk; further role-tenant auth and time tamper protections unproven.",
       "High-impact classification conditional on whether NEEDS_REVIEW events should be excluded from payroll, operational views or subsequent approvals."
     ]
+  },
+  "B14": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/shifts/data/award_rates_casual_first_level.json:1-107",
+      "backend/shifts/data/public_holidays.json",
+      "backend/shifts/pricing.py:47-51",
+      "backend/workforce/award_rates.py:10-93",
+      "docs/qa/MAIN_RELEASE_B14_AWARD_RATE_SOURCE_CHECK_20261025.md"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b14_shift_guide_2026_casual_pharmacist_minimum",
+        "observed": "Actual old shift guide Decimal 47.68 < current 2026 Fair Work casual weekday pharmacist 52.18; red.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189946286",
+        "head": "07bcf99553849e0f2734526f33ef4480f1310975",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Django SimpleTestCase, static shift-guide data, no DB or payroll"
+      },
+      {
+        "test": "test_b14_shift_guide_2026_casual_assistant_minimum",
+        "observed": "Actual old shift guide Decimal 33.19 < 2026 Fair Work casual weekday assistant Level 1 34.76; red.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189946286",
+        "head": "07bcf99553849e0f2734526f33ef4480f1310975",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Django SimpleTestCase static data"
+      },
+      {
+        "test": "test_b14_queensland_2027_australia_day",
+        "observed": "Static shift holiday classifier returned False for QLD public holiday on 26 January 2027; red.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189946286",
+        "head": "07bcf99553849e0f2734526f33ef4480f1310975",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Django SimpleTestCase, no DB"
+      }
+    ],
+    "positive_controls": [
+      "test_b14_workforce_2026_casual_pharmacist_positive PASSED",
+      "test_b14_queensland_2027_nonholiday_positive PASSED"
+    ],
+    "runtime_limitations": [
+      "No database runtime, payroll settlement, shift rate lock, pay period or worker invoice; outcome is 2026 award/2027 holiday static-data divergence.",
+      "No evidence of actual illegal underpayment; negotiated locum price and employee award covered engagements differ.",
+      "No independent S2 full-file certification"
+    ]
   }
 }
