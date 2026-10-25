@@ -7,7 +7,6 @@ from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from shifts.models import Shift, ShiftDescriptionTemplate, ShiftOffer
 from shifts.escalation import allowed_tiers
 from shifts.pricing import expand_shift_slots
-from datetime import date
 from django.utils import timezone
 from organizations.access import user_can_manage_pharmacy
 from organizations.timezone import get_pharmacy_timezone
