@@ -3,7 +3,7 @@
   "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "reviewer": "gpt6-senior-20261025",
   "review_level": "source acquisition only S2/S3 pending",
-  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3",
   "files": [
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx",
@@ -12,7 +12,8 @@
       "blob_sha": "dbed9c25bd93c3ef176b0d82ecfd5f45d6acb16d",
       "lines": 715,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "715 lines retrieved; Vite shift board, persistence and counter-offer flows; calls handleApplySlots; backend permission, rate manipulation and parity require S2/S3."
+      "note": "715 lines retrieved; Vite shift board, persistence and counter-offer flows; calls handleApplySlots; backend permission, rate manipulation and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/constants.ts",
@@ -21,7 +22,8 @@
       "blob_sha": "f85001d328fae42939f805f4f67d98e891650e52",
       "lines": 24,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "24 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+      "note": "24 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts",
@@ -30,7 +32,12 @@
       "blob_sha": "997f2c480182f4df75ae9668d7b71d9a1a725f15",
       "lines": 538,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "538 lines retrieved; Vite shift board, persistence and counter-offer flows; calls storageGetItem, fetchShiftCounterOffersService, fetchShiftCounterOffersBatchService, getOnboardingDetail, calculateShiftRates, onSubmitCounterOffer; backend permission, rate manipulation and parity require S2/S3."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 180-242): Vite batches offered-shift IDs into one shared-core counter-offers batch API, filters returned offers to currentUserId and reconciles persisted badge state. Server must enforce query and shift audience boundaries; F04 object scope remains open. Test contract: Negative: query unrelated shift IDs; positive: same own slot map as Expo but fewer requests. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        180,
+        242
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useFilterSort.ts",
@@ -39,7 +46,8 @@
       "blob_sha": "5c23fbbaf048051d840615fd7430ec6e7bc21a0f",
       "lines": 392,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "392 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+      "note": "392 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useReviewOfferDisplay.ts",
@@ -48,7 +56,8 @@
       "blob_sha": "7aaac77bdf51e50673557459a7d7725f3af0f4d6",
       "lines": 29,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "29 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+      "note": "29 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useShiftPersistence.ts",
@@ -57,7 +66,12 @@
       "blob_sha": "c5c844a1122c4ae5f9b2a51aa6c9a1824d7698fc",
       "lines": 174,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "174 lines retrieved; Vite shift board, persistence and counter-offer flows; calls storageGetItem; backend permission, rate manipulation and parity require S2/S3."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 40-156): Vite adds userId only to saved shift key, but applied/rejected markers remain generic global keys; UI also reconciles to server prop IDs. Account switch in same browser may momentarily show old markers; session storage clear in Next browser-session mitigates some cases. Test contract: Negative: use two accounts in same tab with page restored while API unavailable; positive: scoped state resets. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        40,
+        156
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx",
@@ -66,7 +80,8 @@
       "blob_sha": "6584cfe82dc7a25aba6cf85297e633368ba754bf",
       "lines": 778,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "778 lines retrieved; Vite shift board, persistence and counter-offer flows; calls getPharmacistDashboard, getOnboardingDetail, onToggleSave, onApplyAll, refreshShifts, onApplySlot; backend permission, rate manipulation and parity require S2/S3."
+      "note": "778 lines retrieved; Vite shift board, persistence and counter-offer flows; calls getPharmacistDashboard, getOnboardingDetail, onToggleSave, onApplyAll, refreshShifts, onApplySlot; backend permission, rate manipulation and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/types.ts",
@@ -75,7 +90,8 @@
       "blob_sha": "3884ffd8c124220c80311b945252affab7d0ab9d",
       "lines": 98,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "98 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+      "note": "98 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/counterOffers.ts",
@@ -84,7 +100,8 @@
       "blob_sha": "a3b8751605071cea2363021191492313fdd90c6f",
       "lines": 26,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "26 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+      "note": "26 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/date.ts",
@@ -93,7 +110,8 @@
       "blob_sha": "29915fe7257c4a97d460ca562a45a185349dc045",
       "lines": 11,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "11 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+      "note": "11 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/location.ts",
@@ -102,7 +120,8 @@
       "blob_sha": "1141498a06ccc2b976972aee054a7b4d8e87b24c",
       "lines": 35,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "35 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3."
+      "note": "35 lines retrieved; Vite shift board, persistence and counter-offer flows; calls none; backend permission, rate manipulation and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/rates.ts",
@@ -111,7 +130,8 @@
       "blob_sha": "20a0274cb677c054eb300107f8b1c83b570cb6c1",
       "lines": 106,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "106 lines retrieved; counter-offer/shift state; calls none; backend permission and parity require S2/S3."
+      "note": "106 lines retrieved; counter-offer/shift state; calls none; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/shift.ts",
@@ -120,7 +140,8 @@
       "blob_sha": "96172c392f8b4ed267316830482bfb538350bf8d",
       "lines": 170,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "170 lines retrieved; counter-offer/shift state; calls none; backend permission and parity require S2/S3."
+      "note": "170 lines retrieved; counter-offer/shift state; calls none; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/utils/submitCounterOffer.ts",
@@ -129,7 +150,8 @@
       "blob_sha": "3c8cb59c1836b9ad842d12340611363615c18bdb",
       "lines": 17,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "17 lines retrieved; counter-offer/shift state; calls createShiftCounterOffer; backend permission and parity require S2/S3."
+      "note": "17 lines retrieved; counter-offer/shift state; calls createShiftCounterOffer; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/AvailabilitySidebar.tsx",
@@ -138,7 +160,8 @@
       "blob_sha": "f257b75317a438f83af26a4fbd580ccfc79e00bb",
       "lines": 247,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "247 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+      "note": "247 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/FiltersSidebar.tsx",
@@ -147,7 +170,8 @@
       "blob_sha": "d03cf1bc35972f5b4d1ca36cd1c13397b50b4c21",
       "lines": 4,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "4 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+      "note": "4 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx",
@@ -156,7 +180,8 @@
       "blob_sha": "3f2620ac11f55f6d72bb64009279366b321d5306",
       "lines": 829,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "829 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+      "note": "829 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/TalentCardV2.tsx",
@@ -165,7 +190,8 @@
       "blob_sha": "822eedd587918a6696251a0a71e23e20ea671d0d",
       "lines": 311,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "311 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+      "note": "311 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/constants.ts",
@@ -174,7 +200,8 @@
       "blob_sha": "71279f635a3be45f9b9463d8b359118d67fe5bc3",
       "lines": 17,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "17 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+      "note": "17 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages.ts",
@@ -183,7 +210,8 @@
       "blob_sha": "c4ad53ce158e9b3912756c6addc7480cea9892aa",
       "lines": 2,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "2 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+      "note": "2 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts",
@@ -192,7 +220,8 @@
       "blob_sha": "16f99d49673659d96b62724b51051d66ad99d4e1",
       "lines": 81,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "81 lines retrieved; talent filters, profile projection and availability UI; calls loadAllTalentPages; backend permission and parity require S2/S3."
+      "note": "81 lines retrieved; talent filters, profile projection and availability UI; calls loadAllTalentPages; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFilters.ts",
@@ -201,8 +230,10 @@
       "blob_sha": "e4e60b225ab761a45e321c6a3565651fa04037e1",
       "lines": 9,
       "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
-      "note": "9 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3."
+      "note": "9 lines retrieved; talent filters, profile projection and availability UI; calls none; backend permission and parity require S2/S3.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     }
   ],
-  "findings": []
+  "findings": [],
+  "targeted_recheck_files": 2
 }
