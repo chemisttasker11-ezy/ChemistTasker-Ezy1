@@ -1,0 +1,81 @@
+{
+  "chunk": "C066",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection, service-boundary and scoped interaction review; S2/S3 pending",
+  "files": [
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B16",
+        "B17"
+      ],
+      "note": "Pharmacy form calls shared create/update with idempotency and multipart files, rereads server response and handles conflicts; B16/B17/B49."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyHoursRow.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacyHoursRow.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyOverviewContainer.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacyOverviewContainer.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyProfileFields.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacyProfileFields.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacySoftwareFields.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacySoftwareFields.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/StaffManager.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B03",
+        "B19"
+      ],
+      "note": "StaffManager.tsx: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/inviteUtils.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "inviteUtils.ts: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/membershipApi.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "membershipApi.ts: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/types.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "types.ts: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pills/PillsScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PillsScreen.tsx: Pills balance/referral ledger read with selected persona scope; B10 payment ledger concurrency."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/profile/RefereesScreen.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "RefereesScreen.tsx: Expo presentational utilities and shared-core adapter; no direct backend authorization decisions."
+    }
+  ],
+  "findings": []
+}
