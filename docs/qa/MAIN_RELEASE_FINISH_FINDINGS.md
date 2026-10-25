@@ -1,6 +1,6 @@
-# PR200 finish - candidate findings (unconfirmed)
+# PR200 finish - candidate findings (source statuses)
 
-Regenerated from 89 file/flow chunk reports. Existing independently source-confirmed F03-N1/F04-N1/F04-N2 are tracked separately in VERIFIED.json; this list alone is NOT runtime reproduction. Duplicates across B-series and C/F-series remain flagged for resolution, not silently discarded.
+Generated from 101 chunk outputs. Source-level challenges and root-cause aliases are annotated separately from S3 tests; only F03-N1/F04-N1/F04-N2 have distinct earlier source verifiers. No S3 runtime reproduction is recorded.
 
 ## F03-N1 - P0 - Pharmacy admins - A staff member whose admin role was removed can give it back to themselves by accepting it as a pending admin invitation.
 
@@ -8,8 +8,10 @@ Mia is a Manager admin at Tom's pharmacy. Tom takes away her admin role but keep
 
 - Evidence: `backend/organizations/views.py:586`, `backend/organizations/views.py:590`, `backend/organizations/views.py:313`, `backend/organizations/views.py:318`, `backend/organizations/views.py:336`, `backend/organizations/views.py:341`, `backend/organizations/views.py:359`, `shared-core/src/domains/organizations/api.ts:134`
 - Confidence: high; found by claudeA-3
-- Test needed: Owner removes the admin role of an accepted staff member; that member's GET my-pending-invitations must be empty and POST accept-invitation on the old record must return 404 and leave the role switched off.
-- Decision question: Tom took Mia's Manager role away but kept her on staff. If Mia later opens her admin invitations, what should she see?
+- Test that would prove it: Owner removes the admin role of an accepted staff member; that member's GET my-pending-invitations must be empty and POST accept-invitation on the old record must return 404 and leave the role switched off.
+- Source status: CONFIRMED_SOURCE (distinct prior verifier; S3 NOT_EXECUTED)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom took Mia's Manager role away but kept her on staff. If Mia later opens her admin invitations, what should she see?
   - Nothing: a removed admin role is gone, and only a new invite from Tom can bring it back
   - The old role, shown as 'removed by Tom', with no way to accept it
   - Keep today's behaviour: she can accept it and is a Manager again
@@ -20,8 +22,10 @@ Tom edits one of his own pharmacist shifts and changes the pharmacy number in th
 
 - Evidence: `backend/shifts/base.py:128`, `backend/shifts/base.py:132`, `backend/shifts/serialization/shifts.py:49`, `backend/shifts/serialization/shifts.py:102`, `backend/shifts/serialization/shifts.py:105`, `backend/shifts/serialization/shifts.py:338`, `backend/shifts/posting.py:182`, `backend/shifts/posting.py:193`, `backend/shifts/posting.py:262`
 - Confidence: high; found by claudeB-2
-- Test needed: Tom sends PATCH /api/v1/shifts/<his shift>/ with {"pharmacy": <another org's pharmacy>, "apply_rates_to_pharmacy": true, "role_needed": "PHARMACIST"} and must get 400/403, and the shift's pharmacy and the other pharmacy's rates must be unchanged.
-- Decision question: Tom wants a shift to be at a different pharmacy. What should happen?
+- Test that would prove it: Tom sends PATCH /api/v1/shifts/<his shift>/ with {"pharmacy": <another org's pharmacy>, "apply_rates_to_pharmacy": true, "role_needed": "PHARMACIST"} and must get 400/403, and the shift's pharmacy and the other pharmacy's rates must be unchanged.
+- Source status: CONFIRMED_SOURCE (distinct prior verifier; S3 NOT_EXECUTED)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom wants a shift to be at a different pharmacy. What should happen?
   - The pharmacy can never change after posting; Tom reposts it
   - Tom can move it only between pharmacies he manages himself (for example to Nadia's site)
   - Keep today's behaviour
@@ -32,8 +36,10 @@ Sara, an external locum, opens one of Tom's public shifts. Using that shift's me
 
 - Evidence: `backend/shifts/lifecycle.py:287`, `backend/shifts/lifecycle.py:393`, `backend/shifts/base.py:124`, `backend/shifts/base.py:169`, `backend/shifts/candidates.py:212`, `backend/shifts/candidates.py:245`, `backend/shifts/candidates.py:273`, `backend/shifts/candidates.py:448`, `backend/shifts/candidates.py:417`, `backend/shifts/base.py:316`
 - Confidence: high; found by claudeB-2
-- Test needed: Sara (pharmacist, no membership at Tom's pharmacy) calls GET /api/v1/shifts/<Tom's PLATFORM shift>/member_status/?visibility=FULL_PART_TIME (and ?visibility=ORG_CHAIN on an org pharmacy shift) and must get 403/404, not Omar's row.
-- Decision question: Sara can see Tom's public shift. Should she ever see which of Tom's staff, or Lina's organisation staff, were offered it and how they answered?
+- Test that would prove it: Sara (pharmacist, no membership at Tom's pharmacy) calls GET /api/v1/shifts/<Tom's PLATFORM shift>/member_status/?visibility=FULL_PART_TIME (and ?visibility=ORG_CHAIN on an org pharmacy shift) and must get 403/404, not Omar's row.
+- Source status: CONFIRMED_SOURCE (distinct prior verifier; S3 NOT_EXECUTED)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara can see Tom's public shift. Should she ever see which of Tom's staff, or Lina's organisation staff, were offered it and how they answered?
   - No: only Tom and the people who manage that pharmacy can see member status
   - Sara sees only her own status on that shift
   - Keep today's behaviour
@@ -44,8 +50,10 @@ Omar clocks out at 5:00 PM at Tom's pharmacy in Sydney. When Tom clicks to corre
 
 - Evidence: `frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:237`, `frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:539`
 - Confidence: high; found by agy-g3
-- Test needed: In a browser running in Australia/Sydney (UTC+10), opening the correction modal for an event at 17:00 local time and submitting should send an effective timestamp of 17:00 AEST (07:00Z) rather than shifting 10 hours to 07:00 AEST (21:00Z previous day).
-- Decision question: When Tom corrects an attendance clock time on the review page, how should the date-time picker initialize and submit timestamps for Australian pharmacies?
+- Test that would prove it: In a browser running in Australia/Sydney (UTC+10), opening the correction modal for an event at 17:00 local time and submitting should send an effective timestamp of 17:00 AEST (07:00Z) rather than shifting 10 hours to 07:00 AEST (21:00Z previous day).
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom corrects an attendance clock time on the review page, how should the date-time picker initialize and submit timestamps for Australian pharmacies?
   - (Recommended) Pre-fill the picker in the pharmacy's local timezone and submit the local time converted to UTC, preserving the intended hours.
   - Pre-fill the picker with UTC time and require managers to manually calculate timezone offsets.
   - Keep today's behaviour where UTC strings are loaded into local datetime pickers and shifted on submission.
@@ -56,8 +64,10 @@ Omar clocks in without a rostered shift, clocks out, and Tom rejects those hours
 
 - Evidence: `backend/attendance/approvals.py:53`, `backend/attendance/approvals.py:157`, `backend/attendance/approvals.py:274`, `backend/workforce/timesheet_data.py:241`, `backend/workforce/timesheet_transitions.py:67`, `backend/workforce/timesheet_transitions.py:103`, `backend/workforce/timesheet_transitions.py:139`
 - Confidence: high; found by codexA-1
-- Test needed: Reject Omar's closed provisional attendance, rebuild his timesheet and attempt period locking after all payable hours are approved; assert that the rejected evidence does not leave an unresolvable approval blocker.
-- Decision question: After Tom rejects Omar's unrostered attendance, how should Tom finish that pay period?
+- Test that would prove it: Reject Omar's closed provisional attendance, rebuild his timesheet and attempt period locking after all payable hours are approved; assert that the rejected evidence does not leave an unresolvable approval blocker.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: After Tom rejects Omar's unrostered attendance, how should Tom finish that pay period?
   - Exclude the rejected hours from payable time while retaining the audit evidence
   - Provide an explicit follow-up decision that resolves the rejected hours
   - Keep the entire period blocked with no recovery action (keep today's behaviour)
@@ -68,8 +78,10 @@ Omar's recorded clock-out is Sunday at 23:50, and Tom corrects it to Monday at 0
 
 - Evidence: `backend/attendance/approvals.py:383`, `backend/workforce/timesheet_data.py:206`, `backend/workforce/timesheet_data.py:211`, `backend/workforce/timesheet_data.py:223`, `backend/workforce/timesheet_data.py:258`, `backend/workforce/signals.py:61`, `backend/workforce/timesheet_core.py:21`
 - Confidence: high; found by codexA-1
-- Test needed: Correct Omar's Sunday 23:50 clock-out to Monday 00:10 across adjacent periods, rebuild both periods and assert that their combined worked minutes retain the full corrected duration, including Monday's ten minutes.
-- Decision question: When Tom corrects Omar's finish across midnight into another pay period, where should those extra ten minutes go?
+- Test that would prove it: Correct Omar's Sunday 23:50 clock-out to Monday 00:10 across adjacent periods, rebuild both periods and assert that their combined worked minutes retain the full corrected duration, including Monday's ten minutes.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: RELATED_DISTINCT_TIME_WINDOW_DEFECTS; related to canonical C028-N4
+- Owner question: When Tom corrects Omar's finish across midnight into another pay period, where should those extra ten minutes go?
   - Count them in Omar's next period using the corrected finish
   - Require an explicit adjustment before accepting the correction
   - Accept the correction but omit those minutes from both periods (keep today's behaviour)
@@ -80,8 +92,10 @@ Mia stays signed in on the shared dispensary computer. A coworker goes to the pu
 
 - Evidence: `backend/users/api_passwords.py:70-84`, `backend/users/tasks.py:65-102`, `backend/users/tasks.py:80`, `backend/core/task_queue.py:63-100`, `backend/notifications/services.py:80-88`
 - Confidence: high; found by claudeB-1
-- Test needed: POST password-reset/ for a known user, then assert that no Notification for that user has an action_url (or payload) containing the uid/token reset path.
-- Decision question: When someone asks for a password reset for Mia, what should Mia see inside the app?
+- Test that would prove it: POST password-reset/ for a known user, then assert that no Notification for that user has an action_url (or payload) containing the uid/token reset path.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When someone asks for a password reset for Mia, what should Mia see inside the app?
   - Nothing in-app: the reset link goes by email only
   - An in-app alert 'A password reset was requested' with no link
   - Keep today's behaviour (notification carries the working reset link)
@@ -92,8 +106,10 @@ Zoe requests a verification code on her own phone, then saves Tom's number in he
 
 - Evidence: `backend/onboarding/views.py:293`, `backend/onboarding/serializers.py:825`, `backend/onboarding/services/basic.py:159`, `backend/core/serializer_lifecycle.py:129`, `backend/users/api_otp.py:463`, `backend/onboarding/verification/policy.py:57`
 - Confidence: high; found by codexA-4
-- Test needed: Issue a phone code for Zoe's number, change her phone through the onboarding update to Tom's number, then submit the original code and assert that Tom's number remains unverified.
-- Decision question: When Zoe changes her phone number while a verification code is pending, what should happen to the old code?
+- Test that would prove it: Issue a phone code for Zoe's number, change her phone through the onboarding update to Tom's number, then submit the original code and assert that Tom's number remains unverified.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Zoe changes her phone number while a verification code is pending, what should happen to the old code?
   - Reject the old code and require a new code sent to the replacement number
   - Block number changes until Zoe cancels the pending verification
   - Let the old code verify the replacement number (keep today's behaviour)
@@ -104,8 +120,10 @@ Sara signs out of the mobile app and hands the phone to Omar. When Tom subsequen
 
 - Evidence: `frontend_mobile/context/AuthContext.tsx:220`, `frontend_mobile/context/AuthContext.tsx:502`, `backend/users/api_auth.py:159`, `backend/notifications/services.py:91`, `backend/chat/signals.py:110`
 - Confidence: high; found by codexA-4
-- Test needed: Register a push token for Sara, successfully log her out, send her a private message from Tom, and assert that the logged-out device token receives no push.
-- Decision question: After Sara signs out of a phone, should that phone still display previews of her private messages from Tom?
+- Test that would prove it: Register a push token for Sara, successfully log her out, send her a private message from Tom, and assert that the logged-out device token receives no push.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: SAME_ROOT_CONFIRMED_SOURCE; related to canonical C071-N2
+- Owner question: After Sara signs out of a phone, should that phone still display previews of her private messages from Tom?
   - Stop Sara's push notifications on that phone until she signs in again
   - Send only a generic notification without names or private content
   - Continue displaying Sara's private previews (keep today's behaviour)
@@ -116,8 +134,10 @@ Sara signs in on Tom's shared computer with 'Keep me signed in' unchecked, then 
 
 - Evidence: `frontend_web/src/pages/login.tsx:59`, `frontend_web/src/pages/MobileOTPVerify.tsx:79`, `backend/users/serializers.py:365`, `backend/users/api_otp.py:477`, `backend/users/api_otp.py:489`, `backend/users/sessions.py:43`, `backend/core/settings.py:495`
 - Confidence: high; found by codexA-4
-- Test needed: Log Sara in with remember_me=false, complete phone verification, and assert that the replacement auth cookies remain session cookies rather than gaining a persistent expiry.
-- Decision question: When Sara completes phone verification after declining 'Keep me signed in', how should her login behave on Tom's computer?
+- Test that would prove it: Log Sara in with remember_me=false, complete phone verification, and assert that the replacement auth cookies remain session cookies rather than gaining a persistent expiry.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara completes phone verification after declining 'Keep me signed in', how should her login behave on Tom's computer?
   - Preserve Sara's choice and end the browser session when it closes
   - Require Sara to sign in again after verification
   - Create a persistent 90-day session (keep today's behaviour)
@@ -128,8 +148,10 @@ Tom's shift has three slots, each with a worker waiting on payment. If checkout 
 
 - Evidence: `backend/billing/views.py:665`, `backend/billing/views.py:334`, `backend/billing/views.py:346`, `backend/billing/views.py:583`, `backend/billing/views.py:864`
 - Confidence: medium; found by claudeB-1
-- Test needed: Shift with 3 awaiting offers on 3 slots: POST charge-fulfillment with {} and expect a 400 or quantity 3, not quantity 1 that finalizes 3.
-- Decision question: Tom pays the fee once while three workers are waiting on his shift. What should happen?
+- Test that would prove it: Shift with 3 awaiting offers on 3 slots: POST charge-fulfillment with {} and expect a 400 or quantity 3, not quantity 1 that finalizes 3.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom pays the fee once while three workers are waiting on his shift. What should happen?
   - Require Tom to pick the workers, and charge one fee per worker
   - Charge for all waiting workers automatically
   - One fee confirms everyone (keep today's behaviour)
@@ -140,8 +162,10 @@ Lina's organisation has been on ChemistTasker for a year. A newly created org ad
 
 - Evidence: `backend/billing/utils.py:121`, `backend/billing/utils.py:129`, `backend/billing/utils.py:166`, `backend/billing/views.py:562`, `backend/billing/views.py:594`
 - Confidence: high; found by claudeB-1
-- Test needed: Org created long ago, new ORG_ADMIN joined today pays fulfilment; expect PAYMENT_REQUIRED, not FREE_TRIAL.
-- Decision question: Lina's year-old organisation adds a new admin, who pays a shift fee. Should it be free?
+- Test that would prove it: Org created long ago, new ORG_ADMIN joined today pays fulfilment; expect PAYMENT_REQUIRED, not FREE_TRIAL.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Lina's year-old organisation adds a new admin, who pays a shift fee. Should it be free?
   - No: the trial follows the organisation's start date
   - Trial follows the first org admin only
   - Yes: it follows whoever pays (keep today's behaviour)
@@ -152,8 +176,10 @@ Tom shares his friend referral with Sara. Sara has a verified account and submit
 
 - Evidence: `backend/rewards/views.py:139`, `backend/rewards/services.py:297`, `backend/rewards/services.py:333`, `backend/rewards/services.py:188`, `backend/rewards/models.py:119`
 - Confidence: high; found by codexA-1
-- Test needed: Submit two concurrent first claims by verified Sara for Tom's same referral code, synchronizing their initial lookups; assert one claimed referral and one 100-Pill credit.
-- Decision question: When Sara submits Tom's same referral claim twice simultaneously, what should Tom receive?
+- Test that would prove it: Submit two concurrent first claims by verified Sara for Tom's same referral code, synchronizing their initial lookups; assert one claimed referral and one 100-Pill credit.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: SAME_ROOT_HIGH_CONFIDENCE; related to canonical F10-N3
+- Owner question: When Sara submits Tom's same referral claim twice simultaneously, what should Tom receive?
   - One reward, with both submissions resolving to the same referral
   - One reward, with the duplicate submission rejected
   - Two rewards (keep today's behaviour)
@@ -164,8 +190,10 @@ Tom chooses invoice payment for his subscription, then repeats setup while the f
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:150`, `backend/billing/views.py:388`, `backend/billing/views.py:416`, `backend/billing/views.py:429`, `backend/billing/views.py:431`, `backend/billing/models.py:36`
 - Confidence: high; found by codexA-3
-- Test needed: Submit invoice subscription setup twice before paying the first invoice and assert that the second request cannot create another recurring Stripe subscription.
-- Decision question: When Tom repeats subscription setup before paying his first invoice, what should happen?
+- Test that would prove it: Submit invoice subscription setup twice before paying the first invoice and assert that the second request cannot create another recurring Stripe subscription.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: OVERLAPPING_ROOT_HIGH_CONFIDENCE; related to canonical B70
+- Owner question: When Tom repeats subscription setup before paying his first invoice, what should happen?
   - Show Tom the existing unpaid invoice without creating another subscription
   - Cancel the unpaid subscription before creating its replacement
   - Create another recurring subscription for Tom (keep today's behaviour)
@@ -176,8 +204,10 @@ Tom's subscription renewal fails and Stripe eventually marks the subscription un
 
 - Evidence: `backend/billing/views.py:897`, `backend/billing/views.py:926`, `backend/billing/views.py:944`, `backend/billing/views.py:249`, `frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:107`, `frontend_mobile/roles/owner/subscription-seats.tsx:44`
 - Confidence: high; found by codexA-3
-- Test needed: After an active subscription's paid period expires, deliver invoice.payment_failed followed by customer.subscription.updated with status unpaid and assert that the subscription response no longer reports active.
-- Decision question: After Tom exhausts any payment grace period and Stripe marks his subscription unpaid, what should the app show?
+- Test that would prove it: After an active subscription's paid period expires, deliver invoice.payment_failed followed by customer.subscription.updated with status unpaid and assert that the subscription response no longer reports active.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: NOT_DUPLICATE; related to canonical B68
+- Owner question: After Tom exhausts any payment grace period and Stripe marks his subscription unpaid, what should the app show?
   - Show unpaid status and suspend subscription benefits until Tom pays
   - Show unpaid status while retaining benefits for a defined extension
   - Continue showing Tom an active subscription without a warning (keep today's behaviour)
@@ -188,8 +218,10 @@ Tom opens checkout to confirm Sara, then deletes the still-unpaid shift from his
 
 - Evidence: `frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts:44`, `shared-core/src/domains/shifts/api.ts:121`, `backend/shifts/base.py:111`, `backend/shifts/lifecycle.py:50`, `backend/billing/views.py:689`, `backend/billing/views.py:848`, `backend/billing/models.py:85`, `backend/billing/views.py:1011`
 - Confidence: high; found by codexA-3
-- Test needed: Create checkout for Sara's pending offer, delete the shift, then deliver the paid checkout event and assert that the charge is reconciled or refunded rather than failing permanently against the missing shift.
-- Decision question: If Tom deletes Sara's shift while its checkout is open, what should happen to a payment completed afterward?
+- Test that would prove it: Create checkout for Sara's pending offer, delete the shift, then deliver the paid checkout event and assert that the charge is reconciled or refunded rather than failing permanently against the missing shift.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: RELATED_DIFFERENT_FAILURE_MODES; related to canonical F02-N1
+- Owner question: If Tom deletes Sara's shift while its checkout is open, what should happen to a payment completed afterward?
   - Prevent payment where possible and automatically refund any late charge
   - Prevent Tom from deleting the shift until checkout is resolved
   - Keep the charge without restoring the booking or recording payment (keep today's behaviour)
@@ -200,8 +232,10 @@ Tom has used all five included internal staff seats at one pharmacy and invites 
 
 - Evidence: `frontend_web/src/pages/PricingPage.tsx:259`, `frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:440`, `shared-core/src/domains/memberships/api.ts:24`, `backend/memberships/invites.py:117`, `backend/memberships/invites.py:168`, `backend/memberships/serializers.py:133`, `backend/memberships/views.py:437`, `backend/memberships/views.py:443`, `backend/billing/views.py:826`
 - Confidence: high; found by codexA-3
-- Test needed: Give Tom five purchased seats and five active internal staff at one pharmacy, then accept Nadia's sixth internal membership and assert that activation requires another paid seat or creates the corresponding charge.
-- Decision question: When Nadia would become Tom's sixth internal staff member at a pharmacy with five paid seats, what should happen?
+- Test that would prove it: Give Tom five purchased seats and five active internal staff at one pharmacy, then accept Nadia's sixth internal membership and assert that activation requires another paid seat or creates the corresponding charge.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Nadia would become Tom's sixth internal staff member at a pharmacy with five paid seats, what should happen?
   - Hold Nadia's activation until Tom buys another seat
   - Ask Tom to approve the additional recurring seat charge before activation
   - Activate Nadia without checking or charging for another seat (keep today's behaviour)
@@ -212,8 +246,10 @@ Tom has an active subscription and extra seats, then deletes his account through
 
 - Evidence: `frontend_mobile/roles/owner/profile.tsx:393`, `shared-core/src/domains/auth/api.ts:53`, `backend/core/api_v1_urls.py:30`, `backend/users/api_account.py:76`, `backend/users/account_deletion.py:92`, `backend/billing/views.py:440`, `backend/billing/views.py:522`, `backend/templates/emails/account_deleted.txt:6`
 - Confidence: high; found by codexA-3
-- Test needed: Delete Tom's account with active base and seat subscriptions and assert that both recurring charges are stopped or that deletion is refused until billing is resolved.
-- Decision question: When Tom deletes his account while paying for a subscription and extra seats, what should happen to future charges?
+- Test that would prove it: Delete Tom's account with active base and seat subscriptions and assert that both recurring charges are stopped or that deletion is refused until billing is resolved.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom deletes his account while paying for a subscription and extra seats, what should happen to future charges?
   - Stop both subscriptions from renewing as part of deletion
   - Require Tom to resolve or cancel both subscriptions before deletion
   - Disable Tom's account while both subscriptions keep billing (keep today's behaviour)
@@ -224,8 +260,10 @@ Sara has one active membership somewhere. She creates a custom group chat and li
 
 - Evidence: `backend/chat/serializers.py:264`, `backend/chat/serializers.py:288`, `backend/chat/serializers.py:331`, `backend/chat/views.py:472`, `backend/chat/views.py:863`, `backend/users/presentation.py:60`
 - Confidence: high; found by claudeB-1
-- Test needed: Sara creates a group with Nadia's membership id from an unrelated pharmacy; expect 400/403 and no Participant row for Nadia.
-- Decision question: When Sara builds a custom group chat, whom should she be allowed to add?
+- Test that would prove it: Sara creates a group with Nadia's membership id from an unrelated pharmacy; expect 400/403 and no Participant row for Nadia.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara builds a custom group chat, whom should she be allowed to add?
   - Only people she shares an accepted pharmacy membership with
   - Only people she already has a DM or shift with
   - Anyone on the platform (keep today's behaviour)
@@ -236,8 +274,10 @@ Mia, an ordinary assistant at Tom's pharmacy, edits the pharmacy's community cha
 
 - Evidence: `backend/chat/views.py:50`, `backend/chat/views.py:92`, `backend/chat/views.py:104`, `backend/chat/views.py:453`, `backend/chat/views.py:457`, `backend/chat/serializers.py:265`, `backend/chat/serializers.py:308`, `backend/chat/serializers.py:349`, `backend/chat/views.py:667`
 - Confidence: high; found by claudeA-1
-- Test needed: As a non-admin, non-creator staff member, PATCH /rooms/<community_chat_id>/ with participants=[outsider_membership_id]. Expect 403, no new Participant row for the outsider, and no change to existing participants.
-- Decision question: Mia is a regular staff member, not a chat admin. She tries to change the members of Tom's pharmacy community chat, or of a custom group Omar created. What should happen?
+- Test that would prove it: As a non-admin, non-creator staff member, PATCH /rooms/<community_chat_id>/ with participants=[outsider_membership_id]. Expect 403, no new Participant row for the outsider, and no change to existing participants.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Mia is a regular staff member, not a chat admin. She tries to change the members of Tom's pharmacy community chat, or of a custom group Omar created. What should happen?
   - Refuse: only the group creator or a group admin (or a pharmacy admin with comms rights, for community chats) can change members or the title
   - Let Mia add people from her own pharmacy only, and never remove anyone
   - Keep today's behaviour: any member can change the member list and title
@@ -248,8 +288,10 @@ Tom renames a custom group containing Omar and Mia using the mobile app. Saving 
 
 - Evidence: `frontend_mobile/roles/shared/chat/ChatPage.tsx:293`, `shared-core/src/domains/chat/api.ts:131`, `backend/chat/views.py:416`, `backend/chat/views.py:464`, `backend/chat/serializers.py:347`
 - Confidence: high; found by codexB-1
-- Test needed: Rename Tom's group without supplying participants and verify Omar and Mia remain participants.
-- Decision question: When Tom changes only a group's name, what should happen to Omar and Mia?
+- Test that would prove it: Rename Tom's group without supplying participants and verify Omar and Mia remain participants.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom changes only a group's name, what should happen to Omar and Mia?
   - Keep Omar and Mia in the group
   - Require Tom to confirm any membership changes
   - Remove everyone except Tom (keep today's behaviour)
@@ -260,8 +302,10 @@ Tom reads his conversation with Sara, then opens his conversation with Omar. Sar
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:297`, `frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:305`, `frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:347`, `frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:515`, `backend/chat/signals.py:63`
 - Confidence: high; found by codexA-4
-- Test needed: Open Tom's conversation with Sara, switch to Omar, send a message from Sara, then reopen Sara and verify the missed message appears before it is marked read.
-- Decision question: When Tom returns to Sara's conversation after she sent a message while he was reading Omar's, what should happen?
+- Test that would prove it: Open Tom's conversation with Sara, switch to Omar, send a message from Sara, then reopen Sara and verify the missed message appears before it is marked read.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom returns to Sara's conversation after she sent a message while he was reading Omar's, what should happen?
   - Show Sara's missed messages before marking them read
   - Show an unread notice until Tom explicitly loads the messages
   - Show cached messages and mark the conversation read (keep today's behaviour)
@@ -272,8 +316,10 @@ Sara sends Tom a message, then deletes it while Tom has the conversation open. T
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:428`, `frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:441`, `frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:578`, `frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:932`, `frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx:122`, `frontend_web/src/pages/dashboard/sidebar/chat/ConversationPanel.tsx:327`, `backend/chat/views.py:771`
 - Confidence: high; found by codexA-4
-- Test needed: Delete Sara's latest message while Tom views it with a personal pin; verify its text disappears from the bubble, sidebar preview, search results and pinned banner.
-- Decision question: When Sara deletes a message Tom has already opened or pinned, what should Tom continue seeing?
+- Test that would prove it: Delete Sara's latest message while Tom views it with a personal pin; verify its text disappears from the bubble, sidebar preview, search results and pinned banner.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara deletes a message Tom has already opened or pinned, what should Tom continue seeing?
   - A deletion notice everywhere, with the original text removed
   - No message or preview, with any personal pin removed
   - A deleted bubble but readable previews and pinned text (keep today's behaviour)
@@ -284,8 +330,10 @@ Tom delegates inventory and listing access to Omar, whose reviewed professional 
 
 - Evidence: `frontend_mobile/features/parity/ethicalMarketplace.tsx:26`, `frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:50`, `shared-core/src/platformApi.ts:150`, `backend/ethical_marketplace/views.py:163`, `backend/ethical_marketplace/views.py:228`, `backend/ethical_marketplace/owner_views.py:36`, `backend/ethical_marketplace/policy.py:50`, `backend/ethical_marketplace/serializers.py:38`
 - Confidence: high; found by codexB-1
-- Test needed: Give Omar valid pharmacy grants but professional approval for S4 only, seed S4 and S8 stock and listings, and assert that bulk inventory and owned-listing responses exclude S8 records.
-- Decision question: When Omar is approved for S4 medicines only, what should he see of Tom's S8 stock?
+- Test that would prove it: Give Omar valid pharmacy grants but professional approval for S4 only, seed S4 and S8 stock and listings, and assert that bulk inventory and owned-listing responses exclude S8 records.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Omar is approved for S4 medicines only, what should he see of Tom's S8 stock?
   - No S8 stock or listing details
   - Catalogue names only, with stock and prices withheld
   - All stock and listing details (keep today's behaviour)
@@ -296,8 +344,10 @@ Tom submits a valid premises application from the website or mobile app. The app
 
 - Evidence: `frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:143`, `frontend_mobile/features/parity/ethicalMarketplace.tsx:54`, `shared-core/src/platformApi.ts:141`, `backend/ethical_marketplace/views.py:100`, `backend/ethical_marketplace/views.py:102`, `backend/ethical_marketplace/views.py:113`, `backend/ethical_marketplace/views.py:121`
 - Confidence: high; found by codexB-1
-- Test needed: Submit Tom's first valid premises application and assert a successful creation response containing the saved pending-review application instead of a server error.
-- Decision question: What should Tom see after his valid premises application has been saved?
+- Test that would prove it: Submit Tom's first valid premises application and assert a successful creation response containing the saved pending-review application instead of a server error.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: What should Tom see after his valid premises application has been saved?
   - Confirmation that the application is pending review
   - The saved application with its current status
   - An error despite the saved application (keep today's behaviour)
@@ -308,8 +358,10 @@ Tom publishes an offer for two packs from the pharmacy where Nadia works to his 
 
 - Evidence: `backend/ethical_marketplace/policy.py:94`, `backend/ethical_marketplace/policy.py:100`, `backend/ethical_marketplace/views.py:229`, `backend/ethical_marketplace/views.py:286`, `backend/ethical_marketplace/views.py:288`, `backend/ethical_marketplace/serializers.py:38`, `backend/ethical_marketplace/serializers.py:47`, `backend/ethical_marketplace/serializers.py:56`
 - Confidence: high; found by codexB-1
-- Test needed: As browse-only Omar, confirm that Nadia's pharmacy inventory request is denied, then retrieve its visible two-pack offer and assert that full lot balances, storage checks and source references are absent.
-- Decision question: When Omar may browse Tom's chain offer but cannot access Nadia's pharmacy inventory, how much stock information should he receive?
+- Test that would prove it: As browse-only Omar, confirm that Nadia's pharmacy inventory request is denied, then retrieve its visible two-pack offer and assert that full lot balances, storage checks and source references are absent.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Omar may browse Tom's chain offer but cannot access Nadia's pharmacy inventory, how much stock information should he receive?
   - Only offered quantities and necessary batch and expiry details
   - Additional inventory details after separate authorisation
   - The full underlying stock-lot record (keep today's behaviour)
@@ -320,8 +372,10 @@ Sara sends Tom an invoice and records a partial payment that appears correctly i
 
 - Evidence: `backend/worker_finance/services.py:693`, `backend/worker_finance/services.py:702`, `backend/worker_finance/services.py:982`, `backend/worker_finance/views.py:626`, `backend/worker_finance/views.py:634`
 - Confidence: high; found by codexB-3
-- Test needed: Record a partial payment against a sent invoice, save a notes-only revision without resending, and assert that the cash worksheet's sales and GST totals remain unchanged.
-- Decision question: Should Sara's receipt from Tom remain in her cash worksheet while she prepares an unsent invoice correction?
+- Test that would prove it: Record a partial payment against a sent invoice, save a notes-only revision without resending, and assert that the cash worksheet's sales and GST totals remain unchanged.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should Sara's receipt from Tom remain in her cash worksheet while she prepares an unsent invoice correction?
   - Keep the recorded receipt included throughout the correction.
   - Block revision until Sara completes an explicit accounting adjustment.
   - Exclude the receipt until the corrected invoice is sent (keep today's behaviour).
@@ -332,8 +386,10 @@ Mia works at Tom's pharmacy but is not a member of its restricted managers' grou
 
 - Evidence: `backend/pharmacy_hub/groups.py:29`, `backend/pharmacy_hub/groups.py:35`, `backend/pharmacy_hub/groups.py:47`, `backend/pharmacy_hub/groups.py:108`, `backend/pharmacy_hub/groups.py:114`, `backend/pharmacy_hub/serialization/groups.py:29`, `backend/pharmacy_hub/serialization/groups.py:140`, `backend/pharmacy_hub/access.py:225`, `backend/pharmacy_hub/access.py:271`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: Create private manager group G at pharmacy A and ordinary nonmember Mia at A; GET /api/v1/hub/community-groups/?pharmacy_id=A&include_members=true must not return G or its members. Authorized group member and managers still see permitted details.
-- Decision question: Should Mia see the names, descriptions and member rosters of private groups at Tom's pharmacy when she is not a group member?
+- Test that would prove it: Create private manager group G at pharmacy A and ordinary nonmember Mia at A; GET /api/v1/hub/community-groups/?pharmacy_id=A&include_members=true must not return G or its members. Authorized group member and managers still see permitted details.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should Mia see the names, descriptions and member rosters of private groups at Tom's pharmacy when she is not a group member?
   - No, hide restricted groups from nonmembers
   - Show group titles only without rosters or descriptions
   - Yes, every pharmacy member can view complete group rosters
@@ -344,8 +400,10 @@ Tom administers a community group at his own pharmacy. He edits it and includes 
 
 - Evidence: `backend/pharmacy_hub/groups.py:138`, `backend/pharmacy_hub/groups.py:139`, `backend/pharmacy_hub/groups.py:144`, `backend/pharmacy_hub/serialization/groups.py:30`, `backend/pharmacy_hub/serialization/groups.py:42`, `backend/pharmacy_hub/serialization/groups.py:127`, `backend/pharmacy_hub/serialization/groups.py:137`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: As Tom, manage group G in pharmacy A; PATCH G with pharmacy=B owned by unrelated Nadia. Assert mutation rejected and group pharmacy, member links and posts remain in A. Valid same-pharmacy description change succeeds.
-- Decision question: May Tom move an existing group and its posts into Nadia's unrelated pharmacy using an ordinary group edit?
+- Test that would prove it: As Tom, manage group G in pharmacy A; PATCH G with pharmacy=B owned by unrelated Nadia. Assert mutation rejected and group pharmacy, member links and posts remain in A. Valid same-pharmacy description change succeeds.
+- Source status: REFUTED_SOURCE (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: May Tom move an existing group and its posts into Nadia's unrelated pharmacy using an ordinary group edit?
   - No, pharmacy ownership of a group is immutable
   - Only through an explicit, audited two-party transfer workflow
   - Yes, source manager authorization is sufficient
@@ -356,8 +414,10 @@ Sara creates a public Hub poll while she has no pharmacy membership, and Zoe als
 
 - Evidence: `backend/pharmacy_hub/access.py:338`, `backend/pharmacy_hub/serialization/polls.py:119`, `backend/pharmacy_hub/polls.py:137`, `backend/pharmacy_hub/polls.py:157`, `backend/pharmacy_hub/serialization/polls.py:149`, `backend/pharmacy_hub/serialization/polls.py:257`
 - Confidence: high; found by codexB-2
-- Test needed: Create Sara's public Hub poll with no author membership and existing votes, then PATCH its choices as Zoe without a membership; expect 403 and unchanged choices and votes.
-- Decision question: Should Zoe be allowed to change or delete Sara's public Hub poll when neither belongs to a pharmacy?
+- Test that would prove it: Create Sara's public Hub poll with no author membership and existing votes, then PATCH its choices as Zoe without a membership; expect 403 and unchanged choices and votes.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should Zoe be allowed to change or delete Sara's public Hub poll when neither belongs to a pharmacy?
   - Only Sara and authorized moderators may change it
   - Zoe may suggest changes for Sara to approve
   - Zoe may directly change or delete it (keep today's behaviour)
@@ -368,8 +428,10 @@ Tom and Omar share confidential posts and attachments in a restricted Hub group 
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx:421`, `backend/pharmacy_hub/groups.py:147`, `backend/pharmacy_hub/models.py:143`, `backend/pharmacy_hub/scoping.py:156`, `backend/pharmacy_hub/serialization/posts.py:366`
 - Confidence: high; found by codexB-2
-- Test needed: Delete Tom's restricted group containing a post, comment and attachment, then fetch the pharmacy feed as Mia, who was never a group member; verify none of that content becomes accessible.
-- Decision question: After Tom deletes a restricted Hub group, what should happen to Omar's confidential posts and attachments?
+- Test that would prove it: Delete Tom's restricted group containing a post, comment and attachment, then fetch the pharmacy feed as Mia, who was never a group member; verify none of that content becomes accessible.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: After Tom deletes a restricted Hub group, what should happen to Omar's confidential posts and attachments?
   - Archive them with their restricted audience preserved
   - Delete the group's posts and attachments
   - Make them visible to Mia and the whole pharmacy (keep today's behaviour)
@@ -380,8 +442,10 @@ Sara sends an invoice to Tom and, while the email is still being processed, save
 
 - Evidence: `backend/worker_finance/views.py:272`, `backend/worker_finance/views.py:294`, `backend/worker_finance/views.py:315`, `backend/worker_finance/services.py:693`, `backend/worker_finance/services.py:770`
 - Confidence: high; found by codexB-3
-- Test needed: Pause email sending for version 1, save version 2, then finish the email; assert that version 2 remains draft and Tom can access only delivered version 1.
-- Decision question: If Sara saves a correction while an older invoice email to Tom is sending, which version should Tom be allowed to review?
+- Test that would prove it: Pause email sending for version 1, save version 2, then finish the email; assert that version 2 remains draft and Tom can access only delivered version 1.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL SAME_ROOT_HIGH_CONFIDENCE; aliases: C026-N2
+- Owner question: If Sara saves a correction while an older invoice email to Tom is sending, which version should Tom be allowed to review?
   - Only the emailed version until Sara sends the correction.
   - Prevent Sara from saving while delivery is in progress.
   - Publish the correction when the older email finishes (keep today's behaviour).
@@ -392,8 +456,10 @@ Tom advertises a flexible shift from 09:00 to 17:00. Sara proposes 10:00 to 14:0
 
 - Evidence: `backend/shifts/serialization/offers.py:123`, `backend/shifts/counter_offers.py:163`, `backend/shifts/engagement.py:272`, `backend/shifts/finalize.py:79`, `backend/invoicing/services.py:96`
 - Confidence: high; found by codexB-1
-- Test needed: Confirm a 10:00–14:00 counteroffer against a 09:00–17:00 slot and assert the booking and invoice use four hours.
-- Decision question: After Tom and Sara agree to shorten the shift, which hours should her booking and invoice use?
+- Test that would prove it: Confirm a 10:00–14:00 counteroffer against a 09:00–17:00 slot and assert the booking and invoice use four hours.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: After Tom and Sara agree to shorten the shift, which hours should her booking and invoice use?
   - The agreed 10:00–14:00 hours
   - Require Tom to amend the vacancy before confirmation
   - The original 09:00–17:00 hours (keep today's behaviour)
@@ -404,8 +470,10 @@ Sara has historical invoices for Tom's two pharmacies with the same bill-to name
 
 - Evidence: `backend/worker_finance/migrations/0005_consolidate_invoice_record.py:62`, `backend/worker_finance/migrations/0005_consolidate_invoice_record.py:118`, `backend/worker_finance/views.py:277`
 - Confidence: high; found by codexA-1
-- Test needed: Migrate two legacy invoices sharing a bill-to name but having different emails, addresses and ABNs; assert each migrated snapshot retains its original details.
-- Decision question: When Sara's historical invoices for Tom's pharmacies share a billing name, what should happen to their separate billing details during upgrade?
+- Test that would prove it: Migrate two legacy invoices sharing a bill-to name but having different emails, addresses and ABNs; assert each migrated snapshot retains its original details.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara's historical invoices for Tom's pharmacies share a billing name, what should happen to their separate billing details during upgrade?
   - Preserve each invoice's original billing details
   - Require Sara to resolve conflicting customer details
   - Reuse one customer's details for both invoices (keep today's behaviour)
@@ -416,8 +484,10 @@ Sara creates an $800 service invoice and its separate $96 super request for Tom.
 
 - Evidence: `backend/worker_finance/services.py:690`, `backend/worker_finance/services.py:606`, `backend/worker_finance/services.py:894`, `frontend_web/src/pages/finance/FinanceWorkspace.tsx:356`
 - Confidence: high; found by codexA-1
-- Test needed: Create a separate super request, revise the parent's eligible amount downward, and assert the old contribution cannot remain the active request unchanged.
-- Decision question: When Sara corrects an invoice after creating Tom's super request, what should happen to that request?
+- Test that would prove it: Create a separate super request, revise the parent's eligible amount downward, and assert the old contribution cannot remain the active request unchanged.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: SAME_ROOT_HIGH_CONFIDENCE; related to canonical F07-N6
+- Owner question: When Sara corrects an invoice after creating Tom's super request, what should happen to that request?
   - Replace it through an audited correction
   - Block the invoice correction until the request is resolved
   - Keep the original super request unchanged (keep today's behaviour)
@@ -428,8 +498,10 @@ Tom pays Sara $55 toward a $110 invoice containing $10 GST, so the payment recor
 
 - Evidence: `backend/worker_finance/services.py:690`, `backend/worker_finance/services.py:965`, `backend/worker_finance/services.py:968`, `backend/worker_finance/views.py:634`
 - Confidence: high; found by codexA-1
-- Test needed: Part-pay a GST invoice, revise it to GST-free at the same total, resend and settle it; assert cash GST is reconciled or the correction is rejected.
-- Decision question: When Sara corrects GST after Tom has partly paid, how should the recorded GST be handled?
+- Test that would prove it: Part-pay a GST invoice, revise it to GST-free at the same total, resend and settle it; assert cash GST is reconciled or the correction is rejected.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara corrects GST after Tom has partly paid, how should the recorded GST be handled?
   - Reconcile allocations through an audited adjustment
   - Require a separate correction before changing GST
   - Retain the original payment GST allocation (keep today's behaviour)
@@ -440,8 +512,10 @@ Tom pays Sara's full invoice, and Sara selects Mark as paid as instructed by the
 
 - Evidence: `backend/worker_finance/views.py:251`, `backend/worker_finance/views.py:506`, `backend/worker_finance/views.py:634`, `backend/worker_finance/services.py:835`, `frontend_web/src/pages/finance/FinanceWorkspace.tsx:354`, `frontend_web/src/pages/finance/FinanceWorkspace.tsx:355`
 - Confidence: high; found by codexB-2
-- Test needed: Mark an unpaid invoice paid through the normal action; assert zero balance and inclusion of the payment in the correct cash-reporting period.
-- Decision question: When Sara marks Tom's fully paid invoice as paid, what should happen to its balance and cash report?
+- Test that would prove it: Mark an unpaid invoice paid through the normal action; assert zero balance and inclusion of the payment in the correct cash-reporting period.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: SAME_ROOT_HIGH_CONFIDENCE; related to canonical F07-N2
+- Owner question: When Sara marks Tom's fully paid invoice as paid, what should happen to its balance and cash report?
   - Record the remaining payment with a payment date and clear Sara's balance
   - Require Sara to enter payment details before marking it paid
   - Change only the status and require a separate payment entry, as today
@@ -452,8 +526,10 @@ Sara starts emailing an invoice to Tom, then saves a revised amount in another t
 
 - Evidence: `backend/worker_finance/views.py:279`, `backend/worker_finance/views.py:290`, `backend/worker_finance/views.py:315`, `backend/worker_finance/views.py:316`, `backend/worker_finance/services.py:693`, `backend/worker_finance/services.py:702`, `backend/worker_finance/services.py:772`
 - Confidence: high; found by codexB-2
-- Test needed: Pause sending revision 1, save revision 2, then finish sending; assert revision 2 remains draft and Tom can see only revision 1.
-- Decision question: If Sara saves a newer draft while an earlier invoice email is sending to Tom, which revision should Tom see?
+- Test that would prove it: Pause sending revision 1, save revision 2, then finish sending; assert revision 2 remains draft and Tom can see only revision 1.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: SAME_ROOT_HIGH_CONFIDENCE; related to canonical F07-N4
+- Owner question: If Sara saves a newer draft while an earlier invoice email is sending to Tom, which revision should Tom see?
   - Only the emailed revision until Sara sends the newer draft
   - Prevent Sara from saving while the email is sending
   - Expose the newer draft when the earlier email finishes, as today
@@ -464,8 +540,10 @@ Sara completes a shift for Tom's pharmacy, which is managed by Lina at the organ
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:42`, `frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:484`, `frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:570`, `frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:647`
 - Confidence: high; found by agy-g3
-- Test needed: An Organisation Admin or delegated Pharmacy Admin viewing a received invoice in their dashboard is rendered the read-only recipient document with payment and issue reporting actions rather than the editable contractor form.
-- Decision question: When Lina (organisation admin) or Grace (pharmacy admin) reviews an invoice issued by Sara for work at their pharmacy, what view and actions should they have?
+- Test that would prove it: An Organisation Admin or delegated Pharmacy Admin viewing a received invoice in their dashboard is rendered the read-only recipient document with payment and issue reporting actions rather than the editable contractor form.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Lina (organisation admin) or Grace (pharmacy admin) reviews an invoice issued by Sara for work at their pharmacy, what view and actions should they have?
   - Display the read-only recipient invoice with pay-to bank details, 'Mark as paid', and 'Report an issue' actions
   - Restrict invoice review and payment marking strictly to the pharmacy owner (Tom)
   - Outcome C (keep today's behaviour)
@@ -476,11 +554,28 @@ Sara chooses her accepted shift at Tom's pharmacy and the invoice fills in Tom's
 
 - Evidence: `backend/worker_finance/services.py:362`, `frontend_web/src/pages/finance/InvoiceComposer.tsx:103`, `frontend_web/src/pages/finance/InvoiceComposer.tsx:130`, `frontend_web/src/pages/finance/InvoiceComposer.tsx:187`, `frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:199`, `frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:229`
 - Confidence: high; found by codexB-3
-- Test needed: Choose an eligible accepted shift in each editor and save without manually selecting a customer; assert that an internal invoice is created for the shift's pharmacy.
-- Decision question: When Sara starts an invoice from her accepted shift at Tom's pharmacy, should she be able to save with the pharmacy already selected?
+- Test that would prove it: Choose an eligible accepted shift in each editor and save without manually selecting a customer; assert that an internal invoice is created for the shift's pharmacy.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara starts an invoice from her accepted shift at Tom's pharmacy, should she be able to save with the pharmacy already selected?
   - Sara saves directly using the shift's pharmacy.
   - Sara must confirm an enabled pharmacy selection before saving.
   - Sara remains blocked by the locked customer selection (keep today's behaviour).
+
+## C064-N1 - P1 - Invoicing / Expo - Legacy Expo invoice generator defaults superannuation to 10% despite Australia's current 12% SG rate.
+
+An eligible contractor or worker opens the legacy Expo invoice generator without an existing onboarding super-rate snapshot. The form starts at 10%. The app sends that percentage in the invoice payload; the legacy invoicing service trusts and persists it and calculates the generated superannuation line using that 10%. The actual 2026 standard SG rate is 12%, so a user who relies on the default may generate a short super request. This is a conditional calculation issue, not proof every contractor is SG-eligible or that every custom invoice must charge statutory SG.
+
+- Evidence: `frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:115`, `frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:152`, `frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:392`, `backend/invoicing/services.py:175`, `backend/invoicing/services.py:332`, `frontend_mobile/roles/shared/invoices/InvoiceList.tsx:52`
+- Confidence: high for hardcoded default/source calculation; legal applicability conditional; found by gpt6-senior-20261025
+- Test that would prove it: New user with no onboarding super_rate_snapshot uses legacy InvoiceGenerate for an eligible 2026 invoice; assert suggested rate is current rate 12% (or explicitly configured award/agreement rate), correctly calculates amount, and backend does not silently accept stale default. Confirm historical invoice dates, contractor eligibility, intentionally different agreed rates and legacy vs new FinanceWorkspace paths.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- External reference: https://www.ato.gov.au/api/public/content/0-1cca4d23-4e4a-4642-96f8-eb229b882fb3
+- Owner question: Should the legacy Expo invoice generator continue pre-populating a 10% superannuation rate for 2026 invoices?
+  - Use a documented current 12% default for applicable 2026 invoices, with eligibility/rate checks
+  - Hide legacy generator in favour of independently validated canonical finance flow
+  - Keep the old 10% default
 
 ## C002-N1 - P1 - Kiosk - A repeated kiosk PIN submit flips the worker's clock state instead of being treated as a retry.
 
@@ -488,8 +583,10 @@ Omar types his PIN at Tom's kiosk and presses Clock, but the screen lags (or the
 
 - Evidence: `backend/attendance/kiosk_api.py:454-474`, `backend/attendance/transitions.py:63-72`, `backend/attendance/transitions.py:256-271`
 - Confidence: medium; found by claudeA-2
-- Test needed: Send POST kiosk/pin-clock/ twice within 5 seconds with the same PIN and check that exactly one CLOCK_IN exists and the session is still open.
-- Decision question: Omar presses Clock twice within a few seconds at Tom's kiosk. What should happen?
+- Test that would prove it: Send POST kiosk/pin-clock/ twice within 5 seconds with the same PIN and check that exactly one CLOCK_IN exists and the session is still open.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Omar presses Clock twice within a few seconds at Tom's kiosk. What should happen?
   - The second press within 30 seconds counts as the same action; Omar stays clocked in
   - The kiosk asks Omar to confirm before clocking out someone who clocked in under a minute ago
   - Keep today's behaviour: each press flips Omar between clocked in and clocked out
@@ -500,8 +597,10 @@ Tom stages an ethical stock CSV while the inventory feature is available. An adm
 
 - Evidence: `backend/ethical_marketplace/owner_views.py:47`, `backend/ethical_marketplace/owner_views.py:55`, `backend/ethical_marketplace/owner_views.py:65`, `backend/ethical_marketplace/views.py:193`, `backend/ethical_marketplace/views.py:195`, `backend/ethical_marketplace/views.py:234`, `backend/core/settings.py:242`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: Stage a valid import as a verified entitled owner with ETHICAL_INVENTORY_ENABLED=True; disable it before POST /api/v1/ethical/inventory/imports/{pk}/commit/; expect 503 and no EthicalStockLot/Movement changes. Positive flag-true commit still succeeds.
-- Decision question: When ethical inventory writes are disabled, should a previously staged import still update stock?
+- Test that would prove it: Stage a valid import as a verified entitled owner with ETHICAL_INVENTORY_ENABLED=True; disable it before POST /api/v1/ethical/inventory/imports/{pk}/commit/; expect 503 and no EthicalStockLot/Movement changes. Positive flag-true commit still succeeds.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When ethical inventory writes are disabled, should a previously staged import still update stock?
   - No: block every stock-mutating endpoint including commit
   - Allow viewing staged rows but require explicit re-enable to commit
   - Allow previously staged imports to commit after writes are disabled
@@ -512,8 +611,10 @@ Tom delegates preparation of his ethical listing to Omar. Omar edits that DRAFT 
 
 - Evidence: `backend/ethical_marketplace/views.py:317`, `backend/ethical_marketplace/views.py:318`, `backend/ethical_marketplace/views.py:319`, `backend/ethical_marketplace/views.py:322`, `backend/ethical_marketplace/views.py:324`, `backend/ethical_marketplace/serializers.py:60`, `backend/ethical_marketplace/serializers.py:63`, `backend/ethical_marketplace/signals.py:18`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: Create a draft owned by pharmacy A. As authorized A preparer, PATCH its pharmacy to unrelated B and product to unapproved S8; assert 403/400 and no owner/product/lot/audience changes. Valid description-only update remains allowed.
-- Decision question: May Omar move a draft ethical medicine listing from Tom's premises to Nadia's unrelated premises without the destination owner authorising it?
+- Test that would prove it: Create a draft owned by pharmacy A. As authorized A preparer, PATCH its pharmacy to unrelated B and product to unapproved S8; assert 403/400 and no owner/product/lot/audience changes. Valid description-only update remains allowed.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: CANONICAL RELATED_NOT_IDENTICAL; aliases: B42
+- Owner question: May Omar move a draft ethical medicine listing from Tom's premises to Nadia's unrelated premises without the destination owner authorising it?
   - No; immutable pharmacy and product with fresh draft required for material changes
   - Only with explicit authorization from both pharmacy owners and new product policy checks
   - Yes; leave the existing draft PATCH behavior
@@ -524,23 +625,13 @@ Sara sends an enquiry to Tom's listing twice at the same instant. Both requests 
 
 - Evidence: `backend/marketplace/views.py:283`, `backend/marketplace/views.py:297`, `backend/marketplace/views.py:300`, `backend/marketplace/views.py:309`, `backend/marketplace/models.py:321`, `backend/marketplace/models.py:329`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: Concurrently submit identical enquiry UUIDs using PostgreSQL and verify exactly one exchange and one receipt, with repeat-safe response.
-- Decision question: What should happen if Sara accidentally submits her marketplace enquiry to Tom twice simultaneously?
+- Test that would prove it: Concurrently submit identical enquiry UUIDs using PostgreSQL and verify exactly one exchange and one receipt, with repeat-safe response.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: What should happen if Sara accidentally submits her marketplace enquiry to Tom twice simultaneously?
   - Create one negotiation and replay its outcome
   - Create one negotiation and safely reject the duplicate
   - Create two negotiations with a server error (current race)
-
-## F04-N3 - P1 - Memberships - A pharmacy manager can silently make any registered person an active staff member, with no invitation, email or consent.
-
-Tom invites Sara by email with the hidden 'activate immediately' flag (meant for approving her own application). Sara becomes an accepted, active member of Tom's pharmacy straight away and gets no email or notice. She is now on Tom's team for rosters, chat and hub, and it uses one of her three pharmacy places, so a genuine pharmacy may be unable to add her. Tom can do the same by editing a pending invite's status to accepted. This is the pharmacy-staff version of B47, through a different endpoint and with no notice at all.
-
-- Evidence: `backend/memberships/views.py:142`, `backend/memberships/invites.py:149`, `backend/memberships/invites.py:240`, `backend/memberships/applications.py:121`, `backend/memberships/serializers.py:67`, `backend/memberships/views.py:84`, `backend/memberships/test_membership_workflows_contract.py:116`
-- Confidence: high; found by claudeB-2
-- Test needed: Tom POSTs /api/v1/memberships/ with Sara's email and activate_immediately=true (and separately PATCHes Sara's pending invite to status ACCEPTED); Sara's membership must stay PENDING until she accepts it from My Memberships.
-- Decision question: Tom adds Sara, who already has an account, to his pharmacy. Should she join straight away?
-  - No: Sara must accept the invitation first; only approving her own application activates her at once
-  - Activate at once but always notify Sara and let her leave
-  - Keep today's behaviour
 
 ## C011-N2 - P1 - Memberships - Revoked invitation sender continues receiving membership response notifications containing staff identities.
 
@@ -548,8 +639,10 @@ Lina invites Sara to Tom's pharmacy but subsequently loses her organisation memb
 
 - Evidence: `backend/memberships/notifications.py:66`, `backend/memberships/notifications.py:73`, `backend/memberships/notifications.py:81`, `backend/memberships/notifications.py:116`, `backend/memberships/notifications.py:142`, `backend/memberships/notifications.py:161`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: After revoking Lina's organisation/pharmacy authority, make Sara accept/leave. Lina receives no email or in-app notification; valid managers still receive it.
-- Decision question: Should former manager Lina continue receiving Sara's membership notifications after her access is revoked?
+- Test that would prove it: After revoking Lina's organisation/pharmacy authority, make Sara accept/leave. Lina receives no email or in-app notification; valid managers still receive it.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should former manager Lina continue receiving Sara's membership notifications after her access is revoked?
   - No, recheck recipient authority for each event
   - Only the initial invitation response
   - Yes, retain all inviter notifications after removal
@@ -560,8 +653,10 @@ Sara has no valid invitation to Tom's pharmacy. She obtains or guesses a numeric
 
 - Evidence: `backend/memberships/views.py:310`, `backend/memberships/views.py:316`, `backend/memberships/serializers.py:382`, `backend/memberships/serializers.py:383`, `backend/memberships/serializers.py:423`, `backend/memberships/serializers.py:526`, `backend/memberships/views.py:249`, `backend/memberships/views.py:262`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: As unrelated authenticated Sara, POST /api/v1/membership-applications/ with a valid old or disabled invite_link integer, matching her email/DOB/role. Expect refusal and zero application creation; valid UUID magic-link flow must succeed.
-- Decision question: May Sara apply to Tom's pharmacy using the internal numeric ID of an expired or revoked invitation?
+- Test that would prove it: As unrelated authenticated Sara, POST /api/v1/membership-applications/ with a valid old or disabled invite_link integer, matching her email/DOB/role. Expect refusal and zero application creation; valid UUID magic-link flow must succeed.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: May Sara apply to Tom's pharmacy using the internal numeric ID of an expired or revoked invitation?
   - No, all application creation must require a valid active token
   - Allow only when Tom explicitly re-enables the invitation
   - Yes, the numeric ID is sufficient
@@ -572,11 +667,27 @@ Lina is authorised to review applications for Tom's pharmacy. After deciding an 
 
 - Evidence: `backend/memberships/views.py:310`, `backend/memberships/views.py:318`, `backend/memberships/views.py:324`, `backend/memberships/models.py:233`, `backend/memberships/models.py:283`, `backend/memberships/urls.py:22`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: As scoped manager attempt DELETE on approved, rejected and pending applications; require 405/403 or audited soft-archive, preserving submitted/decision history. Verify positive review/approve/reject remains functional.
-- Decision question: Should Lina be allowed to permanently delete historic membership applications and decisions?
+- Test that would prove it: As scoped manager attempt DELETE on approved, rejected and pending applications; require 405/403 or audited soft-archive, preserving submitted/decision history. Verify positive review/approve/reject remains functional.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should Lina be allowed to permanently delete historic membership applications and decisions?
   - No, retain review history and permit only audited archive
   - Only permit irreversible deletion by an audited super-admin workflow
   - Yes, ordinary managers may delete application history
+
+## F04-N3 - P1 - Memberships - A pharmacy manager can silently make any registered person an active staff member, with no invitation, email or consent.
+
+Tom invites Sara by email with the hidden 'activate immediately' flag (meant for approving her own application). Sara becomes an accepted, active member of Tom's pharmacy straight away and gets no email or notice. She is now on Tom's team for rosters, chat and hub, and it uses one of her three pharmacy places, so a genuine pharmacy may be unable to add her. Tom can do the same by editing a pending invite's status to accepted. This is the pharmacy-staff version of B47, through a different endpoint and with no notice at all.
+
+- Evidence: `backend/memberships/views.py:142`, `backend/memberships/invites.py:149`, `backend/memberships/invites.py:240`, `backend/memberships/applications.py:121`, `backend/memberships/serializers.py:67`, `backend/memberships/views.py:84`, `backend/memberships/test_membership_workflows_contract.py:116`
+- Confidence: high; found by claudeB-2
+- Test that would prove it: Tom POSTs /api/v1/memberships/ with Sara's email and activate_immediately=true (and separately PATCHes Sara's pending invite to status ACCEPTED); Sara's membership must stay PENDING until she accepts it from My Memberships.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom adds Sara, who already has an account, to his pharmacy. Should she join straight away?
+  - No: Sara must accept the invitation first; only approving her own application activates her at once
+  - Activate at once but always notify Sara and let her leave
+  - Keep today's behaviour
 
 ## F03-N2 - P1 - Memberships / Pharmacy admins - When the owner removes a staff member who is also a pharmacy admin, their admin rights stay on, but when they quit themselves the rights are switched off.
 
@@ -584,8 +695,10 @@ Mia is an assistant and a Manager admin at Tom's pharmacy. Tom removes her from 
 
 - Evidence: `backend/memberships/views.py:112`, `backend/memberships/views.py:129`, `backend/memberships/views.py:131`, `backend/memberships/views.py:494`, `backend/organizations/models.py:400`, `backend/organizations/access.py:33`, `backend/organizations/access.py:57`, `shared-core/src/domains/memberships/api.ts:30`
 - Confidence: high; found by claudeA-3
-- Test needed: Owner sends DELETE on an admin's staff membership; afterwards that user must fail the manage-staff and manage-roster checks for the pharmacy and must be missing from the active admin list.
-- Decision question: Tom removes Mia, who is also a Manager admin, from his staff list. What should happen to her admin access?
+- Test that would prove it: Owner sends DELETE on an admin's staff membership; afterwards that user must fail the manage-staff and manage-roster checks for the pharmacy and must be missing from the active admin list.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom removes Mia, who is also a Manager admin, from his staff list. What should happen to her admin access?
   - Switched off at the same moment, the same as when she quits
   - Tom is asked whether to remove her admin role too before he confirms
   - Keep today's behaviour: she stays an admin until it is removed separately
@@ -596,8 +709,10 @@ Tom opens New Chat on his phone and types 'Omar'. The list always says 'No users
 
 - Evidence: `frontend_mobile/roles/shared/chat/hooks.ts:64-73`, `shared-core/src/domains/chat/mappers.ts:53-67`, `shared-core/src/domains/chat/api.ts:147-155`, `frontend_mobile/roles/shared/chat/NewChatModal.tsx:59-61`, `frontend_mobile/roles/shared/chat/GroupManageModal.tsx:199`
 - Confidence: medium; found by claudeB-2
-- Test needed: Return a participant row {id:7,user_details:{first_name:'Omar'}} from fetchChatParticipants; searchParticipants('omar') must return it, and starting a chat must send membershipId 7, not userId 7.
-- Decision question: When Tom searches 'Omar' in mobile New Chat, what should happen?
+- Test that would prove it: Return a participant row {id:7,user_details:{first_name:'Omar'}} from fetchChatParticipants; searchParticipants('omar') must return it, and starting a chat must send membershipId 7, not userId 7.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom searches 'Omar' in mobile New Chat, what should happen?
   - Omar appears and the chat opens with Omar, same as web
   - Mobile only lets Tom pick from shift contacts
   - Keep today's behaviour (no search results on mobile)
@@ -608,8 +723,10 @@ Sara opens Expo and an expired access token triggers refresh or /users/me. Sara 
 
 - Evidence: `frontend_mobile/context/AuthContext.tsx:115`, `frontend_mobile/context/AuthContext.tsx:120`, `frontend_mobile/context/AuthContext.tsx:160`, `frontend_mobile/context/AuthContext.tsx:163`, `frontend_mobile/context/AuthContext.tsx:169`, `frontend_mobile/context/AuthContext.tsx:170`, `frontend_mobile/context/AuthContext.tsx:191`, `frontend_mobile/context/AuthContext.tsx:523`, `frontend_mobile/utils/authSession.ts:198`, `frontend_mobile/utils/authSession.ts:217`, `frontend_mobile/utils/authSession.ts:227`, `frontend_mobile/utils/authSession.ts:268`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: Defer initial /me success and refresh response; logout or log in as another user before resolving each. Assert no old /me user or refresh token persisted, no old API Authorization and role home remains intended. Repeat native and Expo-web cases, including refresh failures and storage/network exceptions.
-- Decision question: When Sara logs out while an earlier refresh/profile request is pending, may the app silently restore Sara's saved account or overwrite Tom's subsequent login?
+- Test that would prove it: Defer initial /me success and refresh response; logout or log in as another user before resolving each. Assert no old /me user or refresh token persisted, no old API Authorization and role home remains intended. Repeat native and Expo-web cases, including refresh failures and storage/network exceptions.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara logs out while an earlier refresh/profile request is pending, may the app silently restore Sara's saved account or overwrite Tom's subsequent login?
   - No; invalidate all in-flight auth writes on identity change and logout
   - Only if the earlier HTTP call was already sent before logout
   - Yes; accept current asynchronous restoration behavior
@@ -620,8 +737,10 @@ Sara signs out from a shared iPhone. Native logout clears local secure tokens bu
 
 - Evidence: `frontend_mobile/context/AuthContext.tsx:502`, `frontend_mobile/context/AuthContext.tsx:523`, `frontend_mobile/context/AuthContext.tsx:528`, `frontend_mobile/utils/pushNotifications.ts:62`, `frontend_mobile/utils/pushNotifications.ts:78`, `backend/users/api_auth.py:155`, `backend/users/api_auth.py:164`, `backend/users/api_auth.py:170`, `backend/notifications/views.py:44`, `backend/notifications/services.py:64`, `backend/notifications/services.py:87`, `backend/users/models.py:128`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: Register an Expo push token while Sara is logged in. Sign out through native app. Trigger a new private message/notification for Sara; assert DeviceToken is inactive or removed and no push sent. Log in as Tom and confirm token belongs only to Tom. Server logout should revoke current device independently of client network reliability.
-- Decision question: Should Sara's private shift, employment and chat alerts continue displaying on a phone after she signs out?
+- Test that would prove it: Register an Expo push token while Sara is logged in. Sign out through native app. Trigger a new private message/notification for Sara; assert DeviceToken is inactive or removed and no push sent. Log in as Tom and confirm token belongs only to Tom. Server logout should revoke current device independently of client network reliability.
+- Source status: SOURCE_SUPPORTED_DUPLICATE_ROOT (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: CANONICAL SAME_ROOT_CONFIRMED_SOURCE; aliases: F09-N3, F11-N2
+- Owner question: Should Sara's private shift, employment and chat alerts continue displaying on a phone after she signs out?
   - No; revoke the current device's push token on logout server-side
   - Only send generic notifications without personal details until next login
   - Yes; preserve notifications after signing out
@@ -632,23 +751,13 @@ Omar writes a post in a restricted Hub group, then Tom removes Omar from that gr
 
 - Evidence: `backend/pharmacy_hub/serialization/groups.py:189`, `backend/pharmacy_hub/access.py:271`, `backend/pharmacy_hub/posts.py:440`, `backend/pharmacy_hub/notifications.py:50`, `backend/notifications/services.py:88`
 - Confidence: high; found by codexB-2
-- Test needed: Remove Omar from a restricted group, confirm his post access is denied, then add Mia's comment to his old post and verify no notification or push containing that comment is delivered to Omar.
-- Decision question: After Tom removes Omar from a restricted Hub group, should Omar receive new comments on posts he previously wrote there?
+- Test that would prove it: Remove Omar from a restricted group, confirm his post access is denied, then add Mia's comment to his old post and verify no notification or push containing that comment is delivered to Omar.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: After Tom removes Omar from a restricted Hub group, should Omar receive new comments on posts he previously wrote there?
   - Stop all notifications about subsequent group activity
   - Send only a generic alert without private comment text
   - Continue sending comment previews to Omar (keep today's behaviour)
-
-## C051-N1 - P1 - Onboarding - Referee decline link routes to a 404 and invokes an obsolete two-parameter backend path instead of token verification
-
-Zoe registers as an Explorer and provides a referee for verification. The referee receives an email request and clicks the decline link, but lands on a not-found page because the web router expects two parameters instead of the single email token. Even if reached directly, the decline page attempts to submit separate ID parameters to a non-existent API route rather than the server's signed token endpoint. The referee cannot decline, reminder emails continue to be sent to them, and Zoe is never alerted to nominate a replacement referee.
-
-- Evidence: `frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:11`, `frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:22`, `backend/onboarding/emails.py:79`, `backend/onboarding/urls.py:41`
-- Confidence: high; found by agy-g1
-- Test needed: Navigating to /onboarding/referee-reject/<token> with a valid signed token renders the decline page and sends a POST with the token to /api/v1/onboarding/referee-reject/<token>/, returning 200 rather than 404.
-- Decision question: When Zoe's nominated referee clicks the decline link in their email request, what should happen?
-  - The referee decline page accepts the signed token, records the decline, notifies Zoe to nominate a new referee, and cancels reminder emails
-  - The decline link asks the referee to confirm their decision on a questionnaire before cancelling reminders
-  - Keep today's behaviour where the decline link fails with a not found error
 
 ## C015-N1 - P1 - Onboarding - AHPRA suspension notices expose an employee's regulatory status to region administrators outside their assigned pharmacies.
 
@@ -656,11 +765,27 @@ Sara works at Tom's pharmacy and her AHPRA registration is suspended. Grace is a
 
 - Evidence: `backend/onboarding/verification/state.py:335`, `backend/onboarding/verification/state.py:340`, `backend/onboarding/verification/state.py:343`, `backend/onboarding/verification/state.py:346`, `backend/onboarding/verification/state.py:352`, `backend/users/org_roles.py:1`
 - Confidence: high; found by gpt6-senior-20261025
-- Test needed: Create two pharmacies in one organisation; Sara is at A, Grace REGION_ADMIN assigned only B. Trigger Sara AHPRA suspension and assert Grace receives no in-app/email status, while authorized A managers do.
-- Decision question: Should region administrator Grace receive Sara's AHPRA suspension details when Sara works at a pharmacy Grace cannot manage?
+- Test that would prove it: Create two pharmacies in one organisation; Sara is at A, Grace REGION_ADMIN assigned only B. Trigger Sara AHPRA suspension and assert Grace receives no in-app/email status, while authorized A managers do.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should region administrator Grace receive Sara's AHPRA suspension details when Sara works at a pharmacy Grace cannot manage?
   - No; deliver only to managers scoped to Sara's pharmacy
   - Send a generic staffing alert without identity or regulatory detail
   - Yes; all regional administrators in the organisation receive detailed suspension notices
+
+## C051-N1 - P1 - Onboarding - Referee decline link routes to a 404 and invokes an obsolete two-parameter backend path instead of token verification
+
+Zoe registers as an Explorer and provides a referee for verification. The referee receives an email request and clicks the decline link, but lands on a not-found page because the web router expects two parameters instead of the single email token. Even if reached directly, the decline page attempts to submit separate ID parameters to a non-existent API route rather than the server's signed token endpoint. The referee cannot decline, reminder emails continue to be sent to them, and Zoe is never alerted to nominate a replacement referee.
+
+- Evidence: `frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:11`, `frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:22`, `backend/onboarding/emails.py:79`, `backend/onboarding/urls.py:41`
+- Confidence: high; found by agy-g1
+- Test that would prove it: Navigating to /onboarding/referee-reject/<token> with a valid signed token renders the decline page and sends a POST with the token to /api/v1/onboarding/referee-reject/<token>/, returning 200 rather than 404.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Zoe's nominated referee clicks the decline link in their email request, what should happen?
+  - The referee decline page accepts the signed token, records the decline, notifies Zoe to nominate a new referee, and cancels reminder emails
+  - The decline link asks the referee to confirm their decision on a questionnaire before cancelling reminders
+  - Keep today's behaviour where the decline link fails with a not found error
 
 ## F05-N1 - P1 - Onboarding / Public shifts - A New to pharmacy account can apply for public shifts without ever being verified, though the same profile is blocked from posting on the talent hub.
 
@@ -668,8 +793,10 @@ Zoe signs up as New to pharmacy from overseas and skips the mobile check. Her ph
 
 - Evidence: `backend/shifts/interest.py:40-72`, `backend/shifts/interest.py:82-84`, `backend/onboarding/verification/state.py:153-178`, `backend/onboarding/verification/policy.py:3-5`, `backend/onboarding/verification/policy.py:44-57`, `backend/talent/views/explorer.py:147-151`, `backend/shifts/access.py:86-87`, `frontend_web/src/navigation.tsx:522-530`
 - Confidence: high; found by claudeB-1
-- Test needed: An EXPLORER user with an unverified ExplorerOnboarding (verified=False, mobile_check_skipped=True, gov_id_verified=False) posts express_interest on a PLATFORM shift with role_needed=EXPLORER and gets 403, not 201.
-- Decision question: Zoe is New to pharmacy, skipped the mobile check from overseas and has no checked photo ID. She tries to apply for Tom's public New to pharmacy shift. What should happen?
+- Test that would prove it: An EXPLORER user with an unverified ExplorerOnboarding (verified=False, mobile_check_skipped=True, gov_id_verified=False) posts express_interest on a PLATFORM shift with role_needed=EXPLORER and gets 403, not 201.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Zoe is New to pharmacy, skipped the mobile check from overseas and has no checked photo ID. She tries to apply for Tom's public New to pharmacy shift. What should happen?
   - Block her until her profile is Verified (mobile, or photo ID if overseas), the same rule as the talent hub
   - Let her apply, but show Tom a clear 'not verified' label on her interest
   - Keep today's behaviour: any New to pharmacy account can apply
@@ -680,8 +807,10 @@ Tom sees Zoe's interest in his public New to pharmacy shift, or books her from t
 
 - Evidence: `backend/shifts/engagement.py:25-28`, `backend/shifts/engagement.py:245-251`, `backend/shifts/engagement.py:580`, `backend/shifts/offers.py:354-363`, `backend/shifts/assignment.py:95-126`, `backend/onboarding/models.py:541-624`, `shared-core/src/domains/talent/presentation.test.ts:10`
 - Confidence: high; found by claudeB-1
-- Test needed: Tom accept_users Zoe (EXPLORER, verified ExplorerOnboarding, no OtherStaffOnboarding) on an EXPLORER-role shift; Zoe POSTs the offer accept and must not get the 400 'Complete worker onboarding' error (or Tom must be stopped from sending the offer in the first place).
-- Decision question: Tom wants to book Zoe, who is New to pharmacy, for a New to pharmacy shift. What should happen when he sends her the offer?
+- Test that would prove it: Tom accept_users Zoe (EXPLORER, verified ExplorerOnboarding, no OtherStaffOnboarding) on an EXPLORER-role shift; Zoe POSTs the offer accept and must not get the 400 'Complete worker onboarding' error (or Tom must be stopped from sending the offer in the first place).
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom wants to book Zoe, who is New to pharmacy, for a New to pharmacy shift. What should happen when he sends her the offer?
   - Zoe can confirm it; New to pharmacy shifts get their own simple engagement terms with no TFN/ABN step
   - Tom is told before sending that Zoe must first upgrade to Pharmacy team and set up payment
   - Keep today's behaviour: the offer is sent but Zoe can never confirm it
@@ -692,8 +821,10 @@ Omar is an ordinary staff member at Tom's pharmacy. He edits one of his own work
 
 - Evidence: `backend/team_calendar/views.py:377-383`, `backend/team_calendar/serializers.py:61-66`, `backend/team_calendar/serializers.py:78-91`, `backend/team_calendar/views.py:241-264`, `backend/team_calendar/views.py:217-227`, `backend/team_calendar/tasks.py:303-319`
 - Confidence: high; found by claudeB-2
-- Test needed: A staff member PATCHes a work note with another pharmacy's id (expect 403 or no change); an owner POSTs an event with own pharmacy plus a foreign organisation (expect 403)
-- Decision question: Omar wants to move a work note from Tom's pharmacy to Nadia's pharmacy, and Tom tags an event with Lina's organisation. What should happen?
+- Test that would prove it: A staff member PATCHes a work note with another pharmacy's id (expect 403 or no change); an owner POSTs an event with own pharmacy plus a foreign organisation (expect 403)
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Omar wants to move a work note from Tom's pharmacy to Nadia's pharmacy, and Tom tags an event with Lina's organisation. What should happen?
   - Never allowed: a note or event stays in the pharmacy or organisation it was made in
   - Allowed only if the person can manage both pharmacies or organisations
   - Keep today's behaviour
@@ -704,8 +835,10 @@ Tom has both pharmacies in his chain and changes only the chain's contact email 
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:159`, `frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:166`, `shared-core/src/domains/organizations/api.ts:150`, `backend/organizations/serializers.py:585`, `backend/shifts/candidates.py:263`
 - Confidence: high; found by codexA-2
-- Test needed: Create a chain with two pharmacies, submit the web form's multipart PUT changing only its email, and verify both pharmacy links remain.
-- Decision question: When Tom edits only his chain's email or logo, what should happen to its pharmacies?
+- Test that would prove it: Create a chain with two pharmacies, submit the web form's multipart PUT changing only its email, and verify both pharmacy links remain.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom edits only his chain's email or logo, what should happen to its pharmacies?
   - Keep every existing pharmacy linked
   - Require Tom to confirm the pharmacy selection before saving
   - Remove all pharmacy links (keep today's behaviour)
@@ -716,8 +849,10 @@ Lina submits a claim request for Tom's independent pharmacy so her organisation 
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/PharmacyClaimsPanels.tsx:245`, `frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:463`
 - Confidence: high; found by agy-g1
-- Test needed: Render the owner pharmacies page with an unclaimed pharmacy and a pending claim request, asserting the claim requests accordion and approve button are visible.
-- Decision question: When Lina submits a claim request to manage Tom's independent pharmacy, how should Tom see and act on the request in his dashboard?
+- Test that would prove it: Render the owner pharmacies page with an unclaimed pharmacy and a pending claim request, asserting the claim requests accordion and approve button are visible.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Lina submits a claim request to manage Tom's independent pharmacy, how should Tom see and act on the request in his dashboard?
   - Outcome A: Show the claim requests section whenever Tom has pending or past claim requests, regardless of whether any pharmacy is already claimed.
   - Outcome B: Direct Tom from email and alerts to a dedicated claim requests page rather than embedding it inside the pharmacies list.
   - Outcome C (keep today's behaviour): Hide the claim requests section until Tom already has at least one claimed or organization-linked pharmacy.
@@ -728,8 +863,10 @@ Tom pays Sara's $1,100 invoice, and Sara uses Mark as paid as instructed once th
 
 - Evidence: `frontend_web/src/pages/finance/FinanceWorkspace.tsx:354`, `backend/worker_finance/views.py:243`, `backend/worker_finance/views.py:498`, `backend/worker_finance/services.py:835`, `backend/worker_finance/views.py:634`, `frontend_web/src/pages/dashboard/sidebar/Invoices/invoiceStats.ts:101`
 - Confidence: high; found by codexB-3
-- Test needed: Mark an unpaid $1,100 GST invoice paid through each persona's action and assert that the balance becomes zero and the confirmed receipt appears in the appropriate cash worksheet period.
-- Decision question: When Sara confirms Tom's full payment using Mark as paid, how should her balance and cash worksheet change?
+- Test that would prove it: Mark an unpaid $1,100 GST invoice paid through each persona's action and assert that the balance becomes zero and the confirmed receipt appears in the appropriate cash worksheet period.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL SAME_ROOT_HIGH_CONFIDENCE; aliases: C026-N1
+- Owner question: When Sara confirms Tom's full payment using Mark as paid, how should her balance and cash worksheet change?
   - Collect a receipt date and record the remaining payment.
   - Require Sara to record payment details before marking it paid.
   - Change only the Paid label while retaining the outstanding balance (keep today's behaviour).
@@ -740,8 +877,10 @@ Tom enables payroll, publishes Omar's payroll shifts and approves Omar's recorde
 
 - Evidence: `backend/shifts/engagement.py:125`, `backend/workforce/timesheet_data.py:172`, `backend/workforce/timesheet_builder.py:183`, `backend/workforce/timesheet_builder.py:207`, `backend/workforce/timesheet_transitions.py:147`, `backend/workforce/timesheet_transitions.py:182`, `backend/workforce/views.py:744`
 - Confidence: high; found by codexA-1
-- Test needed: With payroll enabled and Omar's completed published assignment routed to PAYROLL, build and approve his timesheet, then lock the period; assert that payroll_export contains Omar's assignment and worked day rather than an empty list.
-- Decision question: When Tom locks approved payroll hours for Omar, what should happen if the payroll handoff would omit Omar?
+- Test that would prove it: With payroll enabled and Omar's completed published assignment routed to PAYROLL, build and approve his timesheet, then lock the period; assert that payroll_export contains Omar's assignment and worked day rather than an empty list.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL SAME_ROOT_HIGH_CONFIDENCE; aliases: C028-N1
+- Owner question: When Tom locks approved payroll hours for Omar, what should happen if the payroll handoff would omit Omar?
   - Include Omar's approved payroll shifts in the handoff
   - Refuse locking until Omar's payroll rows can be generated
   - Allow locking with an empty payroll handoff (keep today's behaviour)
@@ -752,8 +891,10 @@ Tom publishes a vacancy anonymously. Zoe searches the public job board using a d
 
 - Evidence: `frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:193`, `frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:214`, `shared-core/src/domains/shifts/api.ts:218`, `backend/shifts/browse.py:537`, `backend/shifts/browse.py:589`, `backend/shifts/serialization/shifts.py:193`, `backend/organizations/serializers.py:56`
 - Confidence: high; found by codexB-1
-- Test needed: Create Tom's anonymous vacancy with a unique pharmacy name and street address; assert that unauthenticated searches matching only those hidden fields do not return it.
-- Decision question: Should Zoe be able to discover Tom's anonymous vacancy by searching for its hidden pharmacy name or street address?
+- Test that would prove it: Create Tom's anonymous vacancy with a unique pharmacy name and street address; assert that unauthenticated searches matching only those hidden fields do not return it.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should Zoe be able to discover Tom's anonymous vacancy by searching for its hidden pharmacy name or street address?
   - Search only information visible on the anonymous card
   - Allow identifying searches only after authorised disclosure
   - Allow those public searches (keep today's behaviour)
@@ -764,8 +905,10 @@ Sara signs out of ChemistTasker on a borrowed phone and returns it to Mia. Tom l
 
 - Evidence: `frontend_mobile/context/AuthContext.tsx:216`, `frontend_mobile/context/AuthContext.tsx:502`, `backend/users/api_auth.py:155`, `backend/notifications/services.py:90`, `backend/chat/signals.py:110`
 - Confidence: high; found by codexB-2
-- Test needed: Register Sara's phone for push, complete a successful mobile logout and close all sockets, then send Sara a new chat message from Tom; verify the signed-out device receives no push.
-- Decision question: After Sara signs out of the borrowed phone, what should Mia be able to receive on that phone?
+- Test that would prove it: Register Sara's phone for push, complete a successful mobile logout and close all sockets, then send Sara a new chat message from Tom; verify the signed-out device receives no push.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: SAME_ROOT_CONFIRMED_SOURCE; related to canonical C071-N2
+- Owner question: After Sara signs out of the borrowed phone, what should Mia be able to receive on that phone?
   - No further notifications for Sara
   - Generic alerts only if Sara explicitly opted in
   - Sara's sender names and message previews (keep today's behaviour)
@@ -776,8 +919,10 @@ Mia was a Manager admin and quit Tom's pharmacy, which switched her admin role o
 
 - Evidence: `backend/memberships/views.py:494`, `backend/memberships/invites.py:123`, `backend/memberships/invites.py:163`, `backend/memberships/views.py:443`, `backend/memberships/views.py:447`
 - Confidence: high; found by claudeA-3
-- Test needed: An admin quits; the owner re-invites them as ASSISTANT; they accept; their old admin record must stay switched off.
-- Decision question: Mia left as a Manager admin. Tom re-invites her as an assistant and she accepts. What access should she get?
+- Test that would prove it: An admin quits; the owner re-invites them as ASSISTANT; they accept; their old admin record must stay switched off.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Mia left as a Manager admin. Tom re-invites her as an assistant and she accepts. What access should she get?
   - Assistant only; admin needs a separate new invite
   - Assistant, and Tom is asked whether to give back her old Manager role
   - Keep today's behaviour: her old Manager role comes back on its own
@@ -788,8 +933,10 @@ Verified Sara sends her first claim for Tom's friend-referral code twice at the 
 
 - Evidence: `shared-core/src/domains/rewards/api.ts:36`, `backend/rewards/views.py:139`, `backend/rewards/services.py:297`, `backend/rewards/services.py:333`, `backend/rewards/services.py:188`, `backend/rewards/models.py:119`, `backend/rewards/services.py:356`
 - Confidence: high; found by codexB-1
-- Test needed: Submit two concurrent first claims by eligible Sara for Tom's same friend-referral code and assert exactly one referral event and one 100-Pill award.
-- Decision question: If Sara's first claim reaches the service twice simultaneously, how many referral rewards should Tom receive?
+- Test that would prove it: Submit two concurrent first claims by eligible Sara for Tom's same friend-referral code and assert exactly one referral event and one 100-Pill award.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL SAME_ROOT_HIGH_CONFIDENCE; aliases: C019-N1
+- Owner question: If Sara's first claim reaches the service twice simultaneously, how many referral rewards should Tom receive?
   - One reward, with both claims returning the same result
   - One reward, with the duplicate claim rejected
   - A reward for each simultaneous claim (keep today's behaviour)
@@ -800,8 +947,10 @@ Tom submits a manual roster assignment putting Ali into a pharmacist vacancy. Al
 
 - Evidence: `backend/shifts/base.py:412`, `backend/shifts/assignment.py:143`, `backend/shifts/assignment.py:169`, `backend/shifts/engagement.py:46`, `backend/shifts/access.py:43`
 - Confidence: high; found by codexA-2
-- Test needed: Manually assign accepted technician Ali to a pharmacist vacancy and assert rejection with no assignment created.
-- Decision question: When Tom manually puts Ali into a pharmacist vacancy, what should happen?
+- Test that would prove it: Manually assign accepted technician Ali to a pharmacist vacancy and assert rejection with no assignment created.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom manually puts Ali into a pharmacist vacancy, what should happen?
   - Reject because Ali is not a pharmacist
   - Require Tom to change the vacancy to technician work first
   - Allow Ali to fill the pharmacist vacancy (keep today's behaviour)
@@ -812,8 +961,10 @@ Omar requests a swap with Ben, Tom's favourite locum with an accepted pharmacy m
 
 - Evidence: `backend/workforce/roster/worker_actions.py:179`, `backend/workforce/roster/worker_actions.py:300`, `backend/workforce/roster/assignment_rates.py:11`, `backend/workforce/roster/assignment_rates.py:17`, `backend/shifts/engagement.py:47`
 - Confidence: high; found by codexA-3
-- Test needed: Attempt to replace Omar's payroll assignment with Ben's locum membership; verify approval cannot transfer Omar's employment snapshot to Ben.
-- Decision question: When Tom approves Ben replacing Omar, how should Ben's payment terms be established?
+- Test that would prove it: Attempt to replace Omar's payroll assignment with Ben's locum membership; verify approval cannot transfer Omar's employment snapshot to Ben.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom approves Ben replacing Omar, how should Ben's payment terms be established?
   - Require Ben to accept his own offer and payment terms
   - Restrict direct replacements to employed staff and use their own dated agreements
   - Give Ben Omar's existing terms (keep today's behaviour)
@@ -824,8 +975,10 @@ Tom requires one pharmacist from 09:00 to 17:00 and schedules Omar only from 09:
 
 - Evidence: `backend/workforce/roster/revisions.py:85`, `backend/workforce/roster/revisions.py:99`, `frontend_web/src/features/workforce/RosterCoveragePanel.tsx:112`
 - Confidence: high; found by codexA-3
-- Test needed: Configure one pharmacist required from 09:00 to 17:00 with Omar assigned only 09:00 to 10:00; verify coverage reports a shortfall.
-- Decision question: Should Tom's 09:00–17:00 pharmacist requirement count as covered when Omar works only 09:00–10:00?
+- Test that would prove it: Configure one pharmacist required from 09:00 to 17:00 with Omar assigned only 09:00 to 10:00; verify coverage reports a shortfall.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should Tom's 09:00–17:00 pharmacist requirement count as covered when Omar works only 09:00–10:00?
   - Show uncovered hours and a coverage shortfall
   - Show partial coverage requiring Tom's review
   - Mark the whole interval covered (keep today's behaviour)
@@ -836,8 +989,10 @@ Omar submits a pending sick-leave request linked to a published shift and explai
 
 - Evidence: `backend/workforce/roster/views.py:552`, `backend/workforce/roster/serializers.py:138`, `backend/workforce/roster/serializers.py:154`, `backend/workforce/views.py:590`
 - Confidence: high; found by codexA-3
-- Test needed: As Mia, retrieve Omar's roster assignment containing a pending sick-leave note; verify the response excludes his private leave details.
-- Decision question: What should Mia see about Omar's leave when viewing their shared pharmacy roster?
+- Test that would prove it: As Mia, retrieve Omar's roster assignment containing a pending sick-leave note; verify the response excludes his private leave details.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: SAME_ROOT_HIGH_CONFIDENCE; related to canonical C045-N2
+- Owner question: What should Mia see about Omar's leave when viewing their shared pharmacy roster?
   - Only a generic availability or cover indicator
   - The leave status and type, with the note restricted to Omar and managers
   - The full leave note (keep today's behaviour)
@@ -848,8 +1003,10 @@ Tom starts converting Omar's assigned shift into an open shift, then dismisses t
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:852`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:866`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:553`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585`
 - Confidence: high; found by codexB-3
-- Test needed: Cancel conversion of Omar's shift, create a separate open shift without leaving the roster page, and assert Omar's original shift and assignment remain.
-- Decision question: After Tom cancels replacing Omar's shift and later posts a separate shift, what should happen to Omar's original shift?
+- Test that would prove it: Cancel conversion of Omar's shift, create a separate open shift without leaving the roster page, and assert Omar's original shift and assignment remain.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: After Tom cancels replacing Omar's shift and later posts a separate shift, what should happen to Omar's original shift?
   - Keep Omar's original shift and create the separate shift
   - Require Tom to explicitly resume or discard the cancelled replacement
   - Delete Omar's original shift after the later posting (keep today's behaviour)
@@ -860,8 +1017,10 @@ Tom edits Omar's rostered Tuesday shift and ticks 'post as open shift'. The post
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:553`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:852`
 - Confidence: high; found by claudeB-1
-- Test needed: Start convert-to-open on shift A, close the wizard, then complete a new open-shift post from Add shift; assert shift A is not deleted.
-- Decision question: Tom starts turning Omar's shift into an open shift, then closes the wizard without posting. What should happen to Omar's shift?
+- Test that would prove it: Start convert-to-open on shift A, close the wizard, then complete a new open-shift post from Add shift; assert shift A is not deleted.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom starts turning Omar's shift into an open shift, then closes the wizard without posting. What should happen to Omar's shift?
   - Omar's shift stays, and nothing later deletes it
   - Ask Tom whether to keep or remove Omar's shift when he closes the wizard
   - Keep today's behaviour (the next open-shift post Tom completes deletes it)
@@ -872,8 +1031,10 @@ Omar asks for sick leave on his Monday shift and writes a note about a medical a
 
 - Evidence: `backend/workforce/roster/serializers.py:138`, `backend/workforce/roster/serializers.py:75`, `backend/workforce/roster/views.py:534`, `frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:410`, `frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:417`, `frontend_web/src/pages/dashboard/sidebar/RosterWorkerDialogs.tsx:233`
 - Confidence: high; found by claudeB-1
-- Test needed: As Ali, GET the worker roster for Tom's pharmacy where Omar has a leave request; assert leave_request has no note or leave_type for Omar's assignment.
-- Decision question: Omar asks for sick leave with a private note. What should Ali, his coworker, see on the shared roster?
+- Test that would prove it: As Ali, GET the worker roster for Tom's pharmacy where Omar has a leave request; assert leave_request has no note or leave_type for Omar's assignment.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL SAME_ROOT_HIGH_CONFIDENCE; aliases: C027-N4
+- Owner question: Omar asks for sick leave with a private note. What should Ali, his coworker, see on the shared roster?
   - Nothing about the leave
   - Only that the shift is 'on leave', with no type or note
   - Keep today's behaviour (type, status and full note)
@@ -884,8 +1045,10 @@ The owner roster page lists every assignment in Tom's pharmacy, including Sara's
 
 - Evidence: `backend/workforce/roster/views.py:51`, `backend/workforce/roster/views.py:96`, `backend/workforce/roster/views.py:418`, `backend/workforce/roster/worker_actions.py:364`, `backend/shifts/history.py:7`, `backend/shifts/models.py:805`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:401`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:509`
 - Confidence: medium; found by claudeA-2
-- Test needed: Give Sara an assignment with a linked LeaveRequest or AttendanceSession. Call POST /roster-shifts/<shift>/escalate/ (or DELETE /roster-owner/<assignment>/) as Tom. Assert it is refused, or that Sara is notified and the history is kept. Today the assignment and its leave are deleted silently.
-- Decision question: Tom escalates or removes Sara's already-confirmed Saturday from the roster page. What should Sara experience?
+- Test that would prove it: Give Sara an assignment with a linked LeaveRequest or AttendanceSession. Call POST /roster-shifts/<shift>/escalate/ (or DELETE /roster-owner/<assignment>/) as Tom. Assert it is refused, or that Sara is notified and the history is kept. Today the assignment and its leave are deleted silently.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL RELATED_DISTINCT_ROUTES; aliases: B67
+- Owner question: Tom escalates or removes Sara's already-confirmed Saturday from the roster page. What should Sara experience?
   - Block it for marketplace bookings; Tom must cancel through the booking with notice and charges
   - Allow it, but notify Sara immediately and keep a cancelled-booking record
   - Keep today's behaviour (silent removal)
@@ -896,8 +1059,10 @@ Tom removes Ali on Monday. Ali stays on next week's published roster: Tom's rost
 
 - Evidence: `backend/memberships/views.py:112`, `backend/memberships/views.py:494`, `backend/workforce/roster/periods.py:129`, `backend/workforce/roster/periods.py:135`, `backend/workforce/roster/views.py:552`, `backend/attendance/eligibility.py:141`, `backend/attendance/eligibility.py:241`, `backend/workforce/roster/validation.py:31`
 - Confidence: high; found by claudeA-3
-- Test needed: Owner removes a staff member who has a published future roster assignment; afterwards that slot must show as vacant (or flagged) in the owner's roster, and a clock-in by the removed worker at shift time must not come back as a confirmed assignment.
-- Decision question: Tom removes Ali, who is rostered for three shifts next week. What should happen to those shifts?
+- Test that would prove it: Owner removes a staff member who has a published future roster assignment; afterwards that slot must show as vacant (or flagged) in the owner's roster, and a clock-in by the removed worker at shift time must not come back as a confirmed assignment.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom removes Ali, who is rostered for three shifts next week. What should happen to those shifts?
   - They become open gaps straight away and Tom is prompted to find cover
   - Tom is shown the shifts and chooses for each one whether to keep Ali or free the slot
   - Keep today's behaviour: Ali stays rostered and can still clock in
@@ -908,8 +1073,10 @@ Tom schedules 60 assignments at his pharmacy for one week. The roster screens re
 
 - Evidence: `backend/core/settings.py:360`, `shared-core/src/domains/roster/api.ts:90`, `frontend_mobile/app/my-roster.tsx:132`, `shared-core/src/domains/memberships/api.ts:90`, `shared-core/src/domains/organizations/api.ts:25`, `shared-core/src/domains/shifts/api.ts:302`, `shared-core/src/domains/pharmacyHub/api.ts:245`, `frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:139`
 - Confidence: high; found by codexB-4
-- Test needed: Return 50 roster assignments with a next page containing Omar's assignment; assert the complete roster includes his assignment.
-- Decision question: When Tom's weekly roster exceeds 50 assignments, how should Omar access all his scheduled work?
+- Test that would prove it: Return 50 roster assignments with a next page containing Omar's assignment; assert the complete roster includes his assignment.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom's weekly roster exceeds 50 assignments, how should Omar access all his scheduled work?
   - Load the complete weekly roster automatically
   - Provide explicit pagination with the full assignment count
   - Show only the first 50 assignments (keep today's behaviour)
@@ -920,8 +1087,10 @@ Tom sends an offer for his public pharmacist shift to Ali (technician) or Jack (
 
 - Evidence: `backend/shifts/base.py:232-259`, `backend/shifts/assignment.py:25-131`, `backend/shifts/offers.py:329-405`, `backend/onboarding/verification/state.py:153-167`, `backend/onboarding/verification/state.py:58-61`, `backend/shifts/finalize.py:23-73`, `backend/shifts/engagement.py:528-537`, `backend/shifts/browse.py:329-334`
 - Confidence: medium; found by claudeB-1
-- Test needed: Tom accept_users Ali (OTHER_STAFF, role_type TECHNICIAN, verified, no AHPRA) on a PLATFORM shift with role_needed=PHARMACIST; Ali's offer accept must be refused, and no ShiftSlotAssignment may be created.
-- Decision question: Tom sends an offer for a pharmacist shift to Ali, who is a technician, and Ali presses Confirm. What should happen?
+- Test that would prove it: Tom accept_users Ali (OTHER_STAFF, role_type TECHNICIAN, verified, no AHPRA) on a PLATFORM shift with role_needed=PHARMACIST; Ali's offer accept must be refused, and no ShiftSlotAssignment may be created.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom sends an offer for a pharmacist shift to Ali, who is a technician, and Ali presses Confirm. What should happen?
   - Block the offer when Tom sends it: only people whose role covers the shift can be offered it
   - Let Tom send it, but refuse Ali's confirmation with a clear role message
   - Keep today's behaviour: Ali is booked as the pharmacist
@@ -932,8 +1101,10 @@ Tom posts two independently claimable pharmacist dates. Omar claims the first da
 
 - Evidence: `backend/shifts/browse.py:343`, `backend/shifts/browse.py:351`, `backend/shifts/browse.py:366`
 - Confidence: high; found by codexA-2
-- Test needed: Claim one slot in a non-single-user shift, then claim another free slot and assert success.
-- Decision question: After Omar claims the first of Tom's independently claimable dates, what should happen to the second?
+- Test that would prove it: Claim one slot in a non-single-user shift, then claim another free slot and assert success.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: After Omar claims the first of Tom's independently claimable dates, what should happen to the second?
   - Keep the second date available for claims
   - Require Tom to offer the remaining date manually
   - Block all further claims on the shift (keep today's behaviour)
@@ -944,8 +1115,10 @@ Tom posts an unfilled weekly pharmacist vacancy running for several weeks. Once 
 
 - Evidence: `backend/shifts/browse.py:75`, `backend/shifts/browse.py:440`, `backend/shifts/browse.py:565`, `backend/shifts/posting.py:48`, `backend/shifts/pricing.py:444`
 - Confidence: high; found by codexA-2
-- Test needed: Create an unassigned recurring slot starting yesterday with a future occurrence and assert it remains discoverable on worker boards.
-- Decision question: When Tom's recurring vacancy has future unfilled dates but its starting date has passed, what should Sara see?
+- Test that would prove it: Create an unassigned recurring slot starting yesterday with a future occurrence and assert it remains discoverable on worker boards.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom's recurring vacancy has future unfilled dates but its starting date has passed, what should Sara see?
   - The remaining future dates
   - A new advertisement Tom must publish for each date
   - No vacancy after the starting date passes (keep today's behaviour)
@@ -956,8 +1129,10 @@ Tom posts a full-time vacancy without dated shifts. Sara submits a counter offer
 
 - Evidence: `backend/shifts/serialization/offers.py:100`, `backend/shifts/serialization/offers.py:163`, `backend/shifts/counter_offers.py:137`, `backend/shifts/counter_offers.py:139`
 - Confidence: high; found by codexA-2
-- Test needed: Submit a valid slotless counter offer without slot_date, then accept it and assert a controlled successful response instead of an exception.
-- Decision question: When Sara counters Tom's full-time vacancy without dated shifts, what should accepting it do?
+- Test that would prove it: Submit a valid slotless counter offer without slot_date, then accept it and assert a controlled successful response instead of an exception.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara counters Tom's full-time vacancy without dated shifts, what should accepting it do?
   - Send Sara an offer without requiring a shift date
   - Require a date before allowing the counter offer submission
   - Leave the submitted counter offer unacceptable (keep today's behaviour)
@@ -968,8 +1143,10 @@ Sara counters for just one date in Tom's recurring vacancy, and Tom accepts that
 
 - Evidence: `backend/shifts/counter_offers.py:163`, `backend/shifts/counter_offers.py:188`, `backend/shifts/engagement.py:268`, `backend/shifts/offers.py:360`, `backend/shifts/finalize.py:39`, `backend/shifts/finalize.py:79`
 - Confidence: high; found by codexA-2
-- Test needed: Confirm an offer targeting one recurring occurrence and assert no assignments exist for any other occurrence.
-- Decision question: When Sara accepts terms for one date in Tom's recurring vacancy, which dates should she be booked for?
+- Test that would prove it: Confirm an offer targeting one recurring occurrence and assert no assignments exist for any other occurrence.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL SAME_ROOT_HIGH_CONFIDENCE; aliases: C021-N3
+- Owner question: When Sara accepts terms for one date in Tom's recurring vacancy, which dates should she be booked for?
   - Only the date she accepted
   - The whole series after separately reviewing and accepting every date
   - Every unfilled recurring date immediately (keep today's behaviour)
@@ -980,8 +1157,10 @@ Tom posts a public shift with several vacancies, and Ben confirms one while paym
 
 - Evidence: `backend/shifts/lifecycle.py:393`, `backend/shifts/serialization/shifts.py:440`, `backend/shifts/serialization/shifts.py:451`, `backend/shifts/serialization/shifts.py:480`
 - Confidence: high; found by codexB-1
-- Test needed: Retrieve a public shift as unrelated Sara and assert Ben's pending-payment and assignment contact details are absent.
-- Decision question: When Sara browses Tom's public vacancy, whose contact details should she see?
+- Test that would prove it: Retrieve a public shift as unrelated Sara and assert Ben's pending-payment and assignment contact details are absent.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: SAME_ROOT_HIGH_CONFIDENCE; related to canonical F01-N1
+- Owner question: When Sara browses Tom's public vacancy, whose contact details should she see?
   - Only her own; Tom's managers can see other candidates
   - Confirmed coworkers' details after Sara is booked
   - Every candidate's details while browsing (keep today's behaviour)
@@ -992,8 +1171,10 @@ Tom posts a recurring Monday vacancy. Sara proposes working only the second Mond
 
 - Evidence: `backend/shifts/serialization/offers.py:17`, `backend/shifts/counter_offers.py:188`, `backend/shifts/engagement.py:271`, `backend/shifts/finalize.py:39`, `backend/shifts/finalize.py:82`
 - Confidence: high; found by codexB-1
-- Test needed: Confirm an offer for the second of three recurring Mondays and assert no assignments exist for the other Mondays.
-- Decision question: When Sara accepts only the second Monday of Tom's recurring vacancy, what should be booked?
+- Test that would prove it: Confirm an offer for the second of three recurring Mondays and assert no assignments exist for the other Mondays.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: SAME_ROOT_HIGH_CONFIDENCE; related to canonical C020-N6
+- Owner question: When Sara accepts only the second Monday of Tom's recurring vacancy, what should be booked?
   - Only the accepted Monday
   - Require explicit acceptance of every date together
   - Every occurrence automatically (keep today's behaviour)
@@ -1004,8 +1185,10 @@ Sara finishes Tom's Sydney shift at 17:00. At 20:00 Sydney time, the filters com
 
 - Evidence: `backend/core/settings.py:445`, `backend/core/settings.py:449`, `backend/shifts/lifecycle.py:148`, `backend/shifts/selectors.py:20`, `backend/shifts/my_shifts.py:20`, `backend/shifts/serialization/shifts.py:403`
 - Confidence: high; found by codexB-1
-- Test needed: Freeze time at 20:00 Sydney time for a same-day 17:00 finish and assert the shift is excluded from upcoming and active results.
-- Decision question: When Tom's pharmacy clock passes the shift's finish time, when should Sara's booking leave Upcoming?
+- Test that would prove it: Freeze time at 20:00 Sydney time for a same-day 17:00 finish and assert the shift is excluded from upcoming and active results.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom's pharmacy clock passes the shift's finish time, when should Sara's booking leave Upcoming?
   - At the finish time in that pharmacy's timezone
   - After a defined grace period in that pharmacy's timezone
   - When the UTC clock reaches the finish time (keep today's behaviour)
@@ -1016,8 +1199,10 @@ Tom uploads pharmacy procedures and controlled-drug protocols, then posts a name
 
 - Evidence: `backend/shifts/lifecycle.py:393`, `backend/shifts/serialization/shifts.py:54`, `backend/shifts/serialization/shifts.py:193`, `backend/organizations/serializers.py:139`, `backend/shifts/serialization/projections.py:110`
 - Confidence: high; found by codexB-1
-- Test needed: Retrieve a named public shift as unrelated Sara and assert pharmacy procedure, protocol, and induction document links are absent.
-- Decision question: When should Sara gain access to Tom's internal pharmacy documents?
+- Test that would prove it: Retrieve a named public shift as unrelated Sara and assert pharmacy procedure, protocol, and induction document links are absent.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When should Sara gain access to Tom's internal pharmacy documents?
   - After a confirmed booking authorises access
   - Only after Tom explicitly grants access
   - Whenever she browses a named vacancy (keep today's behaviour)
@@ -1028,8 +1213,10 @@ Lina assigns Grace to manage Tom's pharmacy as a region admin with roster privil
 
 - Evidence: `backend/shifts/test_access_escalation_contract.py:77`, `backend/organizations/access.py:194`, `backend/organizations/access.py:205`, `backend/shifts/selectors.py:13`, `backend/shifts/lifecycle.py:97`, `backend/shifts/lifecycle.py:153`, `backend/shifts/lifecycle.py:176`, `backend/shifts/worker_requests.py:49`, `backend/shifts/worker_requests.py:57`, `backend/shifts/worker_requests.py:384`
 - Confidence: high; found by codexB-2
-- Test needed: Assign Grace roster-capable region membership without a PharmacyAdmin record; verify Tom's shifts and Omar's cover request are accessible only within her assigned pharmacies.
-- Decision question: When Lina gives Grace region-admin roster privileges for Tom's pharmacy, should Grace see Tom's shifts and decide Omar's cover requests?
+- Test that would prove it: Assign Grace roster-capable region membership without a PharmacyAdmin record; verify Tom's shifts and Omar's cover request are accessible only within her assigned pharmacies.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Lina gives Grace region-admin roster privileges for Tom's pharmacy, should Grace see Tom's shifts and decide Omar's cover requests?
   - Grace can manage this work through her region assignment.
   - Grace needs a separate pharmacy-admin appointment to manage others' work (keep today's behaviour).
 
@@ -1039,8 +1226,10 @@ Tom offers Sara one date, then edits only the shift description before Sara acce
 
 - Evidence: `shared-core/src/domains/shifts/postingDraft.ts:46`, `frontend_web/shared/postShift/PostShiftForm.tsx:457`, `backend/shifts/serialization/shifts.py:355`, `backend/shifts/posting.py:189`, `backend/shifts/models.py:680`, `backend/shifts/offers.py:351`
 - Confidence: high; found by codexA-2
-- Test needed: Create a pending offer for Sara with single_user_only=false, submit the description-edit payload, and assert its original slot remains linked and accept succeeds.
-- Decision question: When Tom edits only a shift description after offering a date to Sara, what should happen to Sara's offer?
+- Test that would prove it: Create a pending offer for Sara with single_user_only=false, submit the description-edit payload, and assert its original slot remains linked and accept succeeds.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom edits only a shift description after offering a date to Sara, what should happen to Sara's offer?
   - Preserve Sara's offer and its original date
   - Block Tom's edit until outstanding offers are withdrawn
   - Leave Sara's offer pending but unusable (keep today's behaviour)
@@ -1051,8 +1240,10 @@ Tom creates a shared shift link for an open shift at his pharmacy. When Lina, an
 
 - Evidence: `frontend_web/src/pages/SharedShiftLandingPage.tsx:246`, `frontend_web/src/pages/SharedShiftLandingPage.tsx:247`
 - Confidence: high; found by agy-g3
-- Test needed: Assert that an authenticated user with role ORG_STAFF or PHARMACY_MANAGER navigating to /shifts/link?token=... is not redirected to a non-existent route resulting in a 404 error.
-- Decision question: When Lina (organisation admin) or a pharmacy manager opens a shared shift link while logged in, where should the platform take them?
+- Test that would prove it: Assert that an authenticated user with role ORG_STAFF or PHARMACY_MANAGER navigating to /shifts/link?token=... is not redirected to a non-existent route resulting in a 404 error.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Lina (organisation admin) or a pharmacy manager opens a shared shift link while logged in, where should the platform take them?
   - (Recommended) Redirect them to their organisation's shift center (/dashboard/organization/shifts/:id) or keep them on the shared shift details view.
   - Do not redirect logged-in admins away from the public shift view, rendering the shared shift directly.
   - Keep today's behaviour where they are redirected to /dashboard/orgstaff/shifts/:id resulting in a 404.
@@ -1063,8 +1254,10 @@ Sara proposes different rates for two dates in Tom's shift. Tom accepts the firs
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:56`, `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:28`, `backend/shifts/counter_offers.py:131`, `backend/shifts/counter_offers.py:143`, `backend/shifts/counter_offers.py:29`
 - Confidence: high; found by codexA-2
-- Test needed: Submit one counter offer covering two independently filled dates, accept only the first, then verify the second remains reviewable and acceptable after reload.
-- Decision question: When Tom accepts the first of two dates proposed by Sara, what should happen to her second date?
+- Test that would prove it: Submit one counter offer covering two independently filled dates, accept only the first, then verify the second remains reviewable and acceptable after reload.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom accepts the first of two dates proposed by Sara, what should happen to her second date?
   - Keep Sara's second date available for a separate decision
   - Accept both dates together with an explicit confirmation
   - Hide Sara's remaining proposal after the first acceptance (keep today's behaviour)
@@ -1075,8 +1268,10 @@ Tom posts a full-time job without individual dated slots, and Omar expresses int
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:45`, `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:65`, `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:196`, `backend/shifts/candidates.py:233`, `backend/shifts/test_shift_posting_contract.py:363`
 - Confidence: high; found by codexA-2
-- Test needed: Open a single-worker full-time job with no dated slots and an interested internal member; verify that member appears and can be reviewed.
-- Decision question: When Omar applies to Tom's full-time job without dated slots, what should Tom see?
+- Test that would prove it: Open a single-worker full-time job with no dated slots and an interested internal member; verify that member appears and can be reviewed.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Omar applies to Tom's full-time job without dated slots, what should Tom see?
   - Show Omar in the job's internal candidates
   - Require dated slots before Tom can publish the job
   - Show an empty internal candidates list (keep today's behaviour)
@@ -1087,8 +1282,10 @@ Tom posts a pharmacist shift offering Sara $80 per hour for a particular date, a
 
 - Evidence: `frontend_web/shared/postShift/useShiftPricing.ts:49`, `frontend_web/shared/postShift/useShiftPricing.ts:106`, `frontend_web/shared/postShift/PostShiftForm.tsx:239`, `frontend_web/shared/postShift/PostShiftForm.tsx:457`, `shared-core/src/domains/shifts/postingDraft.ts:46`
 - Confidence: high; found by codexB-1
-- Test needed: Load an existing shift with an $80 per-date override and a $60 calculated guide; change only its description and assert the submitted rate remains $80.
-- Decision question: When Tom edits only the description of Sara's advertised $80 shift, what should happen to its rate?
+- Test that would prove it: Load an existing shift with an $80 per-date override and a $60 calculated guide; change only its description and assert the submitted rate remains $80.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom edits only the description of Sara's advertised $80 shift, what should happen to its rate?
   - Keep $80 unless Tom explicitly changes it
   - Ask Tom before replacing $80 with the current guide
   - Automatically replace it with the current guide (keep today's behaviour)
@@ -1099,8 +1296,10 @@ Sara accepts Tom's two-day shift and is waiting for Tom to pay. Tom then edits t
 
 - Evidence: `backend/shifts/posting.py:157`, `backend/shifts/posting.py:188`, `backend/shifts/models.py:678`, `backend/shifts/offers.py:615`, `backend/shifts/serialization/shifts.py:464`, `backend/shifts/finalize.py:30`, `backend/billing/views.py:860`, `backend/billing/views.py:890`, `backend/rewards/views.py:217`
 - Confidence: high; found by claudeA-1
-- Test needed: Create an offer in ACCEPTED_AWAITING_PAYMENT on a multi-slot shift, PATCH the shift with a new slots payload, then run the fulfilment webhook for that offer id; assert the edit is refused (or the offer is reset for re-confirmation) rather than the webhook failing or the worker being assigned.
-- Decision question: Tom changes the dates of a shift after Sara has accepted but before he has paid. What should happen to Sara's acceptance?
+- Test that would prove it: Create an offer in ACCEPTED_AWAITING_PAYMENT on a multi-slot shift, PATCH the shift with a new slots payload, then run the fulfilment webhook for that offer id; assert the edit is refused (or the offer is reset for re-confirmation) rather than the webhook failing or the worker being assigned.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom changes the dates of a shift after Sara has accepted but before he has paid. What should happen to Sara's acceptance?
   - Tom cannot change the dates or times until he pays or cancels Sara's acceptance
   - Sara's acceptance goes back to 'needs confirming' and she must accept the new times again before Tom can pay
   - Keep today's behaviour: Sara stays accepted and Tom can pay for the changed shift
@@ -1111,8 +1310,10 @@ The shift-offers endpoint still allows a plain delete, and neither web nor mobil
 
 - Evidence: `backend/shifts/offers.py:156`, `backend/shifts/offers.py:162`, `backend/shifts/offers.py:610`, `backend/billing/views.py:848`, `backend/billing/views.py:864`, `shared-core/src/domains/shifts/api.ts:87`
 - Confidence: high; found by claudeA-1
-- Test needed: As Sara, DELETE /shift-offers/{id}/ on her ACCEPTED_AWAITING_PAYMENT offer; assert 405/403 and that the offer still exists.
-- Decision question: Sara has accepted Tom's shift and Tom is paying. Should anyone be able to make that offer disappear without a trace?
+- Test that would prove it: As Sara, DELETE /shift-offers/{id}/ on her ACCEPTED_AWAITING_PAYMENT offer; assert 405/403 and that the offer still exists.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara has accepted Tom's shift and Tom is paying. Should anyone be able to make that offer disappear without a trace?
   - No one can delete offers; Sara declines and Tom cancels through the normal steps, which notify the other side
   - Only Tom can withdraw an offer, and only before Sara accepts, with a notice to Sara
   - Keep today's behaviour: Sara or Tom can delete it silently
@@ -1123,8 +1324,10 @@ Tom posts a Monday-to-Friday locum shift. Sara is confirmed (and paid for) on Mo
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftsDialogs.tsx:29`, `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftActions.ts:44`, `frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts:44`, `shared-core/src/domains/shifts/api.ts:121`, `backend/shifts/lifecycle.py:53`, `backend/shifts/lifecycle.py:111`, `backend/shifts/base.py:111`, `backend/shifts/models.py:465`, `backend/shifts/models.py:805`, `backend/billing/models.py:85`, `backend/billing/views.py:699`, `shared-core/src/domains/billing/api.ts:58`, `backend/shifts/history.py:7`, `backend/shifts/cancellation.py:48`
 - Confidence: high; found by claudeA-2
-- Test needed: Create a two-date shift where date 1 has a paid, confirmed assignment for Sara and date 2 is open. DELETE /shifts/active/<id>/ as Tom. Assert the request is refused, or that Sara's assignment survives (or she is notified and the penalty/refund rule runs). Today the delete returns 204 and the assignment is gone.
-- Decision question: Tom deletes a posting where Sara is already confirmed (and paid for) on two of its five days. What should happen to Sara's days?
+- Test that would prove it: Create a two-date shift where date 1 has a paid, confirmed assignment for Sara and date 2 is open. DELETE /shifts/active/<id>/ as Tom. Assert the request is refused, or that Sara's assignment survives (or she is notified and the penalty/refund rule runs). Today the delete returns 204 and the assignment is gone.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL RELATED_DIFFERENT_FAILURE_MODES; aliases: F08-N3
+- Owner question: Tom deletes a posting where Sara is already confirmed (and paid for) on two of its five days. What should happen to Sara's days?
   - Block the delete until Tom cancels Sara's days one by one (with notice and the cancellation charge)
   - Delete only the open days and keep Sara's confirmed days as their own booking
   - Allow the full delete but notify Sara, apply the 24/72-hour penalty rule and keep a cancelled-booking record
@@ -1136,8 +1339,10 @@ Tom posts a public multi-day shift. Ben is confirmed for Monday and Omar has acc
 
 - Evidence: `backend/shifts/base.py:113`, `backend/shifts/browse.py:428`, `backend/shifts/lifecycle.py:393`, `backend/shifts/serialization/shifts.py:91`, `backend/shifts/serialization/shifts.py:434`, `backend/shifts/serialization/shifts.py:464`, `backend/shifts/serialization/offers.py:215`, `backend/shifts/serialization/projections.py:87`
 - Confidence: high; found by claudeA-1
-- Test needed: As Sara (unrelated locum), GET /public-shifts/ and /shifts/{id}/ for a shift where Ben is assigned and Omar is awaiting payment; assert no slot_assignments or payment_options entries and no worker email appear.
-- Decision question: When Sara looks at Tom's shift, should she see who else is already booked or waiting for payment on it?
+- Test that would prove it: As Sara (unrelated locum), GET /public-shifts/ and /shifts/{id}/ for a shift where Ben is assigned and Omar is awaiting payment; assert no slot_assignments or payment_options entries and no worker email appear.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL SAME_ROOT_HIGH_CONFIDENCE; aliases: C021-N1
+- Owner question: When Sara looks at Tom's shift, should she see who else is already booked or waiting for payment on it?
   - Sara sees nothing about other workers, only which slots are still open
   - Sara sees that a slot is taken, with no names or contact details
   - Keep today's behaviour: Sara sees other workers' names and emails
@@ -1148,8 +1353,10 @@ Sara creates a separate $120 super request for an invoice to Tom. She later corr
 
 - Evidence: `backend/worker_finance/services.py:606`, `backend/worker_finance/services.py:691`, `backend/worker_finance/services.py:894`, `backend/worker_finance/services.py:902`, `frontend_web/src/pages/finance/FinanceWorkspace.tsx:356`, `frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx:159`
 - Confidence: high; found by codexB-3
-- Test needed: Create a separate super request, revise the parent invoice's eligible amount, and assert that an explicit supported correction produces a matching contribution request rather than permanently returning the old amount.
-- Decision question: When Sara corrects an invoice to Tom after creating its separate super request, what should happen to that request?
+- Test that would prove it: Create a separate super request, revise the parent invoice's eligible amount, and assert that an explicit supported correction produces a matching contribution request rather than permanently returning the old amount.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL SAME_ROOT_HIGH_CONFIDENCE; aliases: C025-N2
+- Owner question: When Sara corrects an invoice to Tom after creating its separate super request, what should happen to that request?
   - Create an audited replacement with the corrected contribution.
   - Require an explicit adjustment before saving the invoice correction.
   - Keep the original request amount with no correction action (keep today's behaviour).
@@ -1160,8 +1367,10 @@ Sara deletes her ChemistTasker account. Her name, email and ID documents are rem
 
 - Evidence: `backend/users/api_account.py:76-82`, `backend/users/account_deletion.py:92-119`, `backend/talent/models.py:119-127`, `backend/talent/views/explorer.py:172-199`
 - Confidence: high; found by claudeB-2
-- Test needed: Delete an account that has an ExplorerPost, then public-feed/ and feed/ must not return that post
-- Decision question: Sara deletes her account while her availability post is on the talent board. What should happen to the post?
+- Test that would prove it: Delete an account that has an ExplorerPost, then public-feed/ and feed/ must not return that post
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara deletes her account while her availability post is on the talent board. What should happen to the post?
   - Delete the post along with the account
   - Hide it from every board but keep it for audit
   - Keep today: it stays visible
@@ -1172,8 +1381,10 @@ Zoe publishes her availability, then all the published dates pass. When she retu
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:486`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:560`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:703`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:971`, `frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46`, `backend/talent/views/explorer.py:126`, `backend/talent/views/explorer.py:182`, `backend/talent/models.py:127`
 - Confidence: high; found by codexA-4
-- Test needed: Give Zoe one expired availability post, open the publish dialog and save future dates; verify the existing post is updated successfully.
-- Decision question: When Zoe's published availability expires and she adds new dates, what should happen?
+- Test that would prove it: Give Zoe one expired availability post, open the publish dialog and save future dates; verify the existing post is updated successfully.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Zoe's published availability expires and she adds new dates, what should happen?
   - Load her expired post for editing and republish it
   - Offer to replace her expired post with a new one
   - Reject publication until the expired post is removed elsewhere (keep today's behaviour)
@@ -1184,8 +1395,10 @@ Sara publishes anonymous availability, and the public board hides her identity. 
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:722`, `frontend_mobile/roles/shared/talent-board/hooks/useTalentFeed.ts:45`, `shared-core/src/domains/talent/api.ts:43`, `backend/talent/views/explorer.py:97`, `backend/talent/views/explorer.py:184`, `backend/talent/serializers/explorer.py:79`, `backend/talent/serializers/explorer.py:83`, `backend/talent/serializers/explorer.py:190`
 - Confidence: high; found by codexB-1
-- Test needed: As unrelated, unverified Zoe, request the authenticated feed containing Sara's anonymous post and assert that Sara's name and identity links remain withheld.
-- Decision question: When Sara publishes anonymously, when should Zoe or Tom be allowed to learn her identity?
+- Test that would prove it: As unrelated, unverified Zoe, request the authenticated feed containing Sara's anonymous post and assert that Sara's name and identity links remain withheld.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara publishes anonymously, when should Zoe or Tom be allowed to learn her identity?
   - After Sara accepts a hiring interaction
   - After an explicitly authorised employer reveal
   - Immediately after signing in (keep today's behaviour)
@@ -1196,8 +1409,10 @@ Tom creates junior employment terms for Mia ending before her next birthday, as 
 
 - Evidence: `backend/workforce/employment_engagement_service.py:109`, `backend/workforce/models.py:165`, `backend/workforce/views.py:362`, `backend/workforce/views.py:391`, `backend/workforce/views.py:416`, `backend/workforce/timesheet_data.py:86`, `backend/workforce/timesheet_data.py:115`
 - Confidence: high; found by codexB-2
-- Test needed: Patch an already-started junior agreement to end on or after its birthday review date, including a null end date; assert rejection.
-- Decision question: When Tom extends Mia's junior employment terms across her next birthday, what should happen?
+- Test that would prove it: Patch an already-started junior agreement to end on or after its birthday review date, including a null end date; assert rejection.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom extends Mia's junior employment terms across her next birthday, what should happen?
   - Require successor terms with reviewed rates from Mia's birthday
   - Automatically create successor terms using the new age
   - Continue Mia's frozen junior rates beyond her birthday, as today
@@ -1208,8 +1423,10 @@ Tom enables payroll and approves Omar's timesheet for shifts designated for payr
 
 - Evidence: `backend/workforce/timesheet_builder.py:183`, `backend/workforce/timesheet_builder.py:203`, `backend/workforce/timesheet_transitions.py:147`, `backend/workforce/timesheet_transitions.py:182`, `backend/workforce/views.py:744`
 - Confidence: high; found by codexA-4
-- Test needed: Build and approve a payroll-enabled period containing Omar's PAYROLL assignment, then lock it and assert that its assignment and worked day are present in payroll_export.
-- Decision question: When Tom locks a payroll-enabled period containing Omar's approved payroll shifts, what should the locked record contain?
+- Test that would prove it: Build and approve a payroll-enabled period containing Omar's PAYROLL assignment, then lock it and assert that its assignment and worked day are present in payroll_export.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: SAME_ROOT_HIGH_CONFIDENCE; related to canonical F06-N1
+- Owner question: When Tom locks a payroll-enabled period containing Omar's approved payroll shifts, what should the locked record contain?
   - Omar's payroll assignments and approved work days
   - Reject locking until payroll routing is available
   - An empty payroll export despite those assignments (keep today's behaviour)
@@ -1220,8 +1437,10 @@ Omar works from Sunday night into Monday morning, with the two parts recorded in
 
 - Evidence: `backend/workforce/signals.py:21`, `backend/workforce/signals.py:41`, `backend/workforce/signals.py:61`, `backend/workforce/timesheet_data.py:206`, `backend/workforce/timesheet_data.py:256`, `backend/workforce/timesheet_transitions.py:137`
 - Confidence: high; found by codexA-4
-- Test needed: Approve both periods intersecting Omar's Sunday-to-Monday session, correct Monday's clock-out, and assert Monday's timesheet becomes stale and cannot lock before rebuilding and reapproval.
-- Decision question: When Tom corrects Omar's overnight attendance spanning two open timesheet periods, which periods should require recalculation?
+- Test that would prove it: Approve both periods intersecting Omar's Sunday-to-Monday session, correct Monday's clock-out, and assert Monday's timesheet becomes stale and cannot lock before rebuilding and reapproval.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL RELATED_DISTINCT_TIME_WINDOW_DEFECTS; aliases: F06-N3
+- Owner question: When Tom corrects Omar's overnight attendance spanning two open timesheet periods, which periods should require recalculation?
   - Every period whose worked minutes or checks are affected
   - Reject the correction until Tom explicitly reopens all affected periods
   - Only the period containing the original clock-in (keep today's behaviour)
@@ -1232,8 +1451,10 @@ Tom approves Omar's annual leave against a published roster, then archives that 
 
 - Evidence: `backend/workforce/roster/publication.py:123`, `backend/workforce/roster/publication.py:177`, `backend/workforce/signals.py:199`, `backend/workforce/timesheet_data.py:150`, `backend/workforce/timesheet_builder.py:96`, `backend/workforce/timesheet_builder.py:124`
 - Confidence: high; found by codexA-4
-- Test needed: Build a timesheet with approved roster-linked annual leave, archive its published roster week, rebuild, and assert rostered and approved-leave minutes remain unchanged.
-- Decision question: When Tom archives a completed published roster, what should happen to Omar's scheduled hours and approved leave in its open timesheet period?
+- Test that would prove it: Build a timesheet with approved roster-linked annual leave, archive its published roster week, rebuild, and assert rostered and approved-leave minutes remain unchanged.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom archives a completed published roster, what should happen to Omar's scheduled hours and approved leave in its open timesheet period?
   - Preserve them as historical published work
   - Require Tom to lock the timesheet period before archiving
   - Remove the roster hours and reduce scheduled leave to zero (keep today's behaviour)
@@ -1244,8 +1465,10 @@ Tom creates Mia's junior pay agreement ending before her next birthday. After it
 
 - Evidence: `backend/workforce/views.py:377`, `backend/workforce/views.py:391`, `backend/workforce/views.py:416`, `backend/workforce/employment_engagement_service.py:109`, `backend/shifts/engagement.py:84`
 - Confidence: high; found by codexB-3
-- Test needed: For an active junior agreement ending before the next birthday, PATCH effective_to=null and assert rejection with the original end date preserved.
-- Decision question: When Tom extends Mia's junior agreement beyond her next birthday, what should happen?
+- Test that would prove it: For an active junior agreement ending before the next birthday, PATCH effective_to=null and assert rejection with the original end date preserved.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom extends Mia's junior agreement beyond her next birthday, what should happen?
   - Require new dated terms for Mia from her birthday
   - Automatically apply Mia's updated birthday rates
   - Preserve Mia's existing lower rates indefinitely (keep today's behaviour)
@@ -1256,8 +1479,10 @@ Tom approves Omar's timesheet, then records a higher rate effective today while 
 
 - Evidence: `backend/workforce/views.py:339`, `backend/workforce/views.py:417`, `backend/workforce/views.py:784`, `backend/workforce/timesheet_builder.py:191`, `backend/workforce/timesheet_transitions.py:137`
 - Confidence: high; found by codexB-3
-- Test needed: After approving Omar's timesheet containing today's work, create successor terms effective today and assert locking fails until recalculation and renewed approval.
-- Decision question: When Tom changes Omar's pay terms for dates in an approved but unlocked timesheet, what should happen?
+- Test that would prove it: After approving Omar's timesheet containing today's work, create successor terms effective today and assert locking fails until recalculation and renewed approval.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom changes Omar's pay terms for dates in an approved but unlocked timesheet, what should happen?
   - Require recalculation and renewed approval for Omar's affected timesheet
   - Prevent the change until Tom explicitly reopens Omar's timesheet
   - Allow locking Omar's existing terms until someone manually recalculates (keep today's behaviour)
@@ -1268,8 +1493,10 @@ An operator runs the seed command on the live server, maybe after copying it fro
 
 - Evidence: `backend/public_hub/management/commands/seed_editorial_content.py:52`, `backend/public_hub/management/commands/seed_editorial_content.py:65`, `backend/public_hub/management/commands/seed_editorial_content.py:78`, `backend/public_hub/management/commands/seed_editorial_content.py:432`, `backend/public_hub/management/commands/seed_editorial_content.py:464`, `backend/public_hub/management/commands/seed_editorial_content.py:501`, `backend/public_hub/management/commands/seed_hub_preview.py:14`
 - Confidence: medium; found by claudeB-2
-- Test needed: Run seed_editorial_content with production settings (DEBUG off, not public_hub.test_settings) and assert that it raises CommandError and makes no ContentAdministrator, Article or Comment changes.
-- Decision question: If someone runs the editorial seed command on the live site, what should happen to Tom's account, the published guides and the comments shown to readers?
+- Test that would prove it: Run seed_editorial_content with production settings (DEBUG off, not public_hub.test_settings) and assert that it raises CommandError and makes no ContentAdministrator, Article or Comment changes.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: If someone runs the editorial seed command on the live site, what should happen to Tom's account, the published guides and the comments shown to readers?
   - Refuse to run outside local/test settings, like the hub preview seed
   - Allow it on live only with an explicit --i-know flag, and never grant admin or post comments as real users
   - Keep today's behaviour (seed runs anywhere)
@@ -1280,8 +1507,10 @@ Omar logs into the web dashboard and opens My Leave to submit annual leave for h
 
 - Evidence: `frontend_web/src/features/workforce/MyLeavePage.tsx:7`, `frontend_web/src/features/workforce/MyLeavePage.tsx:11`, `frontend_web/src/features/workforce/MyLeavePage.tsx:12`, `backend/users/sessions.py:90`, `backend/workforce/leave_service.py:237`
 - Confidence: high; found by agy-g3
-- Test needed: Submit a leave request from MyLeavePage using an authenticated worker whose profile memberships contain pharmacy details without an id attribute, asserting that a valid membership identifier is supplied to the API rather than null or NaN.
-- Decision question: When Omar requests leave on the web dashboard, how should the application identify his active pharmacy membership?
+- Test that would prove it: Submit a leave request from MyLeavePage using an authenticated worker whose profile memberships contain pharmacy details without an id attribute, asserting that a valid membership identifier is supplied to the API rather than null or NaN.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Omar requests leave on the web dashboard, how should the application identify his active pharmacy membership?
   - Include the membership primary key on pharmacy memberships in the user profile payload so Omar's leave request submits a valid membership identifier.
   - Update the leave creation endpoint to accept the pharmacy identifier directly and resolve Omar's active membership automatically.
   - Require workers to submit leave requests through mobile or ask Tom to enter it directly (keep today's behaviour).
@@ -1292,8 +1521,10 @@ After Zoe (or Sara, Ali, or Mia) finishes verifying her mobile number on the web
 
 - Evidence: `frontend_web/src/main.tsx:589`, `frontend_web/src/pages/MobileOTPVerify.tsx:97`, `frontend_web/src/pages/MembershipApplyPage.tsx:386`, `frontend_web/src/pages/PricingPage.tsx:110`
 - Confidence: high; found by agy-g2
-- Test needed: Mount the router at '/dashboard' with an authenticated user and assert that it redirects to the user's role-specific dashboard instead of rendering NotFoundPage.
-- Decision question: When an authenticated user lands on or is redirected to '/dashboard', where should the app send them?
+- Test that would prove it: Mount the router at '/dashboard' with an authenticated user and assert that it redirects to the user's role-specific dashboard instead of rendering NotFoundPage.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When an authenticated user lands on or is redirected to '/dashboard', where should the app send them?
   - (Recommended) Redirect '/dashboard' to the user's role-specific dashboard overview via resolveDashboardPath.
   - Update each caller individually to construct the role dashboard path before navigating.
   - Keep today's behaviour where '/dashboard' falls through to the 404 Page Not Found screen.
@@ -1304,8 +1535,10 @@ Ali can't work his rostered Saturday and taps 'Request cover' on web or mobile. 
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:532`, `frontend_mobile/app/my-roster.tsx:208`, `backend/shifts/worker_requests.py:97`, `backend/shifts/worker_requests.py:239`, `backend/shifts/worker_requests.py:254`, `backend/shifts/worker_requests.py:284`, `frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:602`, `frontend_mobile/features/parity/roster.tsx:638`, `backend/workforce/roster/worker_actions.py:275`, `backend/workforce/roster/worker_actions.py:353`, `backend/workforce/roster/v2_views.py:747`
 - Confidence: high; found by claudeA-2
-- Test needed: Ali has an assignment. POST /worker-shift-requests/ with the exact web payload (no 'shift'), then approve it as Tom. Assert Ali's assignment is released and no second shift is created. Today Ali stays assigned and a new LOCUM_CASUAL shift appears.
-- Decision question: Ali asks for cover on a Saturday he's rostered for, and Tom approves. What should happen?
+- Test that would prove it: Ali has an assignment. POST /worker-shift-requests/ with the exact web payload (no 'shift'), then approve it as Tom. Assert Ali's assignment is released and no second shift is created. Today Ali stays assigned and a new LOCUM_CASUAL shift appears.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Ali asks for cover on a Saturday he's rostered for, and Tom approves. What should happen?
   - Ali is taken off Saturday and that same slot is advertised to locums; Ali is told he's off
   - Ali stays rostered until Tom picks a named replacement (e.g. Mia); both are told
   - Approval only publishes a new locum shift and Ali stays rostered (today's web behaviour)
@@ -1316,8 +1549,10 @@ Omar takes a tea break from 10:00 to 10:10 and a lunch break from 13:00 to 13:30
 
 - Evidence: `backend/attendance/approvals.py:358`, `backend/attendance/approvals.py:363`, `backend/attendance/approvals.py:370`, `backend/attendance/approvals.py:371`, `backend/attendance/views.py:228`
 - Confidence: high; found by claudeA-1
-- Test needed: A session with two break pairs: correcting the second BREAK_START to a time inside the second break succeeds.
-- Decision question: Omar took a tea break and a lunch break. Tom needs to move the lunch start by five minutes. What should happen?
+- Test that would prove it: A session with two break pairs: correcting the second BREAK_START to a time inside the second break succeeds.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Omar took a tea break and a lunch break. Tom needs to move the lunch start by five minutes. What should happen?
   - Allow it: only check against that break's own end and against clock in and clock out
   - Allow it, and also block any overlap between the two breaks
   - Keep today's behaviour: refuse the correction
@@ -1328,8 +1563,10 @@ Tom has his own active subscription, and his pharmacy belongs to Lina's organisa
 
 - Evidence: `backend/billing/views.py:154`, `backend/billing/views.py:157`, `backend/billing/views.py:471`, `backend/billing/views.py:495`, `backend/billing/views.py:522`, `backend/billing/views.py:214`
 - Confidence: medium; found by claudeB-1
-- Test needed: Org without subscription, owner with active one: ORG_ADMIN GET subscription returns inactive/none, and seat purchase is refused.
-- Decision question: Tom pays for his own plan and his pharmacy is in Lina's organisation. What should Lina's org billing show?
+- Test that would prove it: Org without subscription, owner with active one: ORG_ADMIN GET subscription returns inactive/none, and seat purchase is refused.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom pays for his own plan and his pharmacy is in Lina's organisation. What should Lina's org billing show?
   - Only the organisation's own subscription (none)
   - Tom's plan, read-only, with no seat changes
   - Tom's plan, fully manageable (keep today's behaviour)
@@ -1340,8 +1577,10 @@ Tom paid fulfilment fees and penalties, including fees paid for organisation pha
 
 - Evidence: `backend/billing/models.py:84`, `backend/billing/views.py:846`
 - Confidence: medium; found by claudeB-1
-- Test needed: Delete a user with ShiftPayment rows; expect the payments to remain (protected or owner set null).
-- Decision question: Tom deletes his account after paying shift fees. What should happen to those payment records?
+- Test that would prove it: Delete a user with ShiftPayment rows; expect the payments to remain (protected or owner set null).
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom deletes his account after paying shift fees. What should happen to those payment records?
   - Keep them, with Tom's identity anonymised
   - Block account deletion while payment records exist
   - Delete them with the account (keep today's behaviour)
@@ -1352,8 +1591,10 @@ Tom posts a one-day shift with the employment type 'Casual employee' and books M
 
 - Evidence: `backend/billing/views.py:646`, `backend/shifts/models.py:24`, `frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:268`, `shared-core/src/utils/pricing.ts:36`
 - Confidence: medium; found by claudeA-1
-- Test needed: Call charge_shift_fulfillment under PAYMENT_REQUIRED for a CASUAL shift and assert the agreed (per-shift) Stripe price id is used.
-- Decision question: Tom books Mia for a single casual-employee shift. What fee should Tom pay?
+- Test that would prove it: Call charge_shift_fulfillment under PAYMENT_REQUIRED for a CASUAL shift and assert the agreed (per-shift) Stripe price id is used.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom books Mia for a single casual-employee shift. What fee should Tom pay?
   - The per-shift locum fee ($30, or $15 for subscribers)
   - A separate casual fee to be added to the pricing page
   - Keep today's behaviour: the $80 part/full-time job fee
@@ -1364,11 +1605,23 @@ Tom opens mobile group creation and searches for Omar, who is available in his c
 
 - Evidence: `shared-core/src/domains/chat/mappers.ts:62`, `shared-core/src/domains/chat/api.ts:154`, `frontend_mobile/roles/shared/chat/hooks.ts:69`, `frontend_mobile/roles/shared/chat/NewGroupModal.tsx:33`, `frontend_mobile/roles/shared/chat/NewGroupModal.tsx:73`, `frontend_mobile/roles/shared/chat/GroupManageModal.tsx:77`
 - Confidence: high; found by codexB-1
-- Test needed: Return Omar with a nested user identity, search his name in mobile group creation, and verify he is selectable.
-- Decision question: When Tom searches for Omar among available mobile group contacts, what should happen?
+- Test that would prove it: Return Omar with a nested user identity, search his name in mobile group creation, and verify he is selectable.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom searches for Omar among available mobile group contacts, what should happen?
   - Find Omar by his displayed name
   - Show all available contacts for Tom to select
   - Return no matches for nested contact names (keep today's behaviour)
+
+## F12-N1 - P2 - Expo chat UX - Native direct-message send failure is logged but not shown to the user, unlike Vite's retry warning.
+
+Sara taps send on a direct chat while offline. Mobile sendMessage catches the network error and only console.error() logs it; the draft remains but the screen gives no visible send failure, while Vite MessageComposer displays an explicit 'Message not sent' error. Sara may believe the message was delivered.
+
+- Evidence: `frontend_mobile/roles/shared/messages/[id].tsx:403`, `frontend_mobile/roles/shared/messages/[id].tsx:435`, `frontend_web/src/pages/dashboard/sidebar/chat/MessageComposer.tsx:179`
+- Confidence: high for source UI path; must test global error handler and runtime rendering; found by gpt6-cross-platform-20261025
+- Test that would prove it: Disconnect native device network, send a direct text chat; assert clear error and draft retained. Vite shows explicit send failure; retry after reconnect sends once. Ensure global notifications are not already surfacing equivalent errors.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: CANONICAL NOT_DUPLICATE; aliases: B51
 
 ## C070-N1 - P2 - Expo shift board state - Shared AsyncStorage keys can expose previous account's applied/rejected shift markers after account switching.
 
@@ -1376,8 +1629,10 @@ Sara uses a shared phone and marks shift IDs applied or rejected; after logout T
 
 - Evidence: `frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts:6`, `frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts:7`, `frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts:9`, `frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts:60`, `frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts:77`, `frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts:89`, `frontend_mobile/roles/shared/shifts/CommunityShiftsView.tsx:552`
 - Confidence: medium; found by gpt6-senior-20261025
-- Test needed: Native shared device: Sara applies/rejects shifts, signs out; Tom signs in and opens community board with slow server results. Assert applied/rejected markers never display Sara's state, and subsequent writes are isolated. Check default disableLocalPersistence behavior and whether backend props override early hydration.
-- Decision question: Should shift-board saved/applied/rejected status ever be carried between accounts on a shared device?
+- Test that would prove it: Native shared device: Sara applies/rejects shifts, signs out; Tom signs in and opens community board with slow server results. Assert applied/rejected markers never display Sara's state, and subsequent writes are isolated. Check default disableLocalPersistence behavior and whether backend props override early hydration.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should shift-board saved/applied/rejected status ever be carried between accounts on a shared device?
   - No, scope all persisted markers to authenticated user
   - Do not persist applied/rejected locally at all
   - Allow local markers to be shared across logins
@@ -1388,8 +1643,10 @@ Tom posts a poll in his pharmacy hub and Omar, Ali and Mia vote. Tom opens Edit 
 
 - Evidence: `backend/pharmacy_hub/serialization/polls.py:149-160`, `frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:315-318`, `frontend_mobile/roles/shared/hub/PollComposer.tsx:87-92`, `shared-core/src/domains/pharmacyHub/api.ts:214-215`
 - Confidence: high; found by claudeB-1
-- Test needed: PATCH a poll that has votes, sending the same option labels and a new question; assert the votes and vote counts are kept.
-- Decision question: Tom edits a poll that Omar, Ali and Mia have already voted on. What should happen to their votes?
+- Test that would prove it: PATCH a poll that has votes, sending the same option labels and a new question; assert the votes and vote counts are kept.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom edits a poll that Omar, Ali and Mia have already voted on. What should happen to their votes?
   - Votes are kept when the options are unchanged; only changed options lose their votes
   - Options are locked once anyone has voted; only the question can change
   - Keep today's behaviour: every edit clears all votes, but show Tom a warning first
@@ -1400,8 +1657,10 @@ Tom edits his pharmacy hub post on mobile to tag Omar and gets 'Unable to determ
 
 - Evidence: `backend/pharmacy_hub/posts.py:262-269`, `backend/pharmacy_hub/serialization/posts.py:231-236`, `backend/pharmacy_hub/serialization/posts.py:310-311`, `backend/pharmacy_hub/scoping.py:103-107`, `shared-core/src/domains/pharmacyHub/mappers.ts:239`, `frontend_mobile/roles/shared/hub/PostComposer.tsx:239-247`
 - Confidence: high; found by claudeB-1
-- Test needed: PATCH an existing pharmacy post with tagged_member_ids=[staff id], and multipart-POST a post with one attachment and one tagged_member_ids value; both should return 200/201.
-- Decision question: Tom edits a post to tag Omar, or posts a photo tagging only Omar. What should happen?
+- Test that would prove it: PATCH an existing pharmacy post with tagged_member_ids=[staff id], and multipart-POST a post with one attachment and one tagged_member_ids value; both should return 200/201.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom edits a post to tag Omar, or posts a photo tagging only Omar. What should happen?
   - Both work and Omar is notified
   - Tags can only be added when a post is first created; the edit screen hides tagging
   - Keep today's behaviour (both requests fail with an error)
@@ -1412,11 +1671,27 @@ Sara emails her saved invoice to Tom, and the attachment says DRAFT - NOT ISSUED
 
 - Evidence: `backend/worker_finance/services.py:827`, `backend/worker_finance/templates/worker_finance/invoice.html:16`, `backend/worker_finance/documents.py:16`, `backend/worker_finance/views.py:294`, `backend/worker_finance/views.py:268`
 - Confidence: high; found by codexB-3
-- Test needed: Send a finance invoice and inspect both its email attachment and subsequent current PDF; assert that neither labels the issued invoice DRAFT - NOT ISSUED.
-- Decision question: What should Tom see on the invoice PDF that Sara successfully sends?
+- Test that would prove it: Send a finance invoice and inspect both its email attachment and subsequent current PDF; assert that neither labels the issued invoice DRAFT - NOT ISSUED.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: What should Tom see on the invoice PDF that Sara successfully sends?
   - An issued invoice without the draft label.
   - An issued invoice explicitly stating its revision remains editable.
   - DRAFT - NOT ISSUED on the emailed and current PDFs (keep today's behaviour).
+
+## C009-N2 - P2 - Invoicing - Mobile dashboards label all-time drafted invoice value as this month's income.
+
+Sara issued an invoice in January, then another in October. The October pharmacist dashboard labels the sum of both invoices 'Total Income This Month', and even counts unsent draft invoices. The backend returns all-time billed amounts without a date or paid-status filter; the other-staff mobile dashboard uses the same label.
+
+- Evidence: `backend/dashboards/views.py:480`, `backend/dashboards/views.py:894`, `backend/dashboards/views.py:1008`, `frontend_mobile/roles/pharmacist/dashboard.tsx:154`, `frontend_mobile/roles/otherstaff/dashboard.tsx:150`
+- Confidence: high; found by gpt6-senior-20261025
+- Test that would prove it: Sara has an old invoice, this-month sent invoice and an unsent draft; load pharmacist dashboard and assert a clearly defined monthly income metric excludes last month and drafts, while all-time billed metric remains separately labelled.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: What should Sara's 'Income This Month' tile count?
+  - Only money actually received during the current calendar month
+  - Invoices issued this month, labelled 'This Month Invoiced'
+  - All-time invoice totals, but relabel them accurately
 
 ## C026-N4 - P2 - Invoicing - The invoice issue action fails on PostgreSQL because it locks outside a transaction.
 
@@ -1424,8 +1699,10 @@ Sara confirms a saved invoice using the supported issue action before sending it
 
 - Evidence: `backend/worker_finance/views.py:155`, `backend/worker_finance/views.py:234`, `backend/core/settings.py:401`, `backend/core/settings.py:409`, `backend/worker_finance/tests/settings.py:9`, `shared-core/src/domains/finance/api.ts:80`
 - Confidence: high; found by codexB-2
-- Test needed: Call the issue action on PostgreSQL from a TransactionTestCase without an enclosing transaction; assert successful confirmation rather than TransactionManagementError.
-- Decision question: When Sara confirms a saved invoice through the existing issue action, what should happen?
+- Test that would prove it: Call the issue action on PostgreSQL from a TransactionTestCase without an enclosing transaction; assert successful confirmation rather than TransactionManagementError.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara confirms a saved invoice through the existing issue action, what should happen?
   - Confirm successfully while allowing later edits
   - Retire the action and direct Sara to the current send flow
   - Keep the existing action and its current failure
@@ -1436,23 +1713,13 @@ Sara emails an invoice to Tom's pharmacy and the mail provider times out. The se
 
 - Evidence: `shared-core/src/transport/errors.ts:38`, `shared-core/src/transport/client.ts:121`, `backend/worker_finance/views.py:313`, `shared-core/tests/finance.transport.cjs:42`, `shared-core/src/finance.ts:92`
 - Confidence: high; found by claudeB-1
-- Test needed: A finance send call that gets a 503 with the uncertain-delivery detail must reject with that detail text, not the generic status message.
-- Decision question: When Sara sends Tom an invoice email and the server can't confirm it was delivered, what should Sara see?
+- Test that would prove it: A finance send call that gets a 503 with the uncertain-delivery detail must reject with that detail text, not the generic status message.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara sends Tom an invoice email and the server can't confirm it was delivered, what should Sara see?
   - The server's exact warning: delivery is uncertain, do not resend
   - A fixed in-app message, 'Delivery uncertain, check before resending', shown for this 503 only
   - Keep the generic 'Request failed with status 503' and rely on the server blocking a second send
-
-## C009-N2 - P2 - Invoicing - Mobile dashboards label all-time drafted invoice value as this month's income.
-
-Sara issued an invoice in January, then another in October. The October pharmacist dashboard labels the sum of both invoices 'Total Income This Month', and even counts unsent draft invoices. The backend returns all-time billed amounts without a date or paid-status filter; the other-staff mobile dashboard uses the same label.
-
-- Evidence: `backend/dashboards/views.py:480`, `backend/dashboards/views.py:894`, `backend/dashboards/views.py:1008`, `frontend_mobile/roles/pharmacist/dashboard.tsx:154`, `frontend_mobile/roles/otherstaff/dashboard.tsx:150`
-- Confidence: high; found by gpt6-senior-20261025
-- Test needed: Sara has an old invoice, this-month sent invoice and an unsent draft; load pharmacist dashboard and assert a clearly defined monthly income metric excludes last month and drafts, while all-time billed metric remains separately labelled.
-- Decision question: What should Sara's 'Income This Month' tile count?
-  - Only money actually received during the current calendar month
-  - Invoices issued this month, labelled 'This Month Invoiced'
-  - All-time invoice totals, but relabel them accurately
 
 ## C001-N2 - P2 - Kiosk - Anyone at the counter kiosk can start or end a break for a locum or cross-site worker without any PIN.
 
@@ -1460,8 +1727,10 @@ Sara, a locum with a confirmed shift, clocks in by phone QR and has no membershi
 
 - Evidence: `backend/attendance/kiosk_api.py:765`, `backend/attendance/kiosk_api.py:772`, `backend/attendance/kiosk_api.py:774`, `backend/attendance/kiosk_api.py:691`
 - Confidence: medium; found by claudeA-1
-- Test needed: A break START from the kiosk for a clocked-in worker with no local membership PIN is refused unless that worker proves who they are.
-- Decision question: Sara is clocked in at Tom's pharmacy and has no kiosk PIN there. Mia taps 'start break' for Sara on the counter kiosk. What should happen?
+- Test that would prove it: A break START from the kiosk for a clocked-in worker with no local membership PIN is refused unless that worker proves who they are.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara is clocked in at Tom's pharmacy and has no kiosk PIN there. Mia taps 'start break' for Sara on the counter kiosk. What should happen?
   - Refuse: the worker must confirm with their own PIN or app
   - Allow it but tell Sara and flag it for Tom to review
   - Keep today's behaviour: allow it with no check
@@ -1472,8 +1741,10 @@ Anyone standing at the paired counter tablet in Tom's pharmacy can type 1, 2, 3 
 
 - Evidence: `backend/attendance/kiosk_api.py:507`, `backend/attendance/kiosk_api.py:519`, `backend/attendance/kiosk_api.py:531`, `backend/attendance/credentials.py:632`, `backend/attendance/credentials.py:657`, `backend/attendance_tests/test_worker_pin_setup.py:235`, `backend/attendance_tests/test_worker_pin_setup.py:260`
 - Confidence: high; found by claudeA-3
-- Test needed: Using one device token, look up a known staff ID and an unknown one and assert both answers look the same with no name or email; then assert repeated lookups are rate-limited like the PIN screen.
-- Decision question: Someone at Tom's counter tablet types Staff ID numbers one after another. What should the kiosk show them?
+- Test that would prove it: Using one device token, look up a known staff ID and an unknown one and assert both answers look the same with no name or email; then assert repeated lookups are rate-limited like the PIN screen.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Someone at Tom's counter tablet types Staff ID numbers one after another. What should the kiosk show them?
   - Nothing that names anyone: the same neutral 'enter your PIN or check your email' answer for every number, rate-limited
   - Show names only for staff of this pharmacy, never staff from Tom's other pharmacies, and rate-limit lookups
   - Keep today's behaviour: show the name and partly hidden email so staff can confirm it is them
@@ -1484,8 +1755,10 @@ Kiosk tokens are saved only in scrambled (hashed) form so that a leaked database
 
 - Evidence: `backend/attendance/credentials.py:245`, `backend/attendance/credentials.py:256`, `backend/attendance/credentials.py:258`, `backend/attendance_tests/test_kiosk_qr_pin_security.py:209`
 - Confidence: medium; found by claudeA-3
-- Test needed: Activate a kiosk, read its saved hash from the database, call authenticate_kiosk_device with that hash and assert it returns None.
-- Decision question: If someone gets a copy of Tom's database backup, should the kiosk token values in it be enough to run Tom's counter kiosk?
+- Test that would prove it: Activate a kiosk, read its saved hash from the database, call authenticate_kiosk_device with that hash and assert it returns None.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: If someone gets a copy of Tom's database backup, should the kiosk token values in it be enough to run Tom's counter kiosk?
   - No: hash the old plain-text tokens once and accept only real tokens from then on
   - No: make old unhashed kiosks pair again, then drop the extra check
   - Keep today's behaviour so very old kiosks keep working
@@ -1496,8 +1769,10 @@ Omar requests sick leave through My Leave on web or mobile, and Tom receives no 
 
 - Evidence: `frontend_web/src/features/workforce/MyLeavePage.tsx:12`, `frontend_mobile/app/my-leave.tsx:92`, `backend/workforce/leave_service.py:85`, `backend/workforce/leave_service.py:128`, `backend/workforce/leave_service.py:251`, `backend/workforce/leave_service.py:263`, `backend/workforce/leave_service.py:343`, `backend/workforce/signals.py:159`
 - Confidence: high; found by codexA-1
-- Test needed: Create Omar's membership-based leave without a roster assignment and have Tom approve it; assert that Tom receives a request notification and Omar receives a decision notification.
-- Decision question: When Omar requests leave through My Leave rather than a roster shift, how should Tom and Omar be notified?
+- Test that would prove it: Create Omar's membership-based leave without a roster assignment and have Tom approve it; assert that Tom receives a request notification and Omar receives a decision notification.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Omar requests leave through My Leave rather than a roster shift, how should Tom and Omar be notified?
   - Notify Tom of the request and Omar of the decision
   - Notify Tom of the request only
   - Require both people to check their leave lists manually (keep today's behaviour)
@@ -1508,8 +1783,10 @@ Lina manages a large organisation, and more than 50 people have applied through 
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/owner/MembershipApplicationsPanel.tsx:164`, `frontend_web/src/pages/dashboard/sidebar/owner/MembershipApplicationsPanel.tsx:165`, `shared-core/src/domains/memberships/api.ts:99`, `backend/memberships/selectors.py:197`, `backend/core/settings.py:360`
 - Confidence: medium; found by claudeB-2
-- Test needed: Create 51 pending applications across two pharmacies the admin manages, with the oldest at pharmacy A, and check that pharmacy A's panel still lists it and counts 1.
-- Decision question: When Lina opens Tom's pharmacy and Sara's application is older than 50 newer applications at other pharmacies, what should Lina see?
+- Test that would prove it: Create 51 pending applications across two pharmacies the admin manages, with the oldest at pharmacy A, and check that pharmacy A's panel still lists it and counts 1.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Lina opens Tom's pharmacy and Sara's application is older than 50 newer applications at other pharmacies, what should Lina see?
   - Every pending application for Tom's pharmacy, however many there are org-wide
   - The newest applications plus a 'load more' link and a correct total count
   - Keep today's behaviour (only the newest 50 across all pharmacies are checked)
@@ -1520,8 +1797,10 @@ Tom fills in Omar in row 1, leaves row 2 empty, and puts Ali in row 3, then pres
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:427`, `frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:452`, `frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:467`, `backend/memberships/invites.py:333`
 - Confidence: high; found by claudeB-1
-- Test needed: Rows [valid, blank, failing]: the error must show on row 3, not row 2, and the row that worked must be cleared or marked as sent.
-- Decision question: When Tom invites Omar and Ali together and only Ali's invite fails, what should Tom see?
+- Test that would prove it: Rows [valid, blank, failing]: the error must show on row 3, not row 2, and the row that worked must be cleared or marked as sent.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom invites Omar and Ali together and only Ali's invite fails, what should Tom see?
   - Omar's row is removed as sent, and only Ali's row stays, with the reason it failed
   - Every row stays, each marked 'Sent' or with its own error, and Send skips the rows already sent
   - Keep today's behaviour
@@ -1532,8 +1811,10 @@ Tom removes Mia, who ticked off daily pharmacy tasks such as fridge checks for a
 
 - Evidence: `backend/memberships/views.py:129`, `backend/team_calendar/models.py:180`, `backend/team_calendar/models.py:148`, `backend/workforce/models.py:55`
 - Confidence: medium; found by claudeA-3
-- Test needed: Owner removes a staff member who has work-note completion records; those completion records must still exist afterwards.
-- Decision question: When Tom removes Mia, what should happen to her record of completed pharmacy tasks?
+- Test that would prove it: Owner removes a staff member who has work-note completion records; those completion records must still exist afterwards.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom removes Mia, what should happen to her record of completed pharmacy tasks?
   - Kept, still showing Mia's name as the person who completed each task
   - Kept, but with her name replaced by 'former staff'
   - Keep today's behaviour: deleted along with her membership
@@ -1544,8 +1825,10 @@ Omar picks five dates and taps Add Time Slot. Three save and two fail, so he see
 
 - Evidence: `frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:473`, `frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:479`
 - Confidence: high; found by claudeB-1
-- Test needed: Make the second of three create calls fail: the screen should list the saved ones and a retry should not duplicate them.
-- Decision question: Omar's five-date save half-fails. What should he see?
+- Test that would prove it: Make the second of three create calls fail: the screen should list the saved ones and a retry should not duplicate them.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Omar's five-date save half-fails. What should he see?
   - The saved dates listed, with only the failed ones offered for retry
   - Nothing saved at all (all or nothing)
   - Keep today's behaviour
@@ -1556,8 +1839,10 @@ Nadia wrote a post in her pharmacy's private hub and later left that pharmacy. M
 
 - Evidence: `backend/pharmacy_hub/notifications.py:51-56`, `backend/pharmacy_hub/posts.py:440-446`, `backend/pharmacy_hub/posts.py:517-523`
 - Confidence: medium; found by claudeB-1
-- Test needed: Make the post author's membership inactive, comment as another member, and assert the former author gets no notification.
-- Decision question: Nadia left the pharmacy, but her old hub post gets a new comment from Mia. Should Nadia hear about it?
+- Test that would prove it: Make the post author's membership inactive, comment as another member, and assert the former author gets no notification.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Nadia left the pharmacy, but her old hub post gets a new comment from Mia. Should Nadia hear about it?
   - No alert once she can no longer see that hub
   - An alert with no comment text (just 'someone commented')
   - Keep today's behaviour (alert includes the comment text)
@@ -1568,8 +1853,10 @@ Ali was born on 29 February. In a non-leap year, the daily birthday job crashes 
 
 - Evidence: `backend/team_calendar/tasks.py:55`, `backend/team_calendar/tasks.py:117-122`
 - Confidence: high; found by claudeB-2
-- Test needed: generate_birthday_events_for_pharmacy with a 29 February DOB and a 2027 target date must not raise, and must still create other staff members' events
-- Decision question: Ali's birthday is 29 February. In a non-leap year, what should Tom's calendar show?
+- Test that would prove it: generate_birthday_events_for_pharmacy with a 29 February DOB and a 2027 target date must not raise, and must still create other staff members' events
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Ali's birthday is 29 February. In a non-leap year, what should Tom's calendar show?
   - Ali on 28 February, and everyone else as normal
   - Ali on 1 March, and everyone else as normal
   - Skip Ali that year, everyone else as normal
@@ -1580,8 +1867,10 @@ Sara added availability slots with notifications on. She later unticks 'Notify m
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:237`, `frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:371`, `frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:428`
 - Confidence: high; found by claudeB-1
-- Test needed: With saved slots that have notifications on, untick the checkbox and reload; assert the slots have notifications off.
-- Decision question: Sara unticks 'notify me about matching shifts' on her availability page. What should happen?
+- Test that would prove it: With saved slots that have notifications on, untick the checkbox and reload; assert the slots have notifications off.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara unticks 'notify me about matching shifts' on her availability page. What should happen?
   - Notifications turn off for all her saved slots straight away
   - The checkbox only affects new slots, and the page says so clearly
   - Keep today's behaviour
@@ -1592,8 +1881,10 @@ Sara saves several availability slots with 'notify me' ticked. Later she unticks
 
 - Evidence: `frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:360`, `frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:469`, `frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:545`
 - Confidence: medium; found by claudeB-1
-- Test needed: Save a slot with alerts on, untick the box, reload: no saved slot should still have alerts on.
-- Decision question: Sara unticks 'notify me' after saving slots with alerts on. What should happen to her existing slots?
+- Test that would prove it: Save a slot with alerts on, untick the box, reload: no saved slot should still have alerts on.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara unticks 'notify me' after saving slots with alerts on. What should happen to her existing slots?
   - Alerts turn off for all her slots
   - The box only affects new slots and says so on screen
   - Keep today's behaviour
@@ -1604,8 +1895,10 @@ Sara has verified her mobile, and her profile is Verified with her AHPRA-matched
 
 - Evidence: `backend/users/api_otp.py:519-533`, `backend/users/api_otp.py:344-349`, `backend/users/otp.py:119-134`, `backend/onboarding/verification/policy.py:82-89`
 - Confidence: medium; found by claudeB-1
-- Test needed: For a user with is_mobile_verified=True, POST mobile/resend-otp/ and then mobile/request-otp/ with a new number and new names; assert 400 and that the names and number are unchanged.
-- Decision question: Sara is already verified and asks for a new mobile code. What should happen to her verified mobile and name?
+- Test that would prove it: For a user with is_mobile_verified=True, POST mobile/resend-otp/ and then mobile/request-otp/ with a new number and new names; assert 400 and that the names and number are unchanged.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara is already verified and asks for a new mobile code. What should happen to her verified mobile and name?
   - Resend is refused for an already-verified mobile; changes go through support
   - She can change the number, her Verified badge is removed until she re-verifies, and her name stays locked
   - Keep today's behaviour (resend unlocks the number and name, badge stays)
@@ -1616,8 +1909,10 @@ Omar asks Tom to provide a reference. Tom clicks the decline link in the email, 
 
 - Evidence: `backend/onboarding/emails.py:79`, `frontend_web/src/main.tsx:158`, `shared-core/src/constants/endpoints.ts:47`, `shared-core/src/domains/auth/browserOperations.ts:71`, `shared-core/src/domains/auth/browserOperations.test.ts:53`, `backend/onboarding/urls.py:41`
 - Confidence: high; found by codexB-1
-- Test needed: Follow Omar's actual emailed decline link as Tom and verify it records rejection through the signed-token endpoint.
-- Decision question: When Tom clicks the decline link for Omar's reference request, what should happen?
+- Test that would prove it: Follow Omar's actual emailed decline link as Tom and verify it records rejection through the signed-token endpoint.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom clicks the decline link for Omar's reference request, what should happen?
   - Record Tom's refusal and show confirmation
   - Ask Tom to confirm before recording refusal
   - Leave Tom unable to decline through the link (keep today's behaviour)
@@ -1628,8 +1923,10 @@ Lina is the only Org Admin of her chain. She, or the invite form, sends an organ
 
 - Evidence: `backend/users/api_organizations.py:36-37`, `backend/users/api_organizations.py:110-125`, `backend/users/api_organizations.py:498-504`
 - Confidence: medium; found by claudeB-1
-- Test needed: As the only ORG_ADMIN, POST the org invite with your own email and role CHIEF_ADMIN; assert 403 and that the membership role is still ORG_ADMIN.
-- Decision question: Lina sends an invite to someone who is already an admin of her organisation, possibly herself. What should the invite do?
+- Test that would prove it: As the only ORG_ADMIN, POST the org invite with your own email and role CHIEF_ADMIN; assert 403 and that the membership role is still ORG_ADMIN.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Lina sends an invite to someone who is already an admin of her organisation, possibly herself. What should the invite do?
   - Refuse it: existing members are changed only through the member edit screen
   - Allow the role change, but never if it leaves the organisation without an Org Admin
   - Keep today's behaviour (the invite silently overwrites the role)
@@ -1640,8 +1937,10 @@ Tom sets a fortnightly 'controlled drug register check' work note starting Monda
 
 - Evidence: `backend/team_calendar/recurrence.py:71-92`, `backend/team_calendar/views.py:598`, `backend/team_calendar/views.py:616`
 - Confidence: high; found by claudeB-2
-- Test needed: Weekly interval=2 from 2026-03-02, expanded for 2026-06-01..2026-06-30, must return 8 and 22 June, not 1, 15 and 29 June
-- Decision question: Tom sets a task to repeat every two weeks from 2 March. Which weeks should Omar see it in?
+- Test that would prove it: Weekly interval=2 from 2026-03-02, expanded for 2026-06-01..2026-06-30, must return 8 and 22 June, not 1, 15 and 29 June
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Tom sets a task to repeat every two weeks from 2 March. Which weeks should Omar see it in?
   - Always every second week counted from 2 March
   - Keep today: the weeks shift depending on the month viewed
 
@@ -1651,11 +1950,27 @@ Omar acknowledges Tom's published roster. Tom unpublishes the week, changes it a
 
 - Evidence: `backend/workforce/roster/v2_views.py:275`, `backend/workforce/roster/v2_views.py:295`, `backend/workforce/roster/acknowledgements.py:56`, `backend/workforce/roster/publication.py:69`, `frontend_web/src/components/roster/RosterWorkerAcknowledgements.tsx:73`
 - Confidence: high; found by codexA-3
-- Test needed: After Omar acknowledges a week, unpublish and republish it; verify his worker response reports acknowledgement pending and the acknowledgement action remains available.
-- Decision question: After Tom changes and republishes an acknowledged week, what should Omar see?
+- Test that would prove it: After Omar acknowledges a week, unpublish and republish it; verify his worker response reports acknowledgement pending and the acknowledgement action remains available.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: After Tom changes and republishes an acknowledged week, what should Omar see?
   - A pending acknowledgement for the new publication
   - A pending acknowledgement only if Omar's shifts changed
   - His previous acknowledgement remains sufficient (keep today's worker behaviour)
+
+## C009-N1 - P2 - Shifts - Worker dashboard exposes community shift IDs and dates to staff outside the vacancy's audience.
+
+Ben is Tom's favourite locum and should only be offered favourite-locum shifts, not Tom's internal staff vacancies. The pharmacist dashboard counts and returns a FULL_PART_TIME vacancy to Ben as a community opportunity, including its identifier and date. The normal worker shift listing correctly excludes it.
+
+- Evidence: `backend/dashboards/views.py:816`, `backend/dashboards/views.py:873`, `backend/dashboards/views.py:884`, `backend/dashboards/views.py:132`, `backend/shifts/escalation.py:25`
+- Confidence: high; found by gpt6-senior-20261025
+- Test that would prove it: Ben is an accepted LOCUM member only. Tom creates a FULL_PART_TIME internal pharmacist shift; GET /api/v1/dashboard/pharmacist/?workspace=internal&pharmacy_id=... must exclude its ID and count; Omar (accepted FULL_TIME) must see it.
+- Source status: SOURCE_SUPPORTED (same assistant source challenge; NOT separate second-agent S2)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should favourite locum Ben see counts, dates or IDs of Tom's internal FULL_PART_TIME staff vacancies?
+  - No: use the same audience filter as internal shift browsing
+  - Only show aggregated counts, not identifiers or dates
+  - Yes: keep current community opportunity listing
 
 ## C020-N4 - P2 - Shifts - Public boards compare local shift times against the UTC clock
 
@@ -1663,8 +1978,10 @@ Tom posts a Sydney shift ending at 5 pm. At 6 pm Sydney time, Sara can still fin
 
 - Evidence: `backend/shifts/browse.py:431`, `backend/shifts/browse.py:445`, `backend/shifts/browse.py:557`, `backend/shifts/browse.py:568`
 - Confidence: high; found by codexA-2
-- Test needed: Freeze time at 6 pm Sydney time and assert a same-day shift ending at 5 pm is absent from both public lists.
-- Decision question: At 6 pm in Tom's pharmacy, should Sara still see a shift that ended there at 5 pm?
+- Test that would prove it: Freeze time at 6 pm Sydney time and assert a same-day shift ending at 5 pm is absent from both public lists.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: At 6 pm in Tom's pharmacy, should Sara still see a shift that ended there at 5 pm?
   - Hide it using the pharmacy's local time
   - Show it as closed and prevent applications
   - Keep it open until the UTC comparison expires (keep today's behaviour)
@@ -1675,8 +1992,10 @@ Tom books Sara for next week. Before Sara works the shift, both Tom's history an
 
 - Evidence: `backend/shifts/selectors.py:68`, `backend/shifts/lifecycle.py:178`, `backend/shifts/my_shifts.py:61`, `backend/shifts/test_shift_listing_contract.py:73`, `backend/shifts/test_shift_listing_contract.py:103`
 - Confidence: high; found by codexB-1
-- Test needed: Create only a future assigned shift and assert both manager and worker history endpoints exclude it.
-- Decision question: Should Tom and Sara see next week's confirmed booking in History?
+- Test that would prove it: Create only a future assigned shift and assert both manager and worker history endpoints exclude it.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Should Tom and Sara see next week's confirmed booking in History?
   - Only after the shift ends
   - In a separate clearly labelled upcoming section
   - Alongside completed work immediately (keep today's behaviour)
@@ -1687,8 +2006,10 @@ Tom posts a shift with a $65 weekday rate and an $80 Saturday rate. Sara accepts
 
 - Evidence: `shared-core/src/domains/shifts/bookedRate.ts:15`, `backend/shifts/posting.py:84`, `backend/shifts/assignment.py:75`, `backend/shifts/finalize.py:63`, `backend/shifts/serialization/projections.py:21`, `frontend_web/src/pages/dashboard/shiftCenter/WorkerBookedShifts.tsx:82`, `frontend_mobile/roles/shared/shifts/WorkerBookedShifts.tsx:56`
 - Confidence: high; found by codexB-4
-- Test needed: Give Sara an accepted Saturday assignment at $80 with the shift's fixed rate at $65; assert her booked pay label does not show $65.
-- Decision question: What should Sara's booked-shift card show when her accepted Saturday rate differs from Tom's general advertised rate?
+- Test that would prove it: Give Sara an accepted Saturday assignment at $80 with the shift's fixed rate at $65; assert her booked pay label does not show $65.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: What should Sara's booked-shift card show when her accepted Saturday rate differs from Tom's general advertised rate?
   - Sara's agreed rate for each booked date
   - A prompt to view agreed pay without an advertised-rate label
   - Tom's general advertised rate (keep today's behaviour)
@@ -1699,8 +2020,10 @@ Tom in Perth selects automatic escalation from his pharmacy's locum audience to 
 
 - Evidence: `shared-core/src/domains/shifts/visibility.ts:20`, `shared-core/src/domains/shifts/context.ts:98`, `shared-core/src/domains/shifts/postingDraft.ts:49`, `shared-core/src/domains/shifts/visibility.test.ts:19`, `frontend_web/shared/postShift/PostShiftForm.tsx:398`, `backend/shifts/models.py:119`, `backend/core/settings.py:445`
 - Confidence: high; found by codexA-2
-- Test needed: With the client in Australia/Perth and Django in Australia/Sydney during October, assert a 24-hour automatic escalation persists exactly 24 hours after the starting instant.
-- Decision question: When Tom in Perth chooses public visibility after 24 hours, when should Sara gain access?
+- Test that would prove it: With the client in Australia/Perth and Django in Australia/Sydney during October, assert a 24-hour automatic escalation persists exactly 24 hours after the starting instant.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom in Perth chooses public visibility after 24 hours, when should Sara gain access?
   - After the full 24 hours Tom selected
   - At a pharmacy-local time explicitly shown to Tom
   - At the submitted Sydney time regardless of Tom's timezone (keep today's behaviour)
@@ -1711,8 +2034,10 @@ Tom opens a shift before Sara submits a counter offer, leaving an empty offer li
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:104`, `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:218`, `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:83`, `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:31`
 - Confidence: high; found by codexA-2
-- Test needed: Cache an empty counter-offer list, create a counter offer, then navigate to a notification for the same shift without remounting; verify the proposal appears.
-- Decision question: When Tom opens Sara's new counter-offer notification from an already open shift, what should happen?
+- Test that would prove it: Cache an empty counter-offer list, create a counter offer, then navigate to a notification for the same shift without remounting; verify the proposal appears.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom opens Sara's new counter-offer notification from an already open shift, what should happen?
   - Refresh and display Sara's proposed terms
   - Show a visible refresh action that loads Sara's proposal
   - Require Tom to reload or reopen the screen (keep today's behaviour)
@@ -1723,8 +2048,10 @@ Sara applies for a shift on the second page of public shifts, then returns to th
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:201`, `frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:217`, `frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:660`, `frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:687`, `frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:287`, `frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:701`
 - Confidence: high; found by codexB-3
-- Test needed: Place Sara's applied shift on public page two, open Interested from page one, and assert the applied shift is accessible.
-- Decision question: When Sara opens Interested from the first browse page, which applications should she be able to see?
+- Test that would prove it: Place Sara's applied shift on public page two, open Interested from page one, and assert the applied shift is accessible.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Sara opens Interested from the first browse page, which applications should she be able to see?
   - All her eligible applications, with separate pagination if needed
   - Current-page applications with controls to reach the other pages
   - Only current-page applications without pagination (keep today's behaviour)
@@ -1735,8 +2062,10 @@ Tom clears his pharmacy's late-night rate and saves the pharmacy. The page repor
 
 - Evidence: `frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1161`, `frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1948`, `frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1949`, `frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1993`, `shared-core/src/domains/organizations/api.ts:83`, `backend/organizations/serializers.py:458`, `frontend_web/shared/postShift/useShiftPricing.ts:43`
 - Confidence: high; found by codexB-3
-- Test needed: Save a pharmacy with a late-night rate, clear that field through the pharmacy form, save again, and assert the persisted rate is null.
-- Decision question: When Tom clears an optional late-night rate and saves, what should happen?
+- Test that would prove it: Save a pharmacy with a late-night rate, clear that field through the pharmacy form, save again, and assert the persisted rate is null.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom clears an optional late-night rate and saves, what should happen?
   - Remove the saved rate so new postings have no late-night default
   - Reject the save and explain that a replacement rate is required
   - Report success while retaining the old rate (keep today's behaviour)
@@ -1747,23 +2076,13 @@ Tom selects a date manually for his first shift entry at a pharmacy whose hours 
 
 - Evidence: `frontend_web/shared/postShift/useShiftTimetable.ts:76`, `frontend_web/shared/postShift/useShiftTimetable.ts:86`, `frontend_web/shared/postShift/helpers.ts:294`, `frontend_web/shared/postShift/PostShiftTimetableStep.tsx:248`
 - Confidence: high; found by codexB-1
-- Test needed: With pharmacy hours 09:00–17:00 and no added or calendar-selected dates, select a manual date, enter 10:00–16:00, and assert those times survive effects and are added unchanged.
-- Decision question: When Tom chooses a shorter shift for Sara than the pharmacy's opening hours, what should the manual time fields do?
+- Test that would prove it: With pharmacy hours 09:00–17:00 and no added or calendar-selected dates, select a manual date, enter 10:00–16:00, and assert those times survive effects and are added unchanged.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom chooses a shorter shift for Sara than the pharmacy's opening hours, what should the manual time fields do?
   - Keep Tom's chosen times
   - Keep Tom's times after explicit confirmation
   - Restore pharmacy opening hours automatically (keep today's behaviour)
-
-## C009-N1 - P2 - Shifts - Worker dashboard exposes community shift IDs and dates to staff outside the vacancy's audience.
-
-Ben is Tom's favourite locum and should only be offered favourite-locum shifts, not Tom's internal staff vacancies. The pharmacist dashboard counts and returns a FULL_PART_TIME vacancy to Ben as a community opportunity, including its identifier and date. The normal worker shift listing correctly excludes it.
-
-- Evidence: `backend/dashboards/views.py:816`, `backend/dashboards/views.py:873`, `backend/dashboards/views.py:884`, `backend/dashboards/views.py:132`, `backend/shifts/escalation.py:25`
-- Confidence: high; found by gpt6-senior-20261025
-- Test needed: Ben is an accepted LOCUM member only. Tom creates a FULL_PART_TIME internal pharmacist shift; GET /api/v1/dashboard/pharmacist/?workspace=internal&pharmacy_id=... must exclude its ID and count; Omar (accepted FULL_TIME) must see it.
-- Decision question: Should favourite locum Ben see counts, dates or IDs of Tom's internal FULL_PART_TIME staff vacancies?
-  - No: use the same audience filter as internal shift browsing
-  - Only show aggregated counts, not identifiers or dates
-  - Yes: keep current community opportunity listing
 
 ## F01-N4 - P2 - Shifts/Notifications - When a worker accepts or declines, the 'payment needed' or 'declined' notice goes to the pharmacy owner, not the admin who posted the shift.
 
@@ -1771,8 +2090,10 @@ Grace posts a shift for Tom's pharmacy in Lina's organisation and sends Sara an 
 
 - Evidence: `backend/shifts/offers.py:183`, `backend/shifts/offers.py:474`, `backend/shifts/offers.py:626`, `backend/shifts/interest.py:160`, `backend/shifts/counter_offers.py:64`
 - Confidence: medium; found by claudeA-1
-- Test needed: Region admin creates the shift, worker accepts an offer under PAYMENT_REQUIRED; assert the region admin who created the shift receives the shift_worker_confirmed notification.
-- Decision question: Grace posted the shift and Sara accepted it. Who should be told that payment is needed, or that Sara declined?
+- Test that would prove it: Region admin creates the shift, worker accepts an offer under PAYMENT_REQUIRED; assert the region admin who created the shift receives the shift_worker_confirmed notification.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: RELATED_NOT_IDENTICAL; related to canonical B71
+- Owner question: Grace posted the shift and Sara accepted it. Who should be told that payment is needed, or that Sara declined?
   - Grace (the poster) and every admin who can pay for that pharmacy
   - Grace and Tom (the poster and the pharmacy owner)
   - Keep today's behaviour: only Tom, the pharmacy owner
@@ -1783,8 +2104,10 @@ Sara reports a job board shift Tom posted, and a moderator resolves it without h
 
 - Evidence: `backend/public_hub/community.py:217`, `backend/public_hub/migrations/0005_board_reports.py:28`, `backend/public_hub/content_views.py:307`
 - Confidence: high; found by claudeB-2
-- Test needed: Create a BoardReport by Sara, mark it resolved, have Sara POST the report again, and assert that an unresolved report now appears in the moderation queue.
-- Decision question: Sara's report on a job shift was dismissed, and the shift then changed. When she reports it again, what should happen?
+- Test that would prove it: Create a BoardReport by Sara, mark it resolved, have Sara POST the report again, and assert that an unresolved report now appears in the moderation queue.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara's report on a job shift was dismissed, and the shift then changed. When she reports it again, what should happen?
   - A new open report reaches the moderators
   - Sara's old report reopens with her new reason
   - Keep today's behaviour (silently ignored, but she is told it was received)
@@ -1795,8 +2118,10 @@ Sara posts her availability as anonymous, which is the default, because she is q
 
 - Evidence: `backend/talent/serializers/explorer.py:73-83`, `backend/talent/serializers/explorer.py:187-196`, `backend/talent/views/explorer.py:184`, `backend/talent/views/explorer.py:81`
 - Confidence: medium; found by claudeB-2
-- Test needed: A signed-in owner fetches feed/ and retrieve for an is_anonymous post and must not receive explorer_name, author_user_id or explorer_user_id
-- Decision question: Sara posts anonymously. When Tom is logged in and looks at the talent board, what should he learn about who she is?
+- Test that would prove it: A signed-in owner fetches feed/ and retrieve for an is_anonymous post and must not receive explorer_name, author_user_id or explorer_user_id
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: Sara posts anonymously. When Tom is logged in and looks at the talent board, what should he learn about who she is?
   - Nothing until Sara accepts his contact request
   - Name visible only to verified owners and organisation admins
   - Keep today: every logged-in user gets her full name and id
@@ -1807,8 +2132,10 @@ Tom changes Omar's contracted week from 38 hours to 30 hours after a timesheet h
 
 - Evidence: `backend/workforce/signals.py:186`, `backend/workforce/timesheet_data.py:36`, `backend/workforce/timesheet_builder.py:142`, `backend/workforce/timesheet_builder.py:144`, `backend/workforce/timesheet_builder.py:171`
 - Confidence: high; found by codexA-4
-- Test needed: Build Omar's weekly timesheet with 2280 contracted minutes, change only the setting to 1800, rebuild without force, and assert the current total and revision reflect 1800.
-- Decision question: When Tom changes Omar's contracted hours for an open timesheet period, what should recalculation do?
+- Test that would prove it: Build Omar's weekly timesheet with 2280 contracted minutes, change only the setting to 1800, rebuild without force, and assert the current total and revision reflect 1800.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Tom changes Omar's contracted hours for an open timesheet period, what should recalculation do?
   - Update the hours and require review of the changed revision
   - Keep existing periods unchanged through an explicit effective-date policy
   - Mark the timesheet current while retaining its old hours (keep today's behaviour)
@@ -1819,8 +2146,10 @@ Tom withdraws Omar's shift from a published week and edits its hours before repu
 
 - Evidence: `backend/workforce/timesheet_data.py:132`, `backend/workforce/timesheet_data.py:150`, `backend/workforce/timesheet_checks.py:94`, `backend/workforce/roster/publication.py:175`, `backend/workforce/roster/publication.py:233`
 - Confidence: high; found by codexA-4
-- Test needed: Withdraw Omar's individual shift while its week stays published, edit it, rebuild his timesheet, and assert the withdrawn assignment contributes no roster minutes or missing-attendance blocker.
-- Decision question: While Tom edits a withdrawn shift that Omar cannot see in his roster, what should Omar's timesheet use?
+- Test that would prove it: Withdraw Omar's individual shift while its week stays published, edit it, rebuild his timesheet, and assert the withdrawn assignment contributes no roster minutes or missing-attendance blocker.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: While Tom edits a withdrawn shift that Omar cannot see in his roster, what should Omar's timesheet use?
   - Exclude the withdrawn shift until Tom republishes it
   - Preserve the last published hours until Tom republishes it
   - Use the unpublished draft hours immediately (keep today's behaviour)
@@ -1831,8 +2160,10 @@ Omar opens My Hours to review his worked hours at Tom's pharmacy and inspects a 
 
 - Evidence: `frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:63`, `frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:95`, `frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:115`, `frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:288`, `backend/workforce/timesheet_transitions.py:101`
 - Confidence: high; found by agy-g3
-- Test needed: Render TimesheetDetailDrawer with managerMode set to false and verify that CheckCard renders in read-only mode without Resolve, Waive, Reopen, or Add missing clock time buttons.
-- Decision question: When Omar reviews his own hours in the timesheet details drawer, how should checks and attendance issues be displayed?
+- Test that would prove it: Render TimesheetDetailDrawer with managerMode set to false and verify that CheckCard renders in read-only mode without Resolve, Waive, Reopen, or Add missing clock time buttons.
+- Source status: UNCONFIRMED_CANDIDATE (S2/S3 pending)
+- Deduplication: No root-cluster assignment yet
+- Owner question: When Omar reviews his own hours in the timesheet details drawer, how should checks and attendance issues be displayed?
   - Display checks in read-only mode with instructions for Omar to contact his manager Tom to correct source attendance.
   - Allow Omar to submit explanations as comments on the timesheet without showing direct resolution or waiving controls.
   - Leave the manager resolution and punch buttons visible to workers even though server permissions reject their submissions (keep today's behaviour).

@@ -10,6 +10,17 @@ C004-N3 | Billing | An organisation's free trial depends on which org admin clic
 C004-N4 | Billing | Organisation billing falls back to the pharmacy owner's personal subscription for viewing, seat purchases and subscriber status.
 C004-N5 | Billing | Deleting the owner's user account deletes all their shift payment records.
 C005-N1 | Chat | Any chat member can rewrite who is in a room through the plain room update, skipping the creator/admin check and the community-chat block.
+C009-N1 | Shifts | Worker dashboard exposes community shift IDs and dates to staff outside the vacancy's audience.
+C009-N2 | Invoicing | Mobile dashboards label all-time drafted invoice value as this month's income.
+C009-N3 | Marketplace | Ethical stock imports can still be committed after the inventory write feature is switched off.
+C010-N1 | Marketplace | Editing an ethical draft can reassign it to another owner's pharmacy and another product without destination authorization.
+C011-N1 | Marketplace | Concurrent identical marketplace enquiries can persist duplicate negotiations before the idempotency receipt fails.
+C011-N2 | Memberships | Revoked invitation sender continues receiving membership response notifications containing staff identities.
+C012-N1 | Memberships | Authenticated workers can create applications against expired or unauthorised invitation links by calling the generic applications endpoint.
+C012-N2 | Memberships | A pharmacy administrator can permanently delete pending and decided membership application review records through generic DELETE.
+C015-N1 | Onboarding | AHPRA suspension notices expose an employee's regulatory status to region administrators outside their assigned pharmacies.
+C016-N1 | Hub | Ordinary pharmacy workers can list private hub groups and obtain their full membership rosters without joining them.
+C016-N2 | Hub | Hub group PATCH can reassign an existing group to an unrelated pharmacy without checking destination tenant authority.
 C017-N1 | Hub | Editing a poll, even just to fix a typo in the question, deletes every vote already cast.
 C017-N2 | Hub | Tagging teammates fails when editing a post, and when a new post has a file and exactly one tag.
 C017-N3 | Notifications | Comment alerts with the comment text still go to a post's author after they lose access to that private hub.
@@ -89,6 +100,10 @@ C051-N1 | Onboarding | Referee decline link routes to a 404 and invokes an obsol
 C062-N1 | Notifications | Unticking 'notify me about matching shifts' on mobile does not turn notifications off for slots already saved.
 C062-N2 | Mobile | Adding several availability dates at once can half-save, show 'Failed', and create duplicates when retried.
 C063-N1 | Mobile | Mobile chat people search never finds anyone, so New Chat, New Group and Add members do not work in the Expo app.
+C064-N1 | Invoicing / Expo | Legacy Expo invoice generator defaults superannuation to 10% despite Australia's current 12% SG rate.
+C070-N1 | Expo shift board state | Shared AsyncStorage keys can expose previous account's applied/rejected shift markers after account switching.
+C071-N1 | Mobile authentication | Concurrent mobile logout and in-flight refresh/profile hydration can resurrect old tokens or overwrite the newly signed-in account.
+C071-N2 | Mobile push privacy | Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.
 C079-N1 | Shifts | Editing a shift replaces its saved per-date rates
 C079-N2 | Shifts | Manual shift times revert to pharmacy opening hours
 F01-N1 | Shifts/Privacy | Workers browsing shifts can see the names and emails of other workers who are booked on the shift or waiting for payment.
@@ -138,17 +153,4 @@ F10-N6 | Ethical marketplace | Ethical offers disclose full stock-lot records to
 F11-N1 | Auth | Changing a pending phone number leaves the previous number's verification code usable.
 F11-N2 | Auth | Signing out of Expo leaves private push notifications active on that device.
 F11-N3 | Auth | Phone verification replaces a browser-only session with a persistent 90-day session.
-C009-N1 | Shifts | Worker dashboard exposes community shift IDs and dates to staff outside the vacancy's audience.
-C009-N2 | Invoicing | Mobile dashboards label all-time drafted invoice value as this month's income.
-C009-N3 | Marketplace | Ethical stock imports can still be committed after the inventory write feature is switched off.
-C010-N1 | Marketplace | Editing an ethical draft can reassign it to another owner's pharmacy and another product without destination authorization.
-C011-N1 | Marketplace | Concurrent identical marketplace enquiries can persist duplicate negotiations before the idempotency receipt fails.
-C011-N2 | Memberships | Revoked invitation sender continues receiving membership response notifications containing staff identities.
-C012-N1 | Memberships | Authenticated workers can create applications against expired or unauthorised invitation links by calling the generic applications endpoint.
-C012-N2 | Memberships | A pharmacy administrator can permanently delete pending and decided membership application review records through generic DELETE.
-C015-N1 | Onboarding | AHPRA suspension notices expose an employee's regulatory status to region administrators outside their assigned pharmacies.
-C016-N1 | Hub | Ordinary pharmacy workers can list private hub groups and obtain their full membership rosters without joining them.
-C016-N2 | Hub | Hub group PATCH can reassign an existing group to an unrelated pharmacy without checking destination tenant authority.
-C070-N1 | Expo shift board state | Shared AsyncStorage keys can expose previous account's applied/rejected shift markers after account switching.
-C071-N1 | Mobile authentication | Concurrent mobile logout and in-flight refresh/profile hydration can resurrect old tokens or overwrite the newly signed-in account.
-C071-N2 | Mobile push privacy | Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.
+F12-N1 | Expo chat UX | Native direct-message send failure is logged but not shown to the user, unlike Vite's retry warning.
