@@ -125,7 +125,7 @@ class Phase5PrivacyAndRetentionContracts(TestCase):
     def test_b03_staff_removal_must_preserve_historical_chat_messages(self):
         room = Conversation.objects.create(
             type=Conversation.Type.GROUP, title="Phase5 history",
-            pharmacy=self.pharmacy, created_by=self.owner,
+            created_by=self.owner,
         )
         Participant.objects.create(
             conversation=room, membership=self.membership,
