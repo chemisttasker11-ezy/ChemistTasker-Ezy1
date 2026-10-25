@@ -612,7 +612,8 @@ class PaidOfferLosingOccurrenceContracts(TestCase):
         return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=self.make_user("PHARMACIST"),
                                          status=status, offered_slot_date=day)
 
-    def pay(self, offer, intent, event_id=None):
+    def pay(self, offer, intent, event_id=None, real_notifications=False, before_commit=None):
+        from shifts.notifications import notify_shift_managers
         event = _StripeObject(
             id=event_id or f"evt_{intent}", type="checkout.session.completed",
             data=_StripeObject(object=_StripeObject(
@@ -625,12 +626,59 @@ class PaidOfferLosingOccurrenceContracts(TestCase):
             patch("billing.views.stripe.Webhook.construct_event", return_value=event),
             patch("shifts.finalize.get_locked_rate_for_slot", return_value=(Decimal("70"), {})),
             patch("shifts.emails.send_shift_payment_finalized_notifications"),
-            patch("shifts.notifications.notify_shift_managers") as notify,
+            patch("shifts.notifications.notify_shift_managers",
+                  wraps=notify_shift_managers if real_notifications else None) as notify,
             self.captureOnCommitCallbacks(execute=True),
         ):
             response = client_for().post(reverse("api_v1:billing:stripe_webhook"), data=b"{}",
                                          content_type="application/json")
+            if before_commit:
+                before_commit()
         return response, notify
+
+    def test_refund_alert_survives_delivery_failure_and_payment_intent_replays(self):
+        from notifications.models import Notification
+        from shifts.models import ShiftOffer
+        expired = self.offer(ShiftOffer.Status.EXPIRED, self.day)
+        def durable_before_delivery():
+            self.assertEqual(Notification.objects.filter(
+                payload__notification_kind="shift_payment_refund_required").count(), 1)
+        with patch("notifications.services._broadcast", side_effect=RuntimeError("delivery unavailable")) as send:
+            for event_id in (None, None, "evt_same_payment_new_event"):
+                response, _ = self.pay(expired, "pi_durable_refund", event_id, real_notifications=True,
+                                       before_commit=durable_before_delivery)
+                self.assertEqual(response.status_code, 200, response.content)
+                alert = Notification.objects.get(payload__notification_kind="shift_payment_refund_required")
+                self.assertEqual(alert.user_id, self.owner.pk)
+                self.assertEqual(alert.payload["payment_id"], ShiftPayment.objects.get(
+                    stripe_payment_intent_id="pi_durable_refund").pk)
+            send.assert_called_once()
+        self.assertEqual(ShiftPayment.objects.count(), 1)
+
+    def test_refund_alert_delivers_after_commit_when_transport_is_healthy(self):
+        from notifications.models import Notification
+        from shifts.models import ShiftOffer
+        expired = self.offer(ShiftOffer.Status.EXPIRED, self.day)
+        with patch("notifications.services._broadcast") as send, patch("notifications.services._send_expo_push") as push:
+            response, _ = self.pay(expired, "pi_healthy_refund", real_notifications=True)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(Notification.objects.count(), 1)
+        self.assertEqual(send.call_args_list[0].args[1], "notification.created")
+        self.assertEqual(send.call_count, 2)
+        push.assert_called_once()
+
+    def test_refund_alert_rolls_back_with_payment(self):
+        from notifications.models import Notification
+        from shifts.models import ShiftOffer
+        expired = self.offer(ShiftOffer.Status.EXPIRED, self.day)
+        with patch.object(Shift, "save", side_effect=RuntimeError("payment status update failed")), patch(
+            "notifications.services._broadcast",
+        ) as send:
+            response, _ = self.pay(expired, "pi_rolled_back_refund", real_notifications=True)
+        self.assertEqual(response.status_code, 500)
+        self.assertFalse(Notification.objects.exists())
+        self.assertFalse(ShiftPayment.objects.exists())
+        send.assert_not_called()
 
     def test_losing_paid_offer_records_payment_and_is_flagged_for_refund(self):
         from shifts.finalize import finalize_shift_offer

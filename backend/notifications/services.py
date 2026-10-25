@@ -7,6 +7,7 @@ import requests
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.utils import timezone
 
 from notifications.models import Notification
@@ -69,6 +70,7 @@ def notify_users(
     notification_type: str = Notification.Type.TASK,
     action_url: Optional[str] = None,
     payload: Optional[dict] = None,
+    deliver_on_commit: bool = False,
     ) -> None:
     payload = payload or {}
     users = list(
@@ -85,13 +87,19 @@ def notify_users(
             action_url=action_url or "",
             payload=payload,
         )
-        _broadcast(notification.user_id, "notification.created", {"notification": _serialize_notification(notification)})
-        _broadcast_notification_counter(notification.user_id)
-        # Push via Expo tokens for this user
-        tokens = list(
-            DeviceToken.objects.filter(user_id=notification.user_id, active=True).values_list("token", flat=True)
-        )
-        _send_expo_push(tokens, title=notification.title, body=notification.body, data=notification.payload or {})
+        if deliver_on_commit:
+            transaction.on_commit(lambda notification=notification: _deliver_notification(notification), robust=True)
+        else:
+            _deliver_notification(notification)
+
+
+def _deliver_notification(notification: Notification) -> None:
+    _broadcast(notification.user_id, "notification.created", {"notification": _serialize_notification(notification)})
+    _broadcast_notification_counter(notification.user_id)
+    tokens = list(
+        DeviceToken.objects.filter(user_id=notification.user_id, active=True).values_list("token", flat=True)
+    )
+    _send_expo_push(tokens, title=notification.title, body=notification.body, data=notification.payload or {})
 
 
 def mark_notifications_read(user, notification_ids: Optional[Sequence[int]] = None) -> int:

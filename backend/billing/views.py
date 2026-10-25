@@ -1016,14 +1016,16 @@ def _process_stripe_event(event):
                                 payment.pk, lost_ids,
                             )
                             from shifts.notifications import notify_shift_managers
-                            transaction.on_commit(lambda: notify_shift_managers(
+                            # The unique payment intent gates alert creation in this transaction too.
+                            notify_shift_managers(
                                 shift_obj,
                                 title='Shift payment needs a refund',
                                 body='A paid shift offer could not be booked because its date was already taken. '
                                      'The payment needs a refund or manual follow-up.',
                                 kind='shift_payment_refund_required',
                                 payload={'payment_id': payment.pk, 'offer_ids': lost_ids},
-                            ), robust=True)
+                                deliver_on_commit=True,
+                            )
                         from shifts.emails import (
                             send_shift_payment_finalized_notifications,
                         )
