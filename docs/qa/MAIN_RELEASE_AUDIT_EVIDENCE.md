@@ -192,3 +192,10 @@ Six new source-level candidates after checking prior 65: B66 overnight shift can
 - Inspected immutable baseline code for F03-N1 (organizations/views.py:313-344, 586-591), F04-N2 (shifts/base.py:120-137, shifts/serialization/shifts.py:48-51 and 330-350, shifts/posting.py:173-201), F04-N1 (shifts/lifecycle.py:287-290, shifts/candidates.py:212-279): serious source-supported candidates, no HTTP reproduction executed.
 - Updated MAIN_RELEASE_99_PERCENT_PLAN.md at `5b4bf9f4a43342a1e3bf4c795ff50ddd016fa627` and living tracker at `926eaad812c0f688ba2cf3d7548e5710dc930351`, including ordered 38-chunk queue, F12, 99% integer threshold, S0-S3 separation, dedupe and release test gates. No product code, migrations, tests or deployment changed.
 - Still audit-only, NOT RELEASE READY. Next independent workflow must refresh latest head and skip completed output chunks; do not count plan/report commits as semantic coverage.
+
+## Execution continuation — C008 plus independent P0 source verification (25 October 2026)
+
+- Completed new C008 output for all 36 frozen-main backend/core files: [source review](evidence/pr200_finish/out_C008.json), SHA `0b5d4ed8ce08b77ee64dd4e16ff690f78e812adc`. No new unique production finding. Mapped file-validation sniff/MIME fallback to historical B49 and early identity-file cleanup to B44.
+- Independent reviewer checked F03-N1, F04-N1, F04-N2 against current baseline source, invite and shift existing tests. All marked **CONFIRMED_SOURCE** in [VERIFIED.json](evidence/pr200_finish/VERIFIED.json). None is **RUNTIME_REPRODUCED** and zero targeted tests executed; negative/positive test contracts preserved.
+- **Outputs:** 52 of 89 chunk outputs now committed; 37 chunks remain, F12 flow remains. Aggregated per-file CSV still 1,134 until `merge.mjs` is rerun; a correct rebuild should produce **1,170 / 2,151 (54.39%)** reported full-file reviews, including 2 PR-added audit scripts in denominator. Do not update measured ledger percentage before merge.
+- **No product code, migrations, fixes or staging changes**. Audit remains DRAFT, not release-ready.
