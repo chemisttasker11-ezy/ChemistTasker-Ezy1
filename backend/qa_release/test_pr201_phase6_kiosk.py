@@ -71,10 +71,32 @@ class Phase6KioskClockIntegrity(KioskOfflineProtocolTests):
         self.assertEqual(AttendanceSession.objects.count(), 0)
 
     def review_client(self, user):
-        from rest_framework.test import APIClient
-        api = APIClient()
-        api.force_authenticate(user)
-        return api
+        """Use the actual view methods under the isolated in-memory schema.
+
+        The dedicated kiosk unit harness intentionally does not install the
+        full production URLconf. Routing is checked in normal Django tests.
+        """
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from attendance.kiosk_review import (
+            ManagerDecideKioskReviewView, ManagerPendingKioskReviewView,
+        )
+
+        class DirectReviewClient:
+            def __init__(self, actor):
+                self.actor = actor
+                self.factory = APIRequestFactory()
+
+            def post(self, url, payload, format="json"):
+                req = self.factory.post(url, payload, format=format)
+                force_authenticate(req, user=self.actor)
+                return ManagerDecideKioskReviewView.as_view()(req)
+
+            def get(self, url, params=None):
+                req = self.factory.get(url, params or {})
+                force_authenticate(req, user=self.actor)
+                return ManagerPendingKioskReviewView.as_view()(req)
+
+        return DirectReviewClient(user)
 
     def drift_pending(self):
         event = self.signed_event()
