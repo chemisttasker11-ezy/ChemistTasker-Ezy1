@@ -153,6 +153,10 @@ class AdditionalAdminInvitationTests(TestCase):
             user=target, pharmacy=self.pharmacy, membership=membership,
             admin_level='MANAGER', staff_role='ASSISTANT', is_active=True,
         )
+        PharmacyAdmin.objects.create(
+            user=self.inviter, pharmacy=self.pharmacy,
+            admin_level='MANAGER', staff_role='PHARMACIST', is_active=True,
+        )
         removed = self.client.delete(f'/api/v1/pharmacy-admins/{assignment.pk}/')
         self.assertEqual(removed.status_code, 204)
         assignment.refresh_from_db()
