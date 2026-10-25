@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 historical finding IDs retained. 48 distinct IDs / 56 cumulative failing negative assertions across targeted tests; B35 new cross-tenant roster-owner HTTP 201 with owner control, B25 entire partial mutation proven. B31 PostgreSQL race and B53 reordered event tests queued/pending; S2 99% NOT CERTIFIED.",
+  "material": "226 historical IDs (71 B +155 C/F) preserved; 49 distinct tested IDs / 57 cumulative intentional negative red assertions. Newly B53 old Stripe invoice reactivation reproduced in real synthetic Django HTTP workflow, one positive control. B31 first PostgreSQL attempts invalid due UUID receipt serialization; pending JSON-only test-isolation rerun. 99% independent S2 NOT CERTIFIED.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,15 +10,15 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 48,
-  "runtime_failing_scenarios": 56,
+  "runtime_distinct_ids": 49,
+  "runtime_failing_scenarios": 57,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 11,
-    "UNVERIFIED_CANDIDATE": 154,
-    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 46,
+    "UNVERIFIED_CANDIDATE": 153,
+    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 47,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
@@ -61,8 +61,8 @@
       "negative_failures": 7,
       "errors": 0
     },
-    "cumulative_distinct_findings": 48,
-    "cumulative_failed_negative_assertions": 56,
+    "cumulative_distinct_findings": 49,
+    "cumulative_failed_negative_assertions": 57,
     "warning": "Cumulative from multiple isolated targeted runs; not 45 failures in one suite; B24 error invalid, not counted.",
     "additional_runs": [
       {
@@ -143,6 +143,17 @@
         "fixture_errors": 0,
         "excluded_previous_errors": 2,
         "note": "B01/B25 existing valid repeats not double counted; one new distinct B35 and B25 full postconditions confirmed."
+      },
+      {
+        "id": "B53",
+        "run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192054923",
+        "head": "31558d5c63f29564b2c270c06d8afc143a6fc29a",
+        "tests": 2,
+        "negative_scenarios": 1,
+        "positive_controls": 1,
+        "fixture_errors": 0,
+        "negative_test_failing": true,
+        "notes": "Different event IDs, deleted known subscription, late paid invoice reactivation with mocked Stripe signature"
       }
     ]
   },
@@ -1101,16 +1112,28 @@
       "severity": "P1",
       "area": "Historical discovery",
       "title": "P1 candidate — Out-of-order Stripe subscription events may reactivate cancelled base billing or reset purchased seat entitlement",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_SQLITE_REAL_WEBHOOK_MOCK_SIGNATURE",
+      "decision": "FIX_ON_SEPARATE_REMEDIATION_PR",
       "root": "B53",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
+      "source_proof": [
+        "backend/billing/views.py:897-948",
+        "backend/qa_release/test_pr200_phase5_b53_webhook.py:1-68"
+      ],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b53_late_invoice_for_deleted_subscription_must_not_reactivate",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192054923",
+          "head": "31558d5c63f29564b2c270c06d8afc143a6fc29a",
+          "environment": "Ubuntu Django TestCase SQLite with synthetic verified separate webhook IDs; only Stripe signature construction mocked",
+          "observed": "First customer.subscription.deleted event processed and subscription became inactive. Later invoice.paid event for same tracked deleted subscription ID also processed and reactivated OwnerSubscription.status to active. Expected inactive, got active. One failing negative assertion with no fixture errors.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Deleted known subscription marked inactive by one event, later different-ID old invoice.paid reactivates. Real handler and StripeWebhookEvent receipts; mock signature only; positive current invoice pass."
     },
     {
       "id": "B54",

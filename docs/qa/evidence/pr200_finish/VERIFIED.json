@@ -1044,5 +1044,31 @@
       "Proof covers default roster-owner POST path; B36 shift-create and B38 shift-update are separate entry points and not closed.",
       "Original shift fixture lacked mandatory pay fields and produced errors in run 40191476067; excluded. Fixed hourly-rate fixture in run 40191740013 with 0 B35 fixture errors."
     ]
+  },
+  "B53": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/billing/views.py:897-948",
+      "backend/qa_release/test_pr200_phase5_b53_webhook.py:1-68"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b53_late_invoice_for_deleted_subscription_must_not_reactivate",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192054923",
+        "head": "31558d5c63f29564b2c270c06d8afc143a6fc29a",
+        "environment": "Ubuntu Django TestCase SQLite with synthetic verified separate webhook IDs; only Stripe signature construction mocked",
+        "observed": "First customer.subscription.deleted event processed and subscription became inactive. Later invoice.paid event for same tracked deleted subscription ID also processed and reactivated OwnerSubscription.status to active. Expected inactive, got active. One failing negative assertion with no fixture errors.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "positive_controls": [
+      "test_b53_current_paid_invoice_does_not_deactivate_subscription_positive PASSED; matching current subscription invoice.paid keeps active, processed event receipt"
+    ],
+    "runtime_limitations": [
+      "Actual Stripe Webhook.construct_event mocked for signed fake data; no real Stripe API/network or funds.",
+      "Separate event IDs, sequential out-of-order delivery only; subscription lifecycle cancellation/original invoice provider ordering and real entitlement checks not validated.",
+      "Distinct from B68 customer fallback for unknown subscription and B70 duplicate subscription creation."
+    ]
   }
 }
