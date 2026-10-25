@@ -11,11 +11,11 @@ const mapChatUser = <T extends Partial<ChatUserApi>>(api: T) => {
 export const mapChatMessage = (api: ChatMessageApi) => ({
     id: api.id,
     conversation: api.conversation,
-    sender: {
+    sender: api.sender ? {
         id: api.sender.id,
         user_details: mapChatUser(api.sender.user_details),
         pharmacy: api.sender.pharmacy ?? null,
-    },
+    } : null,
     body: api.body,
     attachment_url: api.attachment_url,
     created_at: api.created_at,

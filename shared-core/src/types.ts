@@ -1119,7 +1119,7 @@ export interface ChatMessageApi {
         id: number;
         user_details: ChatUserApi;
         pharmacy: number | null;
-    };
+    } | null;
     body: string;
     attachment_url: string | null;
     created_at: string;
@@ -1181,7 +1181,7 @@ export type ChatMessage = {
         id: number;
         user_details: ChatUserLite;
         pharmacy: number | null;
-    };
+    } | null;
     body: string;
     attachment_url: string | null;
     created_at: string;

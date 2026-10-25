@@ -114,6 +114,10 @@ describe('source-backed wire/domain contracts after extraction',()=>{
     const row={id:10,conversation:7,sender:{id:3,user_details:{id:9,first_name:'Fixture',last_name:'Worker',email:null}},body:'Test',created_at:'2026-10-06T00:00:00Z'};
     expect(mapChatMessage(row)).toMatchObject({id:10,conversation:7,sender:{id:3,user_details:{id:9,firstName:'Fixture',lastName:'Worker',email:undefined}},body:'Test'});
   });
+  it('preserves a chat message after its sender membership is removed',()=>{
+    const row={id:10,conversation:7,sender:null,body:'Test',attachment_url:null,created_at:'2026-10-06T00:00:00Z'};
+    expect(mapChatMessage(row)).toMatchObject(row);
+  });
   it('retains the PIN pharmacy envelope actually returned by WorkerUpdatePinView',async()=>{
     const data={pharmacies:[{id:4,name:'Fixture Pharmacy',has_pin:true}]};responses(data);
     expect(await attendance.getPinPharmacies()).toEqual(data);
