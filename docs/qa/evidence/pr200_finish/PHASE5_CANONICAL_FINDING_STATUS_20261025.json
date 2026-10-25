@@ -1,7 +1,7 @@
 {
   "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
   "audit_head_prior": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
-  "material": "226 original IDs preserved; 52 distinct tested IDs / 60 cumulative intended red assertions across different isolated runs. B02/B57 one policy-conditional red each with positive control at 40192399455. B31 PG 2-connection reproduced only under JSON encoding test seam. 99% independent S2 NOT CERTIFIED.",
+  "material": "226 historical IDs preserved; 54 distinct tested IDs / 62 accumulated intentionally red negative assertions. C004-N3 old/new admin free-trial reset and C004-N4 owner personal subscription org fallback both source/SQLite confirmed, policy/financial impact conditional; S2 99% still NOT CERTIFIED.",
   "gross_candidates": 226,
   "historical_B": 71,
   "new_CF": 155,
@@ -10,14 +10,14 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 52,
-  "runtime_failing_scenarios": 60,
+  "runtime_distinct_ids": 54,
+  "runtime_failing_scenarios": 62,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 11,
-    "UNVERIFIED_CANDIDATE": 150,
+    "UNVERIFIED_CANDIDATE": 148,
     "REPRODUCED_RUNTIME_DJANGO_SQLITE": 47,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
@@ -26,7 +26,7 @@
     "SOURCE_SUPPORTED_UI_SCOPE": 1,
     "REPRODUCED_ISOLATED_PURE_FUNCTION": 1,
     "REPRODUCED_POSTGRES_CONDITIONAL_ISOLATED_SEAM": 1,
-    "REPRODUCED_SQLITE_POLICY_CONDITIONAL": 2
+    "REPRODUCED_SQLITE_POLICY_CONDITIONAL": 4
   },
   "independent_s2_certified_files": null,
   "s0_static": {
@@ -63,8 +63,8 @@
       "negative_failures": 7,
       "errors": 0
     },
-    "cumulative_distinct_findings": 52,
-    "cumulative_failed_negative_assertions": 60,
+    "cumulative_distinct_findings": 54,
+    "cumulative_failed_negative_assertions": 62,
     "warning": "Cumulative from multiple isolated targeted runs; not 45 failures in one suite; B24 error invalid, not counted.",
     "additional_runs": [
       {
@@ -181,6 +181,16 @@
         "fixture_errors": 0,
         "negative_test_failing": true,
         "note": "Both conclusions policy conditional; no provider/true financial reconciliation proven"
+      },
+      {
+        "id": "C004-N3/C004-N4",
+        "run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192616661",
+        "head": "3dc88260f9b9e31e81eea04bc10bc88507f43a4a",
+        "tests": 4,
+        "negative_scenarios": 2,
+        "positive_controls": 2,
+        "fixture_errors": 0,
+        "notes": "One real old/new billing contact trial service, one personal owner subscription fallback; both conditional impact."
       }
     ]
   },
@@ -1933,45 +1943,58 @@
       "severity": "P1",
       "area": "Billing",
       "title": "An organisation's free trial depends on which org admin clicks pay, so a newly joined admin makes every shift free.",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+      "evidence_grade": "S3_ISOLATED_SERVICE_SQLITE_CONDITIONAL",
+      "decision": "GRILL_ORG_BILLING_POLICY_AND_FIX_SEPARATE_PR",
       "root": "C004-N3",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
       "source_proof": [
-        "backend/billing/utils.py:121",
-        "backend/billing/utils.py:129",
-        "backend/billing/utils.py:166",
-        "backend/billing/views.py:562",
-        "backend/billing/views.py:594"
+        "backend/billing/utils.py:13-36",
+        "backend/billing/utils.py:89-188",
+        "backend/qa_release/test_pr200_phase5_org_billing.py:1-48"
       ],
       "test_needed": "Org created long ago, new ORG_ADMIN joined today pays fulfilment; expect PAYMENT_REQUIRED, not FREE_TRIAL.",
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_c004_n3_recent_org_admin_cannot_restart_same_org_trial",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192616661",
+          "head": "3dc88260f9b9e31e81eea04bc10bc88507f43a4a",
+          "environment": "Synthetic Django SQLite service/model tests; old/new ORG_ADMIN, same organisation, owner account",
+          "observed": "Organisation same account old admin returns PAYMENT_REQUIRED, newly joined acting ORG_ADMIN returns FREE_TRIAL contrary to stable-account expected PAYMENT_REQUIRED.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED_POLICY_CONDITIONAL"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Organisation same account old admin returns PAYMENT_REQUIRED, newly joined acting ORG_ADMIN returns FREE_TRIAL contrary to stable-account expected PAYMENT_REQUIRED. This is direct service return only; no actual shift charge waivers or Stripe payments tested. Trial policy may intentionally be per account/contact."
     },
     {
       "id": "C004-N4",
       "severity": "P2",
       "area": "Billing",
       "title": "Organisation billing falls back to the pharmacy owner's personal subscription for viewing, seat purchases and subscriber status.",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+      "evidence_grade": "S3_ISOLATED_SERVICE_SQLITE_CONDITIONAL",
+      "decision": "GRILL_ORG_BILLING_POLICY_AND_FIX_SEPARATE_PR",
       "root": "C004-N4",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
       "source_proof": [
-        "backend/billing/views.py:154",
-        "backend/billing/views.py:157",
-        "backend/billing/views.py:471",
-        "backend/billing/views.py:495",
-        "backend/billing/views.py:522",
-        "backend/billing/views.py:214"
+        "backend/billing/views.py:140-178",
+        "backend/billing/utils.py:90-174",
+        "backend/qa_release/test_pr200_phase5_org_billing.py:49-73"
       ],
       "test_needed": "Org without subscription, owner with active one: ORG_ADMIN GET subscription returns inactive/none, and seat purchase is refused.",
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_c004_n4_owner_personal_subscription_must_not_become_org_subscription",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192616661",
+          "head": "3dc88260f9b9e31e81eea04bc10bc88507f43a4a",
+          "environment": "Synthetic Django SQLite service/model tests; old/new ORG_ADMIN, same organisation, owner account",
+          "observed": "With organisation lacking subscription and pharmacy owner holding a personal active subscription, organisation-scoped _get_subscription_for_account returned owner's active subscription, not None. Positive distinct own org subscription priority passed.",
+          "status": "RED_TEST_FAILED_AS_EXPECTED_POLICY_CONDITIONAL"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "With organisation lacking subscription and pharmacy owner holding a personal active subscription, organisation-scoped _get_subscription_for_account returned owner's active subscription, not None. Positive distinct own org subscription priority passed. Potential intentional legacy owner/organisation billing fallback; actual cross-organisation invoicing, receipt and seat mutations not tested."
     },
     {
       "id": "C004-N5",

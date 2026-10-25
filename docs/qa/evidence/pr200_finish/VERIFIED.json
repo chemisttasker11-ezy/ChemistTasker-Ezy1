@@ -1152,5 +1152,57 @@
       "No real Stripe provider network, customer balance or live financial disclosure.",
       "No independently certified whole-file S2 coverage."
     ]
+  },
+  "C004-N3": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+    "source_proof": [
+      "backend/billing/utils.py:13-36",
+      "backend/billing/utils.py:89-188",
+      "backend/qa_release/test_pr200_phase5_org_billing.py:1-48"
+    ],
+    "scenarios": [
+      {
+        "test": "test_c004_n3_recent_org_admin_cannot_restart_same_org_trial",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192616661",
+        "head": "3dc88260f9b9e31e81eea04bc10bc88507f43a4a",
+        "environment": "Synthetic Django SQLite service/model tests; old/new ORG_ADMIN, same organisation, owner account",
+        "observed": "Organisation same account old admin returns PAYMENT_REQUIRED, newly joined acting ORG_ADMIN returns FREE_TRIAL contrary to stable-account expected PAYMENT_REQUIRED.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED_POLICY_CONDITIONAL"
+      }
+    ],
+    "positive_controls": [
+      "test_c004_n3_old_org_admin_trial_expired_positive PASSED"
+    ],
+    "runtime_limitations": [
+      "This is direct service return only; no actual shift charge waivers or Stripe payments tested. Trial policy may intentionally be per account/contact.",
+      "No external provider, live billing or independently certified domain-wide S2."
+    ]
+  },
+  "C004-N4": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+    "source_proof": [
+      "backend/billing/views.py:140-178",
+      "backend/billing/utils.py:90-174",
+      "backend/qa_release/test_pr200_phase5_org_billing.py:49-73"
+    ],
+    "scenarios": [
+      {
+        "test": "test_c004_n4_owner_personal_subscription_must_not_become_org_subscription",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192616661",
+        "head": "3dc88260f9b9e31e81eea04bc10bc88507f43a4a",
+        "environment": "Synthetic Django SQLite service/model tests; old/new ORG_ADMIN, same organisation, owner account",
+        "observed": "With organisation lacking subscription and pharmacy owner holding a personal active subscription, organisation-scoped _get_subscription_for_account returned owner's active subscription, not None. Positive distinct own org subscription priority passed.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED_POLICY_CONDITIONAL"
+      }
+    ],
+    "positive_controls": [
+      "test_c004_n4_own_org_subscription_takes_precedence_positive PASSED"
+    ],
+    "runtime_limitations": [
+      "Potential intentional legacy owner/organisation billing fallback; actual cross-organisation invoicing, receipt and seat mutations not tested.",
+      "No external provider, live billing or independently certified domain-wide S2."
+    ]
   }
 }
