@@ -234,5 +234,82 @@
         "status": "RED_TEST_FAILED_AS_EXPECTED"
       }
     ]
+  },
+  "F09-N4": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_f09_n4_unrelated_verified_user_cannot_patch_other_public_poll",
+        "observed": "Non-creator returned HTTP 200 and rewrote public poll/question/options.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      },
+      {
+        "test": "test_f09_n4_unrelated_user_cannot_delete_other_public_poll",
+        "observed": "Non-creator returned HTTP 204 deleting another user's public poll.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C005-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c005_n1_ordinary_member_cannot_change_room_membership",
+        "observed": "Non-admin custom-group member PATCH returned HTTP 200 instead of denial.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C004-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c004_n1_cross_pharmacy_group_invite_requires_consent_or_authority",
+        "observed": "Authenticated member POST returned HTTP 201 for a chat with foreign pharmacy membership ID; policy consent qualification remains.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "RUNTIME_REPRODUCED_POLICY_CONDITIONAL",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C012-N2": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c012_n2_decided_application_history_cannot_be_deleted",
+        "observed": "Authorized reviewer DELETE returned HTTP 204 for a decided application, contrary to preservation requirement.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C024-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c024_n1_password_reset_token_not_in_signed_in_bell",
+        "observed": "Password reset created in-app Notification with live /reset-password/ token URL.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
   }
 }

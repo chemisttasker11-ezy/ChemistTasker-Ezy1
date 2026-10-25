@@ -86,14 +86,16 @@
     },
     {
       "id": "C012-N2",
-      "status": "SOURCE_SUPPORTED",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
       "reason": "MembershipApplicationViewSet subclasses ModelViewSet with scoped queryset but no destroy override; scoped managers can invoke inherited hard delete of application history.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/views.py#L310-L338",
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/urls.py#L23-L34"
       ],
       "negative_test": "Exercise the unauthorized, revoked, invalid, repeated, or cross-tenant scenario described in original out_Cxxx finding with an isolated exact-head PostgreSQL/API/native fixture; assert denied or idempotent and no unintended side effects.",
-      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results."
+      "positive_test": "Exercise a valid authorized corresponding operation and confirm intended state, notification, financial and UI results.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+      "runtime": "Authorized reviewer DELETE returned HTTP 204 for a decided application, contrary to preservation requirement."
     },
     {
       "id": "C015-N1",
@@ -458,6 +460,49 @@
       "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
       "independent_second_agent": "NOT_CERTIFIED",
       "negative_test": "test_f04_member_status_hidden_from_external_platform_shift_worker"
+    },
+    {
+      "id": "F09-N4",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "reason": "Non-creator returned HTTP 200 and rewrote public poll/question/options.",
+      "runtime": "Non-creator returned HTTP 204 deleting another user's public poll.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_f09_n4_unrelated_verified_user_cannot_patch_other_public_poll"
+    },
+    {
+      "id": "C005-N1",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "reason": "Non-admin custom-group member PATCH returned HTTP 200 instead of denial.",
+      "runtime": "Non-admin custom-group member PATCH returned HTTP 200 instead of denial.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_c005_n1_ordinary_member_cannot_change_room_membership"
+    },
+    {
+      "id": "C004-N1",
+      "status": "RUNTIME_REPRODUCED_POLICY_CONDITIONAL",
+      "reason": "Authenticated member POST returned HTTP 201 for a chat with foreign pharmacy membership ID; policy consent qualification remains.",
+      "runtime": "Authenticated member POST returned HTTP 201 for a chat with foreign pharmacy membership ID; policy consent qualification remains.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_c004_n1_cross_pharmacy_group_invite_requires_consent_or_authority"
+    },
+    {
+      "id": "C024-N1",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "reason": "Password reset created in-app Notification with live /reset-password/ token URL.",
+      "runtime": "Password reset created in-app Notification with live /reset-password/ token URL.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "negative_test": "test_c024_n1_password_reset_token_not_in_signed_in_bell"
+    },
+    {
+      "id": "C012-N1",
+      "status": "RUNTIME_NEGATIVE_PASSED_ROOT_UNCONFIRMED",
+      "reason": "Expired/inactive invite-link generic POST returned HTTP 400 while valid magic-link positive control returned HTTP 201. Actual rejection cause not inspected; this is not a refutation or P1 closure. Need response body and independent validation path.",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+      "independent_second_agent": "NOT_CERTIFIED"
     }
   ],
   "summary": {
@@ -467,7 +512,7 @@
     "refuted_source": 1,
     "second_agent_certified": 0,
     "runtime_reproduced_in_audit": 0,
-    "total_challenged": 32,
+    "total_challenged": 37,
     "runtime_reproduced_identifiers": [
       "B07",
       "B33",
@@ -479,9 +524,14 @@
       "F03-N1",
       "F04-N1",
       "F09-N1",
-      "B03"
+      "B03",
+      "F09-N4",
+      "C005-N1",
+      "C004-N1",
+      "C012-N2",
+      "C024-N1"
     ],
-    "runtime_reproduced_scenarios": 13
+    "runtime_reproduced_scenarios": 19
   },
   "review_update": "2026-10-25 ten further B-series high-risk challenges: B03 B06 B07 B15 B29 B33 B36 B68 B69 B70; immutable evidence, negative/positive tests, caveated status, no S3 tests or independent second-agent certifications."
 }
