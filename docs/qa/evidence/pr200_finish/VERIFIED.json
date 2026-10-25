@@ -847,5 +847,41 @@
       "No actual HTTP selector, provider charge or two-connection PostgreSQL concurrency proof. Treat source service behavior as demonstrated and multi-unit defect impact as policy/use-case conditional.",
       "No S2 whole-file independent certification"
     ]
+  },
+  "B24": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/marketplace/views.py:347-382",
+      "backend/marketplace/services.py:52-76",
+      "backend/qa_release/test_pr200_phase5_p0_authz.py:283-406"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b24_enquiry_cannot_be_marked_complete_before_terms_acceptance",
+        "observed": "Buyer confirmation returned HTTP 200 from ENQUIRY rather than rejection, asserting invalid transition; all synthetic setup completed.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Django SQLite hosted CI, two-sided real API requests; mock seller policy only for synthetic listing validation",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189568324",
+        "head": "51db9da375c2555490c07d0a87e752709bca1d57"
+      },
+      {
+        "test": "test_b24_proposed_unaccepted_terms_cannot_be_completed",
+        "observed": "Buyer confirmation returned HTTP 200 from TERMS_PROPOSED rather than rejection; no accepted terms.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Django SQLite hosted CI",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189568324",
+        "head": "51db9da375c2555490c07d0a87e752709bca1d57"
+      }
+    ],
+    "positive_controls": [
+      "test_b24_accepted_exchange_completion_is_legitimate_positive_control PASSED",
+      "test_b24_nonparty_cannot_confirm_even_on_accepted_exchange PASSED"
+    ],
+    "runtime_limitations": [
+      "Seller onboarding policy was mocked only at listing save because synthetic seller lacks completed onboarding; exchange state machine and API authorization were not mocked.",
+      "No provider, transactional PostgreSQL or production user exploitation tested.",
+      "S2 whole-file independent review not certified."
+    ]
   }
 }
