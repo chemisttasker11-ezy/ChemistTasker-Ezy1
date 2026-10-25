@@ -205,3 +205,21 @@ class Phase5StripeFinance(TestCase):
             self.assertNotEqual(sub.status, "active")
         else:
             self.assertIn(response.status_code, (400, 403, 409))
+
+    def test_b04_empty_shift_checkout_must_not_create_provider_session(self):
+        # Real HTTP routing/billing authority; fake Stripe provider only.
+        self.offer1.delete()
+        self.offer2.delete()
+        fake = SimpleNamespace(url="https://checkout.example.test/invalid-empty")
+        with (
+            patch("billing.views.get_billing_state_for_account",
+                  return_value="PAYMENT_REQUIRED"),
+            patch("billing.views.stripe.checkout.Session.create",
+                  return_value=fake) as stripe_create,
+        ):
+            empty = client_for(self.owner).post(
+                f"/api/v1/billing/charge-fulfillment/{self.shift.pk}/",
+                {}, format="json",
+            )
+        self.assertEqual(empty.status_code, 400, empty.data)
+        stripe_create.assert_not_called()
