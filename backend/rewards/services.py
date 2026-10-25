@@ -353,7 +353,7 @@ def get_shift_post_pill_cost() -> int:
     return get_current_rule(SHIFT_POST_COST_RULE).pill_amount
 
 
-def spend_pills_for_shift_post(*, user, shift: Shift) -> PillLedgerEntry:
+def spend_pills_for_shift_post(*, user, shift: Shift, unit_key: str | None = None) -> PillLedgerEntry:
     rule = get_current_rule(SHIFT_POST_COST_RULE)
     return _create_ledger_entry(
         user=user,
@@ -363,8 +363,8 @@ def spend_pills_for_shift_post(*, user, shift: Shift) -> PillLedgerEntry:
         amount=-rule.pill_amount,
         shift=shift,
         description=f"Paid shift #{shift.id} with pills",
-        idempotency_key=f"shift:{shift.id}:pill-payment",
-        metadata={"shift_id": shift.id},
+        idempotency_key=f"shift:{shift.id}:pill-payment" + (f":{unit_key}" if unit_key else ""),
+        metadata={"shift_id": shift.id, "unit_key": unit_key or "legacy-shift"},
     )
 
 
