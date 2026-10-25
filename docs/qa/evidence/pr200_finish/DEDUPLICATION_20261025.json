@@ -170,7 +170,7 @@
     "B71": "Acceptance notification transaction ordering; not completed"
   },
   "policy": "Preserve all source finding IDs with canonical/alias relationships; never silently delete historical candidates; exclude REFUTED_SOURCE from active blocker counts; S3 remains not executed.",
-  "review_update": "2026-10-25 expanded second source challenges; preserve all aliases and C016-N2 refutation. Source check not S3.",
+  "review_update": "2026-10-25 source challenge + ten B-series high-risk verification; direct-booking notification subclaim refuted. Independent P1 second reviewer and runtime reproduction pending.",
   "new_source_challenge_ids": [
     "B01",
     "F07-N1",
@@ -178,7 +178,31 @@
     "F09-N1",
     "F10-N5",
     "C064-N1",
-    "F12-N1"
+    "F12-N1",
+    "B03",
+    "B06",
+    "B07",
+    "B15",
+    "B29",
+    "B33",
+    "B36",
+    "B68",
+    "B69",
+    "B70"
   ],
-  "distinctness_note": "F07-N1 customer_id=0 editor mismatch; F08-N3 related but distinct from F02-N1 (external payment); F09-N1 restricted group deletion; F10-N5 valid POST NameError; C064-N1 conditional old SG; F12-N1 native failure UX vs backend authorization B51. No new IDs or proven new roots."
+  "distinctness_note": "F07-N1 customer_id=0 editor mismatch; F08-N3 related but distinct from F02-N1 (external payment); F09-N1 restricted group deletion; F10-N5 valid POST NameError; C064-N1 conditional old SG; F12-N1 native failure UX vs backend authorization B51. No new IDs or proven new roots.",
+  "refuted_claims": [
+    {
+      "id": "PR165_DEDICATED_BOOKING_NOTIFY_WIDENING",
+      "status": "REFUTED_SOURCE_NARROW_SUBCLAIM_ONLY",
+      "reason": "Although Next TalentBoard discards embedded while preserving dedicated_user, backend protect_direct_booking forces private LOCUM_CASUAL visibility and clears escalation stamps; both announced-shift recipient and availability-match callbacks explicitly return for dedicated_user_id. Old claim that submitted notify flags alone email unrelated workers on this protected creation path is contradicted, while all other booking security/parity remains unverified.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx#L422",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L23",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L77",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/announcements.py#L343",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/announcements.py#L461"
+      ]
+    }
+  ]
 }

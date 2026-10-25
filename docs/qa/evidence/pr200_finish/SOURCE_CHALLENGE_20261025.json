@@ -270,16 +270,178 @@
       "runtime": "NOT_EXECUTED",
       "independent_second_agent": "NOT_CERTIFIED",
       "reviewer": "same_online_assistant_20261025"
+    },
+    {
+      "id": "B03",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Permanent membership deletion removes participation then deletes membership; chat Message.sender is CASCADE, deleting that person's conversation history.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/views.py#L112",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/chat/models.py#L96"
+      ],
+      "negative_test": "Remove staff with historic messages; former coworkers retain audit/history while revoked staff lose access.",
+      "positive_test": "Member no longer sees new messages; retained messages are immutable as policy permits.",
+      "existing_test_gap": "Existing app code proves destructive side effect; not HTTP reproduced.",
+      "reviewer": "gpt6_same_assistant_20261025",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "runtime": "NOT_REPRODUCED"
+    },
+    {
+      "id": "B06",
+      "status": "SOURCE_SUPPORTED_POLICY_SCOPE_PENDING",
+      "reason": "Ordinary staff's pharmacy membership grants org ID for CalendarFeed; org filter queries notes from all org pharmacies without intersecting visible pharmacy IDs. Product policy for org-wide note access must be checked.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/team_calendar/views.py#L108",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/team_calendar/views.py#L487",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/team_calendar/views.py#L507"
+      ],
+      "negative_test": "Staff of pharmacy A with same-org B must not see private B work notes via organization_id, unless explicit sharing permits it.",
+      "positive_test": "Authorised org admin sees intended cross-site notes while ordinary workers see only permitted data.",
+      "existing_test_gap": "Calendar test_api doesn't exercise sibling-work-note privacy.",
+      "reviewer": "gpt6_same_assistant_20261025",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "runtime": "NOT_REPRODUCED"
+    },
+    {
+      "id": "B07",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Calendar event and WorkNote edits authorize current source object only; serializers make destination pharmacy or organization writable, allowing potential move to unauthorized location.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/team_calendar/views.py#L266",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/team_calendar/views.py#L377",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/team_calendar/serializers.py#L58",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/team_calendar/serializers.py#L142"
+      ],
+      "negative_test": "A manager PATCHes pharmacy A event/note into unrelated B; deny and preserve scope/assignees.",
+      "positive_test": "Valid same-location edit saves once.",
+      "existing_test_gap": "Existing ordinary manager edit tests don't challenge target scope.",
+      "reviewer": "gpt6_same_assistant_20261025",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "runtime": "NOT_REPRODUCED"
+    },
+    {
+      "id": "B15",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Payment webhook processes any paid session metadata type with shift_id, including cancellation, then unconditionally calls _finalize_pending_offers_for_shift and writes shift payment status.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L781",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L840",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L859"
+      ],
+      "negative_test": "Complete only cancellation penalty in Stripe sandbox while shift has pending fulfillment; must not finalize worker or mark fulfillment paid.",
+      "positive_test": "Correct fulfillment finalizes exactly selected offers once; penalty only settles cancellation.",
+      "existing_test_gap": "Existing billing test covers fulfillment retry, not penalty routing.",
+      "reviewer": "gpt6_same_assistant_20261025",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "runtime": "NOT_REPRODUCED"
+    },
+    {
+      "id": "B29",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Clock drift/backward/monotonic flags mark signed offline kiosk event NEEDS_REVIEW, but only chain/sequence/revocation block _apply_business_event; timestamp still mutates live attendance.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/attendance/protocol.py#L89",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/attendance/protocol.py#L242",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/attendance/protocol.py#L263"
+      ],
+      "negative_test": "Signed valid event with >5 minute trusted-anchor drift flagged for review must not alter approved paid attendance before manager resolution.",
+      "positive_test": "Trustworthy timestamp event applied once; audited review can approve suspect evidence.",
+      "existing_test_gap": "Existing sequence-gap test is not a clock-drift transition test.",
+      "reviewer": "gpt6_same_assistant_20261025",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "runtime": "NOT_REPRODUCED"
+    },
+    {
+      "id": "B33",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Legacy authenticated invoice POST only stamps user; serializer exposes pharmacy/status and issuer/recipient fields without tenant validation; a user can attribute self-created paid/sent invoice to unrelated pharmacy by source path.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/invoicing/views.py#L48",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/invoicing/serializers.py#L44",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/invoicing/urls.py#L13"
+      ],
+      "negative_test": "Outsider POST invoice with unrelated pharmacy and status paid; deny before persistence and no B received invoice mutation.",
+      "positive_test": "Permitted issuer creates valid external invoice; internal shift invoice must use authoritative source.",
+      "existing_test_gap": "New finance service tests do not exercise legacy ListCreateAPIView.",
+      "reviewer": "gpt6_same_assistant_20261025",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "runtime": "NOT_REPRODUCED"
+    },
+    {
+      "id": "B36",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Authenticated RosterShiftManageViewSet ModelViewSet registers POST and scopes only get_queryset; default create invokes ShiftSerializer.post_shift with caller-specified pharmacy but no create-time manage permission.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/workforce/roster/views.py#L116",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/workforce/roster/urls.py#L33",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L303",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L66"
+      ],
+      "negative_test": "Unrelated authenticated worker POST fully valid roster-shifts payload for B; deny and do not create shift/slot/notifications.",
+      "positive_test": "Authorised manager posts own pharmacy shift.",
+      "existing_test_gap": "Roster HTTP tests cover managed PATCH, not outsider POST.",
+      "reviewer": "gpt6_same_assistant_20261025",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "runtime": "NOT_REPRODUCED"
+    },
+    {
+      "id": "B68",
+      "status": "SOURCE_SUPPORTED_CONDITIONAL",
+      "reason": "Stripe invoice.paid does local subscription ID lookup then falls back to any owner subscription sharing customer; marks active and may bind unmatched external subscription ID. Requires provider-side mismatched-ID scenario.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L227",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L897",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L909"
+      ],
+      "negative_test": "Stripe invoice for unrelated subscription under same customer never activates base/add-on entitlement.",
+      "positive_test": "Invoice matching registered exact base/extra subscription updates only corresponding entitlement.",
+      "existing_test_gap": "Signed provider event fixtures needed; existing retry tests don't cover mismatched subscriptions.",
+      "reviewer": "gpt6_same_assistant_20261025",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "runtime": "NOT_REPRODUCED"
+    },
+    {
+      "id": "B69",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Repeated cancellation penalty requests each create Checkout; webhook dedupes by event ID, while ShiftPayment has no per-obligation/payment-intent unique constraint, permitting separate paid records.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L699",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L760",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/models.py#L65"
+      ],
+      "negative_test": "Complete two distinct sessions for same cancellation and ensure at most one paid obligation or correct compensation.",
+      "positive_test": "One cancellation due yields exactly one payable charge across retries.",
+      "existing_test_gap": "Same-event idempotency test doesn't cover cross-session duplicate.",
+      "reviewer": "gpt6_same_assistant_20261025",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "runtime": "NOT_REPRODUCED"
+    },
+    {
+      "id": "B70",
+      "status": "SOURCE_SUPPORTED",
+      "reason": "Base subscriber request only blocks active tracked subscription, allowing another pending Stripe Checkout or send_invoice subscription; extra-seat checkout is also repeatable before webhook receipt.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L388",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L414",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L482",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L525"
+      ],
+      "negative_test": "Double-submit/complete base and addon provider checkouts; no overlapping recurring customer charges or orphan subscription.",
+      "positive_test": "One base plan and intended extra seats create exactly one active provider obligation each.",
+      "existing_test_gap": "Existing entitlement tests do not exercise overlapping pending provider creations.",
+      "reviewer": "gpt6_same_assistant_20261025",
+      "independent_second_agent": "NOT_CERTIFIED",
+      "runtime": "NOT_REPRODUCED"
     }
   ],
   "summary": {
-    "source_supported": 16,
-    "source_supported_conditional_or_ui": 2,
-    "source_supported_duplicate_root": 1,
+    "source_supported": 24,
+    "qualified_source_supported": 4,
+    "duplicate_root": 1,
     "refuted_source": 1,
     "second_agent_certified": 0,
-    "runtime_passed": 0,
-    "total_challenged": 20
+    "runtime_reproduced_in_audit": 0,
+    "total_challenged": 30
   },
-  "review_update": "Second source challenge extended from 13 to 20 entries; source checks by SAME online assistant, no independent P1 reviewer or S3 tests. B-series historical candidate included without creating new finding ID."
+  "review_update": "2026-10-25 ten further B-series high-risk challenges: B03 B06 B07 B15 B29 B33 B36 B68 B69 B70; immutable evidence, negative/positive tests, caveated status, no S3 tests or independent second-agent certifications."
 }
