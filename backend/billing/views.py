@@ -1109,9 +1109,18 @@ def _process_stripe_event(event):
             return
         if refunded_cents < 0:
             return
-        for payment in ShiftPayment.objects.select_for_update().filter(
+        payments = list(ShiftPayment.objects.select_for_update().filter(
             stripe_payment_intent_id=payment_intent_id, payment_method='card'
-        ):
+        ))
+        if not payments:
+            # Retry only shift checkout refunds that beat checkout; other charges (e.g. invoices) are not ours.
+            sessions = stripe.checkout.Session.list(payment_intent=payment_intent_id, limit=1)
+            session = next(iter(_stripe_object_value(sessions, 'data', None) or []), None)
+            if _stripe_object_value(_stripe_object_value(session, 'metadata', None) or {}, 'type') in ('fulfillment', 'cancellation'):
+                raise ValueError('Stripe refund payment is not recorded yet.')
+            logger.info('Ignoring refund for a charge without a shift payment.')
+            return
+        for payment in payments:
             cumulative = min(payment.amount_aud, Decimal(refunded_cents) / Decimal(100))
             if cumulative <= payment.refunded_amount_aud:
                 continue
