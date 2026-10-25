@@ -252,18 +252,10 @@ def ingest_offline_event(device, raw_event):
         processing_status = KioskAttendanceEvent.ProcessingStatus.REJECTED
         rejection_reason = "Employee is inactive."
 
-    blocking_flags = {
-        "SEQUENCE_GAP",
-        "HASH_CHAIN_MISMATCH",
-        "UNEXPECTED_INITIAL_HASH",
-        "DEVICE_REVOKED_DRAIN",
-        # Signed does not imply the kiosk clock is trustworthy. Keep
-        # suspicious evidence provisional until an explicit manager decision.
-        "CLOCK_MOVED_BACKWARDS",
-        "CLOCK_ANCHOR_DRIFT",
-        "SERVER_TIME_DRIFT",
-    }
-    if employee is not None and employee.is_active and not blocking_flags.intersection(flags):
+    # Every integrity flag requires a manager decision.  Never apply a live
+    # event while the signed evidence is marked NEEDS_REVIEW, including a
+    # missing trusted clock or monotonic rollback.
+    if employee is not None and employee.is_active and processing_status == KioskAttendanceEvent.ProcessingStatus.ACCEPTED:
         try:
             with transaction.atomic():
                 attendance_event = _apply_business_event(

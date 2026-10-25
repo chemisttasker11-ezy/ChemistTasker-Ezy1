@@ -130,6 +130,17 @@ class Phase6KioskClockIntegrity(KioskOfflineProtocolTests):
         self.assertEqual(AttendanceEvent.objects.count(), 0)
         self.assertEqual(KioskAttendanceReview.objects.count(), 1)
 
+    def test_b29_missing_trusted_clock_remains_provisional(self):
+        event = self.signed_event()
+        event["trusted_time_estimate"] = None
+        event = self._resign(event)
+        result = sync_offline_batch(self.device, [event])
+        self.assertEqual(result["results"][0]["result"], "needs_review", result)
+        evidence = KioskAttendanceEvent.objects.get()
+        self.assertIn("MISSING_TRUSTED_TIME", evidence.integrity_flags)
+        self.assertIsNone(evidence.attendance_event_id)
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
+
     def test_b29_unrelated_manager_cannot_view_or_decide_other_pharmacy(self):
         from client_profile.characterization_support import make_owner_with_pharmacy
         foreign_owner, _ = make_owner_with_pharmacy("Foreign kiosk manager")
