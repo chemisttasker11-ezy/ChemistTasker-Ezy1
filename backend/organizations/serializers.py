@@ -621,6 +621,7 @@ class ChainSerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers.Mo
     pharmacy_ids = serializers.PrimaryKeyRelatedField(
         many=True,
         write_only=True,
+        required=False,
         queryset=Pharmacy.objects.all(),
         source='pharmacies'
     )
@@ -647,6 +648,12 @@ class ChainSerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers.Mo
             else:
                 raise PermissionDenied("Chain has no owner or organization.")
         return pharmacies
+
+    def update(self, instance, validated_data):
+        # Multipart PUT represents an omitted many-valued field as an empty list.
+        if 'pharmacy_ids' not in self.initial_data:
+            validated_data.pop('pharmacies', None)
+        return super().update(instance, validated_data)
 
     class Meta:
         model = Chain

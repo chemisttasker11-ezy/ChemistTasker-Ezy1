@@ -155,13 +155,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
 
-        if (getSessionGeneration() !== bootstrapId) return;
-        if (nextUser) {
-          setUser(nextUser);
-        }
-        setAccess(nextAccess);
-        setRefresh(nextRefresh);
-
         if (baseURL) {
           const token = await getValidAccessToken(baseURL);
           if (getSessionGeneration() !== bootstrapId) return;
@@ -190,24 +183,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       // Secure storage can fail (e.g. Keychain unavailable/locked). Never leave the app on the
-      // loading screen: an unreadable session is treated as signed out.
-      const latestSession = await readStoredSession().catch(() => null);
+      // loading screen: an unreadable or unverified session is treated as signed out (B52);
+      // a sign-in that started meanwhile bumped the generation and owns the session.
       if (getSessionGeneration() !== bootstrapId) return;
-      const latestAccess = latestSession?.access || latestSession?.tokens?.access || null;
-      const latestRefresh = latestSession?.refresh || latestSession?.tokens?.refresh || null;
-      const latestUser = latestSession?.user ? normalizeUser(latestSession.user) : null;
-
-      if (latestAccess || latestRefresh || latestUser) {
-        primeInMemorySession(latestSession);
-        setAccess(latestAccess);
-        setRefresh(latestRefresh);
-        setUser(latestUser);
-      } else {
-        await clearStoredSession().catch(() => undefined);
-        setAccess(null);
-        setRefresh(null);
-        setUser(null);
-      }
+      await clearStoredSession().catch(() => undefined);
+      primeInMemorySession(null);
+      setAccess(null);
+      setRefresh(null);
+      setUser(null);
       setIsLoading(false);
     };
     loadStoredAuth();

@@ -59,7 +59,9 @@ export const mapChatParticipantRecord = (api: {
     invited_name?: string | null;
     is_admin?: boolean;
 }) => ({
+    ...mapChatUser(api.user_details ?? {}),
     id: api.id,
+    membership_id: api.id,
     userDetails: mapChatUser(api.user_details ?? {}),
     role: api.role ?? undefined,
     employmentType: api.employment_type ?? undefined,

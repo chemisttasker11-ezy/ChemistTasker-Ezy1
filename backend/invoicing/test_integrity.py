@@ -47,6 +47,36 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         [original] = generate_preview_invoice_lines(self.shift, self.worker)
         self.assertEqual((original['quantity'], original['total']), (8.0, 560.0))
 
+    def test_mark_paid_does_not_publish_an_unsent_internal_draft_or_revision(self):
+        record = save_draft(self.worker, internal_invoice_prefill(self.worker, [self.assignment.id]))
+        factory = APIRequestFactory()
+        for version in (1, 2):
+            with self.subTest(version=version):
+                request = factory.post(f"/finance/invoices/{record.pk}/mark-paid/", {"version": version}, format="json")
+                force_authenticate(request, user=self.worker)
+                response = InvoiceViewSet.as_view({"post": "mark_paid"})(request, pk=record.pk)
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertFalse(record.payments.exists())
+                request = factory.get("/finance/received-invoices/")
+                force_authenticate(request, user=self.owner)
+                received = ReceivedInvoiceViewSet.as_view({"get": "list"})(request)
+                self.assertEqual(received.data["count"], version - 1)
+                if version == 2:
+                    self.assertEqual(received.data["results"][0]["version"], 1)
+                request = factory.get(f"/invoices/{record.pk}/")
+                force_authenticate(request, user=self.owner)
+                self.assertEqual(InvoiceDetailView.as_view()(request, pk=record.pk).status_code, 404)
+                if version == 1:
+                    Delivery.objects.create(invoice=record, version=1, recipient=self.owner.email, status="sent", sent_at=timezone.now())
+                    request = factory.get("/finance/received-invoices/")
+                    force_authenticate(request, user=self.owner)
+                    received = ReceivedInvoiceViewSet.as_view({"get": "list"})(request)
+                    self.assertEqual(received.data["count"], 1)
+                    self.assertEqual(received.data["results"][0]["version"], 1)
+                    record.refresh_from_db()
+                    payload = dict(record.payload, version=record.version, notes="Unsent correction")
+                    record = save_draft(self.worker, payload, record.pk)
+
     def setUp(self):
         self.worker = User.objects.create_user(
             email="invoice-integrity@example.com",

@@ -767,9 +767,10 @@ def owner_visible_document(record):
         version=record.version,
         status__in=["sent", "legacy_queued"],
     ).first()
+    # A worker's paid attestation does not deliver their current draft to the pharmacy.
     current_is_visible = (
         current_delivery is not None
-        or record.status in {"sent", "paid"}
+        or record.status == "sent"
         or record.review_status != "NONE"
         or record.legacy_snapshot
     )

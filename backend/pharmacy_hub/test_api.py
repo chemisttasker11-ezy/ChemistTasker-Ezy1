@@ -118,6 +118,32 @@ class HubGroupTests(HubBase):
 
 
 class HubPostTests(HubBase):
+    def test_mentions_refuse_ineligible_recipients_without_sending_private_text(self):
+        from unittest.mock import patch
+        from notifications.models import Notification
+        for employment, status in (("LOCUM", "ACCEPTED"), ("FULL_TIME", "PENDING"), ("FULL_TIME", "REJECTED")):
+            with self.subTest(employment=employment, status=status):
+                Membership.objects.filter(pk=self.other_m.pk).update(employment_type=employment, status=status)
+                with patch("pharmacy_hub.posts.notify_users") as notify, patch("pharmacy_hub.posts.async_task") as email:
+                    response = client_for(self.staff).post(POSTS, {
+                        **self.scope, "body": "Confidential", "tagged_member_ids": [self.other_m.pk],
+                    }, format="json")
+                self.assertEqual(response.status_code, 400, response.data)
+                self.assertFalse(PharmacyHubPost.objects.exists())
+                self.assertFalse(Notification.objects.filter(user=self.other_staff).exists())
+                notify.assert_not_called()
+                email.assert_not_called()
+
+    def test_mentions_notify_accepted_staff_who_can_read_the_post(self):
+        from unittest.mock import patch
+        with patch("pharmacy_hub.posts.notify_users") as notify, patch("pharmacy_hub.posts.async_task"):
+            response = client_for(self.staff).post(POSTS, {
+                **self.scope, "body": "Confidential", "tagged_member_ids": [self.other_m.pk],
+            }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(notify.call_args.args[0], {self.other_staff.pk})
+        self.assertEqual(client_for(self.other_staff).get(f"{POSTS}{response.data['id']}/", self.scope).status_code, 200)
+
     def test_member_creates_post_and_response_has_exact_fields(self):
         res = client_for(self.staff).post(POSTS, {**self.scope, "body": "first!"}, format="json")
         self.assertEqual(res.status_code, 201)

@@ -297,6 +297,23 @@ class CommunityGroupTests(ChatBase):
         self.assertEqual(preview["body"], "")
         self.assertTrue(preview["is_deleted"])
 
+    def test_nonaccepted_members_cannot_read_community_last_message(self):
+        room = Conversation.objects.create(type="GROUP", pharmacy=self.pharmacy, title="Private team")
+        Participant.objects.create(conversation=room, membership=self.alice_m)
+        Message.objects.create(conversation=room, sender=self.bob_m, body="Confidential preview")
+        Membership.objects.filter(pk=self.alice_m.pk).update(employment_type="FULL_TIME")
+        for status in ("PENDING", "REJECTED"):
+            with self.subTest(status=status):
+                Membership.objects.filter(pk=self.alice_m.pk).update(status=status)
+                response = client_for(self.alice).get(ROOMS)
+                self.assertEqual(response.status_code, 200)
+                self.assertNotIn(room.pk, [row["id"] for row in self.rows(response)])
+                self.assertEqual(client_for(self.alice).get(f"{ROOMS}{room.pk}/").status_code, 404)
+        Membership.objects.filter(pk=self.alice_m.pk).update(status="ACCEPTED")
+        response = client_for(self.alice).get(ROOMS)
+        row = next(row for row in self.rows(response) if row["id"] == room.pk)
+        self.assertEqual(row["last_message"]["body"], "Confidential preview")
+
     def test_staff_member_can_get_or_create_the_pharmacy_community_chat(self):
         Membership.objects.filter(pk=self.alice_m.pk).update(employment_type="FULL_TIME")
         c = client_for(self.alice)
