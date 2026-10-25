@@ -220,5 +220,19 @@
         "status": "RED_TEST_FAILED_AS_EXPECTED"
       }
     ]
+  },
+  "B03": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b03_staff_removal_must_preserve_historical_chat_messages",
+        "observed": "After authorized DELETE membership, sender historical Message was absent, violating retention assertion; worker chat history lost",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174581937",
+        "head": "13661c46ff9b82699ece08713a2b2bfac1fd7511",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ]
   }
 }

@@ -304,3 +304,10 @@ Evidence: [structured runtime run](evidence/pr200_finish/RUNTIME_REPRODUCTION_20
 - [PR200 run 40174286021](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021) against frozen main yielded **20 Django tests: 12 failing negative assertions, 1 fixture ERROR and 7 passes**. The 8 older failures remain. New verified F03-N1 (both GET/POST old admin invite), F04-N1 (outsider member-status disclosure), F09-N1 (private group deletion widens pharmacy feed) all reproduced in SQLite HTTP tests.
 - B03 chat-retention test was **TEST_INFRA_BLOCKED** by a unique pharmacy conversation fixture, not classified as reproduced. Fixed the test fixture on separate audit commit `13661c46ff9b82699ece08713a2b2bfac1fd7511`; rerun pending.
 - These findings are baseline red tests and not production attacks. They do not establish whole-repository 99% independent S2. Phase 5 still open for unresolved P1s and root checks.
+
+
+## Phase 5 B03 retention fixture corrected and reproduced — 25 October 2026
+
+- [Baseline frozen-main rerun 40174581937](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174581937) used a corrected chat-room fixture (not conflicting with unique pharmacy community chat) and ran **20 tests, 13 failed negative assertions and 7 passed controls**; **zero fixture errors**.
+- New distinct runtime evidence B03: approved staff-membership deletion erased that worker's existing chat messages through Message.sender CASCADE. Historical chat retention is broken in the isolated SQLite workflow. This is a baseline finding, not a claim of a real production incident. F03-N1 two scenarios, F04-N1 and F09-N1 remain red.
+- Counting unique baseline source findings with S3 isolated runtime reproductions in this recorded battery: **11 IDs across 13 failed negative tests** (B03/B06/B07/B15/B33/B36/F03-N1/F04-N1/F04-N2/F09-N1/F10-N5). Most other P1 findings still source-only. Phase 5 remains incomplete; do not claim 99% S2.

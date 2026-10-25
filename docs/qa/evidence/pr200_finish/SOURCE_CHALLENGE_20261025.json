@@ -275,7 +275,7 @@
     },
     {
       "id": "B03",
-      "status": "SOURCE_SUPPORTED",
+      "status": "RUNTIME_REPRODUCED_ISOLATED_DJANGO_SQLITE",
       "reason": "Permanent membership deletion removes participation then deletes membership; chat Message.sender is CASCADE, deleting that person's conversation history.",
       "evidence": [
         "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/memberships/views.py#L112",
@@ -286,7 +286,8 @@
       "existing_test_gap": "Existing app code proves destructive side effect; not HTTP reproduced.",
       "reviewer": "gpt6_same_assistant_20261025",
       "independent_second_agent": "NOT_CERTIFIED",
-      "runtime": "NOT_REPRODUCED"
+      "runtime": "Historical sender message deleted following membership removal",
+      "runtime_run": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174581937"
     },
     {
       "id": "B06",
@@ -477,9 +478,10 @@
       "B06",
       "F03-N1",
       "F04-N1",
-      "F09-N1"
+      "F09-N1",
+      "B03"
     ],
-    "runtime_reproduced_scenarios": 12
+    "runtime_reproduced_scenarios": 13
   },
   "review_update": "2026-10-25 ten further B-series high-risk challenges: B03 B06 B07 B15 B29 B33 B36 B68 B69 B70; immutable evidence, negative/positive tests, caveated status, no S3 tests or independent second-agent certifications."
 }
