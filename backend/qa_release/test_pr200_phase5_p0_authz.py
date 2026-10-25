@@ -284,8 +284,19 @@ class Phase5MarketplaceExchangeIntegrity(TestCase):
         from marketplace.models import (
             MarketplaceCategory, MarketplaceListing, MarketplaceExchange,
         )
-        seller = make_user("OWNER")
+        seller = make_user(
+            "OWNER", is_otp_verified=True, is_mobile_verified=True,
+            mobile_number="0499000191",
+        )
         buyer = make_user("OWNER")
+        from marketplace.models import IdentityVerification, MarketplaceTermsAcceptance
+        IdentityVerification.objects.create(
+            user=seller, status="VERIFIED", assurance_method="MANUAL",
+            verified_at=timezone.now(),
+        )
+        MarketplaceTermsAcceptance.objects.create(
+            user=seller, version="2026-09",
+        )
         category = MarketplaceCategory.objects.create(
             slug="pr200-fixtures", name="PR200 fixtures",
             context="BOTH", permitted_modes=["SELL"], maximum_buyer_roles=["OWNER"],
