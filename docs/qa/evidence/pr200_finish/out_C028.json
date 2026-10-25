@@ -1,0 +1,269 @@
+{
+ "chunk": "C028",
+ "files": [
+  {
+   "path": "backend/workforce/signals.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N4"
+   ],
+   "note": "Attendance changes invalidate only the session start-date period, leaving overlapping periods stale."
+  },
+  {
+   "path": "backend/workforce/tasks.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/tests/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/workforce/tests/test_employment.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/tests/test_publication_contract.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/tests/test_roster_admin_capabilities.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/tests/test_roster_escalation.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/tests/test_roster_revision.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/tests/test_roster_shift_republish.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/tests/test_roster_slot_concurrency.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/tests/test_roster_slot_http_contract.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/tests/test_timesheet_state_machine.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/tests/test_timesheets.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B62"
+   ],
+   "note": "Expects communication-only region admin to read roster-linked leave."
+  },
+  {
+   "path": "backend/workforce/timesheet_builder.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "N2"
+   ],
+   "note": "Omits frozen roster routing from snapshots and contracted hours from the rebuild fingerprint."
+  },
+  {
+   "path": "backend/workforce/timesheet_checks.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/timesheet_core.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/timesheet_data.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N3",
+    "N5"
+   ],
+   "note": "Includes individually withdrawn shifts but excludes archived published rosters."
+  },
+  {
+   "path": "backend/workforce/timesheet_serialization.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/timesheet_transitions.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B28",
+    "N1"
+   ],
+   "note": "Known locked-check mutation; payroll routing reads a snapshot section the builder never stores."
+  },
+  {
+   "path": "backend/workforce/timesheets.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no routing problem found."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Timesheets",
+   "title": "Locked manifests omit every payroll assignment",
+   "scenario": "Tom enables payroll and approves Omar's timesheet for shifts designated for payroll. Locking the period succeeds, but the returned manifest contains no payroll assignments or payroll work days. Invoice and timesheet-only routing lists are also empty because the saved timesheet lacks the roster details that locking reads.",
+   "evidence": [
+    "backend/workforce/timesheet_builder.py:183",
+    "backend/workforce/timesheet_builder.py:203",
+    "backend/workforce/timesheet_transitions.py:147",
+    "backend/workforce/timesheet_transitions.py:182",
+    "backend/workforce/views.py:744"
+   ],
+   "confidence": "high",
+   "test_needed": "Build and approve a payroll-enabled period containing Omar's PAYROLL assignment, then lock it and assert that its assignment and worked day are present in payroll_export.",
+   "owner_question": {
+    "question": "When Tom locks a payroll-enabled period containing Omar's approved payroll shifts, what should the locked record contain?",
+    "options": [
+     "Omar's payroll assignments and approved work days",
+     "Reject locking until payroll routing is available",
+     "An empty payroll export despite those assignments (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Timesheets",
+   "title": "Changing contracted hours leaves rebuilt timesheets showing the previous hours",
+   "scenario": "Tom changes Omar's contracted week from 38 hours to 30 hours after a timesheet has been built. The change schedules a rebuild, but ordinary rebuilding treats the inputs as unchanged and keeps the old 38-hour total. The timesheet is then marked current and can retain its previous approval.",
+   "evidence": [
+    "backend/workforce/signals.py:186",
+    "backend/workforce/timesheet_data.py:36",
+    "backend/workforce/timesheet_builder.py:142",
+    "backend/workforce/timesheet_builder.py:144",
+    "backend/workforce/timesheet_builder.py:171"
+   ],
+   "confidence": "high",
+   "test_needed": "Build Omar's weekly timesheet with 2280 contracted minutes, change only the setting to 1800, rebuild without force, and assert the current total and revision reflect 1800.",
+   "owner_question": {
+    "question": "When Tom changes Omar's contracted hours for an open timesheet period, what should recalculation do?",
+    "options": [
+     "Update the hours and require review of the changed revision",
+     "Keep existing periods unchanged through an explicit effective-date policy",
+     "Mark the timesheet current while retaining its old hours (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Timesheets",
+   "title": "Timesheets treat individually withdrawn roster shifts as published work",
+   "scenario": "Tom withdraws Omar's shift from a published week and edits its hours before republishing it. Omar's roster correctly hides the shift, but recalculating his timesheet still includes the withdrawn shift and its draft hours. It can also raise a missing-attendance blocker for work Omar was no longer shown as scheduled.",
+   "evidence": [
+    "backend/workforce/timesheet_data.py:132",
+    "backend/workforce/timesheet_data.py:150",
+    "backend/workforce/timesheet_checks.py:94",
+    "backend/workforce/roster/publication.py:175",
+    "backend/workforce/roster/publication.py:233"
+   ],
+   "confidence": "high",
+   "test_needed": "Withdraw Omar's individual shift while its week stays published, edit it, rebuild his timesheet, and assert the withdrawn assignment contributes no roster minutes or missing-attendance blocker.",
+   "owner_question": {
+    "question": "While Tom edits a withdrawn shift that Omar cannot see in his roster, what should Omar's timesheet use?",
+    "options": [
+     "Exclude the withdrawn shift until Tom republishes it",
+     "Preserve the last published hours until Tom republishes it",
+     "Use the unpublished draft hours immediately (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P1",
+   "area": "Timesheets",
+   "title": "Overnight attendance corrections leave the next period approved with stale minutes",
+   "scenario": "Omar works from Sunday night into Monday morning, with the two parts recorded in consecutive timesheet periods. After both are approved, Tom corrects Monday's finish time from 06:00 to 07:00. Only the period containing Sunday's clock-in is marked for rebuilding; Monday's period keeps its old approved minutes and can be locked without the extra hour.",
+   "evidence": [
+    "backend/workforce/signals.py:21",
+    "backend/workforce/signals.py:41",
+    "backend/workforce/signals.py:61",
+    "backend/workforce/timesheet_data.py:206",
+    "backend/workforce/timesheet_data.py:256",
+    "backend/workforce/timesheet_transitions.py:137"
+   ],
+   "confidence": "high",
+   "test_needed": "Approve both periods intersecting Omar's Sunday-to-Monday session, correct Monday's clock-out, and assert Monday's timesheet becomes stale and cannot lock before rebuilding and reapproval.",
+   "owner_question": {
+    "question": "When Tom corrects Omar's overnight attendance spanning two open timesheet periods, which periods should require recalculation?",
+    "options": [
+     "Every period whose worked minutes or checks are affected",
+     "Reject the correction until Tom explicitly reopens all affected periods",
+     "Only the period containing the original clock-in (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N5",
+   "severity": "P1",
+   "area": "Timesheets",
+   "title": "Archiving a roster removes its scheduled work and approved leave from timesheets",
+   "scenario": "Tom approves Omar's annual leave against a published roster, then archives that completed roster week before locking the timesheet period. Archiving triggers recalculation, but archived weeks are excluded from the timesheet's roster inputs. Omar's approved leave minutes fall to zero even though the leave remains approved and the archived roster remains visible as published history.",
+   "evidence": [
+    "backend/workforce/roster/publication.py:123",
+    "backend/workforce/roster/publication.py:177",
+    "backend/workforce/signals.py:199",
+    "backend/workforce/timesheet_data.py:150",
+    "backend/workforce/timesheet_builder.py:96",
+    "backend/workforce/timesheet_builder.py:124"
+   ],
+   "confidence": "high",
+   "test_needed": "Build a timesheet with approved roster-linked annual leave, archive its published roster week, rebuild, and assert rostered and approved-leave minutes remain unchanged.",
+   "owner_question": {
+    "question": "When Tom archives a completed published roster, what should happen to Omar's scheduled hours and approved leave in its open timesheet period?",
+    "options": [
+     "Preserve them as historical published work",
+     "Require Tom to lock the timesheet period before archiving",
+     "Remove the roster hours and reduce scheduled leave to zero (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-4"
+}

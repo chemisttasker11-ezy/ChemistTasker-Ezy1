@@ -1,0 +1,68 @@
+{
+ "chunk": "C029",
+ "files": [
+  {
+   "path": "backend/workforce/views.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B27",
+    "B28",
+    "B60",
+    "N1",
+    "N2"
+   ],
+   "note": "Read in full; junior-rate extensions bypass validation, and employment changes leave existing timesheets stale."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Timesheets",
+   "title": "Extending an active junior agreement bypasses its birthday rate limit.",
+   "scenario": "Tom creates Mia's junior pay agreement ending before her next birthday. After it starts, he removes the end date, and the save succeeds while preserving her lower rates. Work after her birthday can now use those rates without requiring updated terms.",
+   "evidence": [
+    "backend/workforce/views.py:377",
+    "backend/workforce/views.py:391",
+    "backend/workforce/views.py:416",
+    "backend/workforce/employment_engagement_service.py:109",
+    "backend/shifts/engagement.py:84"
+   ],
+   "confidence": "high",
+   "test_needed": "For an active junior agreement ending before the next birthday, PATCH effective_to=null and assert rejection with the original end date preserved.",
+   "owner_question": {
+    "question": "When Tom extends Mia's junior agreement beyond her next birthday, what should happen?",
+    "options": [
+     "Require new dated terms for Mia from her birthday",
+     "Automatically apply Mia's updated birthday rates",
+     "Preserve Mia's existing lower rates indefinitely (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Timesheets",
+   "title": "Saving employment terms leaves existing timesheets using stale pay agreements.",
+   "scenario": "Tom approves Omar's timesheet, then records a higher rate effective today while the pay period remains open. Omar's existing timesheet keeps the previous pay agreement and remains approved. Tom can lock the period without recalculating or reviewing the changed terms.",
+   "evidence": [
+    "backend/workforce/views.py:339",
+    "backend/workforce/views.py:417",
+    "backend/workforce/views.py:784",
+    "backend/workforce/timesheet_builder.py:191",
+    "backend/workforce/timesheet_transitions.py:137"
+   ],
+   "confidence": "high",
+   "test_needed": "After approving Omar's timesheet containing today's work, create successor terms effective today and assert locking fails until recalculation and renewed approval.",
+   "owner_question": {
+    "question": "When Tom changes Omar's pay terms for dates in an approved but unlocked timesheet, what should happen?",
+    "options": [
+     "Require recalculation and renewed approval for Omar's affected timesheet",
+     "Prevent the change until Tom explicitly reopens Omar's timesheet",
+     "Allow locking Omar's existing terms until someone manually recalculates (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-3"
+}

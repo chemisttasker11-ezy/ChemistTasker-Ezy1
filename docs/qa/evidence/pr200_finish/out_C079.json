@@ -1,0 +1,89 @@
+{
+ "chunk": "C079",
+ "files": [
+  {
+   "path": "frontend_web/shared/postShift/helpers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/useShiftDescriptionTemplate.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no confirmed user-facing problem found."
+  },
+  {
+   "path": "frontend_web/shared/postShift/useShiftPricing.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Opening an existing shift replaces saved per-date rates with calculated defaults."
+  },
+  {
+   "path": "frontend_web/shared/postShift/useShiftTimetable.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Pharmacy-hours effect overwrites manual time changes before the first date is added."
+  },
+  {
+   "path": "frontend_web/tests/finance.helpers.cjs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full against the helpers; assertions match their intended behavior. Tests were not run."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Editing a shift replaces its saved per-date rates",
+   "scenario": "Tom posts a pharmacist shift offering Sara $80 per hour for a particular date, above his $60 pharmacy guide. Later, Tom opens the shift to correct its description. The saved $80 rate is replaced by the calculated $60 guide, and saving the description also submits that lower rate.",
+   "evidence": [
+    "frontend_web/shared/postShift/useShiftPricing.ts:49",
+    "frontend_web/shared/postShift/useShiftPricing.ts:106",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:239",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+    "shared-core/src/domains/shifts/postingDraft.ts:46"
+   ],
+   "confidence": "high",
+   "test_needed": "Load an existing shift with an $80 per-date override and a $60 calculated guide; change only its description and assert the submitted rate remains $80.",
+   "owner_question": {
+    "question": "When Tom edits only the description of Sara's advertised $80 shift, what should happen to its rate?",
+    "options": [
+     "Keep $80 unless Tom explicitly changes it",
+     "Ask Tom before replacing $80 with the current guide",
+     "Automatically replace it with the current guide (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Manual shift times revert to pharmacy opening hours",
+   "scenario": "Tom selects a date manually for his first shift entry at a pharmacy whose hours are 09:00–17:00. He changes the start to 10:00 because Sara is needed for a shorter shift. The form immediately restores 09:00, preventing him from keeping his chosen time through this entry flow.",
+   "evidence": [
+    "frontend_web/shared/postShift/useShiftTimetable.ts:76",
+    "frontend_web/shared/postShift/useShiftTimetable.ts:86",
+    "frontend_web/shared/postShift/helpers.ts:294",
+    "frontend_web/shared/postShift/PostShiftTimetableStep.tsx:248"
+   ],
+   "confidence": "high",
+   "test_needed": "With pharmacy hours 09:00–17:00 and no added or calendar-selected dates, select a manual date, enter 10:00–16:00, and assert those times survive effects and are added unchanged.",
+   "owner_question": {
+    "question": "When Tom chooses a shorter shift for Sara than the pharmacy's opening hours, what should the manual time fields do?",
+    "options": [
+     "Keep Tom's chosen times",
+     "Keep Tom's times after explicit confirmation",
+     "Restore pharmacy opening hours automatically (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-1"
+}

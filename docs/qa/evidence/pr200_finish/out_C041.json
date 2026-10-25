@@ -1,0 +1,279 @@
+{
+ "chunk": "C041",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Candidates/PublicLevelView.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Candidates/SlotSelector.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Candidates/StatusCard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Dialogs/CandidateProfile.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Dialogs/CounterOfferDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Dialogs/WorkerProfileDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Escalation/EscalationStepper.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/StepIcon/ColorStepIcon.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCandidateReview.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Accepting one date removes the entire counter offer, including its unaccepted dates."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useOfferDecisions.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useRevealInterest.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShareShift.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftActions.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftSlotAttention.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftsData.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Internal candidates are fetched only through dated slots; jobs without slots always receive empty candidate lists."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useWorkerRatings.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N4"
+   ],
+   "note": "Notification navigation reloads shifts but permanently skips counter offers already present in the cache."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/types.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/utils/activeShiftRuntime.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/utils/audience.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/utils/candidateHelpers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/utils/displayHelpers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/utils/offerHelpers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/utils/shiftHelpers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N3"
+   ],
+   "note": "Editing chain details submits a full multipart update without pharmacy IDs, clearing existing pharmacy links."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Accepting one date hides the remaining dates of a counter offer",
+   "scenario": "Sara proposes different rates for two dates in Tom's shift. Tom accepts the first date, and the whole proposal disappears because it is marked accepted and removed from the list. Tom can no longer review or accept Sara's proposed terms for the second date through the normal screen.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:56",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:28",
+    "backend/shifts/counter_offers.py:131",
+    "backend/shifts/counter_offers.py:143",
+    "backend/shifts/counter_offers.py:29"
+   ],
+   "confidence": "high",
+   "test_needed": "Submit one counter offer covering two independently filled dates, accept only the first, then verify the second remains reviewable and acceptable after reload.",
+   "owner_question": {
+    "question": "When Tom accepts the first of two dates proposed by Sara, what should happen to her second date?",
+    "options": [
+     "Keep Sara's second date available for a separate decision",
+     "Accept both dates together with an explicit confirmation",
+     "Hide Sara's remaining proposal after the first acceptance (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Jobs without dated slots never load internal candidates",
+   "scenario": "Tom posts a full-time job without individual dated slots, and Omar expresses interest in the whole job. Tom opens the internal candidates view, but it says nobody has responded. The page never requests the job's internal candidates because there are no dates to iterate over.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:45",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:65",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:196",
+    "backend/shifts/candidates.py:233",
+    "backend/shifts/test_shift_posting_contract.py:363"
+   ],
+   "confidence": "high",
+   "test_needed": "Open a single-worker full-time job with no dated slots and an interested internal member; verify that member appears and can be reviewed.",
+   "owner_question": {
+    "question": "When Omar applies to Tom's full-time job without dated slots, what should Tom see?",
+    "options": [
+     "Show Omar in the job's internal candidates",
+     "Require dated slots before Tom can publish the job",
+     "Show an empty internal candidates list (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Organisations",
+   "title": "Editing chain details removes its pharmacy links",
+   "scenario": "Tom has both pharmacies in his chain and changes only the chain's contact email or logo. Saving replaces the chain's pharmacy selection with an empty list, so both pharmacies disappear from the chain. Nadia consequently loses the chain connection used to reach staff at Tom's other pharmacy.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:159",
+    "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx:166",
+    "shared-core/src/domains/organizations/api.ts:150",
+    "backend/organizations/serializers.py:585",
+    "backend/shifts/candidates.py:263"
+   ],
+   "confidence": "high",
+   "test_needed": "Create a chain with two pharmacies, submit the web form's multipart PUT changing only its email, and verify both pharmacy links remain.",
+   "owner_question": {
+    "question": "When Tom edits only his chain's email or logo, what should happen to its pharmacies?",
+    "options": [
+     "Keep every existing pharmacy linked",
+     "Require Tom to confirm the pharmacy selection before saving",
+     "Remove all pharmacy links (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Notification refreshes leave counter offers stale",
+   "scenario": "Tom opens a shift before Sara submits a counter offer, leaving an empty offer list cached. Sara then submits her proposal, and Tom opens its notification while staying in the Active screen. The shift and interests reload, but the counter-offer list stays empty, so Sara's proposed terms remain unavailable until Tom reloads or leaves and reopens the screen.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:104",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:218",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useTabData.ts:83",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:31"
+   ],
+   "confidence": "high",
+   "test_needed": "Cache an empty counter-offer list, create a counter offer, then navigate to a notification for the same shift without remounting; verify the proposal appears.",
+   "owner_question": {
+    "question": "When Tom opens Sara's new counter-offer notification from an already open shift, what should happen?",
+    "options": [
+     "Refresh and display Sara's proposed terms",
+     "Show a visible refresh action that loads Sara's proposal",
+     "Require Tom to reload or reopen the screen (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-2"
+}

@@ -1,0 +1,288 @@
+{
+ "chunk": "C026",
+ "files": [
+  {
+   "path": "backend/worker_finance/tests/test_stale_invoice_record_contenttype.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; tests protect unrelated content types, references and database routing."
+  },
+  {
+   "path": "backend/worker_finance/tests/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Test routes match the finance and legacy endpoints."
+  },
+  {
+   "path": "backend/worker_finance/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Finance routes resolve to authenticated views."
+  },
+  {
+   "path": "backend/worker_finance/views.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B58",
+    "N1",
+    "N2",
+    "N4"
+   ],
+   "note": "Known draft visibility issue; payment reporting, send concurrency and issue transaction problems."
+  },
+  {
+   "path": "backend/workforce/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/workforce/admin.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Django admin model registration."
+  },
+  {
+   "path": "backend/workforce/apps.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Connects workforce signal receivers during application startup."
+  },
+  {
+   "path": "backend/workforce/attendance_edits.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; missing punches check manager scope, session ownership and event ordering."
+  },
+  {
+   "path": "backend/workforce/award_rates.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional source-level schedule selection problem found."
+  },
+  {
+   "path": "backend/workforce/employment_engagement_service.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Payload construction validates classifications, agreed rate floors and junior review dates."
+  },
+  {
+   "path": "backend/workforce/employment_terms.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; ordinary-hours validation and correspondence selection are consistent."
+  },
+  {
+   "path": "backend/workforce/leave_service.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B60"
+   ],
+   "note": "Overlapping pending requests can be approved concurrently without a shared worker lock."
+  },
+  {
+   "path": "backend/workforce/migrations/0001_initial.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Initial schema creation; no data transformation."
+  },
+  {
+   "path": "backend/workforce/migrations/0002_employmentengagement.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Employment engagement schema creation."
+  },
+  {
+   "path": "backend/workforce/migrations/0003_employmentengagement_award_snapshot.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Adds the award snapshot field."
+  },
+  {
+   "path": "backend/workforce/migrations/0004_employmentengagement_ordinary_hours_pattern.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Adds the ordinary-hours pattern field."
+  },
+  {
+   "path": "backend/workforce/migrations/0005_consolidate_legacy_leave.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; backfill preserves linked leave details and original application timestamps."
+  },
+  {
+   "path": "backend/workforce/migrations/0006_repoint_attendance_relations.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Migration state changes only."
+  },
+  {
+   "path": "backend/workforce/migrations/0007_move_roster_in.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; moves model state and relabels existing content types in place."
+  },
+  {
+   "path": "backend/workforce/migrations/0008_clean_roster_table_and_index_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Renames database tables and indexes without transforming records."
+  },
+  {
+   "path": "backend/workforce/migrations/0009_clean_roster_constraint_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Renames database constraints, indexes and sequences."
+  },
+  {
+   "path": "backend/workforce/migrations/0010_roster_shift_republish_audit.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Updates audit action choices without changing stored records."
+  },
+  {
+   "path": "backend/workforce/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty migration package initializer."
+  },
+  {
+   "path": "backend/workforce/models.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B27",
+    "N3"
+   ],
+   "note": "Known overlapping timesheet periods; engagement validation permits junior terms beyond their birthday review date."
+  },
+  {
+   "path": "backend/workforce/permissions.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; management checks combine pharmacy capabilities with organisation scope."
+  },
+  {
+   "path": "backend/workforce/roster/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Package documentation only."
+  },
+  {
+   "path": "backend/workforce/roster/acknowledgements.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Acknowledgements require published assignments; manager summaries disregard acknowledgements predating publication."
+  },
+  {
+   "path": "backend/workforce/roster/assignment_rates.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; accepted offer rates and incomplete historical staff snapshots retain their locked rates."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Invoicing",
+   "title": "Marking an invoice paid leaves its payment balance and cash reporting unchanged.",
+   "scenario": "Tom pays Sara's full invoice, and Sara selects Mark as paid as instructed by the screen. The invoice shows Paid, but its recorded payment amount stays zero and its outstanding balance remains the full amount. Sara's cash-basis GST worksheet also omits the money unless she separately records a payment.",
+   "evidence": [
+    "backend/worker_finance/views.py:251",
+    "backend/worker_finance/views.py:506",
+    "backend/worker_finance/views.py:634",
+    "backend/worker_finance/services.py:835",
+    "frontend_web/src/pages/finance/FinanceWorkspace.tsx:354",
+    "frontend_web/src/pages/finance/FinanceWorkspace.tsx:355"
+   ],
+   "confidence": "high",
+   "test_needed": "Mark an unpaid invoice paid through the normal action; assert zero balance and inclusion of the payment in the correct cash-reporting period.",
+   "owner_question": {
+    "question": "When Sara marks Tom's fully paid invoice as paid, what should happen to its balance and cash report?",
+    "options": [
+     "Record the remaining payment with a payment date and clear Sara's balance",
+     "Require Sara to enter payment details before marking it paid",
+     "Change only the status and require a separate payment entry, as today"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Invoicing",
+   "title": "Finishing an older invoice email exposes a newer unsent revision.",
+   "scenario": "Sara starts emailing an invoice to Tom, then saves a revised amount in another tab while the email is being sent. When the earlier email finishes, the app marks the latest invoice as sent even though that email contained the earlier revision. Tom can then see and approve Sara's newer draft before she sends it.",
+   "evidence": [
+    "backend/worker_finance/views.py:279",
+    "backend/worker_finance/views.py:290",
+    "backend/worker_finance/views.py:315",
+    "backend/worker_finance/views.py:316",
+    "backend/worker_finance/services.py:693",
+    "backend/worker_finance/services.py:702",
+    "backend/worker_finance/services.py:772"
+   ],
+   "confidence": "high",
+   "test_needed": "Pause sending revision 1, save revision 2, then finish sending; assert revision 2 remains draft and Tom can see only revision 1.",
+   "owner_question": {
+    "question": "If Sara saves a newer draft while an earlier invoice email is sending to Tom, which revision should Tom see?",
+    "options": [
+     "Only the emailed revision until Sara sends the newer draft",
+     "Prevent Sara from saving while the email is sending",
+     "Expose the newer draft when the earlier email finishes, as today"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Timesheets",
+   "title": "Extending an active employment agreement bypasses its junior rate expiry.",
+   "scenario": "Tom creates junior employment terms for Mia ending before her next birthday, as the app requires. Once those terms have started, Tom can extend or clear their end date without the birthday check running again. Mia's later timesheets then carry the old junior rates beyond the required review date.",
+   "evidence": [
+    "backend/workforce/employment_engagement_service.py:109",
+    "backend/workforce/models.py:165",
+    "backend/workforce/views.py:362",
+    "backend/workforce/views.py:391",
+    "backend/workforce/views.py:416",
+    "backend/workforce/timesheet_data.py:86",
+    "backend/workforce/timesheet_data.py:115"
+   ],
+   "confidence": "high",
+   "test_needed": "Patch an already-started junior agreement to end on or after its birthday review date, including a null end date; assert rejection.",
+   "owner_question": {
+    "question": "When Tom extends Mia's junior employment terms across her next birthday, what should happen?",
+    "options": [
+     "Require successor terms with reviewed rates from Mia's birthday",
+     "Automatically create successor terms using the new age",
+     "Continue Mia's frozen junior rates beyond her birthday, as today"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Invoicing",
+   "title": "The invoice issue action fails on PostgreSQL because it locks outside a transaction.",
+   "scenario": "Sara confirms a saved invoice using the supported issue action before sending it. The confirmation attempts a database lock without opening a transaction, so PostgreSQL rejects the request and Sara receives a server error. The isolated SQLite tests do not expose this failure.",
+   "evidence": [
+    "backend/worker_finance/views.py:155",
+    "backend/worker_finance/views.py:234",
+    "backend/core/settings.py:401",
+    "backend/core/settings.py:409",
+    "backend/worker_finance/tests/settings.py:9",
+    "shared-core/src/domains/finance/api.ts:80"
+   ],
+   "confidence": "high",
+   "test_needed": "Call the issue action on PostgreSQL from a TransactionTestCase without an enclosing transaction; assert successful confirmation rather than TransactionManagementError.",
+   "owner_question": {
+    "question": "When Sara confirms a saved invoice through the existing issue action, what should happen?",
+    "options": [
+     "Confirm successfully while allowing later edits",
+     "Retire the action and direct Sara to the current send flow",
+     "Keep the existing action and its current failure"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-2"
+}

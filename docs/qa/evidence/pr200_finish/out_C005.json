@@ -1,0 +1,89 @@
+{
+ "chunk": "C005",
+ "files": [
+  {
+   "path": "backend/chat/views.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "B50",
+    "B51",
+    "B49"
+   ],
+   "note": "Default room update skips creator/admin check; also known community-preview and revoked-sender gaps"
+  },
+  {
+   "path": "backend/client_profile/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package marker"
+  },
+  {
+   "path": "backend/client_profile/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Standard AppConfig"
+  },
+  {
+   "path": "backend/client_profile/characterization_support.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Test fixture helpers only; no app logic"
+  },
+  {
+   "path": "backend/client_profile/domains/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package marker"
+  },
+  {
+   "path": "backend/client_profile/domains/common/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Docstring-only package marker"
+  },
+  {
+   "path": "backend/client_profile/domains/common/access.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Legacy re-exports of shifts/memberships helpers only"
+  },
+  {
+   "path": "backend/client_profile/fields.py",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Encryption key comes from SECRET_KEY; after rotation, reads quietly return ciphertext instead of failing"
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Chat",
+   "title": "Any chat member can rewrite who is in a room through the plain room update, skipping the creator/admin check and the community-chat block.",
+   "scenario": "Mia, an ordinary assistant at Tom's pharmacy, edits the pharmacy's community chat through the standard room-edit call. She removes every member except the creator and adds Sara, an outside locum, by picking any active membership on the platform. Sara can now read the whole community chat history through the message list, even though she has no role at Tom's pharmacy. The same call also lets a non-admin member of a custom group rename it or remove the other members. The dedicated group-edit path would have refused both.",
+   "evidence": [
+    "backend/chat/views.py:50",
+    "backend/chat/views.py:92",
+    "backend/chat/views.py:104",
+    "backend/chat/views.py:453",
+    "backend/chat/views.py:457",
+    "backend/chat/serializers.py:265",
+    "backend/chat/serializers.py:308",
+    "backend/chat/serializers.py:349",
+    "backend/chat/views.py:667"
+   ],
+   "confidence": "high",
+   "test_needed": "As a non-admin, non-creator staff member, PATCH /rooms/<community_chat_id>/ with participants=[outsider_membership_id]. Expect 403, no new Participant row for the outsider, and no change to existing participants.",
+   "owner_question": {
+    "question": "Mia is a regular staff member, not a chat admin. She tries to change the members of Tom's pharmacy community chat, or of a custom group Omar created. What should happen?",
+    "options": [
+     "Refuse: only the group creator or a group admin (or a pharmacy admin with comms rights, for community chats) can change members or the title",
+     "Let Mia add people from her own pharmacy only, and never remove anyone",
+     "Keep today's behaviour: any member can change the member list and title"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeA-1"
+}

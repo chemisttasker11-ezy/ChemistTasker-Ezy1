@@ -1,0 +1,97 @@
+{
+ "chunk": "C052",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_pharmacist/BasicInfoV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; valid form management, OTP verification, and AHPRA status handling."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_pharmacist/IdentityV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; document type selection, metadata inputs, and verification status display operate correctly."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_pharmacist/PaymentV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; TFN/ABN toggles, ABR scraping workflow, and unsaved changes guard operate as expected."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_pharmacist/PharmacistOnboardingV2Layout.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; step definitions and verification targets correctly configure pharmacist onboarding layout."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_pharmacist/ProfileV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; bio text input and resume file upload/preview function properly."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_pharmacist/RatesV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; rate preferences and early/late toggles serialize cleanly to form data."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_pharmacist/RefereesV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; referee contact collection and verification request dispatch operate correctly."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_pharmacist/SkillsV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; registry integration, skill claims, certificate attachments, and software selection work as intended."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_staff/BasicInfoV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; handles other staff personal details and mobile verification without AHPRA gating."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_staff/IdentityV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; identity document uploads and metadata fields function properly for other staff."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_staff/OtherStaffOnboardingV2Layout.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; step definitions and verification targets correctly configure pharmacy staff onboarding."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_staff/PaymentV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; payment preference configuration and ABN lookup workflow work as intended for staff."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_staff/ProfileV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; staff bio and resume document management function correctly."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_staff/RefereesV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; referee contact collection and dispatch work properly for other staff."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_staff/RegulatoryV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; role selection lock, award levels, intern AHPRA verification, and evidence uploads work cleanly."
+  }
+ ],
+ "findings": [],
+ "reviewer": "agy-g2"
+}

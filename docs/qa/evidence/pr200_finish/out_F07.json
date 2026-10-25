@@ -1,0 +1,204 @@
+{
+ "chunk": "F07",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "backend/core/api_v1_urls.py",
+  "backend/core/settings.py",
+  "backend/invoicing/urls.py",
+  "backend/invoicing/views.py",
+  "backend/invoicing/models.py",
+  "backend/invoicing/serializers.py",
+  "backend/invoicing/services.py",
+  "backend/worker_finance/urls.py",
+  "backend/worker_finance/views.py",
+  "backend/worker_finance/models.py",
+  "backend/worker_finance/serializers.py",
+  "backend/worker_finance/services.py",
+  "backend/worker_finance/calculations.py",
+  "backend/worker_finance/documents.py",
+  "backend/worker_finance/legacy.py",
+  "backend/worker_finance/invoice_bridge.py",
+  "backend/worker_finance/migrations/0005_consolidate_invoice_record.py",
+  "backend/worker_finance/templates/worker_finance/invoice.html",
+  "backend/worker_finance/tests/test_api.py",
+  "backend/organizations/access.py",
+  "backend/users/org_roles.py",
+  "backend/billing/utils.py",
+  "backend/dashboards/views.py",
+  "backend/notifications/models.py",
+  "backend/notifications/services.py",
+  "backend/notifications/apps.py",
+  "shared-core/src/finance.ts",
+  "shared-core/src/financePresentation.ts",
+  "shared-core/src/constants/endpoints.ts",
+  "shared-core/src/domains/finance/api.ts",
+  "shared-core/src/domains/invoicing/api.ts",
+  "frontend_web/src/utils/invoiceIssuer.ts",
+  "frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceManagePage.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/Invoices/invoiceStats.ts",
+  "frontend_web/src/pages/finance/FinanceWorkspace.tsx",
+  "frontend_web/src/pages/finance/InvoiceComposer.tsx",
+  "frontend_web/src/pages/finance/InvoiceReviewDialog.tsx",
+  "frontend_mobile/app/organization/invoice.tsx",
+  "frontend_mobile/roles/shared/invoices/InvoiceList.tsx",
+  "frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx",
+  "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx",
+  "frontend_mobile/features/parity/finance.tsx"
+ ],
+ "confirmed_known": [
+  "B33",
+  "B58",
+  "B59"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Invoicing",
+   "title": "Both invoice editors block saving an invoice prefilled from an accepted shift.",
+   "scenario": "Sara chooses her accepted shift at Tom's pharmacy and the invoice fills in Tom's pharmacy details. Pressing Save tells her to select a customer, but the customer selector is disabled. This happens on both web and mobile, preventing Sara from creating the internal invoice through the intended flow.",
+   "evidence": [
+    "backend/worker_finance/services.py:362",
+    "frontend_web/src/pages/finance/InvoiceComposer.tsx:103",
+    "frontend_web/src/pages/finance/InvoiceComposer.tsx:130",
+    "frontend_web/src/pages/finance/InvoiceComposer.tsx:187",
+    "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:199",
+    "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx:229"
+   ],
+   "confidence": "high",
+   "test_needed": "Choose an eligible accepted shift in each editor and save without manually selecting a customer; assert that an internal invoice is created for the shift's pharmacy.",
+   "owner_question": {
+    "question": "When Sara starts an invoice from her accepted shift at Tom's pharmacy, should she be able to save with the pharmacy already selected?",
+    "options": [
+     "Sara saves directly using the shift's pharmacy.",
+     "Sara must confirm an enabled pharmacy selection before saving.",
+     "Sara remains blocked by the locked customer selection (keep today's behaviour)."
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Payments",
+   "title": "Marking an invoice paid leaves its balance and cash worksheet unchanged.",
+   "scenario": "Tom pays Sara's $1,100 invoice, and Sara uses Mark as paid as instructed once the full amount arrives. The invoice says Paid, but still shows $1,100 outstanding and zero received; her cash worksheet also includes none of that payment or its GST. Tom's own Mark paid action creates the same discrepancy for Sara.",
+   "evidence": [
+    "frontend_web/src/pages/finance/FinanceWorkspace.tsx:354",
+    "backend/worker_finance/views.py:243",
+    "backend/worker_finance/views.py:498",
+    "backend/worker_finance/services.py:835",
+    "backend/worker_finance/views.py:634",
+    "frontend_web/src/pages/dashboard/sidebar/Invoices/invoiceStats.ts:101"
+   ],
+   "confidence": "high",
+   "test_needed": "Mark an unpaid $1,100 GST invoice paid through each persona's action and assert that the balance becomes zero and the confirmed receipt appears in the appropriate cash worksheet period.",
+   "owner_question": {
+    "question": "When Sara confirms Tom's full payment using Mark as paid, how should her balance and cash worksheet change?",
+    "options": [
+     "Collect a receipt date and record the remaining payment.",
+     "Require Sara to record payment details before marking it paid.",
+     "Change only the Paid label while retaining the outstanding balance (keep today's behaviour)."
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Finance summaries",
+   "title": "Saving an invoice revision removes its recorded receipts from the cash worksheet.",
+   "scenario": "Sara sends Tom an invoice and records a partial payment that appears correctly in her cash worksheet. She then corrects only the invoice notes and saves without sending the replacement yet. The payment and its GST disappear from the same worksheet period even though Sara still has the money and the payment history remains.",
+   "evidence": [
+    "backend/worker_finance/services.py:693",
+    "backend/worker_finance/services.py:702",
+    "backend/worker_finance/services.py:982",
+    "backend/worker_finance/views.py:626",
+    "backend/worker_finance/views.py:634"
+   ],
+   "confidence": "high",
+   "test_needed": "Record a partial payment against a sent invoice, save a notes-only revision without resending, and assert that the cash worksheet's sales and GST totals remain unchanged.",
+   "owner_question": {
+    "question": "Should Sara's receipt from Tom remain in her cash worksheet while she prepares an unsent invoice correction?",
+    "options": [
+     "Keep the recorded receipt included throughout the correction.",
+     "Block revision until Sara completes an explicit accounting adjustment.",
+     "Exclude the receipt until the corrected invoice is sent (keep today's behaviour)."
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P1",
+   "area": "Invoice delivery",
+   "title": "Finishing an older invoice email can publish a newer unsent revision.",
+   "scenario": "Sara sends an invoice to Tom and, while the email is still being processed, saves a correction from another device. When the first email finishes, the corrected invoice is marked Sent even though the email contained the older version. Tom can then see and approve the unsent correction while holding a different invoice in his email.",
+   "evidence": [
+    "backend/worker_finance/views.py:272",
+    "backend/worker_finance/views.py:294",
+    "backend/worker_finance/views.py:315",
+    "backend/worker_finance/services.py:693",
+    "backend/worker_finance/services.py:770"
+   ],
+   "confidence": "high",
+   "test_needed": "Pause email sending for version 1, save version 2, then finish the email; assert that version 2 remains draft and Tom can access only delivered version 1.",
+   "owner_question": {
+    "question": "If Sara saves a correction while an older invoice email to Tom is sending, which version should Tom be allowed to review?",
+    "options": [
+     "Only the emailed version until Sara sends the correction.",
+     "Prevent Sara from saving while delivery is in progress.",
+     "Publish the correction when the older email finishes (keep today's behaviour)."
+    ]
+   }
+  },
+  {
+   "id": "N5",
+   "severity": "P2",
+   "area": "Invoice documents",
+   "title": "Current finance invoice PDFs are labelled draft even after delivery.",
+   "scenario": "Sara emails her saved invoice to Tom, and the attachment says DRAFT - NOT ISSUED. Downloading the current invoice after successful delivery or payment produces the same label. Tom receives contradictory information about whether Sara has actually issued the bill.",
+   "evidence": [
+    "backend/worker_finance/services.py:827",
+    "backend/worker_finance/templates/worker_finance/invoice.html:16",
+    "backend/worker_finance/documents.py:16",
+    "backend/worker_finance/views.py:294",
+    "backend/worker_finance/views.py:268"
+   ],
+   "confidence": "high",
+   "test_needed": "Send a finance invoice and inspect both its email attachment and subsequent current PDF; assert that neither labels the issued invoice DRAFT - NOT ISSUED.",
+   "owner_question": {
+    "question": "What should Tom see on the invoice PDF that Sara successfully sends?",
+    "options": [
+     "An issued invoice without the draft label.",
+     "An issued invoice explicitly stating its revision remains editable.",
+     "DRAFT - NOT ISSUED on the emailed and current PDFs (keep today's behaviour)."
+    ]
+   }
+  },
+  {
+   "id": "N6",
+   "severity": "P1",
+   "area": "Superannuation",
+   "title": "A separate super request cannot be corrected when its service invoice changes.",
+   "scenario": "Sara creates a separate $120 super request for an invoice to Tom. She later corrects the work amount, making the invoice's super contribution $180, but the separate request remains $120. Sara cannot revise that request or create a replacement through the available actions, leaving Tom with conflicting contribution amounts.",
+   "evidence": [
+    "backend/worker_finance/services.py:606",
+    "backend/worker_finance/services.py:691",
+    "backend/worker_finance/services.py:894",
+    "backend/worker_finance/services.py:902",
+    "frontend_web/src/pages/finance/FinanceWorkspace.tsx:356",
+    "frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx:159"
+   ],
+   "confidence": "high",
+   "test_needed": "Create a separate super request, revise the parent invoice's eligible amount, and assert that an explicit supported correction produces a matching contribution request rather than permanently returning the old amount.",
+   "owner_question": {
+    "question": "When Sara corrects an invoice to Tom after creating its separate super request, what should happen to that request?",
+    "options": [
+     "Create an audited replacement with the corrected contribution.",
+     "Require an explicit adjustment before saving the invoice correction.",
+     "Keep the original request amount with no correction action (keep today's behaviour)."
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-3"
+}

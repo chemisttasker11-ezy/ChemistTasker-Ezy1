@@ -1,0 +1,178 @@
+{
+ "chunk": "C001",
+ "files": [
+  {
+   "path": "backend/attendance/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package marker."
+  },
+  {
+   "path": "backend/attendance/api_support.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Token extraction and stable error response are fine."
+  },
+  {
+   "path": "backend/attendance/approvals.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "B56"
+   ],
+   "note": "Correction order check compares across different breaks; blocks real corrections."
+  },
+  {
+   "path": "backend/attendance/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "App config only."
+  },
+  {
+   "path": "backend/attendance/credentials.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B63",
+    "B64"
+   ],
+   "note": "Platform-declared native pairing; pairing code and OTP pushed to notifications."
+  },
+  {
+   "path": "backend/attendance/eligibility.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B32"
+   ],
+   "note": "Explicit assignment_id path skips the shift time window."
+  },
+  {
+   "path": "backend/attendance/kiosk_api.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2",
+    "B63"
+   ],
+   "note": "Break start/end needs no PIN for workers without a local PIN."
+  },
+  {
+   "path": "backend/attendance/migrations/0001_initial.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only move plus content-type relabel."
+  },
+  {
+   "path": "backend/attendance/migrations/0002_clean_table_and_index_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Renames only."
+  },
+  {
+   "path": "backend/attendance/migrations/0003_clean_constraint_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Database object renames only."
+  },
+  {
+   "path": "backend/attendance/migrations/0004_favourite_cover.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Adds a choice value; no data change."
+  },
+  {
+   "path": "backend/attendance/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package marker."
+  },
+  {
+   "path": "backend/attendance/models.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Append-only guards and constraints look right."
+  },
+  {
+   "path": "backend/attendance/protocol.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B29",
+    "B32"
+   ],
+   "note": "Time-drift flags still apply attendance; shift_id forwarded as assignment_id."
+  },
+  {
+   "path": "backend/attendance/test_approval_locking.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Asserts match the intended locking and idempotency."
+  },
+  {
+   "path": "backend/attendance/test_favourite_cover.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Asserts match the owner decision."
+  },
+  {
+   "path": "backend/attendance/test_helpers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Simple PIN and QR unit checks; correct."
+  },
+  {
+   "path": "backend/attendance/throttles.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Throttle keys are fine; auth still needs a valid token."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Attendance",
+   "title": "Manager break corrections are wrongly refused when a session has more than one break.",
+   "scenario": "Omar takes a tea break from 10:00 to 10:10 and a lunch break from 13:00 to 13:30. Tom tries to correct the lunch start to 13:05, but the system refuses because 13:05 is after the end of the tea break. Correcting the tea break's end to 10:12 is also refused because it is before the lunch start. Tom cannot fix break times, so Omar's paid minutes stay wrong.",
+   "evidence": [
+    "backend/attendance/approvals.py:358",
+    "backend/attendance/approvals.py:363",
+    "backend/attendance/approvals.py:370",
+    "backend/attendance/approvals.py:371",
+    "backend/attendance/views.py:228"
+   ],
+   "confidence": "high",
+   "test_needed": "A session with two break pairs: correcting the second BREAK_START to a time inside the second break succeeds.",
+   "owner_question": {
+    "question": "Omar took a tea break and a lunch break. Tom needs to move the lunch start by five minutes. What should happen?",
+    "options": [
+     "Allow it: only check against that break's own end and against clock in and clock out",
+     "Allow it, and also block any overlap between the two breaks",
+     "Keep today's behaviour: refuse the correction"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Kiosk",
+   "title": "Anyone at the counter kiosk can start or end a break for a locum or cross-site worker without any PIN.",
+   "scenario": "Sara, a locum with a confirmed shift, clocks in by phone QR and has no membership PIN at Tom's pharmacy. The kiosk staff list shows her worker ID, and anyone at the counter (for example Mia) can tap break start for Sara with no PIN asked. Sara's unpaid break time begins without her knowing. Nadia, covering from Tom's other pharmacy, has the same problem because only a local membership PIN is checked.",
+   "evidence": [
+    "backend/attendance/kiosk_api.py:765",
+    "backend/attendance/kiosk_api.py:772",
+    "backend/attendance/kiosk_api.py:774",
+    "backend/attendance/kiosk_api.py:691"
+   ],
+   "confidence": "medium",
+   "test_needed": "A break START from the kiosk for a clocked-in worker with no local membership PIN is refused unless that worker proves who they are.",
+   "owner_question": {
+    "question": "Sara is clocked in at Tom's pharmacy and has no kiosk PIN there. Mia taps 'start break' for Sara on the counter kiosk. What should happen?",
+    "options": [
+     "Refuse: the worker must confirm with their own PIN or app",
+     "Allow it but tell Sara and flag it for Tom to review",
+     "Keep today's behaviour: allow it with no check"
+    ]
+   }
+  }
+ ],
+ "_comment": "Not checked: whether backfilled cover shifts (PLATFORM visibility, LOCUM type) show on any public feed, and how timesheets count break minutes, which affects how serious N2 is.",
+ "reviewer": "claudeA-1"
+}

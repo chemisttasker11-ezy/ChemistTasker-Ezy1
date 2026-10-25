@@ -1,0 +1,185 @@
+{
+ "chunk": "C062",
+ "not_reviewed": [
+  "frontend_mobile/roles/shared/calendar/calendarModel.ts",
+  "frontend_mobile/roles/shared/calendar/index.tsx",
+  "frontend_mobile/roles/shared/chat/ChatPage.tsx"
+ ],
+ "files": [
+  {
+   "path": "frontend_mobile/roles/pharmacist/profile-tabs/PaymentScreen.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Turning super switch off does not clear super fields; saveABN still sends them."
+  },
+  {
+   "path": "frontend_mobile/roles/pharmacist/profile-tabs/RateScreen.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Plain rate form; server validates."
+  },
+  {
+   "path": "frontend_mobile/roles/pharmacist/profile-tabs/RefereesScreen.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Thin wrapper over shared RefereesScreen."
+  },
+  {
+   "path": "frontend_mobile/roles/pharmacist/profile-tabs/SkillsScreen.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Skills and optional certificates; nothing wrong found."
+  },
+  {
+   "path": "frontend_mobile/roles/pharmacist/profile-tabs/shared.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Picker helpers; MIME trust is server-side (B49)."
+  },
+  {
+   "path": "frontend_mobile/roles/pharmacist/profile.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Notifications switch hardcoded on; App Settings item does nothing."
+  },
+  {
+   "path": "frontend_mobile/roles/pharmacist/publish-availability.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Thin wrapper over shared TalentBoard."
+  },
+  {
+   "path": "frontend_mobile/roles/pharmacist/shifts/[id].tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shift detail actions go through shared services."
+  },
+  {
+   "path": "frontend_mobile/roles/pharmacist/shifts/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tab switching by workspace; nothing wrong found."
+  },
+  {
+   "path": "frontend_mobile/roles/pharmacist/talent-board.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Thin wrapper over shared TalentBoard."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/ManageMembershipsScreen.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Accept/reject/quit go to the server; nothing wrong found."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/availability/AvailabilityRadiusMap.native.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Map preview only."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/availability/AvailabilityRadiusMap.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Platform switch only."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/availability/AvailabilityRadiusMap.web.tsx",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Renders nothing."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "N2"
+   ],
+   "note": "Notify toggle ignores existing slots; partial multi-date save duplicates on retry."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/availability/availabilityModel.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Types and constants."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/calendar/calendarModel.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT READ: usage limit reached; re-dispatch."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/calendar/index.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT READ: usage limit reached; re-dispatch."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/chat.tsx",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Re-export only."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/chat/ChatListItem.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Display only; preview comes from server (B50 is server-side)."
+  },
+  {
+   "path": "frontend_mobile/roles/shared/chat/ChatPage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT READ: usage limit reached; re-dispatch."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Notifications",
+   "title": "Unticking 'notify me about matching shifts' on mobile does not turn notifications off for slots already saved.",
+   "scenario": "Sara saves several availability slots with 'notify me' ticked. Later she unticks the box, thinking she has opted out, but only slots she adds from now on get the new setting, so her old slots keep sending shift alerts. When she reopens the screen the box shows ticked again, because it is ticked whenever any saved slot has alerts on.",
+   "evidence": [
+    "frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:360",
+    "frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:469",
+    "frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:545"
+   ],
+   "confidence": "medium",
+   "test_needed": "Save a slot with alerts on, untick the box, reload: no saved slot should still have alerts on.",
+   "owner_question": {
+    "question": "Sara unticks 'notify me' after saving slots with alerts on. What should happen to her existing slots?",
+    "options": [
+     "Alerts turn off for all her slots",
+     "The box only affects new slots and says so on screen",
+     "Keep today's behaviour"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Mobile",
+   "title": "Adding several availability dates at once can half-save, show 'Failed', and create duplicates when retried.",
+   "scenario": "Omar picks five dates and taps Add Time Slot. Three save and two fail, so he sees 'Failed to save slot' while the three saved dates are missing from his list. He taps Add again and the three dates are saved a second time, so pharmacies see duplicate availability for him.",
+   "evidence": [
+    "frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:473",
+    "frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:479"
+   ],
+   "confidence": "high",
+   "test_needed": "Make the second of three create calls fail: the screen should list the saved ones and a retry should not duplicate them.",
+   "owner_question": {
+    "question": "Omar's five-date save half-fails. What should he see?",
+    "options": [
+     "The saved dates listed, with only the failed ones offered for retry",
+     "Nothing saved at all (all or nothing)",
+     "Keep today's behaviour"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

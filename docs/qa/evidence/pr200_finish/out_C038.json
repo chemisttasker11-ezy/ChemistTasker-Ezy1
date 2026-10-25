@@ -1,0 +1,135 @@
+{
+ "chunk": "C038",
+ "files": [
+  {
+   "path": "frontend_web/src/main.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Omits /dashboard route or redirect, causing direct or returned dashboard navigations to render NotFoundPage."
+  },
+  {
+   "path": "frontend_web/src/navigation.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Role navigation configurations and capability guards correctly route users to valid pages."
+  },
+  {
+   "path": "frontend_web/src/pages/AccountDeletionPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Static policy instructions and data retention guidelines."
+  },
+  {
+   "path": "frontend_web/src/pages/LandingPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Public landing page with correctly resolved dashboard and auth links."
+  },
+  {
+   "path": "frontend_web/src/pages/MembershipApplyPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Post-submission 'My dashboard' link targets unrouted /dashboard path which renders 404."
+  },
+  {
+   "path": "frontend_web/src/pages/MobileCheckoutReturnPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Deep links mobile return parameters back to the mobile app scheme."
+  },
+  {
+   "path": "frontend_web/src/pages/MobileOTPVerify.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Successful verification assigns browser location to unrouted /dashboard path, landing on 404."
+  },
+  {
+   "path": "frontend_web/src/pages/NotFoundPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Standard 404 error page presentation with return home button."
+  },
+  {
+   "path": "frontend_web/src/pages/OTPVerify.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Email OTP verification flow correctly navigates to login with email state."
+  },
+  {
+   "path": "frontend_web/src/pages/OrganizationCreate.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Dead code; unrouted stub page navigating to non-existent /organizations."
+  },
+  {
+   "path": "frontend_web/src/pages/OrganizationPricingPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Public pricing inquiries page with contact inquiry form."
+  },
+  {
+   "path": "frontend_web/src/pages/OwnerClaimRequestsPage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Dead code; unrouted legacy page as claims are handled in PharmacyPage."
+  },
+  {
+   "path": "frontend_web/src/pages/PasswordResetRequestPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Public password reset request form submitting to shared-core service."
+  },
+  {
+   "path": "frontend_web/src/pages/PricingPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Non-owner subscription click navigates to unrouted /dashboard path leading to 404."
+  },
+  {
+   "path": "frontend_web/src/pages/PrivacyPolicyPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Static legal privacy policy documentation."
+  },
+  {
+   "path": "frontend_web/src/pages/PublicJobBoardPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Public job board shift querying, filtering, and application dialogs work properly."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Web",
+   "title": "Post-verification and dashboard return links navigate to an unrouted root path, landing users on a 404 page",
+   "scenario": "After Zoe (or Sara, Ali, or Mia) finishes verifying her mobile number on the web onboarding flow, the page promises to redirect her to her dashboard. Instead, it assigns the browser location to /dashboard, where React Router finds no matching route and displays the 404 Page Not Found screen. The same 404 occurs when Sara clicks 'My dashboard' after submitting a membership application or when clicking subscription buttons as a non-owner.",
+   "evidence": [
+    "frontend_web/src/main.tsx:589",
+    "frontend_web/src/pages/MobileOTPVerify.tsx:97",
+    "frontend_web/src/pages/MembershipApplyPage.tsx:386",
+    "frontend_web/src/pages/PricingPage.tsx:110"
+   ],
+   "confidence": "high",
+   "test_needed": "Mount the router at '/dashboard' with an authenticated user and assert that it redirects to the user's role-specific dashboard instead of rendering NotFoundPage.",
+   "owner_question": {
+    "question": "When an authenticated user lands on or is redirected to '/dashboard', where should the app send them?",
+    "options": [
+     "(Recommended) Redirect '/dashboard' to the user's role-specific dashboard overview via resolveDashboardPath.",
+     "Update each caller individually to construct the role dashboard path before navigating.",
+     "Keep today's behaviour where '/dashboard' falls through to the 404 Page Not Found screen."
+    ]
+   }
+  }
+ ],
+ "reviewer": "agy-g2"
+}

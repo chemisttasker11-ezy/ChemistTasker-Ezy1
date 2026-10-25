@@ -1,0 +1,217 @@
+{
+ "chunk": "C022",
+ "files": [
+  {
+   "path": "backend/shifts/serialization/worker_requests.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B21"
+   ],
+   "note": "Accepts pharmacy and assignment independently without checking requester or tenant scope."
+  },
+  {
+   "path": "backend/shifts/serializers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Stable serializer exports; no additional problem found."
+  },
+  {
+   "path": "backend/shifts/tasks.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no specific reminder delivery problem established."
+  },
+  {
+   "path": "backend/shifts/test_access_escalation_contract.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B09",
+    "N1"
+   ],
+   "note": "Pins read-triggered escalation and exclusion of region admins from managed pharmacies."
+  },
+  {
+   "path": "backend/shifts/test_ahpra_application_gates.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tests distinguish public eligibility from internal member access."
+  },
+  {
+   "path": "backend/shifts/test_app_registration.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Checks canonical Django app registration."
+  },
+  {
+   "path": "backend/shifts/test_claim_eligibility.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Exercises membership locking, role approval and claim visibility boundaries."
+  },
+  {
+   "path": "backend/shifts/test_context_contract.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Validates support counts and context normalization."
+  },
+  {
+   "path": "backend/shifts/test_model_code_ownership.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Checks model identity and preserved historical app labels."
+  },
+  {
+   "path": "backend/shifts/test_pricing_contract.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B14"
+   ],
+   "note": "Pricing expectations preserve the known legacy award figures."
+  },
+  {
+   "path": "backend/shifts/test_rate_visibility.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Checks rate redaction and staff employment pricing."
+  },
+  {
+   "path": "backend/shifts/test_shift_actions_contract.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no specific incorrect assertion established."
+  },
+  {
+   "path": "backend/shifts/test_shift_listing_contract.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Checks listing audiences and assigned-profile contact redaction."
+  },
+  {
+   "path": "backend/shifts/test_shift_posting_contract.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B39"
+   ],
+   "note": "Rate-copy expectations preserve null values for omitted pharmacy rate fields."
+  },
+  {
+   "path": "backend/shifts/test_urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Checks router composition and canonical endpoint names."
+  },
+  {
+   "path": "backend/shifts/test_worker_profile_policy.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Checks current-role profiles and prevents self-verification of qualification evidence."
+  },
+  {
+   "path": "backend/shifts/travel.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no concrete user-facing parsing or distance problem established."
+  },
+  {
+   "path": "backend/shifts/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Routes resolve to the expected shift domain views."
+  },
+  {
+   "path": "backend/shifts/worker_requests.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B21",
+    "B55",
+    "N1"
+   ],
+   "note": "Known scope and approval races; region-admin access also omitted."
+  },
+  {
+   "path": "backend/talent/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/talent/admin.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Registers talent posts with Django admin."
+  },
+  {
+   "path": "backend/talent/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Django app configuration."
+  },
+  {
+   "path": "backend/talent/migrations/0001_initial.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Preserves existing tables and moves content-type identities in place."
+  },
+  {
+   "path": "backend/talent/migrations/0002_clean_table_and_index_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Table and index renames without application-data changes."
+  },
+  {
+   "path": "backend/talent/migrations/0003_clean_constraint_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Database object renames without row changes."
+  },
+  {
+   "path": "backend/talent/migrations/0004_role_labels_pharmacy_team.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Generated role-label migration; stored codes remain unchanged."
+  },
+  {
+   "path": "backend/talent/migrations/0005_board_reports.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Generated migration adding a nullable moderation timestamp."
+  },
+  {
+   "path": "backend/talent/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty migrations package initializer."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Region admins cannot see other managers' shifts or cover requests at their assigned pharmacies.",
+   "scenario": "Lina assigns Grace to manage Tom's pharmacy as a region admin with roster privileges, without adding a separate pharmacy-admin appointment. When Tom posts shifts, Grace's active, confirmed and history lists omit them, although the individual pharmacy permission check recognizes her authority. Omar's cover requests are also unavailable to Grace, preventing her from handling staffing work within her assigned region.",
+   "evidence": [
+    "backend/shifts/test_access_escalation_contract.py:77",
+    "backend/organizations/access.py:194",
+    "backend/organizations/access.py:205",
+    "backend/shifts/selectors.py:13",
+    "backend/shifts/lifecycle.py:97",
+    "backend/shifts/lifecycle.py:153",
+    "backend/shifts/lifecycle.py:176",
+    "backend/shifts/worker_requests.py:49",
+    "backend/shifts/worker_requests.py:57",
+    "backend/shifts/worker_requests.py:384"
+   ],
+   "confidence": "high",
+   "test_needed": "Assign Grace roster-capable region membership without a PharmacyAdmin record; verify Tom's shifts and Omar's cover request are accessible only within her assigned pharmacies.",
+   "owner_question": {
+    "question": "When Lina gives Grace region-admin roster privileges for Tom's pharmacy, should Grace see Tom's shifts and decide Omar's cover requests?",
+    "options": [
+     "Grace can manage this work through her region assignment.",
+     "Grace needs a separate pharmacy-admin appointment to manage others' work (keep today's behaviour)."
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-2"
+}

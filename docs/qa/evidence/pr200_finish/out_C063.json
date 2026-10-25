@@ -1,0 +1,160 @@
+{
+ "chunk": "C063",
+ "files": [
+  {
+   "path": "frontend_mobile/roles/shared/chat/ChatSidebar.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; only matches DMs by title, no permission logic"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/chat/GroupManageModal.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Add-member search uses broken searchParticipants; server enforces membership changes"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/chat/NewChatModal.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Search never returns rows; fallback would send membership id as userId"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/chat/NewGroupModal.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Member search always empty, so a group cannot be created"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/chat/activeRoomState.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Simple module-level active room holder"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/chat/displayName.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Name fallback helper"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/chat/hooks.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Filters on top-level name/email the mapped rows lack"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/chat/types.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Type re-exports"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/dashboard/WorkerShiftPreviews.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/dashboard/dashboardScope.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/forms/UnsavedChangesDialogProvider.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/forms/UnsavedChangesRegistryProvider.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/forms/WorkRightsMenu.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/forms/useUnsavedChangesGuard.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/hub/HubFeed.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/hub/HubPlaceholder.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/hub/HubScreen.model.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/hub/HubScreen.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/hub/PollComposer.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  },
+  {
+   "path": "frontend_mobile/roles/shared/hub/PostCard.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "NOT REVIEWED: usage limit reached; re-dispatch"
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Mobile",
+   "title": "Mobile chat people search never finds anyone, so New Chat, New Group and Add members do not work in the Expo app.",
+   "scenario": "Tom opens New Chat on his phone and types 'Omar'. The list always says 'No users found', even though Omar is his own pharmacist. Tom also cannot start a group with Ali and Mia or add Ben to an existing group. On web the same actions work. If a row ever did match, the app would send Omar's membership id as a user id and could open a chat with the wrong person.",
+   "evidence": [
+    "frontend_mobile/roles/shared/chat/hooks.ts:64-73",
+    "shared-core/src/domains/chat/mappers.ts:53-67",
+    "shared-core/src/domains/chat/api.ts:147-155",
+    "frontend_mobile/roles/shared/chat/NewChatModal.tsx:59-61",
+    "frontend_mobile/roles/shared/chat/GroupManageModal.tsx:199"
+   ],
+   "confidence": "medium",
+   "test_needed": "Return a participant row {id:7,user_details:{first_name:'Omar'}} from fetchChatParticipants; searchParticipants('omar') must return it, and starting a chat must send membershipId 7, not userId 7.",
+   "owner_question": {
+    "question": "When Tom searches 'Omar' in mobile New Chat, what should happen?",
+    "options": [
+     "Omar appears and the chat opens with Omar, same as web",
+     "Mobile only lets Tom pick from shift contacts",
+     "Keep today's behaviour (no search results on mobile)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-2"
+}

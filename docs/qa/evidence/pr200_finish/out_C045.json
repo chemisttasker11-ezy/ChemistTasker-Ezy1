@@ -1,0 +1,153 @@
+{
+ "chunk": "C045",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Cancelled convert-to-open leaves pending deletion; next open-shift post deletes old shift"
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/RosterWorkerDialogs.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Leave dialog shows coworker's leave type and note"
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.model.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Plain mappers and constants"
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Opens leave dialog for any shift with leave, before own-shift check"
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N3"
+   ],
+   "note": "Notify toggle never saved; unchecking does not stop alerts"
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/CounterOfferDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Presentational form; submit logic lives elsewhere"
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/FiltersSidebar.tsx",
+   "verdict": "NA",
+   "ids": [],
+   "note": "One-line re-export of shared UI"
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ReviewCounterOfferDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read-only display dialog"
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ReviewOfferSlotList.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read-only slot list"
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftBoardPreview.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Preview with all actions disabled"
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Multi-offer accept shows only first offer's terms chips and notices"
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Roster",
+   "title": "Cancelling a convert-to-open-shift edit leaves the old shift marked for deletion, so a later, unrelated open-shift post deletes it.",
+   "scenario": "Tom edits Omar's rostered Tuesday shift and ticks 'post as open shift'. The post-shift wizard opens, then Tom changes his mind and closes it, so Omar's shift stays. Later in the same session Tom adds a new open shift for Friday and finishes the wizard. The page then silently deletes Omar's Tuesday shift, and Omar loses a shift he was rostered on without anyone deciding that.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:553",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:852"
+   ],
+   "confidence": "high",
+   "test_needed": "Start convert-to-open on shift A, close the wizard, then complete a new open-shift post from Add shift; assert shift A is not deleted.",
+   "owner_question": {
+    "question": "Tom starts turning Omar's shift into an open shift, then closes the wizard without posting. What should happen to Omar's shift?",
+    "options": [
+     "Omar's shift stays, and nothing later deletes it",
+     "Ask Tom whether to keep or remove Omar's shift when he closes the wizard",
+     "Keep today's behaviour (the next open-shift post Tom completes deletes it)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Roster",
+   "title": "Staff on the worker roster can see coworkers' leave type and private leave notes.",
+   "scenario": "Omar asks for sick leave on his Monday shift and writes a note about a medical appointment. Ali opens 'My roster' for the same pharmacy: Omar's shift shows 'Leave: PENDING', and when Ali clicks it the leave dialog opens with Omar's leave type and the full note. The server only hides the pay and timesheet details from coworkers, not the leave details.",
+   "evidence": [
+    "backend/workforce/roster/serializers.py:138",
+    "backend/workforce/roster/serializers.py:75",
+    "backend/workforce/roster/views.py:534",
+    "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:410",
+    "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:417",
+    "frontend_web/src/pages/dashboard/sidebar/RosterWorkerDialogs.tsx:233"
+   ],
+   "confidence": "high",
+   "test_needed": "As Ali, GET the worker roster for Tom's pharmacy where Omar has a leave request; assert leave_request has no note or leave_type for Omar's assignment.",
+   "owner_question": {
+    "question": "Omar asks for sick leave with a private note. What should Ali, his coworker, see on the shared roster?",
+    "options": [
+     "Nothing about the leave",
+     "Only that the shift is 'on leave', with no type or note",
+     "Keep today's behaviour (type, status and full note)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Notifications",
+   "title": "The 'notify me about matching shifts' checkbox is never saved on its own, so unchecking it does not stop notifications.",
+   "scenario": "Sara added availability slots with notifications on. She later unticks 'Notify me when new public shifts match my availability' and leaves the page, expecting the alerts to stop. Nothing is saved, her existing slots still have notifications on, and the checkbox shows ticked again when she comes back. The setting only applies to slots she adds after changing it.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:237",
+    "frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:371",
+    "frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:428"
+   ],
+   "confidence": "high",
+   "test_needed": "With saved slots that have notifications on, untick the checkbox and reload; assert the slots have notifications off.",
+   "owner_question": {
+    "question": "Sara unticks 'notify me about matching shifts' on her availability page. What should happen?",
+    "options": [
+     "Notifications turn off for all her saved slots straight away",
+     "The checkbox only affects new slots, and the page says so clearly",
+     "Keep today's behaviour"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

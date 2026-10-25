@@ -1,0 +1,139 @@
+{
+ "chunk": "C050",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Invite and remove UI only; the server decides who may manage admins."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/PharmacyOverview.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Display and navigation only."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/PharmacyProfileCard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read-only profile, hours and rate display."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/PharmacySettings.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Toggle layout; saving is handled by its callers."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Bulk-invite errors land on the wrong row when the form has a blank row."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/TopBar.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Breadcrumb only."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/inviteUtils.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Email role lookup and mismatch wording; the server re-checks."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/membershipApi.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Thin wrapper over shared-core."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/pharmacyDetailParts.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Presentational parts."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/teamUi.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Presentational team list and invite-link dialog."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/types.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Type re-exports and a theme helper."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/usePayrollSetting.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "A late reply for another pharmacy cannot overwrite this one."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/rewards/PillsPage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Admin route says 'Pharmacy #X' but shows own pills; referral load errors not caught."
+  },
+  {
+   "path": "frontend_web/src/pages/finance/Editors.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Payment amount capped at balance; idempotency request keys used."
+  },
+  {
+   "path": "frontend_web/src/pages/finance/FinanceTheme.tsx",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Theme density only."
+  },
+  {
+   "path": "frontend_web/src/pages/finance/FinanceWorkspace.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "B58"
+   ],
+   "note": "'Mark as paid' is enabled on unsent drafts, the UI path for B58."
+  },
+  {
+   "path": "frontend_web/src/pages/finance/InvoiceComposer.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "B59"
+   ],
+   "note": "A paid or part-paid invoice can be revised with no check against payments (B59)."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Memberships",
+   "title": "When some bulk staff invitations fail, the error is shown on the wrong person if the form has a blank row in the middle.",
+   "scenario": "Tom fills in Omar in row 1, leaves row 2 empty, and puts Ali in row 3, then presses Send. Omar's invite works, but Ali's fails (for example, he already has a pending application). The server reports the failure as line 2 of the rows it received. The screen puts that error on the empty row 2 instead, and Ali's row shows nothing. Tom sees 'Some invitations were sent' and thinks Ali was invited. If Tom presses Send again, Omar's row is sent again and fails with 'already invited'.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:427",
+    "frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:452",
+    "frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:467",
+    "backend/memberships/invites.py:333"
+   ],
+   "confidence": "high",
+   "test_needed": "Rows [valid, blank, failing]: the error must show on row 3, not row 2, and the row that worked must be cleared or marked as sent.",
+   "owner_question": {
+    "question": "When Tom invites Omar and Ali together and only Ali's invite fails, what should Tom see?",
+    "options": [
+     "Omar's row is removed as sent, and only Ali's row stays, with the reason it failed",
+     "Every row stays, each marked 'Sent' or with its own error, and Send skips the rows already sent",
+     "Keep today's behaviour"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

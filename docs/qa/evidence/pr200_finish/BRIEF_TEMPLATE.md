@@ -14,7 +14,7 @@ ChemistTasker is a pharmacy workforce platform: pharmacy owners and organisation
    - NOTE: a minor quality point (dead code, confusing duplicate logic) that is not a user-facing problem.
    - NA: not app logic (generated file, config, migration with no data change, asset).
 3. Problems already known are listed in docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md (B01-B65). Read that list first. If you see one of those, put its B-id on the file and do NOT write a new finding for it.
-4. Write a new finding only for a real, specific problem you can point to with file:line evidence. No speculation and no style nits. Quality beats quantity; zero new findings is a fine result.
+4. The goal is real problems and production blockers: things that would hurt real users, money, privacy or data once the app is live. Write a new finding only for a real, specific problem you can point to with file:line evidence. No speculation and no style nits. Quality beats quantity; zero new findings is a fine result.
 
 ## The fixed cast (use these names in every scenario)
 Tom = pharmacy owner. Lina = organisation admin. Grace = region admin. Sara = external locum pharmacist. Omar = Tom's own pharmacist. Ali = technician. Mia = pharmacy assistant. Jack = intern. Zoe = Explorer (new user, no role yet). Ben = Tom's favourite locum. Nadia = staff at Tom's other pharmacy.
