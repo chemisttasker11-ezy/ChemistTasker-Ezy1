@@ -102,6 +102,8 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
             self.permission_denied(self.request)
         if slot.shift_id != shift.pk:
             raise DRFValidationError({"slot": "Slot does not belong to the selected shift."})
+        if slot_date is None:
+            raise DRFValidationError({"slot_date": "A roster occurrence date is required."})
         if slot_date != slot.date and not (
             slot.is_recurring and slot.recurring_end_date
             and slot.date <= slot_date <= slot.recurring_end_date
