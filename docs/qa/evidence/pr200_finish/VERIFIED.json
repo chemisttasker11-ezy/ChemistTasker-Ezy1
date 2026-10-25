@@ -578,5 +578,51 @@
       "Existing account membership state reachability needs separate verification for B46",
       "Independent full semantic S2 certification not established"
     ]
+  },
+  "C020-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_c020_n1_manual_pharmacist_slot_rejects_technician",
+        "observed": "Legitimate TECHNICIAN slot manual roster returned 200 and assigned the accepted technician; same actor assigned TECHNICIAN membership to PHARMACIST vacancy and got HTTP 200 with assignment id. Expected 400/403.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40186580438",
+        "head": "9c13610c2fef0044ca78b68e2cc3f0fade6de1f0",
+        "environment": "Django 3.12 runner, disposable SQLite, mocked external dependencies",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/shifts/base.py:399-420",
+      "backend/shifts/assignment.py:133-207",
+      "backend/shifts/access.py:26-41"
+    ],
+    "runtime_limitations": [
+      "staff_assignment_defaults was mocked to isolate qualification, but actual HTTP endpoint, membership lookup and ShiftSlotAssignment persistence executed.",
+      "Synthetic fixture, not proof of actual production exploit; no S2 whole-source certification"
+    ]
+  },
+  "B54": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b54_two_pending_workers_cannot_both_reserve_one_paid_slot",
+        "observed": "Two PENDING offers on the same slot sequentially accepted by distinct workers. First valid accepted and status ACCEPTED_AWAITING_PAYMENT; second also returned 200, leaving two accepted-awaiting-payment offers for the same slot. Expected second 400/403/409.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40186580438",
+        "head": "9c13610c2fef0044ca78b68e2cc3f0fade6de1f0",
+        "environment": "Django 3.12 runner, disposable SQLite, mocked external dependencies",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/shifts/offers.py:329-418",
+      "backend/shifts/assignment.py:25-110",
+      "backend/shifts/models.py:665-719"
+    ],
+    "runtime_limitations": [
+      "Sequential competing reservation evidence only; get_billing_state_for_pharmacy mocked to PAYMENT_REQUIRED. No actual Stripe charges, callback reconciliation or PostgreSQL concurrent acceptance proved.",
+      "Synthetic fixture, not proof of actual production exploit; no S2 whole-source certification"
+    ]
   }
 }

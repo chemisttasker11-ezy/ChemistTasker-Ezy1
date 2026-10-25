@@ -10,15 +10,15 @@
     "P1": 107,
     "P2": 45
   },
-  "runtime_distinct_ids": 30,
-  "runtime_failing_scenarios": 34,
+  "runtime_distinct_ids": 32,
+  "runtime_failing_scenarios": 36,
   "source_refuted_ids": [
     "C016-N2"
   ],
   "status_counts": {
     "SOURCE_SUPPORTED": 13,
-    "UNVERIFIED_CANDIDATE": 170,
-    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 29,
+    "UNVERIFIED_CANDIDATE": 168,
+    "REPRODUCED_RUNTIME_DJANGO_SQLITE": 31,
     "RUNTIME_REPRODUCED_POLICY_CONDITIONAL": 1,
     "REFUTED_SOURCE": 1,
     "ROOT_ALIAS": 10,
@@ -46,7 +46,24 @@
     "tests_executed": 45,
     "environment": "Django SQLite, synthetic mocks, not production release acceptance",
     "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636",
-    "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c"
+    "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c",
+    "previous_broad_run": {
+      "tests": 45,
+      "negative_failures": 34,
+      "passes": 11,
+      "url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636"
+    },
+    "latest_targeted_run": {
+      "tests": 2,
+      "negative_failures": 2,
+      "passes_embedded_within_cases": 2,
+      "fixture_errors": 0,
+      "url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40186580438",
+      "head": "9c13610c2fef0044ca78b68e2cc3f0fade6de1f0"
+    },
+    "cumulative_distinct_findings": 32,
+    "cumulative_failed_negative_assertions": 36,
+    "warning": "36 is accumulated across distinct isolated runs, not 36 cases in one full suite; positive controls for new cases are within each failing test."
   },
   "entries": [
     {
@@ -787,16 +804,29 @@
       "severity": "P0",
       "area": "Historical discovery",
       "title": "P0-impact / P1 candidate — Two worker confirmations can reserve and pay for the same slot; a paid losing offer can appear ACCEPTED without an assignment",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE",
+      "decision": "FIX",
       "root": "B54",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
-      "source_proof": [],
+      "source_proof": [
+        "backend/shifts/offers.py:329-418",
+        "backend/shifts/assignment.py:25-110",
+        "backend/shifts/models.py:665-719"
+      ],
       "test_needed": null,
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_b54_two_pending_workers_cannot_both_reserve_one_paid_slot",
+          "observed": "Two PENDING offers on the same slot sequentially accepted by distinct workers. First valid accepted and status ACCEPTED_AWAITING_PAYMENT; second also returned 200, leaving two accepted-awaiting-payment offers for the same slot. Expected second 400/403/409.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40186580438",
+          "head": "9c13610c2fef0044ca78b68e2cc3f0fade6de1f0",
+          "environment": "Django 3.12 runner, disposable SQLite, mocked external dependencies",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Two PENDING offers on the same slot sequentially accepted by distinct workers. First valid accepted and status ACCEPTED_AWAITING_PAYMENT; second also returned 200, leaving two accepted-awaiting-payment offers for the same slot. Expected second 400/403/409. Qualification: Sequential competing reservation evidence only; get_billing_state_for_pharmacy mocked to PAYMENT_REQUIRED. No actual Stripe charges, callback reconciliation or PostgreSQL concurrent acceptance proved."
     },
     {
       "id": "B55",
@@ -2005,22 +2035,29 @@
       "severity": "P1",
       "area": "Roster",
       "title": "Manual rostering allows staff to fill a pharmacist vacancy without pharmacist eligibility",
-      "status": "UNVERIFIED_CANDIDATE",
-      "evidence_grade": "S1_REPORTED",
-      "decision": "VERIFY",
+      "status": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+      "evidence_grade": "S3_ISOLATED_DJANGO_SQLITE",
+      "decision": "FIX",
       "root": "C020-N1",
       "root_relation": "NO_RECORDED_ROOT_ALIAS",
       "source_proof": [
-        "backend/shifts/base.py:412",
-        "backend/shifts/assignment.py:143",
-        "backend/shifts/assignment.py:169",
-        "backend/shifts/engagement.py:46",
-        "backend/shifts/access.py:43"
+        "backend/shifts/base.py:399-420",
+        "backend/shifts/assignment.py:133-207",
+        "backend/shifts/access.py:26-41"
       ],
       "test_needed": "Manually assign accepted technician Ali to a pharmacist vacancy and assert rejection with no assignment created.",
-      "runtime_scenarios": [],
+      "runtime_scenarios": [
+        {
+          "test": "test_c020_n1_manual_pharmacist_slot_rejects_technician",
+          "observed": "Legitimate TECHNICIAN slot manual roster returned 200 and assigned the accepted technician; same actor assigned TECHNICIAN membership to PHARMACIST vacancy and got HTTP 200 with assignment id. Expected 400/403.",
+          "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40186580438",
+          "head": "9c13610c2fef0044ca78b68e2cc3f0fade6de1f0",
+          "environment": "Django 3.12 runner, disposable SQLite, mocked external dependencies",
+          "status": "RED_TEST_FAILED_AS_EXPECTED"
+        }
+      ],
       "reviewer_independence": "NOT_CERTIFIED",
-      "explanation": "No independent completed S2 or executed S3 proof captured"
+      "explanation": "Legitimate TECHNICIAN slot manual roster returned 200 and assigned the accepted technician; same actor assigned TECHNICIAN membership to PHARMACIST vacancy and got HTTP 200 with assignment id. Expected 400/403. Qualification: staff_assignment_defaults was mocked to isolate qualification, but actual HTTP endpoint, membership lookup and ShiftSlotAssignment persistence executed."
     },
     {
       "id": "C020-N2",
