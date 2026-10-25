@@ -1,5 +1,7 @@
+import json
 import logging
 from datetime import datetime, timezone as dt_timezone
+from hashlib import sha256
 from urllib.parse import urlencode
 import stripe
 from django.conf import settings
@@ -551,7 +553,7 @@ def charge_shift_fulfillment(request, shift_id):
     Generates a checkout session for the fulfillment fee.
     """
     user = request.user
-    from shifts.models import Shift
+    from shifts.models import Shift, ShiftOffer
 
     shift = get_object_or_404(Shift, id=shift_id)
 
@@ -568,27 +570,28 @@ def charge_shift_fulfillment(request, shift_id):
     slot_ids = _normalize_slot_ids(request.data.get('slot_ids') or request.data.get('slotIds'), slot_id)
     offer_ids = _normalize_offer_ids(request.data.get('offer_ids') or request.data.get('offerIds'), request.data.get('offer_id') or request.data.get('offerId'))
 
+    if not offer_ids and not slot_ids:
+        return Response({'error': 'Select at least one unpaid offer or slot.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    offers = ShiftOffer.objects.filter(shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+    if candidate_id:  # match the webhook's finalize filter so we never charge for offers it won't finalize
+        offers = offers.filter(user_id=candidate_id)
     if offer_ids:
-        from shifts.models import ShiftOffer
-        selected_offers = list(ShiftOffer.objects.filter(
-            shift=shift,
-            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            id__in=offer_ids,
-        ))
-        if len(selected_offers) != len(offer_ids):
-            return Response({'error': 'One or more selected offers do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
-        selected_slot_ids = [offer.slot_id for offer in selected_offers if offer.slot_id]
-        if len(selected_slot_ids) != len(set(selected_slot_ids)):
-            return Response({'error': 'Select only one candidate per slot.'}, status=status.HTTP_400_BAD_REQUEST)
-    elif slot_ids:
-        from shifts.models import ShiftOffer
-        matching_count = ShiftOffer.objects.filter(
-            shift=shift,
-            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            slot_id__in=slot_ids,
-        ).values('slot_id').distinct().count()
-        if matching_count != len(slot_ids):
-            return Response({'error': 'One or more selected slots do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
+        offers = offers.filter(id__in=offer_ids)
+    if slot_ids:
+        offers = offers.filter(slot_id__in=slot_ids)
+    selected_offers = list(offers.order_by('id'))
+    if not selected_offers:
+        return Response({'error': 'No selected offers require payment.'}, status=status.HTTP_400_BAD_REQUEST)
+    if offer_ids and len(selected_offers) != len(offer_ids):
+        return Response({'error': 'One or more selected offers do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
+    selected_slot_ids = [offer.slot_id for offer in selected_offers if offer.slot_id]
+    if slot_ids and set(selected_slot_ids) != set(slot_ids):
+        return Response({'error': 'One or more selected slots do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
+    if len(selected_slot_ids) != len(set(selected_slot_ids)):
+        return Response({'error': 'Select only one candidate per slot.'}, status=status.HTTP_400_BAD_REQUEST)
+    offer_ids = [offer.id for offer in selected_offers]
+    slot_ids = sorted(set(selected_slot_ids)) if len(selected_slot_ids) == len(selected_offers) else []
 
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
@@ -662,7 +665,7 @@ def charge_shift_fulfillment(request, shift_id):
             'payment_method_types': ['card'],
             'line_items': [{
                 'price': price_id,
-                'quantity': max(1, len(offer_ids) or len(slot_ids)),
+                'quantity': len(offer_ids),
             }],
             'mode': 'payment',
             'success_url': success_url,
@@ -686,7 +689,11 @@ def charge_shift_fulfillment(request, shift_id):
         else:
             billing_contact = account.get('billing_contact') or user
             session_kwargs['customer_email'] = getattr(billing_contact, 'email', None) or user.email
-        checkout_session = stripe.checkout.Session.create(**session_kwargs)
+        # Key on every param (Stripe rejects a reused key with other params) and the UTC day (the 24h session stays open while reused).
+        request_key = sha256(json.dumps([session_kwargs, str(timezone.now().date())], sort_keys=True, default=str).encode()).hexdigest()
+        checkout_session = stripe.checkout.Session.create(
+            **session_kwargs, idempotency_key=f'shift-fulfillment:{shift.id}:{request_key}',
+        )
         return Response({'url': checkout_session.url})
     except Exception:
         logger.exception('Billing request failed')

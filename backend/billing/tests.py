@@ -128,6 +128,127 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertEqual(delivery.status, StripeWebhookEvent.Status.PROCESSED)
         self.assertIsNotNone(delivery.processed_at)
 
+class ShiftFulfillmentCheckoutTests(TestCase):
+    def setUp(self):
+        from datetime import time
+        from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+        from shifts.models import ShiftOffer, ShiftSlot
+
+        self.owner, self.pharmacy = make_owner_with_pharmacy('Checkout pharmacy')
+        self.worker = make_user('PHARMACIST')
+        self.client = client_for(self.owner)
+        self.shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', payment_status='PENDING',
+        )
+        self.slot = ShiftSlot.objects.create(
+            shift=self.shift, date=timezone.localdate(), start_time=time(9), end_time=time(17),
+        )
+        self.offer = ShiftOffer.objects.create(
+            shift=self.shift, slot=self.slot, user=self.worker,
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+        )
+        self.url = reverse('api_v1:billing:charge_fulfillment', args=[self.shift.pk])
+        billing_state = patch('billing.views.get_billing_state_for_account', return_value='PAYMENT_REQUIRED')
+        billing_state.start()
+        self.addCleanup(billing_state.stop)
+        checkout = patch('billing.views.stripe.checkout.Session.create')
+        self.checkout = checkout.start()
+        self.addCleanup(checkout.stop)
+        self.checkout.return_value = _StripeObject(id='cs_test', url='https://checkout.example.test/cs_test')
+
+    def test_empty_or_invalid_selection_does_not_create_checkout(self):
+        for selection in ({}, {'offer_ids': ['invalid']}, {'slot_ids': ['invalid']}):
+            with self.subTest(selection=selection):
+                response = self.client.post(self.url, selection, format='json')
+                self.assertEqual(response.status_code, 400, response.data)
+        self.checkout.assert_not_called()
+
+    def test_already_paid_selection_does_not_create_checkout(self):
+        from shifts.models import ShiftOffer
+
+        self.offer.status = ShiftOffer.Status.ACCEPTED
+        self.offer.save(update_fields=['status'])
+        for selection in ({'offer_ids': [self.offer.pk]}, {'slot_ids': [self.slot.pk]}):
+            with self.subTest(selection=selection):
+                response = self.client.post(self.url, selection, format='json')
+                self.assertEqual(response.status_code, 400, response.data)
+        self.checkout.assert_not_called()
+
+    def test_foreign_offer_does_not_create_checkout(self):
+        other_shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, role_needed='PHARMACIST', employment_type='LOCUM',
+        )
+        self.offer.shift = other_shift
+        self.offer.save(update_fields=['shift'])
+        response = self.client.post(self.url, {'offer_ids': [self.offer.pk]}, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.checkout.assert_not_called()
+
+    def test_one_unpaid_offer_creates_one_checkout_with_quantity_one(self):
+        response = self.client.post(self.url, {'offer_ids': [self.offer.pk]}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['url'], self.checkout.return_value.url)
+        self.checkout.assert_called_once()
+        self.assertEqual(self.checkout.call_args.kwargs['line_items'], [
+            {'price': 'price_1T52jFBQXaySV5ukezd5JmzS', 'quantity': 1},
+        ])
+
+    def test_repeated_checkout_uses_same_idempotency_key(self):
+        selection = {'offer_ids': [self.offer.pk]}
+        first = self.client.post(self.url, selection, format='json')
+        second = self.client.post(self.url, selection, format='json')
+        self.assertEqual(first.status_code, 200, first.data)
+        self.assertEqual(second.status_code, 200, second.data)
+        self.assertEqual(self.checkout.call_count, 2)
+        first_key = self.checkout.call_args_list[0].kwargs.get('idempotency_key')
+        self.assertTrue(first_key)
+        self.assertEqual(first_key, self.checkout.call_args_list[1].kwargs.get('idempotency_key'))
+
+    def test_slot_selection_and_offer_selection_use_same_idempotency_key(self):
+        first = self.client.post(self.url, {'slot_ids': [self.slot.pk]}, format='json')
+        second = self.client.post(self.url, {'offer_ids': [self.offer.pk]}, format='json')
+        self.assertEqual(first.status_code, 200, first.data)
+        self.assertEqual(second.status_code, 200, second.data)
+        first_key = self.checkout.call_args_list[0].kwargs.get('idempotency_key')
+        self.assertTrue(first_key)
+        self.assertEqual(first_key, self.checkout.call_args_list[1].kwargs.get('idempotency_key'))
+
+    def test_offer_order_does_not_change_key_but_selection_does(self):
+        from shifts.models import ShiftOffer
+
+        other_offer = ShiftOffer.objects.create(
+            shift=self.shift, user=self.worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+        )
+        for offer_ids in ([self.offer.pk, other_offer.pk], [other_offer.pk, self.offer.pk], [self.offer.pk]):
+            response = self.client.post(self.url, {'offer_ids': offer_ids}, format='json')
+            self.assertEqual(response.status_code, 200, response.data)
+        keys = [call.kwargs.get('idempotency_key') for call in self.checkout.call_args_list]
+        self.assertTrue(keys[0])
+        self.assertEqual(keys[0], keys[1])
+        self.assertNotEqual(keys[0], keys[2])
+        self.assertEqual(self.checkout.call_args_list[0].kwargs['line_items'][0]['quantity'], 2)
+
+    def test_changed_params_or_next_day_get_a_new_idempotency_key(self):
+        from datetime import timedelta
+
+        selection = {'offer_ids': [self.offer.pk]}
+        self.client.post(self.url, selection, format='json')
+        self.client.post(self.url, {**selection, 'platform': 'mobile'}, format='json')
+        with patch('billing.views.timezone.now', return_value=timezone.now() + timedelta(days=1)):
+            self.client.post(self.url, selection, format='json')
+        keys = [call.kwargs.get('idempotency_key') for call in self.checkout.call_args_list]
+        self.assertEqual(len(set(keys)), 3)
+
+    def test_candidate_mismatch_does_not_charge_offers_the_webhook_would_skip(self):
+        mismatch = self.client.post(self.url, {'candidate_id': self.worker.pk + 999, 'offer_ids': [self.offer.pk]}, format='json')
+        self.assertEqual(mismatch.status_code, 400, mismatch.data)
+        self.checkout.assert_not_called()
+        match = self.client.post(self.url, {'candidate_id': self.worker.pk, 'offer_ids': [self.offer.pk]}, format='json')
+        self.assertEqual(match.status_code, 200, match.data)
+        self.checkout.assert_called_once()
+
+
 class OrganizationBillingScopeTests(TestCase):
     def setUp(self):
         from client_profile.characterization_support import make_owner_with_pharmacy, make_user
@@ -253,7 +374,7 @@ class OrganizationBillingScopeTests(TestCase):
         self, notify, finalize, billing_state,
     ):
         from rest_framework.test import APIClient
-        from shifts.models import Shift
+        from shifts.models import Shift, ShiftOffer
 
         shift = Shift.objects.create(
             pharmacy=self.pharmacy,
@@ -261,6 +382,9 @@ class OrganizationBillingScopeTests(TestCase):
             role_needed='ASSISTANT',
             employment_type='LOCUM',
             payment_status='PENDING',
+        )
+        offer = ShiftOffer.objects.create(
+            shift=shift, user=self.unrelated, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
         )
         client = APIClient()
         client.force_authenticate(self.chief)
@@ -273,7 +397,7 @@ class OrganizationBillingScopeTests(TestCase):
 
         charge = client.post(
             reverse('api_v1:billing:charge_fulfillment', args=[shift.pk]),
-            {},
+            {'offer_ids': [offer.pk]},
             format='json',
         )
         self.assertEqual(charge.status_code, 200, charge.data)
