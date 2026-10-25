@@ -11,43 +11,62 @@
         "B46",
         "B48"
       ],
-      "note": "PostComposer.tsx: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 109-249): The post composer loads tags by pharmacy, organisation, or group via the shared hub API, filters the returned member list for staff employment types, normalizes attachment URIs (including native FileSystem copy) and submits create/update posts. Client filtering cannot enforce private-group membership: server Hub access/mention rules B46/B48 are the authority. Test contract: Negative: forged group scope/tag IDs and lost membership on submit; positive: accepted member posts and only eligible people are notified. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        109,
+        249
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/hub/api.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "api.ts: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48."
+      "note": "api.ts: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/hub/hubUtils.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "hubUtils.ts: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48."
+      "note": "hubUtils.ts: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/hub/submissionGuard.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "submissionGuard.tsx: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48."
+      "note": "submissionGuard.tsx: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/hub/types.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "types.ts: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48."
+      "note": "types.ts: Hub post, attachment, group and mention state; shared-core handles private scopes and post requests, see B22/B46/B48.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/invoices/FinanceInvoiceEditor.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "FinanceInvoiceEditor.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 180-201): The canonical mobile finance editor retrieves defaults and internal shift prefill and obtains recalculation through finance.preview before finance.saveInvoice(value, initial?.id). It uses a request key, revision and error state. This differs from the legacy invoice generator and should be parity-tested against web InvoiceComposer. Test contract: Negative: changing invoice after optimistic preview, forged customer/source assignment, stale version; positive: correct GST/super/locked source values. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        180,
+        201
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "FinanceWorkspace.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 29-55): The new native finance workspace loads customers/items/invoices/expenses, serializes actions through running.current and displays errors. It uses finance.send(id, version), finance.markPaid and finance.superDocument, the same shared-core domain as Vite. Test contract: Negative: duplicate send and payment, stale version, cross-tenant received invoice, failed file sharing; positive: send once and consistent revision PDF. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        29,
+        55
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/invoices/InvoiceDetail.tsx",
@@ -56,7 +75,8 @@
         "B33",
         "B58"
       ],
-      "note": "InvoiceDetail.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+      "note": "InvoiceDetail.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx",
@@ -64,31 +84,44 @@
       "ids": [
         "N1"
       ],
-      "note": "Legacy Expo InvoiceGenerate initializes superRateSnapshot to 10% (line 115) and only changes it when onboarding.super_rate_snapshot is truthy (lines 138-154). POST generateInvoice passes it as super_rate_snapshot (line 392); backend invoicing.services persists exact value (line 332), calculates super_base * rate/100 (lines 172-178). As at 2026 the Australian SG rate is 12%, but contractual super liability varies. Stale 10% default is a conditional financial accuracy issue in an exposed legacy invoice tool. Server currently does not replace with current statutory rate. S3 financial examples and legal classification needed."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 104-155): The legacy native generator defaults superRateSnapshot to 10%; only an existing truthy onboarding snapshot overwrites it. The submitted FormData contains that figure, and backend invoicing.services computes super using the snapshot. This is newly recorded as C064-N1; current Australian SG standard is 12%. Test contract: Negative: new eligible worker without snapshot creates legacy 2026 invoice and displays a 10% super line; positive: explicitly lawful rate and contextual eligibility, matching actual SGR and source policy. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        104,
+        155
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/invoices/InvoiceList.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "InvoiceList.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 48-56): InvoiceList embeds the canonical FinanceWorkspace but also retains the legacy editor/list under Existing tools, so defects in the legacy invoicing API remain reachable even though the new finance UI is functional. Test contract: Negative: bypass finance revision restrictions via legacy actions; positive: finance-managed invoice routes back to FinanceWorkspace and legacy invoice remains readable. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        48,
+        56
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/invoices/InvoicesPlaceholder.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "InvoicesPlaceholder.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+      "note": "InvoicesPlaceholder.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/invoices/MobileInvoiceStats.tsx",
       "verdict": "OK",
       "ids": [],
-      "note": "MobileInvoiceStats.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+      "note": "MobileInvoiceStats.tsx: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     },
     {
       "path": "frontend_mobile/roles/shared/invoices/invoiceStats.ts",
       "verdict": "OK",
       "ids": [],
-      "note": "invoiceStats.ts: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59."
+      "note": "invoiceStats.ts: Finance/invoice create, update, payment, PDF, send and status projector; shared-core finance API contract, B33/B57-B59.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
     }
   ],
   "findings": [
@@ -119,5 +152,7 @@
         ]
       }
     }
-  ]
+  ],
+  "targeted_recheck_files": 5,
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3"
 }
