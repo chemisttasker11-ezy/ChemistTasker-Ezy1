@@ -219,3 +219,12 @@ Six new source-level candidates after checking prior 65: B66 overnight shift can
 - **139 new candidate findings (3 P0, 95 P1, 41 P2), all unconfirmed**: [MAIN_RELEASE_FINISH_FINDINGS.md](MAIN_RELEASE_FINISH_FINDINGS.md). B01-B65 unchanged.
 - Remaining: 38 file chunks and F12, then dedupe, second-agent verification, targeted tests, agy UI checks and grill/fix classification. Exact plan and work split: [MAIN_RELEASE_FINISH_HANDOVER.md](MAIN_RELEASE_FINISH_HANDOVER.md).
 - Still audit-only: no app code, tests, migrations or deployments changed. **Verdict unchanged: NOT RELEASE READY.**
+
+## Senior 99% coverage plan refresh — 25 October 2026
+
+- The updated [99% execution plan](MAIN_RELEASE_99_PERCENT_PLAN.md) supersedes earlier rough estimates and keeps PR200 audit-only. Plan commit: `5b4bf9f4a43342a1e3bf4c795ff50ddd016fa627`.
+- Frozen main `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`: **2,149** source paths; the finish ledger has 2,151 including 2 PR-only audit scripts. File-by-file agent-reported reads: **1,134**, leaving **1,015 frozen-main** files. For 99% of frozen main, **2,128** must qualify (994 additional).
+- Remaining recorded pass work: **38 unreviewed chunks** and F12 (web/mobile parity). The 139 additional findings remain **unconfirmed**; 71 historical B01–B71 plus 139 is a **pre-deduplication gross count**, not 210 established defects.
+- Per-file review records contain **zero populated test_contract columns**. Do not advertise 1,134 as independently validated semantic or runtime coverage. Publish separate S0 automatic, S1 full-file agent report, S2 independently cross-checked semantic and S3 executed test metrics.
+- Senior source inspection identified credible high-impact P0 chains **F03-N1**, **F04-N1**, **F04-N2** in baseline views/serializers/services; none has an audit-run HTTP reproduction. Verify in isolation before final severity decisions. No application code or tests were changed in this planning pass.
+- Next queue: C008–C016 (security-critical Django), C054/C056–C061 and C064–C071 (Expo), C046/C048/C072–C078 (web/Next), C080/C082–C086 (tooling), F12 (client parity), then dedupe, independent P0/P1 verification and exact-head acceptance.
