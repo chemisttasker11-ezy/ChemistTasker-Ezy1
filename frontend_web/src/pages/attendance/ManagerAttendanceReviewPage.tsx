@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import dayjs from "dayjs";
 import {
   Alert,
   Box,
@@ -536,7 +537,8 @@ export default function ManagerAttendanceReviewPage() {
                               aria-label={`Correct ${humanizeEnum(ev.event_type).toLowerCase()} time`}
                               onClick={() => {
                                 setEditingEventId(ev.event_id);
-                                setCorrectedTimestamp(new Date(ev.effective_timestamp).toISOString().slice(0, 16));
+                                // datetime-local is wall-clock time: show the same local time as the table, which saving reads back as local.
+                                setCorrectedTimestamp(dayjs(ev.effective_timestamp).format("YYYY-MM-DDTHH:mm"));
                                 setCorrectionReason("");
                               }}
                               sx={{ width: 40, height: 40 }}
