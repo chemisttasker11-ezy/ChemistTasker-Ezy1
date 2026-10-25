@@ -1,0 +1,191 @@
+{
+  "chunk": "C070",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection with shared-core call path trace, S2 independent and S3 runtime outstanding",
+  "files": [
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftList.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "ShiftList.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
+      "note": "constants.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useCounterOffers.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "useCounterOffers.ts maintains shift board filters, offer actions or local persisted markers; mobile local state must be user-scoped."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useFilterSort.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "useFilterSort.ts maintains shift board filters, offer actions or local persisted markers; mobile local state must be user-scoped."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useReviewOfferDisplay.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "useReviewOfferDisplay.ts maintains shift board filters, offer actions or local persisted markers; mobile local state must be user-scoped."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
+      "note": "useShiftPersistence.ts maintains shift board filters, offer actions or local persisted markers; mobile local state must be user-scoped."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "index.tsx shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/types.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "types.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/utils/counterOffers.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "counterOffers.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/utils/date.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "date.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/utils/location.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "location.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/utils/rates.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "rates.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ShiftsBoard/utils/shift.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "shift.ts shift board UI, slot selection, counter offers, term acceptance or local state; action guards are advisory, API remains authoritative."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/WorkerBookedShifts.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "WorkerBookedShifts.tsx worker/public booking, offer confirmation, accepted shifts and history via shared-core; concurrency/eligibility B37/B40/B54/B67."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/WorkerConfirmedShiftsView.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "WorkerConfirmedShiftsView.tsx worker/public booking, offer confirmation, accepted shifts and history via shared-core; concurrency/eligibility B37/B40/B54/B67."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/WorkerHistoryShiftsView.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "WorkerHistoryShiftsView.tsx worker/public booking, offer confirmation, accepted shifts and history via shared-core; concurrency/eligibility B37/B40/B54/B67."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/WorkerProfileDialog.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "WorkerProfileDialog.tsx pure display helpers, typed models, and shift/slot presentation defaults."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/utils/getShiftPharmacyName.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "getShiftPharmacyName.ts pure display helpers, typed models, and shift/slot presentation defaults."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/skills/CandidateWorkProfile.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "CandidateWorkProfile.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/skills/ProfileVerificationCard.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "ProfileVerificationCard.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/skills/ReportButton.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "ReportButton.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/skills/SoftwarePicker.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "SoftwarePicker.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/skills/VerificationBadges.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "VerificationBadges.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/skills/WorkerSkillRows.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "WorkerSkillRows.tsx role skill and verification projection uses shared-core validation and artwork; backend badge authority."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/components/AvailabilitySidebar.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AvailabilitySidebar.tsx pure display helpers, typed models, and shift/slot presentation defaults."
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P2",
+      "area": "Expo shift board state",
+      "title": "Shared AsyncStorage keys can expose previous account's applied/rejected shift markers after account switching.",
+      "scenario": "Sara uses a shared phone and marks shift IDs applied or rejected; after logout Tom signs in on the same device. The shift board persistence hook hydrates applied/rejected marker IDs from device-global AsyncStorage keys without an account prefix. Tom can briefly see Sara's state as his own until backend data refresh and shift pruning.",
+      "evidence": [
+        "frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts:6",
+        "frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts:7",
+        "frontend_mobile/roles/shared/shifts/ShiftsBoard/constants.ts:9",
+        "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts:60",
+        "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts:77",
+        "frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useShiftPersistence.ts:89",
+        "frontend_mobile/roles/shared/shifts/CommunityShiftsView.tsx:552"
+      ],
+      "confidence": "medium",
+      "verification": "SOURCE_ONLY_UNCONFIRMED",
+      "test_needed": "Native shared device: Sara applies/rejects shifts, signs out; Tom signs in and opens community board with slow server results. Assert applied/rejected markers never display Sara's state, and subsequent writes are isolated. Check default disableLocalPersistence behavior and whether backend props override early hydration.",
+      "owner_question": {
+        "question": "Should shift-board saved/applied/rejected status ever be carried between accounts on a shared device?",
+        "options": [
+          "No, scope all persisted markers to authenticated user",
+          "Do not persist applied/rejected locally at all",
+          "Allow local markers to be shared across logins"
+        ]
+      }
+    }
+  ]
+}
