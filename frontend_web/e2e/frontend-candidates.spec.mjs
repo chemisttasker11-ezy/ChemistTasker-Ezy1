@@ -42,7 +42,10 @@ test('accepting one counteroffer date keeps its remaining date available for rev
       pharmacy_detail: { id: 101, name: 'Review Pharmacy' }, visibility: 'PLATFORM',
       allowed_escalation_levels: ['PLATFORM'], role_needed: 'PHARMACIST', employment_type: 'LOCUM',
       single_user_only: false, slots }]);
-    if (path.endsWith('/shift-interests/')) return json(route, []);
+    if (path.endsWith('/shift-interests/')) return json(route, slots.map(slot => ({
+      id: slot.id + 10, shift: 51, slot_id: slot.id, user_id: 81,
+      revealed: true, user: 'Review Candidate', user_detail: profile,
+    })));
     if (path.endsWith('/shifts/51/counter-offers/91/accept/')) {
       expect(route.request().postDataJSON()).toEqual({ slot_id: 61 });
       accepted = true;

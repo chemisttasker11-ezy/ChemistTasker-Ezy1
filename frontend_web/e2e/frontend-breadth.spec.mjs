@@ -30,7 +30,7 @@ test.describe('attendance corrections in pharmacy time (C039-N1)', () => {
           return json(route, { correction_id: 4 });
         }
       });
-      await page.goto('/dashboard/owner/attendance');
+      await page.goto('/dashboard/owner/attendance-reviews');
       await page.getByRole('button', { name: 'Clock times' }).click();
       const edit = page.getByRole('button', { name: 'Correct clock out time' });
       await edit.click();
