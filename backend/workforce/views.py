@@ -354,7 +354,8 @@ class EmploymentEngagementDetailView(APIView):
     def patch(self, request, public_id):
         try:
             with transaction.atomic():
-                row = EmploymentEngagement.objects.select_for_update().select_related(
+                # Lock only the engagement row: Postgres refuses FOR UPDATE across nullable joins.
+                row = EmploymentEngagement.objects.select_for_update(of=("self",)).select_related(
                     "membership__pharmacy", "membership__user"
                 ).get(public_id=public_id)
                 require_manage_workforce_pharmacy(request.user, row.membership.pharmacy)
