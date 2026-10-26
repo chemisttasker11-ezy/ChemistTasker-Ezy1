@@ -1,6 +1,6 @@
 # Project-wide Grill Me progress
 
-**Initial status: not started.** This is intentional. Creating the area map and method is not the same as reviewing each area or asking the owner.
+**Initial status: not started.** This is intentional. Creating the map and method is not the same as reviewing an area or interviewing the owner.
 
 | Area | Current source evidence | Legacy questions reconciled | Owner discussion | Area spec | Backlog | Status |
 |---|---|---|---|---|---|---|
@@ -33,8 +33,8 @@
 
 ## Update rules
 
-- Only mark evidence complete after reading current source/tests and recording exact commit references.
-- Only mark discussion complete after the owner answers or deliberately defers each genuine policy choice.
-- Technical defects should become engineering backlog items; they are not owner preference questions.
-- An owner may pause or reorder areas. Record the reason and dependencies.
-- Never claim a percentage based only on a file inventory or question count.
+- Mark evidence complete only after reading current source/tests and recording exact commit references.
+- Mark discussion complete only after the owner answers or deliberately defers each genuine policy choice.
+- Technical defects become engineering backlog items, not owner preference questions.
+- The owner may pause or reorder areas; record the reason and dependencies.
+- Never claim a percentage based on file inventory or question count alone.
