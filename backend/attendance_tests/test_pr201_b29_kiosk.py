@@ -5,6 +5,7 @@ TestCase's default suite; signed events reach the real offline protocol.
 """
 import base64
 import unittest
+from unittest.mock import patch
 from datetime import timedelta
 
 from attendance_tests import test_kiosk_offline_protocol as offline_protocol
@@ -143,6 +144,35 @@ class Phase6KioskClockIntegrity(offline_protocol.KioskOfflineProtocolTests):
         )
         self.assertEqual(response.status_code, 400, response.data)
         self.assertEqual(AttendanceEvent.objects.count(), 0)
+
+    def assert_review_exception_is_private(self, target, field, message):
+        from django.core.exceptions import ValidationError
+        event = self.drift_pending()
+        secret = "private database path /srv/secrets/attendance"
+        with patch(target, side_effect=ValidationError(secret)), \
+                self.assertLogs("attendance.kiosk_review", level="WARNING") as logs:
+            response = self.review_client(self.owner).post(
+                "/api/v1/attendance/manager/kiosk-review/decide/",
+                {"event_id": event["event_id"], "decision": "APPROVED",
+                 "corrected_timestamp": timezone.now().isoformat(), "reason": "Check"},
+            )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertNotIn(secret, response.render().content.decode())
+        self.assertEqual(str(response.data[field]), message)
+        self.assertIn(secret, "\n".join(logs.output))
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
+
+    def test_corrected_timestamp_exception_is_private(self):
+        self.assert_review_exception_is_private(
+            "attendance.kiosk_review._parse_aware_datetime", "corrected_timestamp",
+            "Use an ISO-8601 timestamp with an offset.",
+        )
+
+    def test_attendance_application_exception_is_private(self):
+        self.assert_review_exception_is_private(
+            "attendance.kiosk_review._apply_business_event", "detail",
+            "Attendance application failed validation.",
+        )
 
     def test_b29_rejection_retains_evidence_and_cannot_be_reversed(self):
         from attendance.models import KioskAttendanceReview

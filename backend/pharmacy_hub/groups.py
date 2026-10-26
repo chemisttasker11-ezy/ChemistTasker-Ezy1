@@ -151,5 +151,10 @@ class HubCommunityGroupViewSet(
         scope = resolver.group_scope(instance.id, group=instance)
         if not scope.get("has_group_admin_permissions"):
             raise PermissionDenied("You cannot delete this group.")
+        if instance.hub_posts.exists() or instance.hub_polls.exists():
+            return Response(
+                {"detail": "Remove or move this group's posts before deleting it"},
+                status=status.HTTP_409_CONFLICT,
+            )
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

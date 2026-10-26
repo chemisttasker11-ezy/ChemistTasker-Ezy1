@@ -824,7 +824,6 @@ def charge_penalty(request, shift_id):
         slot_date = assignment.slot_date or slot.date
         
         # Combine date and time
-        from datetime import datetime
         start_dt = timezone.make_aware(datetime.combine(slot_date, slot.start_time))
         end_dt = timezone.make_aware(datetime.combine(slot_date, slot.end_time))
         if slot.end_time <= slot.start_time:

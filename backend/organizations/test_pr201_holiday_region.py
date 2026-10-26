@@ -1,4 +1,5 @@
 """PR201 B14: work-base declaration API, tenant ownership and region validation."""
+from unittest.mock import patch
 from django.test import TestCase
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy
@@ -10,6 +11,23 @@ class PharmacyHolidayConfigurationContracts(TestCase):
         self.owner, self.pharmacy = make_owner_with_pharmacy("P6 holiday work base")
         self.pharmacy.state = "QLD"
         self.pharmacy.save(update_fields=["state"])
+
+    def test_region_validation_exception_is_private_in_api_response(self):
+        from shifts.pricing_data import PricingDataError
+        secret = "private pricing file /srv/secrets/holiday-pricing.json"
+        with patch("shifts.holidays.region_details", side_effect=PricingDataError(secret)), \
+                self.assertLogs("organizations.serializers", level="WARNING") as logs:
+            response = client_for(self.owner).patch(
+                f"/api/v1/pharmacies/{self.pharmacy.pk}/",
+                {"public_holiday_region": "QLD_GOLD_COAST"}, format="json",
+            )
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertNotIn(secret, response.content.decode())
+        self.assertIn(secret, "\n".join(logs.output))
+        self.assertEqual(response.json()["public_holiday_region"],
+                         ["Select a valid public holiday region for this state."])
+        self.pharmacy.refresh_from_db()
+        self.assertEqual(self.pharmacy.public_holiday_region, "")
 
     def test_owner_can_read_authoritative_region_options_by_state(self):
         result = client_for(self.owner).get("/api/v1/holidays/regions/", {"state": "QLD"})

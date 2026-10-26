@@ -1,4 +1,5 @@
 """Pharmacy-authorized review of signed, provisional kiosk attendance evidence."""
+import logging
 import uuid
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
@@ -11,6 +12,8 @@ from attendance.models import KioskAttendanceEvent, KioskAttendanceReview
 from attendance.approvals import is_authorized_attendance_manager
 from attendance.protocol import _apply_business_event, _parse_aware_datetime
 from organizations.models import Pharmacy
+
+logger = logging.getLogger(__name__)
 
 BLOCKED_APPROVAL_FLAGS = {
     "HASH_CHAIN_MISMATCH", "SEQUENCE_GAP", "UNEXPECTED_INITIAL_HASH",
@@ -104,7 +107,10 @@ class ManagerDecideKioskReviewView(APIView):
                             request.data.get("corrected_timestamp"), "corrected_timestamp",
                         )
                     except DjangoValidationError as exc:
-                        raise ValidationError({"corrected_timestamp": str(exc)})
+                        logger.warning("Invalid corrected kiosk timestamp", exc_info=True)
+                        raise ValidationError({
+                            "corrected_timestamp": "Use an ISO-8601 timestamp with an offset.",
+                        }) from exc
                     live_event = _apply_business_event(
                         evidence.device, evidence.employee, evidence.event_type,
                         effective_time, evidence.shift_id,
@@ -119,6 +125,7 @@ class ManagerDecideKioskReviewView(APIView):
                     "attendance_event_id": review.attendance_event_id,
                 })
         except DjangoValidationError as exc:
-            raise ValidationError({"detail": str(exc)})
+            logger.warning("Kiosk attendance application failed validation", exc_info=True)
+            raise ValidationError({"detail": "Attendance application failed validation."}) from exc
         except IntegrityError as exc:
             raise ValidationError({"detail": "Attendance application failed integrity checks."})

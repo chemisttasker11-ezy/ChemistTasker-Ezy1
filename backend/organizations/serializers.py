@@ -1,4 +1,6 @@
 """Serializers for organisations, pharmacies, chains, pharmacy admins and pharmacy claims."""
+import logging
+
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from drf_spectacular.utils import extend_schema_field, OpenApiTypes
@@ -13,6 +15,8 @@ from core.serializer_mixins import UploadValidationMixin
 from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
 from users.models import OrganizationMembership
 from users.org_roles import ORG_WIDE_ADMIN_ROLES
+
+logger = logging.getLogger(__name__)
 
 
 # === Onboardings ===
@@ -317,7 +321,10 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
             try:
                 region_details(state, region)
             except PricingDataError as exc:
-                raise serializers.ValidationError({"public_holiday_region": str(exc)}) from exc
+                logger.warning("Public holiday region validation failed", exc_info=True)
+                raise serializers.ValidationError({
+                    "public_holiday_region": "Select a valid public holiday region for this state.",
+                }) from exc
 
         attrs = self._apply_weekday_hours_compat(attrs)
         return self._clear_closed_day_hours(attrs)

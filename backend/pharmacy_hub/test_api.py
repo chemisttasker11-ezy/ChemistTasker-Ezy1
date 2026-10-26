@@ -85,6 +85,42 @@ class HubScopeTests(HubBase):
 
 
 class HubGroupTests(HubBase):
+    def test_group_with_content_cannot_be_deleted_or_exposed_to_non_members(self):
+        from pharmacy_hub.models import PharmacyCommunityGroup
+        for content_model, content in (
+            (PharmacyHubPost, {"body": "Restricted group post", "author_membership": self.staff_m}),
+            (PharmacyHubPoll, {"question": "Restricted group poll?", "created_by": self.owner}),
+        ):
+            with self.subTest(content_model=content_model.__name__):
+                group = PharmacyCommunityGroup.objects.create(
+                    pharmacy=self.pharmacy, name=content_model.__name__, created_by=self.owner,
+                )
+                item = content_model.objects.create(
+                    pharmacy=self.pharmacy, community_group=group, **content,
+                )
+                endpoint = POSTS if content_model is PharmacyHubPost else POLLS
+                non_member = client_for(self.other_staff)
+                self.assertEqual(non_member.get(f"{endpoint}{item.pk}/").status_code, 403)
+                response = client_for(self.owner).delete(f"{HUB}groups/{group.pk}/")
+                self.assertEqual(response.status_code, 409, response.content)
+                self.assertEqual(response.json()["detail"],
+                                 "Remove or move this group's posts before deleting it")
+                item.refresh_from_db()
+                self.assertEqual(item.community_group_id, group.pk)
+                self.assertEqual(non_member.get(f"{endpoint}{item.pk}/").status_code, 403)
+                feed = non_member.get(endpoint, self.scope)
+                self.assertEqual(feed.status_code, 200, feed.content)
+                self.assertNotIn(item.pk, [row["id"] for row in self.rows(feed)])
+
+    def test_empty_group_can_be_deleted(self):
+        from pharmacy_hub.models import PharmacyCommunityGroup
+        group = PharmacyCommunityGroup.objects.create(
+            pharmacy=self.pharmacy, name="Empty group", created_by=self.owner,
+        )
+        response = client_for(self.owner).delete(f"{HUB}groups/{group.pk}/")
+        self.assertEqual(response.status_code, 204, response.content)
+        self.assertFalse(PharmacyCommunityGroup.objects.filter(pk=group.pk).exists())
+
     def test_invalid_member_update_is_atomic(self):
         groups = HUB + "groups/"
         created = client_for(self.owner).post(
