@@ -23,9 +23,8 @@ Combine PR #201 with the reviewed local fixes at `d35d6e2f`. All five independen
 - **Migrations:** remote attendance 0005, billing 0003/0004 and client_profile 0088 forward/rollback/forward OK on realistic data. Billing 0004 aborts cleanly on a real duplicate intent without rewriting financial rows. Local chat 0004 and users 0006 rollback/forward OK. `makemigrations --check` clean.
 - **Frontend:** shared-core 386 tests + build OK; web `tsc` OK and auth-flow 29 pass; mobile `tsc` OK and script tests OK; landing_next typecheck OK.
 - **Repository audits:** shared-core-boundary `--strict` against `origin/main`, architecture, shared-core-package, api-v1-cutover, native-tab-routes, frontend-static-wiring, ui-boundaries and dashboard-visual-states: all OK.
-- **Browser walk (agy, Docker stack):** see PR comment / to be added.
+- **Browser walk (agy g3, Docker stack built from this branch, seeded test users): 9/9 PASS, no errors.** Description-only shift edit and a per-date rate kept on reload; chain rename keeps its 2 pharmacies; manager invite/accept/remove leaves no access or old invite; chat after staff removal shows the message as "Former member"; org admin creates a roster shift and the region admin sees only its region; poll question edit keeps votes and staff cannot edit/delete it; Explorer availability publishes; an ineligible role shows Apply disabled; invoice-from-shift had no eligible shift in the seed. Screenshots checked by the orchestrator.
 
-Browser walk: <result>
 
 ## Migrations
 
