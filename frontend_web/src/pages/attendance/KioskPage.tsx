@@ -104,6 +104,8 @@ export default function KioskPage() {
   const [identifier, setIdentifier] = useState<string>("");
   const [pin, setPin] = useState<string>("");
   const [pinSubmitting, setPinSubmitting] = useState<boolean>(false);
+  const pinInFlight = useRef(false);
+  const pinRetry = useRef<{ requestId: string; identifier: string; pin: string; deviceToken: string | null } | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinLocked, setPinLocked] = useState<boolean>(false);
   const [requestedPinAction, setRequestedPinAction] = useState<
@@ -630,6 +632,7 @@ export default function KioskPage() {
   };
 
   const handlePinSubmit = async () => {
+    if (pinInFlight.current) return;
     if (!identifier.trim()) {
       setPinError("Please enter your email or staff ID.");
       return;
@@ -644,6 +647,7 @@ export default function KioskPage() {
       return;
     }
 
+    pinInFlight.current = true;
     setPinSubmitting(true);
     setPinError(null);
 
@@ -676,14 +680,21 @@ export default function KioskPage() {
         return;
       }
 
+      const previous = pinRetry.current;
+      const requestId = previous?.identifier === identifier.trim()
+        && previous.pin === pin && previous.deviceToken === deviceToken
+        ? previous.requestId : crypto.randomUUID();
+      pinRetry.current = { requestId, identifier: identifier.trim(), pin, deviceToken };
       const res = await kioskClient.post(
         "/attendance/kiosk/pin-clock/",
         {
           identifier: identifier.trim(),
           pin: pin,
+          request_id: requestId,
         },
         { headers: { "X-Device-Token": deviceToken } }
       );
+      pinRetry.current = null;
 
       setActionSuccess({
         action: res.data.action,
@@ -697,6 +708,7 @@ export default function KioskPage() {
       setIdentifier("");
       setPinMode(false);
     } catch (err: any) {
+      if (err.response) pinRetry.current = null;
       const isLock = err.response?.data?.locked || false;
       const msg = desktopRuntime
         ? String(err)
@@ -704,6 +716,7 @@ export default function KioskPage() {
       setPinError(msg);
       setPinLocked(isLock);
     } finally {
+      pinInFlight.current = false;
       setPinSubmitting(false);
     }
   };

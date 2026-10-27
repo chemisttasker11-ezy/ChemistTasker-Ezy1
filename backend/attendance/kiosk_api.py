@@ -1,8 +1,10 @@
 """Kiosk API: device activation, pairing, configuration, offline sync and revocation; worker
 enrolment, the pharmacy QR, PIN clocking and PIN setup; the active staff list and break actions."""
 import hashlib
+from uuid import UUID
 from datetime import timedelta
 from django.conf import settings
+from django.db import transaction
 from django.core.exceptions import (
     PermissionDenied as DjangoPermissionDenied,
     ValidationError as DjangoValidationError,
@@ -449,48 +451,55 @@ class KioskPinClockView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             worker = membership.user
+            request_id = request.data.get("request_id")
+            if request_id is not None:
+                try:
+                    request_id = UUID(str(request_id))
+                except (ValueError, TypeError, AttributeError):
+                    raise DjangoValidationError("request_id must be a valid UUID.")
 
-            # Check existing open session at this pharmacy
-            status_info = get_active_session_status(worker)
-            at_this_pharmacy = status_info is not None and status_info["pharmacy_id"] == device.pharmacy_id
-            # A resubmit inside the transitions' 30s retry window repeats the last action instead of reversing it.
-            retry_since = timezone.now() - timedelta(seconds=30)
-            just_clocked_in = at_this_pharmacy and status_info["started_at"] >= retry_since
-            just_clocked_out = status_info is None and AttendanceSession.objects.filter(
-                user=worker, pharmacy=device.pharmacy, ended_at__gte=retry_since,
-            ).exists()
-            if (at_this_pharmacy and not just_clocked_in) or just_clocked_out:
-                # Clock out
-                session, out_event = clock_out(
-                    user=worker,
-                    kiosk_device=device,
-                    raw_pin=pin,
-                    user_identifier=identifier,
-                )
-                action_name = "CLOCKED_OUT"
-                ended_at = session.ended_at.isoformat() if session.ended_at else None
-            else:
-                # Clock in
-                session, in_event = clock_in(
-                    user=worker,
-                    pharmacy=device.pharmacy,
-                    kiosk_device=device,
-                    raw_pin=pin,
-                    user_identifier=identifier,
-                )
-                action_name = "CLOCKED_IN"
-                ended_at = None
+            with transaction.atomic():
+                # Serialize lookup and toggle, including when the worker has no open session.
+                User.objects.select_for_update().get(pk=worker.pk)
+                event = None
+                if request_id is not None:
+                    event = AttendanceEvent.objects.select_related("session").filter(
+                        session__user=worker, device=device, request_id=request_id,
+                    ).first()
+                if event is not None:
+                    session = event.session
+                else:
+                    status_info = get_active_session_status(worker)
+                    at_this_pharmacy = status_info is not None and status_info["pharmacy_id"] == device.pharmacy_id
+                    if at_this_pharmacy:
+                        session, event = clock_out(
+                            user=worker,
+                            kiosk_device=device,
+                            raw_pin=pin,
+                            user_identifier=identifier,
+                            request_id=request_id,
+                        )
+                    else:
+                        session, event = clock_in(
+                            user=worker,
+                            pharmacy=device.pharmacy,
+                            kiosk_device=device,
+                            raw_pin=pin,
+                            user_identifier=identifier,
+                            request_id=request_id,
+                        )
 
-            return Response({
-                "action": action_name,
-                "worker_id": worker.id,
-                "worker_name": worker.get_full_name() or worker.username,
-                "session_id": session.id,
-                "started_at": session.started_at.isoformat(),
-                "ended_at": ended_at,
-                "is_provisional": session.is_provisional,
-                "pharmacy_name": device.pharmacy.name,
-            })
+                clocked_out = event.event_type == AttendanceEvent.EventType.CLOCK_OUT
+                return Response({
+                    "action": "CLOCKED_OUT" if clocked_out else "CLOCKED_IN",
+                    "worker_id": worker.id,
+                    "worker_name": worker.get_full_name() or worker.username,
+                    "session_id": session.id,
+                    "started_at": session.started_at.isoformat(),
+                    "ended_at": event.occurred_at.isoformat() if clocked_out else None,
+                    "is_provisional": session.is_provisional,
+                    "pharmacy_name": device.pharmacy.name,
+                })
 
         except (DjangoPermissionDenied, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)

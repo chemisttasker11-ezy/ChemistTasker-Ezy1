@@ -355,6 +355,7 @@ class AttendanceEvent(models.Model):
         related_name="attendance_events",
     )
     ip_address = models.GenericIPAddressField(null=True, blank=True)
+    request_id = models.UUIDField(null=True, blank=True, db_index=True)
     recorded_at = models.DateTimeField(auto_now_add=True)
 
     objects = ImmutableAttendanceQuerySet.as_manager()
