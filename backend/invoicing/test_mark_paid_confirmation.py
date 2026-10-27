@@ -10,9 +10,9 @@ class Claim4SuperMarkPaidClientPayload(TestCase):
         from onboarding.models import OwnerOnboarding
         from organizations.models import Pharmacy
         self.worker = make_user("PHARMACIST")
-        owner = make_user("OWNER")
+        self.owner = make_user("OWNER")
         self.pharmacy = Pharmacy.objects.create(
-            name="Fin204", owner=OwnerOnboarding.objects.create(user=owner, phone_number="0400000000", role="MANAGER"))
+            name="Fin204", owner=OwnerOnboarding.objects.create(user=self.owner, phone_number="0400000000", role="MANAGER"))
 
     def invoice(self, **changes):
         Invoice = apps.get_model("invoicing", "Invoice")
@@ -40,3 +40,18 @@ class Claim4SuperMarkPaidClientPayload(TestCase):
         for value in ({'version': 1}, {'version': 1, 'fund_payment_confirmed': False}):
             with self.subTest(value=value):
                 self.assertEqual(self.mark_paid(self.invoice(kind='super_request'), value).status_code, 400)
+
+    def test_pharmacy_can_mark_super_paid_only_with_explicit_fund_confirmation(self):
+        record = self.invoice(kind='super_request')
+        path = f'/api/v1/finance/received-invoices/{record.pk}/mark-paid/'
+        client = client_for(self.owner)
+        for body in ({'version': 1, 'note': ''}, {'version': 1, 'note': '', 'fund_payment_confirmed': False}):
+            with self.subTest(body=body):
+                self.assertEqual(client.post(path, body, format='json').status_code, 400)
+                self.assertFalse(record.payments.exists())
+        confirmed = client.post(path, {'version': 1, 'note': 'Fund paid', 'fund_payment_confirmed': True}, format='json')
+        self.assertEqual(confirmed.status_code, 200, confirmed.data)
+        self.assertEqual(record.payments.count(), 1)
+        record.refresh_from_db()
+        self.assertEqual(record.status, 'paid')
+        self.assertEqual(record.last_review_note, 'Fund paid')

@@ -19,7 +19,7 @@ import { dollars } from './helpers';
 
 import { receivedKey } from './invoiceFilters';
 
-export type ReviewAction = { invoice: FinanceInvoice; kind: 'approve' | 'revise' | 'paid'; note: string };
+export type ReviewAction = { invoice: FinanceInvoice; kind: 'approve' | 'revise' | 'paid'; note: string; fundPaymentConfirmed?: boolean };
 type Props = {
   reviewInvoice: FinanceInvoice | null; historyDocument: FinanceInvoice | null; receivedMode: boolean; busy: boolean; error: string; notice: string;
   onClose: () => void; clearError: () => void; clearNotice: () => void; clearDocument: () => void;

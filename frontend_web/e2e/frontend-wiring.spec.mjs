@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApiFixture, json, roleUsers } from './support/apiFixture.mjs';
-import { reviewApi } from './support/reviewFixture.mjs';
+import { reviewApi, reviewInvoice } from './support/reviewFixture.mjs';
 
 test('dashboard community stays in Vite with public community enabled and uses the scoped hub APIs', async ({ page }) => {
   const calls = [];
@@ -68,3 +68,44 @@ test('an approved invoice whose list refresh fails reports the saved change and 
   await expect(page.getByRole('alert').filter({ hasText: "The change was saved, but the list didn't refresh" }).first()).toBeVisible();
   expect(writes).toEqual([{ version: 1, note: '' }]);
 });
+
+for (const width of [390, 1440]) for (const kind of ['invoice', 'super_request']) {
+  test(`received ${kind} mark-paid requires the right confirmation at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 960 });
+    const writes = [];
+    const fallback = reviewApi();
+    await installApiFixture(page, roleUsers.owner, async (route, ctx) => {
+      if (ctx.path.endsWith('/finance/received-invoices/')) {
+        return json(route, { results: [{ ...reviewInvoice, kind }], count: 1, next: null, previous: null });
+      }
+      if (ctx.path.endsWith('/finance/received-invoices/41/mark-paid/')) {
+        const body = route.request().postDataJSON();
+        writes.push(body);
+        return json(route, {}, kind === 'super_request' && body.fund_payment_confirmed !== true ? 400 : 200);
+      }
+      return fallback(route, ctx);
+    });
+    await page.goto('/dashboard/owner/invoice?invoice=41');
+    await page.getByRole('button', { name: 'Mark as paid', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Mark INV-0041 as paid?', exact: true });
+    const save = dialog.getByRole('button', { name: 'Mark as paid', exact: true });
+    const confirmation = dialog.getByRole('checkbox', { name: 'I confirm this payment went to the super fund' });
+    if (kind === 'super_request') {
+      await expect(save).toBeDisabled();
+      expect(writes).toEqual([]);
+      await confirmation.check();
+      await expect(save).toBeEnabled();
+    } else {
+      await expect(confirmation).toHaveCount(0);
+      await expect(save).toBeEnabled();
+    }
+    await save.click();
+    await expect(dialog).toHaveCount(0);
+    expect(writes).toEqual([{ version: 1, note: '', ...(kind === 'super_request' ? { fund_payment_confirmed: true } : {}) }]);
+    if (kind === 'super_request') {
+      await page.getByRole('button', { name: 'Mark as paid', exact: true }).click();
+      await expect(confirmation).not.toBeChecked();
+      await expect(save).toBeDisabled();
+    }
+  });
+}

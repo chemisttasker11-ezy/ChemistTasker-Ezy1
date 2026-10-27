@@ -26,3 +26,18 @@ it('markPaid preserves ordinary invoice payloads and never invents fund confirma
         expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body)).toEqual(payload);
     }
 });
+
+it('markReceivedPaid sends the explicit fund confirmation with the review note', async () => {
+    await financeApi.markReceivedPaid(12, 3, 'Fund paid', true);
+    const [url, options] = fetchMock.mock.calls.at(-1)!;
+    expect(url.pathname).toBe('/api/v1/finance/received-invoices/12/mark-paid/');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ version: 3, note: 'Fund paid', fund_payment_confirmed: true });
+});
+
+it('markReceivedPaid preserves ordinary invoice payloads and never invents fund confirmation', async () => {
+    await financeApi.markReceivedPaid(12, 3);
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body)).toEqual({ version: 3, note: '' });
+    await financeApi.markReceivedPaid(12, 3, 'Unconfirmed', false);
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body)).toEqual({ version: 3, note: 'Unconfirmed', fund_payment_confirmed: false });
+});

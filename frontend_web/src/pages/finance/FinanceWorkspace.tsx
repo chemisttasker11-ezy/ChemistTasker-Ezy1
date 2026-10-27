@@ -374,10 +374,11 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
 
     <InvoiceReviewDialog action={reviewAction} busy={busy} error={error} onClose={() => { if (!busy) setReviewAction(null); }}
       onNote={note => setReviewAction(current => current ? { ...current, note } : null)}
+      onFundConfirmation={confirmed => setReviewAction(current => current ? { ...current, fundPaymentConfirmed: confirmed } : null)}
       onConfirm={(action, success) => void run(async () => {
         const { invoice, kind, note } = action;
         if (kind === 'revise') await finance.requestRevision(invoice.id, invoice.version, note.trim());
-        else if (kind === 'paid') await finance.markReceivedPaid(invoice.id, invoice.version, note.trim());
+        else if (kind === 'paid') await finance.markReceivedPaid(invoice.id, invoice.version, note.trim(), action.fundPaymentConfirmed);
         else await finance.approveForPayment(invoice.id, invoice.version, note.trim());
         setReviewAction(null); await refreshAfterMutation(success);
       }, success)} />

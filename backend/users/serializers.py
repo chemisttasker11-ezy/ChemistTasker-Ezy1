@@ -10,7 +10,7 @@ from users.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.conf import settings
 from organizations.models import Organization
-from .models import OrganizationMembership, ContactMessage
+from .models import OrganizationMembership, ContactMessage, RevokedSession
 import secrets
 from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
@@ -542,6 +542,8 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             # Never allow refresh endpoint to 500 on malformed/legacy tokens.
             raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
 
+        if RevokedSession.objects.filter(session_id=original_refresh.get('sid', original_refresh['jti'])).exists():
+            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
         if not user.is_active:
             raise serializers.ValidationError({'detail': 'Account is inactive.'})
         from rest_framework_simplejwt.settings import api_settings
