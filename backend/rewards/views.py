@@ -10,7 +10,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
-from shifts.finalize import finalize_shift_offer
+from shifts.finalize import expire_competing_offers, finalize_shift_offer, offer_occurrence_key
 from shifts.emails import send_shift_payment_finalized_notifications
 from rewards.services import (
     claim_referral_code,
@@ -221,24 +221,15 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
 
                 if slot_ids and any(offer.slot_id not in slot_ids for offer in selected):
                     raise DRFValidationError({"detail": "Selected offers do not match the selected slots."})
-                selected_slots = [offer.slot_id for offer in selected if offer.slot_id]
-                if len(selected_slots) != len(set(selected_slots)):
+                selected_occurrences = [offer_occurrence_key(offer) for offer in selected if offer.slot_id]
+                if len(selected_occurrences) != len(set(selected_occurrences)):
                     raise DRFValidationError({"detail": "Select only one candidate per slot."})
                 # _create_ledger_entry locks the payer row before reading the balance.
                 for offer in selected:
                     ledger_entries.append(spend_pills_for_shift_post(user=request.user, shift=shift, offer=offer))
                     finalize_shift_offer(offer)
                     finalized.append(offer)
-                if selected_slots:
-                    ShiftOffer.objects.filter(
-                        shift=shift, slot_id__in=selected_slots,
-                        status__in=[
-                            ShiftOffer.Status.PENDING,
-                            ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-                        ],
-                    ).exclude(id__in=[offer.id for offer in selected]).update(
-                        status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now(),
-                    )
+                expire_competing_offers(shift, selected)
                 outstanding = ShiftOffer.objects.filter(
                     shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
                 ).exists()

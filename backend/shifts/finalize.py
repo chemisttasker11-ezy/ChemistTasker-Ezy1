@@ -3,8 +3,24 @@ from shifts.pricing import expand_shift_slots, get_locked_rate_for_slot
 from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from decimal import Decimal
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from shifts.engagement import KIND_STAFF_EMPLOYMENT, staff_assignment_defaults
+
+
+def offer_occurrence_key(offer):
+    return offer.slot_id, offer.offered_slot_date
+
+
+def expire_competing_offers(shift, offers):
+    selected_ids = [offer.pk for offer in offers]
+    for offer in offers:
+        slot_id, slot_date = offer_occurrence_key(offer)
+        if slot_id:
+            ShiftOffer.objects.filter(
+                shift=shift, slot_id=slot_id, offered_slot_date=slot_date,
+                status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
+            ).exclude(pk__in=selected_ids).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
 
 
 def _accepted_offer_rate_for_occurrence(offer, slot_id, slot_date):

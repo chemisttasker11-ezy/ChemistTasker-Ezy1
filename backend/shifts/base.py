@@ -113,6 +113,20 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     serializer_class = ShiftSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def destroy(self, request, *args, **kwargs):
+        with transaction.atomic():
+            shift = self.get_object()
+            shift = Shift.objects.select_for_update().get(pk=shift.pk)
+            if (shift.payment_status == 'PENDING'
+                    or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()
+                    or shift.payments.filter(status='pending').exists()):
+                return Response(
+                    {'detail': 'This shift has a pending payment. Complete payment before deleting it.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            self.perform_destroy(shift)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     def check_permissions(self, request):
         super().check_permissions(request)
         # Some actions should be callable without requiring object-level permissions (no `pk`).

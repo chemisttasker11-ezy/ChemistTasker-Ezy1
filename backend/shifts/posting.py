@@ -159,6 +159,14 @@ def revise_shift(
     slots_data = normalize_slots_payload(slots_payload) if slots_payload is not None else None
     with transaction.atomic():
         instance = Shift.objects.select_for_update().get(pk=instance.pk)
+        target = validated_data.get('pharmacy')
+        if target is not None and target.pk != instance.pharmacy_id and (
+            instance.slot_assignments.exists()
+            or instance.offers.filter(status__in=[
+                ShiftOffer.Status.ACCEPTED, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            ]).exists()
+        ):
+            raise serializers.ValidationError({'pharmacy': 'Shift pharmacy cannot change during edit.'})
         # Text-only edits leave the accepted terms intact; anything else waits for payment (F01-N2).
         if instance.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists() and (
             slots_payload is not None

@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from django.utils import timezone
 from .models import OwnerSubscription, ShiftPayment, StripeWebhookEvent
+from shifts.finalize import expire_competing_offers, offer_occurrence_key
 from .utils import (
     BILLING_STATE_FREE_TRIAL,
     BILLING_STATE_PRE_LIVE,
@@ -364,16 +365,7 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
             continue
         finalized_offers.append(offer)
         finalized += 1
-    finalized_ids = [offer.id for offer in finalized_offers]
-    for offer in finalized_offers:
-        if offer.slot_id:
-            # Like shifts.offers: only the booked occurrence closes; other dates of a recurring slot stay open.
-            ShiftOffer.objects.filter(
-                shift=shift,
-                slot_id=offer.slot_id,
-                offered_slot_date=offer.offered_slot_date,
-                status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
-            ).exclude(id__in=finalized_ids).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
+    expire_competing_offers(shift, finalized_offers)
     if return_offers:
         return finalized, finalized_offers
     return finalized
@@ -658,7 +650,7 @@ def charge_shift_fulfillment(request, shift_id):
         selected_slot_ids = [offer.slot_id for offer in selected_offers if offer.slot_id]
         if slot_ids and set(selected_slot_ids) != set(slot_ids):
             return Response({'error': 'One or more selected slots do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
-        selected_occurrences = [(offer.slot_id, offer.offered_slot_date) for offer in selected_offers if offer.slot_id]
+        selected_occurrences = [offer_occurrence_key(offer) for offer in selected_offers if offer.slot_id]
         if len(selected_occurrences) != len(set(selected_occurrences)):
             return Response({'error': 'Select only one candidate per slot.'}, status=status.HTTP_400_BAD_REQUEST)
         offer_ids = [offer.id for offer in selected_offers]
@@ -966,13 +958,15 @@ def _process_stripe_event(event):
                 if not session.get('payment_intent'):
                     raise ValueError('Paid Stripe checkout missing required payment_intent.')
 
+                from shifts.models import Shift as ShiftModel, ShiftOffer
+                shift_obj = ShiftModel.objects.select_for_update().filter(id=shift_id).first()
                 # Distinct Stripe webhook event IDs may describe the same
                 # payment intent. Never create a second local paid ledger debit.
                 payment, created = ShiftPayment.objects.get_or_create(
                     stripe_payment_intent_id=session.payment_intent,
                     defaults={
                         'owner_id': owner_id,
-                        'shift_id': shift_id,
+                        'shift': shift_obj,
                         'amount_aud': amount_aud,
                         'payment_type': payment_type,
                         'payment_method': 'card',
@@ -985,62 +979,71 @@ def _process_stripe_event(event):
                     # offers or turn a refunded payment back into paid.
                     return
 
+                if shift_obj is None:
+                    from notifications.services import notify_users
+                    logger.error('Paid shift checkout %s refers to deleted shift %s: refund required.', payment.pk, shift_id)
+                    notify_users(
+                        [payment.owner_id],
+                        title='Shift payment needs a refund',
+                        body='The paid shift no longer exists. The payment needs a refund or manual follow-up.',
+                        payload={'notification_kind': 'shift_payment_refund_required',
+                                 'payment_id': payment.pk, 'shift_id': shift_id},
+                        deliver_on_commit=True,
+                    )
+                    return
+
                 # Cancellation penalty payment must not finalize worker offers.
                 if payment_type != 'fulfillment':
                     return
 
                 # Mark shift paid, then finalize pending offers waiting on payment.
                 try:
-                    from shifts.models import Shift as ShiftModel
-                    shift_obj = ShiftModel.objects.select_for_update().filter(id=shift_id).first()
-                    if shift_obj:
-                        unbookable_offers = []
-                        finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
+                    unbookable_offers = []
+                    finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
+                        shift_obj,
+                        candidate_id=metadata.get('candidate_id'),
+                        slot_id=metadata.get('slot_id'),
+                        slot_ids=metadata.get('slot_ids'),
+                        offer_ids=metadata.get('offer_ids'),
+                        return_offers=True,
+                        unbookable=unbookable_offers,
+                    )
+                    if unbookable_offers:
+                        # The payment stays recorded; a lost occurrence needs a refund, not a Stripe retry.
+                        lost_ids = [offer.id for offer in unbookable_offers]
+                        logger.error(
+                            'Paid shift checkout %s could not book offers %s: refund or manual action required.',
+                            payment.pk, lost_ids,
+                        )
+                        from shifts.notifications import notify_shift_managers
+                        # The unique payment intent gates alert creation in this transaction too.
+                        notify_shift_managers(
                             shift_obj,
-                            candidate_id=metadata.get('candidate_id'),
-                            slot_id=metadata.get('slot_id'),
-                            slot_ids=metadata.get('slot_ids'),
-                            offer_ids=metadata.get('offer_ids'),
-                            return_offers=True,
-                            unbookable=unbookable_offers,
+                            title='Shift payment needs a refund',
+                            body='A paid shift offer could not be booked because its date was already taken. '
+                                 'The payment needs a refund or manual follow-up.',
+                            kind='shift_payment_refund_required',
+                            payload={'payment_id': payment.pk, 'offer_ids': lost_ids},
+                            deliver_on_commit=True,
                         )
-                        if unbookable_offers:
-                            # The payment stays recorded; a lost occurrence needs a refund, not a Stripe retry.
-                            lost_ids = [offer.id for offer in unbookable_offers]
-                            logger.error(
-                                'Paid shift checkout %s could not book offers %s: refund or manual action required.',
-                                payment.pk, lost_ids,
-                            )
-                            from shifts.notifications import notify_shift_managers
-                            # The unique payment intent gates alert creation in this transaction too.
-                            notify_shift_managers(
-                                shift_obj,
-                                title='Shift payment needs a refund',
-                                body='A paid shift offer could not be booked because its date was already taken. '
-                                     'The payment needs a refund or manual follow-up.',
-                                kind='shift_payment_refund_required',
-                                payload={'payment_id': payment.pk, 'offer_ids': lost_ids},
-                                deliver_on_commit=True,
-                            )
-                        from shifts.emails import (
-                            send_shift_payment_finalized_notifications,
-                        )
-                        from users.models import User
-                        paid_by_user = User.objects.filter(id=metadata.get('actor_user_id')).first()
-                        # Notifications must see committed payment and offer changes.
-                        transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
-                            shift=shift_obj,
-                            offers=finalized_offers,
-                            paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
-                            payment_method='stripe',
-                        ), robust=True)
-                        from shifts.models import ShiftOffer
-                        has_pending_payment = ShiftOffer.objects.filter(
-                            shift=shift_obj,
-                            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-                        ).exists()
-                        shift_obj.payment_status = 'PENDING' if has_pending_payment else 'PAID'
-                        shift_obj.save(update_fields=['payment_status'])
+                    from shifts.emails import (
+                        send_shift_payment_finalized_notifications,
+                    )
+                    from users.models import User
+                    paid_by_user = User.objects.filter(id=metadata.get('actor_user_id')).first()
+                    # Notifications must see committed payment and offer changes.
+                    transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
+                        shift=shift_obj,
+                        offers=finalized_offers,
+                        paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
+                        payment_method='stripe',
+                    ), robust=True)
+                    has_pending_payment = ShiftOffer.objects.filter(
+                        shift=shift_obj,
+                        status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                    ).exists()
+                    shift_obj.payment_status = 'PENDING' if has_pending_payment else 'PAID'
+                    shift_obj.save(update_fields=['payment_status'])
                 except Exception as e:
                     logger.warning('Could not finalize paid shift offers: %s', e)
                     # Roll back payment and offer changes together so Stripe can
