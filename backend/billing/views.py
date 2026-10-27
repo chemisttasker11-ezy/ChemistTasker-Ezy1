@@ -326,21 +326,17 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     """
     Finalize shift offers waiting on payment.
     If candidate_id/slot_id are provided, narrow the target set.
-    With an `unbookable` list, an offer whose occurrence is no longer available is expired and
-    collected there instead of failing the whole call.
+    With an `unbookable` list, refused pending offers are expired and collected instead of
+    failing the whole call; explicitly paid offers in other states are collected unchanged.
     """
     from rest_framework.exceptions import ValidationError
     from shifts.models import ShiftOffer
     from shifts.finalize import finalize_shift_offer
 
     target_offer_ids = _normalize_offer_ids(offer_ids)
-    statuses = [ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT]
-    if target_offer_ids and unbookable is not None:
-        statuses.append(ShiftOffer.Status.EXPIRED)
-    offers = ShiftOffer.objects.filter(
-        shift=shift,
-        status__in=statuses,
-    ).order_by("created_at")
+    offers = ShiftOffer.objects.filter(shift=shift).order_by("created_at")
+    if not (target_offer_ids and unbookable is not None):
+        offers = offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
 
     if candidate_id:
         offers = offers.filter(user_id=candidate_id)
@@ -353,10 +349,9 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     finalized = 0
     finalized_offers = []
     for offer in offers:
-        if offer.status == ShiftOffer.Status.EXPIRED:
-            # A competing checkout may have expired this paid offer before its webhook arrived.
-            if not offer.slot_assignments.exists():
-                unbookable.append(offer)
+        if offer.status != ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT:
+            # This new payment cannot book an offer already consumed or withdrawn.
+            unbookable.append(offer)
             continue
         try:
             finalize_shift_offer(offer)  # its own atomic block rolls back a refused offer
@@ -663,33 +658,35 @@ def charge_shift_fulfillment(request, shift_id):
         selected_slot_ids = [offer.slot_id for offer in selected_offers if offer.slot_id]
         if slot_ids and set(selected_slot_ids) != set(slot_ids):
             return Response({'error': 'One or more selected slots do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
-        if len(selected_slot_ids) != len(set(selected_slot_ids)):
+        selected_occurrences = [(offer.slot_id, offer.offered_slot_date) for offer in selected_offers if offer.slot_id]
+        if len(selected_occurrences) != len(set(selected_occurrences)):
             return Response({'error': 'Select only one candidate per slot.'}, status=status.HTTP_400_BAD_REQUEST)
         offer_ids = [offer.id for offer in selected_offers]
         slot_ids = sorted(set(selected_slot_ids)) if len(selected_slot_ids) == len(selected_offers) else []
 
     # --- Honeymoon period / free trial: finalize for free ---
     if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
-        finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
-            shift,
-            candidate_id=candidate_id,
-            slot_ids=slot_ids,
-            offer_ids=offer_ids,
-            return_offers=True,
-        )
-        from shifts.emails import send_shift_payment_finalized_notifications
-        has_pending_payment = ShiftOffer.objects.filter(
-            shift=shift,
-            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-        ).exists()
-        shift.payment_status = 'PENDING' if has_pending_payment else 'PAID'
-        shift.save(update_fields=['payment_status'])
-        send_shift_payment_finalized_notifications(
-            shift=shift,
-            offers=finalized_offers,
-            paid_by=request.user,
-            payment_method="free",
-        )
+        with transaction.atomic():
+            finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
+                shift,
+                candidate_id=candidate_id,
+                slot_ids=slot_ids,
+                offer_ids=offer_ids,
+                return_offers=True,
+            )
+            from shifts.emails import send_shift_payment_finalized_notifications
+            has_pending_payment = ShiftOffer.objects.filter(
+                shift=shift,
+                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            ).exists()
+            shift.payment_status = 'PENDING' if has_pending_payment else 'PAID'
+            shift.save(update_fields=['payment_status'])
+            transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
+                shift=shift,
+                offers=finalized_offers,
+                paid_by=request.user,
+                payment_method="free",
+            ), robust=True)
         if billing_state == BILLING_STATE_PRE_LIVE:
             return Response({
                 'free': True,
@@ -995,7 +992,7 @@ def _process_stripe_event(event):
                 # Mark shift paid, then finalize pending offers waiting on payment.
                 try:
                     from shifts.models import Shift as ShiftModel
-                    shift_obj = ShiftModel.objects.filter(id=shift_id).first()
+                    shift_obj = ShiftModel.objects.select_for_update().filter(id=shift_id).first()
                     if shift_obj:
                         unbookable_offers = []
                         finalized_count, finalized_offers = _finalize_pending_offers_for_shift(

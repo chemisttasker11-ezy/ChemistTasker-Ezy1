@@ -398,11 +398,12 @@ class OrganizationBillingScopeTests(TestCase):
         )
         self.assertEqual(subscription.status_code, 403, subscription.data)
 
-        charge = client.post(
-            reverse('api_v1:billing:charge_fulfillment', args=[shift.pk]),
-            {'offer_ids': [offer.pk]},
-            format='json',
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            charge = client.post(
+                reverse('api_v1:billing:charge_fulfillment', args=[shift.pk]),
+                {'offer_ids': [offer.pk]},
+                format='json',
+            )
         self.assertEqual(charge.status_code, 200, charge.data)
         finalize.assert_called_once()
         notify.assert_called_once()

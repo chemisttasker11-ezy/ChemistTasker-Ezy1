@@ -47,6 +47,7 @@ class FulfillmentSelectionTests(TestCase):
             patch("billing.views._finalize_pending_offers_for_shift", return_value=(2, self.offers)) as finalize,
             patch("shifts.emails.send_shift_payment_finalized_notifications") as notify,
             patch("billing.views.stripe.checkout.Session.create") as create,
+            self.captureOnCommitCallbacks(execute=True),
         ):
             response = client_for(self.owner).post(
                 f"/api/v1/billing/charge-fulfillment/{self.shift.pk}/", {}, format="json",
