@@ -50,6 +50,15 @@ def _protect_removed_assignments(assignments):
         raise DRFValidationError({"detail": exc.messages}) from exc
 
 
+def _guard_booked_occurrences(assignment, *slot_dates):
+    """Offer-booked or payment-pending occurrences stay as booked; plain rostered staff remain editable."""
+    try:
+        for slot_date in dict.fromkeys(slot_dates):
+            guard_roster_assignment(shift=assignment.shift, slot=assignment.slot, slot_date=slot_date)
+    except DjangoValidationError as exc:
+        raise DRFValidationError({"detail": exc.messages}) from exc
+
+
 def _notify_unassigned(assignments):
     for assignment in assignments:
         notify_shift_users(
@@ -137,7 +146,10 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
             raise DRFValidationError(
                 "Unpublish this shift for editing before changing its assignment in a published roster."
             )
-        super().perform_update(serializer)
+        instance = serializer.instance
+        with transaction.atomic():
+            _guard_booked_occurrences(instance, instance.slot_date, serializer.validated_data.get("slot_date", instance.slot_date))
+            super().perform_update(serializer)
 
     def perform_destroy(self, instance):
         if _slot_locked_by_published_roster(instance.slot):
@@ -145,7 +157,9 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
                 "Unpublish this shift for editing before removing its assignment from a published roster."
             )
         _protect_removed_assignments([instance])
-        super().perform_destroy(instance)
+        with transaction.atomic():
+            _guard_booked_occurrences(instance, instance.slot_date)
+            super().perform_destroy(instance)
         _notify_unassigned([instance])
 
     @action(detail=False, methods=['get'], url_path='members-for-roster')

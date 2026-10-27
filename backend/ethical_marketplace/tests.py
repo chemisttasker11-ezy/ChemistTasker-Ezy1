@@ -326,6 +326,14 @@ class EthicalS8LotAndTransferScheduleTests(TestCase):
         self.assertEqual(self.listed_transfers(), {str(s4.pk)})
         self.assertEqual(self.create_lot("S4").status_code, 201)
 
+    def test_mode_specific_policy_still_lists_its_transfers(self):
+        EthicalJurisdictionPolicy.objects.filter(activity="VIEW_CHAIN_ETHICAL").update(mode="DONATE")
+        self.grant(["S4"])
+        donated = self.transfer("S4")
+        self.assertEqual(self.listed_transfers(), {str(donated.pk)})
+        EthicalJurisdictionPolicy.objects.filter(activity="VIEW_CHAIN_ETHICAL").update(mode="SELL")
+        self.assertEqual(self.listed_transfers(), set())
+
     def test_s8_schedule_holder_still_creates_s8_lots_and_sees_s8_transfers(self):
         self.grant(["S4", "S8"])
         s4, s8 = self.transfer("S4"), self.transfer("S8")

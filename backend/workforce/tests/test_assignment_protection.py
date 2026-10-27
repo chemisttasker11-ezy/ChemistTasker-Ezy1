@@ -152,3 +152,56 @@ class RosterAssignmentProtectionTests(TestCase):
                 {"action": "assign_worker", "slot_id": self.slot.pk, "user_id": self.worker.pk},
             ], self.owner)
         self.assertEqual(self.slot.assignments.get().user_id, self.worker.pk)
+
+    def next_week(self):
+        """Make the slot weekly so next week's date is a valid occurrence to move to."""
+        ShiftSlot.objects.filter(pk=self.slot.pk).update(
+            is_recurring=True, recurring_days=[self.day.weekday()], recurring_end_date=self.day + timedelta(days=7))
+        return self.day + timedelta(days=7)
+
+    def test_single_assignment_patch_and_delete_refuse_booked_or_pending_occurrences(self):
+        target = self.next_week()
+        for state in ("booked", "payment_pending"):
+            if state == "booked":
+                row = self.book()
+            else:
+                self.protect(state)
+                row = ShiftSlotAssignment.objects.create(shift=self.shift, slot=self.slot, slot_date=self.day,
+                                                         user=self.worker, is_rostered=True)
+            url = f"/api/v1/roster-owner/{row.pk}/"
+            for body in ({"user": self.other.pk}, {"unit_rate": "99.00"}, {"slot_date": str(target)}):
+                with self.subTest(state=state, body=body):
+                    self.assertEqual(client_for(self.owner).patch(url, body, format="json").status_code, 400)
+                    row.refresh_from_db()
+                    self.assertEqual((row.user_id, row.slot_date), (self.worker.pk, self.day))
+                    self.assertNotEqual(str(row.unit_rate), "99.00")
+            with self.subTest(state=state, method="delete"):
+                self.assertEqual(client_for(self.owner).delete(url).status_code, 400)
+                self.assertTrue(ShiftSlotAssignment.objects.filter(pk=row.pk).exists())
+            ShiftSlotAssignment.objects.all().delete()
+            ShiftOffer.objects.all().delete()
+
+    def test_single_assignment_patch_refuses_moving_onto_pending_date(self):
+        target = self.next_week()
+        row = ShiftSlotAssignment.objects.create(shift=self.shift, slot=self.slot, slot_date=self.day,
+                                                 user=self.worker, is_rostered=True)
+        ShiftOffer.objects.create(shift=self.shift, slot=self.slot, offered_slot_date=target, user=self.other,
+                                  status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        response = client_for(self.owner).patch(f"/api/v1/roster-owner/{row.pk}/", {"slot_date": str(target)},
+                                                format="json")
+        self.assertEqual(response.status_code, 400)
+        row.refresh_from_db()
+        self.assertEqual(row.slot_date, self.day)
+
+    def test_single_plain_rostered_assignment_stays_editable(self):
+        target = self.next_week()
+        row = ShiftSlotAssignment.objects.create(shift=self.shift, slot=self.slot, slot_date=self.day,
+                                                 user=self.worker, is_rostered=True)
+        url = f"/api/v1/roster-owner/{row.pk}/"
+        response = client_for(self.owner).patch(url, {"user": self.other.pk, "unit_rate": "55.00",
+                                                      "slot_date": str(target)}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        row.refresh_from_db()
+        self.assertEqual((row.user_id, str(row.unit_rate), row.slot_date), (self.other.pk, "55.00", target))
+        self.assertEqual(client_for(self.owner).delete(url).status_code, 204)
+        self.assertFalse(ShiftSlotAssignment.objects.filter(pk=row.pk).exists())

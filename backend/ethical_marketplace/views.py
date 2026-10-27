@@ -518,7 +518,7 @@ class Transfers(APIView):
             return private(Response(TransferSerializer(transfer_for(request.user, pk)).data))
         pharmacy = admitted_pharmacy(request)
         rows = EthicalTransfer.objects.filter(models_transfer_party(pharmacy)).select_related("listing", "listing__product", "source_pharmacy", "destination_pharmacy").prefetch_related("lines")
-        rows = [row for row in rows if evaluate_ethical_access(request.user, pharmacy, product=row.listing.product).admitted]
+        rows = [row for row in rows if evaluate_ethical_access(request.user, pharmacy, product=row.listing.product, mode=row.mode).admitted]
         return private(Response(TransferSerializer(rows, many=True).data))
 
 

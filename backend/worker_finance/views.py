@@ -32,7 +32,7 @@ from .services import (
     save_draft, snapshot_lines, calculate, serialize_record, duplicate,
     make_super_document, record_payment, check_version, json_safe,
     invoice_defaults, internal_invoice_sources, internal_invoice_prefill,
-    record_revision_state, serialize_revision, serialize_owner_revision, owner_visible_document,
+    record_revision_state, serialize_revision, serialize_owner_revision, owner_visible_document, legacy_current_visible,
 )
 
 logger = logging.getLogger(__name__)
@@ -365,7 +365,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             delivered
             or record.status == 'sent'
             or record.review_status != 'NONE'
-            or record.legacy_snapshot
+            or legacy_current_visible(record)
         )
         if not current_visible:
             raise ValidationError({
@@ -419,7 +419,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
             version=revision.version,
             status__in=['sent', 'legacy_queued'],
         ).exists()
-        if not delivered and not (record.legacy_snapshot and revision.version == record.version):
+        if not delivered and not (legacy_current_visible(record) and revision.version == record.version):
             raise Http404
         return pdf_response(record, serialize_owner_revision(record, revision))
 

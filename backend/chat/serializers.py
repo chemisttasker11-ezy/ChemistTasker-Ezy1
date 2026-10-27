@@ -292,7 +292,10 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
                 or self.instance.pharmacy_id
                 or not (
                     self.instance.created_by_id == user.id
-                    or self.instance.participants.filter(membership__user=user, is_admin=True).exists()
+                    or self.instance.participants.filter(
+                        membership__user=user, membership__is_active=True,
+                        membership__status=Membership.Status.ACCEPTED, is_admin=True,
+                    ).exists()
                 )
             ):
                 raise PermissionDenied("Not authorized to modify this group.")

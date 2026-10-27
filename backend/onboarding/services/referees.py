@@ -52,6 +52,21 @@ def apply_referees_tab(instance, vdata: dict, submit: bool):
     apply_ref(1)
     apply_ref(2)
 
+    # The candidate receives no signed link of their own, and two references come from two people.
+    own_email = clean_email(getattr(instance.user, "email", ""))
+    errors = {}
+    for idx in (1, 2):
+        field = f"referee{idx}_email"
+        email = getattr(instance, field)
+        if not email or getattr(instance, f"referee{idx}_confirmed", False) or not (field in vdata or submit):
+            continue
+        if email == own_email:
+            errors[field] = ["You cannot be your own referee."]
+        elif idx == 2 and email == instance.referee1_email:
+            errors[field] = ["Each referee needs a different email address."]
+    if errors:
+        raise serializers.ValidationError(errors)
+
     if submit:
         errors = {}
         for idx in [1, 2]:

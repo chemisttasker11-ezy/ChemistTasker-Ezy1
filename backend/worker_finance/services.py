@@ -735,6 +735,11 @@ def serialize_revision(record, revision):
     return document
 
 
+def legacy_current_visible(record):
+    """A migrated snapshot shows its current content only while sent or paid; a later unsent edit stays hidden."""
+    return record.legacy_snapshot and record.status in ("sent", "paid")
+
+
 def serialize_owner_revision(record, revision):
     document = serialize_revision(record, revision)
     visible_versions = set(
@@ -745,7 +750,7 @@ def serialize_owner_revision(record, revision):
     if (
         record.status == "sent"
         or record.review_status != "NONE"
-        or record.legacy_snapshot
+        or legacy_current_visible(record)
     ):
         visible_versions.add(record.version)
     document["revisions"] = [
@@ -772,7 +777,7 @@ def owner_visible_document(record):
         current_delivery is not None
         or record.status == "sent"
         or record.review_status != "NONE"
-        or record.legacy_snapshot
+        or legacy_current_visible(record)
     )
     visible_versions = set(
         record.deliveries

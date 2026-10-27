@@ -329,6 +329,19 @@ class RefereesTabTests(TabFixture):
                                                           ("emails/referee_request.html", ("bob@example.com",))])
                 self.assertEqual(sorted(work["reminders"]), [(obj._meta.model_name, 1), (obj._meta.model_name, 2)])
 
+    def test_referee_email_cannot_be_the_candidate_or_the_other_referee(self):
+        for label in ("pharmacist", "otherstaff", "explorer"):
+            user, obj, url = self.onboarding(label)
+            for field, email in (("referee1_email", f" {user.email.upper()} "), ("referee2_email", "ANN@example.com")):
+                with self.subTest(role=label, field=field):
+                    response, work = self.patch(user, url, {"tab": "referees", "submitted_for_verification": True,
+                                                            **self.REFS, field: email})
+                    self.assertEqual(response.status_code, 400)
+                    self.assertEqual(set(response.data), {field})
+                    self.assertEqual(work["emails"], [])
+                    obj.refresh_from_db()
+                    self.assertIsNone(obj.referee1_last_sent)
+
     def test_confirmed_referee_is_locked_and_a_changed_one_is_reset(self):
         for label in ("pharmacist", "otherstaff", "explorer"):
             with self.subTest(role=label):

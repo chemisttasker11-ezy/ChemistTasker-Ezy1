@@ -479,6 +479,45 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(revised.review_status, "NONE")
         self.assertEqual(revised.status, "draft")
 
+    def owner_call(self, method, action, record, path="", data=None, **kwargs):
+        request = getattr(APIRequestFactory(), method)(f"/finance/received-invoices/{record.id}/{path}", data,
+                                                       format="json")
+        force_authenticate(request, user=self.owner)
+        return ReceivedInvoiceViewSet.as_view({method: action})(request, pk=record.id, **kwargs)
+
+    def sent_then_edited(self, *, legacy=False, request_revision=False):
+        record = save_draft(self.worker, internal_invoice_prefill(self.worker, [self.assignment.id]))
+        Delivery.objects.create(invoice=record, version=1, recipient=self.owner.email, status="sent",
+                                sent_at=timezone.now())
+        record.status, record.legacy_snapshot = "sent", legacy
+        record.save(update_fields=["status", "legacy_snapshot"])
+        self.assertEqual(self.owner_call("get", "retrieve", record).data["version"], 1)
+        if request_revision:
+            response = self.owner_call("post", "request_revision", record, "request-revision/",
+                                       {"version": 1, "note": "Fix the hours."})
+            self.assertEqual(response.status_code, 200, response.data)
+        record.refresh_from_db()
+        payload = dict(record.payload, version=record.version, notes="Unsent correction")
+        return save_draft(self.worker, payload, record.id)
+
+    def assert_owner_sees_only_sent_version(self, record):
+        self.assertEqual((record.version, record.status), (2, "draft"))
+        detail = self.owner_call("get", "retrieve", record)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.data["version"], 1)
+        self.assertNotEqual(detail.data["payload"].get("notes"), "Unsent correction")
+        self.assertEqual(self.owner_call("get", "revision_pdf", record, "revisions/2/pdf/", version="2").status_code,
+                         404)
+        response = self.owner_call("post", "approve_payment", record, "approve-payment/", {"version": 2})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("version", response.data)
+
+    def test_unsent_edit_of_sent_legacy_snapshot_stays_hidden_from_the_pharmacy(self):
+        self.assert_owner_sees_only_sent_version(self.sent_then_edited(legacy=True))
+
+    def test_unsent_edit_after_revision_request_stays_hidden_from_the_pharmacy(self):
+        self.assert_owner_sees_only_sent_version(self.sent_then_edited(request_revision=True))
+
     def test_owner_review_action_rejects_stale_invoice_version(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
         record = save_draft(self.worker, draft)

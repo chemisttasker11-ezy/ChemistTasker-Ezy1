@@ -422,7 +422,8 @@ class ConversationViewSet(mixins.ListModelMixin,
 
         # Case B: Update existing custom group
         if room_id:
-            conv = get_object_or_404(Conversation, pk=room_id, type=Conversation.Type.GROUP)
+            # A revoked creator or admin no longer sees the room, so cannot rename it or remove members.
+            conv = get_object_or_404(accessible_conversations_queryset(user), pk=room_id, type=Conversation.Type.GROUP)
             # Only allow updates on non-pharmacy groups here
             if conv.pharmacy_id:
                 return Response({"detail": "Use pharmacy_id to manage community chats."}, status=status.HTTP_400_BAD_REQUEST)
