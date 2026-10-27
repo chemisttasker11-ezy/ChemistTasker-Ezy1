@@ -736,8 +736,9 @@ def serialize_revision(record, revision):
 
 
 def legacy_current_visible(record):
-    """A migrated snapshot shows its current content only while sent or paid; a later unsent edit stays hidden."""
-    return record.legacy_snapshot and record.status in ("sent", "paid")
+    """A migrated snapshot shows its current content only while sent or paid; a later unsent edit stays hidden.
+    The migration kept every legacy invoice at version 1, so only that revision gets the exception."""
+    return record.legacy_snapshot and record.version == 1 and record.status in ("sent", "paid")
 
 
 def serialize_owner_revision(record, revision):

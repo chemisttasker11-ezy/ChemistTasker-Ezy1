@@ -52,20 +52,20 @@ def apply_referees_tab(instance, vdata: dict, submit: bool):
     apply_ref(1)
     apply_ref(2)
 
-    # The candidate receives no signed link of their own, and two references come from two people.
-    own_email = clean_email(getattr(instance.user, "email", ""))
-    errors = {}
-    for idx in (1, 2):
-        field = f"referee{idx}_email"
-        email = getattr(instance, field)
-        if not email or getattr(instance, f"referee{idx}_confirmed", False) or not (field in vdata or submit):
-            continue
-        if email == own_email:
-            errors[field] = ["You cannot be your own referee."]
-        elif idx == 2 and email == instance.referee1_email:
-            errors[field] = ["Each referee needs a different email address."]
-    if errors:
-        raise serializers.ValidationError(errors)
+    # The candidate receives no signed link of their own, and two references come from two people; the final pair is
+    # checked, confirmed referees included, so a locked referee cannot be duplicated from the other side.
+    if submit or "referee1_email" in vdata or "referee2_email" in vdata:
+        own_email = clean_email(getattr(instance.user, "email", ""))
+        emails = {idx: clean_email(getattr(instance, f"referee{idx}_email")) for idx in (1, 2)}
+        errors = {}
+        for idx, email in emails.items():
+            if email and email == own_email:
+                errors[f"referee{idx}_email"] = ["You cannot be your own referee."]
+        if emails[1] and emails[1] == emails[2]:
+            field = "referee1_email" if instance.referee2_confirmed else "referee2_email"   # blame the editable side
+            errors.setdefault(field, ["Each referee needs a different email address."])
+        if errors:
+            raise serializers.ValidationError(errors)
 
     if submit:
         errors = {}

@@ -500,10 +500,13 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         if next_visibility == PUBLIC_LEVEL:
             enforce_public_shift_daily_limit(shift.pharmacy)
 
-        removed = list(shift.slot_assignments.select_related('user', 'slot', 'shift__pharmacy'))
-        _protect_removed_assignments(removed)
         try:
             with transaction.atomic():   # the assignments are cleared together with the escalation, or not at all
+                # Lock like offer finalization (shift, then its slots) so no booking lands between guard and delete.
+                Shift.objects.select_for_update(of=("self",)).get(pk=shift.pk)
+                list(ShiftSlot.objects.select_for_update(of=("self",)).filter(shift=shift).order_by("pk"))
+                removed = list(shift.slot_assignments.select_related('user', 'slot', 'shift__pharmacy'))
+                _protect_removed_assignments(removed)
                 for assignment in removed:
                     _guard_booked_occurrences(assignment, assignment.slot_date)
                 shift.slot_assignments.all().delete()

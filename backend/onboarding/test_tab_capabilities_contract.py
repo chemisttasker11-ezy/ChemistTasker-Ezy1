@@ -342,6 +342,26 @@ class RefereesTabTests(TabFixture):
                     obj.refresh_from_db()
                     self.assertIsNone(obj.referee1_last_sent)
 
+    def test_a_referee_cannot_duplicate_a_confirmed_one_or_the_candidate(self):
+        for label in ("pharmacist", "otherstaff", "explorer"):
+            with self.subTest(role=label):
+                user, obj, url = self.onboarding(label, referee2_name="Bob", referee2_email="bob@example.com",
+                                                 referee2_confirmed=True)
+                for body in ({"referee1_email": " BOB@example.com "},
+                             {"submitted_for_verification": True, **self.REFS, "referee1_email": "bob@example.com"}):
+                    response, work = self.patch(user, url, {"tab": "referees", **body})
+                    self.assertEqual(response.status_code, 400)
+                    self.assertEqual(set(response.data), {"referee1_email"})
+                    self.assertEqual(work["emails"], [])
+                obj.refresh_from_db()
+                self.assertFalse(obj.referee1_email)
+                type(obj).objects.filter(pk=obj.pk).update(referee2_email=user.email)
+                response, _ = self.patch(user, url, {"tab": "referees", "referee1_email": "ann@example.com"})
+                self.assertEqual(set(response.data), {"referee2_email"})
+                type(obj).objects.filter(pk=obj.pk).update(referee2_email="bob@example.com")
+                response, _ = self.patch(user, url, {"tab": "referees", "referee1_email": "ann@example.com"})
+                self.assertEqual(response.status_code, 200, response.data)
+
     def test_confirmed_referee_is_locked_and_a_changed_one_is_reset(self):
         for label in ("pharmacist", "otherstaff", "explorer"):
             with self.subTest(role=label):

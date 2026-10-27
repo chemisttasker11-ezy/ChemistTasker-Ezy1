@@ -18,7 +18,7 @@ from client_profile.models import (
     ShiftSlotAssignment,
 )
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
-from invoicing.models import Invoice, InvoiceLineItem
+from invoicing.models import Invoice, InvoiceLineItem, manager_visible_state
 from notifications.models import Notification
 from invoicing.serializers import InvoiceSerializer
 from invoicing.services import generate_invoice_from_shifts
@@ -515,6 +515,21 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
     def test_unsent_edit_of_sent_legacy_snapshot_stays_hidden_from_the_pharmacy(self):
         self.assert_owner_sees_only_sent_version(self.sent_then_edited(legacy=True))
 
+    def test_marking_an_unsent_edit_of_a_legacy_snapshot_paid_keeps_it_hidden(self):
+        record = self.sent_then_edited(legacy=True)
+        request = APIRequestFactory().post(f"/finance/invoices/{record.pk}/mark-paid/", {"version": record.version},
+                                           format="json")
+        force_authenticate(request, user=self.worker)
+        self.assertEqual(InvoiceViewSet.as_view({"post": "mark_paid"})(request, pk=record.pk).status_code, 200)
+        record.refresh_from_db()
+        self.assertEqual((record.version, record.status), (2, "paid"))
+        detail = self.owner_call("get", "retrieve", record)
+        self.assertEqual(detail.data["version"], 1)
+        self.assertNotEqual(detail.data["payload"].get("notes"), "Unsent correction")
+        self.assertEqual(self.owner_call("get", "revision_pdf", record, "revisions/2/pdf/", version="2").status_code,
+                         404)
+        self.assertFalse(Invoice.objects.filter(manager_visible_state(), pk=record.pk).exists())  # dashboards
+
     def test_unsent_edit_after_revision_request_stays_hidden_from_the_pharmacy(self):
         self.assert_owner_sees_only_sent_version(self.sent_then_edited(request_revision=True))
 
@@ -918,11 +933,27 @@ class LegacySnapshotEditVisibilityTests(TestCase):
             with self.subTest(path=path):
                 self.assertNotIn(record.pk, self.listed_ids(path))
 
+    def test_paid_later_version_of_legacy_snapshot_is_hidden_from_the_pharmacy(self):
+        record = self.invoice(status="paid")
+        for path in ("/api/v1/invoices/", "/api/v1/finance/received-invoices/"):
+            with self.subTest(path=path):
+                self.assertNotIn(record.pk, self.listed_ids(path))
+        self.assertFalse(Invoice.objects.filter(manager_visible_state(), pk=record.pk).exists())
+
     def test_sent_and_paid_legacy_snapshots_stay_listed(self):
-        sent, paid = self.invoice(status="sent"), self.invoice(status="paid")
+        # The migrated revision is version 1; only it keeps the legacy exception.
+        sent, paid = self.invoice(status="sent", version=1), self.invoice(status="paid", version=1)
         for path in ("/api/v1/invoices/", "/api/v1/finance/received-invoices/"):
             with self.subTest(path=path):
                 self.assertTrue({sent.pk, paid.pk} <= self.listed_ids(path))
+        self.assertEqual(set(Invoice.objects.filter(manager_visible_state()).values_list("pk", flat=True)),
+                         {sent.pk, paid.pk})
+        owner = client_for(self.owner)
+        for record in (sent, paid):
+            with self.subTest(record=record.status):
+                detail = owner.get(f"/api/v1/finance/received-invoices/{record.pk}/")
+                self.assertEqual((detail.status_code, detail.data["version"]), (200, 1))
+                self.assertEqual(owner.get(f"/api/v1/finance/received-invoices/{record.pk}/pdf/").status_code, 200)
 
     def test_old_editor_draft_without_request_key_stays_listed(self):
         record = self.invoice(request_key=None, legacy_snapshot=False)

@@ -7,7 +7,7 @@ def manager_visible_state():
     """Invoices whose current content a pharmacy manager may see; a worker's unsent revision stays hidden."""
     return (
         models.Q(request_key__isnull=True)
-        | models.Q(legacy_snapshot=True, status__in=["sent", "paid"])
+        | models.Q(legacy_snapshot=True, version=1, status__in=["sent", "paid"])  # only the migrated revision
         | models.Q(
             deliveries__version=models.F("version"),
             deliveries__status__in=["sent", "legacy_queued"],
