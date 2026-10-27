@@ -2,7 +2,7 @@
 from rest_framework import permissions, status, viewsets
 from memberships.models import Membership
 from organizations.models import Pharmacy
-from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
+from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from memberships.serializers import MembershipSerializer
 from workforce.roster.serializers import RosterAssignmentSerializer
@@ -187,6 +187,17 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         if not managed_pharmacies_for(self.request.user).filter(pk=pharmacy.pk).exists():
             self.permission_denied(self.request)
         serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        # Plain rostered staff on a draft shift may go with it (grill #9); offer-booked or payment-pending may not.
+        with transaction.atomic():
+            shift = Shift.objects.select_for_update().get(pk=self.get_object().pk)
+            if (shift.slot_assignments.filter(source_offer__isnull=False).exists()
+                    or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()):
+                return Response({'detail': 'This shift has a booked or payment-pending worker and cannot be deleted.'},
+                                status=status.HTTP_409_CONFLICT)
+            self.perform_destroy(shift)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_destroy(self, instance):
         if any(_slot_locked_by_published_roster(slot) for slot in instance.slots.select_related("shift")):

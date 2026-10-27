@@ -244,8 +244,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                 if slot.shift.pharmacy_id != roster_period.pharmacy_id:
                     raise ValidationError(f"Operation {idx}: Slot belongs to a different pharmacy.")
 
-                if op.get("target_user_id"):
-                    guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=slot.date, candidate=op["target_user_id"])
+                guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=slot.date)
                 target_date_raw = op.get("target_date")
                 if target_date_raw:
                     target_date = _parse_date(target_date_raw)
@@ -253,6 +252,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                         raise ValidationError(f"Operation {idx}: Target date {target_date} is outside this roster period.")
 
                     if target_date != slot.date:
+                        guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=target_date)
                         slot.date = target_date
                         slot.save(update_fields=["date"])
                         slot.assignments.all().update(slot_date=target_date)

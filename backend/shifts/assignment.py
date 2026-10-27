@@ -212,14 +212,18 @@ def roster_direct_staff(*, shift, candidate, assignments):
     }
 
 
-def guard_roster_assignment(*, shift, slot, slot_date, candidate):
+def guard_roster_assignment(*, shift, slot, slot_date, candidate=None):
     """Call inside the assignment transaction; share the slot lock with offer finalization.
-    The candidate's own rostered occurrence may be re-saved or moved; booked or another worker's may not."""
+    Offer-booked or payment-pending occurrences are never changed, not even for their own worker; with a candidate,
+    another worker's rostered occurrence is refused too (only the candidate's own may be re-saved or moved)."""
     ShiftSlot.objects.select_for_update().get(pk=slot.pk)
     held = ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot_date)
-    if held.filter(Q(source_offer__isnull=False) | ~Q(user=candidate)).exists() or (
-        not held.exists() and slot_locked_for_shift_offer(shift=shift, slot=slot, slot_date=slot_date, ignore_user=candidate)
-    ):
+    held = held.filter(source_offer__isnull=False) if candidate is None else held.exclude(user=candidate, source_offer__isnull=True)
+    pending = ShiftOffer.objects.filter(
+        Q(slot=slot) | Q(slot__isnull=True), Q(offered_slot_date=slot_date) | Q(offered_slot_date__isnull=True),
+        shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+    )
+    if held.exists() or pending.exists():
         raise DjangoValidationError('This shift occurrence is already assigned or awaiting payment.')
 
 

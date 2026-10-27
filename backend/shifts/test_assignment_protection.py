@@ -52,6 +52,19 @@ class AssignmentProtectionTests(_ShiftMixin, TestCase):
         self.assertIn(r.status_code, (400, 409))
         self.assertEqual(self.assignments().count(), 0)
 
+    def test_i2_manual_assign_same_worker_over_own_payment_pending_occurrence_refused(self):
+        from shifts.models import ShiftOffer
+        staff = self.staff()
+        pending = self.offer(self.day)
+        ShiftOffer.objects.filter(pk=pending.pk).update(user=staff)
+        pending.refresh_from_db()
+        r = client_for(self.owner).post(f"/api/v1/shifts/{self.shift.pk}/manual-assign/", {
+            "user_id": staff.pk, "assignments": [{"slot_id": self.slot.pk, "slot_date": str(self.day)}]}, format="json")
+        self.assertIn(r.status_code, (400, 409), "rostering over the worker's own checkout dropped its offer link")
+        self.assertEqual(self.assignments().count(), 0)
+        self.book(pending)
+        self.assertEqual(self.assignments(self.day).get().source_offer_id, pending.pk)
+
     def test_i2_booked_shift_delete(self):
         self.book(self.offer(self.day))
         r = client_for(self.owner).delete(f"/api/v1/shifts/{self.shift.pk}/")

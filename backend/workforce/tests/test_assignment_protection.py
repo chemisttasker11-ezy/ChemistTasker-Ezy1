@@ -86,6 +86,66 @@ class RosterAssignmentProtectionTests(TestCase):
         self.assertEqual(self.slot.date, self.day)
         self.assert_unchanged("payment_pending")
 
+    def book(self):
+        offer = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, offered_slot_date=self.day,
+                                          user=self.worker, status=ShiftOffer.Status.ACCEPTED)
+        return ShiftSlotAssignment.objects.create(shift=self.shift, slot=self.slot, slot_date=self.day,
+                                                  user=self.worker, is_rostered=True, source_offer=offer)
+
+    def other_day(self):
+        return self.period.week_start if self.day != self.period.week_start else self.day + timedelta(days=1)
+
+    def test_move_without_worker_refuses_booked_or_pending_occurrences(self):
+        for state in ("booked", "payment_pending"):
+            self.book() if state == "booked" else self.protect(state)
+            for op in ({"target_date": str(self.other_day())}, {"target_user_id": None}):
+                with self.subTest(state=state, op=op):
+                    with self.assertRaisesMessage(ValidationError, "already assigned or awaiting payment"):
+                        bulk_edit_roster_period(self.period, [{"action": "move_shift", "slot_id": self.slot.pk, **op}],
+                                                self.owner)
+                    self.slot.refresh_from_db()
+                    self.assertEqual(self.slot.date, self.day)
+                    self.assertEqual(self.slot.assignments.count(), 1 if state == "booked" else 0)
+            self.slot.assignments.all().delete()
+            ShiftOffer.objects.all().delete()
+
+    def test_slot_patch_refuses_booked_or_pending_occurrences(self):
+        url = f"/api/v1/roster-shifts/{self.shift.pk}/"
+        for state in ("booked", "payment_pending"):
+            self.book() if state == "booked" else self.protect(state)
+            for body in ({"slots": [{"id": self.slot.pk, "date": str(self.other_day())}]},
+                         {"slots": [{"id": self.slot.pk}], "user_id": self.worker.pk}):
+                with self.subTest(state=state, body=body):
+                    response = client_for(self.owner).patch(url, body, format="json")
+                    self.assertEqual(response.status_code, 400, response.data)
+                    self.slot.refresh_from_db()
+                    self.assertEqual(self.slot.date, self.day)
+                    self.assertEqual(self.slot.assignments.count(), 1 if state == "booked" else 0)
+            self.slot.assignments.all().delete()
+            ShiftOffer.objects.all().delete()
+
+    def test_roster_shift_delete_refuses_booked_or_pending_occurrences(self):
+        url = f"/api/v1/roster-shifts/{self.shift.pk}/"
+        for state in ("booked", "payment_pending"):
+            self.book() if state == "booked" else self.protect(state)
+            with self.subTest(state=state):
+                self.assertEqual(client_for(self.owner).delete(url).status_code, 409)
+                self.assertTrue(Shift.objects.filter(pk=self.shift.pk).exists())
+                self.assertEqual(self.slot.assignments.count(), 1 if state == "booked" else 0)
+            self.slot.assignments.all().delete()
+            ShiftOffer.objects.all().delete()
+
+    def test_plain_rostered_staff_stay_editable(self):
+        self.protect("assigned")
+        with patch("workforce.roster.bulk_edit._validate_and_price"):
+            bulk_edit_roster_period(self.period, [
+                {"action": "move_shift", "slot_id": self.slot.pk, "target_date": str(self.other_day())},
+            ], self.owner)
+        self.assertEqual(self.slot.assignments.get().slot_date, self.other_day())
+        response = client_for(self.owner).delete(f"/api/v1/roster-shifts/{self.shift.pk}/")
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Shift.objects.filter(pk=self.shift.pk).exists())
+
     def test_bulk_free_occurrence_control(self):
         with patch("workforce.roster.bulk_edit._validate_and_price"):
             bulk_edit_roster_period(self.period, [

@@ -151,7 +151,8 @@ class SessionRevocationTests(TransactionTestCase):
             await self.closed(comm)
         self.assertEqual((await survivor.receive_json_from(timeout=TIMEOUT))['unread'], 7)
         await self.socket(access=first['access'], accepted=False)
-        await self.socket(ticket=await self.ticket(rotated.data['access']), accepted=False)
+        # REST auth now refuses a revoked session id, so no ticket is even issued (users/authentication.py).
+        self.assertEqual((await self.post('ws-ticket', access=rotated.data['access'])).status_code, 401)
         await self.disconnect_sockets()
 
     async def test_ticket_socket_checks_access_expiry_on_delivery(self):
