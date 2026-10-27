@@ -1,6 +1,6 @@
 # Light Senior Review — ChemistTasker Engineering Handbook
 
-**Version:** 1.0 — 26 October 2026 (Australia/Brisbane)  
+**Version:** 1.1 — 28 October 2026 (Australia/Brisbane)  
 **Invocation:** **"Light Senior Review"** (alias: **"Fast Senior Review"**)  
 **Purpose:** Senior-level, efficient investigation, coding, review and specific testing **while work is in progress**.
 
@@ -49,6 +49,24 @@ Never let the phrase **"not the entire repository reviewed"** block closure of a
 **F. Test the changed behavior immediately.** Run targeted tests on the exact current head, inspect failures and relevant side effects. Fix actual in-scope regressions, rerun and conclude. Do not automatically rerun the complete CI matrix after every edit. Existing broader CI may run in the background while coding; evaluate exact-head results when they become available.
 
 **G. Close this work package.** Say clearly what passed, failed, is conditional and remains outside scope. If the requested issue is fixed and the targeted acceptance checks pass, declare **LIGHT COMPLETE**, not "incomplete because the whole system was not reviewed." If a real in-scope blocker remains, say **LIGHT BLOCKED** and name precisely why.
+
+### Mandatory four-step protected-rule path review (every behavioral or security fix)
+
+A Light Senior Review is **not complete for a changed invariant** after testing just the endpoint that was originally fixed. Run this bounded four-step method **for each rule protected by the change**, without escalating to an unrelated whole-repository audit:
+
+1. **Name the protected rule.** Write one falsifiable business/security invariant in plain language, e.g. **"A paid booking is never erased or reassigned"**, **"A revoked session cannot read or receive data"**, or **"Only the last delivered invoice revision is visible to its recipient."**
+2. **Search every way to break that rule.** From relevant user/API entry points, follow **views, serializers, bulk edits, services, model methods/signals, background tasks/webhooks, admin actions, management commands and cascade deletes**. Search both callers and direct writes (including `update()`, `delete()`, M2M writes and implicit side effects). Include other clients/personas and concurrent calls when they can reach the same state. This is **complete coverage of paths affecting the named invariant**, not 99% coverage of unrelated source files.
+3. **Label each reachable path with source evidence.** Mark **GUARDED — `file:line`** with the actual authorization, state guard or transaction/DB constraint, or **GAP — exact user/API request or action that reaches it + one-line smallest safe fix**. A guard located on another path does **not** prove this path safe. If a path cannot be verified, report it as a **GAP (unverified)** with the missing evidence; never silently omit it. Include negative proof for real gaps and the exact head SHA; do not call a speculative path reproduced.
+4. **Check that allowed users still work.** Run or inspect a **positive control** as well as the forbidden-path negative case: authorized role, valid state, correct pharmacy, intended edit, cancellation, clock action or payment must still succeed with correct side effects. Exercise roles, recurrence, history and PostgreSQL concurrency where material. Do not celebrate a blanket `403/409` that also blocks legitimate users.
+
+**Minimum path ledger** (one short table per protected rule; no extra global tracker):
+
+| Path / request / actor | Result | Evidence / smallest fix | Negative + allowed-path test |
+| --- | --- | --- | --- |
+| `POST /api/v1/example/...`, owner | **GUARDED** | `app/views.py:123` checks booked state; `app/services.py:44` locks slot | Negative PASS; authorized unbooked edit PASS |
+| `bulk-edit: delete assignment`, manager | **GAP** | Request `DELETE ...` removes paid assignment; add booked-occurrence guard before delete | Negative FAIL; allowed unbooked edit PASS |
+
+Do not label **LIGHT COMPLETE** while a high-risk in-scope **GAP** is unresolved or untested; use **FINDINGS ONLY — LIGHT REVIEW COMPLETE** for a finished read-only investigation, or **LIGHT BLOCKED** when implementation was requested and the issue remains. A user's choice of Light mode limits the *business-rule scope*, **not** the completeness of the path search for that rule.
 
 ## 4. Testing ladder — choose the smallest level that proves the change
 
