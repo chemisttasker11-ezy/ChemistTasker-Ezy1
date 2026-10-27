@@ -16,7 +16,7 @@ from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from shifts.access import ShiftActionRefused, _user_can_perform_shift_role, staff_membership_can_claim_role
 from shifts.emails import build_offer_shift_details, build_shift_offer_context
 from shifts.engagement import staff_assignment_defaults
-from shifts.models import ShiftOffer, ShiftSlotAssignment
+from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from shifts.notifications import notify_shift_users
 
 OFFER_EXPIRY_HOURS = 48
@@ -171,6 +171,7 @@ def roster_direct_staff(*, shift, candidate, assignments):
                 raise ShiftActionRefused('Invalid slot_date format, use YYYY-MM-DD')
 
             try:
+                guard_roster_assignment(shift=shift, slot=slot, slot_date=slot_date, candidate=candidate)
                 assignment_defaults = staff_assignment_defaults(
                     user=candidate,
                     pharmacy=shift.pharmacy,
@@ -209,6 +210,17 @@ def roster_direct_staff(*, shift, candidate, assignments):
         "detail": f"{len(assignment_ids)} slot(s) rostered for {candidate.get_full_name()}",
         "assignment_ids": assignment_ids
     }
+
+
+def guard_roster_assignment(*, shift, slot, slot_date, candidate):
+    """Call inside the assignment transaction; share the slot lock with offer finalization.
+    The candidate's own rostered occurrence may be re-saved or moved; booked or another worker's may not."""
+    ShiftSlot.objects.select_for_update().get(pk=slot.pk)
+    held = ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot_date)
+    if held.filter(Q(source_offer__isnull=False) | ~Q(user=candidate)).exists() or (
+        not held.exists() and slot_locked_for_shift_offer(shift=shift, slot=slot, slot_date=slot_date, ignore_user=candidate)
+    ):
+        raise DjangoValidationError('This shift occurrence is already assigned or awaiting payment.')
 
 
 def slot_locked_for_shift_offer(*, shift, slot, slot_date=None, ignore_user=None):

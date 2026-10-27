@@ -117,6 +117,11 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             shift = self.get_object()
             shift = Shift.objects.select_for_update().get(pk=shift.pk)
+            if shift.slot_assignments.exists():
+                return Response(
+                    {'detail': 'This shift has assigned workers and cannot be deleted.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
             if (shift.payment_status == 'PENDING'
                     or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()
                     or shift.payments.filter(status='pending').exists()):

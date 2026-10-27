@@ -412,8 +412,9 @@ class RosterSlotHTTPContractTests(TestCase):
             self.assignment.refresh_from_db()
             self.assertEqual(self.assignment.user_id, self.worker.pk)
 
-    def test_assignment_without_history_is_reassigned(self):
+    def test_assignment_without_history_cannot_be_overwritten(self):
         replacement = self.make_replacement()
         response = self.client.patch(self.url, {"user_id": replacement.pk}, format="json")
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(ShiftSlotAssignment.objects.get(slot=self.slot).user_id, replacement.pk)
+        # Fail closed for every assigned occurrence, even without invoice or attendance history.
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(ShiftSlotAssignment.objects.get(slot=self.slot).user_id, self.worker.pk)

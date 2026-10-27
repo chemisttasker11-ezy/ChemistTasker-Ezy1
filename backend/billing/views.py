@@ -1008,7 +1008,7 @@ def _process_stripe_event(event):
                         return_offers=True,
                         unbookable=unbookable_offers,
                     )
-                    if unbookable_offers:
+                    if unbookable_offers or not finalized_count:
                         # The payment stays recorded; a lost occurrence needs a refund, not a Stripe retry.
                         lost_ids = [offer.id for offer in unbookable_offers]
                         logger.error(
@@ -1020,7 +1020,7 @@ def _process_stripe_event(event):
                         notify_shift_managers(
                             shift_obj,
                             title='Shift payment needs a refund',
-                            body='A paid shift offer could not be booked because its date was already taken. '
+                            body='A paid shift offer could not be booked because it is no longer available. '
                                  'The payment needs a refund or manual follow-up.',
                             kind='shift_payment_refund_required',
                             payload={'payment_id': payment.pk, 'offer_ids': lost_ids},

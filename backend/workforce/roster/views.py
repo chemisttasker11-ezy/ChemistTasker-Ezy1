@@ -21,6 +21,7 @@ from shifts.pricing import get_locked_rate_for_slot
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_users
 from shifts.engagement import staff_assignment_defaults
+from shifts.assignment import guard_roster_assignment
 from datetime import date, datetime
 from django.db import transaction
 from datetime import timedelta
@@ -246,6 +247,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                 slot_date = slot.date
                 desired_keys.add((slot.id, slot_date))
                 try:
+                    guard_roster_assignment(shift=shift_instance, slot=slot, slot_date=slot_date, candidate=newly_assigned_user)
                     assignment_defaults = staff_assignment_defaults(
                         user=newly_assigned_user,
                         pharmacy=shift_instance.pharmacy,

@@ -18,8 +18,12 @@ class CookieJWTAuthentication(JWTAuthentication):
         from rest_framework_simplejwt.exceptions import AuthenticationFailed
         from rest_framework_simplejwt.settings import api_settings
         from rest_framework_simplejwt.utils import get_md5_hash_password
+        from users.models import RevokedSession
 
         user = super().get_user(validated_token)
+        sid = validated_token.get('sid')
+        if sid and RevokedSession.objects.filter(session_id=sid).exists():
+            raise AuthenticationFailed('Token is invalid or expired.')
         fingerprint = validated_token.get(api_settings.REVOKE_TOKEN_CLAIM)
         # shortcut: tokens minted before the fingerprint existed pass until they expire (avoids a forced re-login on deploy).
         if user.deleted_at or (fingerprint is not None and fingerprint != get_md5_hash_password(user.password)):

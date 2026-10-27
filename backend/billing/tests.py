@@ -545,7 +545,8 @@ class PaymentWebhookCommitContracts(TestCase):
         )
         for target, value in (
             ("billing.views.stripe.Webhook.construct_event", self.event),
-            ("billing.views._finalize_pending_offers_for_shift", (0, [])),
+            # A normal paid checkout books its offer; booking nothing is the refund-alert case.
+            ("billing.views._finalize_pending_offers_for_shift", (1, [object()])),
         ):
             mock = patch(target, return_value=value)
             mock.start()
