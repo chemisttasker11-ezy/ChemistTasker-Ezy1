@@ -934,6 +934,7 @@ def make_super_document(owner, record_id, version):
     companion = Invoice.objects.create(
         user=owner,
         external=record.external,
+        pharmacy=record.pharmacy,
         customer=record.customer,
         parent=record,
         kind="super_request",

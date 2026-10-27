@@ -132,3 +132,43 @@ class PharmacyAccessCharacterizationTests(TestCase):
         self.assertEqual(claim.responded_by_id, self.owner.pk)
         self.assertEqual(self.owned.organization_id, self.organization.pk)
         self.assertEqual(client.put(url, {"status": "REJECTED"}, format="json").status_code, 400)
+
+
+class ChainRemoveUserTests(TestCase):
+    def setUp(self):
+        from memberships.models import Membership
+        self.owner, self.pharmacy = make_owner_with_pharmacy("Chain")
+        self.chain = Chain.objects.create(owner=self.pharmacy.owner, name="Chain")
+        self.chain.pharmacies.add(self.pharmacy)
+        self.admin_user = make_user("PHARMACIST")
+        self.membership = Membership.objects.create(user=self.admin_user, pharmacy=self.pharmacy, role="PHARMACY_ADMIN",
+                                                    employment_type="FULL_TIME", status=Membership.Status.ACCEPTED, is_active=True)
+        PharmacyAdmin.objects.create(user=self.admin_user, pharmacy=self.pharmacy, membership=self.membership,
+                                     admin_level=PharmacyAdmin.AdminLevel.MANAGER, is_active=True)
+
+    def remove(self, actor, chain):
+        client = APIClient()
+        client.force_authenticate(user=actor)
+        return client.post(f"/api/v1/chains/{chain.id}/remove_user/", {"user_id": self.admin_user.id}, format="json")
+
+    def test_owner_removal_also_revokes_pharmacy_admin_access(self):
+        self.assertEqual(self.remove(self.owner, self.chain).status_code, 204)
+        self.assertFalse(type(self.membership).objects.filter(pk=self.membership.pk).exists())
+        self.assertFalse(PharmacyAdmin.objects.filter(user=self.admin_user, pharmacy=self.pharmacy, is_active=True).exists())
+
+    def test_org_admin_of_the_chain_organization_can_remove(self):
+        org = Organization.objects.create(name="Chain org", slug="chain-org")
+        Pharmacy.objects.filter(pk=self.pharmacy.pk).update(organization=org)
+        org_chain = Chain.objects.create(organization=org, name="Org chain")
+        org_chain.pharmacies.add(self.pharmacy)
+        org_admin = make_user("OWNER")
+        OrganizationMembership.objects.create(user=org_admin, organization=org, role="ORG_ADMIN")
+        self.assertEqual(self.remove(org_admin, org_chain).status_code, 204)
+        self.assertFalse(type(self.membership).objects.filter(pk=self.membership.pk).exists())
+
+    def test_chain_owner_cannot_remove_staff_of_a_pharmacy_they_no_longer_own(self):
+        _, other = make_owner_with_pharmacy("New owner")
+        Pharmacy.objects.filter(pk=self.pharmacy.pk).update(owner=other.owner)
+        self.assertEqual(self.remove(self.owner, self.chain).status_code, 403)
+        self.assertTrue(type(self.membership).objects.filter(pk=self.membership.pk).exists())
+        self.assertTrue(PharmacyAdmin.objects.filter(user=self.admin_user, pharmacy=self.pharmacy, is_active=True).exists())

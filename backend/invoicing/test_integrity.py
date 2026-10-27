@@ -333,8 +333,11 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
 
     def test_owner_can_read_migrated_snapshot_without_new_delivery_row(self):
         record = save_draft(self.worker, internal_invoice_prefill(self.worker, [self.assignment.id]))
+        # A migrated paid snapshot is listed only through the legacy rule; an unsent legacy edit is not
+        # (LegacySnapshotEditVisibilityTests).
         record.legacy_snapshot = True
-        record.save(update_fields=["legacy_snapshot"])
+        record.status = "paid"
+        record.save(update_fields=["legacy_snapshot", "status"])
 
         request = APIRequestFactory().get("/finance/received-invoices/")
         force_authenticate(request, user=self.owner)
@@ -830,3 +833,38 @@ class InvoiceTenantIsolationContracts(TestCase):
         self.assertFalse(
             Invoice.objects.filter(user=self.outsider, pharmacy=self.b).exists()
         )
+
+
+class LegacySnapshotEditVisibilityTests(TestCase):
+    def setUp(self):
+        self.owner, self.pharmacy = make_owner_with_pharmacy("LegacyEdit")
+        self.worker = make_user("PHARMACIST")
+
+    def invoice(self, **changes):
+        fields = dict(user=self.worker, pharmacy=self.pharmacy, source="internal", request_key=uuid4(), status="draft",
+                      version=2, legacy_snapshot=True, payload={"invoice_date": timezone.localdate().isoformat()},
+                      calculation={"payable": "999.00"})
+        fields.update(changes)
+        return Invoice.objects.create(**fields)
+
+    def listed_ids(self, path):
+        response = client_for(self.owner).get(path)
+        self.assertEqual(response.status_code, 200, response.content)
+        rows = response.data["results"] if isinstance(response.data, dict) else response.data
+        return {row["id"] for row in rows}
+
+    def test_unsent_edit_of_legacy_snapshot_is_hidden_from_the_pharmacy(self):
+        record = self.invoice()
+        for path in ("/api/v1/invoices/", "/api/v1/finance/received-invoices/"):
+            with self.subTest(path=path):
+                self.assertNotIn(record.pk, self.listed_ids(path))
+
+    def test_sent_and_paid_legacy_snapshots_stay_listed(self):
+        sent, paid = self.invoice(status="sent"), self.invoice(status="paid")
+        for path in ("/api/v1/invoices/", "/api/v1/finance/received-invoices/"):
+            with self.subTest(path=path):
+                self.assertTrue({sent.pk, paid.pk} <= self.listed_ids(path))
+
+    def test_old_editor_draft_without_request_key_stays_listed(self):
+        record = self.invoice(request_key=None, legacy_snapshot=False)
+        self.assertIn(record.pk, self.listed_ids("/api/v1/invoices/"))

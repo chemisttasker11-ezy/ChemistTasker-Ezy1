@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -264,3 +266,68 @@ class EthicalApprovalContracts(TestCase):
         self.assertEqual(
             EthicalPharmacyApproval.objects.filter(pharmacy=pharmacy).count(), 1
         )
+
+
+@override_settings(ETHICAL_INVENTORY_ENABLED=True, ETHICAL_PRIVATE_READ_ENABLED=True, ETHICAL_S8_ENABLED=True)
+class EthicalS8LotAndTransferScheduleTests(TestCase):
+    ACTIONS = ["VIEW_CHAIN_ETHICAL", "MANAGE_OWN_STOCK", "PREPARE_LISTING", "REQUEST_TRANSFER", "APPROVE_TRANSFER", "DISPATCH", "RECEIVE"]
+
+    def owner_user(self, email):
+        user = User.objects.create_user(email=email, password="x", role="OWNER", is_active=True, is_otp_verified=True,
+                                        mobile_number="0400000000", is_mobile_verified=True)
+        owner = OwnerOnboarding.objects.create(user=user, phone_number="0400000000", role="PHARMACIST", verified=True, ahpra_verified=True)
+        IdentityVerification.objects.create(user=user, status="VERIFIED", assurance_method="MANUAL", verified_at=timezone.now())
+        MarketplaceTermsAcceptance.objects.create(user=user, version="2026-09")
+        return user, owner
+
+    def setUp(self):
+        self.user, owner = self.owner_user("s8-source@example.test")
+        self.buyer, buyer_owner = self.owner_user("s8-destination@example.test")
+        self.pharmacy = Pharmacy.objects.create(name="S8 source", owner=owner, verified=True, state="QLD")
+        self.destination = Pharmacy.objects.create(name="S8 destination", owner=buyer_owner, verified=True, state="QLD")
+        self.products = {schedule: EthicalProduct.objects.create(name=schedule, strength="1", form="pack", pack_size="1", schedule=schedule,
+                                                                 status="APPROVED", classification_provenance="test")
+                         for schedule in ("S4", "S8")}
+        for schedule in self.products:
+            for action in self.ACTIONS:
+                EthicalJurisdictionPolicy.objects.create(jurisdiction="QLD", activity=action, schedule=schedule, mode="ANY", allowed=True,
+                                                         effective_from=timezone.now() - timedelta(days=1), policy_version="test", reviewed_by=self.user)
+        EthicalPharmacyApproval.objects.create(pharmacy=self.pharmacy, applicant=self.user, accountable_owner=self.user,
+                                               business_phone="0700000000", business_email=self.user.email, status="VERIFIED")
+        self.client = APIClient(); self.client.force_authenticate(self.user)
+
+    def grant(self, schedules):
+        EthicalProfessionalAccess.objects.create(user=self.user, status="VERIFIED", professional_basis="test", schedules=schedules,
+                                                 activities=self.ACTIONS, jurisdictions=["QLD"])
+
+    def create_lot(self, schedule):
+        return self.client.post("/api/v1/ethical/inventory/lots/", {
+            "pharmacy": self.pharmacy.pk, "product": self.products[schedule].pk, "batch_number": "B1", "expiry_date": "2030-01-01",
+            "on_hand_quantity": 5, "source_reference": "test", "last_reconciled_at": timezone.now().isoformat()}, format="json")
+
+    def transfer(self, schedule):
+        from .models import EthicalTransfer
+        listing = EthicalListing.objects.create(pharmacy=self.pharmacy, accountable_owner=self.user, prepared_by=self.user,
+                                                product=self.products[schedule], mode="DONATE", current_circle="CHAIN_PHARMACIES",
+                                                maximum_circle="CHAIN_PHARMACIES", scope_owner_id=self.pharmacy.owner_id, status="PUBLISHED")
+        return EthicalTransfer.objects.create(listing=listing, source_pharmacy=self.pharmacy, destination_pharmacy=self.destination,
+                                              requested_by=self.buyer, mode="DONATE")
+
+    def listed_transfers(self):
+        response = self.client.get("/api/v1/ethical/transfers/", {"pharmacy": self.pharmacy.pk})
+        self.assertEqual(response.status_code, 200, response.data)
+        return {str(row["id"]) for row in response.data}
+
+    def test_s8_lot_and_transfers_require_the_s8_schedule(self):
+        self.grant(["S4"])
+        s4, s8 = self.transfer("S4"), self.transfer("S8")
+        self.assertEqual(self.create_lot("S8").status_code, 403)
+        self.assertFalse(EthicalStockLot.objects.filter(product=self.products["S8"]).exists())
+        self.assertEqual(self.listed_transfers(), {str(s4.pk)})
+        self.assertEqual(self.create_lot("S4").status_code, 201)
+
+    def test_s8_schedule_holder_still_creates_s8_lots_and_sees_s8_transfers(self):
+        self.grant(["S4", "S8"])
+        s4, s8 = self.transfer("S4"), self.transfer("S8")
+        self.assertEqual(self.create_lot("S8").status_code, 201)
+        self.assertEqual(self.listed_transfers(), {str(s4.pk), str(s8.pk)})

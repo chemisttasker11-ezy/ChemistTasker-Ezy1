@@ -238,6 +238,7 @@ class Lots(APIView):
             return Response({"code": "ETHICAL_INVENTORY_DISABLED"}, status=503)
         serializer = StockLotSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        require(request.user, pharmacy, "MANAGE_OWN_STOCK", product=serializer.validated_data["product"])
         lot = serializer.save(pharmacy=pharmacy)
         EthicalStockMovement.objects.create(lot=lot, movement_type="RECONCILIATION", quantity_delta=lot.on_hand_quantity, resulting_on_hand=lot.on_hand_quantity, actor=request.user, reference_type="lot", reference_id=str(lot.id))
         return private(Response(StockLotSerializer(lot).data, status=201))
@@ -516,7 +517,8 @@ class Transfers(APIView):
         if pk:
             return private(Response(TransferSerializer(transfer_for(request.user, pk)).data))
         pharmacy = admitted_pharmacy(request)
-        rows = EthicalTransfer.objects.filter(models_transfer_party(pharmacy)).select_related("listing", "source_pharmacy", "destination_pharmacy").prefetch_related("lines")
+        rows = EthicalTransfer.objects.filter(models_transfer_party(pharmacy)).select_related("listing", "listing__product", "source_pharmacy", "destination_pharmacy").prefetch_related("lines")
+        rows = [row for row in rows if evaluate_ethical_access(request.user, pharmacy, product=row.listing.product).admitted]
         return private(Response(TransferSerializer(rows, many=True).data))
 
 

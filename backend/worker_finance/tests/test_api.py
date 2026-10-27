@@ -80,6 +80,31 @@ class MarkPaidReceiptTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual((super_record.payments.get().gst, super_record.payments.get().sales), (Decimal('0.00'), Decimal('0.00')))
 
+    def test_super_request_companion_keeps_pharmacy_and_reaches_recipient(self):
+        from django.db import transaction
+        from worker_finance.services import make_super_document
+        customer = Customer.objects.create(owner=self.worker, name='Super pharmacy', email='super@example.test')
+        payload = {'invoice_date': self.today.isoformat(), 'due_date': self.today.isoformat(), 'issuer_name': 'W',
+                   'issuer_abn': '51824753556', 'gst_registered': False, 'super_mode': 'separate', 'super_rate': '12.00',
+                   'super_fund_name': 'F', 'super_usi': 'U', 'super_member_number': 'M',
+                   'customer': {'name': 'Super pharmacy', 'address': '', 'email': 'super@example.test', 'abn': ''}, 'lines': []}
+        record = Invoice.objects.create(user=self.worker, pharmacy=self.pharmacy, customer=customer, source='internal',
+                                        request_key=uuid4(), status='sent', payload=payload,
+                                        calculation={'subtotal': '800.00', 'gst': '0.00', 'super': '96.00', 'payable': '800.00'})
+        with transaction.atomic():
+            companion = make_super_document(self.worker, record.pk, record.version)
+        Invoice.objects.filter(pk=companion.pk).update(status='sent')
+        self.assertEqual(companion.pharmacy_id, self.pharmacy.id)
+        received = APIClient()
+        received.force_authenticate(self.owner)
+        response = received.get(BASE + 'received-invoices/')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn(companion.pk, {row['id'] for row in response.data['results']})
+        worker = APIClient()
+        worker.force_authenticate(self.worker)
+        response = worker.get(BASE + f'invoices/{companion.pk}/')
+        self.assertEqual(response.status_code, 200, response.data)
+
 
 @skipUnless(getattr(settings, 'FINANCE_CONTRACT_TESTS', False), 'Use the isolated finance contract settings.')
 class FinanceApiTests(TestCase):

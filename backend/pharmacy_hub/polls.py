@@ -81,10 +81,11 @@ class HubPollViewSet(
                 pharmacy=scope["pharmacy"],
                 community_group__isnull=True
             )
-        # Organization scope: include polls tied to the org or any pharmacy within the org, excluding group polls
+        # Organization scope: only org-tagged polls (organization set, pharmacy NULL), exclude group polls
         org = scope.get("organization")
         return queryset.filter(
-            Q(organization=org) | Q(pharmacy__organization=org),
+            organization=org,
+            pharmacy__isnull=True,
             community_group__isnull=True,
         )
 

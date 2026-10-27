@@ -58,7 +58,7 @@ def _invoice_queryset_for_user(user):
     )
     manager_visible_state = (
         Q(request_key__isnull=True)
-        | Q(legacy_snapshot=True)
+        | Q(legacy_snapshot=True, status__in=["sent", "paid"])
         | Q(
             deliveries__version=F("version"),
             deliveries__status__in=["sent", "legacy_queued"],

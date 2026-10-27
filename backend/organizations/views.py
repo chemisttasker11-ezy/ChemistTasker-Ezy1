@@ -9,6 +9,7 @@ from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
 from onboarding.models import OwnerOnboarding
 from notifications.models import Notification
 from users.permissions import AuthenticatedOrganizationMember, IsOwner, OrganizationRolePermission
+from memberships.access import user_can_change_membership
 from memberships.role_resolution import membership_role_refusal
 from memberships.serializers import required_user_role_for_membership
 from rest_framework.response import Response
@@ -734,6 +735,9 @@ class ChainViewSet(viewsets.ModelViewSet):
         ).first()
         if not membership:
             raise NotFound("User not in this chain’s pharmacies.")
+        if not user_can_change_membership(request.user, membership):
+            self.permission_denied(request, message="Not allowed to modify this membership.")
+        membership.revoke_admin_access()
         membership.delete()
         return Response(status=204)
 

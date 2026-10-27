@@ -826,3 +826,23 @@ class ProfileTests(HubFixture):
                                                   format="multipart")
             actual[label] = [pharmacy.status_code, organization.status_code]
         self.check_recorded("profiles", actual)
+
+
+class PollScopeTests(HubFixture):
+    def poll(self, **scope):
+        from pharmacy_hub.models import PharmacyHubPoll
+        return PharmacyHubPoll.objects.create(question="Which roster?", created_by=self.owner, **scope)
+
+    def listed(self, params):
+        response = client_for(self.users["staff"]).get(f"{BASE}hub/polls/", params)
+        self.assertEqual(response.status_code, 200, response.data)
+        rows = response.data["results"] if isinstance(response.data, dict) else response.data
+        return {row["id"] for row in rows}
+
+    def test_organization_scope_lists_only_org_wide_polls(self):
+        org_poll = self.poll(organization=self.org)
+        own_poll = self.poll(pharmacy=self.pharmacy)
+        sibling_poll = self.poll(pharmacy=self.sibling)
+        self.assertEqual(self.listed({"scope": "organization", "organization_id": self.org.id}), {org_poll.id})
+        self.assertEqual(self.listed({"scope": "pharmacy", "pharmacy_id": self.pharmacy.id}), {own_poll.id})
+        self.assertNotIn(sibling_poll.id, self.listed({"scope": "organization", "organization_id": self.org.id}))

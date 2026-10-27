@@ -339,7 +339,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
                 models.Q(deliveries__status__in=['sent', 'legacy_queued'])
                 | models.Q(status='sent')
                 | ~models.Q(review_status='NONE')
-                | models.Q(legacy_snapshot=True)
+                | models.Q(legacy_snapshot=True, status__in=['sent', 'paid'])
             )
             .select_related('customer', 'user')
             .prefetch_related('payments', 'deliveries', 'revisions', 'review_requests__requested_by')
