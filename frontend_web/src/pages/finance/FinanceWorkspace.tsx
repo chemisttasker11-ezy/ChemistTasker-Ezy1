@@ -35,7 +35,7 @@ import { useFinanceData } from './useFinanceData';
 
 type Editor = { kind: 'customer'; value?: FinanceCustomer } | { kind: 'item'; value?: FinanceItem }
   | { kind: 'invoice'; value?: FinanceInvoice; prefillShiftId?: number } | { kind: 'expense'; value?: FinanceExpense }
-  | { kind: 'payment'; value: FinanceInvoice };
+  | { kind: 'payment'; value: FinanceInvoice; markPaid?: boolean };
 type Confirmation = { title: string; body: string; confirmLabel: string; busyLabel: string; action: () => Promise<unknown> };
 const workerTools = ['invoices', 'customers', 'items', 'expenses', 'bas'] as const;
 const ownerTools = ['received'] as const;
@@ -351,7 +351,10 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
           item(<Mail size={17} />, 'Email to customer', () => ask({ title: `Email ${invoice.number} to ${invoice.payload.customer?.name || 'the customer'}?`, body: `The saved PDF (revision ${invoice.version}) goes to ${invoice.payload.customer?.email || 'the customer, but no invoice email is saved for them'}. If you change it later, you can send the new revision.`, confirmLabel: 'Send email', busyLabel: 'Sending…', action: async () => { const result = await finance.send(invoice.id, invoice.version); await refreshAfterMutation(result.detail); } })),
           item(<Copy size={17} />, 'Duplicate', () => { const key = crypto.randomUUID(); ask({ title: `Duplicate ${invoice.number}?`, body: 'Creates a new draft with the same customer and lines. Shift links, payments and email history are not copied.', confirmLabel: 'Duplicate', busyLabel: 'Duplicating…', action: async () => { const result = await finance.duplicate(invoice.id, key); await refreshAfterMutation(); setLink({ invoice: result.id }); } }); }, !isInvoice),
           <Divider key="divider" />,
-          item(<CheckCircle2 size={17} />, 'Mark as paid', () => ask({ title: `Mark ${invoice.number} as paid?`, body: 'Use this when the full amount has arrived. You can still edit the invoice later if something needs correcting.', confirmLabel: 'Mark as paid', busyLabel: 'Saving…', action: async () => { await finance.markPaid(invoice.id, invoice.version); await refreshAfterMutation(); } }), invoice.status === 'paid'),
+          item(<CheckCircle2 size={17} />, 'Mark as paid', () => {
+            if (invoice.kind === 'super_request') { setMenu(null); setEditor({ kind: 'payment', value: invoice, markPaid: true }); }
+            else ask({ title: `Mark ${invoice.number} as paid?`, body: 'Use this when the full amount has arrived. You can still edit the invoice later if something needs correcting.', confirmLabel: 'Mark as paid', busyLabel: 'Saving…', action: async () => { await finance.markPaid(invoice.id, invoice.version); await refreshAfterMutation(); } });
+          }, invoice.status === 'paid'),
           item(<CircleDollarSign size={17} />, 'Record a payment', () => { setEditor({ kind: 'payment', value: invoice }); setMenu(null); }, Number(invoice.balance || '0') <= 0, Number(invoice.balance || '0') <= 0 ? 'Nothing owed' : 'Optional, for part payments'),
           item(<PiggyBank size={17} />, 'Create super request', () => ask({ title: 'Create a separate super request?', body: 'Creates a linked request for the super amount, paid to your fund. Your service payment stays separate.', confirmLabel: 'Create request', busyLabel: 'Creating…', action: async () => { await finance.superDocument(invoice.id, invoice.version); await refreshAfterMutation(); } }), !isInvoice || invoice.payload.super_mode !== 'separate' || Boolean(invoice.super_document_id), invoice.super_document_id ? 'Already created' : invoice.payload.super_mode !== 'separate' ? 'Set super to "separate" first' : undefined),
         ];
@@ -367,7 +370,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
     {editor?.kind === 'customer' && <CustomerEditor initial={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
     {editor?.kind === 'item' && <ItemEditor initial={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
     {editor?.kind === 'expense' && <ExpenseEditor initial={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
-    {editor?.kind === 'payment' && <PaymentEditor invoice={editor.value} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
+    {editor?.kind === 'payment' && <PaymentEditor invoice={editor.value} markPaid={editor.markPaid} onClose={() => setEditor(null)} onSaved={refreshAfterSave} />}
 
     <InvoiceReviewDialog action={reviewAction} busy={busy} error={error} onClose={() => { if (!busy) setReviewAction(null); }}
       onNote={note => setReviewAction(current => current ? { ...current, note } : null)}

@@ -1,5 +1,5 @@
 import { useShiftDescriptionTemplate } from './useShiftDescriptionTemplate';
-import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, type ShiftPostingDraft } from '@chemisttasker/shared-core';
+import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, getShiftPostingOwnerAdjustedRate, type ShiftPostingDraft } from '@chemisttasker/shared-core';
 import { useShiftPricing } from './useShiftPricing';
 import { useShiftTimetable } from './useShiftTimetable';
 import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults, type SupportEntry } from '@chemisttasker/shared-core';
@@ -211,7 +211,7 @@ const PostShiftForm: React.FC<PostShiftFormProps> = ({
           setRateEarlyMorning(initEarlyMorning);
           const initLateNight = toRateInputString(firstPresent((detail as any).rateLateNight, (detail as any).rate_late_night, (pharmacyDefaults as any)?.rateLateNight, (pharmacyDefaults as any)?.rate_late_night));
           setRateLateNight(initLateNight);
-          const initOwnerBonus = toRateInputString((detail as any).ownerAdjustedRate ?? (detail as any).owner_adjusted_rate ?? (detail as any).ownerBonus ?? (detail as any).owner_bonus);
+          const initOwnerBonus = toRateInputString(getShiftPostingOwnerAdjustedRate(detail));
           setOwnerBonus(initOwnerBonus);
           setMinHourly(toRateInputString((detail as any).minHourlyRate ?? (detail as any).min_hourly_rate));
           setMaxHourly(toRateInputString((detail as any).maxHourlyRate ?? (detail as any).max_hourly_rate));

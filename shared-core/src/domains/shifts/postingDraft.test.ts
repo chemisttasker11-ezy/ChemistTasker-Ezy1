@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, SUPER_GUARANTEE_PERCENT, type ShiftPostingDraft } from './postingDraft';
+import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, getShiftPostingOwnerAdjustedRate, SUPER_GUARANTEE_PERCENT, type ShiftPostingDraft } from './postingDraft';
 import { expandShiftDraftSlots } from './draftSlots';
+import { mapShift } from './mappers';
+import type { ShiftApi } from '../../types';
 const draft = (): ShiftPostingDraft => ({
   pharmacyId:1, roleNeeded:'PHARMACIST', employmentType:'LOCUM', description:'Review draft',
   workloadTags:[], supportOnShift:[], mustHave:[], niceToHave:[], visibility:'PLATFORM',
@@ -15,7 +17,33 @@ const draft = (): ShiftPostingDraft => ({
   showNotifyPharmacyStaff:true, showNotifyFavoriteStaff:true, showNotifyChainMembers:true,
   notifyPharmacyStaff:true, notifyFavoriteStaff:true, notifyChainMembers:true,
 });
+describe('getShiftPostingOwnerAdjustedRate', () => {
+  it.each(['ownerAdjustedRate', 'owner_adjusted_rate', 'ownerBonus', 'owner_bonus'] as const)('reads %s', (field) => {
+    expect(getShiftPostingOwnerAdjustedRate({ [field]: '7.50' })).toBe('7.50');
+  });
+  it('prefers mapped, API, then legacy values, preserving zero', () => {
+    const shift = { ownerAdjustedRate: 0, owner_adjusted_rate: '8.00', ownerBonus: '9.00', owner_bonus: '10.00' };
+    expect(getShiftPostingOwnerAdjustedRate(shift)).toBe(0);
+    expect(getShiftPostingOwnerAdjustedRate({ ...shift, ownerAdjustedRate: null })).toBe('8.00');
+    expect(getShiftPostingOwnerAdjustedRate({ ...shift, ownerAdjustedRate: null, owner_adjusted_rate: null })).toBe('9.00');
+    expect(getShiftPostingOwnerAdjustedRate({})).toBeUndefined();
+  });
+});
+
 describe('shared posting payload', () => {
+  it.each(['7.50', '0.00'])('preserves the stored owner bonus %s on a mobile pricing edit', (storedRate) => {
+    const shift = mapShift({ id: 10, role_needed: 'ASSISTANT', visibility: 'PLATFORM', owner_adjusted_rate: storedRate } as ShiftApi);
+    const input = {
+      ...draft(), editingShiftId: shift.id, roleNeeded: shift.roleNeeded,
+      ownerBonus: String(getShiftPostingOwnerAdjustedRate(shift) ?? ''),
+      slotsModified: false, slotRateRows: [{ rate: '105', dirty: true }],
+      ratesModified: haveShiftPostingSlotRatesChanged(['90.00'], [{ rate: '105', dirty: true }]),
+    };
+    input.expandedSlots = expandShiftDraftSlots(input.slots);
+    expect(buildShiftPostingPayload(input)).toMatchObject({
+      owner_adjusted_rate: Number(storedRate), slots: [{ rate: '105.00' }],
+    });
+  });
   it.each([null, ''])('omits slots on a text edit when an originally %j rate was auto-filled', (originalRate) => {
     const slotRateRows = [{ rate: '90', dirty: false }, { rate: '70', dirty: true }];
     const input = {

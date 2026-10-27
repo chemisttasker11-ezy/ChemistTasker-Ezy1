@@ -1,4 +1,4 @@
-import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, type ShiftPostingDraft } from '@chemisttasker/shared-core';
+import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, getShiftPostingOwnerAdjustedRate, type ShiftPostingDraft } from '@chemisttasker/shared-core';
 import NativeShiftBoardPreview from './NativeShiftBoardPreview';
 import { expandShiftDraftSlots, reconcileShiftDraftRateRows } from '@chemisttasker/shared-core';
 import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults, type SupportEntry } from '@chemisttasker/shared-core';
@@ -415,13 +415,7 @@ export default function PostShiftScreen() {
             setEscalationDates(escalations);
             setEscalationPlan({ mode: Object.values(escalations).some(Boolean) ? 'custom' : 'off', everyHours: 24 });
             setDedicatedUserId(typeof data.dedicatedUser === 'number' ? data.dedicatedUser : typeof data.dedicated_user === 'number' ? data.dedicated_user : null);
-            const initOwnerBonus = (
-                data.owner_bonus != null
-                    ? String(data.owner_bonus)
-                    : data.ownerBonus != null
-                        ? String(data.ownerBonus)
-                        : ''
-            );
+            const initOwnerBonus = toRateInputString(getShiftPostingOwnerAdjustedRate(data));
             setOwnerBonus(initOwnerBonus);
             const rateTypeValue = data.rate_type ?? data.rateType;
             if (rateTypeValue === 'PHARMACIST_PROVIDED') {

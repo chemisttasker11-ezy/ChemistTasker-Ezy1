@@ -6,6 +6,15 @@ import type { ShiftApi } from '../../types';
 /** Australian Superannuation Guarantee rate from 1 July 2025; the locum "super on top" default. */
 export const SUPER_GUARANTEE_PERCENT = 12;
 
+export function getShiftPostingOwnerAdjustedRate(shift: {
+  ownerAdjustedRate?: string | number | null;
+  owner_adjusted_rate?: string | number | null;
+  ownerBonus?: string | number | null;
+  owner_bonus?: string | number | null;
+}) {
+  return shift.ownerAdjustedRate ?? shift.owner_adjusted_rate ?? shift.ownerBonus ?? shift.owner_bonus;
+}
+
 /** Calculated rates are display defaults; only explicit edits can change loaded slot rates. */
 export function haveShiftPostingSlotRatesChanged(
   initialRates: readonly (string | number | null | undefined)[],
