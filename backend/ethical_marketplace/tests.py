@@ -339,3 +339,26 @@ class EthicalS8LotAndTransferScheduleTests(TestCase):
         s4, s8 = self.transfer("S4"), self.transfer("S8")
         self.assertEqual(self.create_lot("S8").status_code, 201)
         self.assertEqual(self.listed_transfers(), {str(s4.pk), str(s8.pk)})
+
+    def commit_import(self):
+        batch = EthicalImportBatch.objects.create(pharmacy=self.pharmacy, created_by=self.user, source_rights_attested=True, status="STAGED")
+        for number, schedule in enumerate(("S4", "S8"), 2):
+            EthicalProductIdentifier.objects.create(product=self.products[schedule], kind="BARCODE", value=f"{schedule}-code")
+            EthicalStagingRow.objects.create(batch=batch, row_number=number, status="PENDING", safe_payload={
+                "barcode": f"{schedule}-code", "batch_number": "B1", "expiry_date": "2030-01-01", "quantity": "4"})
+        response = self.client.post(f"/api/v1/ethical/inventory/imports/{batch.pk}/commit/")
+        self.assertEqual(response.status_code, 200, response.data)
+        return response.data, set(EthicalStockLot.objects.values_list("product__schedule", flat=True))
+
+    def test_import_commit_rejects_s8_rows_without_the_s8_schedule(self):
+        self.grant(["S4"])
+        data, schedules = self.commit_import()
+        self.assertEqual((data["status"], data["accepted_count"], data["rejected_count"]), ("PARTIAL", 1, 1))
+        self.assertEqual(schedules, {"S4"})
+        self.assertIn("schedule", EthicalStagingRow.objects.get(row_number=3).reason)
+
+    def test_s8_schedule_holder_imports_s8_rows(self):
+        self.grant(["S4", "S8"])
+        data, schedules = self.commit_import()
+        self.assertEqual((data["status"], data["accepted_count"]), ("COMMITTED", 2))
+        self.assertEqual(schedules, {"S4", "S8"})

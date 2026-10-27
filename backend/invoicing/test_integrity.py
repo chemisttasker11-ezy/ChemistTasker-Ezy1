@@ -518,6 +518,26 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
     def test_unsent_edit_after_revision_request_stays_hidden_from_the_pharmacy(self):
         self.assert_owner_sees_only_sent_version(self.sent_then_edited(request_revision=True))
 
+    def test_owner_review_actions_return_only_delivered_revisions(self):
+        for action, path in (("request_revision", "request-revision/"), ("approve_payment", "approve-payment/"),
+                             ("mark_paid", "mark-paid/")):
+            with self.subTest(action=action):
+                InvoiceRevision.objects.all().delete()
+                Invoice.objects.all().delete()
+                record = self.sent_then_edited()
+                payload = dict(record.payload, version=record.version, notes="Second correction")
+                record = save_draft(self.worker, payload, record.id)
+                Delivery.objects.create(invoice=record, version=3, recipient=self.owner.email, status="sent",
+                                        sent_at=timezone.now())
+                record.status = "sent"
+                record.save(update_fields=["status"])
+                response = self.owner_call("post", action, record, path,
+                                           {"version": 3, "note": "Checked", "fund_payment_confirmed": True})
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(response.data["version"], 3)
+                self.assertEqual([row["version"] for row in response.data["revisions"]], [3, 1])
+                self.assertEqual(response.data, self.owner_call("get", "retrieve", record).data)
+
     def test_owner_review_action_rejects_stale_invoice_version(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
         record = save_draft(self.worker, draft)

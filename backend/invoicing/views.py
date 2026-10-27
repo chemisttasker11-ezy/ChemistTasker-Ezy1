@@ -3,7 +3,7 @@ from rest_framework import generics, permissions, status
 from organizations.models import Pharmacy
 from shifts.models import Shift, ShiftSlotAssignment
 from memberships.models import Membership
-from invoicing.models import Invoice
+from invoicing.models import Invoice, manager_visible_state
 from notifications.models import Notification
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,7 +14,7 @@ from rest_framework.decorators import api_view, permission_classes
 from organizations.access import pharmacies_user_admins, user_can_manage_pharmacy
 from django.shortcuts import get_object_or_404
 import json
-from django.db.models import F, Q
+from django.db.models import Q
 from invoicing.services import (
     generate_invoice_from_shifts,
     generate_preview_invoice_lines,
@@ -56,19 +56,8 @@ def _invoice_queryset_for_user(user):
         | Q(pharmacy_id__in=admin_pharmacy_ids)
         | Q(pharmacy_id__in=org_pharmacy_ids)
     )
-    manager_visible_state = (
-        Q(request_key__isnull=True)
-        | Q(legacy_snapshot=True, status__in=["sent", "paid"])
-        | Q(
-            deliveries__version=F("version"),
-            deliveries__status__in=["sent", "legacy_queued"],
-        )
-        | Q(status="sent")
-        | ~Q(review_status="NONE")
-    )
-
     return Invoice.objects.filter(
-        Q(user=user) | (managed_pharmacy_invoice & manager_visible_state)
+        Q(user=user) | (managed_pharmacy_invoice & manager_visible_state())
     ).distinct()
 
 

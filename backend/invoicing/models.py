@@ -3,6 +3,20 @@ from django.db import models
 from datetime import date
 
 
+def manager_visible_state():
+    """Invoices whose current content a pharmacy manager may see; a worker's unsent revision stays hidden."""
+    return (
+        models.Q(request_key__isnull=True)
+        | models.Q(legacy_snapshot=True, status__in=["sent", "paid"])
+        | models.Q(
+            deliveries__version=models.F("version"),
+            deliveries__status__in=["sent", "legacy_queued"],
+        )
+        | models.Q(status="sent")
+        | ~models.Q(review_status="NONE")
+    )
+
+
 ## Invoice model
 class Invoice(models.Model):
     STATUS_CHOICES = [

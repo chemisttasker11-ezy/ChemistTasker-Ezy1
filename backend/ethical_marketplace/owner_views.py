@@ -84,6 +84,9 @@ class ImportCommit(APIView):
                     identifier = EthicalProductIdentifier.objects.select_related("product").filter(value=barcode, product__status="APPROVED").first()
                     if not identifier:
                         raise ValueError("Barcode is not mapped to an approved ethical product")
+                    decision = evaluate_ethical_access(request.user, pharmacy, "MANAGE_OWN_STOCK", product=identifier.product)
+                    if not decision.admitted:
+                        raise ValueError(decision.blockers[0]["message"])
                     batch_number = str(payload.get("batch_number") or "").strip()
                     if not batch_number:
                         raise ValueError("Batch number is required")

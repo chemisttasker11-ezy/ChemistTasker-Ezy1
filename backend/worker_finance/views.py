@@ -458,7 +458,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
                     'requested_version': record.version,
                 },
             )
-        return Response(serialize_record(record))
+        return Response(owner_visible_document(record))
 
     @action(detail=True, methods=['post'], url_path='approve-payment')
     def approve_payment(self, request, pk=None):
@@ -491,7 +491,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
                     'version': record.version,
                 },
             )
-        return Response(serialize_record(record))
+        return Response(owner_visible_document(record))
 
     @action(detail=True, methods=['post'], url_path='mark-paid')
     def mark_paid(self, request, pk=None):
@@ -529,7 +529,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
                     'version': record.version,
                 },
             )
-        return Response(serialize_record(record))
+        return Response(owner_visible_document(record))
 
 
 class ExpenseViewSet(OwnedViewSet):
