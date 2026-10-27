@@ -1,4 +1,5 @@
 """Session-specific logout and account-wide password revocation across WS auth transports."""
+from unittest.mock import patch
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from channels.testing import WebsocketCommunicator
@@ -128,6 +129,40 @@ class SessionRevocationTests(TransactionTestCase):
         for comm in (bearer, ticket_socket):
             await self.closed(comm)
         self.assertEqual((await self.post('token/refresh', {'refresh': rotated.data['refresh']})).status_code, 401)
+        await self.disconnect_sockets()
+
+    async def test_missed_logout_broadcast_is_rechecked_on_delivery_for_every_transport(self):
+        user, first = await self.login()
+        _, other = await self.login(user)
+        bearer = await self.socket(access=first['access'])
+        cookie = await self.socket(access=first['access'], cookie=True)
+        ticket = await self.socket(ticket=await self.ticket(first['access']))
+        survivor = await self.socket(access=other['access'])
+        rotated = await self.post('token/refresh', {'refresh': first['refresh']})
+        self.assertEqual(rotated.status_code, 200)
+        await self.event(user, bearer, cookie, ticket, survivor)
+        # A rotated-away refresh token must still revoke its stable session id.
+        with patch('users.api_auth.notify_auth_changed') as missed:
+            self.assertEqual((await self.post('logout', {'refresh': first['refresh']})).status_code, 200)
+            missed.assert_called_once()
+        await get_channel_layer().group_send(USER_GROUP_FMT.format(user_id=user.pk),
+                                             {'type': 'notification.counter', 'unread': 7})
+        for comm in (bearer, cookie, ticket):
+            await self.closed(comm)
+        self.assertEqual((await survivor.receive_json_from(timeout=TIMEOUT))['unread'], 7)
+        await self.socket(access=first['access'], accepted=False)
+        await self.socket(ticket=await self.ticket(rotated.data['access']), accepted=False)
+        await self.disconnect_sockets()
+
+    async def test_ticket_socket_checks_access_expiry_on_delivery(self):
+        from datetime import datetime, timezone as dt_timezone
+        user, session = await self.login()
+        comm = await self.socket(ticket=await self.ticket(session['access']))
+        expired_at = datetime.fromtimestamp(UntypedToken(session['access'])['exp'] + 1, tz=dt_timezone.utc)
+        with patch('users.jwt_ws.timezone.now', return_value=expired_at):
+            await get_channel_layer().group_send(USER_GROUP_FMT.format(user_id=user.pk),
+                                                 {'type': 'notification.counter', 'unread': 7})
+            await self.closed(comm)
         await self.disconnect_sockets()
 
     @database_sync_to_async

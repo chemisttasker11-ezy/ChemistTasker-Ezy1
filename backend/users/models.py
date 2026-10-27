@@ -182,6 +182,12 @@ class WebSocketTicket(models.Model):
     ticket = models.CharField(max_length=64, unique=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     session_id = models.CharField(max_length=255, blank=True, default='')
+    access_expires_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Ticket for {self.user.email} at {self.created_at}"
+
+
+class RevokedSession(models.Model):
+    session_id = models.CharField(max_length=255, primary_key=True)
+    revoked_at = models.DateTimeField(auto_now_add=True)

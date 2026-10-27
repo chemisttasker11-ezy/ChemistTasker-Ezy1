@@ -1,4 +1,5 @@
 """Chat uses the same session revocation contract as notification sockets."""
+from unittest.mock import patch
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from channels.testing import WebsocketCommunicator
@@ -70,6 +71,30 @@ class RoomSessionRevocationTests(TransactionTestCase):
         self.assertEqual((await self.post('logout', {'refresh': rotated.data['refresh']})).status_code, 200)
         for comm in (bearer, ticket):
             await self.closed(comm)
+        await self.disconnect_sockets()
+
+    async def test_missed_logout_broadcast_closes_on_receive_and_delivery_only_for_own_session(self):
+        for direction in ('receive', 'deliver'):
+            with self.subTest(direction=direction):
+                user, first = await self.actors()
+                _, other = await self.login(user)
+                comm = await self.socket(first['access'], ticket=direction == 'deliver')
+                survivor = await self.socket(other['access'])
+                rotated = await self.post('token/refresh', {'refresh': first['refresh']})
+                self.assertEqual(rotated.status_code, 200)
+                await self.typing(comm, survivor)
+                with patch('users.api_auth.notify_auth_changed') as missed:
+                    self.assertEqual((await self.post('logout', {'refresh': first['refresh']})).status_code, 200)
+                    missed.assert_called_once()
+                if direction == 'receive':
+                    await comm.send_json_to({'type': 'message', 'body': 'revoked credentials'})
+                else:
+                    await get_channel_layer().group_send(ROOM_GROUP_FMT.format(room_id=self.room),
+                                                         {'type': 'typing.update'})
+                    self.assertEqual((await survivor.receive_json_from(timeout=TIMEOUT))['type'], 'typing')
+                await self.closed(comm)
+                await self.typing(survivor)
+                self.assertFalse(await database_sync_to_async(Message.objects.exists)())
         await self.disconnect_sockets()
 
     async def test_both_password_reset_routes_close_all_chat_sessions(self):

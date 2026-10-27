@@ -33,5 +33,5 @@ def notify_auth_changed(user_id, sid=None):
                 USER_GROUP_FMT.format(user_id=user_id), {'type': 'auth.changed', 'sid': sid},
             )
     except Exception:
-        # Sockets still re-check password/active state before every delivery.
+        # Sockets still re-check durable logout/password/active state before every delivery.
         logging.getLogger('users.views').exception('Failed notifying sockets for user %s', user_id)

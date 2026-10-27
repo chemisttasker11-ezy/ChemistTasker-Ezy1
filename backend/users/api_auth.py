@@ -170,6 +170,8 @@ class LogoutView(APIView):
                 if refresh.get('token_type') == 'refresh':
                     # Close only this session's sockets; rotation keeps `sid`, so the rotated-away token works too.
                     sid = refresh.get('sid', refresh['jti'])
+                    from users.models import RevokedSession
+                    RevokedSession.objects.get_or_create(session_id=sid)
                     WebSocketTicket.objects.filter(session_id=sid).delete()
                     transaction.on_commit(lambda: notify_auth_changed(refresh['user_id'], sid))
                     device_token = request.data.get('device_token')
@@ -213,12 +215,14 @@ class WsTicketView(APIView):
     def post(self, request):
         # Generate a secure 64-character token
         ticket_str = secrets.token_urlsafe(48)[:64]
+        from datetime import datetime, timezone as dt_timezone
         
         # Save it to the database
         WebSocketTicket.objects.create(
             user=request.user,
             ticket=ticket_str,
             session_id=request.auth.get('sid', '') if request.auth else '',
+            access_expires_at=datetime.fromtimestamp(request.auth['exp'], tz=dt_timezone.utc) if request.auth else None,
         )
         
         return Response({'ticket': ticket_str})

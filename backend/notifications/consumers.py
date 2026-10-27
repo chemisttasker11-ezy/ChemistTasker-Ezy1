@@ -20,6 +20,9 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
         self.user_id = user.id
         self.session_id = self.scope.get('session_id', '')
         self.group_name = USER_GROUP_FMT.format(user_id=self.user_id)
+        if not await self._still_authorized():
+            await self.close(code=self._authorization_close_code)
+            return
         if self.channel_layer:
             try:
                 await self.channel_layer.group_add(self.group_name, self.channel_name)
@@ -52,6 +55,11 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             await self.close(code=self._authorization_close_code)
             return
         await super().send_json(content, close=close)
+
+    async def receive_json(self, content, **kwargs):
+        if not await self._still_authorized():
+            await self.disconnect(self._authorization_close_code)
+            await self.close(code=self._authorization_close_code)
 
     async def disconnect(self, code):
         if self.channel_layer and hasattr(self, "group_name"):

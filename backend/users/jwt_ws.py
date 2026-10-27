@@ -10,12 +10,19 @@ from channels.db import database_sync_to_async
 
 from users.authentication import CookieJWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, AuthenticationFailed, TokenError
-from users.models import WebSocketTicket
+from rest_framework_simplejwt.settings import api_settings
+from users.models import RevokedSession, WebSocketTicket
 
 
 def websocket_credentials_valid(scope, user):
-    """Check the connection's password snapshot and access expiry, not refresh rotation blacklists."""
+    """Check session logout, password snapshot and access expiry independently of rotation."""
     if user.password != scope['user'].password:
+        return False
+    sid = scope.get('session_id')
+    if sid and RevokedSession.objects.filter(session_id=sid).exists():
+        return False
+    expires_at = scope.get('access_expires_at')
+    if expires_at is not None and timezone.now() >= expires_at:
         return False
     token = scope.get('auth')
     if token:
@@ -50,9 +57,10 @@ class JWTAuthMiddleware:
         if ticket_str:
             result = await self._get_user_from_ticket(ticket_str)
             if result:
-                user, session_id = result
+                user, session_id, expires_at = result
                 scope["user"] = user
                 scope["session_id"] = session_id
+                scope["access_expires_at"] = expires_at
                 return await self.inner(scope, receive, send)
 
         # 2. Fallback to standard token auth (for backwards compatibility just in case)
@@ -77,13 +85,16 @@ class JWTAuthMiddleware:
             with transaction.atomic():
                 ticket_obj = WebSocketTicket.objects.select_for_update().select_related('user').get(ticket=ticket_str)
                 user = ticket_obj.user
+                expires_at = ticket_obj.access_expires_at or ticket_obj.created_at + api_settings.ACCESS_TOKEN_LIFETIME
                 valid = (
                     ticket_obj.created_at >= timezone.now() - timedelta(minutes=5)
                     and user.is_active
                     and getattr(user, 'deleted_at', None) is None
+                    and expires_at > timezone.now()
+                    and not RevokedSession.objects.filter(session_id=ticket_obj.session_id).exists()
                 )
                 ticket_obj.delete()
-                return (user, ticket_obj.session_id) if valid else None
+                return (user, ticket_obj.session_id, expires_at) if valid else None
         except WebSocketTicket.DoesNotExist:
             return None
 
