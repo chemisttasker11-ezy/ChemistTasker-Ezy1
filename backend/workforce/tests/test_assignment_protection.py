@@ -8,9 +8,12 @@ from django.utils import timezone
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from memberships.models import Membership
-from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
-from workforce.models import RosterPeriod
+from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment, WorkerShiftRequest
+from workforce.models import RosterActionAudit, RosterPeriod
 from workforce.roster.bulk_edit import bulk_edit_roster_period
+from workforce.roster.worker_actions import (
+    approve_cover_replacement, approve_direct_swap, release_worker_from_assignment,
+)
 
 
 class RosterAssignmentProtectionTests(TestCase):
@@ -204,4 +207,133 @@ class RosterAssignmentProtectionTests(TestCase):
         row.refresh_from_db()
         self.assertEqual((row.user_id, str(row.unit_rate), row.slot_date), (self.other.pk, "55.00", target))
         self.assertEqual(client_for(self.owner).delete(url).status_code, 204)
+        self.assertFalse(ShiftSlotAssignment.objects.filter(pk=row.pk).exists())
+
+    def row(self, state, slot_date=None):
+        """The worker's row on an occurrence that is booked, payment-pending (another worker's offer) or plain."""
+        slot_date = slot_date or self.day
+        offer = None
+        if state == "booked":
+            offer = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, offered_slot_date=slot_date,
+                                              user=self.worker, status=ShiftOffer.Status.ACCEPTED)
+        elif state == "payment_pending":
+            ShiftOffer.objects.create(shift=self.shift, slot=self.slot, offered_slot_date=slot_date, user=self.other,
+                                      status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        return ShiftSlotAssignment.objects.create(shift=self.shift, slot=self.slot, slot_date=slot_date,
+                                                  user=self.worker, is_rostered=True, source_offer=offer)
+
+    def reset(self):
+        ShiftSlotAssignment.objects.all().delete()
+        ShiftOffer.objects.all().delete()
+
+    def test_roster_patch_clear_and_recurring_cleanup_refuse_booked_or_pending_occurrences(self):
+        url = f"/api/v1/roster-shifts/{self.shift.pk}/"
+        later = self.next_week()
+        for state in ("booked", "payment_pending"):
+            for slot_date, body in ((self.day, {"user_id": None}), (later, {"user_id": self.worker.pk})):
+                row = self.row(state, slot_date)
+                with self.subTest(state=state, body=body):
+                    self.assertEqual(client_for(self.owner).patch(url, body, format="json").status_code, 400)
+                    self.assertTrue(ShiftSlotAssignment.objects.filter(pk=row.pk, slot_date=slot_date).exists())
+                self.reset()
+
+    def test_roster_patch_still_clears_and_cleans_up_plain_rostered_rows(self):
+        url = f"/api/v1/roster-shifts/{self.shift.pk}/"
+        self.row("plain", self.next_week())
+        self.assertEqual(client_for(self.owner).patch(url, {"user_id": self.worker.pk}, format="json").status_code, 200)
+        self.assertEqual(list(self.slot.assignments.values_list("slot_date", flat=True)), [self.day])
+        self.assertEqual(client_for(self.owner).patch(url, {"user_id": None}, format="json").status_code, 200)
+        self.assertFalse(self.slot.assignments.exists())
+
+    def test_bulk_unassign_and_time_edits_refuse_booked_or_pending_occurrences_and_keep_their_rate(self):
+        # Bulk edits refuse recurring slots outright (edit_guards._protect_marketplace_slot), so only slot.date counts.
+        for state in ("booked", "payment_pending"):
+            row = self.row(state)
+            # A staff member's accepted offer would otherwise be repriced from their staff terms.
+            ShiftSlotAssignment.objects.filter(pk=row.pk).update(
+                engagement_kind="STAFF_EMPLOYMENT", unit_rate="99.99",
+                engagement_terms_snapshot={"settlement_channel": "TIMESHEET_ONLY"})
+            for op in ({"action": "update_slot_times", "slot_id": self.slot.pk, "start_time": "10:00",
+                        "end_time": "18:00", "planned_break_minutes": 30},
+                       {"action": "unassign_worker", "assignment_id": row.pk}):
+                with self.subTest(state=state, action=op["action"]):
+                    with self.assertRaisesMessage(ValidationError, "already assigned or awaiting payment"):
+                        bulk_edit_roster_period(self.period, [op], self.owner)
+                    row.refresh_from_db()
+                    self.slot.refresh_from_db()
+                    self.assertEqual((self.slot.start_time, self.slot.planned_break_minutes, str(row.unit_rate)),
+                                     (time(9), 0, "99.99"))
+            self.reset()
+
+    def test_bulk_unassign_and_time_edits_keep_plain_rostered_rows_editable(self):
+        row = self.row("plain")
+        with patch("workforce.roster.bulk_edit._validate_and_price"):
+            bulk_edit_roster_period(self.period, [
+                {"action": "update_slot_times", "slot_id": self.slot.pk, "start_time": "10:00", "end_time": "18:00"},
+                {"action": "unassign_worker", "assignment_id": row.pk},
+            ], self.owner)
+        self.slot.refresh_from_db()
+        self.assertEqual(self.slot.start_time, time(10))
+        self.assertFalse(ShiftSlotAssignment.objects.filter(pk=row.pk).exists())
+
+    def worker_request(self, row, swap_to=None):
+        req = WorkerShiftRequest.objects.create(pharmacy=self.pharmacy, requested_by=self.worker, shift=row,
+                                                role="PHARMACIST", slot_date=row.slot_date, start_time=time(9),
+                                                end_time=time(17), status="PENDING")
+        if swap_to:
+            RosterActionAudit.objects.create(pharmacy=self.pharmacy, shift_assignment=row, performed_by=self.worker,
+                                             action_type=RosterActionAudit.ActionType.SWAP_REQUESTED,
+                                             target_user=swap_to, details={"request_id": req.pk})
+        return req
+
+    def manager_actions(self, row):
+        return {
+            "swap": lambda: approve_direct_swap(self.worker_request(row, swap_to=self.other), self.owner),
+            "cover": lambda: approve_cover_replacement(self.worker_request(row), self.other, self.owner),
+            "release": lambda: release_worker_from_assignment(self.worker_request(row), self.owner),
+        }
+
+    def test_swap_cover_and_release_refuse_booked_or_pending_occurrences(self):
+        Membership.objects.create(user=self.other, pharmacy=self.pharmacy, role="PHARMACIST",
+                                  employment_type="FULL_TIME", status=Membership.Status.ACCEPTED, is_active=True)
+        for state in ("booked", "payment_pending"):
+            row = self.row(state)
+            for name, approve in self.manager_actions(row).items():
+                with self.subTest(state=state, action=name):
+                    with self.assertRaisesMessage(ValidationError, "cancel the booking"):
+                        approve()
+                    self.assertEqual(ShiftSlotAssignment.objects.get(pk=row.pk).user_id, self.worker.pk)
+            with self.subTest(state=state, action="worker-shift-requests approve"):
+                req = self.worker_request(row)
+                response = client_for(self.owner).post(f"/api/v1/worker-shift-requests/{req.pk}/approve/")
+                self.assertEqual(response.status_code, 400, response.data)
+                self.assertTrue(ShiftSlotAssignment.objects.filter(pk=row.pk).exists())
+            self.reset()
+
+    def test_swap_cover_and_release_keep_working_for_plain_rostered_rows(self):
+        Membership.objects.create(user=self.other, pharmacy=self.pharmacy, role="PHARMACIST",
+                                  employment_type="FULL_TIME", status=Membership.Status.ACCEPTED, is_active=True)
+        for name in ("swap", "cover", "release"):
+            row = self.row("plain")
+            with self.subTest(action=name):
+                self.manager_actions(row)[name]()
+                remaining = ShiftSlotAssignment.objects.filter(pk=row.pk)
+                self.assertEqual(list(remaining.values_list("user_id", flat=True)),
+                                 [] if name == "release" else [self.other.pk])
+            self.reset()
+
+    def test_escalate_refuses_booked_or_pending_occurrences(self):
+        url = f"/api/v1/roster-shifts/{self.shift.pk}/escalate/"
+        Shift.objects.filter(pk=self.shift.pk).update(visibility="FULL_PART_TIME", escalation_level=0)
+        for state in ("booked", "payment_pending"):
+            row = self.row(state)
+            with self.subTest(state=state):
+                response = client_for(self.owner).post(url, {}, format="json")
+                self.assertEqual(response.status_code, 400, response.data)
+                self.assertIn("already assigned or awaiting payment", str(response.data))
+                self.assertTrue(ShiftSlotAssignment.objects.filter(pk=row.pk).exists())
+            self.reset()
+        row = self.row("plain")
+        response = client_for(self.owner).post(url, {}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
         self.assertFalse(ShiftSlotAssignment.objects.filter(pk=row.pk).exists())

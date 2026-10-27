@@ -156,6 +156,19 @@ class ChainRemoveUserTests(TestCase):
         self.assertFalse(type(self.membership).objects.filter(pk=self.membership.pk).exists())
         self.assertFalse(PharmacyAdmin.objects.filter(user=self.admin_user, pharmacy=self.pharmacy, is_active=True).exists())
 
+    def test_removal_of_a_membership_kept_by_an_employment_agreement_deactivates_it(self):
+        from django.utils import timezone
+        from workforce.models import EmploymentEngagement
+        EmploymentEngagement.objects.create(
+            membership=self.membership, effective_from=timezone.localdate(), role="PHARMACIST",
+            employment_type="FULL_TIME", pay_basis="AWARD", created_by=self.owner, updated_by=self.owner,
+            rate_weekday=30, rate_saturday=35, rate_sunday=40, rate_public_holiday=50,
+        )
+        self.assertEqual(self.remove(self.owner, self.chain).status_code, 204)
+        self.membership.refresh_from_db()
+        self.assertFalse(self.membership.is_active)
+        self.assertFalse(PharmacyAdmin.objects.filter(user=self.admin_user, pharmacy=self.pharmacy, is_active=True).exists())
+
     def test_org_admin_of_the_chain_organization_can_remove(self):
         org = Organization.objects.create(name="Chain org", slug="chain-org")
         Pharmacy.objects.filter(pk=self.pharmacy.pk).update(organization=org)

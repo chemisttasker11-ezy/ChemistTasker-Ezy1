@@ -237,8 +237,8 @@ def slot_locked_for_shift_offer(*, shift, slot, slot_date=None, ignore_user=None
     if assignment_qs.exists():
         return True
     pending_qs = ShiftOffer.objects.filter(
+        Q(slot=slot) | Q(slot__isnull=True),   # a whole-shift offer awaiting payment holds every slot
         shift=shift,
-        slot=slot,
         status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
     )
     if ignore_user is not None:

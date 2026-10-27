@@ -185,6 +185,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
 
                 _protect_marketplace_slot(assignment.slot, idx, roster_period)
                 _protect_assignment_history(assignment)
+                guard_roster_assignment(shift=assignment.shift, slot=assignment.slot, slot_date=assignment.slot_date)
                 assignment.delete()
                 summary["unassigned"] += 1
 
@@ -227,6 +228,8 @@ def bulk_edit_roster_period(roster_period, operations, user):
                 if st == et:
                     raise ValidationError(f"Operation {idx}: start_time and end_time must differ.")
 
+                # Recurring slots never get here (_protect_marketplace_slot), so slot.date is the only occurrence.
+                guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=slot.date)
                 slot.start_time = st
                 slot.end_time = et
                 if "planned_break_minutes" in op:

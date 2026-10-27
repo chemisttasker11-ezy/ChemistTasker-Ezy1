@@ -36,6 +36,26 @@ class ClaimEligibilityTests(TestCase):
         self.assertEqual(allowed.status_code, 201, allowed.data)
         self.assertEqual(shift.slot_assignments.count(), 2)
 
+    def test_payment_pending_whole_shift_offer_blocks_a_staff_claim(self):
+        from shifts.models import ShiftOffer
+        worker = make_user('PHARMACIST')
+        Membership.objects.create(user=worker, pharmacy=self.pharmacy, role='PHARMACIST', employment_type='FULL_TIME',
+                                  status=Membership.Status.ACCEPTED, is_active=True)
+        shift = Shift.objects.create(pharmacy=self.pharmacy, created_by=self.owner, role_needed='PHARMACIST',
+                                     employment_type='LOCUM', visibility='FULL_PART_TIME', single_user_only=True)
+        ShiftSlot.objects.create(shift=shift, date=date.today() + timedelta(days=7), start_time=time(9), end_time=time(17))
+        offer = ShiftOffer.objects.create(shift=shift, slot=None, user=make_user('PHARMACIST'),
+                                          status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        with mock.patch('shifts.browse.async_task'):
+            refused = client_for(worker).post(f'{API}community-shifts/{shift.id}/claim-shift/', {}, format='json')
+        self.assertEqual(refused.status_code, 400, refused.data)
+        self.assertFalse(shift.slot_assignments.exists())
+        offer.status = ShiftOffer.Status.EXPIRED
+        offer.save(update_fields=['status'])
+        with mock.patch('shifts.browse.async_task'):
+            allowed = client_for(worker).post(f'{API}community-shifts/{shift.id}/claim-shift/', {}, format='json')
+        self.assertEqual(allowed.status_code, 201, allowed.data)
+
     def test_assistant_claim_does_not_replace_pharmacy_approved_technician_employment_role(self):
         from onboarding.models import OtherStaffOnboarding
         worker = make_user('OTHER_STAFF')

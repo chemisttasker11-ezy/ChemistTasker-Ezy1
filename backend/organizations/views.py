@@ -737,8 +737,7 @@ class ChainViewSet(viewsets.ModelViewSet):
             raise NotFound("User not in this chain’s pharmacies.")
         if not user_can_change_membership(request.user, membership):
             self.permission_denied(request, message="Not allowed to modify this membership.")
-        membership.revoke_admin_access()
-        membership.delete()
+        membership.remove()
         return Response(status=204)
 
 

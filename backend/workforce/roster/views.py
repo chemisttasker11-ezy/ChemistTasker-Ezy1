@@ -257,6 +257,8 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
             if new_user_id in (None, '', 'null'):
                 # Explicit clear requested by caller.
                 _protect_removed_assignments(existing_assignments.values())
+                for assignment in existing_assignments.values():
+                    _guard_booked_occurrences(assignment, assignment.slot_date)
                 shift_instance.slot_assignments.all().delete()
                 return response
 
@@ -302,13 +304,11 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                     }
                 )
 
-            obsolete_assignment_ids = [
-                assignment.id
-                for key, assignment in existing_assignments.items()
-                if key not in desired_keys
-            ]
-            if obsolete_assignment_ids:
-                ShiftSlotAssignment.objects.filter(id__in=obsolete_assignment_ids).delete()
+            obsolete = [assignment for key, assignment in existing_assignments.items() if key not in desired_keys]
+            for assignment in obsolete:
+                _guard_booked_occurrences(assignment, assignment.slot_date)
+            if obsolete:
+                ShiftSlotAssignment.objects.filter(id__in=[assignment.id for assignment in obsolete]).delete()
 
             return response
 
@@ -504,6 +504,8 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         _protect_removed_assignments(removed)
         try:
             with transaction.atomic():   # the assignments are cleared together with the escalation, or not at all
+                for assignment in removed:
+                    _guard_booked_occurrences(assignment, assignment.slot_date)
                 shift.slot_assignments.all().delete()
                 visibility = apply_escalation(shift, allowed_tiers, target_index)
         except DjangoValidationError as exc:   # e.g. the shift belongs to a published roster

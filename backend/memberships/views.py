@@ -16,7 +16,6 @@ from users.normalization import sanitize_email_text as clean_email
 from core.task_queue import async_task
 from datetime import date
 from django.db import transaction
-from django.db.models.deletion import ProtectedError
 from datetime import timedelta
 from users.models import User
 from memberships.serializers import (
@@ -111,19 +110,7 @@ class MembershipViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         """Remove membership access while preserving historical chat messages."""
-        membership = self.get_object()
-
-        with transaction.atomic():
-            membership.revoke_admin_access()
-            # Remove chat access before deleting or deactivating the membership.
-            membership.chat_participations.all().delete()
-
-            try:
-                membership.delete()
-            except ProtectedError:
-                membership.is_active = False
-                membership.save(update_fields=["is_active"])
-
+        self.get_object().remove()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _create_membership_invite(self, data, inviter):

@@ -52,10 +52,22 @@ def validate_worker_replacement_eligibility(
     return True
 
 
+def _guard_booked(assignment):
+    """Offer-booked or payment-pending work changes hands only through cancellation; plain rostered staff may swap."""
+    from shifts.assignment import guard_roster_assignment
+    try:
+        guard_roster_assignment(shift=assignment.shift, slot=assignment.slot,
+                                slot_date=assignment.slot_date or assignment.slot.date)
+    except ValidationError:
+        raise ValidationError("This shift is booked or awaiting payment: cancel the booking instead of swapping, "
+                              "replacing or releasing the worker.")
+
+
 def _reassign(assignment, user):
     """Hand an assignment to a replacement worker under that worker's own staff terms, never the departing worker's."""
     from shifts.engagement import staff_assignment_defaults
     from workforce.roster.services import _protect_assignment_history, refresh_assignment_rate
+    _guard_booked(assignment)
     _protect_assignment_history(assignment)
     defaults = staff_assignment_defaults(
         user=user, pharmacy=assignment.shift.pharmacy, work_date=assignment.slot_date or assignment.slot.date,
@@ -379,6 +391,7 @@ def release_worker_from_assignment(
             # Explicit deletion of the filled slot assignment
             from workforce.roster.services import _protect_assignment_history
             _protect_assignment_history(assignment)
+            _guard_booked(assignment)
             assignment.delete()
             req.shift = None
 
