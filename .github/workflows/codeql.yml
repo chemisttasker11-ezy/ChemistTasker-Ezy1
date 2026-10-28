@@ -38,7 +38,7 @@ jobs:
       # still runs; findings are reported as warnings and the SARIF is kept as an artifact for triage
       # (same pass/fail behaviour as the public repository, where findings went to Code Scanning).
       - name: Analyze
-        uses: github/codeql-action/analyze@3ea06614dafe36dec890db3446326e0d40ce53d4 # v3
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v3
         with:
           upload: ${{ github.event.repository.private && 'never' || 'always' }}
           output: codeql-results
