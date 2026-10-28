@@ -1,0 +1,21 @@
+diff --git a/node_modules/deepmerge/dist/cjs.js b/node_modules/deepmerge/dist/cjs.js
+index 7c36cbd..dbcdeec 100644
+--- a/node_modules/deepmerge/dist/cjs.js
++++ b/node_modules/deepmerge/dist/cjs.js
+@@ -80,11 +80,15 @@ function mergeObject(target, source, options) {
+ 	var destination = {};
+ 	if (options.isMergeableObject(target)) {
+ 		getKeys(target).forEach(function(key) {
++			// GHSA-gcqx-w48m-w2h4: an own "__proto__" key would replace the result's prototype.
++			if (key === '__proto__') {
++				return
++			}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
+ 		});
+ 	}
+ 	getKeys(source).forEach(function(key) {
+-		if (propertyIsUnsafe(target, key)) {
++		if (key === '__proto__' || propertyIsUnsafe(target, key)) {
+ 			return
+ 		}
+ 

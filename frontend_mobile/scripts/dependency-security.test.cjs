@@ -145,6 +145,17 @@ test('security gate rejects new advisories and unpatched duplicate dependency co
   assert.throws(() => verifyAudit(report), /Unresolved advisory/);
 });
 
+test('patched deepmerge never lets an own __proto__ key replace the result prototype', () => {
+  const deepmerge = require('deepmerge');
+  const evil = JSON.parse('{"__proto__":{"isAdmin":true},"nested":{"__proto__":{"isAdmin":true}}}');
+  for (const merged of [deepmerge(evil, {}), deepmerge(evil, evil), deepmerge({}, evil), deepmerge.all([{ nested: {} }, evil])]) {
+    assert.equal(Object.getPrototypeOf(merged), Object.prototype);
+    assert.equal(merged.isAdmin, undefined);
+    if (merged.nested) assert.equal(merged.nested.isAdmin, undefined);
+  }
+  assert.deepEqual(deepmerge({ a: { b: 1 }, list: [1] }, { a: { c: 2 }, list: [2] }), { a: { b: 1, c: 2 }, list: [1, 2] });
+});
+
 test('patched fast-uri rejects percent-encoded dangerous URI schemes', () => {
   const uri = require('fast-uri');
   for (const value of ['%6Aavascript:alert(1)', '%u006Aavascript:alert(1)']) {

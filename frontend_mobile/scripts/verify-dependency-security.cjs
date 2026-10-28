@@ -30,6 +30,7 @@ function verifyInstalled() {
   assert.equal(mobileRequire('fast-uri/package.json').version, '3.1.9');
   assert.equal(lock.packages['node_modules/undici'].version, '6.29.1');
   assert.equal(mobileRequire('undici/package.json').version, '6.29.1');
+  assert.equal(lock.packages['node_modules/qs'].version, '6.17.0');
   assert.equal(Object.keys(lock.packages).some(name => name.endsWith('node_modules/sprintf-js')), false);
   return lock;
 }
@@ -40,6 +41,8 @@ function verifyAudit(report) {
   const patched = {
     'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm': 'braces',
     'https://github.com/advisories/GHSA-86w9-cpqp-85rv': 'node-forge',
+    // No fixed deepmerge release exists (4.3.1 is the latest); patched via patches/deepmerge+4.3.1.patch.
+    'https://github.com/advisories/GHSA-gcqx-w48m-w2h4': 'deepmerge',
   };
   const seenAdvisories = new Set();
   function leaves(name, active = new Set()) {

@@ -99,7 +99,8 @@
     "node-forge": "1.4.0",
     "follow-redirects": "1.16.1",
     "fast-uri": "3.1.9",
-    "undici": "6.29.1"
+    "undici": "6.29.1",
+    "qs": "6.17.0"
   },
   "private": true
 }
