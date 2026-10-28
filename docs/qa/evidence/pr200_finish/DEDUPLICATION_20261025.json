@@ -1,0 +1,208 @@
+{
+  "review_date": "2026-10-25",
+  "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "scope": "Triage across original B01-B71 and new C/F findings including new F12-N1 and C064-N1",
+  "method": "Root-cause and scenario comparison; source verification noted in SOURCE_CHALLENGE_20261025.json. No runtime tests. No independent separate second-agent certification.",
+  "roots": [
+    {
+      "canonical": "C071-N2",
+      "aliases": [
+        "F09-N3",
+        "F11-N2"
+      ],
+      "status": "SAME_ROOT_CONFIRMED_SOURCE",
+      "reason": "One underlying device-token revocation omission: mobile logout does not deactivate prior account's DeviceToken, and server push continues sending to active tokens. F09-N3 and F11-N2 describe the same disclosure from chat previews; C071-N2 traces exact root."
+    },
+    {
+      "canonical": "B70",
+      "aliases": [
+        "F08-N1"
+      ],
+      "status": "OVERLAPPING_ROOT_HIGH_CONFIDENCE",
+      "reason": "Repeated Stripe base-subscription setup creates recurring provider subscriptions without idempotent guard while local OwnerSubscription tracks a single id. F08-N1 is the invoice-payment variant of B70; B70 also covers extra-seat Checkout. Keep both reproduction scenarios, remediate base and seats as distinct endpoints."
+    },
+    {
+      "canonical": "C010-N1",
+      "aliases": [
+        "B42"
+      ],
+      "status": "RELATED_NOT_IDENTICAL",
+      "reason": "Ethical draft PATCH may have unauthorized destination/product reassignment, and B42 concerns atomicity/error after persistence. Shared endpoint but different vulnerabilities, both retained."
+    },
+    {
+      "canonical": "F02-N1",
+      "aliases": [
+        "F08-N3"
+      ],
+      "status": "RELATED_DIFFERENT_FAILURE_MODES",
+      "reason": "Deleting a shift with bookings and deleting while Stripe Checkout remains open share shift-deletion lifecycle boundary, but need different safety/compensation guards and negative tests. Preserve separate findings."
+    },
+    {
+      "canonical": "F02-N3",
+      "aliases": [
+        "B67"
+      ],
+      "status": "RELATED_DISTINCT_ROUTES",
+      "reason": "Roster assignment removal/escalation and generic shift-offer DELETE bypass lifecycle at different entry points. Neither should automatically close the other."
+    },
+    {
+      "canonical": "B69",
+      "aliases": [
+        "B66"
+      ],
+      "status": "RELATED_DISTINCT_FAILURE_MODES",
+      "reason": "Cancellation penalty paid-once/retry safety is different from overnight negative wage arithmetic; maintain independent test contracts."
+    },
+    {
+      "canonical": "B68",
+      "aliases": [
+        "F08-N2"
+      ],
+      "status": "NOT_DUPLICATE",
+      "reason": "Cross-customer invoice.paid subscription entitlement and failure to handle unpaid status both occur in Stripe synchronization but have different causal roots and event cases."
+    },
+    {
+      "canonical": "B71",
+      "aliases": [
+        "F01-N4"
+      ],
+      "status": "RELATED_NOT_IDENTICAL",
+      "reason": "Shift acceptance notification service failure after a committed state and misrouting owner vs posting administrator are distinct delivery/reliability problems."
+    },
+    {
+      "canonical": "F12-N1",
+      "aliases": [
+        "B51"
+      ],
+      "status": "NOT_DUPLICATE",
+      "reason": "Mobile chat send error UI missing feedback differs from backend authorization defect allowing revoked chat member to send."
+    },
+    {
+      "canonical": "F07-N2",
+      "aliases": [
+        "C026-N1"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same worker_finance invoice mark_paid operation changes status without a payment record; cash worksheet/balance remain unchanged. Both cite backend/worker_finance/views.py ~243/251, 498/506."
+    },
+    {
+      "canonical": "F07-N4",
+      "aliases": [
+        "C026-N2"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same email-send completion vs later invoice revision race in worker_finance/views.py ~272-315; same unsent revision exposure."
+    },
+    {
+      "canonical": "F07-N6",
+      "aliases": [
+        "C025-N2"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same worker_finance separate super_document amount not updated after parent invoice revision; both cite services.py ~606/690/894."
+    },
+    {
+      "canonical": "F06-N1",
+      "aliases": [
+        "C028-N1"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same timesheet_builder payroll manifest empty handoff after locking; F06 and C028 cite timesheet_builder.py:183."
+    },
+    {
+      "canonical": "F01-N1",
+      "aliases": [
+        "C021-N1"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same worker PII projection in public shift response via shifts/lifecycle.py:393 and serialization/shifts.py, including assigned and payment-pending workers."
+    },
+    {
+      "canonical": "F10-N3",
+      "aliases": [
+        "C019-N1"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same concurrent friend-referral claim duplicated Pill reward, both cite rewards/views.py:139 and rewards/services.py:297."
+    },
+    {
+      "canonical": "C020-N6",
+      "aliases": [
+        "C021-N3"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same multi-date recurring offer acceptance/engagement code assigns all recurring occurrences, even when the counteroffer covered only one, both cite shifts/counter_offers.py:188 and engagement.py:268/271."
+    },
+    {
+      "canonical": "C045-N2",
+      "aliases": [
+        "C027-N4"
+      ],
+      "status": "SAME_ROOT_HIGH_CONFIDENCE",
+      "reason": "Same worker roster endpoint and serializer exposes coworker leave type/note via workforce/roster/views.py and serializers.py:138."
+    },
+    {
+      "canonical": "C028-N4",
+      "aliases": [
+        "F06-N3"
+      ],
+      "status": "RELATED_DISTINCT_TIME_WINDOW_DEFECTS",
+      "reason": "Both concern overnight corrections, but C028 says signals mark only one period dirty while F06 says timesheet split builder drops minutes even on rebuild; require separate remediation and tests."
+    }
+  ],
+  "refuted": [
+    {
+      "id": "C016-N2",
+      "status": "REFUTED_SOURCE_FOR_REPORTED_PATCH_PATH",
+      "reason": "HubCommunityGroupSerializer.Meta.read_only_fields includes pharmacy, so ordinary PATCH cannot reassign the group's pharmacy through validated serializer data. Preserve historical claim as disproved; investigate other routes separately if discovered.",
+      "refs": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/serialization/groups.py#L53-L82",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/groups.py#L138-L145"
+      ]
+    }
+  ],
+  "earlier_B66_B71": {
+    "B66": "Overnight wage arithmetic; not completed",
+    "B67": "Generic offer DELETE; not completed",
+    "B68": "Stripe account attribution; not completed",
+    "B69": "Penalty paid-once guard; not completed",
+    "B70": "Recurring base and extra-seat subscription creation; source overlap F08-N1",
+    "B71": "Acceptance notification transaction ordering; not completed"
+  },
+  "policy": "Preserve all source finding IDs with canonical/alias relationships; never silently delete historical candidates; exclude REFUTED_SOURCE from active blocker counts; S3 remains not executed.",
+  "review_update": "2026-10-25 source challenge + ten B-series high-risk verification; direct-booking notification subclaim refuted. Independent P1 second reviewer and runtime reproduction pending.",
+  "new_source_challenge_ids": [
+    "B01",
+    "F07-N1",
+    "F08-N3",
+    "F09-N1",
+    "F10-N5",
+    "C064-N1",
+    "F12-N1",
+    "B03",
+    "B06",
+    "B07",
+    "B15",
+    "B29",
+    "B33",
+    "B36",
+    "B68",
+    "B69",
+    "B70"
+  ],
+  "distinctness_note": "F07-N1 customer_id=0 editor mismatch; F08-N3 related but distinct from F02-N1 (external payment); F09-N1 restricted group deletion; F10-N5 valid POST NameError; C064-N1 conditional old SG; F12-N1 native failure UX vs backend authorization B51. No new IDs or proven new roots.",
+  "refuted_claims": [
+    {
+      "id": "PR165_DEDICATED_BOOKING_NOTIFY_WIDENING",
+      "status": "REFUTED_SOURCE_NARROW_SUBCLAIM_ONLY",
+      "reason": "Although Next TalentBoard discards embedded while preserving dedicated_user, backend protect_direct_booking forces private LOCUM_CASUAL visibility and clears escalation stamps; both announced-shift recipient and availability-match callbacks explicitly return for dedicated_user_id. Old claim that submitted notify flags alone email unrelated workers on this protected creation path is contradicted, while all other booking security/parity remains unverified.",
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx#L422",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L23",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L77",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/announcements.py#L343",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/announcements.py#L461"
+      ]
+    }
+  ]
+}

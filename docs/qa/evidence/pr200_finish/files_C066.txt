@@ -1,0 +1,11 @@
+frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx
+frontend_mobile/roles/shared/pharmacies/PharmacyHoursRow.tsx
+frontend_mobile/roles/shared/pharmacies/PharmacyOverviewContainer.tsx
+frontend_mobile/roles/shared/pharmacies/PharmacyProfileFields.tsx
+frontend_mobile/roles/shared/pharmacies/PharmacySoftwareFields.tsx
+frontend_mobile/roles/shared/pharmacies/StaffManager.tsx
+frontend_mobile/roles/shared/pharmacies/inviteUtils.ts
+frontend_mobile/roles/shared/pharmacies/membershipApi.ts
+frontend_mobile/roles/shared/pharmacies/types.ts
+frontend_mobile/roles/shared/pills/PillsScreen.tsx
+frontend_mobile/roles/shared/profile/RefereesScreen.tsx

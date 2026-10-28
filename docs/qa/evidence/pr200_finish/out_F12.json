@@ -1,0 +1,420 @@
+{
+  "chunk": "F12",
+  "reviewer": "gpt6-cross-platform-20261025",
+  "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "verification": "Bounded causal source comparison only across Vite, Next/handoffs and Expo; no independent second-agent S2 or S3 browser/native/PostgreSQL/Stripe verification. Three historical P0 independently source-confirmed.",
+  "status": "SOURCE_COMPARISON_14_ACTIONS_RECORDED_RUNTIME_NOT_TESTED_PARITY_NOT_SIGNED_OFF",
+  "paths_read": [
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L149-L166",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L454-L462",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/CommunityShiftsView.tsx#L552-L570",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L382-L387",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L440-L445",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts#L59-L73",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L343-L379",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useCounterOffers.ts#L200-L245",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts#L182-L240",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L436-L439",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts#L40-L48",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/attendance/api.ts#L5-L12",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/features/parity/attendance.tsx#L145-L155",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/attendance/WorkerAttendancePage.tsx#L197-L260",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/finance/api.ts#L74-L89",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/finance/FinanceWorkspace.tsx#L348-L356",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx#L143-L162",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx#L360-L429",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/chat/MessageComposer.tsx#L170-L185",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx#L571-L591",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/messages/[id].tsx#L403-L439",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/chat/api.ts#L112-L115",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L115",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L261",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L443",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/landing_next/shared/session-provider.tsx#L7",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/users/api_auth.py#L155",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/billing/api.ts#L15",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx#L150",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/owner/subscription-seats.tsx#L94",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L839",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/tests.py#L25",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx#L412",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/hub/HubScreen.tsx#L22",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/landing_next/lib/hub-server.ts#L24",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/models.py#L143",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/scoping.py#L156",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/notifications/api.ts#L6",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L502",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/notifications/services.py#L79",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx#L407",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx#L727",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L42",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx#L532",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/app/my-roster.tsx#L208",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/worker_requests.py#L97",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/workforce/roster/worker_actions.py#L364",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/base.py#L114",
+    "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L142"
+  ],
+  "action_count": 14,
+  "actions": [
+    {
+      "id": "F12-A1",
+      "flow": "worker_apply_or_express_interest",
+      "source_status": "SOURCE_TRACED_CONTRACT; backend policy F01/F04 carried forward",
+      "vite": "ShiftsBoard/index.tsx delegates onApplyAll/onApplySlot to caller; same shared-core shift service mapping",
+      "next": "migrated ShiftsBoard/index.tsx delegates equivalent apply callbacks; actual Next page caller-specific auth not runtime verified",
+      "expo": "roles/shared/shifts/ShiftsBoard/index.tsx delegates apply callbacks; CommunityShiftsView supplies handlers",
+      "shared_core": "expressInterestInCommunityShiftService / expressInterestInPublicShiftService / expressInterestInShiftService => POST /community-shifts/{id}/express_interest/, /public-shifts/{id}/express_interest/ or /shifts/{id}/express_interest/ with slot_id/slot_ids",
+      "backend": "shifts interest, access and escalation endpoints traced in existing F01/F04; cross-audience negative tests remain mandatory",
+      "differences": "same API transport shape where same action is used; request audience/role context cannot be certified from callback signatures alone",
+      "tests": {
+        "positive": "pharmacist and other staff apply to visible eligible date and observe single backend interest in each client",
+        "negative": "cross-tenant/internal-only visibility, wrong worker type, expired posting, duplicate concurrent interest, offer payment gate",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L149-L166",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L454-L462",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/CommunityShiftsView.tsx#L552-L570"
+      ]
+    },
+    {
+      "id": "F12-A2",
+      "flow": "owner_accept_candidate_or_offer",
+      "source_status": "SOURCE_TRACED_CONTRACT; state transitions require runtime proof",
+      "vite": "ActiveShiftsPage/hooks/useShiftActions calls acceptShiftCandidateService(shiftId,{userId,slotId})",
+      "next": "migrated owner details to be checked in staging, not asserted equivalent",
+      "expo": "ActiveShiftsPage/hooks/useShiftActions calls the same acceptShiftCandidateService; ActiveShiftsPage/hooks/useCounterOffers calls acceptShiftCounterOfferService",
+      "shared_core": "accept_user -> POST /shifts/{id}/accept_user/ with user_id,slot_id; counter offer -> POST /shifts/{id}/counter-offers/{offerId}/accept/?slot_id=...",
+      "backend": "existing F01 shift-offer/paywall/assignment boundary, booking exclusivity and payment webhook safety",
+      "differences": "Vite and Expo use shared-core candidate accept; owner UI state and payment notice parity untested",
+      "tests": {
+        "positive": "same scoped manager accepts selected eligible slot, reserves once and sees correct payment deadline in web and Expo",
+        "negative": "unauthorized manager, another pharmacy, paid slot, double accept concurrent, expired offer, missed notification",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L382-L387",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L440-L445",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts#L59-L73"
+      ]
+    },
+    {
+      "id": "F12-A3",
+      "flow": "worker_counter_offer",
+      "source_status": "SOURCE_TRACED_CLIENT_DIFFERENCE",
+      "vite": "Vite useCounterOffers batch-fetches all rendered shift IDs through fetchShiftCounterOffersBatchService, filters offers by currentUserId",
+      "next": "Next migrated useCounterOffers uses per-shift fetchShiftCounterOffersService on list, rather than Vite batch transport",
+      "expo": "Expo useCounterOffers fetches each shift serially via fetchShiftCounterOffersService in a loop; client-side own-user filtering and device-global persistence",
+      "shared_core": "submitShiftCounterOfferService maps slot_id,slot_date,proposed_rate,start/end,request_travel; endpoints /shifts/{id}/counter-offers/ and /shifts/counter-offers-batch/",
+      "backend": "shift counter_offers and authorization in existing F01/F04; server must filter to current worker, not trust UI filtering",
+      "differences": "confirmed batching/per-shift request-count divergence; business correctness not disproven; potential N+1 latency in Expo/Next",
+      "tests": {
+        "positive": "same offer slots, rate, travel and review state on Vite/Next/Expo with 50+ shifts and a fresh login",
+        "negative": "anonymous lookup, other worker counter offers, forged slot_id, visibility revocation, slow server and account switch",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L343-L379",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useCounterOffers.ts#L200-L245",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts#L182-L240"
+      ]
+    },
+    {
+      "id": "F12-A4",
+      "flow": "cancellation_delete_and_reopen",
+      "source_status": "EXISTING_HIGH_RISK_DEFECTS; not parity certified",
+      "vite": "ActiveShiftsPage/hooks/useShiftActions uses deleteActiveShiftService; worker cancellation/cover from separate roster paths",
+      "next": "Next migrated shift UI delegates parent mutations; actual delete/cancellation authorization to verify",
+      "expo": "ActiveShiftsPage/hooks/useShiftActions same deleteActiveShiftService; separate mobile worker roster cover request path",
+      "shared_core": "DELETE /shifts/active/{id}/; separate cancellation and offer action endpoints",
+      "backend": "existing F02-N1 and F02-N3 describe deletion of paid assignments without workflow checks; B67 generic offer DELETE requires separate source verification",
+      "differences": "same destructive API used by Vite/Expo; no evidence of safe cancellation handling or UI parity across all status transitions",
+      "tests": {
+        "positive": "cancel eligible unpaid shift and worker request with warning, refund/penalty, timeline and notification persisted",
+        "negative": "part-paid shift, attended shift, assigned user, deletion after checkout, duplicated cancel, cross-tenant manager",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/shifts/api.ts#L436-L439",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts#L40-L48"
+      ]
+    },
+    {
+      "id": "F12-A5",
+      "flow": "attendance_clock_in_out_break",
+      "source_status": "SOURCE_TRACED_SHARED_TRANSPORT",
+      "vite": "WorkerAttendancePage calls attendance.clockIn(qrToken), clockOut(qrToken), breakStart(), breakEnd()",
+      "next": "Not established as a distinct Next screen; existing Vite route is operational attendance UI",
+      "expo": "features/parity/attendance.tsx calls identical shared attendance methods, QR scans via expo-camera",
+      "shared_core": "attendance.clockIn/clockOut -> operational POST with {qr_token}; breakStart/breakEnd -> POST empty body",
+      "backend": "attendance worker_api and transitions, eligibility, timesheet side effects traced in F06",
+      "differences": "same shared API contract; QR scanner permissions and mobile failure/loading states differ",
+      "tests": {
+        "positive": "same shift worker can clock in/out, break and see one consistent history/timesheet across clients",
+        "negative": "unassigned worker, wrong pharmacy QR, duplicate clock/break tap, offline retry, token replay, clock after cancellation",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/attendance/api.ts#L5-L12",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/features/parity/attendance.tsx#L145-L155",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/attendance/WorkerAttendancePage.tsx#L197-L260"
+      ]
+    },
+    {
+      "id": "F12-A6",
+      "flow": "finance_invoice_create_send",
+      "source_status": "SOURCE_TRACED_SHARED_FINANCE; legacy generator separate",
+      "vite": "FinanceWorkspace email action calls finance.send(invoice.id,invoice.version); InvoiceComposer saves with finance.saveInvoice",
+      "next": "Next FinanceWorkspace integration not demonstrated as a distinct page in source set",
+      "expo": "FinanceWorkspace calls finance.send(id,version), FinanceInvoiceEditor finance.saveInvoice; legacy InvoiceGenerate posts FormData to generateInvoice in separate legacy invoicing flow",
+      "shared_core": "finance.send -> POST /worker-finance/invoices/{id}/send/ {version,confirmed:true}; finance.saveInvoice POST or PATCH with FinanceDraft; legacy generateInvoice uses different API",
+      "backend": "worker_finance views/services and invoicing views/services traced in F07; tenant/recipient/amount/duplicate-send gates remain critical",
+      "differences": "new finance workspace transport matches Vite/Expo; distinct legacy Expo generator can show differing PDF/GST/super data and must not be assumed equivalent",
+      "tests": {
+        "positive": "create, version, send and approve exact same invoice and PDF contents, role/tenant and notifications across clients",
+        "negative": "forged issuer or pharmacy, wrong tenant, stale version, duplicate sends, GST/super mismatch, unpaid/draft status",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/finance/api.ts#L74-L89",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/finance/FinanceWorkspace.tsx#L348-L356",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx#L143-L162",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx#L360-L429"
+      ]
+    },
+    {
+      "id": "F12-A7",
+      "flow": "chat_send_text_attachment_retry",
+      "source_status": "SOURCE_CONFIRMED_CLIENT_ERROR_UI_DIVERGENCE",
+      "vite": "ChatPage forwards sendRoomMessageService to MessageComposer, which retains draft/attachment and displays send failure on catch; websocket event updates messages",
+      "next": "Migrated Chat UI uses same browser shared-core transport but Next runtime and session wiring not separately tested",
+      "expo": "roles/shared/messages/[id].tsx calls same sendRoomMessageService, updates optimistic state on success; text send catch logs to console without visible snackbar or failure status",
+      "shared_core": "sendRoomMessageService -> POST /chat/rooms/{id}/messages/; JSON body or multipart FormData; backend membership object permissions enforce access",
+      "backend": "chat views/serializers and realtime signals in existing F09; no live socket test",
+      "differences": "confirmed user-facing failure feedback gap on Expo direct message text compared to Vite",
+      "tests": {
+        "positive": "send text, file, mention on both clients, verify unique message event and retained retry on failure",
+        "negative": "remove from room before send, spoof roomId/membership, fail network request, retry on reconnect, privacy after logout",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/chat/MessageComposer.tsx#L170-L185",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx#L571-L591",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/messages/[id].tsx#L403-L439",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/chat/api.ts#L112-L115"
+      ]
+    },
+    {
+      "id": "F12-A8",
+      "flow": "authentication_login_refresh_logout",
+      "vite": "Vite AuthContext reconciles cookies/bearer and user storage.",
+      "next": "Next session-provider generation-guards async reload and logout events; migrated auth context needs browser test.",
+      "expo": "Expo AuthContext bootstrap/login/refreshUser writes identity after async await without generation guard (C071-N1).",
+      "shared_core": "Shared auth/current-user transports, web cookies/CSRF vs native token persistence.",
+      "backend": "users/api_auth LogoutView refresh-token blacklist/cookie clear; no device-token deletion.",
+      "differences": "Native stale identity after switch/source race; no cross-client S3.",
+      "source_status": "SOURCE_PATHS_TRACED_NO_S3",
+      "tests": {
+        "negative": "Simultaneously hydrate then logout A / login B; no A profile resurrects; Next cross-tab safe.",
+        "positive": "Valid login/logout and persona change give correct user and storage.",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L115",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L261",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L443",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/landing_next/shared/session-provider.tsx#L7",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/users/api_auth.py#L155"
+      ]
+    },
+    {
+      "id": "F12-A9",
+      "flow": "stripe_subscription_and_shift_checkout",
+      "vite": "Web owner billing posts subscription checkout; shift payment redirects via chargeShiftFulfillment.",
+      "next": "Next authenticated payment screen not separately verified; dashboard handoff to Vite not equal Next parity.",
+      "expo": "Expo subscription-seats POSTs same checkout with platform=mobile and Linking.openURL, shift checkout likewise.",
+      "shared_core": "POST /billing/subscribe/, /billing/subscription/seats/, /billing/charge-fulfillment/{shift}/ with offer_ids and platform.",
+      "backend": "billing.views builds Stripe session and signature/idempotency-checked webhook then finalizes ShiftPayment/assignments.",
+      "differences": "B01 rate path, F08-N3 deleted shift and B70 double subscription unresolved; platform callbacks differ.",
+      "source_status": "SOURCE_PATHS_TRACED_NO_S3",
+      "tests": {
+        "negative": "Repeat paid checkout after deleting shift or with cross-pharmacy/expired offer; never orphan charge.",
+        "positive": "One accepted slot pays once at correct rate, replay safe and visible in clients.",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/billing/api.ts#L15",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx#L150",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/owner/subscription-seats.tsx#L94",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/views.py#L839",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/billing/tests.py#L25"
+      ]
+    },
+    {
+      "id": "F12-A10",
+      "flow": "hub_group_posts_and_privacy",
+      "vite": "Vite HubPage group delete, edit, feed; same shared Hub domain transport.",
+      "next": "Next hub-server is publicContent publishing/reader, not proof authenticated private group Hub parity.",
+      "expo": "Expo HubScreen group management and HubFeed post/comment/poll via shared Hub API.",
+      "shared_core": "GET/POST/DELETE /hub/groups, /hub/posts, scoped pharmacy/group/organization.",
+      "backend": "HubScopeResolver checks membership; post.community_group SET_NULL on group deletion can widen pharmacy feed.",
+      "differences": "F09-N1 affects both Vite/Expo server results; Next public Hub distinct surface.",
+      "source_status": "SOURCE_PATHS_TRACED_NO_S3",
+      "tests": {
+        "negative": "Group delete, revoked membership, same-pharmacy outsider and unrelated tenant cannot read former restricted posts.",
+        "positive": "Authorized existing group receives only intended posts and can safely archive.",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx#L412",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/hub/HubScreen.tsx#L22",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/landing_next/lib/hub-server.ts#L24",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/models.py#L143",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/pharmacy_hub/scoping.py#L156"
+      ]
+    },
+    {
+      "id": "F12-A11",
+      "flow": "notification_inbox_push_logout",
+      "vite": "Vite notifications facade delegates fetch + mark-read shared API.",
+      "next": "Next session provider clears identity on logout; independently tested authenticated notification UI absent from evidence.",
+      "expo": "Expo registers Expo push DeviceToken on login; logout clears local state but not server DeviceToken.",
+      "shared_core": "GET /notifications/?page, POST /notifications/mark-read {ids}, POST /device-tokens {token,platform}.",
+      "backend": "notifications.services sends private payload to active device tokens; auth logout never unregisters.",
+      "differences": "C071-N2/F09-N3/F11-N2 are SAME root, not three separate blockers; native push not browser parity.",
+      "source_status": "SOURCE_PATHS_TRACED_NO_S3",
+      "tests": {
+        "negative": "After A->B switch on same device, no A private push preview; revoked group/room no events.",
+        "positive": "Valid A receives only own push and read states across web/native.",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/shared-core/src/domains/notifications/api.ts#L6",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/context/AuthContext.tsx#L502",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/users/api_auth.py#L155",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/notifications/services.py#L79"
+      ]
+    },
+    {
+      "id": "F12-A12",
+      "flow": "dedicated_talent_booking_post",
+      "vite": "Vite dashboard PostShiftForm handles dedicated_user and audience controls.",
+      "next": "Next migrated TalentBoard sets dedicated_user then drops embedded before Vite post-shift navigation; not direct Next persistence.",
+      "expo": "Expo talent board/PostShiftScreen composes draft with audience and date; no exact private booking runtime check.",
+      "shared_core": "Shared Shift posting accepts dedicated_user, visibility, staff/chain/favourite notice options.",
+      "backend": "ShiftSerializer exposes dedicated_user + notification flags; backend must enforce private recipient policy.",
+      "differences": "Potential private audience widening is historical warning, not newly runtime reproduced.",
+      "source_status": "SOURCE_PATHS_TRACED_NO_S3",
+      "tests": {
+        "negative": "Forged direct booking request must not notify unrelated workers or auto-escalate to public.",
+        "positive": "Selecting one worker and dates creates private correctly scoped booking.",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx#L407",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx#L727",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L42"
+      ]
+    },
+    {
+      "id": "F12-A13",
+      "flow": "cover_request_and_roster_cancellation",
+      "vite": "Vite roster worker cover request and owner approve/remove in Roster pages.",
+      "next": "No independent authenticated Next cover workflow path verified.",
+      "expo": "Expo my-roster worker request and parity roster owner approval.",
+      "shared_core": "Shared roster/worker requests APIs with staff assignment identifiers.",
+      "backend": "worker_requests and workforce.roster.worker_actions own matching assignment release, potential F02-N2/N3.",
+      "differences": "Same backend incomplete link risk; frontend confirmation not authority.",
+      "source_status": "SOURCE_PATHS_TRACED_NO_S3",
+      "tests": {
+        "negative": "Wrong worker or pharmacy, filled paid and attended shifts and double approval must not silently unbook.",
+        "positive": "Worker requests cover, manager approves once, assignments/historical notice consistent.",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx#L532",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/app/my-roster.tsx#L208",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/worker_requests.py#L97",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/workforce/roster/worker_actions.py#L364"
+      ]
+    },
+    {
+      "id": "F12-A14",
+      "flow": "shift_edit_tenant_and_payment_integrity",
+      "vite": "Vite editable ShiftForm uses same shared shifts API mutation.",
+      "next": "Next migrated board delegates edit / dashboard handoff, no independent protected patch validation.",
+      "expo": "Expo PostShiftScreen chooses pharmacy/rates, invokes shift APIs.",
+      "shared_core": "PATCH /shifts/{id}/; serializer accepts pharmacy and payment_status and apply_rates_to_pharmacy.",
+      "backend": "BaseShiftViewSet checks original pharmacy only; serializer permits arbitrary destination and payment status; revise_shift can rewrite destination rate defaults (F04-N2).",
+      "differences": "Confirmed source-level P0 irrespective of client UI restrictions; no exploit S3.",
+      "source_status": "SOURCE_PATHS_TRACED_NO_S3",
+      "tests": {
+        "negative": "Owner A PATCHes pharmacy B and payment_status=PAID; must deny and preserve both tenants/rates.",
+        "positive": "Owner edits permitted same-pharmacy fields without payment tamper.",
+        "execution": "NOT_EXECUTED"
+      },
+      "evidence": [
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/base.py#L114",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L42",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L142",
+        "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx#L727"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P2",
+      "area": "Expo chat UX",
+      "title": "Native direct-message send failure is logged but not shown to the user, unlike Vite's retry warning.",
+      "scenario": "Sara taps send on a direct chat while offline. Mobile sendMessage catches the network error and only console.error() logs it; the draft remains but the screen gives no visible send failure, while Vite MessageComposer displays an explicit 'Message not sent' error. Sara may believe the message was delivered.",
+      "evidence": [
+        "frontend_mobile/roles/shared/messages/[id].tsx:403",
+        "frontend_mobile/roles/shared/messages/[id].tsx:435",
+        "frontend_web/src/pages/dashboard/sidebar/chat/MessageComposer.tsx:179"
+      ],
+      "confidence": "high for source UI path; must test global error handler and runtime rendering",
+      "verification": "SOURCE_ONLY_UNCONFIRMED",
+      "test_needed": "Disconnect native device network, send a direct text chat; assert clear error and draft retained. Vite shows explicit send failure; retry after reconnect sends once. Ensure global notifications are not already surfacing equivalent errors."
+    }
+  ],
+  "family_map": {
+    "authentication": [
+      "F12-A8"
+    ],
+    "shifts": [
+      "F12-A1",
+      "F12-A2",
+      "F12-A3",
+      "F12-A14"
+    ],
+    "booking": [
+      "F12-A2",
+      "F12-A12"
+    ],
+    "cancellations": [
+      "F12-A4",
+      "F12-A13"
+    ],
+    "stripe": [
+      "F12-A9"
+    ],
+    "invoices": [
+      "F12-A6"
+    ],
+    "attendance": [
+      "F12-A5"
+    ],
+    "hub": [
+      "F12-A10"
+    ],
+    "chat": [
+      "F12-A7"
+    ],
+    "notifications": [
+      "F12-A11"
+    ]
+  },
+  "parity_verdict": "All requested domains have source-level comparison entries; true authenticated behavior parity remains UNVERIFIED, particularly Next dashboard handoffs versus Vite, Stripe, private Hub, native session and device push."
+}

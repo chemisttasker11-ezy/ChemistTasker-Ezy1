@@ -1,0 +1,213 @@
+{
+ "chunk": "F08",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "backend/billing/views.py",
+  "backend/billing/models.py",
+  "backend/billing/utils.py",
+  "backend/billing/urls.py",
+  "backend/billing/apps.py",
+  "backend/billing/tests.py",
+  "backend/billing/migrations/0001_squashed_baseline.py",
+  "backend/core/api_v1_urls.py",
+  "backend/core/task_queue.py",
+  "backend/shifts/base.py",
+  "backend/shifts/models.py",
+  "backend/shifts/urls.py",
+  "backend/shifts/offers.py",
+  "backend/shifts/finalize.py",
+  "backend/shifts/emails.py",
+  "backend/shifts/notifications.py",
+  "backend/shifts/lifecycle.py",
+  "backend/shifts/posting.py",
+  "backend/shifts/my_shifts.py",
+  "backend/shifts/tasks.py",
+  "backend/workforce/signals.py",
+  "backend/notifications/services.py",
+  "backend/memberships/models.py",
+  "backend/memberships/views.py",
+  "backend/memberships/serializers.py",
+  "backend/memberships/invites.py",
+  "backend/memberships/applications.py",
+  "backend/memberships/urls.py",
+  "backend/users/api_account.py",
+  "backend/users/account_deletion.py",
+  "backend/templates/emails/account_deleted.txt",
+  "shared-core/src/domains/billing/api.ts",
+  "shared-core/src/domains/shifts/api.ts",
+  "shared-core/src/domains/memberships/api.ts",
+  "shared-core/src/domains/auth/api.ts",
+  "shared-core/src/utils/pricing.ts",
+  "frontend_web/src/pages/PricingPage.tsx",
+  "frontend_web/src/pages/MobileCheckoutReturnPage.tsx",
+  "frontend_web/landing_next/app/(public)/mobile-checkout-return/page.tsx",
+  "frontend_web/src/pages/dashboard/organization/OrganizationOverviewPage.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/owner/InviteStaffModal.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/ManageMembershipsPage.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftsDialogs.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftActions.ts",
+  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts",
+  "frontend_mobile/roles/owner/subscription-seats.tsx",
+  "frontend_mobile/roles/owner/profile.tsx",
+  "frontend_mobile/roles/organization/profile.tsx",
+  "frontend_mobile/roles/shared/ManageMembershipsScreen.tsx",
+  "frontend_mobile/roles/shared/pharmacies/StaffManager.tsx",
+  "frontend_mobile/roles/shared/pharmacies/membershipApi.ts",
+  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx",
+  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts",
+  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Dialogs/DeleteConfirmDialog.tsx"
+ ],
+ "confirmed_known": [
+  "B01",
+  "B02",
+  "B04",
+  "B11",
+  "B15",
+  "B53",
+  "B54",
+  "B57",
+  "C004-N2",
+  "C004-N3",
+  "C004-N4",
+  "C004-N5"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Billing",
+   "title": "Repeating subscription setup can create multiple recurring charges for the same plan.",
+   "scenario": "Tom chooses invoice payment for his subscription, then repeats setup while the first invoice is unpaid. Each attempt creates another recurring Stripe subscription, while the app replaces the previous subscription reference and still presents one plan. Tom can receive multiple recurring bills for the same service.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:150",
+    "backend/billing/views.py:388",
+    "backend/billing/views.py:416",
+    "backend/billing/views.py:429",
+    "backend/billing/views.py:431",
+    "backend/billing/models.py:36"
+   ],
+   "confidence": "high",
+   "test_needed": "Submit invoice subscription setup twice before paying the first invoice and assert that the second request cannot create another recurring Stripe subscription.",
+   "owner_question": {
+    "question": "When Tom repeats subscription setup before paying his first invoice, what should happen?",
+    "options": [
+     "Show Tom the existing unpaid invoice without creating another subscription",
+     "Cancel the unpaid subscription before creating its replacement",
+     "Create another recurring subscription for Tom (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Billing",
+   "title": "Subscriptions remain active after Stripe marks them unpaid.",
+   "scenario": "Tom's subscription renewal fails and Stripe eventually marks the subscription unpaid. The app ignores both the failed-payment notice and the subscription status change, so web and mobile continue showing Tom an active subscription without a payment problem. The local subscription remains active unless a separate cancellation event arrives.",
+   "evidence": [
+    "backend/billing/views.py:897",
+    "backend/billing/views.py:926",
+    "backend/billing/views.py:944",
+    "backend/billing/views.py:249",
+    "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:107",
+    "frontend_mobile/roles/owner/subscription-seats.tsx:44"
+   ],
+   "confidence": "high",
+   "test_needed": "After an active subscription's paid period expires, deliver invoice.payment_failed followed by customer.subscription.updated with status unpaid and assert that the subscription response no longer reports active.",
+   "owner_question": {
+    "question": "After Tom exhausts any payment grace period and Stripe marks his subscription unpaid, what should the app show?",
+    "options": [
+     "Show unpaid status and suspend subscription benefits until Tom pays",
+     "Show unpaid status while retaining benefits for a defined extension",
+     "Continue showing Tom an active subscription without a warning (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Billing",
+   "title": "An open checkout can charge Tom after its shift has been deleted.",
+   "scenario": "Tom opens checkout to confirm Sara, then deletes the still-unpaid shift from his phone before completing payment in the browser. The open checkout remains payable, so Stripe can take Tom's money after the shift and Sara's offer have disappeared. The payment callback cannot save a payment linked to the deleted shift, leaving Tom charged without a recorded payment or confirmed booking.",
+   "evidence": [
+    "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts:44",
+    "shared-core/src/domains/shifts/api.ts:121",
+    "backend/shifts/base.py:111",
+    "backend/shifts/lifecycle.py:50",
+    "backend/billing/views.py:689",
+    "backend/billing/views.py:848",
+    "backend/billing/models.py:85",
+    "backend/billing/views.py:1011"
+   ],
+   "confidence": "high",
+   "test_needed": "Create checkout for Sara's pending offer, delete the shift, then deliver the paid checkout event and assert that the charge is reconciled or refunded rather than failing permanently against the missing shift.",
+   "owner_question": {
+    "question": "If Tom deletes Sara's shift while its checkout is open, what should happen to a payment completed afterward?",
+    "options": [
+     "Prevent payment where possible and automatically refund any late charge",
+     "Prevent Tom from deleting the shift until checkout is resolved",
+     "Keep the charge without restoring the booking or recording payment (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P1",
+   "area": "Billing",
+   "title": "Staff can join beyond the purchased seat count without an additional charge.",
+   "scenario": "Tom has used all five included internal staff seats at one pharmacy and invites Nadia from his other pharmacy to join it too. Nadia can accept and become active without Tom purchasing another seat or receiving an additional seat charge. The membership checks limit how many pharmacies Nadia joins, but never compare Tom's staff total with his purchased seats.",
+   "evidence": [
+    "frontend_web/src/pages/PricingPage.tsx:259",
+    "frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:440",
+    "shared-core/src/domains/memberships/api.ts:24",
+    "backend/memberships/invites.py:117",
+    "backend/memberships/invites.py:168",
+    "backend/memberships/serializers.py:133",
+    "backend/memberships/views.py:437",
+    "backend/memberships/views.py:443",
+    "backend/billing/views.py:826"
+   ],
+   "confidence": "high",
+   "test_needed": "Give Tom five purchased seats and five active internal staff at one pharmacy, then accept Nadia's sixth internal membership and assert that activation requires another paid seat or creates the corresponding charge.",
+   "owner_question": {
+    "question": "When Nadia would become Tom's sixth internal staff member at a pharmacy with five paid seats, what should happen?",
+    "options": [
+     "Hold Nadia's activation until Tom buys another seat",
+     "Ask Tom to approve the additional recurring seat charge before activation",
+     "Activate Nadia without checking or charging for another seat (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N5",
+   "severity": "P1",
+   "area": "Billing",
+   "title": "Deleting Tom's account leaves his recurring Stripe charges running.",
+   "scenario": "Tom has an active subscription and extra seats, then deletes his account through the app. The app confirms deletion, disables his login and signs him out, but neither recurring Stripe subscription is cancelled or scheduled to stop. Tom can continue being billed after losing access to the account and its billing screen.",
+   "evidence": [
+    "frontend_mobile/roles/owner/profile.tsx:393",
+    "shared-core/src/domains/auth/api.ts:53",
+    "backend/core/api_v1_urls.py:30",
+    "backend/users/api_account.py:76",
+    "backend/users/account_deletion.py:92",
+    "backend/billing/views.py:440",
+    "backend/billing/views.py:522",
+    "backend/templates/emails/account_deleted.txt:6"
+   ],
+   "confidence": "high",
+   "test_needed": "Delete Tom's account with active base and seat subscriptions and assert that both recurring charges are stopped or that deletion is refused until billing is resolved.",
+   "owner_question": {
+    "question": "When Tom deletes his account while paying for a subscription and extra seats, what should happen to future charges?",
+    "options": [
+     "Stop both subscriptions from renewing as part of deletion",
+     "Require Tom to resolve or cancel both subscriptions before deletion",
+     "Disable Tom's account while both subscriptions keep billing (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-3"
+}

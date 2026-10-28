@@ -1,0 +1,13 @@
+frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx
+frontend_web/src/pages/dashboard/sidebar/TalentBoard/talentModel.ts
+frontend_web/src/pages/dashboard/sidebar/TalentBoard/types.ts
+frontend_web/src/pages/dashboard/sidebar/WorkerShiftDetailPage.tsx
+frontend_web/src/pages/dashboard/sidebar/calendarViews.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/ConversationHeader.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/ConversationMessageList.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/ConversationPanel.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/DeleteMessageDialog.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/MessageBubble.tsx

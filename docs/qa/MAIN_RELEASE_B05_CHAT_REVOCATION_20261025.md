@@ -1,0 +1,7 @@
+# Phase5 B05: connected WebSocket access after staff revocation
+
+Frozen main `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. Test environment disposable Django in-memory Channels and SQLite; exact URL `/ws/chat/rooms/{room_id}/` behind real ticket/JWTAuthMiddlewareStack. **Status: PENDING RUN** until positive and negative tests inspected.
+
+`backend/chat/consumers.py:21-202` verifies a membership only on WebSocket connect. `receive_json` and `send_json` recheck AHPRA suspension but never re-evaluate membership or Participant; cached membership is used by `_create_message`. In `backend/chat/signals.py:135-157`, Membership.save with is_active=False and status LEFT removes community Participant. Existing channel membership remains until socket disconnect, and room group fanout does not recheck saved Participant. `backend/chat/realtime.py:62-88` checks effective membership for badges but does not cover room group subscribers.
+
+Tests: positive valid staff connected/send and peer received. Negative (1) connected staff gets revoked through genuine Membership.save, Participant deletion observed, then sending another message must not persist. Negative (2) revoked socket cannot send typing event to healthy peer. Both have cleanup in finally, exact synthetic staff and independently connected peers. If ASGI fixture or mail/Redis problem occurs, mark TEST_INVALID, not S3. Reproductions do not imply unauthorized access to other rooms or actual production socket exploitation. No product code changes.

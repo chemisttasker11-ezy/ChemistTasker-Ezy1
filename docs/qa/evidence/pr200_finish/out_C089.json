@@ -1,0 +1,31 @@
+{
+ "chunk": "C089",
+ "files": [
+  {
+   "path": "frontend_web/eslint.config.js",
+   "verdict": "NA",
+   "ids": [],
+   "note": "ESLint configuration; not application logic."
+  },
+  {
+   "path": "frontend_web/postcss.config.js",
+   "verdict": "NA",
+   "ids": [],
+   "note": "PostCSS configuration; not application logic."
+  },
+  {
+   "path": "frontend_web/tailwind.config.js",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Tailwind CSS configuration; not application logic."
+  },
+  {
+   "path": "frontend_web/vite.config.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Vite build and dev server configuration; not application logic."
+  }
+ ],
+ "findings": [],
+ "reviewer": "agy-g3"
+}

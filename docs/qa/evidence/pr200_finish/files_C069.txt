@@ -1,0 +1,12 @@
+frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx
+frontend_mobile/roles/shared/shifts/PostShiftSkillsStep.tsx
+frontend_mobile/roles/shared/shifts/PostShiftTimetableStep.tsx
+frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx
+frontend_mobile/roles/shared/shifts/PublicShiftsView.tsx
+frontend_mobile/roles/shared/shifts/ShiftBoardTabsPage.tsx
+frontend_mobile/roles/shared/shifts/ShiftsBoard/components/CounterOfferDialog.tsx
+frontend_mobile/roles/shared/shifts/ShiftsBoard/components/FiltersSidebar.tsx
+frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ReviewCounterOfferDialog.tsx
+frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ReviewOfferSlotList.tsx
+frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx
+frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftList.model.ts

@@ -1,0 +1,114 @@
+{
+ "chunk": "C039",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/PublicOrganizationPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Public organization profile page with valid metadata and shift board navigation."
+  },
+  {
+   "path": "frontend_web/src/pages/PublicTalentBoardPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Public talent board feed with proper authentication dialogs for interactions."
+  },
+  {
+   "path": "frontend_web/src/pages/ResetPasswordPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Password reset confirmation form with validation and session sign-out."
+  },
+  {
+   "path": "frontend_web/src/pages/SharedShiftLandingPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Redirect for logged-in users constructs non-existent route paths for org staff and pharmacy managers."
+  },
+  {
+   "path": "frontend_web/src/pages/TermsOfServicePage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Static legal terms of service document."
+  },
+  {
+   "path": "frontend_web/src/pages/attendance/KioskActivationView.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Kiosk activation and pairing code presentation view."
+  },
+  {
+   "path": "frontend_web/src/pages/attendance/KioskBreakDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Break management dialog with PIN keypad and clocked-in staff selection."
+  },
+  {
+   "path": "frontend_web/src/pages/attendance/KioskPage.runtime.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Axios client setup with CSRF and auth token interceptors for kiosk."
+  },
+  {
+   "path": "frontend_web/src/pages/attendance/KioskPage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused setPinMode state setter retained after PIN mode UI simplification."
+  },
+  {
+   "path": "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Correction modal initializes local datetime-local input with UTC string shifting timestamps."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Attendance",
+   "title": "Attendance timeline correction modal uses UTC string in local datetime input shifting timestamps",
+   "scenario": "Omar clocks out at 5:00 PM at Tom's pharmacy in Sydney. When Tom clicks to correct Omar's clock-out time on the review page, the date-time picker is populated with a universal time string showing 7:00 AM instead of 5:00 PM. When Tom submits the form, the browser parses the value in the local timezone, shifting the record 10 hours earlier so it precedes Omar's morning clock-in. The server rejects the submission for violating event order, blocking Tom from saving corrections, or silently distorts shift hours if editing clock-in.",
+   "evidence": [
+    "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:237",
+    "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:539"
+   ],
+   "confidence": "high",
+   "test_needed": "In a browser running in Australia/Sydney (UTC+10), opening the correction modal for an event at 17:00 local time and submitting should send an effective timestamp of 17:00 AEST (07:00Z) rather than shifting 10 hours to 07:00 AEST (21:00Z previous day).",
+   "owner_question": {
+    "question": "When Tom corrects an attendance clock time on the review page, how should the date-time picker initialize and submit timestamps for Australian pharmacies?",
+    "options": [
+     "(Recommended) Pre-fill the picker in the pharmacy's local timezone and submit the local time converted to UTC, preserving the intended hours.",
+     "Pre-fill the picker with UTC time and require managers to manually calculate timezone offsets.",
+     "Keep today's behaviour where UTC strings are loaded into local datetime pickers and shifted on submission."
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Shared shift landing redirect produces non-existent dashboard routes for non-standard roles",
+   "scenario": "Tom creates a shared shift link for an open shift at his pharmacy. When Lina, an organisation admin, clicks the link while logged in, the page calculates a non-existent role path. The application fails to match any valid screen and displays a missing page error, preventing Lina from reviewing the shift. The same breakdown locks out users with pharmacy manager roles.",
+   "evidence": [
+    "frontend_web/src/pages/SharedShiftLandingPage.tsx:246",
+    "frontend_web/src/pages/SharedShiftLandingPage.tsx:247"
+   ],
+   "confidence": "high",
+   "test_needed": "Assert that an authenticated user with role ORG_STAFF or PHARMACY_MANAGER navigating to /shifts/link?token=... is not redirected to a non-existent route resulting in a 404 error.",
+   "owner_question": {
+    "question": "When Lina (organisation admin) or a pharmacy manager opens a shared shift link while logged in, where should the platform take them?",
+    "options": [
+     "(Recommended) Redirect them to their organisation's shift center (/dashboard/organization/shifts/:id) or keep them on the shared shift details view.",
+     "Do not redirect logged-in admins away from the public shift view, rendering the shared shift directly.",
+     "Keep today's behaviour where they are redirected to /dashboard/orgstaff/shifts/:id resulting in a 404."
+    ]
+   }
+  }
+ ],
+ "reviewer": "agy-g3"
+}

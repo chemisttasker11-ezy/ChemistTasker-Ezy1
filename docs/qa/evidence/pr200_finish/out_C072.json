@@ -1,0 +1,244 @@
+{
+  "chunk": "C072",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "test source retrieval only, not test execution",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
+  "files": [
+    {
+      "path": "frontend_web/e2e/authenticated/session.e2e.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "cf653ced27880f562ecb11f460b53ec41e40498d",
+      "lines": 64,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "64 lines; e2e browser test/fixture, 2 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/calendar-wire.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "eed5339eb5b1266e3f27c446e9671271e681f714",
+      "lines": 200,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "200 lines; e2e browser test/fixture, 5 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/e2e.authenticated.config.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "411ef4eea74cbfd26527d5bbfcdd48d9ff80e33d",
+      "lines": 39,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "39 lines; e2e browser test/fixture, 0 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/e2e.config.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f21e00cf8062ba4d864dae050cd79f0f15619466",
+      "lines": 31,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "31 lines; e2e browser test/fixture, 0 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-ahpra.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "a3b619fef47e289ac652c1f0cbb1478ba1ac53ad",
+      "lines": 60,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "60 lines; e2e browser test/fixture, 2 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-appearance.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "534724301754adb7f1a2384b793a080dcb6ab0b8",
+      "lines": 65,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "65 lines; e2e browser test/fixture, 1 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-behaviour.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "d5e37bf63b050e782c06ed5142ac446cfbcd92bc",
+      "lines": 104,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "104 lines; e2e browser test/fixture, 7 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-breadth.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ff2b67271f0df0bfbec67f390fe2db71a26f49e2",
+      "lines": 968,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "968 lines; e2e browser test/fixture, 30 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-candidates.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "a49d7948fbfb1a4ba9aa3348b489ce8680838b9a",
+      "lines": 142,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "142 lines; e2e browser test/fixture, 3 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-chat.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "2ff44790d6df77dd85cce4aa5816faaf07c9f385",
+      "lines": 139,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "139 lines; e2e browser test/fixture, 9 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-integration-contracts.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "42e430868ef0f4baeb5d27f1c7d8095b5181c1be",
+      "lines": 55,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "55 lines; e2e browser test/fixture, 2 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-next-live.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "1162c4172e6d99e2a61be64464ec5b62a320238c",
+      "lines": 18,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "18 lines; e2e browser test/fixture, 1 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-product-acceptance.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "bb667c87a11e670ca6ff42b32dbd5d20d1b282a1",
+      "lines": 41,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "41 lines; e2e browser test/fixture, 3 observed test declarations (heuristic, not executed). Mocked vs real backend, tenant and billing tests must be verified in test execution."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-seeded-acceptance.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "9eb16aea40ace95f1d2fbde0e8eeee07a57d6c8d",
+      "lines": 87,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "87 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-shift-tabs.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ed796f1409d099abadb340f1dc6ba2b340ef40e2",
+      "lines": 29,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "29 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-smoke.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b2b8415331ce1a34fa998454239ba8f3f1e0bbfc",
+      "lines": 1370,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "1370 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/frontend-wiring.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "c7d8baa67ab7310dadfef512083af55a66964b33",
+      "lines": 71,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "71 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/playwright.config.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "810e151afb1c49a46ec6515a664706d8cac1cbd3",
+      "lines": 32,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "32 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/real-stack.spec.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "03c74128e57ca51032337234a95cca45d627be10",
+      "lines": 50,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "50 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/run-e2e.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "9c14e79bf07c5cc9f0682b3d7cd203753e7f822c",
+      "lines": 96,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "96 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/run-tests.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "cac0106c01b46ce702bbab56b57b3c5ad3a520fd",
+      "lines": 50,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "50 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/support/apiFixture.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "303eb6c6017f23971fae2b127db49c5c5ee32f58",
+      "lines": 146,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "146 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/support/appearanceComparison.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "78e7eb428e4b98c8bb18650f420145277c8fa01f",
+      "lines": 60,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "60 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/support/appearanceComparison.test.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "7e111c264a5d3d47b82225c9f5070a234dfbf14e",
+      "lines": 24,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "24 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/support/financeFixture.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "9dce7a03e142d3a90086821e9e92d5c17dbf8744",
+      "lines": 39,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "39 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    },
+    {
+      "path": "frontend_web/e2e/support/reviewFixture.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3ba5dcc1860e81a34330d14457137b41c35775d6",
+      "lines": 21,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "21 lines; browser E2E harness and fixtures retrieved, exact data setup and mocked/real status require S2; no tests run."
+    }
+  ],
+  "findings": []
+}

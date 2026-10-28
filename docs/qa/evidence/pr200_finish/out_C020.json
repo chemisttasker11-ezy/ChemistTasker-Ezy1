@@ -1,0 +1,252 @@
+{
+ "chunk": "C020",
+ "files": [
+  {
+   "path": "backend/shifts/announcements.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B41"
+   ],
+   "note": "Private shift announcements omit accepted membership status."
+  },
+  {
+   "path": "backend/shifts/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Django app configuration only."
+  },
+  {
+   "path": "backend/shifts/assignment.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B38",
+    "N1"
+   ],
+   "note": "Manual rostering bypasses role eligibility and can overwrite existing assignments."
+  },
+  {
+   "path": "backend/shifts/base.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B09",
+    "B62",
+    "N1"
+   ],
+   "note": "Contains known escalation and authorization issues; manual assignment omits worker role checks."
+  },
+  {
+   "path": "backend/shifts/browse.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B41",
+    "N2",
+    "N3",
+    "N4"
+   ],
+   "note": "Membership status, partial claiming, recurring discovery and local-time filtering have problems."
+  },
+  {
+   "path": "backend/shifts/cancellation.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional specific problem confirmed."
+  },
+  {
+   "path": "backend/shifts/candidates.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B41"
+   ],
+   "note": "Member status includes active memberships without requiring acceptance."
+  },
+  {
+   "path": "backend/shifts/context.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Workload and support input validation checked."
+  },
+  {
+   "path": "backend/shifts/counter_offers.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N5",
+    "N6"
+   ],
+   "note": "Slotless acceptance crashes; recurring date selection does not constrain eventual assignments."
+  },
+  {
+   "path": "backend/shifts/description_templates.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B62"
+   ],
+   "note": "Template mutations inherit the overly broad pharmacy management permission."
+  },
+  {
+   "path": "backend/shifts/emails.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional specific problem confirmed."
+  },
+  {
+   "path": "backend/shifts/engagement.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N6"
+   ],
+   "note": "Recurring acceptance terms describe fewer dates than finalization books."
+  },
+  {
+   "path": "backend/shifts/escalation.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B09"
+   ],
+   "note": "Automatic escalation remains read-triggered and does not announce the expanded audience."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Roster",
+   "title": "Manual rostering allows staff to fill a pharmacist vacancy without pharmacist eligibility",
+   "scenario": "Tom submits a manual roster assignment putting Ali into a pharmacist vacancy. Ali's accepted technician membership satisfies the checks, so the assignment succeeds without checking that Ali can perform pharmacist work.",
+   "evidence": [
+    "backend/shifts/base.py:412",
+    "backend/shifts/assignment.py:143",
+    "backend/shifts/assignment.py:169",
+    "backend/shifts/engagement.py:46",
+    "backend/shifts/access.py:43"
+   ],
+   "confidence": "high",
+   "test_needed": "Manually assign accepted technician Ali to a pharmacist vacancy and assert rejection with no assignment created.",
+   "owner_question": {
+    "question": "When Tom manually puts Ali into a pharmacist vacancy, what should happen?",
+    "options": [
+     "Reject because Ali is not a pharmacist",
+     "Require Tom to change the vacancy to technician work first",
+     "Allow Ali to fill the pharmacist vacancy (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "One claimed slot prevents claims on every remaining free slot",
+   "scenario": "Tom posts two independently claimable pharmacist dates. Omar claims the first date, then tries to claim the second. The second claim is refused because the shift already has an assignment, although that date remains free.",
+   "evidence": [
+    "backend/shifts/browse.py:343",
+    "backend/shifts/browse.py:351",
+    "backend/shifts/browse.py:366"
+   ],
+   "confidence": "high",
+   "test_needed": "Claim one slot in a non-single-user shift, then claim another free slot and assert success.",
+   "owner_question": {
+    "question": "After Omar claims the first of Tom's independently claimable dates, what should happen to the second?",
+    "options": [
+     "Keep the second date available for claims",
+     "Require Tom to offer the remaining date manually",
+     "Block all further claims on the shift (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Recurring vacancies disappear from worker boards after their starting date",
+   "scenario": "Tom posts an unfilled weekly pharmacist vacancy running for several weeks. Once its starting date passes, Sara cannot find the remaining dates on the public board. Omar likewise loses an equivalent recurring vacancy from the community board.",
+   "evidence": [
+    "backend/shifts/browse.py:75",
+    "backend/shifts/browse.py:440",
+    "backend/shifts/browse.py:565",
+    "backend/shifts/posting.py:48",
+    "backend/shifts/pricing.py:444"
+   ],
+   "confidence": "high",
+   "test_needed": "Create an unassigned recurring slot starting yesterday with a future occurrence and assert it remains discoverable on worker boards.",
+   "owner_question": {
+    "question": "When Tom's recurring vacancy has future unfilled dates but its starting date has passed, what should Sara see?",
+    "options": [
+     "The remaining future dates",
+     "A new advertisement Tom must publish for each date",
+     "No vacancy after the starting date passes (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Public boards compare local shift times against the UTC clock",
+   "scenario": "Tom posts a Sydney shift ending at 5 pm. At 6 pm Sydney time, Sara can still find and express interest in it because the board compares its ending time with the much earlier UTC clock.",
+   "evidence": [
+    "backend/shifts/browse.py:431",
+    "backend/shifts/browse.py:445",
+    "backend/shifts/browse.py:557",
+    "backend/shifts/browse.py:568"
+   ],
+   "confidence": "high",
+   "test_needed": "Freeze time at 6 pm Sydney time and assert a same-day shift ending at 5 pm is absent from both public lists.",
+   "owner_question": {
+    "question": "At 6 pm in Tom's pharmacy, should Sara still see a shift that ended there at 5 pm?",
+    "options": [
+     "Hide it using the pharmacy's local time",
+     "Show it as closed and prevent applications",
+     "Keep it open until the UTC comparison expires (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N5",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Accepting a valid counter offer for a vacancy without dated slots crashes",
+   "scenario": "Tom posts a full-time vacancy without dated shifts. Sara submits a counter offer containing the requested working times but no date, which the app accepts. When Tom accepts it, the request fails instead of sending Sara an offer.",
+   "evidence": [
+    "backend/shifts/serialization/offers.py:100",
+    "backend/shifts/serialization/offers.py:163",
+    "backend/shifts/counter_offers.py:137",
+    "backend/shifts/counter_offers.py:139"
+   ],
+   "confidence": "high",
+   "test_needed": "Submit a valid slotless counter offer without slot_date, then accept it and assert a controlled successful response instead of an exception.",
+   "owner_question": {
+    "question": "When Sara counters Tom's full-time vacancy without dated shifts, what should accepting it do?",
+    "options": [
+     "Send Sara an offer without requiring a shift date",
+     "Require a date before allowing the counter offer submission",
+     "Leave the submitted counter offer unacceptable (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N6",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Confirming one recurring date books dates outside the accepted terms",
+   "scenario": "Sara counters for just one date in Tom's recurring vacancy, and Tom accepts that date. Sara reviews terms describing that date and confirms. When the booking is finalized, the app assigns Sara to every unfilled date in the recurring series, including dates she did not accept.",
+   "evidence": [
+    "backend/shifts/counter_offers.py:163",
+    "backend/shifts/counter_offers.py:188",
+    "backend/shifts/engagement.py:268",
+    "backend/shifts/offers.py:360",
+    "backend/shifts/finalize.py:39",
+    "backend/shifts/finalize.py:79"
+   ],
+   "confidence": "high",
+   "test_needed": "Confirm an offer targeting one recurring occurrence and assert no assignments exist for any other occurrence.",
+   "owner_question": {
+    "question": "When Sara accepts terms for one date in Tom's recurring vacancy, which dates should she be booked for?",
+    "options": [
+     "Only the date she accepted",
+     "The whole series after separately reviewing and accepting every date",
+     "Every unfilled recurring date immediately (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-2"
+}

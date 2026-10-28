@@ -1,0 +1,50 @@
+{
+  "chunk": "C082",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "source retrieval only; 2 files PR branch only, 2 archived main",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
+  "files": [
+    {
+      "path": "docs/qa/pr200_quarter_audit.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "98ba99a4eecf6191009e8aaab59029aab91299ea",
+      "source_ref": "PR200_HEAD",
+      "lines": 132,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "132 lines; audit-added script, not present on frozen main; must not count as frozen-main coverage. No tests run."
+    },
+    {
+      "path": "docs/qa/pr200_static_audit.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "607a7523113e020925e924ad6b81de2d1756b9dc",
+      "source_ref": "PR200_HEAD",
+      "lines": 198,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "198 lines; audit-added script, not present on frozen main; must not count as frozen-main coverage. No tests run."
+    },
+    {
+      "path": "docs/roster-attendance/archive/2026-09-15-pre-repair-0044_roster_v2_and_attendance_v1.py",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "0eebbc2ac25743f36dadc58609a70822a28f043e",
+      "source_ref": "FROZEN_MAIN",
+      "lines": 172,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "172 lines; archived historical migration/model, not active production implementation. No tests run."
+    },
+    {
+      "path": "docs/roster-attendance/archive/2026-09-15-pre-repair-models.py",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "488f48aca7023e06ce03570a78a011b18e55db3d",
+      "source_ref": "FROZEN_MAIN",
+      "lines": 4463,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "4463 lines; archived historical migration/model, not active production implementation. No tests run."
+    }
+  ],
+  "findings": []
+}

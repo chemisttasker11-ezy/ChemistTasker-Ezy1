@@ -1,0 +1,1208 @@
+{
+  "F03-N1": {
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "verifier": "gpt6-senior-20261025",
+    "independent_of": "claudeA-3",
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "reason": "DELETE deactivates PharmacyAdmin but leaves accepted/active Membership unchanged. The custom invitation list and accept action explicitly select inactive PharmacyAdmin with accepted active Membership; POST reactivates assignment without a fresh owner grant. Tests cover accepting a fresh invite but omit the removal-then-reaccept case.",
+    "evidence": [
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/organizations/views.py#L313-L361",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/organizations/views.py#L586-L592",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/client_profile/test_admin_invitations.py#L31-L92"
+    ],
+    "confidence": "high",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "negative_test": "As owner remove existing accepted staff manager via DELETE /api/v1/pharmacy-admins/{id}/. Authenticate as removed manager; GET my-pending-invitations must exclude old assignment and POST /api/v1/pharmacy-admins/{id}/accept-invitation/ must refuse; is_active stays false.",
+    "positive_test": "Newly invited existing accepted staff can accept once; active admin remains usable and a separately reissued invitation succeeds only if current manager explicitly sent it.",
+    "impact": "Revoked staff could restore manager authority without fresh consent.",
+    "classification": "FIX",
+    "severity": "P0 candidate; no exploit run",
+    "status_note": "Source-level verification is not a runtime reproduction, and production exploitability still requires authenticated negative test.",
+    "scenarios": [
+      {
+        "test": "test_f03_revoked_admin_cannot_accept_old_role",
+        "observed": "Revoked admin accepted old invitation HTTP 200",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
+        "head": "6865b99e3c7ff567e5125d76a01aeaa714715c17",
+        "environment": "Ubuntu Django TestCase SQLite",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      },
+      {
+        "test": "test_f03_revoked_admin_not_listed_as_pending_invitation",
+        "observed": "Revoked admin invitation returned in list",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
+        "head": "6865b99e3c7ff567e5125d76a01aeaa714715c17",
+        "environment": "Ubuntu Django TestCase SQLite",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ]
+  },
+  "F04-N2": {
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "verifier": "gpt6-senior-20261025",
+    "independent_of": "claudeB-2",
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "reason": "PATCH authorization inspects existing shift.pharmacy only; serializer pharmacy is writable and has unrestricted queryset; validate() has no destination tenant guard; revise_shift assigns validated pharmacy then saves, optionally synchronizes destination pharmacy defaults. payment_status is also in writable serializer fields.",
+    "evidence": [
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/base.py#L114-L135",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L42-L52",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L97-L110",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L138-L187",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/serialization/shifts.py#L330-L351",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/posting.py#L142-L200"
+    ],
+    "confidence": "high",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "negative_test": "Owner of pharmacy A PATCHes their own shift with pharmacy=unrelated B, apply_rates_to_pharmacy=true and payment_status=PAID; must reject (or ignore nonmutable payment state) and leave A's shift, B's rate defaults and financial status unchanged.",
+    "positive_test": "Owner edits allowed fields of their own pharmacy's shift without breaking normal rates, slots or notifications; if cross-site moves are explicitly permitted, require authority over both pharmacies.",
+    "impact": "Cross-tenant mutable shift ownership, unrelated pharmacy rate tampering and forged shift payment state.",
+    "classification": "FIX",
+    "severity": "P0 candidate; no exploit run",
+    "status_note": "Exact protected write branch is visible; no real PostgreSQL/API mutation executed.",
+    "scenarios": [
+      {
+        "test": "test_f04_shift_patch_denies_cross_tenant_and_paid_override",
+        "observed": "HTTP 200; unrelated target pharmacy and PAID accepted",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ]
+  },
+  "F04-N1": {
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "verifier": "gpt6-senior-20261025",
+    "independent_of": "claudeB-2",
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "reason": "SAFE GET actions bypass manager check; platform-visible PHARMACIST shifts enter worker get_queryset; member_status action returns _build_member_status_response; requested_visibility selects active FULL_PART_TIME or ORG_CHAIN memberships without verifying caller manages target pharmacy. Candidate rows include name, user id, membership and team details.",
+    "evidence": [
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/base.py#L114-L172",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/lifecycle.py#L285-L295",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/lifecycle.py#L384-L399",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/candidates.py#L212-L292",
+      "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/b77e9fd296bc2710350ef6f3cd402ce2529ffc06/backend/shifts/candidates.py#L446-L469"
+    ],
+    "confidence": "high",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "negative_test": "External verified PHARMACIST without pharmacy membership requests a PLATFORM PHARMACIST shift member_status with FULL_PART_TIME or ORG_CHAIN visibility; server must refuse or restrict to self without returning any unrelated staff data.",
+    "positive_test": "Owner/authorized manager receives permitted staff status, and external worker can see their own permitted shift status through non-leaking worker-facing endpoint.",
+    "impact": "An external user who can view a public shift may enumerate staff identity and participation in unrelated pharmacy or organisation.",
+    "classification": "FIX",
+    "severity": "P0 candidate; no exploit run",
+    "status_note": "Unrestricted filters identified by source, but sensitive-field availability and full response shape need request-based confirmation.",
+    "scenarios": [
+      {
+        "test": "test_f04_member_status_hidden_from_external_platform_shift_worker",
+        "observed": "Nonmanager saw pharmacy staff member-status HTTP 200",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
+        "head": "6865b99e3c7ff567e5125d76a01aeaa714715c17",
+        "environment": "Ubuntu Django TestCase SQLite",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ]
+  },
+  "B07": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b07_event_patch_denies_destination_pharmacy",
+        "observed": "HTTP 200; destination pharmacy field accepted",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      },
+      {
+        "test": "test_b07_work_note_patch_denies_destination_pharmacy",
+        "observed": "HTTP 200; note destination accepted",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "B33": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b33_invoice_post_denies_foreign_pharmacy",
+        "observed": "HTTP 201; unrelated user's paid invoice created for pharmacy B",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "B36": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b36_roster_post_denies_unmanaged_pharmacy",
+        "observed": "HTTP 201; unrelated worker creates B roster shift",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "B15": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b15_cancellation_webhook_never_finalizes_worker_offer",
+        "observed": "Penalty session invoked fulfillment finalizer",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "F10-N5": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_f10_approval_valid_post_returns_201",
+        "observed": "HTTP 500; NameError creating variable",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "B06": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b06_organization_feed_does_not_expose_sibling_notes",
+        "observed": "Ordinary A staff received B's organization work note",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+        "head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+        "environment": "GitHub Actions Ubuntu Python 3.12 Django SQLite TestCase",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "severity": "Historical candidate, assess release impact"
+  },
+  "F09-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_f09_group_delete_must_not_promote_restricted_post_to_pharmacy_feed",
+        "observed": "Former group-restricted content appeared in pharmacy feed for group non-member after deletion",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021",
+        "head": "6865b99e3c7ff567e5125d76a01aeaa714715c17",
+        "environment": "Ubuntu Django TestCase SQLite",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ]
+  },
+  "B03": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b03_staff_removal_must_preserve_historical_chat_messages",
+        "observed": "After authorized DELETE membership, sender historical Message was absent, violating retention assertion; worker chat history lost",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174581937",
+        "head": "13661c46ff9b82699ece08713a2b2bfac1fd7511",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ]
+  },
+  "F09-N4": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_f09_n4_unrelated_verified_user_cannot_patch_other_public_poll",
+        "observed": "Non-creator returned HTTP 200 and rewrote public poll/question/options.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      },
+      {
+        "test": "test_f09_n4_unrelated_user_cannot_delete_other_public_poll",
+        "observed": "Non-creator returned HTTP 204 deleting another user's public poll.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C005-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c005_n1_ordinary_member_cannot_change_room_membership",
+        "observed": "Non-admin custom-group member PATCH returned HTTP 200 instead of denial.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C004-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c004_n1_cross_pharmacy_group_invite_requires_consent_or_authority",
+        "observed": "Authenticated member POST returned HTTP 201 for a chat with foreign pharmacy membership ID; policy consent qualification remains.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "RUNTIME_REPRODUCED_POLICY_CONDITIONAL",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C012-N2": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c012_n2_decided_application_history_cannot_be_deleted",
+        "observed": "Authorized reviewer DELETE returned HTTP 204 for a decided application, contrary to preservation requirement.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C024-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c024_n1_password_reset_token_not_in_signed_in_bell",
+        "observed": "Password reset created in-app Notification with live /reset-password/ token URL.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005",
+        "head": "81cfd9c9370be6770598f47432e78378f5ba9a01",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C004-N2": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c004_n2_unspecified_offer_checkout_must_not_charge_one_and_book_two",
+        "observed": "Stripe checkout quantity=1 when 2 accepted-awaiting-payment offers exist and neither offer nor slot is selected.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "B70": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b70_repeated_invoice_subscription_setup_must_not_create_two_recurring_ids",
+        "observed": "Two sequential POST subscription invoice setup calls each invoked stripe.Subscription.create; two provider IDs returned.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "F08-N2": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_f08_n2_unpaid_stripe_status_must_deactivate_entitlement",
+        "observed": "customer.subscription.updated with unpaid state returned 200 but active subscription remained active.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "B68": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b68_unknown_subscription_on_same_customer_must_not_activate_other_entitlement",
+        "observed": "Paid invoice with unknown sub ID but matching customer activated unrelated tracked subscription.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "B69": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b69_same_cancellation_payment_intent_in_two_events_must_record_once",
+        "observed": "Two different webhook event IDs with same payment intent recorded two paid cancellation payments.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "F01-N3": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_f01_n3_worker_cannot_delete_payment_waiting_offer",
+        "observed": "Worker DELETE offer in ACCEPTED_AWAITING_PAYMENT returned 204 and removed offer.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "F08-N5": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_f08_n5_owner_delete_does_not_leave_active_recurring_billing",
+        "observed": "DELETE /api/v1/account/ returned success while local subscription remained active and both recurring subscription IDs populated.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029",
+        "head": "845b911957c8703f365bdc7c63da8f2a4cbb7360",
+        "environment": "Ubuntu Python3.12 Django SQLite with mocked Stripe API/signed event",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Synthetic provider events or mocked calls; Stripe sandbox and real payment obligations not tested",
+      "No PostgreSQL concurrent requests or real financial settlement"
+    ]
+  },
+  "C012-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c012_n1_generic_create_rejects_expired_numeric_link",
+        "observed": "After fixing unique mobile/DOB fixture, expired inactive invite-link integer POST persisted a membership application with HTTP 201; valid UUID magic-link positive control HTTP 201.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885",
+        "head": "ce5609527e256fc228914e7d2e3d11d277a54947",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "B66": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b66_overnight_assigned_work_must_have_nonzero_cancellation_wage",
+        "observed": "22:00–06:00 future assigned shift returned no penalty due negative computed wage; equivalent same-day positive control generated a nonzero checkout.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885",
+        "head": "ce5609527e256fc228914e7d2e3d11d277a54947",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "C071-N2": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_c071_n2_logging_out_revokes_previous_device_push_token",
+        "observed": "A real user-registered synthetic Android DeviceToken remained active after server logout with valid refresh token; signed-out device still eligible for private pushes.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885",
+        "head": "ce5609527e256fc228914e7d2e3d11d277a54947",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE"
+  },
+  "B43": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b43_password_reset_invalidates_all_preexisting_refresh_tokens",
+        "observed": "Password-reset-confirm returned HTTP 200 and positive password-change assertion passed; old SimpleJWT refresh token still returned HTTP 200 from /api/v1/users/token/refresh/ rather than 401/403.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179425592",
+        "head": "2fe2ce27b90c2de181041c5a6073bcc56e27ff5c",
+        "environment": "GitHub-hosted Ubuntu Python 3.12; Django contract_test_settings; disposable SQLite; real Django APIClient and SimpleJWT; no staging user.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "source_proof": [
+      "backend/users/api_passwords.py:43-56",
+      "backend/users/api_auth.py:115-152",
+      "backend/users/serializers.py:515-544",
+      "backend/core/settings.py:490-502"
+    ],
+    "root_cause": "Password-reset confirmation changes password and clears login lockout state but does not blacklist outstanding refresh tokens or bump a token-version/session-epoch. Existing RefreshToken passes CustomTokenRefreshSerializer and is rotated.",
+    "runtime_limitations": [
+      "No production/staging JWT or browser cookie session challenged",
+      "No existing access token survival window tested; this reproduction tests refresh-token validity only",
+      "Security policy should explicitly require reset-session revocation; source finding is classified P0 candidate rather than proof of a production incident",
+      "Independent full-repository S2 and PostgreSQL/real-device testing not established"
+    ]
+  },
+  "B46": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b46_pending_staff_cannot_read_private_pharmacy_post",
+        "observed": "PENDING active FULL_TIME membership received HTTP 200 and private post content instead of denial; accepted staff positive control succeeded.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636",
+        "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      },
+      {
+        "test": "test_b46_pending_staff_cannot_publish_private_hub_posts",
+        "observed": "PENDING active FULL_TIME membership created private post with HTTP 201 instead of 403; accepted staff posting control succeeded.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636",
+        "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Disposable SQLite and synthetic users, not production exposure or an exploit on staging",
+      "Existing account membership state reachability needs separate verification for B46",
+      "Independent full semantic S2 certification not established"
+    ]
+  },
+  "B48": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b48_private_mention_cannot_notify_ineligible_locum",
+        "observed": "Pharmacy post with tagged LOCUM membership returned HTTP 201 instead of rejection. Recipient is explicitly denied pharmacy Hub GET; valid accepted-staff mention notification control passed.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636",
+        "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Disposable SQLite and synthetic users, not production exposure or an exploit on staging",
+      "Existing account membership state reachability needs separate verification for B46",
+      "Independent full semantic S2 certification not established"
+    ]
+  },
+  "B51": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "scenarios": [
+      {
+        "test": "test_b51_revoked_group_participant_cannot_post_new_message",
+        "observed": "After is_active=False,status=LEFT, retained group participant POST /api/v1/messages/ returned 201 instead of 403. Active sender control passed.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40185020636",
+        "head": "40f70d1df5dbda4eea597e095313a393ac4a3b3c",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "runtime_verification": "REPRODUCED_ISOLATED_SQLITE",
+    "runtime_limitations": [
+      "Disposable SQLite and synthetic users, not production exposure or an exploit on staging",
+      "Existing account membership state reachability needs separate verification for B46",
+      "Independent full semantic S2 certification not established"
+    ]
+  },
+  "C020-N1": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_c020_n1_manual_pharmacist_slot_rejects_technician",
+        "observed": "Legitimate TECHNICIAN slot manual roster returned 200 and assigned the accepted technician; same actor assigned TECHNICIAN membership to PHARMACIST vacancy and got HTTP 200 with assignment id. Expected 400/403.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40186580438",
+        "head": "9c13610c2fef0044ca78b68e2cc3f0fade6de1f0",
+        "environment": "Django 3.12 runner, disposable SQLite, mocked external dependencies",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/shifts/base.py:399-420",
+      "backend/shifts/assignment.py:133-207",
+      "backend/shifts/access.py:26-41"
+    ],
+    "runtime_limitations": [
+      "staff_assignment_defaults was mocked to isolate qualification, but actual HTTP endpoint, membership lookup and ShiftSlotAssignment persistence executed.",
+      "Synthetic fixture, not proof of actual production exploit; no S2 whole-source certification"
+    ]
+  },
+  "B54": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b54_two_pending_workers_cannot_both_reserve_one_paid_slot",
+        "observed": "Two PENDING offers on the same slot sequentially accepted by distinct workers. First valid accepted and status ACCEPTED_AWAITING_PAYMENT; second also returned 200, leaving two accepted-awaiting-payment offers for the same slot. Expected second 400/403/409.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40186580438",
+        "head": "9c13610c2fef0044ca78b68e2cc3f0fade6de1f0",
+        "environment": "Django 3.12 runner, disposable SQLite, mocked external dependencies",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/shifts/offers.py:329-418",
+      "backend/shifts/assignment.py:25-110",
+      "backend/shifts/models.py:665-719"
+    ],
+    "runtime_limitations": [
+      "Sequential competing reservation evidence only; get_billing_state_for_pharmacy mocked to PAYMENT_REQUIRED. No actual Stripe charges, callback reconciliation or PostgreSQL concurrent acceptance proved.",
+      "Synthetic fixture, not proof of actual production exploit; no S2 whole-source certification"
+    ]
+  },
+  "B16": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b16_roster_manager_cannot_revoke_another_admin",
+        "observed": "ROSTER_MANAGER PATCH target manager is_active=false returned 200; owner PATCH title positive control returned 200.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187156554",
+        "head": "16b174666fa122fcba8f641e4eb1e080aebf4604",
+        "environment": "GitHub Ubuntu Django disposable SQLite HTTP, no external services",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/organizations/views.py:384-425",
+      "backend/organizations/serializers.py:603-665"
+    ],
+    "runtime_limitations": [
+      "Response status and mutation shown in payload; negative assertion executed before post-check; no actual production user account affected.",
+      "No production/staging exploit, no exact PostgreSQL/adversarial concurrency or second-person whole-file independent S2 certification"
+    ]
+  },
+  "B17": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b17_chain_patch_cannot_insert_foreign_pharmacy",
+        "observed": "Owner A chain PATCH with owner B pharmacy_ids returned 200; response contained foreign pharmacy, valid own-chain rename control passed.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187156554",
+        "head": "16b174666fa122fcba8f641e4eb1e080aebf4604",
+        "environment": "GitHub Ubuntu Django disposable SQLite HTTP, no external services",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/organizations/views.py:595-695",
+      "backend/organizations/serializers.py:577-602"
+    ],
+    "runtime_limitations": [
+      "No secondary membership removal tested; cross-owner chain inclusion alone reproduced.",
+      "No production/staging exploit, no exact PostgreSQL/adversarial concurrency or second-person whole-file independent S2 certification"
+    ]
+  },
+  "B18": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b18_org_admin_put_cannot_approve_own_pharmacy_claim",
+        "observed": "Org claimant PUT status=ACCEPTED returned 200 on pending claim; response status accepted with responded_by null; both owner and org read controls returned 200.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187156554",
+        "head": "16b174666fa122fcba8f641e4eb1e080aebf4604",
+        "environment": "GitHub Ubuntu Django disposable SQLite HTTP, no external services",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/organizations/claims.py:351-555",
+      "backend/organizations/serializers.py:487-528"
+    ],
+    "runtime_limitations": [
+      "This proves claim status mutation bypass; no pharmacy.organization association switch or notification implied.",
+      "No production/staging exploit, no exact PostgreSQL/adversarial concurrency or second-person whole-file independent S2 certification"
+    ]
+  },
+  "B19": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b19_invite_link_cannot_be_retargeted_to_foreign_pharmacy",
+        "observed": "Owner A PATCH retained invite token but changed pharmacy to owner B via HTTP 200; separate permitted link-disable control passed.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187156554",
+        "head": "16b174666fa122fcba8f641e4eb1e080aebf4604",
+        "environment": "GitHub Ubuntu Django disposable SQLite HTTP, no external services",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/memberships/views.py:189-225",
+      "backend/memberships/serializers.py:265-275"
+    ],
+    "runtime_limitations": [
+      "No application-linked historical CASCADE delete or resulting applicant behavior tested.",
+      "No production/staging exploit, no exact PostgreSQL/adversarial concurrency or second-person whole-file independent S2 certification"
+    ]
+  },
+  "B20": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b20_worker_cannot_move_own_interest_to_foreign_shift",
+        "observed": "Worker A PATCH self-owned interest shift ID to owner B's shift returned 200 and serialized destination shift B; own interest retrieve positive control passed.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187156554",
+        "head": "16b174666fa122fcba8f641e4eb1e080aebf4604",
+        "environment": "GitHub Ubuntu Django disposable SQLite HTTP, no external services",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/shifts/offers.py:43-135",
+      "backend/shifts/serialization/interests.py:7-42"
+    ],
+    "runtime_limitations": [
+      "Post-assertion DB check not reached; response includes changed shift field, avoid claiming confirmed persisted row from this particular test alone.",
+      "No production/staging exploit, no exact PostgreSQL/adversarial concurrency or second-person whole-file independent S2 certification"
+    ]
+  },
+  "B22": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b22_org_poll_feed_must_not_include_private_pharmacy_poll",
+        "observed": "Staff A scoped to pharmacy A in same org GET org polls returned 200 and included private poll from sibling pharmacy B; valid org poll also present.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187156554",
+        "head": "16b174666fa122fcba8f641e4eb1e080aebf4604",
+        "environment": "GitHub Ubuntu Django disposable SQLite HTTP, no external services",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/pharmacy_hub/polls.py:74-89",
+      "backend/pharmacy_hub/scoping.py:151-171",
+      "backend/pharmacy_hub/access.py:281-322"
+    ],
+    "runtime_limitations": [
+      "Privacy severity depends intended organisation-wide poll audience; source behaviour directly differs from org posts policy; no external organization involved.",
+      "No production/staging exploit, no exact PostgreSQL/adversarial concurrency or second-person whole-file independent S2 certification"
+    ]
+  },
+  "B21": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b21_manager_cannot_release_foreign_pharmacy_assignment",
+        "observed": "Owner A with authority only over Pharmacy A called release_worker_from_assignment on a pending request referencing Pharmacy B's assignment. The expected PermissionDenied was not raised. Legitimate owner B GET of same-pharmacy request returned 200, and assignment B existed before forged request.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187352244",
+        "head": "aee112dd7b0541981b1066dd62d6313308ef8788",
+        "environment": "GitHub Ubuntu Django isolated SQLite service test; no production data",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "source_proof": [
+      "backend/workforce/roster/worker_actions.py:328-397",
+      "backend/shifts/serialization/worker_requests.py:7-27,77-91",
+      "backend/shifts/worker_requests.py:20-100"
+    ],
+    "runtime_limitations": [
+      "Direct service call with forged but constructible WorkerShiftRequest; request creation via API not separately exercised in this test",
+      "The post-assertion assignment absence assertion was not reached; deletion path is source-visible; stronger HTTP creation-to-approval proof remains open",
+      "No production/staging exploitation"
+    ]
+  },
+  "B23": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b23_chief_admin_cannot_edit_organization_record",
+        "observed": "Chief Admin PATCH organization.name returned HTTP 200; legitimate Org Admin positive control returned 200. Chief Admin edited name despite owner-level organisation record authority policy.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187628658",
+        "head": "5ea325b907fa69682fbc82a1477b70b095d41763",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Isolated Django SQLite; synthetic fixtures; B04 provider mocked"
+      }
+    ],
+    "source_proof": [
+      "backend/organizations/views.py:55-73",
+      "backend/users/org_roles.py:129-154"
+    ],
+    "runtime_limitations": [
+      "Product-policy caveat: Chief Admin role may be granted broad organization-wide authority; distinct ownership of organization record must be decided.",
+      "No live environment or independent whole-source S2 review"
+    ]
+  },
+  "B04": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b04_empty_shift_checkout_must_not_create_provider_session",
+        "observed": "After removing both payment-awaiting offers, POST charge-fulfillment with no selectors returned HTTP 200 and fake checkout URL rather than 400; mock Stripe Session.create was installed.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40187836775",
+        "head": "a9597b5bd216dfa3086e379ee4d79489b428554d",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Isolated Django SQLite; synthetic fixtures; B04 provider mocked"
+      }
+    ],
+    "source_proof": [
+      "backend/billing/views.py:548-695"
+    ],
+    "runtime_limitations": [
+      "Provider call mocked, checkout URL synthetic, no payment charged; only empty obligation contract reproduced, not duplicate checkout concurrency.",
+      "No live environment or independent whole-source S2 review"
+    ]
+  },
+  "B10": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "scenarios": [
+      {
+        "test": "test_b10_two_distinct_paid_offer_units_require_two_debits",
+        "observed": "Two sequential spend_pills_for_shift_post(user, same shift) calls returned the same PillLedgerEntry pk (2 == 2). Negative distinct-entry assertion failed; positive opening balance 100 and first debit to 90 passed. This invokes the service twice without separate obligation selectors.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40188055560",
+        "head": "10c92441453ab36af1b86a00c275a9af07c2431d",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Isolated Django SQLite; mock active Pill rule; no provider, API or concurrency"
+      }
+    ],
+    "source_proof": [
+      "backend/rewards/services.py:352-368",
+      "backend/qa_release/test_pr200_phase5_pills.py:10-40"
+    ],
+    "runtime_limitations": [
+      "Service does not accept offer/slot unit identifiers. Test models a two-unit requirement by two calls on same shift but does not establish an actual user-facing multi-unit charge or desired once-per-shift product pricing.",
+      "No actual HTTP selector, provider charge or two-connection PostgreSQL concurrency proof. Treat source service behavior as demonstrated and multi-unit defect impact as policy/use-case conditional.",
+      "No S2 whole-file independent certification"
+    ]
+  },
+  "B24": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/marketplace/views.py:347-382",
+      "backend/marketplace/services.py:52-76",
+      "backend/qa_release/test_pr200_phase5_p0_authz.py:283-406"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b24_enquiry_cannot_be_marked_complete_before_terms_acceptance",
+        "observed": "Buyer confirmation returned HTTP 200 from ENQUIRY rather than rejection, asserting invalid transition; all synthetic setup completed.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Django SQLite hosted CI, two-sided real API requests; mock seller policy only for synthetic listing validation",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189568324",
+        "head": "51db9da375c2555490c07d0a87e752709bca1d57"
+      },
+      {
+        "test": "test_b24_proposed_unaccepted_terms_cannot_be_completed",
+        "observed": "Buyer confirmation returned HTTP 200 from TERMS_PROPOSED rather than rejection; no accepted terms.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Django SQLite hosted CI",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189568324",
+        "head": "51db9da375c2555490c07d0a87e752709bca1d57"
+      }
+    ],
+    "positive_controls": [
+      "test_b24_accepted_exchange_completion_is_legitimate_positive_control PASSED",
+      "test_b24_nonparty_cannot_confirm_even_on_accepted_exchange PASSED"
+    ],
+    "runtime_limitations": [
+      "Seller onboarding policy was mocked only at listing save because synthetic seller lacks completed onboarding; exchange state machine and API authorization were not mocked.",
+      "No provider, transactional PostgreSQL or production user exploitation tested.",
+      "S2 whole-file independent review not certified."
+    ]
+  },
+  "B29": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/attendance/protocol.py:89-117",
+      "backend/attendance/protocol.py:234-301",
+      "backend/qa_release/test_pr200_kiosk_clock_audit.py:1-72"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b29_properly_signed_anchor_drift_must_not_apply_attendance",
+        "observed": "Valid Ed25519 signed event with 10-minute difference between device_timestamp and trusted_time_estimate returned needs_review, but persisted KioskAttendanceEvent.attendance_event_id=2, not NULL. The no-apply negative assertion failed after integrity flag assertion passed.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189842660",
+        "head": "9c0d0f0e658d24c8c2beb2795a429f9659f4dd08",
+        "environment": "Ubuntu isolated standalone attendance_tests SQLite schema, real offline protocol and Ed25519 signed event"
+      },
+      {
+        "test": "test_b29_properly_signed_server_drift_must_not_apply_attendance",
+        "observed": "Valid Ed25519 signed event dated eight days before server time returned needs_review, but persisted attendance_event_id=3, not NULL. No-apply negative assertion failed after SERVER_TIME_DRIFT flag assertion passed.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189842660",
+        "head": "9c0d0f0e658d24c8c2beb2795a429f9659f4dd08",
+        "environment": "Isolated standalone attendance_tests SQLite, real signed protocol"
+      }
+    ],
+    "positive_controls": [
+      "test_b29_normal_clock_positive_control_applies_attendance PASSED; one accepted KioskAttendanceEvent and AttendanceEvent/AttendanceSession"
+    ],
+    "runtime_limitations": [
+      "Two fixture-valid signed-event paths were checked. A manager approval, payroll export/payment and separate kiosk device were not exercised.",
+      "No PostgreSQL concurrency; no physical kiosk; further role-tenant auth and time tamper protections unproven.",
+      "High-impact classification conditional on whether NEEDS_REVIEW events should be excluded from payroll, operational views or subsequent approvals."
+    ]
+  },
+  "B14": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_ISOLATED_PURE_FUNCTION",
+    "source_proof": [
+      "backend/shifts/data/award_rates_casual_first_level.json:1-107",
+      "backend/shifts/data/public_holidays.json",
+      "backend/shifts/pricing.py:47-51",
+      "backend/workforce/award_rates.py:10-93",
+      "docs/qa/MAIN_RELEASE_B14_AWARD_RATE_SOURCE_CHECK_20261025.md"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b14_shift_guide_2026_casual_pharmacist_minimum",
+        "observed": "Actual old shift guide Decimal 47.68 < current 2026 Fair Work casual weekday pharmacist 52.18; red.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189946286",
+        "head": "07bcf99553849e0f2734526f33ef4480f1310975",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Django SimpleTestCase, static shift-guide data, no DB or payroll"
+      },
+      {
+        "test": "test_b14_shift_guide_2026_casual_assistant_minimum",
+        "observed": "Actual old shift guide Decimal 33.19 < 2026 Fair Work casual weekday assistant Level 1 34.76; red.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189946286",
+        "head": "07bcf99553849e0f2734526f33ef4480f1310975",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Django SimpleTestCase static data"
+      },
+      {
+        "test": "test_b14_queensland_2027_australia_day",
+        "observed": "Static shift holiday classifier returned False for QLD public holiday on 26 January 2027; red.",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40189946286",
+        "head": "07bcf99553849e0f2734526f33ef4480f1310975",
+        "status": "RED_TEST_FAILED_AS_EXPECTED",
+        "environment": "Django SimpleTestCase, no DB"
+      }
+    ],
+    "positive_controls": [
+      "test_b14_workforce_2026_casual_pharmacist_positive PASSED",
+      "test_b14_queensland_2027_nonholiday_positive PASSED"
+    ],
+    "runtime_limitations": [
+      "No database runtime, payroll settlement, shift rate lock, pay period or worker invoice; outcome is 2026 award/2027 holiday static-data divergence.",
+      "No evidence of actual illegal underpayment; negotiated locum price and employee award covered engagements differ.",
+      "No independent S2 full-file certification"
+    ]
+  },
+  "B01": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/billing/views.py:635-649",
+      "backend/billing/views.py:653-691",
+      "backend/qa_release/test_pr200_phase5_wave_next.py:15-45"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b01_active_subscriber_must_get_discount",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191476067",
+        "head": "b33cdca0263df3554e1c119a47e8f59dbdda1796",
+        "environment": "GitHub-hosted Django isolated SQLite HTTP, mocked Stripe Checkout",
+        "observed": "Active OwnerSubscription and one accepted-awaiting-payment offer still selected standard locum price_1T52jFBQXaySV5ukezd5JmzS instead of documented discounted price_1T52jFBQXaySV5ukkXOKPHSV. HTTP 200 and provider call succeeded; expected-red assertion failed; no setup errors.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "positive_controls": [
+      "test_b01_non_subscriber_standard_price_positive PASSED with one offer, correct standard price and quantity one"
+    ],
+    "runtime_limitations": [
+      "Stripe Session.create mocked; real Stripe amount, production price configuration and settled money not tested.",
+      "No refund/account-type parity or multi-offer pricing."
+    ]
+  },
+  "B25": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/marketplace/views.py:198-227",
+      "backend/marketplace/models.py:135-181",
+      "backend/qa_release/test_pr200_phase5_wave_next.py:80-146"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b25_invalid_second_step_rolls_back_everything",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191740013",
+        "head": "d607de3f91dd97978236f43161a9dc637062418b",
+        "environment": "GitHub-hosted Django SQLite authenticated marketplace API, verified synthetic owner/pharmacy/identity/terms",
+        "observed": "Fixture-valid invalid-second-step API returned HTTP 400 but all three database postconditions changed: (version, current_circle, ListingEscalationStep.count)=(2, PLATFORM, 1) instead of (1, OWNED_CHAIN, 0); the expected-red tuple assertion failed.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "positive_controls": [
+      "test_b25_valid_schedule_positive PASSED: valid owner POST returned 200, version advanced and one step stored"
+    ],
+    "runtime_limitations": [
+      "No PostgreSQL transaction proof, notification/escalation task execution or unverified-owner denial in this run.",
+      "No PostgreSQL transaction isolation, live escalation worker execution or other marketplace routes tested."
+    ]
+  },
+  "B35": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/workforce/roster/views.py:44-104",
+      "backend/workforce/roster/serializers.py:25-55",
+      "backend/workforce/roster/urls.py:33-42",
+      "backend/qa_release/test_pr200_phase5_wave_next.py:46-85"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b35_foreign_owner_cannot_create_roster_assignment",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40191740013",
+        "head": "d607de3f91dd97978236f43161a9dc637062418b",
+        "environment": "GitHub hosted synthetic Django/SQLite HTTP, unrelated owner A/B and accepted worker in pharmacy B",
+        "observed": "Owner A GET roster-owner?pharmacy=B returned 200 via scoped read, yet POST with ShiftSlot/Shift/User foreign to owner A returned 201 and serializer disclosed a created assignment in pharmacy B. Negative rejection assertion failed after valid fixture.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "positive_controls": [
+      "test_b35_valid_owner_creates_own_roster_assignment PASSED (201 and persisted ShiftSlotAssignment)"
+    ],
+    "runtime_limitations": [
+      "Real authenticated synthetic users under force_authenticate, not production exploit or live worker data.",
+      "Proof covers default roster-owner POST path; B36 shift-create and B38 shift-update are separate entry points and not closed.",
+      "Original shift fixture lacked mandatory pay fields and produced errors in run 40191476067; excluded. Fixed hourly-rate fixture in run 40191740013 with 0 B35 fixture errors."
+    ]
+  },
+  "B53": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_RUNTIME_DJANGO_SQLITE",
+    "source_proof": [
+      "backend/billing/views.py:897-948",
+      "backend/qa_release/test_pr200_phase5_b53_webhook.py:1-68"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b53_late_invoice_for_deleted_subscription_must_not_reactivate",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192054923",
+        "head": "31558d5c63f29564b2c270c06d8afc143a6fc29a",
+        "environment": "Ubuntu Django TestCase SQLite with synthetic verified separate webhook IDs; only Stripe signature construction mocked",
+        "observed": "First customer.subscription.deleted event processed and subscription became inactive. Later invoice.paid event for same tracked deleted subscription ID also processed and reactivated OwnerSubscription.status to active. Expected inactive, got active. One failing negative assertion with no fixture errors.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED"
+      }
+    ],
+    "positive_controls": [
+      "test_b53_current_paid_invoice_does_not_deactivate_subscription_positive PASSED; matching current subscription invoice.paid keeps active, processed event receipt"
+    ],
+    "runtime_limitations": [
+      "Actual Stripe Webhook.construct_event mocked for signed fake data; no real Stripe API/network or funds.",
+      "Separate event IDs, sequential out-of-order delivery only; subscription lifecycle cancellation/original invoice provider ordering and real entitlement checks not validated.",
+      "Distinct from B68 customer fallback for unknown subscription and B70 duplicate subscription creation."
+    ]
+  },
+  "B31": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_POSTGRES_CONDITIONAL_ISOLATED_SEAM",
+    "source_proof": [
+      "backend/ethical_marketplace/views.py:365-410",
+      "backend/ethical_marketplace/models.py:164-276",
+      "backend/qa_release/test_pr200_phase5_pg_ethics.py:1-195"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b31_parallel_disjoint_lot_requests_reserve_one_listing_once",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192236075",
+        "head": "974c2e80891e32ea3712fbd574a6fe84ad0ba594",
+        "environment": "Ubuntu GitHub Actions Postgres 16, Django TransactionTestCase, 2 independently opened DB connections/threads and real atomic transfer/stock ORM; test-only DRF JSON-compatible serializer substitution for receipt output",
+        "observed": "Both authentically verified synthetic buyer requests passed PUBLISHED gate before transactions. Different lot stock rows locked separately; both HTTP 201 responses committed different EthicalTransfer/Reservation for same listing (two UUIDs). Expected exactly one 201; assertion failed with 2 != 1. No threading errors.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED_CONDITIONAL_TEST_SEAM"
+      }
+    ],
+    "positive_controls": [
+      "test_b31_positive_one_transfer_then_sequential_second_denied PASSED: after first 201 reservation listing becomes RESERVED, second sequential attempt denied; only one transfer and one active reservation"
+    ],
+    "runtime_limitations": [
+      "Original unmodified HTTP path failed with TypeError Object of type UUID is not JSON serializable when storing TransferSerializer.data into EthicalRequestReceipt JSONField (runs 40191894383 and 40192054917). These errors are not counted as concurrency reproductions.",
+      "This run uses test-only subclass of the original TransferSerializer which renders DRF output to native JSON-compatible types before the receipt persistence. **This masks a separate serialization issue solely to isolate locking**; original production code cannot be claimed to successfully create two transfers in unmodified HTTP environment.",
+      "No real pharmacy data, provider settlement, controlled-drug distribution or physical stock movement; jurisdiction S4 synthetic only.",
+      "PostgreSQL row-locking/transaction overlap genuinely exercised, with disjoint lot locks and two DB connections; no source application code altered."
+    ]
+  },
+  "B02": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+    "source_proof": [
+      "backend/billing/views.py:476-540",
+      "backend/billing/models.py:1-61",
+      "backend/qa_release/test_pr200_phase5_seats_refunds.py:1-47"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b02_existing_addon_seat_quantity_can_be_changed",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192399455",
+        "head": "9b86345ed03ec23b27e54cc0a1e252cf413beb10",
+        "environment": "GitHub Django isolated SQLite/real authenticated API; Stripe Checkout mocked",
+        "observed": "Owner with active base and purchased add-on subscription requested 8 seats; HTTP 400 explicit 'Incremental changes to an existing add-on are not supported' instead of 200. Positive initial two-seat checkout returned 200 and quantity 2.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED_POLICY_GAP"
+      }
+    ],
+    "positive_controls": [
+      "test_b02_first_addon_purchase_positive PASSED"
+    ],
+    "runtime_limitations": [
+      "Explicitly unsupported product capability, not unauthorized finance or provider malfunction; require owner policy on adjustments/proration.",
+      "No real Stripe provider network, customer balance or live financial disclosure.",
+      "No independently certified whole-file S2 coverage."
+    ]
+  },
+  "B57": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+    "source_proof": [
+      "backend/billing/views.py:805-956",
+      "backend/billing/models.py:61-116",
+      "backend/qa_release/test_pr200_phase5_seats_refunds.py:48-105"
+    ],
+    "scenarios": [
+      {
+        "test": "test_b57_refund_callback_cannot_leave_local_unreconciled_paid",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192399455",
+        "head": "9b86345ed03ec23b27e54cc0a1e252cf413beb10",
+        "environment": "GitHub Django isolated SQLite/real webhook and receipt; Stripe signature parser mocked",
+        "observed": "charge.refunded event for the existing paid ShiftPayment intent returned 200 and processed event receipt, but matched ShiftPayment.status stayed 'paid'. Positive unrelated customer.updated callback preserved paid status.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED_CONDITIONAL_RECONCILIATION"
+      }
+    ],
+    "positive_controls": [
+      "test_b57_unrelated_callback_keeps_paid_payment_positive PASSED"
+    ],
+    "runtime_limitations": [
+      "Refund may be reconciled by external finance ledger or another event; only local ShiftPayment state tested, not legal/accounting final state or actual Stripe refund.",
+      "No real Stripe provider network, customer balance or live financial disclosure.",
+      "No independently certified whole-file S2 coverage."
+    ]
+  },
+  "C004-N3": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+    "source_proof": [
+      "backend/billing/utils.py:13-36",
+      "backend/billing/utils.py:89-188",
+      "backend/qa_release/test_pr200_phase5_org_billing.py:1-48"
+    ],
+    "scenarios": [
+      {
+        "test": "test_c004_n3_recent_org_admin_cannot_restart_same_org_trial",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192616661",
+        "head": "3dc88260f9b9e31e81eea04bc10bc88507f43a4a",
+        "environment": "Synthetic Django SQLite service/model tests; old/new ORG_ADMIN, same organisation, owner account",
+        "observed": "Organisation same account old admin returns PAYMENT_REQUIRED, newly joined acting ORG_ADMIN returns FREE_TRIAL contrary to stable-account expected PAYMENT_REQUIRED.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED_POLICY_CONDITIONAL"
+      }
+    ],
+    "positive_controls": [
+      "test_c004_n3_old_org_admin_trial_expired_positive PASSED"
+    ],
+    "runtime_limitations": [
+      "This is direct service return only; no actual shift charge waivers or Stripe payments tested. Trial policy may intentionally be per account/contact.",
+      "No external provider, live billing or independently certified domain-wide S2."
+    ]
+  },
+  "C004-N4": {
+    "baseline": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+    "verdict": "REPRODUCED_SQLITE_POLICY_CONDITIONAL",
+    "source_proof": [
+      "backend/billing/views.py:140-178",
+      "backend/billing/utils.py:90-174",
+      "backend/qa_release/test_pr200_phase5_org_billing.py:49-73"
+    ],
+    "scenarios": [
+      {
+        "test": "test_c004_n4_owner_personal_subscription_must_not_become_org_subscription",
+        "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192616661",
+        "head": "3dc88260f9b9e31e81eea04bc10bc88507f43a4a",
+        "environment": "Synthetic Django SQLite service/model tests; old/new ORG_ADMIN, same organisation, owner account",
+        "observed": "With organisation lacking subscription and pharmacy owner holding a personal active subscription, organisation-scoped _get_subscription_for_account returned owner's active subscription, not None. Positive distinct own org subscription priority passed.",
+        "status": "RED_TEST_FAILED_AS_EXPECTED_POLICY_CONDITIONAL"
+      }
+    ],
+    "positive_controls": [
+      "test_c004_n4_own_org_subscription_takes_precedence_positive PASSED"
+    ],
+    "runtime_limitations": [
+      "Potential intentional legacy owner/organisation billing fallback; actual cross-organisation invoicing, receipt and seat mutations not tested.",
+      "No external provider, live billing or independently certified domain-wide S2."
+    ]
+  }
+}

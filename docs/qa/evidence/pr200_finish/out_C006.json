@@ -1,0 +1,16 @@
+{
+ "chunk": "C006",
+ "files": [
+  {
+   "path": "backend/client_profile/migrations/0001_squashed_baseline.py",
+   "verdict": "NA",
+   "ids": [
+    "B03",
+    "B19"
+   ],
+   "note": "Schema-only baseline; users 0001 builds tables. Message sender and invite-link deletes cascade (lines 1186, 1176)."
+  }
+ ],
+ "findings": [],
+ "reviewer": "claudeB-2"
+}

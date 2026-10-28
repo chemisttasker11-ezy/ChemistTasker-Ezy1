@@ -1,0 +1,31 @@
+{
+ "chunk": "C088",
+ "files": [
+  {
+   "path": "frontend_mobile/app.config.js",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Expo application configuration script for environment variables and Maps API keys."
+  },
+  {
+   "path": "frontend_mobile/eslint.config.js",
+   "verdict": "NA",
+   "ids": [],
+   "note": "ESLint flat configuration file for mobile project linting."
+  },
+  {
+   "path": "frontend_mobile/metro.config.js",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Metro bundler configuration file resolving shared-core monorepo package."
+  },
+  {
+   "path": "frontend_mobile/react-native-ssl-public-key-pinning.d.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "TypeScript ambient type definitions for react-native-ssl-public-key-pinning module."
+  }
+ ],
+ "findings": [],
+ "reviewer": "agy-g2"
+}

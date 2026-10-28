@@ -1,0 +1,135 @@
+{
+ "chunk": "C042",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/CommunityShiftsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Community shift browsing, saving, applications, counter-offers, and offer confirmations."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ConfirmedShiftsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Owner board for confirmed shifts and deferred TFN payroll activations."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/HistoryShiftsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Owner board for shift history, worker profile inspection, and worker rating."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Checks user.role === OWNER instead of workspace persona, locking org and pharmacy admins out of payment."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/InvoiceGeneratePage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Legacy invoice generator form is dead code behind modern finance workspace redirect."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/InvoiceManagePage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Dead code; superseded by Invoices/InvoiceManagePage and unreferenced in routes."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceDetailPage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Re-export stub forwarding to ../InvoiceDetailPage."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceGeneratePage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Re-export stub forwarding to ../InvoiceGeneratePage."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceManagePage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Wraps FinanceWorkspace and determines receivedMode via isIssuerWorkspace."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceStatsCards.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Card metrics for draft, pending, revenue, paid, unpaid, and overdue invoices."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/Invoices/LegacyInvoiceManagePage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Dead code; legacy invoice management component unreferenced in application routes."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/Invoices/invoiceParts.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Presentation components and formatting utilities for invoice detail and editing."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/Invoices/invoiceStats.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Stat aggregation and timeframe filter helpers for invoice listings."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/LearningMaterialsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Public learning material list with role pathways, search, and category filters."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/LogoutPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Calls auth logout and redirects to login."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ManageMembershipsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Membership management handling pharmacy invitations, admin invitations, and leaving pharmacies."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/MyConfirmedShiftsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Worker confirmed shifts view with pharmacy details dialog."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Invoicing",
+   "title": "Organisation and pharmacy admins are treated as invoice issuers instead of recipients on legacy invoice detail view",
+   "scenario": "Sara completes a shift for Tom's pharmacy, which is managed by Lina at the organisation level and Grace as the pharmacy admin, and issues an invoice. When Lina or Grace opens the invoice in their manager dashboard, the page mistakes them for the invoice issuer because their user role is not pharmacy owner. Instead of seeing the recipient document with bank details and the ability to mark the invoice as paid or report an issue, Lina and Grace are shown an editable contractor draft with Sara's banking and line items, and their attempts to save or manage payment are rejected.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:42",
+    "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:484",
+    "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:570",
+    "frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx:647"
+   ],
+   "confidence": "high",
+   "test_needed": "An Organisation Admin or delegated Pharmacy Admin viewing a received invoice in their dashboard is rendered the read-only recipient document with payment and issue reporting actions rather than the editable contractor form.",
+   "owner_question": {
+    "question": "When Lina (organisation admin) or Grace (pharmacy admin) reviews an invoice issued by Sara for work at their pharmacy, what view and actions should they have?",
+    "options": [
+     "Display the read-only recipient invoice with pay-to bank details, 'Mark as paid', and 'Report an issue' actions",
+     "Restrict invoice review and payment marking strictly to the pharmacy owner (Tom)",
+     "Outcome C (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "agy-g3"
+}

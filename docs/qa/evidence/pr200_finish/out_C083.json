@@ -1,0 +1,181 @@
+{
+  "chunk": "C083",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "source acquisition only, S2/S3 pending",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
+  "files": [
+    {
+      "path": ".agents/skills/brand/scripts/extract-colors.cjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "73aa6d4cb3cb235dfece6c98954dee46d87ae01d",
+      "lines": 338,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "338 lines; nonproduction brand/design skill automation; file/command side effects not executed."
+    },
+    {
+      "path": ".agents/skills/brand/scripts/inject-brand-context.cjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "04073071934d7426ef18757a17f47de00bfea2b0",
+      "lines": 350,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "350 lines; nonproduction brand/design skill automation; file/command side effects not executed."
+    },
+    {
+      "path": ".agents/skills/brand/scripts/sync-brand-to-tokens.cjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "1e3b8ce6bbb5dc4cdd12a0b225f8a8d736e6689d",
+      "lines": 254,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "254 lines; nonproduction brand/design skill automation; file/command side effects not executed."
+    },
+    {
+      "path": ".agents/skills/brand/scripts/tests/test_sync_brand_to_tokens.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "53c54370689f49e079e437320531a167804baecc",
+      "lines": 89,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "89 lines; nonproduction brand/design skill automation; file/command side effects not executed."
+    },
+    {
+      "path": ".agents/skills/brand/scripts/validate-asset.cjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "1bd4c929f98c89ee4dfe10d90505c2b7a359d8c7",
+      "lines": 388,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "388 lines; nonproduction brand/design skill automation; file/command side effects not executed."
+    },
+    {
+      "path": ".agents/skills/design-system/scripts/embed-tokens.cjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e677f0cd768f0a87fbaef48a485a0f66a9a763d7",
+      "lines": 104,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "104 lines; nonproduction brand/design skill automation; file/command side effects not executed."
+    },
+    {
+      "path": ".agents/skills/design-system/scripts/fetch-background.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "08a997079c685325c042ea5cb3dc1859fd612a2d",
+      "lines": 340,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "340 lines; nonproduction brand/design skill automation; file/command side effects not executed."
+    },
+    {
+      "path": ".agents/skills/design-system/scripts/generate-slide.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "2de390d905d4dc2d22a43b7a16d3f208d221161d",
+      "lines": 771,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "771 lines; nonproduction brand/design skill automation; file/command side effects not executed."
+    },
+    {
+      "path": ".agents/skills/design-system/scripts/generate-tokens.cjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "73cc7d7ae98a3d053d618a1ae1756a025510b407",
+      "lines": 206,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "206 lines; nonproduction brand/design skill automation; file/command side effects not executed."
+    },
+    {
+      "path": ".agents/skills/design-system/scripts/html-token-validator.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "2b9c5d08fab6f1522f451ad263713822af19cd83",
+      "lines": 360,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "360 lines; nonproduction brand/design skill automation; file/command side effects not executed."
+    },
+    {
+      "path": ".agents/skills/design-system/scripts/search-slides.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "fc9ce74b8f991ab8cc0943ec0b44001bc5b263a4",
+      "lines": 229,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "229 lines; supplemental design system and skill script; no product runtime effects tested."
+    },
+    {
+      "path": ".agents/skills/design-system/scripts/slide-token-validator.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "22548614b86ee9415c8d258aac1bc7b9bd2d59f9",
+      "lines": 36,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "36 lines; supplemental design system and skill script; no product runtime effects tested."
+    },
+    {
+      "path": ".agents/skills/design-system/scripts/slide_search_core.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "0c98e85baad80db673f2b74317a40a3cb5fd47b8",
+      "lines": 454,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "454 lines; supplemental design system and skill script; no product runtime effects tested."
+    },
+    {
+      "path": ".agents/skills/design-system/scripts/tests/test_validate_tokens.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "675424675459e93c1a8c845c50c6e766d5e8537e",
+      "lines": 53,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "53 lines; supplemental design system and skill script; no product runtime effects tested."
+    },
+    {
+      "path": ".agents/skills/design-system/scripts/validate-tokens.cjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "9839ed2486c0dee8671140fc1e4ff24eb1c3e62a",
+      "lines": 247,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "247 lines; supplemental design system and skill script; no product runtime effects tested."
+    },
+    {
+      "path": ".agents/skills/design/scripts/cip/core.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "5e6b7a902ceabbc2f7a9ef425923774c9435f9da",
+      "lines": 216,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "216 lines; supplemental design system and skill script; no product runtime effects tested."
+    },
+    {
+      "path": ".agents/skills/design/scripts/cip/generate.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e92b2e1841d0a4db287dd9ac6a2e975b7c0ad2a2",
+      "lines": 488,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "488 lines; supplemental design system and skill script; no product runtime effects tested."
+    },
+    {
+      "path": ".agents/skills/design/scripts/cip/render-html.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "34e378261f642ea98303ee4a7718568b78ec8520",
+      "lines": 425,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "425 lines; supplemental design system and skill script; no product runtime effects tested."
+    },
+    {
+      "path": ".agents/skills/design/scripts/cip/search.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "894f4841979ef66920e5b96b8f41c89c896b8f6a",
+      "lines": 128,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "128 lines; supplemental design system and skill script; no product runtime effects tested."
+    }
+  ],
+  "findings": []
+}

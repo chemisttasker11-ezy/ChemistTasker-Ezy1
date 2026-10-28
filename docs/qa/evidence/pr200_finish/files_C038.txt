@@ -1,0 +1,16 @@
+frontend_web/src/main.tsx
+frontend_web/src/navigation.tsx
+frontend_web/src/pages/AccountDeletionPage.tsx
+frontend_web/src/pages/LandingPage.tsx
+frontend_web/src/pages/MembershipApplyPage.tsx
+frontend_web/src/pages/MobileCheckoutReturnPage.tsx
+frontend_web/src/pages/MobileOTPVerify.tsx
+frontend_web/src/pages/NotFoundPage.tsx
+frontend_web/src/pages/OTPVerify.tsx
+frontend_web/src/pages/OrganizationCreate.tsx
+frontend_web/src/pages/OrganizationPricingPage.tsx
+frontend_web/src/pages/OwnerClaimRequestsPage.tsx
+frontend_web/src/pages/PasswordResetRequestPage.tsx
+frontend_web/src/pages/PricingPage.tsx
+frontend_web/src/pages/PrivacyPolicyPage.tsx
+frontend_web/src/pages/PublicJobBoardPage.tsx

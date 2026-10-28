@@ -1,0 +1,271 @@
+{
+  "chunk": "C075",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection and selected Next proxy/auth semantic trace; S2 independent verification and S3 runtime not performed",
+  "files": [
+    {
+      "path": "frontend_web/landing_next/lib/api-root.mjs",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Canonicalizes backend API root to /api/v1; existing test verifies URL rewrite and fallback."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/api-root.test.mjs",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tests canonical `/api/v1` conversion; unit harness only, does not prove production host."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/browser-api.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Client content operations use cookie-backed Next BFF and scoped shared-core operations."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/chemisttasker-api.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Browser API sends X-Client-Platform, CSRF on mutation, credentials included; refresh via browser-session."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/hub-server.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Public SSR article/hub reader uses per-request server API, converts 404 to null and other failures to HubUnavailable."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/hub.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Public content DTO, article path and safeWebUrl projectors; external http(s) allowed by intentional public display policy."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/marketplace-image-url.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Marketplace image URL normalization; view-only helper, verify upstream image safety."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/platform-proxy.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Next same-origin BFF permits mutation only with matching Origin, forwards allowlisted auth/cookie/CSRF headers, enforces 32MiB limit and no-store."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/public-route-contract.test.mjs",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Public route wiring assertions; static contract coverage only."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/safe-hub-attachment.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Strictly rewrites local numeric public-hub attachment URL; no arbitrary external link accepted."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/server-api-fetch.mjs",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Preserves trusted public scheme in X-Forwarded-Proto for private-server backend calls."
+    },
+    {
+      "path": "frontend_web/landing_next/lib/server-chemisttasker-api.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Constructs per-request server shared-core API with explicit auth token; no module-global user identity."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/components/AnimatedBackground.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "WebGL animation, no account or data authority."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/components/LegalDocumentShell.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Legal document rendering and scroll behavior."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/components/PublicContactFormSection.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Public support form requires configured reCAPTCHA, validates fields, submits to shared contactSupport."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/components/PublicLogoTopBar.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "No-op compatibility top bar."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/config/api.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Configures singleton shared-core client with browser storage and in-memory token, cookie-based refresh; server has final auth authority."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/constants/adminCapabilities.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Re-exports shared admin capabilities; no authority."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/constants/api.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Uses shared canonical API endpoints and Next BFF root."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/constants/roles.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Re-exports shared role labels."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/contexts/AuthContext.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Migrated browser auth bootstrap, persona selection and logout; synthetic membership-derived manager persona is UI-only, backend must enforce capability (historical role/authorization audit)."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/contexts/ToastContext.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Presentation-only transient message context."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/layouts/AuthLayout.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Presentational layout for public auth forms."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/AccountDeletionPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Account deletion help/legal page; no account mutation."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/Contact.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Thin public support form route."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/MobileCheckoutReturnPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Builds app-scheme return link from query and links to store or dashboard; final payment settlement handled on backend webhook."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/MobileOTPVerify.tsx",
+      "verdict": "OK",
+      "ids": [
+        "F11-N3"
+      ],
+      "note": "Browser mobile OTP verifies and re-enters login persona; F11-N3 handles remember-me duration policy."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/NotFoundPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Inspected Next UI/helper and transport call boundary; no additional source-only candidate identified."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/OTPVerify.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "OTP verification uses shared browser operation and redirects to login after success."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/OrganizationPricingPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Public organization price presentation and navigation; actual billing server-side."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/PasswordResetRequestPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Requests reset via shared-core, deliberately returns neutral success copy to avoid enumeration."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/PricingPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Public subscription offer presentation and navigation; checkout authority backend."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/PrivacyPolicyPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Public policy HTML via React and SEO, no sensitive operation."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Anonymous shift browse via shared API, interest/counteroffer restricted to signed-in role and backend authorization."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/PublicOrganizationPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Public organization page loads scoped listing and routes to public shift filter."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/PublicTalentBoardPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Anonymous talent browse with login gate for likes/booking, actual actions still server authorized."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/ResetPasswordPage.tsx",
+      "verdict": "OK",
+      "ids": [
+        "B43"
+      ],
+      "note": "Password reset confirmation uses shared API and token parameters; historic B43 refresh-token invalidation remains a backend concern."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/SharedShiftLandingPage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Token-based shared shift URL uses shared backend view and redirects authenticated user to assigned shift."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/TermsOfServicePage.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Public terms display and canonical tags; no sensitive mutation."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/CounterOfferDialog.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Counteroffer form UI; caller/service validates slots and rates."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/FiltersSidebar.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Re-exports canonical Next shared shift filtering view."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ReviewCounterOfferDialog.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Read-only counteroffer detail dialog."
+    },
+    {
+      "path": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ReviewOfferSlotList.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Counteroffer slot view-model; read-only."
+    }
+  ],
+  "findings": []
+}

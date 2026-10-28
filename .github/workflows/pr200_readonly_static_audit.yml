@@ -1,0 +1,58 @@
+name: PR200 Read-Only Source Audit
+
+on:
+  push:
+    branches:
+      - audit/main-release-blockers-coverage-tracker-20261024
+    paths:
+      - docs/qa/pr200_static_audit.py
+      - docs/qa/pr200_quarter_audit.py
+      - .github/workflows/pr200_readonly_static_audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr200-static-source-audit
+  cancel-in-progress: true
+
+jobs:
+  inspect-every-source-path:
+    if: github.repository == 'chemisttasker11-ezy/ChemistTasker-Ezy1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact audit PR head with history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Read every tracked source blob without modifying application code
+        run: python3 docs/qa/pr200_static_audit.py
+
+      - name: Independently read and hash-verify the selected 538-source tranche
+        run: python3 docs/qa/pr200_quarter_audit.py
+
+      - name: Attach source-by-source audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr200-full-source-static-scan
+          path: |
+            docs/qa/evidence/MAIN_RELEASE_SOURCE_COVERAGE.csv
+            docs/qa/evidence/MAIN_RELEASE_STATIC_FLAGS.csv
+            docs/qa/evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.md
+            docs/qa/evidence/MAIN_RELEASE_AUTOMATED_STATIC_AUDIT.json
+            docs/qa/evidence/MAIN_RELEASE_QUARTER_2_FILE_LEDGER.csv
+            docs/qa/evidence/MAIN_RELEASE_QUARTER_2_STATIC_REPORT.md
+            docs/qa/evidence/MAIN_RELEASE_QUARTER_2_STATIC_REPORT.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Prove that no application code was modified
+        run: |
+          git diff --exit-code -- backend frontend_web frontend_mobile shared-core scripts .agents
+          git status --short
+
