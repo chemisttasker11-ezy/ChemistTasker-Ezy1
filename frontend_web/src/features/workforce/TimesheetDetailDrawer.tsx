@@ -32,8 +32,9 @@ import {
 import DashboardContentState from '../../components/dashboard/DashboardContentState';
 import { Pill } from '../../components/ui/Pill';
 import { type StatusTone } from '../../components/ui/tone';
-import { formatHours, plural, timesheetStatus } from './timesheetDisplay';
+import { approveButtonLabel, formatHours, plural, timesheetStatus } from './timesheetDisplay';
 import type { TimesheetCheck, TimesheetDetail } from './types';
+import TimesheetAdjustTimesDialog from './TimesheetAdjustTimesDialog';
 
 const clock = (value: string | null, timeZone?: string) => {
   if (!value) return '—';
@@ -146,6 +147,7 @@ export default function TimesheetDetailDrawer({
   const [missingPunchCheck, setMissingPunchCheck] = useState<TimesheetCheck | null>(null);
   const [missingPunchAt, setMissingPunchAt] = useState('');
   const [missingPunchReason, setMissingPunchReason] = useState('');
+  const [adjustingDay, setAdjustingDay] = useState<any | null>(null);
 
   const load = async () => {
     if (!timesheetId) return;
@@ -275,6 +277,19 @@ export default function TimesheetDetailDrawer({
                         <Typography variant="body2" color="text.secondary">Finish</Typography><Typography variant="body2">{clock(day.actual_end, timeZone)}</Typography><Typography variant="body2">{clock(day.rostered_end, timeZone)}</Typography>
                         <Typography variant="body2" color="text.secondary">Break</Typography><Typography variant="body2">{day.recorded_break_minutes} min</Typography><Typography variant="body2">{day.planned_break_minutes} min</Typography>
                       </Box>
+                      {managerMode && day.session_id != null && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1.5 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            disabled={loading || data.status === 'APPROVED'}
+                            onClick={() => setAdjustingDay(day)}
+                            sx={{ minHeight: 36 }}
+                          >
+                            Adjust times
+                          </Button>
+                        </Stack>
+                      )}
                     </Box>
                   ))}
                 </Stack>
@@ -336,7 +351,7 @@ export default function TimesheetDetailDrawer({
                     startIcon={spin('approve', <CheckCircle2 size={18} />)}
                     onClick={() => timesheetId && data.revision_number && run('approve', () => approveTimesheet(timesheetId, data.revision_number!))}
                   >
-                    Approve {formatHours(data.reviewed_minutes)}
+                    {approveButtonLabel(data.worked_minutes)}
                   </Button>
                   {approveBlockedReason && <Typography variant="body2" color="text.secondary" textAlign="center">{approveBlockedReason}</Typography>}
                 </>}
@@ -389,6 +404,21 @@ export default function TimesheetDetailDrawer({
           >Save time</Button>
         </DialogActions>
       </Dialog>
+      {adjustingDay && timesheetId && adjustingDay.session_id != null && (
+        <TimesheetAdjustTimesDialog
+          open={Boolean(adjustingDay)}
+          onClose={() => setAdjustingDay(null)}
+          timesheetId={timesheetId}
+          sessionId={adjustingDay.session_id}
+          day={adjustingDay}
+          timeZone={timeZone}
+          readOnly={!managerMode || data?.status === 'APPROVED'}
+          onSaved={async () => {
+            await load();
+            onChanged?.();
+          }}
+        />
+      )}
     </Drawer>
   );
 }

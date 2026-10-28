@@ -50,6 +50,7 @@ import {
   RosterPharmacyMember,
   RosterShiftDetail,
   rosterV2,
+  formatAttendanceMinutes,
   fetchPharmaciesService,
   fetchRosterOwnerAssignments,
   fetchWorkerShiftRequestsService,
@@ -1234,7 +1235,7 @@ export default function RosterOwnerPage() {
                         )}
                         {workforce?.timesheet && (
                           <Typography component="div" variant="caption" noWrap sx={{ color: 'inherit', opacity: .9, fontSize: 12, lineHeight: 1.2 }}>
-                            {workforce.timesheet.status.replaceAll('_', ' ')} · reviewed {(workforce.timesheet.reviewedMinutes / 60).toFixed(2)}h
+                            {workforce.timesheet.status.replaceAll('_', ' ')} · reviewed {formatAttendanceMinutes(workforce.timesheet.reviewedMinutes)}
                           </Typography>
                         )}
                       </Box>

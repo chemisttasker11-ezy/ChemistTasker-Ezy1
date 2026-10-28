@@ -33,6 +33,7 @@ from attendance.transitions import clock_in, clock_out, end_break, get_active_se
 from attendance.protocol import sync_offline_batch
 from memberships.models import Membership
 from organizations.models import Pharmacy
+from organizations.timezone import get_pharmacy_timezone
 from attendance.models import AttendanceEvent, AttendanceSession, KioskDevice, WorkerPIN
 from attendance.api_support import _get_kiosk_device_from_request, _unexpected_error_response
 from django.contrib.auth import get_user_model
@@ -129,7 +130,7 @@ class KioskRequestPairingCodeView(APIView):
                 | Q(pk__in=scoped_pharmacy_ids)
             )
         return Response({"pharmacies": [{"id": pharmacy.pk, "name": pharmacy.name,
-                                         "timezone": pharmacy.timezone}
+                                         "timezone": str(get_pharmacy_timezone(pharmacy))}
             for pharmacy in pharmacies if is_authorized_kiosk_manager(request.user, pharmacy)]})
 
     def post(self, request):

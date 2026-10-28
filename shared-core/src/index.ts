@@ -59,6 +59,7 @@ export * from './policy/rosterPolicy';
 
 // Re-export pricing utils
 export * from './utils/pricing';
+export * from './utils/attendanceDisplay';
 
 // Shared mobile/desktop offline kiosk protocol.
 export * from './kioskProtocol';

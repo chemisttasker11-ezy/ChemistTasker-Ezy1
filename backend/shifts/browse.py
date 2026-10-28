@@ -27,10 +27,9 @@ from shifts.assignment import slot_locked_for_shift_offer
 from shifts.selectors import _future_or_current_slot_q
 from shifts.access import staff_membership_can_claim_role
 from shifts.emails import build_roster_email_link, build_shift_email_context
-from django.conf import settings
 from core.task_queue import async_task
 from datetime import date
-from zoneinfo import ZoneInfo
+from organizations.timezone import get_pharmacy_timezone
 from shifts.access import (
     _normalized_role_code,
     _shift_roles_visible_to_user,
@@ -694,9 +693,9 @@ class SharedShiftDetailView(APIView):
         else:
             return Response({"error": "A share token is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        tz_name = getattr(shift.pharmacy, 'timezone', None) or getattr(settings, 'TIME_ZONE', None) or 'UTC'
+        tz = get_pharmacy_timezone(shift.pharmacy)
         try:
-            now_local = timezone.now().astimezone(ZoneInfo(tz_name))
+            now_local = timezone.now().astimezone(tz)
         except Exception:
             now_local = timezone.now()
         today = now_local.date()

@@ -19,6 +19,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import moment from 'moment';
+import { formatAttendanceMinutes } from '@chemisttasker/shared-core';
 import { BRAND_COLORS, BRAND_FONTS, BRAND_SHADOWS } from '../../constants/brandTheme';
 import { type CalendarEventItem, type DayOperatingHours, type HorizontalCalendarGridProps, formatMinutesToTime, getPharmacyDayHours, getRoleTheme } from './HorizontalCalendarGrid.model';
 export type { CalendarEventItem, HorizontalCalendarGridProps, DayOperatingHours } from './HorizontalCalendarGrid.model';
@@ -1019,7 +1020,7 @@ export default function HorizontalCalendarGrid({
                             )}
                             {workforce?.timesheet && (
                               <Typography variant="caption" sx={{ display: 'block' }}>
-                                Timesheet: {workforce.timesheet.status.replaceAll('_', ' ')} · worked {(workforce.timesheet.workedMinutes / 60).toFixed(2)}h · reviewed {(workforce.timesheet.reviewedMinutes / 60).toFixed(2)}h
+                                Timesheet: {workforce.timesheet.status.replaceAll('_', ' ')} · worked {formatAttendanceMinutes(workforce.timesheet.workedMinutes)} · reviewed {formatAttendanceMinutes(workforce.timesheet.reviewedMinutes)}
                               </Typography>
                             )}
                             {workforce?.payrollActivationRequired && !workforce?.payrollReady && (
