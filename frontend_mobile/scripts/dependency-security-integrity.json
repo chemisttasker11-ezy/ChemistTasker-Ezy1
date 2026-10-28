@@ -6,7 +6,8 @@
     "node_modules/braces/lib/expand.js": "19d9497d82c3e5d1e7c2944d1be503402dacbf829e42f5089422c2804b5f6ac0",
     "node_modules/braces/lib/stringify.js": "c95abf85ab3c3b62399e98ee65aabfc17e672d6b4cc48b454df5a8c6adaf59a7",
     "node_modules/braces/lib/utils.js": "35f0d608bd905438e3114da522d9d7473a1b7b2a117ee47efd75833dfc393e42",
-    "node_modules/node-forge/lib/rsa.js": "96c154db17c611f81eeb48aed2c064c80d87517df2fff24cf574fbd1ac050492",
+    "node_modules/deepmerge/dist/cjs.js": "c03b7e5b72e5f37aa0376cbba684a653ef5a0b0adbf61f53f06a817c9eec55f3",
+    "node_modules/node-forge/lib/rsa.js":"96c154db17c611f81eeb48aed2c064c80d87517df2fff24cf574fbd1ac050492",
     "node_modules/metro/src/Assets.js": "d6c19bdbcd1858c16ee7dce4b2301a18b735d017c4859eb93b1ad9cd12e03cd8",
     "node_modules/metro/src/Assets.js.flow": "11f7bc3869f8c2f6621e393d773eff09530edd4f049e1840740004d57a413bfd"
   }
