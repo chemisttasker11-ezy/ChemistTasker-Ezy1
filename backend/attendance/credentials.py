@@ -35,6 +35,7 @@ from django.utils.crypto import salted_hmac
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from organizations.access import _is_active_actor
 from organizations.models import Chain, Pharmacy, PharmacyAdmin
 from memberships.models import Membership
 from attendance.models import KioskDevice, KioskPairingAuthorization, PharmacyQRSession, WorkerPIN
@@ -81,7 +82,7 @@ def hash_kiosk_token(raw_token: str) -> str:
 
 def is_authorized_kiosk_manager(user, pharmacy: Pharmacy) -> bool:
     """Check whether a user has authority to activate/manage kiosks or worker PINs."""
-    if not user or not pharmacy:
+    if not _is_active_actor(user) or not pharmacy:
         return False
     if user.is_superuser:
         return True

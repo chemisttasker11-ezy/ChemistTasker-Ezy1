@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from attendance.credentials import (
     _pairing_recovery_message,
@@ -145,3 +146,23 @@ class KioskReleaseBlockerTests(unittest.TestCase):
                 client_attempt_id=str(wrong_attempt),
                 proof_signature=wrong_proof,
             )
+
+        # Even the original attempt/key/proof cannot revive a revoked terminal.
+        for revoked_fields in (
+            {"is_active": False, "revoked_at": None},
+            {"is_active": True, "revoked_at": timezone.now()},
+        ):
+            with self.subTest(revoked_fields=revoked_fields):
+                type(first_device).objects.filter(pk=first_device.pk).update(**revoked_fields)
+                recovered_device.refresh_from_db()
+                original_hash = recovered_device.device_token
+                with self.assertRaises(ValidationError):
+                    redeem_kiosk_pairing_code(
+                        pairing_code=code, public_signing_key=public_key, platform="windows",
+                        client_attempt_id=str(attempt_id), proof_signature=proof,
+                    )
+                recovered_device.refresh_from_db()
+                self.assertEqual(recovered_device.device_token, original_hash)
+                if not revoked_fields["is_active"]:
+                    self.assertIsNone(authenticate_kiosk_device(recovered_token))
+                self.assertEqual(type(first_device).objects.filter(pharmacy=self.pharmacy).count(), 2)

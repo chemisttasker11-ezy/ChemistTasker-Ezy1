@@ -11,9 +11,9 @@ Verifies:
 """
 
 from datetime import date, datetime, time, timedelta
-from concurrent.futures import ThreadPoolExecutor
 import os
 import unittest
+from unittest.mock import patch
 
 import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
@@ -212,25 +212,6 @@ class KioskPairingCodeTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             redeem_kiosk_pairing_code(pairing_code=code)
 
-    def test_simultaneous_redemption_creates_one_device(self):
-        if connection.vendor != "postgresql":
-            self.skipTest("Row-lock concurrency is verified only on PostgreSQL.")
-        code = generate_kiosk_pairing_code(self.owner_user, self.pharmacy)
-
-        def redeem():
-            try:
-                device, _ = redeem_kiosk_pairing_code(pairing_code=code)
-                return ("created", device.id)
-            except ValidationError:
-                return ("consumed", None)
-
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            outcomes = list(executor.map(lambda _: redeem(), range(2)))
-
-        self.assertEqual(sum(result[0] == "created" for result in outcomes), 1)
-        self.assertEqual(sum(result[0] == "consumed" for result in outcomes), 1)
-        self.assertEqual(KioskDevice.objects.count(), 1)
-
     def test_redeem_with_spaces_or_dashes(self):
         """Code entry formats like '849-201' or '849 201' are normalized."""
         code = generate_kiosk_pairing_code(
@@ -242,10 +223,38 @@ class KioskPairingCodeTests(unittest.TestCase):
         self.assertIsNotNone(device)
         self.assertTrue(raw_token.startswith("ctk_kiosk_"))
 
-    def test_redeem_invalid_or_expired_code(self):
+    def test_redeem_unknown_code(self):
         """Non-existent code raises ValidationError."""
         with self.assertRaises(ValidationError):
             redeem_kiosk_pairing_code(pairing_code="999999")
+
+    def test_real_code_expires_after_fifteen_minutes_even_with_cached_payload(self):
+        issued_at = timezone.now()
+        with patch("django.utils.timezone.now", return_value=issued_at):
+            code = generate_kiosk_pairing_code(self.owner_user, self.pharmacy)
+        authorization = KioskPairingAuthorization.objects.get()
+        self.assertEqual(authorization.expires_at, issued_at + timedelta(minutes=15))
+        # Advance the service clock, retaining the compatibility cache entry:
+        # the durable authorization must enforce expiry independently of cache eviction.
+        self.assertIsNotNone(cache.get(f"{KIOSK_PAIR_CACHE_PREFIX}{code}"))
+        for elapsed in (900, 901):
+            with self.subTest(elapsed=elapsed):
+                with patch("django.utils.timezone.now", return_value=issued_at + timedelta(seconds=elapsed)):
+                    with self.assertRaises(ValidationError):
+                        redeem_kiosk_pairing_code(pairing_code=code)
+                authorization.refresh_from_db()
+                self.assertIsNone(authorization.consumed_at)
+                self.assertIsNone(authorization.resulting_device_id)
+                self.assertFalse(KioskDevice.objects.exists())
+
+    def test_real_code_remains_usable_just_before_expiry(self):
+        issued_at = timezone.now()
+        with patch("django.utils.timezone.now", return_value=issued_at):
+            code = generate_kiosk_pairing_code(self.owner_user, self.pharmacy)
+        with patch("django.utils.timezone.now", return_value=issued_at + timedelta(seconds=899)):
+            device, token = redeem_kiosk_pairing_code(pairing_code=code)
+        self.assertEqual(device.pharmacy_id, self.pharmacy.pk)
+        self.assertEqual(authenticate_kiosk_device(token).pk, device.pk)
 
     def test_redeem_malformed_code(self):
         """Code that is not 6 digits raises ValidationError."""

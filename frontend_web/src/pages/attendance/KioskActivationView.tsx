@@ -107,7 +107,7 @@ export default function KioskActivationView({
               </Typography>
               <Typography variant="body2" sx={{ color: "#94a3b8", mt: 0.5 }}>
                 {pairingMode === "CODE"
-                  ? "Enter the 6-digit pairing code sent to your pharmacy owner's mobile app."
+                  ? "Enter the 6-digit pairing code generated in the web dashboard or mobile app."
                   : "Authorize this device directly using owner credentials and Pharmacy ID."}
               </Typography>
             </Box>
@@ -223,13 +223,13 @@ export default function KioskActivationView({
                         How to receive the pairing code:
                       </Typography>
                       <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mt: 0.3 }}>
-                        1. Open the <strong>ChemistTasker Mobile App</strong> on the owner's phone.
+                        1. Sign in to the <strong>Web Dashboard</strong> (Pharmacy Details → <strong>Pair new terminal</strong>) or open the mobile app.
                       </Typography>
                       <Typography variant="caption" sx={{ color: "#94a3b8", display: "block" }}>
-                        2. Tap <strong>Kiosk Terminals</strong> → <strong>Pair New Terminal</strong>.
+                        2. Generate the 6-digit pairing code for this pharmacy.
                       </Typography>
                       <Typography variant="caption" sx={{ color: "#94a3b8", display: "block" }}>
-                        3. A push notification with your 6-digit code will appear immediately.
+                        3. Enter the code above before the 15-minute countdown expires.
                       </Typography>
                     </Box>
                   </Stack>

@@ -117,6 +117,9 @@ jobs:
       - name: WebSocket URL tests
         run: node --test scripts/ws-url.test.mjs
         working-directory: frontend_web
+      - name: Kiosk pairing dialog tests
+        run: node --test src/pages/attendance/KioskPairingDialog.test.mjs
+        working-directory: frontend_web
       - name: Build Vite app
         run: npx vite build
         working-directory: frontend_web
@@ -238,7 +241,7 @@ jobs:
       - name: Real PDF rendering contract
         run: python backend/manage.py test core.test_pdf_rendering_contract --settings=core.contract_test_settings
       - name: Kernel and domain app tests
-        run: python backend/manage.py test client_profile attendance chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar core.test_admin_registry_contract --settings=core.contract_test_settings
+        run: python backend/manage.py test client_profile attendance.test_approval_locking attendance.test_favourite_cover attendance.test_helpers attendance.test_pin_clock attendance.test_rostered_corrections attendance.test_timezone_resolution chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar core.test_admin_registry_contract --settings=core.contract_test_settings
       - name: Pharmacy authorization and multipart preservation contracts
         run: python backend/manage.py test organizations.test_pharmacy_access_characterization organizations.test_pharmacy_upload_contract --settings=core.contract_test_settings
       - name: Promoted domain app and architecture contracts
@@ -306,7 +309,7 @@ jobs:
       - name: PostgreSQL migration rehearsal
         run: python backend/manage.py migrate --noinput --settings=core.postgres_test_settings
       - name: PostgreSQL concurrency contracts
-        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards billing.test_pr201_finance_pg ethical_marketplace.test_pr201_b31_pg marketplace.tests marketplace.test_pr201_b24_b25 attendance.test_approval_locking onboarding.test_verification_transitions shifts.test_shift_actions_contract workforce.tests.test_publication_contract workforce.tests.test_roster_slot_concurrency workforce.tests.test_timesheets --settings=core.postgres_test_settings
+        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards billing.test_pr201_finance_pg ethical_marketplace.test_pr201_b31_pg marketplace.tests marketplace.test_pr201_b24_b25 attendance.test_approval_locking attendance.test_kiosk_pairing attendance.test_kiosk_review attendance.test_clock_locking attendance_tests.test_double_clock_guard onboarding.test_verification_transitions shifts.test_shift_actions_contract workforce.tests.test_publication_contract workforce.tests.test_roster_slot_concurrency workforce.tests.test_timesheets --settings=core.postgres_test_settings
 
   boundary-audit:
     runs-on: ubuntu-latest
