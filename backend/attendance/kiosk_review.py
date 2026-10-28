@@ -216,6 +216,14 @@ class ManagerDecideKioskReviewView(APIView):
                     "decision": review.decision, "review_id": review.pk,
                     "attendance_event_id": review.attendance_event_id,
                 })
+        except OperationalError as exc:
+            # Device/session lock timeout: the outer transaction has rolled back, so the client may retry.
+            if _is_lock_unavailable_error(exc):
+                return Response(
+                    {"code": "CONCURRENT_REVIEW", "detail": "Another review is in progress for this event."},
+                    status=409,
+                )
+            raise
         except DjangoValidationError as exc:
             logger.warning("Kiosk attendance application failed validation", exc_info=True)
             raise ValidationError({"detail": "Attendance application failed validation."}) from exc

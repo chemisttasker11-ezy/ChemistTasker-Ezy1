@@ -1832,6 +1832,19 @@ export default function KioskPage() {
                     No phone with you? Enter your email or ID and your 4-6 digit personal code.
                   </Typography>
 
+                  <Box
+                    sx={{
+                      p: 1.25,
+                      borderRadius: "10px",
+                      bgcolor: "rgba(0, 189, 210, 0.08)",
+                      border: "1px solid rgba(0, 189, 210, 0.25)",
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ color: "#e2e8f0", fontSize: 12.5, lineHeight: 1.45 }}>
+                      <strong>Booked locums:</strong> A booking alone gives no kiosk PIN. Booked locums without a staff membership use the mobile app to scan the counter QR code. Pending staff members must accept invitations in the app before setting a PIN.
+                    </Typography>
+                  </Box>
+
                   {pinError && (
                     <Alert
                       severity="error"

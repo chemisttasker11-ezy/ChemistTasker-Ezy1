@@ -71,7 +71,9 @@ async function worker({ active = true, reject = true } = {}) {
   const exports = load('./WorkerAttendancePage.tsx', {
     react: hooks, 'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
     '@mui/material': names, 'lucide-react': names, moment: () => ({ format: () => '' }),
-    '@chemisttasker/shared-core': { attendance, rosterV2: { getWorkerRoster: async () => ({ shifts: [] }) } },
+    '@chemisttasker/shared-core': { attendance, rosterV2: { getWorkerRoster: async () => ({ shifts: [] }) },
+      formatAttendanceMinutes: load('../../../../shared-core/src/utils/attendanceDisplay.ts', {}).formatAttendanceMinutes,
+    },
     '../../components/ui/PageHeader': 'PageHeader', '../../components/ui/IconTile': 'IconTile',
     '../../components/dashboard/DashboardContentState': 'DashboardContentState',
     '../../components/ui/Hint': { Hint: 'Hint' }, '../../components/ui/Pill': { Pill: 'Pill' },

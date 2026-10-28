@@ -588,6 +588,17 @@ def verify_signed_pharmacy_qr(
 # 3. Worker Personal Code (PIN) Lifecycle & Verification
 # -----------------------------------------------------------------------------
 
+def pin_eligible_memberships(queryset=None):
+    """Memberships that may hold or use a kiosk PIN: active, ACCEPTED and not CONTACT (E5/E12)."""
+    queryset = Membership.objects.all() if queryset is None else queryset
+    return queryset.filter(is_active=True, status=Membership.Status.ACCEPTED).exclude(role="CONTACT")
+
+
+def _require_pin_eligible(membership: Membership) -> None:
+    if not pin_eligible_memberships().filter(pk=membership.pk).exists():
+        raise ValidationError("Only active, accepted staff memberships can use an attendance PIN.")
+
+
 def set_worker_personal_code(
     user,
     membership: Membership,
@@ -596,6 +607,7 @@ def set_worker_personal_code(
     """Set or reset a worker's hashed PIN; requires pharmacy owner or manager authority."""
     if not is_authorized_kiosk_manager(user, membership.pharmacy):
         raise PermissionDenied("Only the pharmacy owner or manager can set a worker's personal code.")
+    _require_pin_eligible(membership)
 
     worker_pin, _ = WorkerPIN.objects.get_or_create(membership=membership)
     worker_pin.set_pin(raw_pin)
@@ -611,6 +623,8 @@ def toggle_worker_personal_code(
     """Enable or disable the PIN requirement for a worker."""
     if not is_authorized_kiosk_manager(user, membership.pharmacy):
         raise PermissionDenied("Only the pharmacy owner or manager can toggle personal codes.")
+    if is_enabled:
+        _require_pin_eligible(membership)
 
     worker_pin, _ = WorkerPIN.objects.get_or_create(membership=membership)
     worker_pin.is_enabled = is_enabled
@@ -632,16 +646,20 @@ def _find_kiosk_candidate_membership(
     user_filter = Q(user__email__iexact=ident) | Q(user__username__iexact=ident)
     if ident.isdigit():
         user_filter |= Q(user__id=int(ident))
+    return find_kiosk_pin_membership(kiosk_device, user_filter, require_pin=require_pin)
 
+
+def find_kiosk_pin_membership(kiosk_device: KioskDevice, user_filter: Q, require_pin: bool = True) -> Optional[Membership]:
+    """PIN-eligible membership at the kiosk pharmacy or a same-owner/chain/organization sister site."""
     target_pharmacy = kiosk_device.pharmacy
 
-    local_kwargs = {"pharmacy": target_pharmacy, "is_active": True}
+    local_kwargs = {"pharmacy": target_pharmacy}
     if require_pin:
         local_kwargs["worker_pin__isnull"] = False
 
     # 1. Local membership
     local_mem = (
-        Membership.objects.filter(
+        pin_eligible_memberships().filter(
             user_filter,
             **local_kwargs,
         )
@@ -651,13 +669,13 @@ def _find_kiosk_candidate_membership(
     if local_mem is not None:
         return local_mem
 
-    remote_kwargs = {"is_active": True}
+    remote_kwargs = {}
     if require_pin:
         remote_kwargs["worker_pin__isnull"] = False
 
     # 2. Cross-site membership under same owner, active Chain, or organization
     remote_memberships = (
-        Membership.objects.filter(
+        pin_eligible_memberships().filter(
             user_filter,
             **remote_kwargs,
         )
@@ -989,9 +1007,7 @@ def worker_update_own_pin(user, new_pin: str, pharmacy_id=None) -> WorkerPIN:
     if not (4 <= len(cleaned_pin) <= 6) or not cleaned_pin.isdigit():
         raise ValidationError("PIN must be 4 to 6 numeric digits.")
 
-    memberships = Membership.objects.filter(
-        user=user, is_active=True, status=Membership.Status.ACCEPTED,
-    )
+    memberships = pin_eligible_memberships().filter(user=user)
     if pharmacy_id is not None:
         memberships = memberships.filter(pharmacy_id=pharmacy_id)
     elif memberships.count() > 1:

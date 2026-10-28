@@ -17,7 +17,7 @@ import {
 } from "@mui/material";
 import { CalendarCheck, Clock, Coffee, KeyRound, LogOut, Pause, Play, QrCode } from "lucide-react";
 import moment from "moment";
-import { attendance, rosterV2 } from "@chemisttasker/shared-core";
+import { attendance, rosterV2, formatAttendanceMinutes } from "@chemisttasker/shared-core";
 import PageHeader from "../../components/ui/PageHeader";
 import IconTile from "../../components/ui/IconTile";
 import DashboardContentState from "../../components/dashboard/DashboardContentState";
@@ -54,7 +54,7 @@ export default function WorkerAttendancePage() {
     is_on_break?: boolean;
   } | null>(null);
 
-  const [elapsedDuration, setElapsedDuration] = useState<string>("00:00:00");
+  const [elapsedDuration, setElapsedDuration] = useState<string>(() => formatAttendanceMinutes(0));
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -70,19 +70,36 @@ export default function WorkerAttendancePage() {
   const [newPin, setNewPin] = useState("");
   const [confirmNewPin, setConfirmNewPin] = useState("");
   const [submittingPin, setSubmittingPin] = useState(false);
-  const [pinUpdateError, setPinUpdateError] = useState<string | null>(null);
+  const [pinLoadError, setPinLoadError] = useState<string | null>(null);
+  const [pinSaveError, setPinSaveError] = useState<string | null>(null);
+  const [loadingPinPharmacies, setLoadingPinPharmacies] = useState(false);
+  const [pinPharmaciesLoaded, setPinPharmaciesLoaded] = useState(false);
   const [pinPharmacies, setPinPharmacies] = useState<Array<{ id: number; name: string }>>([]);
   const [pinPharmacyId, setPinPharmacyId] = useState('');
+
   useEffect(() => {
     if (!pinModalOpen) return;
     let active = true;
-    setPinPharmacies([]); setPinPharmacyId(''); setPinUpdateError(null);
+    setLoadingPinPharmacies(true);
+    setPinPharmaciesLoaded(false);
+    setPinPharmacies([]);
+    setPinPharmacyId('');
+    setPinLoadError(null);
+    setPinSaveError(null);
     attendance.getPinPharmacies().then((data: any) => {
       if (!active) return;
       const pharmacies = Array.isArray(data?.pharmacies) ? data.pharmacies : [];
       setPinPharmacies(pharmacies);
+      setPinPharmaciesLoaded(true);
       if (pharmacies.length === 1) setPinPharmacyId(String(pharmacies[0].id));
-    }).catch(() => { if (active) setPinUpdateError('Unable to load your pharmacies. Close this dialog and try again.'); });
+    }).catch(() => {
+      if (active) {
+        setPinLoadError('Unable to load your pharmacies. Close this dialog and try again.');
+        setPinPharmaciesLoaded(false);
+      }
+    }).finally(() => {
+      if (active) setLoadingPinPharmacies(false);
+    });
     return () => { active = false; };
   }, [pinModalOpen]);
 
@@ -94,18 +111,18 @@ export default function WorkerAttendancePage() {
   const [acknowledgingPeriodId, setAcknowledgingPeriodId] = useState<number | null>(null);
 
   const handleUpdatePin = async () => {
-    if (!pinPharmacyId) { setPinUpdateError('Select a pharmacy.'); return; }
+    if (!pinPharmacyId) { setPinSaveError('Select a pharmacy.'); return; }
     if (newPin.length < 4 || newPin.length > 6) {
-      setPinUpdateError("PIN must be between 4 and 6 numeric digits.");
+      setPinSaveError("PIN must be between 4 and 6 numeric digits.");
       return;
     }
     if (newPin !== confirmNewPin) {
-      setPinUpdateError("PINs do not match. Please re-enter.");
+      setPinSaveError("PINs do not match. Please re-enter.");
       return;
     }
 
     setSubmittingPin(true);
-    setPinUpdateError(null);
+    setPinSaveError(null);
     try {
       await attendance.updatePin(Number(pinPharmacyId), newPin);
       setSuccessMsg("Attendance PIN updated for the selected pharmacy. Connect its terminal to the internet when first using the new PIN.");
@@ -113,7 +130,7 @@ export default function WorkerAttendancePage() {
       setNewPin("");
       setConfirmNewPin("");
     } catch (err: any) {
-      setPinUpdateError(err?.message || "Failed to update PIN.");
+      setPinSaveError(err?.message || "Failed to update PIN.");
     } finally {
       setSubmittingPin(false);
     }
@@ -175,19 +192,15 @@ export default function WorkerAttendancePage() {
   // Live stopwatch timer
   useEffect(() => {
     if (!statusInfo?.has_active_session || !statusInfo?.started_at) {
-      setElapsedDuration("00:00:00");
+      setElapsedDuration(formatAttendanceMinutes(0));
       return;
     }
 
     const updateTimer = () => {
       const startMs = new Date(statusInfo.started_at!).getTime();
       const diffSec = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
-      const hours = Math.floor(diffSec / 3600);
-      const minutes = Math.floor((diffSec % 3600) / 60);
-      const seconds = diffSec % 60;
-      setElapsedDuration(
-        `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
-      );
+      const minutes = Math.floor(diffSec / 60);
+      setElapsedDuration(formatAttendanceMinutes(minutes));
     };
 
     updateTimer();
@@ -461,7 +474,10 @@ export default function WorkerAttendancePage() {
             onClick={() => {
               setNewPin("");
               setConfirmNewPin("");
-              setPinUpdateError(null);
+              setPinLoadError(null);
+              setPinSaveError(null);
+              setPinPharmaciesLoaded(false);
+              setLoadingPinPharmacies(true);
               setPinModalOpen(true);
             }}
             sx={{ mt: 2, minHeight: 44 }}
@@ -649,46 +665,91 @@ export default function WorkerAttendancePage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Choose a 4–6 digit PIN for clocking in on this pharmacy's counter screen.
           </Typography>
-          {pinUpdateError && (
+          {pinLoadError && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {pinUpdateError}
+              {pinLoadError}
             </Alert>
           )}
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField select label="Pharmacy" value={pinPharmacyId} onChange={e => setPinPharmacyId(e.target.value)} disabled={submittingPin} fullWidth>
-              {pinPharmacies.map(pharmacy => <MenuItem key={pharmacy.id} value={String(pharmacy.id)}>{pharmacy.name}</MenuItem>)}
-            </TextField>
-            <TextField
-              label="New PIN (4–6 digits)"
-              type="password"
-              value={newPin}
-              onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-              fullWidth
-              autoFocus
-              inputProps={{ maxLength: 6, inputMode: "numeric" }}
-            />
-            <TextField
-              label="Confirm new PIN"
-              type="password"
-              value={confirmNewPin}
-              onChange={(e) => setConfirmNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-              error={confirmNewPin.length > 0 && confirmNewPin !== newPin}
-              helperText={confirmNewPin.length > 0 && confirmNewPin !== newPin ? "PINs don't match yet" : " "}
-              fullWidth
-              inputProps={{ maxLength: 6, inputMode: "numeric" }}
-            />
-          </Stack>
+          {pinSaveError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {pinSaveError}
+            </Alert>
+          )}
+          {loadingPinPharmacies && (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+              <CircularProgress size={24} />
+            </Box>
+          )}
+          {!loadingPinPharmacies && pinPharmaciesLoaded && !pinLoadError && pinPharmacies.length === 0 && (
+            <Stack spacing={1.5} sx={{ mt: 1 }}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: "var(--ct-card-radius, 12px)",
+                  bgcolor: "var(--ct-subtle-bg, rgba(0, 0, 0, 0.03))",
+                  border: "1px solid var(--ct-border-color, rgba(0, 0, 0, 0.12))",
+                }}
+              >
+                <Typography variant="body2" sx={{ color: "var(--ct-text-primary, inherit)", lineHeight: 1.6, mb: 1.5 }}>
+                  Setting a kiosk PIN requires an accepted staff membership at that pharmacy.
+                </Typography>
+                <Typography variant="body2" sx={{ color: "var(--ct-text-primary, inherit)", lineHeight: 1.6, mb: 1.5 }}>
+                  Booked locums clock in using the mobile app by scanning the pharmacy QR code on the counter terminal.
+                </Typography>
+                <Typography variant="body2" sx={{ color: "var(--ct-text-secondary, text.secondary)", lineHeight: 1.6 }}>
+                  Have a pending invite? Check your{" "}
+                  <a
+                    href="/dashboard/admin-invitations"
+                    style={{ color: "var(--ct-primary, #00bdd2)", fontWeight: 600, textDecoration: "underline" }}
+                  >
+                    invitations
+                  </a>{" "}
+                  to accept it.
+                </Typography>
+              </Box>
+            </Stack>
+          )}
+          {!loadingPinPharmacies && pinPharmaciesLoaded && !pinLoadError && pinPharmacies.length > 0 && (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField select label="Pharmacy" value={pinPharmacyId} onChange={e => setPinPharmacyId(e.target.value)} disabled={submittingPin} fullWidth>
+                {pinPharmacies.map(pharmacy => <MenuItem key={pharmacy.id} value={String(pharmacy.id)}>{pharmacy.name}</MenuItem>)}
+              </TextField>
+              <TextField
+                label="New PIN (4–6 digits)"
+                type="password"
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                fullWidth
+                autoFocus
+                inputProps={{ maxLength: 6, inputMode: "numeric" }}
+              />
+              <TextField
+                label="Confirm new PIN"
+                type="password"
+                value={confirmNewPin}
+                onChange={(e) => setConfirmNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                error={confirmNewPin.length > 0 && confirmNewPin !== newPin}
+                helperText={confirmNewPin.length > 0 && confirmNewPin !== newPin ? "PINs don't match yet" : " "}
+                fullWidth
+                inputProps={{ maxLength: 6, inputMode: "numeric" }}
+              />
+            </Stack>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setPinModalOpen(false)} disabled={submittingPin}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleUpdatePin}
-            disabled={submittingPin || !pinPharmacyId || newPin.length < 4 || newPin !== confirmNewPin}
-            startIcon={submittingPin ? <CircularProgress size={16} color="inherit" /> : undefined}
-          >
-            Save PIN
+          <Button onClick={() => setPinModalOpen(false)} disabled={submittingPin}>
+            {!loadingPinPharmacies && pinPharmaciesLoaded && !pinLoadError && pinPharmacies.length === 0 ? "Close" : "Cancel"}
           </Button>
+          {!loadingPinPharmacies && pinPharmaciesLoaded && !pinLoadError && pinPharmacies.length > 0 && (
+            <Button
+              variant="contained"
+              onClick={handleUpdatePin}
+              disabled={submittingPin || !pinPharmacyId || newPin.length < 4 || newPin !== confirmNewPin}
+              startIcon={submittingPin ? <CircularProgress size={16} color="inherit" /> : undefined}
+            >
+              Save PIN
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

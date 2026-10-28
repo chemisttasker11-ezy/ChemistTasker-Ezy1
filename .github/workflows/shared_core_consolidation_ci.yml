@@ -117,8 +117,8 @@ jobs:
       - name: WebSocket URL tests
         run: node --test scripts/ws-url.test.mjs
         working-directory: frontend_web
-      - name: Kiosk pairing dialog tests
-        run: node --test src/pages/attendance/KioskPairingDialog.test.mjs
+      - name: Attendance and kiosk tests
+        run: node --test src/pages/attendance/KioskEvidenceReview.test.mjs src/pages/attendance/KioskPairingDialog.test.mjs src/pages/attendance/KioskDoubleClock.test.mjs src/pages/attendance/WorkerDoubleClock.test.mjs src/pages/attendance/WorkerAttendancePinGuidance.test.mjs src/pages/attendance/KioskLocumGuidance.test.mjs
         working-directory: frontend_web
       - name: Build Vite app
         run: npx vite build
@@ -202,7 +202,7 @@ jobs:
         run: npm run test:security
         working-directory: frontend_mobile
       - name: Mobile calendar request budget contract
-        run: node --test scripts/calendar-request-budget.test.cjs
+        run: node --test scripts/calendar-request-budget.test.cjs scripts/attendance-double-clock.test.cjs scripts/attendance-pin-guidance.test.cjs
         working-directory: frontend_mobile
       - name: Verify patched runtime dependencies and reject new advisories
         run: npm run security:dependencies
@@ -309,7 +309,7 @@ jobs:
       - name: PostgreSQL migration rehearsal
         run: python backend/manage.py migrate --noinput --settings=core.postgres_test_settings
       - name: PostgreSQL concurrency contracts
-        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards billing.test_pr201_finance_pg ethical_marketplace.test_pr201_b31_pg marketplace.tests marketplace.test_pr201_b24_b25 attendance.test_approval_locking attendance.test_kiosk_pairing attendance.test_kiosk_review attendance.test_clock_locking attendance_tests.test_double_clock_guard onboarding.test_verification_transitions shifts.test_shift_actions_contract workforce.tests.test_publication_contract workforce.tests.test_roster_slot_concurrency workforce.tests.test_timesheets --settings=core.postgres_test_settings
+        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards billing.test_pr201_finance_pg ethical_marketplace.test_pr201_b31_pg marketplace.tests marketplace.test_pr201_b24_b25 attendance.test_approval_locking attendance.test_kiosk_pairing attendance.test_kiosk_review attendance.test_clock_locking attendance.test_pin_eligibility attendance_tests.test_double_clock_guard onboarding.test_verification_transitions shifts.test_shift_actions_contract workforce.tests.test_publication_contract workforce.tests.test_roster_slot_concurrency workforce.tests.test_timesheets --settings=core.postgres_test_settings
 
   boundary-audit:
     runs-on: ubuntu-latest

@@ -7,7 +7,7 @@ from rest_framework import permissions, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from attendance.credentials import verify_signed_pharmacy_qr, worker_update_own_pin
+from attendance.credentials import pin_eligible_memberships, verify_signed_pharmacy_qr, worker_update_own_pin
 from attendance.throttles import WorkerClockInThrottle, WorkerClockOutThrottle
 from attendance.transitions import (
     ConfirmOppositeActionRequired,
@@ -17,7 +17,6 @@ from attendance.transitions import (
     get_active_session_status,
     start_break,
 )
-from memberships.models import Membership
 from attendance.api_support import _confirm_opposite, _unexpected_error_response
 
 
@@ -184,8 +183,8 @@ class WorkerUpdatePinView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        memberships = Membership.objects.filter(
-            user=request.user, is_active=True, status=Membership.Status.ACCEPTED,
+        memberships = pin_eligible_memberships().filter(
+            user=request.user,
         ).select_related("pharmacy", "worker_pin").order_by("pharmacy__name", "pk")
         return Response({"pharmacies": [{
             "id": membership.pharmacy_id,

@@ -656,7 +656,7 @@ connection.close()
         self.assert_no_decision(evidence, before + 1)
         self.assertEqual(self.snapshot(evidence), original)
 
-    def assert_later_lock_timeout_propagates(self, model, event_type):
+    def assert_later_lock_timeout_returns_conflict(self, model, event_type):
         worker, session = self.prepare_worker(event_type)
         evidence = self.queue(worker, event_type)
         original = self.snapshot(evidence)
@@ -690,14 +690,11 @@ connection.close()
         self.assertEqual(sqlstate, "55P03", (sql, status, data))
         self.assertIn(connection.ops.quote_name(model._meta.db_table), sql)
         self.assertNotIn("NOWAIT", sql)
-        self.assertFalse(
-            status == 409 and isinstance(data, dict) and data.get("code") == "CONCURRENT_REVIEW",
-            "A later device/session timeout is not evidence-review contention.",
-        )
-        self.assertTrue(
-            (status == "unexpected" and data.startswith("OperationalError(")) or status == 500,
-            (status, data),
-        )
+        with self.subTest(check="retryable conflict"):
+            self.assertEqual((status, data), (409, {
+                "code": "CONCURRENT_REVIEW",
+                "detail": "Another review is in progress for this event.",
+            }))
         self.assert_no_decision(evidence, before)
         self.assertEqual(self.snapshot(evidence), original)
         # Releasing the unrelated lock leaves a valid first decision and exact replay.
@@ -710,8 +707,8 @@ connection.close()
         self.assertEqual(KioskAttendanceReview.objects.filter(evidence=evidence).count(), 1)
         self.assertEqual(self.snapshot(evidence), original)
 
-    def test_device_lock_timeout_is_not_concurrent_review(self):
-        self.assert_later_lock_timeout_propagates(KioskDevice, "CLOCK_IN")
+    def test_device_lock_timeout_returns_retryable_conflict(self):
+        self.assert_later_lock_timeout_returns_conflict(KioskDevice, "CLOCK_IN")
 
-    def test_session_lock_timeout_is_not_concurrent_review(self):
-        self.assert_later_lock_timeout_propagates(AttendanceSession, "CLOCK_OUT")
+    def test_session_lock_timeout_returns_retryable_conflict(self):
+        self.assert_later_lock_timeout_returns_conflict(AttendanceSession, "CLOCK_OUT")
