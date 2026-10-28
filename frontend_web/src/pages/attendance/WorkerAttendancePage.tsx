@@ -52,6 +52,7 @@ export default function WorkerAttendancePage() {
     started_at?: string | null;
     is_provisional?: boolean;
     is_on_break?: boolean;
+    cover_type?: string | null;
   } | null>(null);
 
   const [elapsedDuration, setElapsedDuration] = useState<string>(() => formatAttendanceMinutes(0));
@@ -365,6 +366,7 @@ export default function WorkerAttendancePage() {
                       <Alert severity="warning" sx={{ width: "100%", textAlign: "left" }}>
                         <strong>Provisional attendance.</strong> This shift wasn't on the roster (or is cover at another
                         site). Your hours are still recorded and sent to the pharmacy manager to review.
+                        {statusInfo.cover_type === "UNBOOKED_LOCUM_COVER" && " A manager must approve it before it is payable."}
                       </Alert>
                     )}
 

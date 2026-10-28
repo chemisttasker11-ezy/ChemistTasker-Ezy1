@@ -32,7 +32,7 @@ function load(relative, imports = {}, globals = {}) {
 const { formatAttendanceMinutes } = load('../../../../shared-core/src/utils/attendanceDisplay.ts');
 const emptyPhrases = [/accepted\s+(?:staff\s+)?membership/i, /booked locums/i, /mobile app/i];
 
-async function worker({ active = false, saveError = null } = {}) {
+async function worker({ active = false, saveError = null, status = {} } = {}) {
   const state = [], deps = [];
   let cursor = 0, dirty = true, effects = [], tree, timer, resolvePin, rejectPin, pinLoads = 0;
   const pinResponse = new Promise((resolve, reject) => { resolvePin = resolve; rejectPin = reject; });
@@ -66,7 +66,7 @@ async function worker({ active = false, saveError = null } = {}) {
     'react-router-dom': { Link: 'Link', NavLink: 'NavLink' },
     '@chemisttasker/shared-core': {
       attendance: {
-        getWorkerStatus: async () => ({ has_active_session: active, pharmacy_name: 'Guidance Pharmacy', started_at: '2026-10-29T00:00:00Z' }),
+        getWorkerStatus: async () => ({ has_active_session: active, pharmacy_name: 'Guidance Pharmacy', started_at: '2026-10-29T00:00:00Z', ...status }),
         getPinPharmacies() { pinLoads++; return pinResponse; },
         async updatePin(pharmacyId, pin) {
           pinSaveCalls.push({ pharmacyId, pin });
@@ -246,4 +246,29 @@ test('worker open shift uses shared hours/minutes formatting at 425 minutes and 
   await ui.tick();
   assert.equal(text(duration()), formatAttendanceMinutes(426));
   assert.doesNotMatch(text(duration()), /\d+:\d{2}:\d{2}/);
+});
+
+
+test('web worker unbooked provisional session explains manager approval before payable', async () => {
+  const ui = await worker({ active: true, status: { is_provisional: true, cover_type: 'UNBOOKED_LOCUM_COVER' } });
+  const note = nodes(ui.tree, 'Alert').find(node => node.props.severity === 'warning' && /provisional/i.test(text(node)));
+  assert.ok(note, 'An open provisional session must show its attendance warning');
+  const copy = text(note);
+  assert.match(copy, /manager/i);
+  assert.match(copy, /approv(?:e|al)[\s\S]*before[\s\S]*payable/i);
+});
+
+test('web worker ordinary provisional session keeps the existing recorded-hours review note', async () => {
+  const ui = await worker({ active: true, status: { is_provisional: true, cover_type: 'UNROSTERED_LOCAL' } });
+  const note = nodes(ui.tree, 'Alert').find(node => node.props.severity === 'warning' && /provisional/i.test(text(node)));
+  assert.ok(note);
+  const copy = text(note).replace(/\s+/g, ' ').trim();
+  assert.match(copy, /This shift wasn't on the roster \(or is cover at another site\)\. Your hours are still recorded and sent to the pharmacy manager to review\./);
+  assert.doesNotMatch(copy, /unbooked|no booking|payable/i);
+});
+
+test('web worker non-provisional session has no provisional approval or payable note', async () => {
+  const ui = await worker({ active: true, status: { is_provisional: false, cover_type: null } });
+  const copy = nodes(ui.tree, 'Alert').map(text).join(' ');
+  assert.doesNotMatch(copy, /provisional|manager.*approv|payable/i);
 });

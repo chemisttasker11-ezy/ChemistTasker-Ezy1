@@ -47,6 +47,7 @@ const COVER_TYPES: Record<string, { label: string; tone: StatusTone; hint: strin
   UNROSTERED_LOCAL: { label: "Not on the roster", tone: "blue", hint: "Worked at this pharmacy without a rostered shift." },
   CROSS_SITE_CHAIN: { label: "Cover from a sister store", tone: "violet", hint: "Usually works at another pharmacy in your chain." },
   CROSS_SITE_ORG: { label: "Cover from your organisation", tone: "amber", hint: "Usually works at another pharmacy in your organisation." },
+  UNBOOKED_LOCUM_COVER: { label: "Unbooked locum cover", tone: "amber", hint: "Verified pharmacist with no booking or membership here. Approve before any time is payable." },
 };
 
 const EVENT_TONES: Record<string, StatusTone> = { CLOCK_IN: "green", CLOCK_OUT: "navy" };
@@ -60,7 +61,7 @@ type PendingReview = {
   worker_email: string;
   started_at: string;
   ended_at: string | null;
-  cover_type: "UNROSTERED_LOCAL" | "CROSS_SITE_CHAIN" | "CROSS_SITE_ORG";
+  cover_type: "UNROSTERED_LOCAL" | "CROSS_SITE_CHAIN" | "CROSS_SITE_ORG" | "UNBOOKED_LOCUM_COVER";
   source_pharmacy_name: string | null;
   status: string;
   decision_reason: string | null;
@@ -367,6 +368,11 @@ export default function ManagerAttendanceReviewPage() {
                     {row.worker_email}
                     {row.source_pharmacy_name ? ` · usually at ${row.source_pharmacy_name}` : ""}
                   </Typography>
+                  {row.cover_type === "UNBOOKED_LOCUM_COVER" && (
+                    <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+                      {cover.hint}
+                    </Typography>
+                  )}
                   <Typography variant="body2" sx={{ mt: 0.5, color: "var(--ct-text-primary)", fontVariantNumeric: "tabular-nums" }}>
                     {startTime.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })} · {time(startTime)} – {endTime ? time(endTime) : "still clocked in"}
                     {" · "}

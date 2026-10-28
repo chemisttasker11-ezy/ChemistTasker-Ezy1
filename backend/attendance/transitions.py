@@ -195,6 +195,7 @@ def clock_in(
             pharmacy,
             target_time=now,
             assignment_id=assignment_id,
+            allow_unbooked_cover=bool(signed_qr_token),
         )
         if not eligibility.is_eligible:
             raise ValidationError(
@@ -439,12 +440,13 @@ def get_active_session_status(user) -> Optional[dict]:
     """Retrieve summary of worker's active open session, if any."""
     session = (
         AttendanceSession.objects.filter(user=user, ended_at__isnull=True)
-        .select_related("pharmacy", "assignment")
+        .select_related("pharmacy", "assignment", "provisional_review")
         .first()
     )
     if not session:
         return None
 
+    provisional = getattr(session, "provisional_review", None) if session.is_provisional else None
     last_event = session.events.order_by("-occurred_at", "-id").first()
     is_on_break = (
         last_event.event_type == AttendanceEvent.EventType.BREAK_START
@@ -458,6 +460,7 @@ def get_active_session_status(user) -> Optional[dict]:
         "pharmacy_name": session.pharmacy.name,
         "started_at": session.started_at,
         "is_provisional": session.is_provisional,
+        "cover_type": provisional.cover_type if provisional else None,
         "is_on_break": is_on_break,
         "last_event_type": last_event.event_type if last_event else None,
     }

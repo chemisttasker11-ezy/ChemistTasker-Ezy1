@@ -150,3 +150,21 @@ test('kiosk PIN entry still submits an eligible worker without a guidance acknow
   assert.ok(ui.calls[0].body.request_id); assert.notEqual(ui.calls[0].body.confirm_opposite, true);
   assert.equal(ui.calls[0].config.headers['X-Device-Token'], 'device-token');
 });
+
+for (const desktop of [false, true]) {
+  test(`${desktop ? 'desktop' : 'web'} kiosk guides unbooked verified pharmacists to scan pharmacy QR in the ChemistTasker app`, async () => {
+    const ui = await kiosk({ desktop }); const copy = text(ui.pinPanel());
+    assert.match(copy, /unbooked|no booking/i);
+    assert.match(copy, /verified\s+pharmacist/i);
+    assert.match(copy, /scan/i); assert.match(copy, /pharmacy[^.!?]*QR|QR[^.!?]*pharmacy/i);
+    assert.match(copy, /ChemistTasker\s+app/i);
+    assert.equal(ui.calls.length, 0, 'Reading unbooked locum guidance must not submit attendance');
+  });
+
+  test(`${desktop ? 'desktop' : 'web'} kiosk explains manager approval before unbooked locum cover is paid`, async () => {
+    const ui = await kiosk({ desktop }); const copy = text(ui.pinPanel());
+    assert.match(copy, /manager[^.!?]*approve|approve[^.!?]*manager/i);
+    assert.match(copy, /before[^.!?]*(?:paid|payable)/i);
+    assert.equal(ui.calls.length, 0);
+  });
+}

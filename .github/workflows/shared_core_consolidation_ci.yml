@@ -118,7 +118,7 @@ jobs:
         run: node --test scripts/ws-url.test.mjs
         working-directory: frontend_web
       - name: Attendance and kiosk tests
-        run: node --test src/pages/attendance/KioskEvidenceReview.test.mjs src/pages/attendance/KioskPairingDialog.test.mjs src/pages/attendance/KioskDoubleClock.test.mjs src/pages/attendance/WorkerDoubleClock.test.mjs src/pages/attendance/WorkerAttendancePinGuidance.test.mjs src/pages/attendance/KioskLocumGuidance.test.mjs
+        run: node --test src/pages/attendance/KioskEvidenceReview.test.mjs src/pages/attendance/KioskPairingDialog.test.mjs src/pages/attendance/KioskDoubleClock.test.mjs src/pages/attendance/WorkerDoubleClock.test.mjs src/pages/attendance/WorkerAttendancePinGuidance.test.mjs src/pages/attendance/KioskLocumGuidance.test.mjs src/pages/attendance/ManagerLocumReview.test.mjs
         working-directory: frontend_web
       - name: Build Vite app
         run: npx vite build
@@ -202,7 +202,7 @@ jobs:
         run: npm run test:security
         working-directory: frontend_mobile
       - name: Mobile calendar request budget contract
-        run: node --test scripts/calendar-request-budget.test.cjs scripts/attendance-double-clock.test.cjs scripts/attendance-pin-guidance.test.cjs
+        run: node --test scripts/calendar-request-budget.test.cjs scripts/attendance-double-clock.test.cjs scripts/attendance-pin-guidance.test.cjs features/parity/attendanceLocum.test.mjs
         working-directory: frontend_mobile
       - name: Verify patched runtime dependencies and reject new advisories
         run: npm run security:dependencies
@@ -268,7 +268,7 @@ jobs:
           python -m unittest attendance_tests.test_security_boundaries
           python -m unittest attendance_tests.test_roster_worker_actions.RosterWorkerActionsTests.test_acknowledgement_action_available_only_on_published_week
       - name: Workforce and finance contracts
-        run: python backend/manage.py test workforce.tests worker_finance.tests --settings=core.contract_test_settings
+        run: python backend/manage.py test workforce.tests.test_assignment_protection workforce.tests.test_employment workforce.tests.test_pr201_roster workforce.tests.test_publication_contract workforce.tests.test_roster_admin_capabilities workforce.tests.test_roster_escalation workforce.tests.test_roster_escalation_lock workforce.tests.test_roster_revision workforce.tests.test_roster_shift_republish workforce.tests.test_roster_slot_concurrency workforce.tests.test_roster_slot_http_contract workforce.tests.test_rostered_corrections workforce.tests.test_timesheet_state_machine workforce.tests.test_timesheets workforce.tests.test_timezone_resolution worker_finance.tests --settings=core.contract_test_settings
       - name: Isolated finance API contracts
         run: python backend/manage.py test worker_finance.tests --settings=worker_finance.tests.settings
       - name: Signal and startup contracts
@@ -309,7 +309,7 @@ jobs:
       - name: PostgreSQL migration rehearsal
         run: python backend/manage.py migrate --noinput --settings=core.postgres_test_settings
       - name: PostgreSQL concurrency contracts
-        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards billing.test_pr201_finance_pg ethical_marketplace.test_pr201_b31_pg marketplace.tests marketplace.test_pr201_b24_b25 attendance.test_approval_locking attendance.test_kiosk_pairing attendance.test_kiosk_review attendance.test_clock_locking attendance.test_pin_eligibility attendance_tests.test_double_clock_guard onboarding.test_verification_transitions shifts.test_shift_actions_contract workforce.tests.test_publication_contract workforce.tests.test_roster_slot_concurrency workforce.tests.test_timesheets --settings=core.postgres_test_settings
+        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards billing.test_pr201_finance_pg ethical_marketplace.test_pr201_b31_pg marketplace.tests marketplace.test_pr201_b24_b25 attendance.test_approval_locking attendance.test_kiosk_pairing attendance.test_kiosk_review attendance.test_clock_locking attendance.test_pin_eligibility attendance.test_unbooked_locum_cover workforce.tests.test_locum_approval_gate attendance_tests.test_double_clock_guard onboarding.test_verification_transitions shifts.test_shift_actions_contract workforce.tests.test_publication_contract workforce.tests.test_roster_slot_concurrency workforce.tests.test_timesheets --settings=core.postgres_test_settings
 
   boundary-audit:
     runs-on: ubuntu-latest

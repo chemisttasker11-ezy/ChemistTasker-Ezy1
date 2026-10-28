@@ -37,6 +37,7 @@ class WorkerAttendanceStatusView(APIView):
                 "pharmacy_name": None,
                 "started_at": None,
                 "is_provisional": False,
+                "cover_type": None,
                 "is_on_break": False,
                 "last_event_type": None,
             })
@@ -47,6 +48,7 @@ class WorkerAttendanceStatusView(APIView):
             "pharmacy_name": status_info["pharmacy_name"],
             "started_at": status_info["started_at"].isoformat() if status_info["started_at"] else None,
             "is_provisional": status_info["is_provisional"],
+            "cover_type": status_info["cover_type"],
             "is_on_break": status_info["is_on_break"],
             "last_event_type": status_info["last_event_type"],
         })

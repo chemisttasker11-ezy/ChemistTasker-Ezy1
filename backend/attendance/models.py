@@ -499,6 +499,7 @@ class ProvisionalAttendance(models.Model):
         CROSS_SITE_CHAIN = "CROSS_SITE_CHAIN", "Cross-Site Same Owner Chain"
         CROSS_SITE_ORG = "CROSS_SITE_ORG", "Cross-Site Same Organization"
         FAVOURITE_COVER = "FAVOURITE_COVER", "Favourite-List Emergency Cover"
+        UNBOOKED_LOCUM_COVER = "UNBOOKED_LOCUM_COVER", "Unbooked locum cover"
 
     session = models.OneToOneField(
         AttendanceSession,

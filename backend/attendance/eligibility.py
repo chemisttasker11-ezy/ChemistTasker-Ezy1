@@ -12,6 +12,8 @@ resolving the exact eligibility tier:
 3. Cross-Site Staff: Active, accepted employed staff at another pharmacy sharing
    the same owner chain (same owner or active Chain) or same organization.
    Provisional (pending manager approval). Records the source membership.
+4. Unbooked locum cover (online live-QR clock-in only): a verified pharmacist account.
+   Provisional (pending manager approval), no source membership.
 
 Unauthorized attempts (inactive, pending, plain CONTACT favourites without an assignment,
 unrelated staff, null-to-null owner/org matches, org-admin without membership)
@@ -48,6 +50,7 @@ class EligibilityType:
     CROSS_SITE_CHAIN = "CROSS_SITE_CHAIN"
     CROSS_SITE_ORG = "CROSS_SITE_ORG"
     FAVOURITE_COVER = "FAVOURITE_COVER"
+    UNBOOKED_LOCUM_COVER = "UNBOOKED_LOCUM_COVER"
     REJECTED = "REJECTED"
 
 
@@ -195,6 +198,7 @@ def resolve_attendance_eligibility(
     pharmacy: Pharmacy,
     target_time: Optional[datetime] = None,
     assignment_id: Optional[int] = None,
+    allow_unbooked_cover: bool = False,
 ) -> AttendanceEligibilityResult:
     """
     Resolve attendance eligibility for a user at a given pharmacy.
@@ -206,11 +210,15 @@ def resolve_attendance_eligibility(
         FAVOURITE_COVER (pending owner review; paid by the worker's own invoice or TFN payroll preference).
     3. Cross-Site Staff under same owner chain -> Eligible, provisional CROSS_SITE_CHAIN.
     4. Cross-Site Staff under same organization -> Eligible, provisional CROSS_SITE_ORG.
-    5. Rejection with reason.
+    5. Only with allow_unbooked_cover (online live-QR clock-in): a verified PHARMACIST account
+       (onboarding verification policy) -> Eligible, provisional UNBOOKED_LOCUM_COVER. An inactive,
+       REJECTED or LEFT local membership blocks it.
+    6. Rejection with reason.
 
     Negative Rules:
     - Never match on null owner or null organization.
-    - Never infer eligibility from onboarding flags or org-admin roles.
+    - Onboarding verification counts only for tier 5; never infer eligibility from org-admin roles
+      or stored onboarding flags.
     - Plain contacts (role CONTACT) without an assignment are rejected.
     - Read-only evaluation; never creates shifts or memberships.
     """
@@ -351,6 +359,36 @@ def resolve_attendance_eligibility(
                 cover_type=ProvisionalAttendance.CoverType.CROSS_SITE_ORG,
                 assignment=None,
                 source_membership=mem,
+            )
+
+    # -------------------------------------------------------------------------
+    # Tier 5: Unbooked verified pharmacist cover (E8, E11; live QR only)
+    # An inactive, REJECTED or LEFT local membership blocks it (owner decision).
+    # -------------------------------------------------------------------------
+    if (
+        allow_unbooked_cover
+        and user.is_active
+        and getattr(user, "role", None) == "PHARMACIST"
+        and not (
+            local_membership is not None
+            and (
+                not local_membership.is_active
+                or local_membership.status in (Membership.Status.REJECTED, Membership.Status.LEFT)
+            )
+        )
+    ):
+        from onboarding.models import PharmacistOnboarding
+        from onboarding.verification.policy import evaluate
+
+        profile = PharmacistOnboarding.objects.filter(user=user).first()
+        if profile is not None and evaluate(profile)["verified"]:
+            return AttendanceEligibilityResult(
+                is_eligible=True,
+                eligibility_type=EligibilityType.UNBOOKED_LOCUM_COVER,
+                is_provisional=True,
+                cover_type=ProvisionalAttendance.CoverType.UNBOOKED_LOCUM_COVER,
+                assignment=None,
+                source_membership=None,
             )
 
     # -------------------------------------------------------------------------

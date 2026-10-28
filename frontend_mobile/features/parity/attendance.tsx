@@ -106,7 +106,8 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
     return <ParityPage title={titles[screen]} subtitle="Review provisional and cross-site attendance before it becomes rostered history." loading={loading} error={error} onRetry={load} onRefresh={()=>{setRefreshing(true);void load();}} refreshing={refreshing}>
       <MetricGrid items={[{label:'Pending',value:pending.length,tone:pending.length?'warning':'success'}]}/>
       <Section title="Pending provisional shifts">
-        {pending.length?pending.map((row:any)=><DataRow key={row.provisional_id} title={row.worker_name||row.worker_email||'Worker'} subtitle={`${replaceUnderscore(row.cover_type)} · ${dateLabel(row.started_at)}`} status={row.status||'PENDING'} onPress={()=>router.push(`/attendance/reviews/${row.provisional_id}` as any)}/>):<EmptyState title="Nothing to review" body="No provisional attendance is waiting for a manager decision."/>}
+        {pending.some((row:any)=>coverInfo(row.cover_type).hint)?<InfoNote title="Unbooked locum cover" tone="warning">{UNBOOKED_HINT}</InfoNote>:null}
+        {pending.length?pending.map((row:any)=><DataRow key={row.provisional_id} title={row.worker_name||row.worker_email||'Worker'} subtitle={`${coverInfo(row.cover_type).label} · ${dateLabel(row.started_at)}`} status={row.status||'PENDING'} onPress={()=>router.push(`/attendance/reviews/${row.provisional_id}` as any)}/>):<EmptyState title="Nothing to review" body="No provisional attendance is waiting for a manager decision."/>}
       </Section>
     </ParityPage>;
   }
@@ -122,7 +123,7 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
       {label:'Pharmacy',value:status?.pharmacy_name||'—'},
       {label:'Break',value:status?.is_on_break?'On break':'Working',tone:status?.is_on_break?'warning':'success'},
     ]}/>
-    {status?.is_provisional?<InfoNote title="Provisional attendance" tone="warning">This session needs manager review before it is treated as approved roster history.</InfoNote>:null}
+    <ProvisionalNote status={status}/>
     <Section title="Attendance tools">
       <ScreenLink title="Clock & breaks" subtitle="Clock in/out from a pharmacy QR token and manage breaks." onPress={()=>router.push('/attendance/clock' as any)}/>
       <ScreenLink title="Attendance correction" subtitle={manager?'Append an audited correction to a recorded event.':'Request a missing-punch correction through your timesheet.'} onPress={()=>router.push('/attendance/corrections/new' as any)}/>
@@ -131,6 +132,16 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
       <ScreenLink title="My hours" subtitle="Review timesheet periods and recorded hours." onPress={()=>router.push('/my-hours' as any)}/>
     </Section>
   </ParityPage>;
+}
+
+const UNBOOKED_HINT='No booking or membership here: a manager must approve this before any time is payable.';
+function coverInfo(type:string){
+  return type==='UNBOOKED_LOCUM_COVER'?{label:'Unbooked locum cover',hint:UNBOOKED_HINT}:{label:replaceUnderscore(type),hint:''};
+}
+
+function ProvisionalNote({status}:{status:any}) {
+  if(!status?.is_provisional) return null;
+  return <InfoNote title="Provisional attendance" tone="warning">{status.cover_type==='UNBOOKED_LOCUM_COVER'?'Unbooked cover: a manager at this pharmacy must approve this session before it is payable.':'This session needs manager review before it is treated as approved roster history.'}</InfoNote>;
 }
 
 function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean;error:string;onReload:()=>Promise<void>}) {
@@ -210,6 +221,7 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
   return <ParityPage title="Clock & breaks" subtitle="Scan the rotating pharmacy kiosk QR to clock in or out. Break actions use your active session." loading={loading} error={error||localError}>
     <MetricGrid minItemWidth={140} items={[{label:'Status',value:active?'Clocked in':'Not clocked in',tone:active?'success':'primary'},{label:'Pharmacy',value:status?.pharmacy_name||'—'},{label:'Started',value:status?.started_at?dateLabel(status.started_at):'—'}]}/>
 
+    <ProvisionalNote status={status}/>
     <Section title={active?'Scan to clock out':'Scan to clock in'} description="The kiosk QR changes regularly and is valid only for its pharmacy.">
       {scannerOpen ? <View style={scannerStyles.scannerShell}>
         <View style={scannerStyles.cameraFrame}>
@@ -291,7 +303,8 @@ function ReviewDetail({screen,row,timeline,loading,error,onReload}:{screen:Atten
   return <ParityPage title={titles[screen]} subtitle="Session chronology and audit-safe manager decision." loading={loading} error={error||localError}>
     {!row?<EmptyState title="Attendance record not found" body="This provisional attendance item is no longer pending for the selected pharmacy."/>:<>
       <Section title={row.worker_name||'Worker'} description={row.worker_email}>
-        <MetricGrid items={[{label:'Cover type',value:replaceUnderscore(row.cover_type)},{label:'Started',value:dateLabel(row.started_at)},{label:'Ended',value:row.ended_at?dateLabel(row.ended_at):'In progress',tone:row.ended_at?'success':'warning'}]}/>
+        <MetricGrid items={[{label:'Cover type',value:coverInfo(row.cover_type).label},{label:'Started',value:dateLabel(row.started_at)},{label:'Ended',value:row.ended_at?dateLabel(row.ended_at):'In progress',tone:row.ended_at?'success':'warning'}]}/>
+        {coverInfo(row.cover_type).hint?<InfoNote title="Unbooked locum cover" tone="warning">{UNBOOKED_HINT}</InfoNote>:null}
         {row.source_pharmacy_name?<DataRow title="Home pharmacy" subtitle={row.source_pharmacy_name}/>:null}
       </Section>
       <Section title="Session chronology">

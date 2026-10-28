@@ -1841,7 +1841,7 @@ export default function KioskPage() {
                     }}
                   >
                     <Typography variant="body2" sx={{ color: "#e2e8f0", fontSize: 12.5, lineHeight: 1.45 }}>
-                      <strong>Booked locums:</strong> A booking alone gives no kiosk PIN. Booked locums without a staff membership use the mobile app to scan the counter QR code. Pending staff members must accept invitations in the app before setting a PIN.
+                      <strong>Booked locums:</strong> A booking alone gives no kiosk PIN. Booked locums without a staff membership use the mobile app to scan the counter QR code. Pending staff members must accept invitations in the app before setting a PIN. <strong>Unbooked cover:</strong> verified pharmacists with no booking here scan this pharmacy's QR code in the ChemistTasker app to start cover; a manager must approve it before it is paid.
                     </Typography>
                   </Box>
 

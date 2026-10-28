@@ -9,6 +9,7 @@ export interface AttendanceWorkerStatus {
   is_provisional: boolean;
   is_on_break: boolean;
   last_event_type: string | null;
+  cover_type?: string | null;
 }
 
 export interface AttendanceClockResult {
