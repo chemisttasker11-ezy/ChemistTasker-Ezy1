@@ -225,6 +225,8 @@ export const API_ENDPOINTS = {
         managerCorrect: '/attendance/manager/correct/',
         managerTimeline: (sessionId: number | string) => `/attendance/manager/timeline/${sessionId}/`,
         managerKioskDevices: '/attendance/manager/kiosk-devices/',
+        managerKioskReviewPending: '/attendance/manager/kiosk-review/pending/',
+        managerKioskReviewDecide: '/attendance/manager/kiosk-review/decide/',
     },
     rosterV2: {
         period: '/attendance/roster/period/',

@@ -1,4 +1,14 @@
-import type { AttendanceWorkerStatus, AttendanceClockResult, AttendanceBreakResult, AttendancePinPharmacy, PendingAttendance, AttendanceTimeline } from '../../contracts/attendanceRoster';
+import type {
+    AttendanceWorkerStatus,
+    AttendanceClockResult,
+    AttendanceBreakResult,
+    AttendancePinPharmacy,
+    PendingAttendance,
+    AttendanceTimeline,
+    PendingKioskReview,
+    DecideKioskReviewPayload,
+    KioskReviewDecisionResponse,
+} from '../../contracts/attendanceRoster';
 /** Domain-owned operations extracted from the established shared API. */
 import { API_ENDPOINTS } from '../../constants/endpoints';
 import { operationalRequest } from '../../transport/operational';
@@ -32,4 +42,13 @@ export const attendance = {
     }),
     getManagerKioskDevices: (pharmacyId: number | string) => operationalRequest(API_ENDPOINTS.attendance.managerKioskDevices, { query: { pharmacy_id: pharmacyId } }),
     revokeManagerKioskDevice: (deviceId: number | string) => operationalRequest(API_ENDPOINTS.attendance.managerKioskDevices, { method: 'POST', body: { device_id: deviceId } }),
+    getManagerPendingKioskReviews: (pharmacyId: number | string) =>
+        operationalRequest<PendingKioskReview[]>(API_ENDPOINTS.attendance.managerKioskReviewPending, {
+            query: { pharmacy_id: pharmacyId },
+        }),
+    decideKioskReview: (payload: DecideKioskReviewPayload) =>
+        operationalRequest<KioskReviewDecisionResponse>(API_ENDPOINTS.attendance.managerKioskReviewDecide, {
+            method: 'POST',
+            body: payload,
+        }),
 };

@@ -170,3 +170,33 @@ export interface RosterAudit {
   created_at: string;
 }
 
+
+
+export interface PendingKioskReview {
+  event_id: string;
+  employee_id: number;
+  worker_name: string;
+  event_type: string;
+  device_id: number;
+  device_name: string;
+  pharmacy_timezone: string;
+  device_timestamp: string;
+  trusted_time_estimate: string | null;
+  received_at: string;
+  integrity_flags: string[];
+  can_approve: boolean;
+  approval_block_reason: string | null;
+}
+
+export interface DecideKioskReviewPayload {
+  event_id: string;
+  decision: 'APPROVED' | 'REJECTED';
+  reason: string;
+  corrected_timestamp?: string;
+}
+
+export interface KioskReviewDecisionResponse {
+  decision: string;
+  review_id: number;
+  attendance_event_id: number | null;
+}

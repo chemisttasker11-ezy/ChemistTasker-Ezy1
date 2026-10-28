@@ -2,13 +2,14 @@
 import logging
 import uuid
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, OperationalError, transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from attendance.models import KioskAttendanceEvent, KioskAttendanceReview
+from attendance.models import AttendanceSession, KioskAttendanceEvent, KioskAttendanceReview, KioskDevice
 from attendance.approvals import is_authorized_attendance_manager
 from attendance.protocol import _apply_business_event, _parse_aware_datetime
 from organizations.models import Pharmacy
@@ -19,6 +20,15 @@ BLOCKED_APPROVAL_FLAGS = {
     "HASH_CHAIN_MISMATCH", "SEQUENCE_GAP", "UNEXPECTED_INITIAL_HASH",
     "DEVICE_REVOKED_DRAIN", "MONOTONIC_ROLLBACK",
 }
+
+
+def _is_lock_unavailable_error(exc: Exception) -> bool:
+    cause = getattr(exc, "__cause__", None)
+    pgcode = getattr(cause, "pgcode", None) or getattr(exc, "pgcode", None) or getattr(cause, "sqlstate", None)
+    if pgcode == "55P03":
+        return True
+    msg = str(exc).lower()
+    return "could not obtain lock" in msg or "lock not available" in msg
 
 
 class ManagerPendingKioskReviewView(APIView):
@@ -38,19 +48,47 @@ class ManagerPendingKioskReviewView(APIView):
                 processing_status=KioskAttendanceEvent.ProcessingStatus.NEEDS_REVIEW,
                 manager_review__isnull=True,
                 attendance_event__isnull=True,
-            ).select_related("device", "employee").order_by("received_at")[:100]
+            ).select_related("device", "device__pharmacy", "employee").order_by("received_at")[:100]
         )
-        return Response([
-            {
-                "event_id": str(event.event_id), "employee_id": event.employee_id,
+        results = []
+        for event in events:
+            worker_name = ""
+            if event.employee:
+                worker_name = f"{event.employee.first_name} {event.employee.last_name}".strip()
+                if not worker_name:
+                    worker_name = event.employee.get_full_name() or event.employee.username or str(event.employee)
+
+            can_approve = True
+            approval_block_reason = None
+
+            if not event.device.is_active or event.device.revoked_at is not None:
+                can_approve = False
+                approval_block_reason = "Device was revoked."
+            elif event.employee is None or not event.employee.is_active:
+                can_approve = False
+                approval_block_reason = "Worker is inactive or not eligible."
+            else:
+                blocked = sorted(set(event.integrity_flags or []).intersection(BLOCKED_APPROVAL_FLAGS))
+                if blocked:
+                    can_approve = False
+                    approval_block_reason = f"Approval blocked: {blocked[0]}"
+
+            results.append({
+                "event_id": str(event.event_id),
+                "employee_id": event.employee_id,
+                "worker_name": worker_name,
                 "event_type": event.event_type,
+                "device_id": event.device.pk,
+                "device_name": event.device.device_name,
+                "pharmacy_timezone": event.device.pharmacy.timezone or "UTC",
                 "device_timestamp": event.device_timestamp.isoformat(),
                 "trusted_time_estimate": event.trusted_time_estimate.isoformat() if event.trusted_time_estimate else None,
-                "integrity_flags": event.integrity_flags,
+                "integrity_flags": event.integrity_flags or [],
                 "received_at": event.received_at.isoformat(),
-            }
-            for event in events
-        ])
+                "can_approve": can_approve,
+                "approval_block_reason": approval_block_reason,
+            })
+        return Response(results)
 
 
 class ManagerDecideKioskReviewView(APIView):
@@ -70,12 +108,23 @@ class ManagerDecideKioskReviewView(APIView):
 
         try:
             with transaction.atomic():
-                evidence = get_object_or_404(
-                    KioskAttendanceEvent.objects.select_for_update(of=("self",)).select_related(
-                        "device", "device__pharmacy", "employee",
-                    ),
-                    event_id=event_uuid,
-                )
+                try:
+                    with transaction.atomic():
+                        evidence = get_object_or_404(
+                            KioskAttendanceEvent.objects.select_for_update(
+                                nowait=True, of=("self",),
+                            ).select_related(
+                                "device", "device__pharmacy", "employee",
+                            ),
+                            event_id=event_uuid,
+                        )
+                except OperationalError as exc:
+                    if _is_lock_unavailable_error(exc):
+                        return Response(
+                            {"code": "CONCURRENT_REVIEW", "detail": "Another review is in progress for this event."},
+                            status=409,
+                        )
+                    raise
                 pharmacy = evidence.device.pharmacy
                 if not is_authorized_attendance_manager(request.user, pharmacy):
                     return Response({"detail": "Not authorized for this pharmacy."}, status=403)
@@ -83,8 +132,20 @@ class ManagerDecideKioskReviewView(APIView):
                     return Response({"code": "EVENT_NOT_PENDING_REVIEW"}, status=409)
                 review = KioskAttendanceReview.objects.filter(evidence=evidence).first()
                 if review:
-                    if review.decision != decision:
+                    if review.manager_id != request.user.pk or review.decision != decision:
                         return Response({"code": "REVIEW_ALREADY_DECIDED"}, status=409)
+                    if (review.reason or "").strip() != reason:
+                        return Response({"code": "REVIEW_ALREADY_DECIDED"}, status=409)
+                    if decision == KioskAttendanceReview.Decision.APPROVED:
+                        raw_corrected = request.data.get("corrected_timestamp")
+                        if not raw_corrected:
+                            return Response({"code": "REVIEW_ALREADY_DECIDED"}, status=409)
+                        try:
+                            req_time = _parse_aware_datetime(raw_corrected, "corrected_timestamp")
+                        except DjangoValidationError:
+                            return Response({"code": "REVIEW_ALREADY_DECIDED"}, status=409)
+                        if review.effective_timestamp != req_time:
+                            return Response({"code": "REVIEW_ALREADY_DECIDED"}, status=409)
                     return Response({
                         "decision": review.decision, "review_id": review.pk,
                         "attendance_event_id": review.attendance_event_id,
@@ -99,6 +160,15 @@ class ManagerDecideKioskReviewView(APIView):
                         return Response({"code": "UNTRUSTWORTHY_DEVICE_EVIDENCE"}, status=409)
                     if evidence.employee is None or not evidence.employee.is_active:
                         return Response({"code": "WORKER_NOT_ELIGIBLE"}, status=409)
+
+                    device = (
+                        KioskDevice.objects.select_for_update(no_key=True)
+                        .extra(where=["1=1 /* FOR UPDATE */"])
+                        .get(pk=evidence.device_id)
+                    )
+                    if not device.is_active or device.revoked_at is not None:
+                        return Response({"code": "DEVICE_REVOKED"}, status=409)
+
                     # Clock-drift evidence is never applied using an untrusted
                     # signed timestamp. The reviewer must supply a corrected
                     # aware timestamp and a written justification.
@@ -111,8 +181,30 @@ class ManagerDecideKioskReviewView(APIView):
                         raise ValidationError({
                             "corrected_timestamp": "Use an ISO-8601 timestamp with an offset.",
                         }) from exc
+
+                    if effective_time > timezone.now():
+                        raise ValidationError({
+                            "corrected_timestamp": "Corrected timestamp cannot be in the future.",
+                        })
+
+                    open_session = (
+                        AttendanceSession.objects.select_for_update()
+                        .filter(user=evidence.employee, ended_at__isnull=True)
+                        .first()
+                    )
+                    if open_session:
+                        latest_event = open_session.events.order_by("-occurred_at", "-id").first()
+                        if latest_event and effective_time < latest_event.occurred_at:
+                            raise ValidationError({
+                                "corrected_timestamp": "Corrected timestamp cannot precede the latest event in the active session.",
+                            })
+                        if effective_time < open_session.started_at:
+                            raise ValidationError({
+                                "corrected_timestamp": "Corrected timestamp cannot precede session start.",
+                            })
+
                     live_event = _apply_business_event(
-                        evidence.device, evidence.employee, evidence.event_type,
+                        device, evidence.employee, evidence.event_type,
                         effective_time, evidence.shift_id,
                     )
                 review = KioskAttendanceReview.objects.create(

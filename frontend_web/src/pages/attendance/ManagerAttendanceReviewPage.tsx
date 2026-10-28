@@ -32,6 +32,7 @@ import {
 import { Check, ClipboardCheck, History, PencilLine, RefreshCw, X } from "lucide-react";
 import { attendance, fetchPharmaciesService, formatAttendanceMinutes } from "@chemisttasker/shared-core";
 import PageHeader from "../../components/ui/PageHeader";
+import KioskEvidenceReview from "./KioskEvidenceReview";
 import DashboardContentState from "../../components/dashboard/DashboardContentState";
 import { InitialsAvatar } from "../../components/ui/InitialsAvatar";
 import { Pill } from "../../components/ui/Pill";
@@ -418,6 +419,10 @@ export default function ManagerAttendanceReviewPage() {
       )}
 
       {body}
+
+      {selectedPharmacyId && !pharmaciesLoading && (
+        <KioskEvidenceReview key={selectedPharmacyId} pharmacyId={Number(selectedPharmacyId)} />
+      )}
 
       {/* Approval Confirmation Dialog */}
       <Dialog open={!!approvingItem} onClose={isApproving ? undefined : () => setApprovingItem(null)} maxWidth="sm" fullWidth>
