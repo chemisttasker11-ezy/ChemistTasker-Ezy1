@@ -1,6 +1,7 @@
 import type {
     AttendanceWorkerStatus,
     AttendanceClockResult,
+    AttendanceClockOptions,
     AttendanceBreakResult,
     AttendancePinPharmacy,
     PendingAttendance,
@@ -14,10 +15,22 @@ import { API_ENDPOINTS } from '../../constants/endpoints';
 import { operationalRequest } from '../../transport/operational';
 export const attendance = {
     getWorkerStatus: () => operationalRequest<AttendanceWorkerStatus>(API_ENDPOINTS.attendance.workerStatus),
-    clockIn: (qrToken: string) => operationalRequest<AttendanceClockResult>(API_ENDPOINTS.attendance.workerClockIn, { method: 'POST', body: { qr_token: qrToken } }),
+    clockIn: (qrToken: string, options?: boolean | AttendanceClockOptions) => {
+        const opts = typeof options === 'boolean' ? { confirm_opposite: options } : (options || {});
+        const body: Record<string, unknown> = { qr_token: qrToken };
+        if (opts.confirm_opposite !== undefined) body.confirm_opposite = opts.confirm_opposite;
+        if (opts.request_id !== undefined) body.request_id = opts.request_id;
+        return operationalRequest<AttendanceClockResult>(API_ENDPOINTS.attendance.workerClockIn, { method: 'POST', body });
+    },
     breakStart: () => operationalRequest<AttendanceBreakResult>(API_ENDPOINTS.attendance.workerBreakStart, { method: 'POST', body: {} }),
     breakEnd: () => operationalRequest<AttendanceBreakResult>(API_ENDPOINTS.attendance.workerBreakEnd, { method: 'POST', body: {} }),
-    clockOut: (qrToken: string) => operationalRequest<AttendanceClockResult>(API_ENDPOINTS.attendance.workerClockOut, { method: 'POST', body: { qr_token: qrToken } }),
+    clockOut: (qrToken: string, options?: boolean | AttendanceClockOptions) => {
+        const opts = typeof options === 'boolean' ? { confirm_opposite: options } : (options || {});
+        const body: Record<string, unknown> = { qr_token: qrToken };
+        if (opts.confirm_opposite !== undefined) body.confirm_opposite = opts.confirm_opposite;
+        if (opts.request_id !== undefined) body.request_id = opts.request_id;
+        return operationalRequest<AttendanceClockResult>(API_ENDPOINTS.attendance.workerClockOut, { method: 'POST', body });
+    },
     getPinPharmacies: () => operationalRequest<{
         pharmacies: AttendancePinPharmacy[];
     }>(API_ENDPOINTS.attendance.workerPinUpdate),

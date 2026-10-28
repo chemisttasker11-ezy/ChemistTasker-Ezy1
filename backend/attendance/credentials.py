@@ -717,7 +717,7 @@ def verify_kiosk_worker_pin(
     with transaction.atomic():
         try:
             worker_pin = (
-                WorkerPIN.objects.select_for_update()
+                WorkerPIN.objects.select_for_update(of=("self",))
                 .select_related("membership", "membership__user")
                 .get(pk=membership.worker_pin.pk)
             )
@@ -879,13 +879,23 @@ def send_worker_pin_setup_code(
     }
 
 
+def consume_worker_pin_otp(worker_id) -> None:
+    cache_key = f"{WORKER_PIN_OTP_CACHE_PREFIX}{worker_id}"
+    security_cache.delete_many([cache_key, f"{cache_key}:fail", f"{cache_key}:claim"])
+
+
 def setup_worker_kiosk_pin(
     kiosk_device: KioskDevice,
     user_identifier: str,
     verification_code: str,
     new_pin: str,
+    consume_otp: bool = True,
 ) -> Tuple[Membership, WorkerPIN]:
-    """Verify email OTP and set the worker's PIN from the kiosk."""
+    """Verify email OTP and set the worker's PIN from the kiosk.
+
+    consume_otp=False spends the code only when the transaction commits, so a rolled-back setup keeps it usable.
+    The caller must hold the worker's User lock: the claim check below relies on that serialization.
+    """
     if not kiosk_device or not kiosk_device.is_active:
         raise ValidationError("Kiosk device is inactive or revoked.")
 
@@ -901,6 +911,12 @@ def setup_worker_kiosk_pin(
     cached_data = security_cache.get(cache_key)
 
     if not cached_data or not isinstance(cached_data, dict):
+        raise ValidationError("Verification code expired or not requested. Please request a new code.")
+    # A claim whose PIN hash is committed means an earlier setup committed before its on_commit consumption ran;
+    # an uncommitted (rolled-back) claim is stale, since the User lock means that setup has finished.
+    claim = security_cache.get(f"{cache_key}:claim")
+    if claim and WorkerPIN.objects.filter(pk=claim["pin_id"], pin_hash=claim["pin_hash"]).exists():
+        consume_worker_pin_otp(worker.id)
         raise ValidationError("Verification code expired or not requested. Please request a new code.")
     if (
         cached_data.get("membership_id") != membership.id
@@ -925,9 +941,8 @@ def setup_worker_kiosk_pin(
     if not (4 <= len(cleaned_pin) <= 6) or not cleaned_pin.isdigit():
         raise ValidationError("PIN must be 4 to 6 numeric digits.")
 
-    # Code is valid, consume it immediately
-    security_cache.delete(cache_key)
-    security_cache.delete(f"{cache_key}:fail")
+    if consume_otp:
+        consume_worker_pin_otp(worker.id)
 
     # Save or update WorkerPIN
     worker_pin, _ = WorkerPIN.objects.get_or_create(membership=membership)
@@ -936,6 +951,13 @@ def setup_worker_kiosk_pin(
     worker_pin.failed_attempts = 0
     worker_pin.locked_until = None
     worker_pin.save()
+
+    if not consume_otp:
+        security_cache.set(
+            f"{cache_key}:claim", {"pin_id": worker_pin.pk, "pin_hash": worker_pin.pin_hash},
+            timeout=WORKER_PIN_OTP_TTL,
+        )
+        transaction.on_commit(lambda: consume_worker_pin_otp(worker.id))
 
     # Send confirmation email
     try:

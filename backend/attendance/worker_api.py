@@ -9,9 +9,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from attendance.credentials import verify_signed_pharmacy_qr, worker_update_own_pin
 from attendance.throttles import WorkerClockInThrottle, WorkerClockOutThrottle
-from attendance.transitions import clock_in, clock_out, end_break, get_active_session_status, start_break
+from attendance.transitions import (
+    ConfirmOppositeActionRequired,
+    clock_in,
+    clock_out,
+    end_break,
+    get_active_session_status,
+    start_break,
+)
 from memberships.models import Membership
-from attendance.api_support import _unexpected_error_response
+from attendance.api_support import _confirm_opposite, _unexpected_error_response
 
 
 class WorkerAttendanceStatusView(APIView):
@@ -64,11 +71,16 @@ class WorkerClockInView(APIView):
         if not valid:
             return Response({"error": f"QR verification failed: {reason}"}, status=status.HTTP_400_BAD_REQUEST)
 
+        request_id = request.data.get("request_id")
+        confirm_opposite = _confirm_opposite(request)
+
         try:
             session, in_event = clock_in(
                 user=request.user,
                 pharmacy=qr_session.pharmacy,
                 signed_qr_token=qr_token,
+                request_id=request_id,
+                confirm_opposite=confirm_opposite,
             )
             return Response({
                 "session_id": session.id,
@@ -78,6 +90,8 @@ class WorkerClockInView(APIView):
                 "is_provisional": session.is_provisional,
                 "status": "CLOCKED_IN",
             }, status=status.HTTP_201_CREATED)
+        except ConfirmOppositeActionRequired as e:
+            return Response(e.to_dict(), status=status.HTTP_409_CONFLICT)
         except (DjangoValidationError, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception:
@@ -136,10 +150,15 @@ class WorkerClockOutView(APIView):
         if not qr_token:
             return Response({"error": "qr_token is required."}, status=status.HTTP_400_BAD_REQUEST)
 
+        request_id = request.data.get("request_id")
+        confirm_opposite = _confirm_opposite(request)
+
         try:
             session, out_event = clock_out(
                 user=request.user,
                 signed_qr_token=qr_token,
+                request_id=request_id,
+                confirm_opposite=confirm_opposite,
             )
             return Response({
                 "session_id": session.id,
@@ -149,6 +168,8 @@ class WorkerClockOutView(APIView):
                 "ended_at": session.ended_at.isoformat() if session.ended_at else None,
                 "status": "CLOCKED_OUT",
             })
+        except ConfirmOppositeActionRequired as e:
+            return Response(e.to_dict(), status=status.HTTP_409_CONFLICT)
         except (DjangoValidationError, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception:

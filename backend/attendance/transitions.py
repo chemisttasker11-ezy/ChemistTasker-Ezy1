@@ -28,6 +28,72 @@ from attendance.credentials import verify_kiosk_worker_pin, verify_signed_pharma
 from attendance.eligibility import resolve_attendance_eligibility
 from organizations.models import Pharmacy
 from attendance.models import AttendanceEvent, AttendanceSession, KioskDevice, ProvisionalAttendance
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+class ConfirmOppositeActionRequired(Exception):
+    def __init__(self, *, last_action: str, pending_action: str, last_action_at, message: str):
+        self.code = "CONFIRM_OPPOSITE_ACTION"
+        self.last_action = last_action
+        self.pending_action = pending_action
+        self.last_action_at = last_action_at
+        self.message = message
+        super().__init__(message)
+
+    def to_dict(self):
+        last_action_at_str = (
+            self.last_action_at.isoformat()
+            if hasattr(self.last_action_at, "isoformat")
+            else str(self.last_action_at)
+        )
+        return {
+            "code": self.code,
+            "last_action": self.last_action,
+            "last_action_at": last_action_at_str,
+            "pending_action": self.pending_action,
+            "message": self.message,
+        }
+
+
+def _lock_online_worker(user):
+    """Serialize a worker's online clock actions; always the first lock, before any session.
+
+    NO KEY UPDATE so verified sync/review (device -> session -> KEY SHARE on User via FKs) never wait on it.
+    """
+    User.objects.select_for_update(no_key=True).get(pk=user.pk)
+
+
+def check_clock_in_double_guard(
+    user,
+    pharmacy: Pharmacy,
+    occurred_at=None,
+    confirm_opposite: bool = False,
+):
+    if confirm_opposite is True:
+        return
+    now = occurred_at or timezone.now()
+    last_closed_session = (
+        AttendanceSession.objects.filter(
+            user=user,
+            pharmacy=pharmacy,
+            ended_at__isnull=False,
+        )
+        .order_by("-ended_at")
+        .first()
+    )
+    if (
+        last_closed_session is not None
+        and last_closed_session.ended_at is not None
+        and timedelta(0) <= (now - last_closed_session.ended_at) <= timedelta(seconds=60)
+    ):
+        raise ConfirmOppositeActionRequired(
+            last_action="CLOCK_OUT",
+            pending_action="CLOCK_IN",
+            last_action_at=last_closed_session.ended_at,
+            message="You just clocked out. Clock in now?",
+        )
 
 
 def clock_in(
@@ -43,6 +109,7 @@ def clock_in(
     occurred_at=None,
     assignment_id: Optional[int] = None,
     request_id=None,
+    confirm_opposite: bool = False,
 ) -> Tuple[AttendanceSession, AttendanceEvent]:
     """
     Clock in a worker at a pharmacy transactionally.
@@ -54,6 +121,9 @@ def clock_in(
     now = occurred_at or timezone.now()
 
     with transaction.atomic():
+        if not verified_kiosk_event:
+            _lock_online_worker(user)
+
         # Check existing open session across all pharmacies
         existing_session = (
             AttendanceSession.objects.select_for_update()
@@ -74,6 +144,14 @@ def clock_in(
 
             raise ValidationError(
                 f"Worker already has an open attendance session at {existing_session.pharmacy.name}."
+            )
+
+        if not verified_kiosk_event:
+            check_clock_in_double_guard(
+                user=user,
+                pharmacy=pharmacy,
+                occurred_at=now,
+                confirm_opposite=confirm_opposite,
             )
 
         # Validate presence credentials
@@ -240,6 +318,7 @@ def clock_out(
     verified_kiosk_event: bool = False,
     occurred_at=None,
     request_id=None,
+    confirm_opposite: bool = False,
 ) -> Tuple[AttendanceSession, AttendanceEvent]:
     """
     Clock out a worker from their active attendance session.
@@ -249,8 +328,10 @@ def clock_out(
     now = occurred_at or timezone.now()
 
     with transaction.atomic():
+        if not verified_kiosk_event:
+            _lock_online_worker(user)
         session = (
-            AttendanceSession.objects.select_for_update()
+            AttendanceSession.objects.select_for_update(of=("self",))
             .select_related("pharmacy")
             .filter(user=user, ended_at__isnull=True)
             .first()
@@ -309,6 +390,18 @@ def clock_out(
             source = AttendanceEvent.Source.KIOSK_PIN
         else:
             raise ValidationError("A valid signed QR token or kiosk PIN credentials must be provided.")
+
+        if not verified_kiosk_event and confirm_opposite is not True:
+            if (
+                session.started_at is not None
+                and timedelta(0) <= (now - session.started_at) <= timedelta(seconds=60)
+            ):
+                raise ConfirmOppositeActionRequired(
+                    last_action="CLOCK_IN",
+                    pending_action="CLOCK_OUT",
+                    last_action_at=session.started_at,
+                    message="You just clocked in. Clock out now?",
+                )
 
         # If currently on break, auto-close the break with BREAK_END first
         last_event = session.events.order_by("-occurred_at", "-id").first()

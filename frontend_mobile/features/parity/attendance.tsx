@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Alert, Linking, StyleSheet, View } from 'react-native';
 import { Button, Chip, Icon, Text } from 'react-native-paper';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -141,18 +141,40 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
   const [scanLocked,setScanLocked]=useState(false);
   const [permission,requestPermission]=useCameraPermissions();
   const active=Boolean(status?.has_active_session);
-  const run=async(kind:'in'|'out'|'break-start'|'break-end',scannedToken?:string)=>{
+  const run=async(kind:'in'|'out'|'break-start'|'break-end',scannedToken?:string,confirmOpposite?:boolean)=>{
     const token=(scannedToken??qrToken).trim();
     setBusy(true);setLocalError('');
     try{
-      if(kind==='in') await attendance.clockIn(token);
-      if(kind==='out') await attendance.clockOut(token);
+      if(kind==='in') await attendance.clockIn(token, confirmOpposite ? { confirm_opposite: true } : undefined);
+      if(kind==='out') await attendance.clockOut(token, confirmOpposite ? { confirm_opposite: true } : undefined);
       if(kind==='break-start') await attendance.breakStart();
       if(kind==='break-end') await attendance.breakEnd();
       setQrToken('');
       setScannerOpen(false);
       await onReload();
-    }catch(e){setLocalError(errorMessage(e,'Attendance action failed.'));}
+    }catch(e: any){
+      // shared-core ApiError carries the server body in `payload`.
+      const errData = e?.payload;
+      const is409 = e?.status === 409 && errData?.code === 'CONFIRM_OPPOSITE_ACTION';
+      if (is409) {
+        const message = errData?.message || (kind === 'out' ? 'You just clocked in. Clock out now?' : 'You just clocked out. Clock in now?');
+        Alert.alert(
+          'Confirm clock action',
+          message,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Confirm',
+              onPress: () => {
+                void run(kind, token, true);
+              },
+            },
+          ]
+        );
+        return;
+      }
+      setLocalError(errorMessage(e,'Attendance action failed.'));
+    }
     finally{setBusy(false);setScanLocked(false);}
   };
 

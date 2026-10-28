@@ -320,7 +320,12 @@ def sync_offline_batch(device, events, *, app_version=""):
     if len(events) > 100:
         raise ValidationError("A sync batch may contain at most 100 events.")
 
-    device = KioskDevice.objects.select_for_update().select_related("pharmacy").get(pk=device.pk)
+    # NO KEY UPDATE of the device row only: online kiosk events (FK KEY SHARE on device) and the
+    # joined pharmacy (FK KEY SHARE from new sessions) must not wait on a sync batch.
+    device = (
+        KioskDevice.objects.select_for_update(no_key=True, of=("self",))
+        .select_related("pharmacy").get(pk=device.pk)
+    )
     if device.client_kind != "NATIVE_OFFLINE":
         raise ValidationError("This device is not authorized for offline attendance sync.")
 

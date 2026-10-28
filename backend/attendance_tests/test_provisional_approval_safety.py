@@ -223,7 +223,7 @@ class ProvisionalApprovalSafetyTests(unittest.TestCase):
         """On approval, clear the provisional flag and create backfill shift, slot, assignment."""
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.cross_worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
         session.refresh_from_db()
         self.assertTrue(session.is_provisional)
 
@@ -272,7 +272,7 @@ class ProvisionalApprovalSafetyTests(unittest.TestCase):
         """Repeated approval calls do not create duplicate shifts or slots."""
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.cross_worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
         prov = session.provisional_review
 
         p1 = approve_provisional_attendance(self.manager_alpha_user, prov.id, reason="First")
@@ -288,7 +288,7 @@ class ProvisionalApprovalSafetyTests(unittest.TestCase):
         """Wrong-site managers receive HTTP 403 Forbidden on approve, reject, and correct."""
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, in_event = clock_in(self.cross_worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
         prov = session.provisional_review
 
         # 1. Approve
@@ -389,7 +389,7 @@ class ProvisionalApprovalSafetyTests(unittest.TestCase):
         """Cross-site approval never creates a permanent destination pharmacy membership."""
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.cross_worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
 
         self.assertEqual(
             Membership.objects.filter(user=self.cross_worker_user, pharmacy=self.pharmacy_a).count(),

@@ -27,15 +27,19 @@ class KioskPinClockTests(TestCase):
         self.addCleanup(p.stop)
         self.view = KioskPinClockView.as_view()
 
-    def submit(self, request_id=None):
+    def submit(self, request_id=None, *, confirm_opposite=False, expected_status=200):
         body = {"identifier": self.worker.email, "pin": "1357"}
+        if confirm_opposite:
+            body["confirm_opposite"] = True
         if request_id is not None:
             body["request_id"] = request_id
         req = RequestFactory().post("/api/v1/attendance/kiosk/pin-clock/",
                                     body,
                                     content_type="application/json", HTTP_X_DEVICE_TOKEN=self.token)
         r = self.view(req)
-        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.status_code, expected_status, r.data)
+        if expected_status == 409:
+            self.assertEqual(r.data["code"], "CONFIRM_OPPOSITE_ACTION")
         return r.data
 
     def age_sessions(self, seconds=60):
@@ -48,16 +52,24 @@ class KioskPinClockTests(TestCase):
             s.save()
 
     def test_claim4_clock_out_right_after_clock_in_bug(self):
-        from attendance.models import AttendanceSession
+        from attendance.models import AttendanceEvent, AttendanceSession
         self.assertEqual(self.submit()["action"], "CLOCKED_IN")
-        second = self.submit()  # worker clocked in by mistake and now wants out
+        self.submit(expected_status=409)
+        self.assertTrue(AttendanceSession.objects.get(user=self.worker).is_open)
+        self.assertEqual(AttendanceEvent.objects.count(), 1)
+        second = self.submit(confirm_opposite=True)
         self.assertEqual(second["action"], "CLOCKED_OUT", "immediate second submit did not clock out")
 
     def test_claim4_clock_in_right_after_clock_out_bug(self):
+        from attendance.models import AttendanceEvent, AttendanceSession
         self.assertEqual(self.submit()["action"], "CLOCKED_IN")
         self.age_sessions()
         self.assertEqual(self.submit()["action"], "CLOCKED_OUT")
-        third = self.submit()  # wants to clock straight back in
+        before = AttendanceEvent.objects.count()
+        self.submit(expected_status=409)
+        self.assertEqual(AttendanceEvent.objects.count(), before)
+        self.assertFalse(AttendanceSession.objects.filter(user=self.worker, ended_at__isnull=True).exists())
+        third = self.submit(confirm_opposite=True)
         self.assertEqual(third["action"], "CLOCKED_IN", "immediate submit after clock-out did not clock in")
 
     def test_claim4_toggle_outside_window_control(self):
@@ -75,7 +87,9 @@ class KioskPinClockTests(TestCase):
         self.assertEqual(self.submit(in_id), first)
         self.assertEqual(AttendanceEvent.objects.filter(session__user=self.worker).count(), 1)
 
-        second = self.submit(out_id)
+        self.submit(out_id, expected_status=409)
+        self.assertEqual(AttendanceEvent.objects.filter(session__user=self.worker).count(), 1)
+        second = self.submit(out_id, confirm_opposite=True)
         self.assertEqual(second["action"], "CLOCKED_OUT")
         self.assertEqual(self.submit(out_id), second)
         self.assertEqual(self.submit(in_id), first)
@@ -100,5 +114,7 @@ class KioskPinClockTests(TestCase):
         self.assertEqual(self.submit(request_id)["action"], "CLOCKED_IN")
         self.worker = original_worker
         _, self.token = activate_kiosk_device(self.owner, self.pharmacy, "Other counter")
-        self.assertEqual(self.submit(request_id)["action"], "CLOCKED_OUT")
+        self.submit(request_id, expected_status=409)
+        self.assertEqual(AttendanceEvent.objects.filter(request_id=request_id).count(), 2)
+        self.assertEqual(self.submit(request_id, confirm_opposite=True)["action"], "CLOCKED_OUT")
         self.assertEqual(AttendanceEvent.objects.filter(request_id=request_id).count(), 3)

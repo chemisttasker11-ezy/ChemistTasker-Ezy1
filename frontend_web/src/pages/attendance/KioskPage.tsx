@@ -111,6 +111,18 @@ export default function KioskPage() {
   const [requestedPinAction, setRequestedPinAction] = useState<
     "CLOCK_IN" | "CLOCK_OUT" | "BREAK_START" | "BREAK_END"
   >("CLOCK_IN");
+  // shortcut: lost on kiosk restart, upgrade by asking the native store
+  const desktopRecentActions = useRef<Map<string, { action: string; timestamp: number }>>(new Map());
+  const [doubleClockDialog, setDoubleClockDialog] = useState<{
+    message: string;
+    isDesktop: boolean;
+    setup?: boolean;
+    requestId?: string;
+    identifier: string;
+    pin: string;
+    desktopAction?: "CLOCK_IN" | "CLOCK_OUT" | "BREAK_START" | "BREAK_END";
+  } | null>(null);
+  const [confirmInFlight, setConfirmInFlight] = useState(false);
 
   // First-time PIN setup state
   const [setupStep, setSetupStep] = useState<"IDLE" | "SETUP_REQUIRED">("IDLE");
@@ -571,7 +583,7 @@ export default function KioskPage() {
   };
 
   // Submit OTP + New PIN to set PIN and immediately clock in
-  const handleCompletePinSetup = async () => {
+  const handleCompletePinSetup = async (confirmOpposite = false) => {
     if (desktopRuntime) {
       setPinError("PIN setup is unavailable inside the desktop kiosk. Use the ChemistTasker mobile app.");
       return;
@@ -598,10 +610,12 @@ export default function KioskPage() {
           identifier: identifier.trim(),
           verification_code: setupOtp.trim(),
           new_pin: setupNewPin.trim(),
+          ...(confirmOpposite ? { confirm_opposite: true } : {}),
         },
         { headers: { "X-Device-Token": deviceToken } }
       );
 
+      setDoubleClockDialog(null);
       setActionSuccess({
         action: "CLOCKED_IN",
         workerName: res.data.worker_name || setupWorkerName,
@@ -617,6 +631,18 @@ export default function KioskPage() {
       setIdentifier("");
       setPin("");
     } catch (err: any) {
+      if (err.response?.status === 409 && err.response?.data?.code === "CONFIRM_OPPOSITE_ACTION") {
+        // OTP and new PIN stay in the form; confirming resubmits them to the setup endpoint.
+        setDoubleClockDialog({
+          message: err.response.data.message,
+          isDesktop: false,
+          setup: true,
+          identifier: identifier.trim(),
+          pin: "",
+        });
+        return;
+      }
+      setDoubleClockDialog(null);
       setPinError(err.response?.data?.error || "Failed to setup PIN. Please check your verification code.");
     } finally {
       setSetupLoading(false);
@@ -629,6 +655,41 @@ export default function KioskPage() {
     setSetupNewPin("");
     setSetupConfirmPin("");
     setPinError(null);
+  };
+
+  const performDesktopCapture = async (
+    ident: string,
+    pinVal: string,
+    action: "CLOCK_IN" | "CLOCK_OUT" | "BREAK_START" | "BREAK_END"
+  ) => {
+    const requestId = await prepareDesktopCaptureRequest(
+      ident,
+      action,
+    );
+    const local = await captureDesktopPinAttendance(
+      ident,
+      pinVal,
+      action,
+      requestId,
+    );
+    desktopRecentActions.current.set(ident, {
+      action: action,
+      timestamp: Date.now(),
+    });
+    setActionSuccess({
+      action: local.action,
+      workerName: local.worker_name,
+      time: new Date(local.event.captured_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      customMessage: local.recovered
+        ? "Recovered the original local attendance record."
+        : "Recorded locally and queued for secure synchronization.",
+    });
+    // Confirmation is delivery bookkeeping. Attendance is already committed
+    // and must not be shown as failed if this response is interrupted.
+    void confirmDesktopCaptureReceipt(requestId, local.event.event_id).catch(() => undefined);
+    setPin("");
+    setIdentifier("");
+    setPinMode(false);
   };
 
   const handlePinSubmit = async () => {
@@ -653,30 +714,28 @@ export default function KioskPage() {
 
     try {
       if (desktopRuntime) {
-        const requestId = await prepareDesktopCaptureRequest(
-          identifier.trim(),
-          requestedPinAction,
-        );
-        const local = await captureDesktopPinAttendance(
-          identifier.trim(),
-          pin,
-          requestedPinAction,
-          requestId,
-        );
-        setActionSuccess({
-          action: local.action,
-          workerName: local.worker_name,
-          time: new Date(local.event.captured_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          customMessage: local.recovered
-            ? "Recovered the original local attendance record."
-            : "Recorded locally and queued for secure synchronization.",
-        });
-        // Confirmation is delivery bookkeeping. Attendance is already committed
-        // and must not be shown as failed if this response is interrupted.
-        void confirmDesktopCaptureReceipt(requestId, local.event.event_id).catch(() => undefined);
-        setPin("");
-        setIdentifier("");
-        setPinMode(false);
+        const ident = identifier.trim();
+        const prev = desktopRecentActions.current.get(ident);
+        const isOpposite =
+          (prev?.action === "CLOCK_IN" && requestedPinAction === "CLOCK_OUT") ||
+          (prev?.action === "CLOCK_OUT" && requestedPinAction === "CLOCK_IN");
+        // E13a: decide from the kiosk's own memory only; never await the server before signed capture.
+        if (isOpposite && prev && Date.now() - prev.timestamp <= 60000) {
+          const msg =
+            prev.action === "CLOCK_IN"
+              ? "You just clocked in. Clock out now?"
+              : "You just clocked out. Clock in now?";
+          setDoubleClockDialog({
+            message: msg,
+            isDesktop: true,
+            identifier: ident,
+            pin: pin,
+            desktopAction: requestedPinAction,
+          });
+          return;
+        }
+
+        await performDesktopCapture(ident, pin, requestedPinAction);
         return;
       }
 
@@ -708,6 +767,16 @@ export default function KioskPage() {
       setIdentifier("");
       setPinMode(false);
     } catch (err: any) {
+      if (err.response?.status === 409 && err.response?.data?.code === "CONFIRM_OPPOSITE_ACTION") {
+        setDoubleClockDialog({
+          message: err.response.data.message || (err.response.data.last_action === "CLOCK_IN" ? "You just clocked in. Clock out now?" : "You just clocked out. Clock in now?"),
+          isDesktop: false,
+          requestId: pinRetry.current?.requestId,
+          identifier: identifier.trim(),
+          pin: pin,
+        });
+        return;
+      }
       if (err.response) pinRetry.current = null;
       const isLock = err.response?.data?.locked || false;
       const msg = desktopRuntime
@@ -719,6 +788,51 @@ export default function KioskPage() {
       pinInFlight.current = false;
       setPinSubmitting(false);
     }
+  };
+
+  const handleConfirmDoubleClock = async () => {
+    if (!doubleClockDialog || confirmInFlight) return;
+    const pending = doubleClockDialog;
+    setConfirmInFlight(true);
+    try {
+      if (pending.setup) {
+        await handleCompletePinSetup(true);
+      } else if (pending.isDesktop && pending.desktopAction) {
+        await performDesktopCapture(pending.identifier, pending.pin, pending.desktopAction);
+        setDoubleClockDialog(null);
+      } else {
+        const res = await kioskClient.post(
+          "/attendance/kiosk/pin-clock/",
+          {
+            identifier: pending.identifier,
+            pin: pending.pin,
+            request_id: pending.requestId,
+            confirm_opposite: true,
+          },
+          { headers: { "X-Device-Token": deviceToken } }
+        );
+        pinRetry.current = null;
+        setDoubleClockDialog(null);
+        setActionSuccess({
+          action: res.data.action,
+          workerName: res.data.worker_name,
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          isProvisional: res.data.is_provisional,
+        });
+        setPin("");
+        setIdentifier("");
+        setPinMode(false);
+      }
+    } catch (err: any) {
+      setPinError(err.response?.data?.error || "Failed to confirm clock action.");
+      setDoubleClockDialog(null);
+    } finally {
+      setConfirmInFlight(false);
+    }
+  };
+
+  const handleCancelDoubleClock = () => {
+    setDoubleClockDialog(null);
   };
 
   // Fetch active clocked in staff for this kiosk
@@ -1671,7 +1785,7 @@ export default function KioskPage() {
                     <Button
                       fullWidth
                       variant="contained"
-                      onClick={handleCompletePinSetup}
+                      onClick={() => void handleCompletePinSetup()}
                       disabled={
                         setupLoading ||
                         setupOtp.length !== 6 ||
@@ -2123,6 +2237,29 @@ export default function KioskPage() {
             onClick={() => void handleDeactivate()}
           >
             {settingsBusy ? <CircularProgress size={20} color="inherit" /> : desktopRuntime ? "Disconnect Device" : "Remove Browser Kiosk"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(doubleClockDialog)}
+        onClose={handleCancelDoubleClock}
+      >
+        <DialogTitle>Confirm Clock Action</DialogTitle>
+        <DialogContent>
+          <Typography>{doubleClockDialog?.message}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDoubleClock} disabled={confirmInFlight}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDoubleClock}
+            variant="contained"
+            color="primary"
+            disabled={confirmInFlight}
+          >
+            Confirm
           </Button>
         </DialogActions>
       </Dialog>

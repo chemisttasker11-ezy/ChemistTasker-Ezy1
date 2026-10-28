@@ -238,10 +238,18 @@ class AttendanceAPITests(unittest.TestCase):
         self.assertEqual(clock_in_resp.data["action"], "CLOCKED_IN")
         self.assertTrue(clock_in_resp.data["is_provisional"])
 
-        # 3. Without a request ID, a new submit toggles immediately.
+        # 3. A new opposite action requires explicit confirmation within 60 seconds.
         clock_out_resp = kiosk_client.post(
             "/attendance/kiosk/pin-clock/",
             {"device_token": raw_token, "identifier": self.worker_user.email, "pin": "1234"},
+        )
+        self.assertEqual(clock_out_resp.status_code, status.HTTP_409_CONFLICT, clock_out_resp.data)
+        self.assertEqual(clock_out_resp.data["code"], "CONFIRM_OPPOSITE_ACTION")
+        self.assertIsNone(AttendanceSession.objects.get(user=self.worker_user).ended_at)
+        clock_out_resp = kiosk_client.post(
+            "/attendance/kiosk/pin-clock/",
+            {"device_token": raw_token, "identifier": self.worker_user.email, "pin": "1234", "confirm_opposite": True},
+            format="json",
         )
         self.assertEqual(clock_out_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(clock_out_resp.data["action"], "CLOCKED_OUT")
@@ -254,19 +262,30 @@ class AttendanceAPITests(unittest.TestCase):
         kiosk_client = APIClient()
         body = {"device_token": raw_token, "identifier": self.worker_user.email, "pin": "1234", "request_id": str(uuid4())}
 
+        in_request_id = body["request_id"]
         first = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
         retry = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
         self.assertEqual(first.data["action"], "CLOCKED_IN")
         self.assertEqual(retry.data["action"], "CLOCKED_IN")
         self.assertEqual(retry.data["session_id"], first.data["session_id"])
+        self.assertEqual(retry.data, first.data)
         session = AttendanceSession.objects.get(user=self.worker_user)
         self.assertIsNone(session.ended_at)
 
         body["request_id"] = str(uuid4())
         out = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
+        self.assertEqual(out.status_code, status.HTTP_409_CONFLICT, out.data)
+        self.assertEqual(out.data["code"], "CONFIRM_OPPOSITE_ACTION")
+        self.assertIsNone(AttendanceSession.objects.get(user=self.worker_user).ended_at)
+        out = kiosk_client.post("/attendance/kiosk/pin-clock/", {**body, "confirm_opposite": True}, format="json")
+        self.assertEqual(out.status_code, status.HTTP_200_OK, out.data)
         out_retry = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
         self.assertEqual(out.data["action"], "CLOCKED_OUT")
         self.assertEqual(out_retry.data["action"], "CLOCKED_OUT")
+        self.assertEqual(out_retry.data, out.data)
+        original_retry = kiosk_client.post("/attendance/kiosk/pin-clock/", {**body, "request_id": in_request_id})
+        self.assertEqual(original_retry.data, first.data)
+        self.assertEqual(session.events.count(), 2)
         self.assertEqual(AttendanceSession.objects.filter(user=self.worker_user).count(), 1)
 
     def test_manager_timeline_includes_the_resolved_pharmacy_timezone(self):
@@ -344,6 +363,9 @@ class AttendanceAPITests(unittest.TestCase):
 
         # 7. Clock Out
         clock_out_resp = worker_client.post("/attendance/worker/clock-out/", {"qr_token": qr_token})
+        self.assertEqual(clock_out_resp.status_code, status.HTTP_409_CONFLICT, clock_out_resp.data)
+        self.assertEqual(clock_out_resp.data["code"], "CONFIRM_OPPOSITE_ACTION")
+        clock_out_resp = worker_client.post("/attendance/worker/clock-out/", {"qr_token": qr_token, "confirm_opposite": True}, format="json")
         self.assertEqual(clock_out_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(clock_out_resp.data["status"], "CLOCKED_OUT")
 
@@ -366,7 +388,11 @@ class AttendanceAPITests(unittest.TestCase):
         worker_client = APIClient()
         worker_client.force_authenticate(user=self.worker_user)
         worker_client.post("/attendance/worker/clock-in/", {"qr_token": qr_resp.data["qr_token"]})
-        worker_client.post("/attendance/worker/clock-out/", {"qr_token": qr_resp.data["qr_token"]})
+        clock_out_resp = worker_client.post("/attendance/worker/clock-out/", {
+            "qr_token": qr_resp.data["qr_token"], "confirm_opposite": True,
+        }, format="json")
+        self.assertEqual(clock_out_resp.status_code, status.HTTP_200_OK, clock_out_resp.data)
+        self.assertEqual(clock_out_resp.data["status"], "CLOCKED_OUT")
 
         # 2. Manager queries pending attendances
         mgr_client = APIClient()

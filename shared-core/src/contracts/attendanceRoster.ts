@@ -21,6 +21,19 @@ export interface AttendanceClockResult {
   status: 'CLOCKED_IN' | 'CLOCKED_OUT';
 }
 
+export interface AttendanceClockOptions {
+  confirm_opposite?: boolean;
+  request_id?: string;
+}
+
+export interface AttendanceConfirmRequiredResponse {
+  code: 'CONFIRM_OPPOSITE_ACTION';
+  last_action: 'CLOCK_IN' | 'CLOCK_OUT';
+  last_action_at: string;
+  pending_action: 'CLOCK_IN' | 'CLOCK_OUT';
+  message: string;
+}
+
 export interface AttendanceBreakResult {
   status: 'ON_BREAK' | 'WORKING';
   event_id: number;

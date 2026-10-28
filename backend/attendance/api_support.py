@@ -18,6 +18,12 @@ def _unexpected_error_response(request, operation):
     return Response({"error": f"Unable to {operation}. Please try again."}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _confirm_opposite(request):
+    """Explicit E13 confirmation: JSON true or a form-encoded "true"; anything else (incl. "false") is not."""
+    value = request.data.get("confirm_opposite")
+    return value is True or value == "true"
+
+
 def _get_kiosk_device_from_request(request, *, allow_revoked=False):
     """
     Extracts and authenticates a KioskDevice from request headers, META, or body.

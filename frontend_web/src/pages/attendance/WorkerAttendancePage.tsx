@@ -62,6 +62,7 @@ export default function WorkerAttendancePage() {
   const [scanModalOpen, setScanModalOpen] = useState(false);
   const [scanAction, setScanAction] = useState<"CLOCK_IN" | "CLOCK_OUT">("CLOCK_IN");
   const [qrInputToken, setQrInputToken] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; action: "CLOCK_IN" | "CLOCK_OUT"; token: string } | null>(null);
   const [submittingAction, setSubmittingAction] = useState(false);
 
   // Kiosk PIN self-service state
@@ -233,8 +234,9 @@ export default function WorkerAttendancePage() {
   };
 
   // Submit Clock In / Out
-  const handleQrSubmit = async () => {
-    if (!qrInputToken.trim()) {
+  const handleQrSubmit = async (confirmOpposite = false) => {
+    const token = confirmDialog?.token || qrInputToken.trim();
+    if (!token) {
       setErrorMsg("Please scan or paste the kiosk QR code token.");
       return;
     }
@@ -242,21 +244,35 @@ export default function WorkerAttendancePage() {
     setSubmittingAction(true);
     setErrorMsg(null);
 
+    const action = confirmDialog?.action || scanAction;
+
     try {
-      if (scanAction === "CLOCK_IN") {
-        const data = await attendance.clockIn(qrInputToken.trim()) as any;
+      if (action === "CLOCK_IN") {
+        const data = await attendance.clockIn(token, confirmOpposite ? { confirm_opposite: true } : undefined) as any;
         setSuccessMsg(
           data.is_provisional
             ? `Clocked in provisionally at ${data.pharmacy_name}. Pending manager review.`
             : `Clocked in successfully at ${data.pharmacy_name}.`
         );
       } else {
-        const data = await attendance.clockOut(qrInputToken.trim()) as any;
+        const data = await attendance.clockOut(token, confirmOpposite ? { confirm_opposite: true } : undefined) as any;
         setSuccessMsg(`Clocked out successfully from ${data.pharmacy_name}.`);
       }
       setScanModalOpen(false);
+      setConfirmDialog(null);
       await fetchStatus();
     } catch (err: any) {
+      // shared-core ApiError carries the server body in `payload`.
+      const errData = err?.payload;
+      const is409 = err?.status === 409 && errData?.code === 'CONFIRM_OPPOSITE_ACTION';
+      if (is409) {
+        setConfirmDialog({
+          message: errData?.message || (action === "CLOCK_IN" ? "You just clocked out. Clock in now?" : "You just clocked in. Clock out now?"),
+          action,
+          token,
+        });
+        return;
+      }
       setErrorMsg(err?.message || "QR verification or clock transition failed.");
     } finally {
       setSubmittingAction(false);
@@ -596,11 +612,32 @@ export default function WorkerAttendancePage() {
           <Button
             variant="contained"
             color={scanAction === "CLOCK_IN" ? "primary" : "error"}
-            onClick={handleQrSubmit}
+            onClick={() => void handleQrSubmit()}
             disabled={submittingAction || !qrInputToken.trim()}
             startIcon={submittingAction ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
             {scanAction === "CLOCK_IN" ? "Clock in" : "Clock out"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Double Clock Confirmation Dialog */}
+      <Dialog open={Boolean(confirmDialog)} onClose={() => setConfirmDialog(null)}>
+        <DialogTitle>Confirm Clock Action</DialogTitle>
+        <DialogContent>
+          <Typography>{confirmDialog?.message}</Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setConfirmDialog(null)} disabled={submittingAction}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleQrSubmit(true)}
+            variant="contained"
+            color="primary"
+            disabled={submittingAction}
+          >
+            Confirm
           </Button>
         </DialogActions>
       </Dialog>

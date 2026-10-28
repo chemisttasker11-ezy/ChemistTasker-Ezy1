@@ -197,7 +197,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def test_destination_manager_approves_and_backfills(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, in_event = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
         prov = ProvisionalAttendance.objects.get(session=session)
 
         # Manager A of Alpha approves
@@ -243,7 +243,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def test_wrong_site_manager_denied_approval(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
         prov = ProvisionalAttendance.objects.get(session=session)
 
         # Manager B of Beta attempts to approve Alpha session -> Denied
@@ -254,7 +254,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def test_duplicate_approval_is_idempotent(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
         prov = ProvisionalAttendance.objects.get(session=session)
 
         p1 = approve_provisional_attendance(self.manager_a_user, prov.id, reason="Initial approval")
@@ -269,7 +269,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
         """Cross-site worker approved at destination pharmacy does NOT receive permanent membership."""
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.cross_worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.cross_worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
         prov = ProvisionalAttendance.objects.get(session=session)
 
         self.assertEqual(prov.cover_type, ProvisionalAttendance.CoverType.CROSS_SITE_CHAIN)
@@ -312,7 +312,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def test_cannot_approve_rejected_attendance(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
         prov = ProvisionalAttendance.objects.get(session=session)
 
         reject_provisional_attendance(self.manager_a_user, prov.id, reason="Rejected")
@@ -324,7 +324,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def test_cannot_reject_approved_attendance(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, _ = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
         prov = ProvisionalAttendance.objects.get(session=session)
 
         approve_provisional_attendance(self.manager_a_user, prov.id)
@@ -372,7 +372,7 @@ class AttendanceApprovalsTests(unittest.TestCase):
     def test_effective_session_timeline_resolution(self):
         qr = generate_signed_pharmacy_qr(self.kiosk_a)
         session, in_event = clock_in(self.worker_user, self.pharmacy_a, signed_qr_token=qr["signed_token"])
-        clock_out(self.worker_user, signed_qr_token=qr["signed_token"])
+        clock_out(self.worker_user, signed_qr_token=qr["signed_token"], confirm_opposite=True)
 
         # Create correction on in_event
         corrected_in = in_event.occurred_at - timedelta(minutes=10)
