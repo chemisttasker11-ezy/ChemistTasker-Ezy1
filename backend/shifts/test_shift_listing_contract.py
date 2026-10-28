@@ -5,7 +5,7 @@ different relationships to the pharmacy. Each listing endpoint is called as each
 compared to the expected matrix. The matrix was recorded from the code before the browse module was split, so it pins
 the visibility rules exactly while the views move.
 """
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from unittest import mock
 
 from django.test import TestCase, override_settings
@@ -437,3 +437,58 @@ class AssignedProfileTests(ShiftListingFixture):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual({row["user_id"] for row in response.data}, {self.users["staff"].id})
+
+
+@override_settings(TIME_ZONE="Australia/Sydney")
+class ShiftListingTimezoneTests(ShiftListingFixture):
+    def test_location_zones_keep_current_slots_visible_on_every_sibling_list(self):
+        work_date = date(2026, 1, 5)
+        routes = (
+            ("community-shifts/", "staff", "public"),
+            ("public-shifts/", "outsider", "public"),
+            ("public-job-board/", "anonymous", "public"),
+            ("shifts/active/", "owner", "public"),
+            ("shifts/confirmed/", "owner", "confirmed"),
+            ("my-confirmed-shifts/", "staff", "confirmed"),
+        )
+        for explicit in (None, "invalid-zone"):
+            for state, postcode, utc_hour, utc_minute in (
+                ("QLD", "4000", 6, 30), ("NSW", "2880", 6, 15),
+            ):
+                self.pharmacy.timezone, self.pharmacy.state, self.pharmacy.postcode = explicit, state, postcode
+                self.pharmacy.save(update_fields=["timezone", "state", "postcode"])
+                for recurring in (False, True):
+                    ShiftSlot.objects.filter(shift__pharmacy=self.pharmacy).update(
+                        date=work_date - timedelta(days=7) if recurring else work_date,
+                        is_recurring=recurring, recurring_end_date=work_date if recurring else None,
+                        recurring_days=[(work_date.weekday() + 1) % 7] if recurring else [],
+                    )
+                    ShiftSlotAssignment.objects.filter(shift__pharmacy=self.pharmacy).update(slot_date=work_date)
+                    before_end = datetime(2026, 1, 5, utc_hour, utc_minute, tzinfo=timezone.utc)
+                    for endpoint, viewer, label in routes:
+                        with self.subTest(explicit=explicit, state=state, recurring=recurring, endpoint=endpoint):
+                            with mock.patch("django.utils.timezone.now", return_value=before_end):
+                                self.assertIn(label, self.visible(endpoint, self.users[viewer]))
+                            with mock.patch("django.utils.timezone.now", return_value=before_end + timedelta(hours=1)):
+                                self.assertNotIn(label, self.visible(endpoint, self.users[viewer]))
+        self.pharmacy.refresh_from_db()
+        self.assertEqual(self.pharmacy.timezone, "invalid-zone")
+
+    def test_valid_explicit_zone_wins_over_store_location_for_lists(self):
+        self.pharmacy.timezone, self.pharmacy.state, self.pharmacy.postcode = "Australia/Perth", "NSW", "2880"
+        self.pharmacy.save(update_fields=["timezone", "state", "postcode"])
+        ShiftSlot.objects.filter(shift__pharmacy=self.pharmacy).update(date=date(2026, 1, 5))
+        ShiftSlotAssignment.objects.filter(shift__pharmacy=self.pharmacy).update(slot_date=date(2026, 1, 5))
+        for endpoint, viewer, label in (
+            ("community-shifts/", "staff", "public"),
+            ("public-shifts/", "outsider", "public"),
+            ("public-job-board/", "anonymous", "public"),
+            ("shifts/active/", "owner", "public"),
+            ("shifts/confirmed/", "owner", "confirmed"),
+            ("my-confirmed-shifts/", "staff", "confirmed"),
+        ):
+            with self.subTest(endpoint=endpoint):
+                with mock.patch("django.utils.timezone.now", return_value=datetime(2026, 1, 5, 8, 30, tzinfo=timezone.utc)):
+                    self.assertIn(label, self.visible(endpoint, self.users[viewer]))
+                with mock.patch("django.utils.timezone.now", return_value=datetime(2026, 1, 5, 9, 1, tzinfo=timezone.utc)):
+                    self.assertNotIn(label, self.visible(endpoint, self.users[viewer]))

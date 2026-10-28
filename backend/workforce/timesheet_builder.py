@@ -1,8 +1,12 @@
 """Building and rebuilding timesheets: one per worker per period, each build a new revision when its inputs
 changed."""
+from copy import copy
+
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
+from attendance.models import AttendanceSession
 from workforce.models import Timesheet, TimesheetCheck, TimesheetPeriod, TimesheetRevision, TimesheetSegment
 from workforce.timesheet_checks import _compare_roster_and_actual, _latest_revision
 from workforce.timesheet_core import _check, _hash, _local_date, _minutes, _period_bounds, _serialize_dt
@@ -38,137 +42,194 @@ def _locked_timesheet_and_period_for_build(timesheet_id):
     return timesheet, period
 
 
+def _timesheet_projection(timesheet, period, *, timezone_name=None):
+    # Reproject legacy approvals in their original zone without changing stored location data.
+    if timezone_name:
+        period = copy(period)
+        period.pharmacy = copy(period.pharmacy)
+        period.pharmacy.timezone = timezone_name
+    start_bound, end_bound, tz = _period_bounds(period)
+    tz_name = str(tz)
+    membership = _active_membership(timesheet.user_id, period.pharmacy_id)
+    roster_rows = _roster_rows(timesheet.user_id, period, tz)
+    modern_leave = _modern_leave(timesheet.user_id, period, start_bound, end_bound)
+    slot_linked_assignment_ids = {
+        leave.slot_assignment_id
+        for leave in modern_leave
+        if leave.slot_assignment_id
+    }
+    fully_leave_covered_assignment_ids = {
+        roster["assignment_id"]
+        for roster in roster_rows
+        if any(leave.start_at <= roster["start"] and leave.end_at >= roster["end"] for leave in modern_leave)
+    }
+    approved_leave_assignment_ids = slot_linked_assignment_ids | fully_leave_covered_assignment_ids
+    session_rows, segments, checks = _session_rows(timesheet.user_id, period, start_bound, end_bound, tz)
+    day_rows, comparison_checks = _compare_roster_and_actual(session_rows, roster_rows, approved_leave_assignment_ids)
+    checks.extend(comparison_checks)
+
+    engagement_rows, missing_engagement_dates = _attach_employment_engagements(
+        day_rows,
+        membership,
+        period,
+    )
+    for missing_date in missing_engagement_dates:
+        checks.append(_check(
+            "MISSING_EMPLOYMENT_ENGAGEMENT",
+            "WARNING",
+            "No dated employment engagement covers this worked/rostered date; payroll terms are not yet resolved.",
+            work_date=missing_date,
+            identity_parts=["employment-engagement", membership.pk, missing_date],
+            details={"membership_id": membership.pk},
+        ))
+
+    pending_leave_count = _pending_leave_count(timesheet.user_id, period, start_bound, end_bound)
+    if pending_leave_count:
+        checks.append(_check(
+            "PENDING_LEAVE", "WARNING", f"{pending_leave_count} leave request(s) are pending review.",
+            identity_parts=["period", period.pk, "worker", timesheet.user_id],
+            details={"pending_leave_count": pending_leave_count},
+        ))
+
+    leave_minutes = 0
+    leave_rows = []
+    counted_leave_intervals = []
+    for leave in modern_leave:
+        requested_start = max(leave.start_at, start_bound)
+        requested_end = min(leave.end_at, end_bound)
+        scheduled_minutes = 0
+        for roster in roster_rows:
+            s = max(requested_start, roster["start"])
+            e = min(requested_end, roster["end"])
+            if s >= e:
+                continue
+            mins = _minutes(s, e)
+            scheduled_minutes += mins
+            counted_leave_intervals.append((s, e))
+            segments.append({
+                "segment_type": "LEAVE", "started_at": s, "ended_at": e, "minutes": mins,
+                "source_type": "WORKFORCE_LEAVE", "source_id": str(leave.pk),
+                "metadata": {"leave_type": leave.leave_type, "assignment_id": roster["assignment_id"]},
+            })
+        leave_rows.append({
+            "id": leave.pk, "leave_type": leave.leave_type,
+            "start_at": requested_start.isoformat(), "end_at": requested_end.isoformat(),
+            "minutes": scheduled_minutes,
+            "note": "Approved leave minutes count only overlap with published rostered work in this non-payroll phase.",
+        })
+
+    # Sum the union of scheduled leave intervals so overlapping records cannot
+    # inflate the summary. This is reviewed-time display, not a leave entitlement engine.
+    merged_leave = []
+    for start, end in sorted(counted_leave_intervals, key=lambda pair: pair[0]):
+        if not merged_leave or start > merged_leave[-1][1]:
+            merged_leave.append([start, end])
+        else:
+            merged_leave[-1][1] = max(merged_leave[-1][1], end)
+    leave_minutes = sum(_minutes(start, end) for start, end in merged_leave)
+
+    # Flag contradictory evidence instead of silently counting worked time and
+    # approved leave for the same interval. A manager can investigate/waive the
+    # warning, but the original attendance and leave records remain unchanged.
+    for work_segment in [segment for segment in segments if segment["segment_type"] == "WORK"]:
+        if any(work_segment["started_at"] < leave_end and leave_start < work_segment["ended_at"] for leave_start, leave_end in merged_leave):
+            checks.append(_check(
+                "WORK_OVERLAPS_APPROVED_LEAVE", "WARNING",
+                "Recorded work overlaps approved leave.",
+                work_date=_local_date(work_segment["started_at"], tz),
+                identity_parts=["work-leave", work_segment["source_id"], work_segment["started_at"].isoformat()],
+                details={"source_id": work_segment["source_id"]},
+            ))
+
+    rostered_minutes = sum(r["minutes"] for r in roster_rows)
+    planned_break_minutes = sum(r["planned_break_minutes"] for r in roster_rows)
+    worked_minutes = sum(s["minutes"] for s in segments if s["segment_type"] == "WORK")
+    contracted_minutes = _contracted_minutes(membership, period)
+
+    source_payload = {
+        "period": [period.pk, str(period.start_date), str(period.end_date)],
+        "worker_id": timesheet.user_id,
+        "membership_id": membership.pk if membership else None,
+        "employment_engagements": engagement_rows,
+        "roster": [{**r, "start": r["start"].isoformat(), "end": r["end"].isoformat(), "date": str(r["date"])} for r in roster_rows],
+        "sessions": [
+            {
+                "session_id": row["session_id"],
+                "assignment_id": row["assignment_id"],
+                "actual_start": _serialize_dt(row["actual_start"]),
+                "actual_end": _serialize_dt(row["actual_end"]),
+                "timeline": [
+                    {
+                        "event_id": ev["event_id"],
+                        "event_type": ev["event_type"],
+                        "effective_timestamp": _serialize_dt(ev["effective_timestamp"]),
+                        "correction_id": ev["correction_id"],
+                    } for ev in row["timeline"]
+                ],
+            } for row in session_rows
+        ],
+        "leave": leave_rows,
+        "checks": [{**c, "work_date": str(c["work_date"]) if c["work_date"] else None} for c in checks],
+    }
+    snapshot = {
+        "worker": {"id": timesheet.user_id, "name": timesheet.user.get_full_name() or timesheet.user.username},
+        "pharmacy": {
+            "id": period.pharmacy_id,
+            "name": period.pharmacy.name,
+            "use_chemisttasker_payroll": bool(getattr(period.pharmacy, "use_chemisttasker_payroll", False)),
+        },
+        "period": {"id": period.pk, "start_date": str(period.start_date), "end_date": str(period.end_date), "timezone": tz_name},
+        "employment_engagements": engagement_rows,
+        "days": day_rows,
+        "leave": leave_rows,
+        "totals": {
+            "rostered_minutes": rostered_minutes,
+            "planned_break_minutes": planned_break_minutes,
+            "contracted_minutes": contracted_minutes,
+            "worked_minutes": worked_minutes,
+            "approved_leave_minutes": leave_minutes,
+            "reviewed_minutes": 0,
+        },
+    }
+    return membership, source_payload, snapshot, segments, checks
+
+
 def build_timesheet(timesheet_id: int, *, actor=None, force=False):
     with transaction.atomic():
         timesheet, period = _locked_timesheet_and_period_for_build(timesheet_id)
         if period.status == TimesheetPeriod.Status.LOCKED:
             raise ValidationError("Locked timesheet periods cannot be recalculated in place.")
 
-        start_bound, end_bound, tz = _period_bounds(period)
-        membership = _active_membership(timesheet.user_id, period.pharmacy_id)
-        roster_rows = _roster_rows(timesheet.user_id, period, tz)
-        modern_leave = _modern_leave(timesheet.user_id, period, start_bound, end_bound)
-        slot_linked_assignment_ids = {
-            leave.slot_assignment_id
-            for leave in modern_leave
-            if leave.slot_assignment_id
-        }
-        fully_leave_covered_assignment_ids = {
-            roster["assignment_id"]
-            for roster in roster_rows
-            if any(leave.start_at <= roster["start"] and leave.end_at >= roster["end"] for leave in modern_leave)
-        }
-        approved_leave_assignment_ids = slot_linked_assignment_ids | fully_leave_covered_assignment_ids
-        session_rows, segments, checks = _session_rows(timesheet.user_id, period, start_bound, end_bound, tz)
-        day_rows, comparison_checks = _compare_roster_and_actual(session_rows, roster_rows, approved_leave_assignment_ids)
-        checks.extend(comparison_checks)
-
-        engagement_rows, missing_engagement_dates = _attach_employment_engagements(
-            day_rows,
-            membership,
-            period,
-        )
-        for missing_date in missing_engagement_dates:
-            checks.append(_check(
-                "MISSING_EMPLOYMENT_ENGAGEMENT",
-                "WARNING",
-                "No dated employment engagement covers this worked/rostered date; payroll terms are not yet resolved.",
-                work_date=missing_date,
-                identity_parts=["employment-engagement", membership.pk, missing_date],
-                details={"membership_id": membership.pk},
-            ))
-
-        pending_leave_count = _pending_leave_count(timesheet.user_id, period, start_bound, end_bound)
-        if pending_leave_count:
-            checks.append(_check(
-                "PENDING_LEAVE", "WARNING", f"{pending_leave_count} leave request(s) are pending review.",
-                identity_parts=["period", period.pk, "worker", timesheet.user_id],
-                details={"pending_leave_count": pending_leave_count},
-            ))
-
-        leave_minutes = 0
-        leave_rows = []
-        counted_leave_intervals = []
-        for leave in modern_leave:
-            requested_start = max(leave.start_at, start_bound)
-            requested_end = min(leave.end_at, end_bound)
-            scheduled_minutes = 0
-            for roster in roster_rows:
-                s = max(requested_start, roster["start"])
-                e = min(requested_end, roster["end"])
-                if s >= e:
-                    continue
-                mins = _minutes(s, e)
-                scheduled_minutes += mins
-                counted_leave_intervals.append((s, e))
-                segments.append({
-                    "segment_type": "LEAVE", "started_at": s, "ended_at": e, "minutes": mins,
-                    "source_type": "WORKFORCE_LEAVE", "source_id": str(leave.pk),
-                    "metadata": {"leave_type": leave.leave_type, "assignment_id": roster["assignment_id"]},
-                })
-            leave_rows.append({
-                "id": leave.pk, "leave_type": leave.leave_type,
-                "start_at": requested_start.isoformat(), "end_at": requested_end.isoformat(),
-                "minutes": scheduled_minutes,
-                "note": "Approved leave minutes count only overlap with published rostered work in this non-payroll phase.",
-            })
-
-        # Sum the union of scheduled leave intervals so overlapping records cannot
-        # inflate the summary. This is reviewed-time display, not a leave entitlement engine.
-        merged_leave = []
-        for start, end in sorted(counted_leave_intervals, key=lambda pair: pair[0]):
-            if not merged_leave or start > merged_leave[-1][1]:
-                merged_leave.append([start, end])
-            else:
-                merged_leave[-1][1] = max(merged_leave[-1][1], end)
-        leave_minutes = sum(_minutes(start, end) for start, end in merged_leave)
-
-        # Flag contradictory evidence instead of silently counting worked time and
-        # approved leave for the same interval. A manager can investigate/waive the
-        # warning, but the original attendance and leave records remain unchanged.
-        for work_segment in [segment for segment in segments if segment["segment_type"] == "WORK"]:
-            if any(work_segment["started_at"] < leave_end and leave_start < work_segment["ended_at"] for leave_start, leave_end in merged_leave):
-                checks.append(_check(
-                    "WORK_OVERLAPS_APPROVED_LEAVE", "WARNING",
-                    "Recorded work overlaps approved leave.",
-                    work_date=_local_date(work_segment["started_at"], tz),
-                    identity_parts=["work-leave", work_segment["source_id"], work_segment["started_at"].isoformat()],
-                    details={"source_id": work_segment["source_id"]},
-                ))
-
-        rostered_minutes = sum(r["minutes"] for r in roster_rows)
-        planned_break_minutes = sum(r["planned_break_minutes"] for r in roster_rows)
-        worked_minutes = sum(s["minutes"] for s in segments if s["segment_type"] == "WORK")
-        contracted_minutes = _contracted_minutes(membership, period)
-
-        source_payload = {
-            "period": [period.pk, str(period.start_date), str(period.end_date)],
-            "worker_id": timesheet.user_id,
-            "membership_id": membership.pk if membership else None,
-            "employment_engagements": engagement_rows,
-            "roster": [{**r, "start": r["start"].isoformat(), "end": r["end"].isoformat(), "date": str(r["date"])} for r in roster_rows],
-            "sessions": [
-                {
-                    "session_id": row["session_id"],
-                    "assignment_id": row["assignment_id"],
-                    "actual_start": _serialize_dt(row["actual_start"]),
-                    "actual_end": _serialize_dt(row["actual_end"]),
-                    "timeline": [
-                        {
-                            "event_id": ev["event_id"],
-                            "event_type": ev["event_type"],
-                            "effective_timestamp": _serialize_dt(ev["effective_timestamp"]),
-                            "correction_id": ev["correction_id"],
-                        } for ev in row["timeline"]
-                    ],
-                } for row in session_rows
-            ],
-            "leave": leave_rows,
-            "checks": [{**c, "work_date": str(c["work_date"]) if c["work_date"] else None} for c in checks],
-        }
-        fingerprint = _hash(source_payload)
+        tz_name = str(_period_bounds(period)[2])
+        if period.status not in {TimesheetPeriod.Status.LOCKED, TimesheetPeriod.Status.APPROVED} and period.timezone != tz_name:
+            period.timezone = tz_name
+            period.save(update_fields=["timezone", "updated_at"])
         previous = _latest_revision(timesheet)
-        if previous and previous.source_fingerprint == fingerprint and not force:
+        membership, source_payload, snapshot, segments, checks = _timesheet_projection(timesheet, period)
+        fingerprint = _hash(source_payload)
+        unchanged = previous and previous.source_fingerprint == fingerprint
+        previous_timezone = previous.snapshot.get("period", {}).get("timezone") if previous else None
+        if (
+            previous and timesheet.status == Timesheet.Status.APPROVED
+            and previous_timezone and previous_timezone != tz_name and not unchanged
+        ):
+            _, previous_zone_payload, _, _, _ = _timesheet_projection(
+                timesheet, period, timezone_name=previous_timezone,
+            )
+            unchanged = previous.source_fingerprint == _hash(previous_zone_payload)
+            if unchanged:
+                boundary_session_ids = (
+                    {row["session_id"] for row in source_payload["sessions"]}
+                    - {row["session_id"] for row in previous_zone_payload["sessions"]}
+                )
+                # The old projection cannot detect new or changed evidence in newly included boundary sessions.
+                unchanged = not AttendanceSession.objects.filter(pk__in=boundary_session_ids).filter(
+                    Q(created_at__gt=previous.created_at)
+                    | Q(updated_at__gt=previous.created_at)
+                    | Q(events__recorded_at__gt=previous.created_at)
+                    | Q(events__corrections__corrected_at__gt=previous.created_at)
+                ).exists()
+        if unchanged and not force:
             timesheet.needs_rebuild = False
             timesheet.last_built_at = timezone.now()
             timesheet.save(update_fields=["needs_rebuild", "last_built_at", "updated_at"])
@@ -177,29 +238,12 @@ def build_timesheet(timesheet_id: int, *, actor=None, force=False):
         revision_number = (previous.revision_number + 1) if previous else 1
         blockers = sum(1 for c in checks if c["severity"] == "BLOCKER")
         warnings = sum(1 for c in checks if c["severity"] == "WARNING")
-        # Reviewed/approved time is not established by projection alone.
-        # It becomes authoritative only after a manager approves this exact revision.
+        rostered_minutes = snapshot["totals"]["rostered_minutes"]
+        planned_break_minutes = snapshot["totals"]["planned_break_minutes"]
+        contracted_minutes = snapshot["totals"]["contracted_minutes"]
+        worked_minutes = snapshot["totals"]["worked_minutes"]
+        leave_minutes = snapshot["totals"]["approved_leave_minutes"]
         reviewed_minutes = 0
-        snapshot = {
-            "worker": {"id": timesheet.user_id, "name": timesheet.user.get_full_name() or timesheet.user.username},
-            "pharmacy": {
-                "id": period.pharmacy_id,
-                "name": period.pharmacy.name,
-                "use_chemisttasker_payroll": bool(getattr(period.pharmacy, "use_chemisttasker_payroll", False)),
-            },
-            "period": {"id": period.pk, "start_date": str(period.start_date), "end_date": str(period.end_date), "timezone": period.timezone},
-            "employment_engagements": engagement_rows,
-            "days": day_rows,
-            "leave": leave_rows,
-            "totals": {
-                "rostered_minutes": rostered_minutes,
-                "planned_break_minutes": planned_break_minutes,
-                "contracted_minutes": contracted_minutes,
-                "worked_minutes": worked_minutes,
-                "approved_leave_minutes": leave_minutes,
-                "reviewed_minutes": reviewed_minutes,
-            },
-        }
         revision = TimesheetRevision.objects.create(
             timesheet=timesheet,
             revision_number=revision_number,

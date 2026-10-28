@@ -281,13 +281,21 @@ class AttendanceAPITests(unittest.TestCase):
         self.assertEqual(client.get(url).status_code, status.HTTP_403_FORBIDDEN)
 
         client.force_authenticate(user=self.owner_user)
+        self.pharmacy.state = "QLD"
         for stored_zone in ("Australia/Perth", None, "invalid-zone"):
             self.pharmacy.timezone = stored_zone
-            self.pharmacy.save(update_fields=["timezone"])
+            self.pharmacy.save(update_fields=["state", "timezone"])
             response = client.get(url)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-            expected = stored_zone if stored_zone == "Australia/Perth" else timezone.get_default_timezone_name()
+            expected = stored_zone if stored_zone == "Australia/Perth" else "Australia/Brisbane"
             self.assertEqual(response.data.get("pharmacy_timezone"), expected)
+
+        self.pharmacy.state = ""
+        self.pharmacy.timezone = None
+        self.pharmacy.save(update_fields=["state", "timezone"])
+        response = client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("pharmacy_timezone"), timezone.get_default_timezone_name())
 
     def test_worker_mobile_qr_and_break_lifecycle(self):
         # Setup kiosk and generate active QR

@@ -30,7 +30,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Check, ClipboardCheck, History, PencilLine, RefreshCw, X } from "lucide-react";
-import { attendance, fetchPharmaciesService } from "@chemisttasker/shared-core";
+import { attendance, fetchPharmaciesService, formatAttendanceMinutes } from "@chemisttasker/shared-core";
 import PageHeader from "../../components/ui/PageHeader";
 import DashboardContentState from "../../components/dashboard/DashboardContentState";
 import { InitialsAvatar } from "../../components/ui/InitialsAvatar";
@@ -343,7 +343,7 @@ export default function ManagerAttendanceReviewPage() {
         {pendingReviews.map((row) => {
           const startTime = new Date(row.started_at);
           const endTime = row.ended_at ? new Date(row.ended_at) : null;
-          const hours = endTime ? (endTime.getTime() - startTime.getTime()) / (1000 * 3600) : null;
+          const durationMinutes = endTime ? (endTime.getTime() - startTime.getTime()) / 60000 : null;
           const cover = COVER_TYPES[row.cover_type] ?? { label: humanizeEnum(row.cover_type), tone: "neutral" as StatusTone, hint: "" };
           const time = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -369,7 +369,7 @@ export default function ManagerAttendanceReviewPage() {
                   <Typography variant="body2" sx={{ mt: 0.5, color: "var(--ct-text-primary)", fontVariantNumeric: "tabular-nums" }}>
                     {startTime.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })} · {time(startTime)} – {endTime ? time(endTime) : "still clocked in"}
                     {" · "}
-                    <strong>{hours === null ? "In progress" : `${hours.toFixed(1)} h`}</strong>
+                    <strong>{durationMinutes === null ? "In progress" : formatAttendanceMinutes(durationMinutes)}</strong>
                   </Typography>
                 </Box>
               </Stack>

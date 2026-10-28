@@ -22,11 +22,11 @@ or memberships.
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from typing import Optional
-import zoneinfo
 
 from django.db.models import Q
 from django.utils import timezone
 
+from organizations.timezone import get_pharmacy_timezone
 from organizations.models import (
     Chain,
     Pharmacy,
@@ -74,18 +74,6 @@ def _is_staff_membership(membership: Membership) -> bool:
     if membership.role == "CONTACT":
         return False
     return membership.employment_type in PHARMACY_STAFF_EMPLOYMENT_TYPES
-
-
-def _get_pharmacy_tz(pharmacy, eval_time: datetime):
-    """Determine the relevant timezone for evaluating scheduled times."""
-    if pharmacy and getattr(pharmacy, "timezone", None):
-        try:
-            return zoneinfo.ZoneInfo(pharmacy.timezone)
-        except Exception:
-            pass
-    if eval_time and timezone.is_aware(eval_time):
-        return eval_time.tzinfo
-    return timezone.get_current_timezone()
 
 
 def is_draft_roster_assignment(assignment: ShiftSlotAssignment) -> bool:
@@ -151,7 +139,7 @@ def _find_matching_assignment(
     if shift_id is not None:
         base_qs = base_qs.filter(shift_id=shift_id)
 
-    tz = _get_pharmacy_tz(pharmacy, target_time)
+    tz = get_pharmacy_timezone(pharmacy)
     eval_local = target_time.astimezone(tz) if timezone.is_aware(target_time) and tz else target_time
 
     target_date = eval_local.date()

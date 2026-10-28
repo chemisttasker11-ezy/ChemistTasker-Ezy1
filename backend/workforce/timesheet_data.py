@@ -155,7 +155,7 @@ def _roster_rows(user_id, period: TimesheetPeriod, tz):
         if not published_week_cache[monday]:
             continue
         start, end = work_interval(
-            assignment.shift.pharmacy,
+            period.pharmacy,
             work_date,
             assignment.slot.start_time,
             assignment.slot.end_time,
