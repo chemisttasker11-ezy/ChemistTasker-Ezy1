@@ -7,9 +7,33 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import ContentAdministrator, ContentAssignment, ContentInvitation, ContentRevision, Article
+from .models import ContentAdministrator, ContentAssignment, ContentInvitation, ContentRevision, Article, Comment
 from .editorial import publish_due
 from pharmacy_hub.models import PharmacyHubComment, PharmacyHubPost
+
+
+class EditorialSeedGuardTests(TestCase):
+    def test_production_seed_requires_explicit_override_before_any_side_effect(self):
+        from django.core.management import call_command, CommandError
+        from io import StringIO
+
+        get_user_model().objects.create_user(email='seed@example.test', role='EXPLORER')
+        for debug, module in ((False, 'core.settings'), (True, 'core.production_settings')):
+            with self.subTest(debug=debug, module=module), override_settings(DEBUG=debug, SETTINGS_MODULE=module):
+                with patch('public_hub.management.commands.seed_editorial_content.os.makedirs') as mkdir:
+                    with self.assertRaises(CommandError):
+                        call_command('seed_editorial_content', stdout=StringIO())
+                    mkdir.assert_not_called()
+                self.assertFalse(ContentAdministrator.objects.exists())
+                self.assertFalse(Article.objects.exists())
+                self.assertFalse(Comment.objects.exists())
+
+        with override_settings(DEBUG=False, SETTINGS_MODULE='core.production_settings'), patch(
+            'public_hub.management.commands.seed_editorial_content.os.makedirs'
+        ):
+            call_command('seed_editorial_content', '--allow-production', stdout=StringIO())
+        self.assertTrue(ContentAdministrator.objects.filter(user__email='seed@example.test').exists())
+        self.assertTrue(Article.objects.filter(status='published').exists())
 
 
 def payload(title='A pharmacy perspective', slug='pharmacy-perspective'):

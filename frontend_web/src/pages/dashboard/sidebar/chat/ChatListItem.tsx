@@ -120,6 +120,7 @@ export const ChatListItem: FC<ChatListItemProps> = ({
   const isPinnable = true;
   const lastMessage = room.last_message;
   const preview =
+    lastMessage?.is_deleted ? 'This message was deleted' :
     (previewOverride && previewOverride.trim()) ||
     (lastMessage?.body?.trim()) ||
     (lastMessage ? '📎 Attachment' : 'No messages yet');

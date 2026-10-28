@@ -107,9 +107,7 @@ def validate_uploaded_file(uploaded_file, policy: UploadPolicy, field_label: str
         raise ValidationError(f"{label} must be {max_mb} MB or smaller.")
 
     sniffed_type = _sniff_kind(uploaded_file)
-    content_type = getattr(uploaded_file, "content_type", None)
-    effective_type = sniffed_type or content_type
-    if effective_type not in policy.allowed_content_types:
+    if sniffed_type not in policy.allowed_content_types:
         raise ValidationError(f"{label} type is not allowed.")
 
 

@@ -1,9 +1,10 @@
 """Characterization of calendar events, work notes and the feed
 (/calendar-events/, /work-notes/, /calendar-feed/). Fixed dates only: no test depends on today."""
-from datetime import date
+from datetime import date, timedelta
 
 from django.test import TestCase
 
+from organizations.models import Organization
 from team_calendar.models import CalendarEvent, WorkNote, WorkNoteAssignee, WorkNoteCompletion
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_staff_member, make_user,
@@ -32,6 +33,15 @@ class CalendarBase(TestCase):
 
 
 class CalendarAuthTests(CalendarBase):
+    def test_work_note_create_refuses_foreign_pharmacy_but_accepts_own(self):
+        _, foreign = make_owner_with_pharmacy("Foreign notes")
+        payload = {"title": "Private note", "date": "2026-03-11"}
+        response = client_for(self.staff).post(NOTES, {**payload, "pharmacy": foreign.pk}, format="json")
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(WorkNote.objects.exists())
+        response = client_for(self.staff).post(NOTES, {**payload, "pharmacy": self.pharmacy.pk}, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+
     def test_all_three_endpoints_require_authentication(self):
         c = client_for()
         for url in (EVENTS, NOTES, FEED):
@@ -40,6 +50,37 @@ class CalendarAuthTests(CalendarBase):
 
 class CalendarEventTests(CalendarBase):
     PAYLOAD = {"title": "Team meeting", "date": "2026-03-11"}
+
+    def test_org_only_create_requires_org_admin_not_just_staff_visibility(self):
+        from users.models import OrganizationMembership
+        org = Organization.objects.create(name="Calendar org", slug="calendar-org-create")
+        self.pharmacy.organization = org
+        self.pharmacy.save(update_fields=["organization"])
+        payload = {**self.PAYLOAD, "organization": org.pk}
+        response = client_for(self.staff).post(EVENTS, payload, format="json")
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(CalendarEvent.objects.exists())
+        OrganizationMembership.objects.create(user=self.stranger, organization=org, role="ORG_ADMIN")
+        response = client_for(self.stranger).post(EVENTS, payload, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+
+
+    def test_create_refuses_mismatched_organization(self):
+        foreign = Organization.objects.create(name="Foreign", slug="foreign-calendar")
+        res = client_for(self.owner).post(
+            EVENTS, {**self.PAYLOAD, "pharmacy": self.pharmacy.id, "organization": foreign.id}, format="json")
+        self.assertEqual(res.status_code, 403)
+        self.assertFalse(CalendarEvent.objects.exists())
+
+    def test_create_accepts_matching_organization_or_pharmacy_only(self):
+        org = Organization.objects.create(name="Managed", slug="managed-calendar")
+        self.pharmacy.organization = org
+        self.pharmacy.save(update_fields=["organization"])
+        for scope in ({"pharmacy": self.pharmacy.id}, {"pharmacy": self.pharmacy.id, "organization": org.id}):
+            with self.subTest(scope=scope):
+                res = client_for(self.owner).post(EVENTS, {**self.PAYLOAD, **scope}, format="json")
+                self.assertEqual(res.status_code, 201)
+        self.assertEqual(CalendarEvent.objects.count(), 2)
 
     def test_owner_creates_manual_event_stamped_with_creator(self):
         res = client_for(self.owner).post(EVENTS, {**self.PAYLOAD, "pharmacy": self.pharmacy.id}, format="json")
@@ -259,3 +300,58 @@ class CalendarQueryParameterTests(CalendarBase):
         self.assertEqual(ids(f"{EVENTS}?pharmacy_id={self.pharmacy.id}&date_from=2026-04-01"), [april.id])
         self.assertEqual(ids(EVENTS + "?date_from=2026-4-1"), [april.id])   # the ORM's DateField form keeps working
         self.assertEqual(ids(EVENTS + "?date_to=2026-03-31&pharmacy_id="), [march.id])   # an empty id is no filter
+
+
+class CalendarTenantIsolationContracts(TestCase):
+    def setUp(self):
+        self.owner_a, self.a = make_owner_with_pharmacy("PR200 A")
+        self.owner_b, self.b = make_owner_with_pharmacy("PR200 B")
+        self.outsider = make_user("PHARMACIST")
+        self.day = date.today() + timedelta(days=21)
+
+    def test_b07_event_patch_denies_destination_pharmacy(self):
+        event = CalendarEvent.objects.create(
+            pharmacy=self.a, title="Private A calendar", date=self.day,
+            created_by=self.owner_a,
+        )
+        response = client_for(self.owner_a).patch(
+            f"/api/v1/calendar-events/{event.pk}/",
+            {"pharmacy": self.b.pk}, format="json",
+        )
+        self.assertIn(response.status_code, (400, 403, 404), response.data)
+        event.refresh_from_db()
+        self.assertEqual(event.pharmacy_id, self.a.pk)
+
+    def test_b07_work_note_patch_denies_destination_pharmacy(self):
+        note = WorkNote.objects.create(
+            pharmacy=self.a, title="Private A work note", date=self.day,
+            created_by=self.owner_a,
+        )
+        response = client_for(self.owner_a).patch(
+            f"/api/v1/work-notes/{note.pk}/",
+            {"pharmacy": self.b.pk}, format="json",
+        )
+        self.assertIn(response.status_code, (400, 403, 404), response.data)
+        note.refresh_from_db()
+        self.assertEqual(note.pharmacy_id, self.a.pk)
+
+    def test_b06_organization_feed_does_not_expose_sibling_notes(self):
+        org = Organization.objects.create(
+            name="PR200 Group", slug="pr200-group-for-isolation",
+        )
+        for pharmacy in (self.a, self.b):
+            pharmacy.organization = org
+            pharmacy.save(update_fields=["organization"])
+        staff, _membership = make_staff_member(self.a)
+        WorkNote.objects.create(
+            pharmacy=self.b, date=self.day, title="Private sibling note",
+            body="Synthetic private note", is_general=True,
+            created_by=self.owner_b,
+        )
+        response = client_for(staff).get(
+            f"/api/v1/calendar-feed/?organization_id={org.pk}"
+            f"&date_from={self.day.isoformat()}&date_to={self.day.isoformat()}"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        titles = [row.get("title") for row in response.data["work_notes"]]
+        self.assertNotIn("Private sibling note", titles)

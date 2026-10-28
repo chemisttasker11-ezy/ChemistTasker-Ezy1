@@ -1,5 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
 import { canPublishTalent, loadAllTalentPages } from './talent';
+import { getExplorerPostForEditing } from './talent';
+import { configureApi } from './transport/application';
+
+describe('getExplorerPostForEditing', () => {
+  it('loads the owner post even when expired availability is absent from the feed', async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL) => new Response(JSON.stringify({ count: 1, results: [
+      { id: 78, author_user_id: 7, availability_days: ['2020-01-01'], post_kind: 'AVAILABILITY' },
+    ] }), { headers: { 'Content-Type': 'application/json' } }));
+    configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'owner-token', fetchImpl });
+    await expect(getExplorerPostForEditing()).resolves.toMatchObject({ id: 78, authorUserId: 7, availabilityDays: ['2020-01-01'] });
+    expect(String(fetchImpl.mock.calls[0][0])).toContain('/explorer-posts/?mine=true');
+  });
+
+  it('returns no existing post for a legitimate first-time publisher', async () => {
+    configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'new-owner-token',
+      fetchImpl: vi.fn(async () => new Response(JSON.stringify({ count: 0, results: [] }),
+        { headers: { 'Content-Type': 'application/json' } })) });
+    await expect(getExplorerPostForEditing()).resolves.toBeNull();
+  });
+});
 
 describe('canPublishTalent', () => {
   it('allows explorers without the staff-only verification gate', () => {

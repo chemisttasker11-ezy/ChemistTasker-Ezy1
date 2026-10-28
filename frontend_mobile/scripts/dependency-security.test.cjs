@@ -144,3 +144,13 @@ test('security gate rejects new advisories and unpatched duplicate dependency co
   report.vulnerabilities.braces.via[0].url = 'https://github.com/advisories/NEW';
   assert.throws(() => verifyAudit(report), /Unresolved advisory/);
 });
+
+test('patched fast-uri rejects percent-encoded dangerous URI schemes', () => {
+  const uri = require('fast-uri');
+  for (const value of ['%6Aavascript:alert(1)', '%u006Aavascript:alert(1)']) {
+    let normalized;
+    try { normalized = uri.normalize(value); }
+    catch { continue; } // Rejecting malformed URI schemes is also safe.
+    assert.notEqual(normalized, 'javascript:alert(1)');
+  }
+});

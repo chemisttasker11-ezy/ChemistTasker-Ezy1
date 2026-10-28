@@ -3,6 +3,7 @@ the dashboard links they carry (per recipient role)."""
 from django.conf import settings
 
 from core.task_queue import async_task
+from memberships.access import user_can_invite_members_to_pharmacy
 from memberships.models import Membership
 from notifications.models import Notification
 from notifications.services import notify_users
@@ -67,7 +68,7 @@ def _membership_controller_users(pharmacy, invited_by=None):
     users_by_id = {}
 
     def add(user):
-        if user and getattr(user, "id", None):
+        if user and getattr(user, "id", None) and user_can_invite_members_to_pharmacy(user, pharmacy):
             users_by_id[user.id] = user
 
     add(invited_by)

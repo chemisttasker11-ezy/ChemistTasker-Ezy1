@@ -10,8 +10,9 @@ export type LogoutSessionOptions = {
     refreshToken?: string | null;
     isBrowser?: boolean;
     csrfToken?: string | null;
+    deviceToken?: string | null;
 };
-export function logoutSession({ refreshToken = null, isBrowser = false, csrfToken = null }: LogoutSessionOptions = {}) {
+export function logoutSession({ refreshToken = null, isBrowser = false, csrfToken = null, deviceToken = null }: LogoutSessionOptions = {}) {
     const headers = {
         'Content-Type': 'application/json',
         'X-Client-Platform': isBrowser ? 'web' : 'mobile',
@@ -19,7 +20,7 @@ export function logoutSession({ refreshToken = null, isBrowser = false, csrfToke
     };
     return fetchApi('/users/logout/', {
         method: 'POST',
-        body: JSON.stringify(isBrowser ? {} : { refresh: refreshToken }),
+        body: JSON.stringify(isBrowser ? {} : { refresh: refreshToken, ...(deviceToken ? { device_token: deviceToken } : {}) }),
         headers,
         credentials: isBrowser ? 'include' : 'omit',
         skipAuth: true,

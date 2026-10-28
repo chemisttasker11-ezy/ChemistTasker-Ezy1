@@ -87,9 +87,17 @@ def _revoke_user_tokens(user):
             BlacklistedToken.objects.get_or_create(token=token)
     except Exception:
         logging.getLogger("users.views").exception("Failed to revoke JWT tokens for user %s", user.id)
+    from users.models import WebSocketTicket
+    from users.tokens import notify_auth_changed
+    WebSocketTicket.objects.filter(user=user).delete()
+    transaction.on_commit(lambda: notify_auth_changed(user.id))
 
 
 def _anonymize_user(user):
+    from django.db.models import Q
+    from talent.models import ExplorerPost
+
+    ExplorerPost.objects.filter(Q(author_user=user) | Q(explorer_profile__user=user)).delete()
     original_email = (user.email or "").strip()
     update_fields = ["is_active", "deleted_at"]
 

@@ -45,15 +45,22 @@ describe('browser identity and public wire contract parity', () => {
     await browserRegisterAccount(options, { email: 'e@test.invalid' });
     await browserRequestPasswordReset(options, 'e@test.invalid');
     await browserSubmitReferee(options, 'invite-token', { referee_name: 'John' });
-    await browserRejectReferee(options, '7', '2');
+    await browserRejectReferee(options, 'otherstaffonboarding:7:2:signed-token');
     await browserMagicMembershipInfo(options, 'invite-token');
     expect(seen.map(s => s.path)).toEqual([
       '/api/v1/users/register/', '/api/v1/users/password-reset/',
       '/api/v1/onboarding/submit-reference/invite-token/',
-      '/api/v1/onboarding/referee-reject/7/2/',
+      '/api/v1/onboarding/referee-reject/otherstaffonboarding:7:2:signed-token/',
       '/api/v1/magic/memberships/invite-token/',
     ]);
     expect(seen.every(s => s.credentials === 'same-origin' && !s.headers.has('Authorization'))).toBe(true);
+  });
+  it('propagates rejection of a forged decline token without falling back to an unsigned URL', async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL) => json({ detail: 'This referee link is invalid or has expired.' }, 403));
+    await expect(browserRejectReferee({ baseUrl: 'https://example.test/api/v1', fetchImpl }, 'forged-token'))
+      .rejects.toThrow();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(String(fetchImpl.mock.calls[0][0])).toContain('/onboarding/referee-reject/forged-token/');
   });
   it('cookie-only current-user bootstrap does not refresh while bearer reads keep their access header', async () => {
     const { seen, options } = make(() => ({ id: 44, role: 'OWNER' }));

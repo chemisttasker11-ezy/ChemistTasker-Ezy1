@@ -10,7 +10,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
-from shifts.finalize import finalize_shift_offer
+from shifts.finalize import expire_competing_offers, finalize_shift_offer, offer_occurrence_key
 from shifts.emails import send_shift_payment_finalized_notifications
 from rewards.services import (
     claim_referral_code,
@@ -149,122 +149,107 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=["post"], url_path="pay-shift")
     def pay_shift(self, request):
+        """Settle one pill charge per selected pending offer, atomically.
+
+        Shift is the serialization key and the payer row prevents concurrent
+        deductions from the same balance across different shifts.
+        """
         shift_id = request.data.get("shift_id") or request.data.get("shiftId")
         if not shift_id:
             raise DRFValidationError({"shift_id": "This field is required."})
-        shift = get_object_or_404(Shift.objects.select_related("pharmacy", "pharmacy__owner"), pk=shift_id)
-        if not user_can_manage_pharmacy(request.user, shift.pharmacy):
-            raise PermissionDenied("You do not have permission to pay for this shift.")
-        if shift.payment_status == "PAID":
-            return Response({
-                "detail": "Shift is already paid.",
-                "balance": get_pill_balance(request.user),
-                "payment_status": shift.payment_status,
-            })
-        if shift.payment_status != "PENDING":
-            raise DRFValidationError({"detail": "This shift does not require payment."})
-        slot_id = request.data.get("slot_id") or request.data.get("slotId")
-        raw_slot_ids = request.data.get("slot_ids") or request.data.get("slotIds")
-        raw_offer_ids = request.data.get("offer_ids") or request.data.get("offerIds") or request.data.get("offer_id") or request.data.get("offerId")
-        if raw_offer_ids is None:
-            raw_offer_ids = []
-        if isinstance(raw_offer_ids, str):
-            raw_offer_ids = [part.strip() for part in raw_offer_ids.split(",") if part.strip()]
-        elif not isinstance(raw_offer_ids, list):
-            raw_offer_ids = [raw_offer_ids]
-        offer_ids = []
-        for value in raw_offer_ids:
-            try:
-                offer_ids.append(int(value))
-            except (TypeError, ValueError):
-                raise DRFValidationError({"offer_ids": f"Invalid offer id: {value}"})
-        offer_ids = sorted(set(offer_ids))
 
-        if raw_slot_ids is None:
-            raw_slot_ids = [slot_id] if slot_id else []
-        if isinstance(raw_slot_ids, str):
-            raw_slot_ids = [part.strip() for part in raw_slot_ids.split(",") if part.strip()]
-        elif not isinstance(raw_slot_ids, list):
-            raw_slot_ids = [raw_slot_ids]
-        slot_ids = []
-        for value in raw_slot_ids:
+        def parse_ids(raw, key):
+            if raw in (None, "", []):
+                return []
+            values = raw.split(",") if isinstance(raw, str) else raw if isinstance(raw, list) else [raw]
             try:
-                slot_ids.append(int(value))
+                result = [int(item) for item in values]
             except (TypeError, ValueError):
-                raise DRFValidationError({"slot_ids": f"Invalid slot id: {value}"})
-        slot_ids = sorted(set(slot_ids))
-        if offer_ids:
-            selected_offers = list(ShiftOffer.objects.filter(
-                shift=shift,
-                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-                id__in=offer_ids,
-            ))
-            if len(selected_offers) != len(offer_ids):
-                raise DRFValidationError({"detail": "One or more selected offers do not require payment."})
-            selected_slot_ids = [offer.slot_id for offer in selected_offers if offer.slot_id]
-            if len(selected_slot_ids) != len(set(selected_slot_ids)):
-                raise DRFValidationError({"detail": "Select only one candidate per slot."})
-        elif slot_ids:
-            matching_count = ShiftOffer.objects.filter(
-                shift=shift,
-                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-                slot_id__in=slot_ids,
-            ).values("slot_id").distinct().count()
-            if matching_count != len(slot_ids):
-                raise DRFValidationError({"detail": "One or more selected slots do not require payment."})
-        payment_units = max(1, len(offer_ids) or len(slot_ids))
-        ledgers = []
+                raise DRFValidationError({key: "IDs must be integers."})
+            if any(value < 1 for value in result):
+                raise DRFValidationError({key: "IDs must be positive."})
+            return sorted(set(result))
+
+        slot_ids = parse_ids(
+            request.data.get("slot_ids") or request.data.get("slotIds")
+            or request.data.get("slot_id") or request.data.get("slotId"),
+            "slot_ids",
+        )
+        offer_ids = parse_ids(
+            request.data.get("offer_ids") or request.data.get("offerIds")
+            or request.data.get("offer_id") or request.data.get("offerId"),
+            "offer_ids",
+        )
+        ledger_entries = []
+        finalized = []
         try:
-            for _ in range(payment_units):
-                ledgers.append(spend_pills_for_shift_post(user=request.user, shift=shift))
+            with transaction.atomic():
+                shift = get_object_or_404(
+                    Shift.objects.select_for_update(of=("self",)).select_related("pharmacy", "pharmacy__owner"),
+                    pk=shift_id,
+                )
+                if not user_can_manage_pharmacy(request.user, shift.pharmacy):
+                    raise PermissionDenied("You do not have permission to pay for this shift.")
+                if shift.payment_status == "PAID":
+                    return Response({
+                        "detail": "Shift is already paid.",
+                        "balance": get_pill_balance(request.user),
+                        "payment_status": shift.payment_status,
+                    })
+                if shift.payment_status != "PENDING":
+                    raise DRFValidationError({"detail": "This shift does not require payment."})
+                pending = list(
+                    ShiftOffer.objects.select_for_update().filter(
+                        shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                    ).order_by("pk")
+                )
+                if offer_ids:
+                    selected = [offer for offer in pending if offer.id in offer_ids]
+                    if len(selected) != len(offer_ids):
+                        raise DRFValidationError({"detail": "One or more selected offers do not require payment."})
+                elif slot_ids:
+                    selected = [offer for offer in pending if offer.slot_id in slot_ids]
+                    if len(selected) != len(slot_ids):
+                        raise DRFValidationError({"detail": "Select exactly one pending offer per slot."})
+                elif len(pending) == 1:
+                    # Legacy single-offer clients may send only a shift ID.
+                    selected = pending
+                else:
+                    raise DRFValidationError({
+                        "detail": "Select the pending offer(s) to pay for this shift."
+                    })
+
+                if slot_ids and any(offer.slot_id not in slot_ids for offer in selected):
+                    raise DRFValidationError({"detail": "Selected offers do not match the selected slots."})
+                selected_occurrences = [offer_occurrence_key(offer) for offer in selected if offer.slot_id]
+                if len(selected_occurrences) != len(set(selected_occurrences)):
+                    raise DRFValidationError({"detail": "Select only one candidate per slot."})
+                # _create_ledger_entry locks the payer row before reading the balance.
+                for offer in selected:
+                    ledger_entries.append(spend_pills_for_shift_post(user=request.user, shift=shift, offer=offer))
+                    finalize_shift_offer(offer)
+                    finalized.append(offer)
+                expire_competing_offers(shift, selected)
+                outstanding = ShiftOffer.objects.filter(
+                    shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                ).exists()
+                shift.payment_status = "PENDING" if outstanding else "PAID"
+                shift.save(update_fields=["payment_status"])
         except RewardError as exc:
             raise DRFValidationError({
                 "detail": str(exc),
                 "code": "insufficient_pills" if "Insufficient" in str(exc) else "pill_payment_failed",
                 "balance": get_pill_balance(request.user),
-                "required": get_shift_post_pill_cost() * payment_units,
+                "required": get_shift_post_pill_cost() * max(1, len(offer_ids) or len(slot_ids)),
             })
-        finalized_count = 0
-        finalized_offers = []
-        with transaction.atomic():
-            pending_offers = ShiftOffer.objects.filter(
-                shift=shift,
-                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            ).order_by("created_at")
-            if offer_ids:
-                pending_offers = pending_offers.filter(id__in=offer_ids)
-            elif slot_ids:
-                pending_offers = pending_offers.filter(slot_id__in=slot_ids)
-            selected_slot_ids = set()
-            for offer in pending_offers:
-                finalize_shift_offer(offer)
-                finalized_offers.append(offer)
-                if offer.slot_id:
-                    selected_slot_ids.add(offer.slot_id)
-                finalized_count += 1
-            if selected_slot_ids:
-                ShiftOffer.objects.filter(
-                    shift=shift,
-                    slot_id__in=selected_slot_ids,
-                    status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
-                ).exclude(id__in=offer_ids).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
-            has_pending_payment = ShiftOffer.objects.filter(
-                shift=shift,
-                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            ).exists()
-            shift.payment_status = "PENDING" if has_pending_payment else "PAID"
-            shift.save(update_fields=["payment_status"])
         send_shift_payment_finalized_notifications(
-            shift=shift,
-            offers=finalized_offers,
-            paid_by=request.user,
-            payment_method="pills",
+            shift=shift, offers=finalized, paid_by=request.user, payment_method="pills",
         )
         return Response({
             "detail": "Shift paid with pills.",
             "balance": get_pill_balance(request.user),
             "payment_status": shift.payment_status,
-            "finalized_offers": finalized_count,
-            "ledger_entries": PillLedgerEntrySerializer(ledgers, many=True).data,
-            "ledger_entry": PillLedgerEntrySerializer(ledgers[-1]).data if ledgers else None,
+            "finalized_offers": len(finalized),
+            "ledger_entries": PillLedgerEntrySerializer(ledger_entries, many=True).data,
+            "ledger_entry": PillLedgerEntrySerializer(ledger_entries[-1]).data if ledger_entries else None,
         })

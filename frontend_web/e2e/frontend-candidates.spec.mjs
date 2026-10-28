@@ -1,6 +1,71 @@
 import { test, expect } from '@playwright/test';
 import { installApiFixture, json, roleUsers } from './support/apiFixture.mjs';
 
+for (const dated of [false, true]) {
+  test(`internal candidates load for ${dated ? 'dated' : 'slotless'} vacancies`, async ({ page }) => {
+    const memberRequests = [];
+    await installApiFixture(page, roleUsers.owner, async (route, { path, url }) => {
+      if (path.endsWith('/shifts/active/')) return json(route, [{
+        id: 51, pharmacy_detail: { id: 101, name: 'Internal Pharmacy' },
+        visibility: 'FULL_PART_TIME', allowed_escalation_levels: ['FULL_PART_TIME'],
+        role_needed: 'PHARMACIST', employment_type: 'FULL_TIME', single_user_only: true,
+        slots: dated ? [{ id: 61, date: '2026-10-31', start_time: '09:00:00', end_time: '17:00:00' }] : [],
+      }]);
+      if (path.endsWith('/shifts/51/member_status/')) {
+        memberRequests.push(url.searchParams.get('slot_id'));
+        return json(route, [{ user_id: 81, name: 'Internal Candidate', role: 'PHARMACIST',
+          employment_type: 'FULL_TIME', status: 'interested', is_member: true,
+          user_detail: { id: 81, first_name: 'Internal', last_name: 'Candidate', role_label: 'Pharmacist' } }]);
+      }
+      if (path.includes('/counter-offers')) return json(route, []);
+    });
+    await page.goto('/dashboard/owner/shift-center/active?workspace=internal&pharmacy_id=101');
+    await page.getByRole('button', { name: 'Manage candidates', exact: true }).click();
+    await expect(page.getByText('Internal Candidate', { exact: true }).first()).toBeVisible();
+    expect(memberRequests).toContain(dated ? '61' : null);
+    await page.getByRole('button', { name: 'Review', exact: true }).first().click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+  });
+}
+
+test('accepting one counteroffer date keeps its remaining date available for review', async ({ page }) => {
+  let accepted = false;
+  const profile = { id: 81, first_name: 'Review', last_name: 'Candidate', role_label: 'Pharmacist' };
+  const slots = [61, 62].map((id, index) => ({ id, date: `2026-10-${30 + index}`,
+    start_time: '09:00:00', end_time: '17:00:00' }));
+  const offer = () => ({ id: 91, shift: 51, user: 81, status: 'PENDING', user_detail: profile,
+    slots: (accepted ? slots.slice(1) : slots).map(slot => ({ id: slot.id + 100, slot_id: slot.id,
+      slot_date: slot.date, proposed_start_time: slot.start_time, proposed_end_time: slot.end_time,
+      proposed_rate: '70.00' })) });
+  await installApiFixture(page, roleUsers.owner, async (route, { path }) => {
+    if (path.endsWith('/shifts/active/')) return json(route, [{ id: 51, pharmacy: 101,
+      pharmacy_detail: { id: 101, name: 'Review Pharmacy' }, visibility: 'PLATFORM',
+      allowed_escalation_levels: ['PLATFORM'], role_needed: 'PHARMACIST', employment_type: 'LOCUM',
+      single_user_only: false, slots }]);
+    if (path.endsWith('/shift-interests/')) return json(route, slots.map(slot => ({
+      id: slot.id + 10, shift: 51, slot_id: slot.id, user_id: 81,
+      revealed: true, user: 'Review Candidate', user_detail: profile,
+    })));
+    if (path.endsWith('/shifts/51/counter-offers/91/accept/')) {
+      expect(route.request().postDataJSON()).toEqual({ slot_id: 61 });
+      accepted = true;
+      return json(route, { detail: 'Offer sent for candidate confirmation.', offer_ids: [121] });
+    }
+    if (path.endsWith('/shifts/counter-offers-batch/')) return json(route, { 51: [offer()] });
+    if (path.includes('/counter-offers')) return json(route, [offer()]);
+  });
+  await page.goto('/dashboard/owner/shift-center/active');
+  await page.getByRole('button', { name: 'Manage candidates', exact: true }).click();
+  await page.getByRole('button', { name: 'Review offer', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Accept offer', exact: true })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Accept offer', exact: true }).click();
+  await expect.poll(() => accepted).toBe(true);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('group', { name: 'Choose a shift date', exact: true }).getByRole('button', { name: /31 Oct/ }).click();
+  await expect(page.getByRole('button', { name: 'Review offer', exact: true })).toBeVisible();
+  await expect(page.getByText('Review Candidate', { exact: true }).first()).toBeVisible();
+});
+
 for (const role of ['Student', 'Pharmacist']) for (const initiallyRevealed of [true, false]) {
   test(`${role} platform interest retains the work profile after ${initiallyRevealed ? 'a reload' : 'reveal'}`, async ({ page }) => {
     const profile = {

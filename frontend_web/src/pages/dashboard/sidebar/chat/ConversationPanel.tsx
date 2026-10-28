@@ -255,7 +255,7 @@ return 'Direct Message';
     if (!lastReadTime) return -1;
     return messages.findIndex(msg =>
       (dayjs.utc(msg.created_at).valueOf() > lastReadTime) &&
-      (msg.sender.user_details.id !== currentUserId)
+      (!msg.sender || msg.sender.user_details.id !== currentUserId)
     );
   }, [activeRoom?.my_last_read_at, messages, currentUserId]);
 

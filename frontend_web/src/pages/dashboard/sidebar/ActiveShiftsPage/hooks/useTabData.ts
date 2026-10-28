@@ -62,7 +62,9 @@ export function useTabData(
                     return acc;
                 }, {});
 
-                const members = membersBySlotEntries.flatMap(([, list]) => list);
+                const members = shift.slots?.length
+                    ? membersBySlotEntries.flatMap(([, list]) => list)
+                    : await fetchShiftMemberStatus(shift.id, { visibility: levelKey });
 
                 setTabData(prev => ({
                     ...prev,

@@ -1,5 +1,5 @@
 import { useShiftDescriptionTemplate } from './useShiftDescriptionTemplate';
-import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, type ShiftPostingDraft } from '@chemisttasker/shared-core';
+import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, getShiftPostingOwnerAdjustedRate, type ShiftPostingDraft } from '@chemisttasker/shared-core';
 import { useShiftPricing } from './useShiftPricing';
 import { useShiftTimetable } from './useShiftTimetable';
 import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults, type SupportEntry } from '@chemisttasker/shared-core';
@@ -23,7 +23,8 @@ import {
   Shift,
   EscalationLevelKey,
   fetchPharmaciesService,
-  fetchActiveShiftDetailService,
+  fetchWorkerShiftDetailService,
+  expandShiftDraftSlots,
   createOwnerShiftService,
   updateOwnerShiftService,
 } from '@chemisttasker/shared-core';
@@ -133,6 +134,8 @@ const PostShiftForm: React.FC<PostShiftFormProps> = ({
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
   const [activeStep, setActiveStep] = useState(0);
   const [prefillAppliedFor, setPrefillAppliedFor] = useState<string | null>(null);
+  const initialSlotsJsonRef = useRef<string | null>(null);
+  const initialRatesJsonRef = useRef<string | null>(null);
 
   const selectedPharmacy = useMemo(
     () => pharmacies.find((x) => x.id === pharmacyId),
@@ -172,7 +175,7 @@ const PostShiftForm: React.FC<PostShiftFormProps> = ({
 
       if (editingShiftId) {
         try {
-          const detail = await fetchActiveShiftDetailService(Number(editingShiftId));
+          const detail = await fetchWorkerShiftDetailService(Number(editingShiftId));
           const detailPharmacyId =
             detail.pharmacy ?? detail.pharmacyId ?? detail.pharmacyDetail?.id ?? null;
           if (scopedPharmacyId != null && detailPharmacyId !== scopedPharmacyId) {
@@ -196,13 +199,20 @@ const PostShiftForm: React.FC<PostShiftFormProps> = ({
           setVisibility(detail.visibility ?? 'FULL_PART_TIME');
           const incomingRateType = detail.rateType ?? '';
           setRateType(incomingRateType || 'FLEXIBLE');
-          setRateWeekday(toRateInputString(firstPresent((detail as any).rateWeekday, (detail as any).rate_weekday, (pharmacyDefaults as any)?.rateWeekday, (pharmacyDefaults as any)?.rate_weekday)));
-          setRateSaturday(toRateInputString(firstPresent((detail as any).rateSaturday, (detail as any).rate_saturday, (pharmacyDefaults as any)?.rateSaturday, (pharmacyDefaults as any)?.rate_saturday)));
-          setRateSunday(toRateInputString(firstPresent((detail as any).rateSunday, (detail as any).rate_sunday, (pharmacyDefaults as any)?.rateSunday, (pharmacyDefaults as any)?.rate_sunday)));
-          setRatePublicHoliday(toRateInputString(firstPresent((detail as any).ratePublicHoliday, (detail as any).rate_public_holiday, (pharmacyDefaults as any)?.ratePublicHoliday, (pharmacyDefaults as any)?.rate_public_holiday)));
-          setRateEarlyMorning(toRateInputString(firstPresent((detail as any).rateEarlyMorning, (detail as any).rate_early_morning, (pharmacyDefaults as any)?.rateEarlyMorning, (pharmacyDefaults as any)?.rate_early_morning)));
-          setRateLateNight(toRateInputString(firstPresent((detail as any).rateLateNight, (detail as any).rate_late_night, (pharmacyDefaults as any)?.rateLateNight, (pharmacyDefaults as any)?.rate_late_night)));
-          setOwnerBonus(toRateInputString((detail as any).ownerAdjustedRate ?? (detail as any).owner_adjusted_rate ?? (detail as any).ownerBonus ?? (detail as any).owner_bonus));
+          const initWeekday = toRateInputString(firstPresent((detail as any).rateWeekday, (detail as any).rate_weekday, (pharmacyDefaults as any)?.rateWeekday, (pharmacyDefaults as any)?.rate_weekday));
+          setRateWeekday(initWeekday);
+          const initSaturday = toRateInputString(firstPresent((detail as any).rateSaturday, (detail as any).rate_saturday, (pharmacyDefaults as any)?.rateSaturday, (pharmacyDefaults as any)?.rate_saturday));
+          setRateSaturday(initSaturday);
+          const initSunday = toRateInputString(firstPresent((detail as any).rateSunday, (detail as any).rate_sunday, (pharmacyDefaults as any)?.rateSunday, (pharmacyDefaults as any)?.rate_sunday));
+          setRateSunday(initSunday);
+          const initPublicHoliday = toRateInputString(firstPresent((detail as any).ratePublicHoliday, (detail as any).rate_public_holiday, (pharmacyDefaults as any)?.ratePublicHoliday, (pharmacyDefaults as any)?.rate_public_holiday));
+          setRatePublicHoliday(initPublicHoliday);
+          const initEarlyMorning = toRateInputString(firstPresent((detail as any).rateEarlyMorning, (detail as any).rate_early_morning, (pharmacyDefaults as any)?.rateEarlyMorning, (pharmacyDefaults as any)?.rate_early_morning));
+          setRateEarlyMorning(initEarlyMorning);
+          const initLateNight = toRateInputString(firstPresent((detail as any).rateLateNight, (detail as any).rate_late_night, (pharmacyDefaults as any)?.rateLateNight, (pharmacyDefaults as any)?.rate_late_night));
+          setRateLateNight(initLateNight);
+          const initOwnerBonus = toRateInputString(getShiftPostingOwnerAdjustedRate(detail));
+          setOwnerBonus(initOwnerBonus);
           setMinHourly(toRateInputString((detail as any).minHourlyRate ?? (detail as any).min_hourly_rate));
           setMaxHourly(toRateInputString((detail as any).maxHourlyRate ?? (detail as any).max_hourly_rate));
           setMinAnnual(toRateInputString((detail as any).minAnnualSalary ?? (detail as any).min_annual_salary));
@@ -235,11 +245,31 @@ const PostShiftForm: React.FC<PostShiftFormProps> = ({
             recurringDays: slot.recurringDays ?? [],
             recurringEndDate: slot.recurringEndDate ?? '',
           }));
+
           setSlots(parsedSlots);
-          setSlotRateRows((detail.slots ?? []).map((slot: NonNullable<Shift['slots']>[number]) => {
-            const rate = toRateInputString(getSlotRateValue(slot));
-            return { rate, status: rate ? 'success' as const : 'idle' as const, dirty: false };
-          }));
+          const expanded = expandShiftDraftSlots(parsedSlots);
+          const rawSlots = detail.slots ?? [];
+          const initialSlotRateRows = expanded.map((slot) => {
+            const raw = rawSlots[slot.sourceIndex];
+            const rate = toRateInputString(getSlotRateValue(raw));
+            return { rate, status: rate ? 'success' as const : 'idle' as const, dirty: Boolean(rate) };
+          });
+          setSlotRateRows(initialSlotRateRows);
+          initialSlotsJsonRef.current = JSON.stringify(parsedSlots);
+          initialRatesJsonRef.current = JSON.stringify({
+            rateType: incomingRateType || 'FLEXIBLE',
+            rateWeekday: initWeekday,
+            rateSaturday: initSaturday,
+            rateSunday: initSunday,
+            ratePublicHoliday: initPublicHoliday,
+            rateEarlyMorning: initEarlyMorning,
+            rateLateNight: initLateNight,
+            ownerBonus: initOwnerBonus,
+            slotRates: initialSlotRateRows.map((r) => r.rate),
+          });
+
+
+
         } catch {
           if (!cancelled) {
             showSnackbar('Failed to load shift for editing', 'error');
@@ -439,7 +469,27 @@ const PostShiftForm: React.FC<PostShiftFormProps> = ({
     ...(renderPreview ? [{ key: 'review', label: 'Review', icon: ScanEye, tone: 'violet' as const }] : []),
   ], [isLocumLike, renderPreview]);
 
-  const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility, escalationDates, editingShiftId, postAnonymously });
+  const areSlotsModified = () => {
+    if (!editingShiftId || initialSlotsJsonRef.current === null) return true;
+    return JSON.stringify(slots) !== initialSlotsJsonRef.current;
+  };
+  const areRatesModified = () => {
+    if (!editingShiftId || initialRatesJsonRef.current === null) return true;
+    const { slotRates: initialSlotRates, ...initialRates } = JSON.parse(initialRatesJsonRef.current);
+    const currentRatesJson = JSON.stringify({
+      rateType,
+      rateWeekday,
+      rateSaturday,
+      rateSunday,
+      ratePublicHoliday,
+      rateEarlyMorning,
+      rateLateNight,
+      ownerBonus,
+    });
+    return currentRatesJson !== JSON.stringify(initialRates) || haveShiftPostingSlotRatesChanged(initialSlotRates, slotRateRows);
+  };
+
+  const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility, escalationDates, editingShiftId, postAnonymously, slotsModified: areSlotsModified(), ratesModified: areRatesModified() });
   const buildPayload = () => buildShiftPostingPayload(postingDraft());
 
   // shortcut: the preview leaves out server-computed fields (distance, ratings); fine for a pre-post check.

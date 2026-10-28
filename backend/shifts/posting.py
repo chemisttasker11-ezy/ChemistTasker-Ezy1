@@ -14,7 +14,7 @@ from shifts.assignment import offer_dedicated_shift
 from shifts.emails import send_shift_updated_notifications
 from shifts.escalation import ESCALATION_FIELD_MAP
 from shifts.limits import enforce_public_shift_daily_limit
-from shifts.models import Shift, ShiftSlot
+from shifts.models import Shift, ShiftOffer, ShiftSlot
 
 
 def normalize_money_value(value, *, field_name, slot_index):
@@ -151,17 +151,6 @@ def revise_shift(
     """Apply a validated edit: recalculate the escalation level when the visibility changes (`allowed_tiers` must
     contain it), replace the slots when `slots_payload` is given, optionally copy the rates to the pharmacy, and
     announce the update after commit."""
-    # Roster slot IDs and accepted assignments are durable identities. They may
-    # only be edited by the in-place roster command, never this marketplace
-    # collection-replacement path (including when individually unpublished).
-    if slots_payload is not None and (
-        instance.is_roster_container
-        or instance.slots.filter(roster_period__isnull=False).exists()
-        or instance.slot_assignments.filter(is_rostered=True).exists()
-    ):
-        raise serializers.ValidationError({
-            "slots": "Use the roster editor to update existing roster slots in place."
-        })
     # Validate the new slots before changing anything, and apply the whole edit atomically.
     protect_direct_booking(validated_data, instance=instance)
     if 'visibility' in validated_data and allowed_tiers is None:
@@ -169,6 +158,30 @@ def revise_shift(
         allowed_tiers = pharmacy_allowed_tiers(instance.pharmacy)
     slots_data = normalize_slots_payload(slots_payload) if slots_payload is not None else None
     with transaction.atomic():
+        instance = Shift.objects.select_for_update().get(pk=instance.pk)
+        target = validated_data.get('pharmacy')
+        if target is not None and target.pk != instance.pharmacy_id and (
+            instance.slot_assignments.exists()
+            or instance.offers.filter(status__in=[
+                ShiftOffer.Status.ACCEPTED, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            ]).exists()
+        ):
+            raise serializers.ValidationError({'pharmacy': 'Shift pharmacy cannot change during edit.'})
+        # Text-only edits leave the accepted terms intact; anything else waits for payment (F01-N2).
+        if instance.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists() and (
+            slots_payload is not None
+            or any(getattr(instance, key) != value for key, value in validated_data.items() if key != 'description')
+        ):
+            raise serializers.ValidationError('This shift has an accepted offer awaiting payment. Complete payment before editing its terms.')
+        # Inspect durable identities on the locked shift before replacing any slots.
+        if slots_data is not None and (
+            instance.is_roster_container
+            or instance.slots.filter(roster_period__isnull=False).exists()
+            or instance.slot_assignments.exists()
+        ):
+            raise serializers.ValidationError({
+                "slots": "Use the roster editor to update existing roster slots in place."
+            })
         # If visibility is changing, recalc escalation_level
         if 'visibility' in validated_data:
             new_vis = validated_data['visibility']
@@ -241,12 +254,16 @@ def sync_pharmacy_rate_defaults(pharmacy, *, shift=None, request_data=None):
     )
     pharmacy.default_rate_type = next_rate_type
 
-    pharmacy.rate_weekday = to_decimal_or_none(get_request_value('rate_weekday', 'rateWeekday'))
-    pharmacy.rate_saturday = to_decimal_or_none(get_request_value('rate_saturday', 'rateSaturday'))
-    pharmacy.rate_sunday = to_decimal_or_none(get_request_value('rate_sunday', 'rateSunday'))
-    pharmacy.rate_public_holiday = to_decimal_or_none(get_request_value('rate_public_holiday', 'ratePublicHoliday'))
-    pharmacy.rate_early_morning = to_decimal_or_none(get_request_value('rate_early_morning', 'rateEarlyMorning'))
-    pharmacy.rate_late_night = to_decimal_or_none(get_request_value('rate_late_night', 'rateLateNight'))
+    for field, alias in (
+        ('rate_weekday', 'rateWeekday'),
+        ('rate_saturday', 'rateSaturday'),
+        ('rate_sunday', 'rateSunday'),
+        ('rate_public_holiday', 'ratePublicHoliday'),
+        ('rate_early_morning', 'rateEarlyMorning'),
+        ('rate_late_night', 'rateLateNight'),
+    ):
+        if field in request_data or alias in request_data:
+            setattr(pharmacy, field, to_decimal_or_none(get_request_value(field, alias)))
 
     fixed_rate_value = (
         get_request_value('fixed_rate', 'fixedRate', 'hourly_rate', 'hourlyRate')

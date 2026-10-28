@@ -1,6 +1,8 @@
 """pharmacy_hub: cohesive posts serializers."""
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 from memberships.models import Membership
+from pharmacy_hub.access import HubScopeResolver
 from pharmacy_hub.models import PharmacyCommunityGroupMembership, PharmacyHubAttachment, PharmacyHubComment, PharmacyHubPost, PharmacyHubPostMention
 from django.db.models import Q
 from users.presentation import _build_absolute_media_url
@@ -263,7 +265,10 @@ class HubPostSerializer(serializers.ModelSerializer):
         if not normalized_ids:
             return []
         memberships = list(
-            Membership.objects.filter(id__in=set(normalized_ids), is_active=True).select_related("pharmacy__organization", "user")
+            Membership.objects.filter(
+                id__in=set(normalized_ids), is_active=True,
+                status=Membership.Status.ACCEPTED, user__is_active=True,
+            ).select_related("pharmacy__organization", "user")
         )
         if len(memberships) != len(set(normalized_ids)):
             found_ids = {m.id for m in memberships}
@@ -309,6 +314,17 @@ class HubPostSerializer(serializers.ModelSerializer):
             )
         else:
             raise serializers.ValidationError({"tagged_member_ids": "Unable to determine post scope for tagging."})
+        for membership in memberships:
+            resolver = HubScopeResolver(membership.user)
+            try:
+                if community_group:
+                    resolver.group_scope(community_group.pk, group=community_group)
+                elif pharmacy:
+                    resolver.pharmacy_scope(pharmacy.pk, pharmacy=pharmacy)
+                elif organization:
+                    resolver.organization_scope(organization.pk, organization=organization)
+            except PermissionDenied:
+                raise serializers.ValidationError({"tagged_member_ids": "Mentioned members must have access to this post."})
         return memberships
 
     def _apply_mentions(self, post, memberships):

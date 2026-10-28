@@ -1,4 +1,4 @@
-import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, type ShiftPostingDraft } from '@chemisttasker/shared-core';
+import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, getShiftPostingOwnerAdjustedRate, type ShiftPostingDraft } from '@chemisttasker/shared-core';
 import NativeShiftBoardPreview from './NativeShiftBoardPreview';
 import { expandShiftDraftSlots, reconcileShiftDraftRateRows } from '@chemisttasker/shared-core';
 import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults, type SupportEntry } from '@chemisttasker/shared-core';
@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
     fetchPharmaciesService,
-    fetchActiveShiftDetailService,
+    fetchWorkerShiftDetailService,
     createOwnerShiftService,
     updateOwnerShiftService,
     calculateShiftRates,
@@ -215,10 +215,14 @@ export default function PostShiftScreen() {
         setMaxAnnual('');
         setSavingPharmacyRates(false);
         setDedicatedUserId(null);
+        initialSlotsJsonRef.current = null;
+        initialRatesJsonRef.current = null;
     }, []);
 
     // Reset escalation dates when the initial audience changes, mirroring web behaviour
     const hasInitialAudienceRun = React.useRef(false);
+    const initialSlotsJsonRef = React.useRef<string | null>(null);
+    const initialRatesJsonRef = React.useRef<string | null>(null);
     useEffect(() => {
         // Skip the first run so preloaded escalation dates are kept when editing
         if (!hasInitialAudienceRun.current) {
@@ -360,7 +364,7 @@ export default function PostShiftScreen() {
     const loadShift = useCallback(async () => {
         if (!editingId) return;
         try {
-            const data: any = await fetchActiveShiftDetailService(editingId);
+            const data: any = await fetchWorkerShiftDetailService(editingId);
             setPharmacyId(
                 data.pharmacy_detail?.id ??
                 data.pharmacyDetail?.id ??
@@ -411,13 +415,8 @@ export default function PostShiftScreen() {
             setEscalationDates(escalations);
             setEscalationPlan({ mode: Object.values(escalations).some(Boolean) ? 'custom' : 'off', everyHours: 24 });
             setDedicatedUserId(typeof data.dedicatedUser === 'number' ? data.dedicatedUser : typeof data.dedicated_user === 'number' ? data.dedicated_user : null);
-            setOwnerBonus(
-                data.owner_bonus != null
-                    ? String(data.owner_bonus)
-                    : data.ownerBonus != null
-                        ? String(data.ownerBonus)
-                        : ''
-            );
+            const initOwnerBonus = toRateInputString(getShiftPostingOwnerAdjustedRate(data));
+            setOwnerBonus(initOwnerBonus);
             const rateTypeValue = data.rate_type ?? data.rateType;
             if (rateTypeValue === 'PHARMACIST_PROVIDED') {
                 setRateType('PHARMACIST_PROVIDED');
@@ -426,12 +425,18 @@ export default function PostShiftScreen() {
             } else {
                 setRateType('FLEXIBLE');
             }
-            setRateWeekday(toRateInputString(firstPresent(data.rate_weekday, data.rateWeekday, (pharmacyDefaults as any)?.rate_weekday, (pharmacyDefaults as any)?.rateWeekday)));
-            setRateSaturday(toRateInputString(firstPresent(data.rate_saturday, data.rateSaturday, (pharmacyDefaults as any)?.rate_saturday, (pharmacyDefaults as any)?.rateSaturday)));
-            setRateSunday(toRateInputString(firstPresent(data.rate_sunday, data.rateSunday, (pharmacyDefaults as any)?.rate_sunday, (pharmacyDefaults as any)?.rateSunday)));
-            setRatePublicHoliday(toRateInputString(firstPresent(data.rate_public_holiday, data.ratePublicHoliday, (pharmacyDefaults as any)?.rate_public_holiday, (pharmacyDefaults as any)?.ratePublicHoliday)));
-            setRateEarlyMorning(toRateInputString(firstPresent(data.rate_early_morning, data.rateEarlyMorning, (pharmacyDefaults as any)?.rate_early_morning, (pharmacyDefaults as any)?.rateEarlyMorning)));
-            setRateLateNight(toRateInputString(firstPresent(data.rate_late_night, data.rateLateNight, (pharmacyDefaults as any)?.rate_late_night, (pharmacyDefaults as any)?.rateLateNight)));
+            const initWeekday = toRateInputString(firstPresent(data.rate_weekday, data.rateWeekday, (pharmacyDefaults as any)?.rate_weekday, (pharmacyDefaults as any)?.rateWeekday));
+            setRateWeekday(initWeekday);
+            const initSaturday = toRateInputString(firstPresent(data.rate_saturday, data.rateSaturday, (pharmacyDefaults as any)?.rate_saturday, (pharmacyDefaults as any)?.rate_saturday));
+            setRateSaturday(initSaturday);
+            const initSunday = toRateInputString(firstPresent(data.rate_sunday, data.rateSunday, (pharmacyDefaults as any)?.rate_sunday, (pharmacyDefaults as any)?.rateSunday));
+            setRateSunday(initSunday);
+            const initPublicHoliday = toRateInputString(firstPresent(data.rate_public_holiday, data.ratePublicHoliday, (pharmacyDefaults as any)?.rate_public_holiday, (pharmacyDefaults as any)?.ratePublicHoliday));
+            setRatePublicHoliday(initPublicHoliday);
+            const initEarlyMorning = toRateInputString(firstPresent(data.rate_early_morning, data.rateEarlyMorning, (pharmacyDefaults as any)?.rate_early_morning, (pharmacyDefaults as any)?.rateEarlyMorning));
+            setRateEarlyMorning(initEarlyMorning);
+            const initLateNight = toRateInputString(firstPresent(data.rate_late_night, data.rateLateNight, (pharmacyDefaults as any)?.rate_late_night, (pharmacyDefaults as any)?.rateLateNight));
+            setRateLateNight(initLateNight);
             setPaymentPreference((data.payment_preference ?? data.paymentPreference ?? 'ABN') === 'TFN' ? 'TFN' : 'ABN');
             const detailSuper = data.super_percent ?? data.superPercent;
             if (detailSuper === null || detailSuper === undefined || detailSuper === '') {
@@ -453,10 +458,29 @@ export default function PostShiftScreen() {
                 }))
                 : [];
             setSlots(parsedSlots);
-            setSlotRateRows((Array.isArray(data.slots) ? data.slots : []).map((s: any) => {
-                const rate = toRateInputString(getSlotRateValue(s));
-                return { rate, status: rate ? 'success' as const : 'idle' as const, dirty: false };
-            }));
+            const expanded = expandShiftDraftSlots(parsedSlots);
+            const rawSlots = Array.isArray(data.slots) ? data.slots : [];
+            const initialSlotRateRows = expanded.map((s) => {
+                const source = rawSlots[s.sourceIndex];
+                const rate = toRateInputString(getSlotRateValue(source));
+                return { rate, status: rate ? 'success' as const : 'idle' as const, dirty: Boolean(rate) };
+            });
+            setSlotRateRows(initialSlotRateRows);
+            initialSlotsJsonRef.current = JSON.stringify(parsedSlots);
+            initialRatesJsonRef.current = JSON.stringify({
+                rateType: rateTypeValue || 'FLEXIBLE',
+                rateWeekday: initWeekday,
+                rateSaturday: initSaturday,
+                rateSunday: initSunday,
+                ratePublicHoliday: initPublicHoliday,
+                rateEarlyMorning: initEarlyMorning,
+                rateLateNight: initLateNight,
+                ownerBonus: initOwnerBonus,
+                slotRates: initialSlotRateRows.map((r) => r.rate),
+            });
+
+
+
         } catch {
             setError('Unable to load shift details');
         }
@@ -784,7 +808,7 @@ export default function PostShiftScreen() {
                         if (entry.error) return { ...prior, status: 'error' as const, error: String(entry.error) };
                         const rateVal = entry.rate ?? entry.rate_per_hour ?? entry.value;
                         const nextRate =
-                            prior.dirty && prior.rate !== undefined && prior.rate !== null && prior.rate !== ''
+                            (prior.dirty || (editingId && Boolean(prior.rate))) && prior.rate !== undefined && prior.rate !== null && prior.rate !== ''
                                 ? prior.rate
                                 : rateVal != null
                                     ? String(rateVal)
@@ -958,7 +982,27 @@ export default function PostShiftScreen() {
         );
     };
 
-    const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff: !isPrivateBooking, showNotifyFavoriteStaff: !isPrivateBooking, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform } });
+    const areSlotsModified = () => {
+        if (!editingId || initialSlotsJsonRef.current === null) return true;
+        return JSON.stringify(slots) !== initialSlotsJsonRef.current;
+    };
+    const areRatesModified = () => {
+        if (!editingId || initialRatesJsonRef.current === null) return true;
+        const { slotRates: initialSlotRates, ...initialRates } = JSON.parse(initialRatesJsonRef.current);
+        const currentRatesJson = JSON.stringify({
+            rateType,
+            rateWeekday,
+            rateSaturday,
+            rateSunday,
+            ratePublicHoliday,
+            rateEarlyMorning,
+            rateLateNight,
+            ownerBonus,
+        });
+        return currentRatesJson !== JSON.stringify(initialRates) || haveShiftPostingSlotRatesChanged(initialSlotRates, slotRateRows);
+    };
+
+    const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff: !isPrivateBooking, showNotifyFavoriteStaff: !isPrivateBooking, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform }, slotsModified: areSlotsModified(), ratesModified: areRatesModified() });
 
     const handleSubmit = async () => {
         setError('');

@@ -34,8 +34,8 @@ export async function updateUserAvailabilityService(id: number | string, payload
 export async function deleteUserAvailabilityService(id: number | string) {
     await deleteUserAvailability(id);
 }
-export function getExplorerPosts() {
-    return fetchApi<Collection<ExplorerPostApi>>('/explorer-posts/');
+export function getExplorerPosts(params?: Record<string, unknown>) {
+    return fetchApi<Collection<ExplorerPostApi>>(`/explorer-posts/${buildQuery(params)}`);
 }
 export function getExplorerPostDetail(id: number | string) {
     return fetchApi<ExplorerPostApi>(`/explorer-posts/${id}/`);

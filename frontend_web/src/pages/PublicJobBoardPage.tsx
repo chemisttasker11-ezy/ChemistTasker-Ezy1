@@ -129,6 +129,7 @@ export default function PublicJobBoardPage() {
       ...raw,
       roleLabel: raw.role_label ?? raw.roleLabel ?? raw.role_needed ?? raw.roleNeeded,
       roleNeeded: raw.role_needed ?? raw.roleNeeded,
+      canApply: raw.can_apply ?? raw.canApply,
       employmentType: raw.employment_type ?? raw.employmentType,
       rateType: raw.rate_type ?? raw.rateType,
       minHourlyRate: raw.min_hourly_rate ?? raw.minHourlyRate,

@@ -388,3 +388,33 @@ class RosterSlotHTTPContractTests(TestCase):
         self.assertIsNotNone(self.slot.unpublished_at)
         self.assert_original_assignment()
         announce.assert_not_called()
+
+    def make_replacement(self):
+        replacement = make_user("PHARMACIST")
+        Membership.objects.create(
+            user=replacement, pharmacy=self.pharmacy, role="PHARMACIST",
+            employment_type="FULL_TIME", status=Membership.Status.ACCEPTED, is_active=True,
+        )
+        return replacement
+
+    def test_user_id_only_patch_keeps_an_invoiced_assignment(self):
+        # B38: the legacy user_id path must not hand an invoiced assignment to someone else.
+        from invoicing.models import Invoice, InvoiceLineItem
+
+        invoice = Invoice.objects.create(user=self.worker, pharmacy=self.pharmacy)
+        InvoiceLineItem.objects.create(
+            invoice=invoice, source_assignment=self.assignment, shift=self.shift,
+            description="Frozen prior service", quantity=1, unit_price=57, total=57,
+        )
+        for user_id in (self.make_replacement().pk, None):
+            response = self.client.patch(self.url, {"user_id": user_id}, format="json")
+            self.assertEqual(response.status_code, 400, response.content)
+            self.assignment.refresh_from_db()
+            self.assertEqual(self.assignment.user_id, self.worker.pk)
+
+    def test_assignment_without_history_cannot_be_overwritten(self):
+        replacement = self.make_replacement()
+        response = self.client.patch(self.url, {"user_id": replacement.pk}, format="json")
+        # Fail closed for every assigned occurrence, even without invoice or attendance history.
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(ShiftSlotAssignment.objects.get(slot=self.slot).user_id, self.worker.pk)

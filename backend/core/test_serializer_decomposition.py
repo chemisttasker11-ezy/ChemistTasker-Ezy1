@@ -2,6 +2,8 @@
 
 The compact snapshot was measured against the original implementations before
 extraction. Behavior-specific suites remain the authority for writes and policy.
+Reviewed F2 additions expose store holiday region, part-day windows and calendar
+status through the pharmacy nested in MyShift, ShiftOffer and Shift serializers.
 """
 import ast
 import hashlib

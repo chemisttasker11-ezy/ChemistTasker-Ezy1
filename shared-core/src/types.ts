@@ -836,6 +836,7 @@ export interface ShiftRatingCommentApi {
 }
 
 export interface ShiftApi {
+    can_apply?: boolean | null;
     published_rates_visible?: boolean;
     dedicated_user?: number | null;
     id: number;
@@ -1119,7 +1120,7 @@ export interface ChatMessageApi {
         id: number;
         user_details: ChatUserApi;
         pharmacy: number | null;
-    };
+    } | null;
     body: string;
     attachment_url: string | null;
     created_at: string;
@@ -1144,6 +1145,7 @@ export interface ChatRoomApi {
     last_message?: {
         id: number;
         body: string;
+        is_deleted?: boolean;
         created_at: string;
         sender: number;
     } | null;
@@ -1165,6 +1167,7 @@ export type ChatUserLite = {
 export type ChatLastMessage = {
     id: number;
     body: string;
+    is_deleted?: boolean;
     created_at: string;
     sender: number;
 };
@@ -1181,7 +1184,7 @@ export type ChatMessage = {
         id: number;
         user_details: ChatUserLite;
         pharmacy: number | null;
-    };
+    } | null;
     body: string;
     attachment_url: string | null;
     created_at: string;

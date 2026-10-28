@@ -1,5 +1,8 @@
 """Characterization of the Ratings API (/api/v1/ratings/)."""
+from datetime import timedelta
+
 from django.test import TestCase
+from django.utils import timezone
 
 from ratings.models import Rating, RatingReport
 from client_profile.models import Organization, Pharmacy
@@ -29,6 +32,20 @@ class RatingsAuthTests(RatingsBase):
 
 
 class RatingsCreateTests(RatingsBase):
+    def test_future_assignment_does_not_allow_either_rating_direction(self):
+        from shifts.models import ShiftSlotAssignment
+
+        ShiftSlotAssignment.objects.all().delete()
+        make_assignment(self.pharmacy, self.owner, self.worker, day=timezone.localdate() + timedelta(days=7))
+        for user, payload in (
+            (self.owner, {"direction": O2W, "ratee_user": self.worker.id}),
+            (self.worker, {"direction": W2P, "ratee_pharmacy": self.pharmacy.id}),
+        ):
+            with self.subTest(direction=payload["direction"]):
+                response = client_for(user).post(URL, {**payload, "stars": 5}, format="json")
+                self.assertEqual(response.status_code, 403)
+        self.assertFalse(Rating.objects.exists())
+
     def test_owner_rates_worker_who_worked_at_their_pharmacy(self):
         res = client_for(self.owner).post(
             URL, {"direction": O2W, "ratee_user": self.worker.id, "stars": 4, "comment": "good"}, format="json")

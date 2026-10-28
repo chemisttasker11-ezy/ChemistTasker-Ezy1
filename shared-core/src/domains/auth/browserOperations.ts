@@ -65,10 +65,9 @@ export async function browserSubmitReferee(
   return client(options).post(API_ENDPOINTS.submitRefereeResponse(invitationToken), payload as object, publicRequest);
 }
 export async function browserRejectReferee(
-  options: BrowserIdentityTransport, candidateId: string, referenceIndex: string,
+  options: BrowserIdentityTransport, invitationToken: string,
 ): Promise<{ message?: string }> {
-  // Do not rewrite or reinterpret legacy signed links in an architecture PR.
-  return client(options).post(API_ENDPOINTS.refereeReject(candidateId, referenceIndex), undefined, publicRequest);
+  return client(options).post(API_ENDPOINTS.refereeRejectByToken(invitationToken), undefined, publicRequest);
 }
 export async function browserMagicMembershipInfo<T>(
   options: BrowserIdentityTransport, invitationToken: string,

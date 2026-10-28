@@ -242,15 +242,17 @@ function BasScreen() {
 }
 
 function ReceivedDetail({invoice,loading,error,onReload}:{invoice?:FinanceInvoice;loading:boolean;error:string;onReload:()=>Promise<void>}) {
-  const [note,setNote]=useState(''),[busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
-  const act=async(kind:'approve'|'revise'|'paid')=>{if(!invoice)return;setBusy(true);setLocalError('');try{if(kind==='approve')await finance.approveForPayment(invoice.id,invoice.version,note);if(kind==='revise'){if(!note.trim())throw new Error('Add a revision note first.');await finance.requestRevision(invoice.id,invoice.version,note);}if(kind==='paid')await finance.markReceivedPaid(invoice.id,invoice.version,note);await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
+  const [note,setNote]=useState(''),[fundConfirmed,setFundConfirmed]=useState(false),[busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
+  useEffect(()=>setFundConfirmed(false),[invoice?.id,invoice?.version]);
+  const act=async(kind:'approve'|'revise'|'paid')=>{if(!invoice)return;setBusy(true);setLocalError('');try{if(kind==='approve')await finance.approveForPayment(invoice.id,invoice.version,note);if(kind==='revise'){if(!note.trim())throw new Error('Add a revision note first.');await finance.requestRevision(invoice.id,invoice.version,note);}if(kind==='paid'){if(invoice.kind==='super_request'&&!fundConfirmed)throw new Error('Confirm the payment went to the super fund.');await finance.markReceivedPaid(invoice.id,invoice.version,note,invoice.kind==='super_request'?fundConfirmed:undefined);}await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
   return <ParityPage title="Received invoice" subtitle="Review the current immutable invoice revision." loading={loading} error={error||localError}>
     {!invoice?<EmptyState title="Invoice not found" body="The requested received invoice is unavailable."/>:<>
       <MetricGrid items={[{label:'Invoice',value:invoice.number},{label:'Revision',value:invoice.version},{label:'Payable',value:money(invoice.calculation.payable)},{label:'Balance',value:money(invoice.balance)}]}/>
       <DataRow title={invoice.payload.issuer_name} subtitle={invoice.payload.reference||'No reference'} status={financeStatus(invoice)}/>
       {invoice.last_review_note?<InfoNote title="Latest review note">{invoice.last_review_note}</InfoNote>:null}
       <Field label="Review note" value={note} multiline onChangeText={setNote}/>
-      <ActionButtons><Button mode="contained" loading={busy} onPress={()=>void act('approve')}>Approve for payment</Button><Button mode="outlined" disabled={busy||!note.trim()} onPress={()=>void act('revise')}>Request revision</Button><Button disabled={busy} onPress={()=>void act('paid')}>Mark paid</Button></ActionButtons>
+      {invoice.kind==='super_request'?<Chip selected={fundConfirmed} disabled={busy} onPress={()=>setFundConfirmed(!fundConfirmed)}>Payment went to super fund</Chip>:null}
+      <ActionButtons><Button mode="contained" loading={busy} onPress={()=>void act('approve')}>Approve for payment</Button><Button mode="outlined" disabled={busy||!note.trim()} onPress={()=>void act('revise')}>Request revision</Button><Button disabled={busy||(invoice.kind==='super_request'&&!fundConfirmed)} onPress={()=>void act('paid')}>Mark paid</Button></ActionButtons>
     </>}
   </ParityPage>;
 }

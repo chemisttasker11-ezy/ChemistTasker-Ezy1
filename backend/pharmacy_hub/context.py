@@ -142,6 +142,7 @@ class HubContextBuilder:
             PharmacyCommunityGroupMembership.objects.filter(
                 membership__user=self.user,
                 membership__is_active=True,
+                membership__status=Membership.Status.ACCEPTED,
                 membership__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
             ).values_list("group_id", flat=True)
         )

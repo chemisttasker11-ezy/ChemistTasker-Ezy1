@@ -39,7 +39,7 @@ export default function InvoiceDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const isOwner = user?.role === 'OWNER';
+  const isRecipient = !isIssuerWorkspace(location.pathname, user?.role);
 
   // Main state
   const [loading, setLoading] = useState(true);
@@ -154,7 +154,7 @@ export default function InvoiceDetailPage() {
     // Invoices managed by the finance workspace open there (issuer: composer, recipient: review history);
     // this page stays for legacy invoices the workspace doesn't manage.
     const listBase = location.pathname.replace(/\/[^/]+\/?$/, '');
-    const managed = isIssuerWorkspace(location.pathname, user?.role) ? finance.invoice(Number(id)) : finance.receivedInvoice(Number(id));
+    const managed = isRecipient ? finance.receivedInvoice(Number(id)) : finance.invoice(Number(id));
     managed
       .then(() => {
         if (cancelled) return;
@@ -481,12 +481,12 @@ export default function InvoiceDetailPage() {
         </Stack>
       }
       subtitle={
-        isOwner
+        isRecipient
           ? [issuerName && `From ${issuerName}`, dueDate && `due ${formatDay(dueDate)}`].filter(Boolean).join(' · ')
           : [billToName && `To ${billToName}`, dueDate && `due ${formatDay(dueDate)}`].filter(Boolean).join(' · ')
       }
       actions={
-        isOwner ? (
+        isRecipient ? (
           <>
             <Button variant="outlined" startIcon={<Download size={16} />} onClick={handleDownloadPdf} sx={{ minHeight: 44 }}>Download PDF</Button>
             <Button variant="outlined" color="warning" startIcon={<Flag size={16} />} onClick={() => { setReportNote(''); setReportOpen(true); }} disabled={submitting} sx={{ minHeight: 44 }}>
@@ -567,7 +567,7 @@ export default function InvoiceDetailPage() {
   );
 
   /* ---------- recipient (owner): a read-only invoice document ---------- */
-  if (isOwner) {
+  if (isRecipient) {
     return (
       <Box data-ct-tokens="" sx={pageSx}>
         {backLink}

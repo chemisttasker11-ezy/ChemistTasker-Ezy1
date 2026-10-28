@@ -22,6 +22,17 @@ const TOKEN_REFRESH_PATH = '/users/token/refresh/';
 let refreshPromise: Promise<string | null> | null = null;
 let inMemorySession: StoredUserSession | null = null;
 let legacyMigrationPromise: Promise<StoredUserSession | null> | null = null;
+let sessionGeneration = 0;
+let storageWrite: Promise<void> = Promise.resolve();
+
+export function getSessionGeneration(): number {
+  return sessionGeneration;
+}
+
+export function invalidateSessionGeneration(): number {
+  refreshPromise = null;
+  return ++sessionGeneration;
+}
 
 function normalizeToken(value: unknown): string | null {
   return typeof value === 'string' && value && value !== 'cookie-session' ? value : null;
@@ -113,6 +124,7 @@ async function migrateLegacySessionIfNeeded(): Promise<StoredUserSession | null>
     return legacyMigrationPromise;
   }
 
+  const generation = sessionGeneration;
   legacyMigrationPromise = (async () => {
     const [storedAccess, storedRefresh] = await Promise.all([
       secureGet(ACCESS_STORAGE_KEY),
@@ -146,9 +158,14 @@ async function migrateLegacySessionIfNeeded(): Promise<StoredUserSession | null>
       return null;
     }
 
-    await persistSecureTokens(legacyAccess, legacyRefresh);
-    await persistStoredUser(legacySession?.user ?? null);
-    await removeLegacyAsyncSession();
+    storageWrite = storageWrite.catch(() => undefined).then(async () => {
+      if (generation !== sessionGeneration) return;
+      await persistSecureTokens(legacyAccess, legacyRefresh);
+      await persistStoredUser(legacySession?.user ?? null);
+      await removeLegacyAsyncSession();
+    });
+    await storageWrite;
+    if (generation !== sessionGeneration) return null;
 
     return {
       access: legacyAccess,
@@ -164,11 +181,15 @@ async function migrateLegacySessionIfNeeded(): Promise<StoredUserSession | null>
 }
 
 export async function readStoredSession(): Promise<StoredUserSession | null> {
+  const generation = sessionGeneration;
+  await storageWrite.catch(() => undefined);
+  if (generation !== sessionGeneration) return inMemorySession;
   if (inMemorySession) {
     return inMemorySession;
   }
 
   const migrated = await migrateLegacySessionIfNeeded();
+  if (generation !== sessionGeneration) return inMemorySession;
   if (migrated) {
     inMemorySession = migrated;
     return migrated;
@@ -179,6 +200,7 @@ export async function readStoredSession(): Promise<StoredUserSession | null> {
     secureGet(REFRESH_STORAGE_KEY),
     readStoredUser(),
   ]);
+  if (generation !== sessionGeneration) return inMemorySession;
   const access = normalizeToken(storedAccess);
   const refresh = normalizeRefreshToken(storedRefresh);
 
@@ -195,8 +217,9 @@ export async function readStoredSession(): Promise<StoredUserSession | null> {
   return inMemorySession;
 }
 
-export async function writeStoredSession(next: StoredUserSession): Promise<void> {
+export async function writeStoredSession(next: StoredUserSession, generation = sessionGeneration): Promise<boolean> {
   const current = (await readStoredSession()) || {};
+  if (generation !== sessionGeneration) return false;
   const access = normalizeToken(next.access ?? next.tokens?.access ?? current.access ?? current.tokens?.access);
   const refresh = normalizeRefreshToken(next.refresh ?? next.tokens?.refresh ?? current.refresh ?? current.tokens?.refresh);
   const merged: StoredUserSession = {
@@ -209,19 +232,28 @@ export async function writeStoredSession(next: StoredUserSession): Promise<void>
   };
 
   inMemorySession = merged;
-  await persistSecureTokens(access, refresh);
-  await persistStoredUser(merged.user ?? null);
-  await removeLegacyAsyncSession();
+  storageWrite = storageWrite.catch(() => undefined).then(async () => {
+    if (generation !== sessionGeneration) return;
+    await persistSecureTokens(access, refresh);
+    await persistStoredUser(merged.user ?? null);
+    await removeLegacyAsyncSession();
+  });
+  await storageWrite;
+  return generation === sessionGeneration;
 }
 
 export async function clearStoredSession(): Promise<void> {
+  invalidateSessionGeneration();
   inMemorySession = null;
-  await Promise.all([
-    secureRemove(ACCESS_STORAGE_KEY).catch(() => null),
-    secureRemove(REFRESH_STORAGE_KEY).catch(() => null),
-    AsyncStorage.removeItem(USER_STORAGE_KEY).catch(() => null),
-    removeLegacyAsyncSession(),
-  ]);
+  storageWrite = storageWrite.catch(() => undefined).then(async () => {
+    await Promise.all([
+      secureRemove(ACCESS_STORAGE_KEY).catch(() => null),
+      secureRemove(REFRESH_STORAGE_KEY).catch(() => null),
+      AsyncStorage.removeItem(USER_STORAGE_KEY).catch(() => null),
+      removeLegacyAsyncSession(),
+    ]);
+  });
+  await storageWrite;
 }
 
 export async function refreshAccessToken(baseURL: string): Promise<string | null> {
@@ -229,14 +261,15 @@ export async function refreshAccessToken(baseURL: string): Promise<string | null
     return refreshPromise;
   }
 
+  const generation = sessionGeneration;
   refreshPromise = (async () => {
-    const session = await readStoredSession();
-    const refresh = normalizeRefreshToken(session?.refresh ?? session?.tokens?.refresh);
-    if (Platform.OS !== 'web' && !refresh) {
-      return null;
-    }
-
     try {
+      const session = await readStoredSession();
+      if (generation !== sessionGeneration) return null;
+      const refresh = normalizeRefreshToken(session?.refresh ?? session?.tokens?.refresh);
+      if (Platform.OS !== 'web' && !refresh) {
+        return null;
+      }
       const isWeb = Platform.OS === 'web';
       const response = await fetch(`${baseURL}${TOKEN_REFRESH_PATH}`, {
         method: 'POST',
@@ -248,6 +281,7 @@ export async function refreshAccessToken(baseURL: string): Promise<string | null
         },
         body: JSON.stringify(isWeb ? {} : { refresh }),
       });
+      if (generation !== sessionGeneration) return null;
 
       if (response.status === 400 || response.status === 401) {
         await clearStoredSession();
@@ -259,22 +293,23 @@ export async function refreshAccessToken(baseURL: string): Promise<string | null
       }
 
       const data = await response.json().catch(() => ({}));
+      if (generation !== sessionGeneration) return null;
       const nextAccess = normalizeToken(data.access);
       const nextRefresh = normalizeRefreshToken(data.refresh) ?? refresh;
       if (!nextAccess) {
         throw new Error('Refresh response missing access token');
       }
 
-      await writeStoredSession({
+      const saved = await writeStoredSession({
         access: nextAccess,
         refresh: nextRefresh,
-      });
+      }, generation);
 
-      return nextAccess;
+      return saved ? nextAccess : null;
     } catch {
       return null;
     } finally {
-      refreshPromise = null;
+      if (generation === sessionGeneration) refreshPromise = null;
     }
   })();
 

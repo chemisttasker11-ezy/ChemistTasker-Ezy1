@@ -136,11 +136,19 @@ def _create_ledger_entry(
     if amount == 0:
         raise RewardError("Pill ledger amount cannot be zero.")
 
-    existing = PillLedgerEntry.objects.filter(idempotency_key=idempotency_key).first()
-    if existing:
-        return existing
-
+    # Lock the payer before *both* the idempotency check and balance sum.
+    # Other entry points (referral credits, manual awards and separate shifts)
+    # use the same central ledger helper; a view-only lock is not sufficient.
     with transaction.atomic():
+        User.objects.select_for_update().get(pk=user.pk)
+        existing = PillLedgerEntry.objects.filter(idempotency_key=idempotency_key).first()
+        if existing:
+            if (existing.user_id != user.pk
+                    or existing.source != source
+                    or existing.shift_id != (shift.pk if shift is not None else None)):
+                raise RewardError("Pill transaction idempotency key conflicts with another transaction.")
+            return existing
+
         current_balance = get_pill_balance(user)
         next_balance = current_balance + amount
         if next_balance < 0:
@@ -185,7 +193,8 @@ def award_referral_event(event: PillReferralEvent) -> PillLedgerEntry:
         referral_event=event,
         shift=event.shift,
         description=rule.name,
-        idempotency_key=f"referral:{event.id}:award",
+        idempotency_key=(f"referral:{event.referral_code_id}:{event.referred_user_id}:{event.referral_type}:{event.shift_id}:award"
+                         if event.referred_user_id else f"referral:{event.id}:award"),
     )
     event.status = PillReferralEvent.Status.AWARDED
     event.awarded_at = event.awarded_at or timezone.now()
@@ -274,6 +283,7 @@ def create_shift_referral(*, referrer, shift: Shift, referred_email: str = "") -
     )
 
 
+@transaction.atomic
 def claim_referral_code(
     *,
     referred_user,
@@ -282,7 +292,7 @@ def claim_referral_code(
     referral_event_id: int | None = None,
     award: bool = False,
 ) -> PillReferralEvent:
-    referral_code = PillReferralCode.objects.select_related("user").filter(
+    referral_code = PillReferralCode.objects.select_for_update(of=("self",)).select_related("user").filter(
         code=(code or "").strip().upper(),
         is_active=True,
     ).first()
@@ -353,7 +363,7 @@ def get_shift_post_pill_cost() -> int:
     return get_current_rule(SHIFT_POST_COST_RULE).pill_amount
 
 
-def spend_pills_for_shift_post(*, user, shift: Shift) -> PillLedgerEntry:
+def spend_pills_for_shift_post(*, user, shift: Shift, offer=None) -> PillLedgerEntry:
     rule = get_current_rule(SHIFT_POST_COST_RULE)
     return _create_ledger_entry(
         user=user,
@@ -363,8 +373,8 @@ def spend_pills_for_shift_post(*, user, shift: Shift) -> PillLedgerEntry:
         amount=-rule.pill_amount,
         shift=shift,
         description=f"Paid shift #{shift.id} with pills",
-        idempotency_key=f"shift:{shift.id}:pill-payment",
-        metadata={"shift_id": shift.id},
+        idempotency_key=f"shift:{shift.id}:offer:{offer.pk}:pill-payment" if offer else f"shift:{shift.id}:pill-payment",
+        metadata={"shift_id": shift.id, **({"offer_id": offer.pk} if offer else {})},
     )
 
 

@@ -26,6 +26,7 @@ import {
   getMyHistoryShifts,
   getOnboarding,
   previewInvoice,
+  SUPER_GUARANTEE_PERCENT,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 
@@ -112,7 +113,7 @@ export default function InvoiceGenerate({ basePath }: Props) {
   const [issuerLastName, setIssuerLastName] = useState('');
   const [issuerAbn, setIssuerAbn] = useState('');
   const issuerEmail = user?.email ?? '';
-  const [superRateSnapshot, setSuperRateSnapshot] = useState<number>(10);
+  const [superRateSnapshot, setSuperRateSnapshot] = useState<number>(SUPER_GUARANTEE_PERCENT);
   const [superFundName, setSuperFundName] = useState('');
   const [superUsi, setSuperUsi] = useState('');
   const [superMemberNumber, setSuperMemberNumber] = useState('');

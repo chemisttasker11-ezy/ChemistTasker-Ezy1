@@ -9,6 +9,7 @@ from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
 from onboarding.models import OwnerOnboarding
 from notifications.models import Notification
 from users.permissions import AuthenticatedOrganizationMember, IsOwner, OrganizationRolePermission
+from memberships.access import user_can_change_membership
 from memberships.role_resolution import membership_role_refusal
 from memberships.serializers import required_user_role_for_membership
 from rest_framework.response import Response
@@ -301,6 +302,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 class PharmacyAdminViewSet(viewsets.ModelViewSet):
     serializer_class = PharmacyAdminSerializer
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
     STAFF_ROLE_MEMBERSHIP_MAP = {
         "PHARMACIST": "PHARMACIST",
@@ -383,7 +385,11 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = PharmacyAdmin.objects.filter(is_active=True).select_related("user", "pharmacy", "membership")
+        qs = PharmacyAdmin.objects.select_related("user", "pharmacy", "membership")
+        if self.action == 'destroy':
+            qs = qs.filter(Q(is_active=True) | Q(membership__status=Membership.Status.PENDING))
+        else:
+            qs = qs.filter(is_active=True)
         pharmacy_id = self.request.query_params.get("pharmacy")
 
         accessible_ids = set()
@@ -587,8 +593,18 @@ class PharmacyAdminViewSet(viewsets.ModelViewSet):
         assignment: PharmacyAdmin = self.get_object()
         if not assignment.can_be_removed_by(request.user):
             return Response({"detail": "Not allowed to remove this admin."}, status=status.HTTP_403_FORBIDDEN)
+        # Conditional update: a concurrent accept must not be overwritten to REJECTED.
+        now = timezone.now()
+        Membership.objects.filter(pk=assignment.membership_id, status=Membership.Status.PENDING).update(
+            status=Membership.Status.REJECTED, is_active=False, responded_at=now, updated_at=now,
+        )
+        # Revocation is not a pending invitation: unlink its membership so
+        # my-pending-invitations and accept-invitation cannot resurrect it.
+        # Keep the inactive assignment for audit and let a fresh authorized
+        # create() explicitly re-link membership for any later re-invite.
         assignment.is_active = False
-        assignment.save(update_fields=["is_active", "updated_at"])
+        assignment.membership = None
+        assignment.save(update_fields=["is_active", "membership", "updated_at"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -676,18 +692,7 @@ class ChainViewSet(viewsets.ModelViewSet):
         if not pharm:
             raise NotFound("That pharmacy does not exist.")
 
-        # Owner-chain: pharmacy.owner must match
-        if chain.owner:
-            if pharm.owner != chain.owner:
-                raise PermissionDenied("You don’t own that pharmacy.")
-        # Org-chain: pharmacy.organization must match
-        elif chain.organization:
-            org = chain.organization
-            if pharm.organization != org:
-                raise PermissionDenied("That pharmacy isn't in your organization.")
-        else:
-            # no owner or org on chain
-            raise PermissionDenied("Chain has no owner or organization.")
+        self.get_serializer(chain).validate_pharmacy_ids([pharm])
 
         chain.pharmacies.add(pharm)
         return Response({'status': 'Pharmacy added', 'pharmacy': pharm.name})
@@ -730,7 +735,9 @@ class ChainViewSet(viewsets.ModelViewSet):
         ).first()
         if not membership:
             raise NotFound("User not in this chain’s pharmacies.")
-        membership.delete()
+        if not user_can_change_membership(request.user, membership):
+            self.permission_denied(request, message="Not allowed to modify this membership.")
+        membership.remove()
         return Response(status=204)
 
 

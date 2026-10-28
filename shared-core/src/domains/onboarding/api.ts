@@ -28,9 +28,6 @@ export function submitRefereeResponse(token: string, data: unknown) {
 export function refereeRejectByToken(token: string) {
     return fetchApi(API_ENDPOINTS.refereeRejectByToken(token), { method: 'POST' });
 }
-export function refereeReject(pk: number | string | string, refIndex: number | string) {
-    return fetchApi(`/onboarding/referee-reject/${pk}/${refIndex}/`, { method: 'POST' });
-}
 export function getExplorerOnboardingProfile() {
     return fetchApi('/explorer/onboarding/me/');
 }

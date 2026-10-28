@@ -1,5 +1,6 @@
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -16,20 +17,69 @@ from client_profile.models import (
     ShiftSlot,
     ShiftSlotAssignment,
 )
-from invoicing.models import InvoiceLineItem
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+from invoicing.models import Invoice, InvoiceLineItem, manager_visible_state
 from notifications.models import Notification
 from invoicing.serializers import InvoiceSerializer
 from invoicing.services import generate_invoice_from_shifts
 from invoicing.views import InvoiceDetailView, send_invoice_email
-from worker_finance.views import ReceivedInvoiceViewSet
+from worker_finance.views import InvoiceViewSet, ReceivedInvoiceViewSet
 from worker_finance.models import CatalogueItem, Customer, Delivery, InvoiceRevision
-from worker_finance.services import internal_invoice_prefill, save_draft, serialize_record
+from worker_finance.services import internal_invoice_prefill, save_draft, serialize_record, owner_visible_document
 
 
 User = get_user_model()
 
 
 class AcceptedShiftInvoiceIntegrityTests(TestCase):
+    def test_c021_n2_invoices_use_the_accepted_hours_and_keep_other_occurrences_unchanged(self):
+        from invoicing.services import generate_preview_invoice_lines
+        occurrence = self.assignment.engagement_terms_snapshot['occurrences'][0]
+        occurrence.update(start_time='10:00:00', end_time='14:00:00')
+        self.assignment.save(update_fields=['engagement_terms_snapshot'])
+        [line] = generate_preview_invoice_lines(self.shift, self.worker)
+        self.assertEqual((line['start_time'], line['end_time'], line['quantity'], line['total']),
+                         ('10:00:00', '14:00:00', 4.0, 280.0))
+        invoice = self._generate()
+        self.assertEqual(invoice.line_items.get(category_code='ProfessionalServices').quantity, Decimal('4.00'))
+        occurrence.update(date=str(self.slot.date + timedelta(days=1)))
+        self.assignment.save(update_fields=['engagement_terms_snapshot'])
+        [original] = generate_preview_invoice_lines(self.shift, self.worker)
+        self.assertEqual((original['quantity'], original['total']), (8.0, 560.0))
+
+    def test_mark_paid_does_not_publish_an_unsent_internal_draft_or_revision(self):
+        record = save_draft(self.worker, internal_invoice_prefill(self.worker, [self.assignment.id]))
+        factory = APIRequestFactory()
+        for version in (1, 2):
+            with self.subTest(version=version):
+                request = factory.post(f"/finance/invoices/{record.pk}/mark-paid/", {"version": record.version}, format="json")
+                force_authenticate(request, user=self.worker)
+                response = InvoiceViewSet.as_view({"post": "mark_paid"})(request, pk=record.pk)
+                self.assertEqual(response.status_code, 200, response.data)
+                # F07-N2 records the balance once, even for an undelivered draft.
+                self.assertEqual(record.payments.count(), 1)
+                self.assertEqual(record.payments.get().amount, Decimal(record.calculation["payable"]))
+                request = factory.get("/finance/received-invoices/")
+                force_authenticate(request, user=self.owner)
+                received = ReceivedInvoiceViewSet.as_view({"get": "list"})(request)
+                self.assertEqual(received.data["count"], version - 1)
+                if version == 2:
+                    self.assertEqual(received.data["results"][0]["version"], 1)
+                    self.assertEqual([revision["version"] for revision in received.data["results"][0]["revisions"]], [1])
+                request = factory.get(f"/invoices/{record.pk}/")
+                force_authenticate(request, user=self.owner)
+                self.assertEqual(InvoiceDetailView.as_view()(request, pk=record.pk).status_code, 404)
+                if version == 1:
+                    Delivery.objects.create(invoice=record, version=1, recipient=self.owner.email, status="sent", sent_at=timezone.now())
+                    request = factory.get("/finance/received-invoices/")
+                    force_authenticate(request, user=self.owner)
+                    received = ReceivedInvoiceViewSet.as_view({"get": "list"})(request)
+                    self.assertEqual(received.data["count"], 1)
+                    self.assertEqual(received.data["results"][0]["version"], 1)
+                    record.refresh_from_db()
+                    payload = dict(record.payload, version=record.version, notes="Unsent correction")
+                    record = save_draft(self.worker, payload, record.pk)
+
     def setUp(self):
         self.worker = User.objects.create_user(
             email="invoice-integrity@example.com",
@@ -164,6 +214,71 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(record.pharmacy_id, self.pharmacy.id)
         self.assertEqual(InvoiceRevision.objects.filter(invoice=record).count(), 1)
 
+    @patch("worker_finance.documents.render_pdf", return_value=b"%PDF-test")
+    @patch("worker_finance.views.EmailMessage.send", return_value=1)
+    def test_cash_receipts_survive_an_unsent_invoice_revision(self, _send, _render):
+        draft = internal_invoice_prefill(self.worker, [self.assignment.id])
+        record = save_draft(self.worker, draft)
+        client = client_for(self.worker)
+        url = f"/api/v1/finance/invoices/{record.pk}/"
+        sent = client.post(url + "send/", {"version": 1, "confirmed": True}, format="json")
+        self.assertEqual(sent.status_code, 200, sent.data)
+        paid = client.post(url + "payments/", {
+            "request_key": str(uuid4()),
+            "date": timezone.localdate().isoformat(), "amount": "308.00",
+        }, format="json")
+        self.assertEqual(paid.status_code, 200, paid.data)
+        day = timezone.localdate().isoformat()
+        worksheet = f"/api/v1/finance/bas-worksheet/?start={day}&end={day}&basis=cash"
+        before = client.get(worksheet)
+        self.assertEqual(before.status_code, 200, before.data)
+        self.assertEqual(Decimal(before.data["G1"]), Decimal("308.00"))
+        self.assertEqual(Decimal(before.data["1A"]), Decimal("28.00"))
+
+        revised = save_draft(self.worker, {**record.payload, "version": 1, "notes": "Corrected notes"}, record.pk)
+        self.assertEqual(revised.status, "draft")
+        after = client.get(worksheet)
+        self.assertEqual(after.data["G1"], before.data["G1"])
+        self.assertEqual(after.data["1A"], before.data["1A"])
+        self.assertEqual(Decimal(client_for(self.owner).get(worksheet).data["G1"]), 0)
+        self.assertEqual(Decimal(client.get(worksheet.replace("basis=cash", "basis=accrual")).data["G1"]), 0)
+
+    @patch("worker_finance.documents.render_pdf", return_value=b"%PDF-test")
+    def test_finishing_old_email_does_not_publish_a_new_saved_revision(self, _render):
+        draft = internal_invoice_prefill(self.worker, [self.assignment.id])
+        record = save_draft(self.worker, draft)
+
+        def save_during_send(**kwargs):
+            save_draft(self.worker, {**record.payload, "version": 1, "notes": "Unsent revision"}, record.pk)
+            return 1
+
+        request = APIRequestFactory().post("/finance/invoices/send/", {"version": 1, "confirmed": True}, format="json")
+        force_authenticate(request, user=self.worker)
+        with patch("worker_finance.views.EmailMessage.send", side_effect=save_during_send):
+            response = InvoiceViewSet.as_view({"post": "send"})(request, pk=record.pk)
+        self.assertEqual(response.status_code, 200, response.data)
+        record.refresh_from_db()
+        self.assertEqual(record.version, 2)
+        self.assertEqual(record.status, "draft")
+        self.assertEqual(record.deliveries.get(version=1).status, "sent")
+        self.assertEqual(record.revisions.get(version=1).invoice_status, "sent")
+        self.assertEqual(record.revisions.get(version=2).invoice_status, "draft")
+        self.assertEqual(owner_visible_document(record)["version"], 1)
+        self.assertNotEqual(owner_visible_document(record)["payload"]["notes"], "Unsent revision")
+
+    @patch("worker_finance.documents.render_pdf", return_value=b"%PDF-test")
+    @patch("worker_finance.views.EmailMessage.send", return_value=1)
+    def test_finishing_current_email_publishes_that_revision(self, _send, _render):
+        record = save_draft(self.worker, internal_invoice_prefill(self.worker, [self.assignment.id]))
+        request = APIRequestFactory().post("/finance/invoices/send/", {"version": 1, "confirmed": True}, format="json")
+        force_authenticate(request, user=self.worker)
+        response = InvoiceViewSet.as_view({"post": "send"})(request, pk=record.pk)
+        self.assertEqual(response.status_code, 200, response.data)
+        record.refresh_from_db()
+        self.assertEqual(record.status, "sent")
+        self.assertEqual(record.revisions.get(version=1).invoice_status, "sent")
+        self.assertEqual(owner_visible_document(record)["version"], 1)
+
     def test_internal_invoice_recipient_override_is_invoice_only_and_keeps_pharmacy_provenance(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
         original_email = draft["customer"]["email"]
@@ -218,8 +333,11 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
 
     def test_owner_can_read_migrated_snapshot_without_new_delivery_row(self):
         record = save_draft(self.worker, internal_invoice_prefill(self.worker, [self.assignment.id]))
+        # A migrated paid snapshot is listed only through the legacy rule; an unsent legacy edit is not
+        # (LegacySnapshotEditVisibilityTests).
         record.legacy_snapshot = True
-        record.save(update_fields=["legacy_snapshot"])
+        record.status = "paid"
+        record.save(update_fields=["legacy_snapshot", "status"])
 
         request = APIRequestFactory().get("/finance/received-invoices/")
         force_authenticate(request, user=self.owner)
@@ -360,6 +478,80 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(request_row.resolved_by_version, revised.version)
         self.assertEqual(revised.review_status, "NONE")
         self.assertEqual(revised.status, "draft")
+
+    def owner_call(self, method, action, record, path="", data=None, **kwargs):
+        request = getattr(APIRequestFactory(), method)(f"/finance/received-invoices/{record.id}/{path}", data,
+                                                       format="json")
+        force_authenticate(request, user=self.owner)
+        return ReceivedInvoiceViewSet.as_view({method: action})(request, pk=record.id, **kwargs)
+
+    def sent_then_edited(self, *, legacy=False, request_revision=False):
+        record = save_draft(self.worker, internal_invoice_prefill(self.worker, [self.assignment.id]))
+        Delivery.objects.create(invoice=record, version=1, recipient=self.owner.email, status="sent",
+                                sent_at=timezone.now())
+        record.status, record.legacy_snapshot = "sent", legacy
+        record.save(update_fields=["status", "legacy_snapshot"])
+        self.assertEqual(self.owner_call("get", "retrieve", record).data["version"], 1)
+        if request_revision:
+            response = self.owner_call("post", "request_revision", record, "request-revision/",
+                                       {"version": 1, "note": "Fix the hours."})
+            self.assertEqual(response.status_code, 200, response.data)
+        record.refresh_from_db()
+        payload = dict(record.payload, version=record.version, notes="Unsent correction")
+        return save_draft(self.worker, payload, record.id)
+
+    def assert_owner_sees_only_sent_version(self, record):
+        self.assertEqual((record.version, record.status), (2, "draft"))
+        detail = self.owner_call("get", "retrieve", record)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.data["version"], 1)
+        self.assertNotEqual(detail.data["payload"].get("notes"), "Unsent correction")
+        self.assertEqual(self.owner_call("get", "revision_pdf", record, "revisions/2/pdf/", version="2").status_code,
+                         404)
+        response = self.owner_call("post", "approve_payment", record, "approve-payment/", {"version": 2})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("version", response.data)
+
+    def test_unsent_edit_of_sent_legacy_snapshot_stays_hidden_from_the_pharmacy(self):
+        self.assert_owner_sees_only_sent_version(self.sent_then_edited(legacy=True))
+
+    def test_marking_an_unsent_edit_of_a_legacy_snapshot_paid_keeps_it_hidden(self):
+        record = self.sent_then_edited(legacy=True)
+        request = APIRequestFactory().post(f"/finance/invoices/{record.pk}/mark-paid/", {"version": record.version},
+                                           format="json")
+        force_authenticate(request, user=self.worker)
+        self.assertEqual(InvoiceViewSet.as_view({"post": "mark_paid"})(request, pk=record.pk).status_code, 200)
+        record.refresh_from_db()
+        self.assertEqual((record.version, record.status), (2, "paid"))
+        detail = self.owner_call("get", "retrieve", record)
+        self.assertEqual(detail.data["version"], 1)
+        self.assertNotEqual(detail.data["payload"].get("notes"), "Unsent correction")
+        self.assertEqual(self.owner_call("get", "revision_pdf", record, "revisions/2/pdf/", version="2").status_code,
+                         404)
+        self.assertFalse(Invoice.objects.filter(manager_visible_state(), pk=record.pk).exists())  # dashboards
+
+    def test_unsent_edit_after_revision_request_stays_hidden_from_the_pharmacy(self):
+        self.assert_owner_sees_only_sent_version(self.sent_then_edited(request_revision=True))
+
+    def test_owner_review_actions_return_only_delivered_revisions(self):
+        for action, path in (("request_revision", "request-revision/"), ("approve_payment", "approve-payment/"),
+                             ("mark_paid", "mark-paid/")):
+            with self.subTest(action=action):
+                InvoiceRevision.objects.all().delete()
+                Invoice.objects.all().delete()
+                record = self.sent_then_edited()
+                payload = dict(record.payload, version=record.version, notes="Second correction")
+                record = save_draft(self.worker, payload, record.id)
+                Delivery.objects.create(invoice=record, version=3, recipient=self.owner.email, status="sent",
+                                        sent_at=timezone.now())
+                record.status = "sent"
+                record.save(update_fields=["status"])
+                response = self.owner_call("post", action, record, path,
+                                           {"version": 3, "note": "Checked", "fund_payment_confirmed": True})
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(response.data["version"], 3)
+                self.assertEqual([row["version"] for row in response.data["revisions"]], [3, 1])
+                self.assertEqual(response.data, self.owner_call("get", "retrieve", record).data)
 
     def test_owner_review_action_rejects_stale_invoice_version(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
@@ -677,3 +869,92 @@ class InvoiceIssuerProfileTests(TestCase):
         org_staff = User.objects.create_user(email="issuer-org-svc@example.com", password="x", role="ORG_STAFF")
         with self.assertRaises(ValidationError):
             generate_invoice_from_shifts(user=org_staff, pharmacy_id=None, shift_ids=[], custom_lines=[], external=True)
+
+
+class InvoiceTenantIsolationContracts(TestCase):
+    def setUp(self):
+        self.owner_a, self.a = make_owner_with_pharmacy("PR200 A")
+        self.owner_b, self.b = make_owner_with_pharmacy("PR200 B")
+        self.outsider = make_user("PHARMACIST")
+        self.day = date.today() + timedelta(days=21)
+
+    def invoice_payload(self):
+        return {
+            "pharmacy": self.b.pk, "external": False, "status": "paid",
+            "pharmacy_name_snapshot": self.b.name,
+            "invoice_date": self.day.isoformat(),
+            "line_items": [{
+                "description": "Synthetic one-hour invoice",
+                "category_code": "ProfessionalServices", "unit": "Hours",
+                "quantity": "1.00", "unit_price": "65.00", "discount": "0",
+                "gst_applicable": False, "super_applicable": False,
+            }],
+        }
+
+    def test_b33_invoice_positive_control(self):
+        response = client_for(self.owner_b).post(
+            "/api/v1/invoices/", self.invoice_payload(), format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_b33_invoice_post_denies_foreign_pharmacy(self):
+        client = client_for(self.outsider)
+        client.raise_request_exception = False
+        response = client.post(
+            "/api/v1/invoices/", self.invoice_payload(), format="json",
+        )
+        self.assertIn(response.status_code, (400, 403, 404), response.data)
+        self.assertFalse(
+            Invoice.objects.filter(user=self.outsider, pharmacy=self.b).exists()
+        )
+
+
+class LegacySnapshotEditVisibilityTests(TestCase):
+    def setUp(self):
+        self.owner, self.pharmacy = make_owner_with_pharmacy("LegacyEdit")
+        self.worker = make_user("PHARMACIST")
+
+    def invoice(self, **changes):
+        fields = dict(user=self.worker, pharmacy=self.pharmacy, source="internal", request_key=uuid4(), status="draft",
+                      version=2, legacy_snapshot=True, payload={"invoice_date": timezone.localdate().isoformat()},
+                      calculation={"payable": "999.00"})
+        fields.update(changes)
+        return Invoice.objects.create(**fields)
+
+    def listed_ids(self, path):
+        response = client_for(self.owner).get(path)
+        self.assertEqual(response.status_code, 200, response.content)
+        rows = response.data["results"] if isinstance(response.data, dict) else response.data
+        return {row["id"] for row in rows}
+
+    def test_unsent_edit_of_legacy_snapshot_is_hidden_from_the_pharmacy(self):
+        record = self.invoice()
+        for path in ("/api/v1/invoices/", "/api/v1/finance/received-invoices/"):
+            with self.subTest(path=path):
+                self.assertNotIn(record.pk, self.listed_ids(path))
+
+    def test_paid_later_version_of_legacy_snapshot_is_hidden_from_the_pharmacy(self):
+        record = self.invoice(status="paid")
+        for path in ("/api/v1/invoices/", "/api/v1/finance/received-invoices/"):
+            with self.subTest(path=path):
+                self.assertNotIn(record.pk, self.listed_ids(path))
+        self.assertFalse(Invoice.objects.filter(manager_visible_state(), pk=record.pk).exists())
+
+    def test_sent_and_paid_legacy_snapshots_stay_listed(self):
+        # The migrated revision is version 1; only it keeps the legacy exception.
+        sent, paid = self.invoice(status="sent", version=1), self.invoice(status="paid", version=1)
+        for path in ("/api/v1/invoices/", "/api/v1/finance/received-invoices/"):
+            with self.subTest(path=path):
+                self.assertTrue({sent.pk, paid.pk} <= self.listed_ids(path))
+        self.assertEqual(set(Invoice.objects.filter(manager_visible_state()).values_list("pk", flat=True)),
+                         {sent.pk, paid.pk})
+        owner = client_for(self.owner)
+        for record in (sent, paid):
+            with self.subTest(record=record.status):
+                detail = owner.get(f"/api/v1/finance/received-invoices/{record.pk}/")
+                self.assertEqual((detail.status_code, detail.data["version"]), (200, 1))
+                self.assertEqual(owner.get(f"/api/v1/finance/received-invoices/{record.pk}/pdf/").status_code, 200)
+
+    def test_old_editor_draft_without_request_key_stays_listed(self):
+        record = self.invoice(request_key=None, legacy_snapshot=False)
+        self.assertIn(record.pk, self.listed_ids("/api/v1/invoices/"))

@@ -85,6 +85,42 @@ class HubScopeTests(HubBase):
 
 
 class HubGroupTests(HubBase):
+    def test_group_with_content_cannot_be_deleted_or_exposed_to_non_members(self):
+        from pharmacy_hub.models import PharmacyCommunityGroup
+        for content_model, content in (
+            (PharmacyHubPost, {"body": "Restricted group post", "author_membership": self.staff_m}),
+            (PharmacyHubPoll, {"question": "Restricted group poll?", "created_by": self.owner}),
+        ):
+            with self.subTest(content_model=content_model.__name__):
+                group = PharmacyCommunityGroup.objects.create(
+                    pharmacy=self.pharmacy, name=content_model.__name__, created_by=self.owner,
+                )
+                item = content_model.objects.create(
+                    pharmacy=self.pharmacy, community_group=group, **content,
+                )
+                endpoint = POSTS if content_model is PharmacyHubPost else POLLS
+                non_member = client_for(self.other_staff)
+                self.assertEqual(non_member.get(f"{endpoint}{item.pk}/").status_code, 403)
+                response = client_for(self.owner).delete(f"{HUB}groups/{group.pk}/")
+                self.assertEqual(response.status_code, 409, response.content)
+                self.assertEqual(response.json()["detail"],
+                                 "Remove or move this group's posts before deleting it")
+                item.refresh_from_db()
+                self.assertEqual(item.community_group_id, group.pk)
+                self.assertEqual(non_member.get(f"{endpoint}{item.pk}/").status_code, 403)
+                feed = non_member.get(endpoint, self.scope)
+                self.assertEqual(feed.status_code, 200, feed.content)
+                self.assertNotIn(item.pk, [row["id"] for row in self.rows(feed)])
+
+    def test_empty_group_can_be_deleted(self):
+        from pharmacy_hub.models import PharmacyCommunityGroup
+        group = PharmacyCommunityGroup.objects.create(
+            pharmacy=self.pharmacy, name="Empty group", created_by=self.owner,
+        )
+        response = client_for(self.owner).delete(f"{HUB}groups/{group.pk}/")
+        self.assertEqual(response.status_code, 204, response.content)
+        self.assertFalse(PharmacyCommunityGroup.objects.filter(pk=group.pk).exists())
+
     def test_invalid_member_update_is_atomic(self):
         groups = HUB + "groups/"
         created = client_for(self.owner).post(
@@ -118,6 +154,32 @@ class HubGroupTests(HubBase):
 
 
 class HubPostTests(HubBase):
+    def test_mentions_refuse_ineligible_recipients_without_sending_private_text(self):
+        from unittest.mock import patch
+        from notifications.models import Notification
+        for employment, status in (("LOCUM", "ACCEPTED"), ("FULL_TIME", "PENDING"), ("FULL_TIME", "REJECTED")):
+            with self.subTest(employment=employment, status=status):
+                Membership.objects.filter(pk=self.other_m.pk).update(employment_type=employment, status=status)
+                with patch("pharmacy_hub.posts.notify_users") as notify, patch("pharmacy_hub.posts.async_task") as email:
+                    response = client_for(self.staff).post(POSTS, {
+                        **self.scope, "body": "Confidential", "tagged_member_ids": [self.other_m.pk],
+                    }, format="json")
+                self.assertEqual(response.status_code, 400, response.data)
+                self.assertFalse(PharmacyHubPost.objects.exists())
+                self.assertFalse(Notification.objects.filter(user=self.other_staff).exists())
+                notify.assert_not_called()
+                email.assert_not_called()
+
+    def test_mentions_notify_accepted_staff_who_can_read_the_post(self):
+        from unittest.mock import patch
+        with patch("pharmacy_hub.posts.notify_users") as notify, patch("pharmacy_hub.posts.async_task"):
+            response = client_for(self.staff).post(POSTS, {
+                **self.scope, "body": "Confidential", "tagged_member_ids": [self.other_m.pk],
+            }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(notify.call_args.args[0], {self.other_staff.pk})
+        self.assertEqual(client_for(self.other_staff).get(f"{POSTS}{response.data['id']}/", self.scope).status_code, 200)
+
     def test_member_creates_post_and_response_has_exact_fields(self):
         res = client_for(self.staff).post(POSTS, {**self.scope, "body": "first!"}, format="json")
         self.assertEqual(res.status_code, 201)
@@ -516,6 +578,65 @@ class HubReactionTests(HubBase):
 
 
 class HubPollTests(HubBase):
+    def test_question_correction_with_unchanged_options_keeps_votes(self):
+        poll = self.make_poll()
+        url = f"{POLLS}{poll['id']}/"
+        options = poll['options']
+        voted = client_for(self.other_staff).post(url + 'vote/', {'option_id': options[0]['id']}, format='json')
+        self.assertEqual(voted.status_code, 200, voted.content)
+        vote_ids = list(PharmacyHubPollVote.objects.filter(poll_id=poll['id']).values_list('id', flat=True))
+        for labels in (None, [option['label'] for option in options]):
+            payload = {'question': 'Lunch tomorrow?'}
+            if labels is not None:
+                payload['options'] = labels
+            edited = client_for(self.staff).patch(url, payload, format='json')
+            self.assertEqual(edited.status_code, 200, edited.content)
+            self.assertEqual(edited.json()['question'], 'Lunch tomorrow?')
+            self.assertEqual([option['id'] for option in edited.json()['options']], [option['id'] for option in options])
+            self.assertEqual(list(PharmacyHubPollVote.objects.filter(poll_id=poll['id']).values_list('id', flat=True)), vote_ids)
+
+    def test_membershipless_user_cannot_modify_another_users_platform_poll(self):
+        author = make_user("PHARMACIST", is_otp_verified=True)
+        other = make_user("PHARMACIST", is_otp_verified=True)
+        created = client_for(author).post(
+            POLLS,
+            {"scope": "platform", "platform_hub": "public", "question": "Keep votes?", "choices": ["Yes", "No"]},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        poll_id = created.json()["id"]
+        poll = PharmacyHubPoll.objects.get(pk=poll_id)
+        self.assertIsNone(poll.created_by_membership_id)
+        options = list(poll.options.values_list("id", "label"))
+        url = f"{POLLS}{poll_id}/"
+        vote = client_for(other).post(url + "vote/", {"option_id": options[0][0]}, format="json")
+        self.assertEqual(vote.status_code, 200, vote.content)
+        vote_ids = list(poll.votes.values_list("id", flat=True))
+
+        for method in ("patch", "put"):
+            with self.subTest(method=method):
+                denied = getattr(client_for(other), method)(
+                    url, {"question": "Hijacked", "choices": ["New", "Choices"]}, format="json"
+                )
+                self.assertEqual(denied.status_code, 403, denied.content)
+                poll.refresh_from_db()
+                self.assertEqual(poll.question, "Keep votes?")
+                self.assertEqual(list(poll.options.values_list("id", "label")), options)
+                self.assertEqual(list(poll.votes.values_list("id", flat=True)), vote_ids)
+        self.assertEqual(client_for(other).delete(url).status_code, 403)
+        self.assertTrue(PharmacyHubPoll.objects.filter(pk=poll_id).exists())
+
+        edited = client_for(author).patch(url, {"question": "Author edit"}, format="json")
+        self.assertEqual(edited.status_code, 200, edited.content)
+        self.assertEqual(client_for(author).delete(url).status_code, 204)
+
+    def test_scope_manager_can_modify_another_users_poll(self):
+        poll = self.make_poll()
+        url = f"{POLLS}{poll['id']}/"
+        edited = client_for(self.owner).patch(url, {"question": "Manager edit"}, format="json")
+        self.assertEqual(edited.status_code, 200, edited.content)
+        self.assertEqual(client_for(self.owner).delete(url).status_code, 204)
+
     def make_poll(self, who=None):
         res = client_for(who or self.staff).post(
             POLLS, {**self.scope, "question": "Lunch?", "option_labels": ["Pizza", "Salad"]}, format="json")

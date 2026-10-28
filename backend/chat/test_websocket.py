@@ -3,9 +3,9 @@
 Routes are the ones mounted by core/asgi.py: JWTAuthMiddlewareStack(URLRouter(core.routing...)).
 Tests are async and use TransactionTestCase because the consumer touches the DB from worker threads."""
 from channels.db import database_sync_to_async
-from django.test import TransactionTestCase, override_settings
+from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.utils import timezone
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from chat.models import Conversation, Message, Participant
 from memberships.models import Membership
@@ -13,6 +13,38 @@ from core.websocket_testing import TIMEOUT, connect, make_actors, new_ticket
 from onboarding.models import AhpraCheck, OtherStaffOnboarding
 from onboarding.test_ahpra_desktop import NUMBER, TEST_CACHES, result
 from onboarding.verification.desktop import apply_ahpra_result
+
+
+class RoomDeliveryRecheckTests(SimpleTestCase):
+    async def test_outgoing_burst_checks_access_each_time_and_bounds_ahpra_backstop(self):
+        from chat.consumers import RoomConsumer
+        consumer = RoomConsumer()
+        consumer._ahpra_checked_at = 100.0
+        consumer._membership_still_authorized = AsyncMock(return_value=True)
+        consumer._ahpra_suspended = AsyncMock(return_value=False)
+        consumer.scope = {"user": None}
+        consumer.close = AsyncMock()
+        with patch("chat.consumers.time") as clock, patch(
+            "channels.generic.websocket.AsyncJsonWebsocketConsumer.send_json", new_callable=AsyncMock,
+        ) as send:
+            clock.monotonic.return_value = 101.0
+            for _ in range(20):
+                await consumer.send_json({"type": "typing"})
+            self.assertEqual(consumer._membership_still_authorized.await_count, 20)
+            consumer._ahpra_suspended.assert_not_awaited()
+            self.assertEqual(send.await_count, 20)
+            clock.monotonic.return_value = 110.0
+            await consumer.send_json({"type": "typing"})
+            clock.monotonic.return_value = 115.0
+            await consumer.send_json({"type": "typing"})
+            consumer.close.assert_not_awaited()
+            self.assertEqual(consumer._membership_still_authorized.await_count, 22)
+            consumer._ahpra_suspended.assert_awaited_once()
+            consumer._membership_still_authorized.return_value = False
+            # Revocation closes immediately, even within the same clock tick.
+            await consumer.send_json({"type": "typing"})
+            consumer.close.assert_awaited_once_with(code=4403)
+            self.assertEqual(send.await_count, 22)
 
 
 @database_sync_to_async
@@ -49,6 +81,57 @@ def make_room_with(users_memberships):
 
 
 class RoomSocketTests(TransactionTestCase):
+    async def test_inactive_contact_can_still_receive_their_direct_messages(self):
+        alice, alice_m, bob, bob_m, _ = await make_actors()
+        room = await make_room_with([(alice, alice_m), (bob, bob_m)])
+        @database_sync_to_async
+        def make_contact():
+            Conversation.objects.filter(pk=room).update(type='DM')
+            Membership.objects.filter(pk=alice_m.pk).update(is_active=False, employment_type='CONTACT')
+        await make_contact()
+        await new_ticket(alice, 'contact-still-valid')
+        a, ok, _ = await connect(f'/ws/chat/rooms/{room}/', '?ticket=contact-still-valid')
+        self.assertTrue(ok)
+        await a.receive_json_from(timeout=TIMEOUT)
+        await a.send_json_to({'type': 'typing', 'is_typing': True})
+        self.assertEqual((await a.receive_json_from(timeout=TIMEOUT))['type'], 'typing')
+        await a.disconnect()
+
+    async def test_revoked_connections_close_before_receive_or_delivery(self):
+        for revocation in ('membership_deleted', 'membership_inactive', 'participant_removed', 'user_inactive'):
+            for direction in ('receive', 'deliver'):
+                with self.subTest(revocation=revocation, direction=direction):
+                    alice, alice_m, bob, bob_m, _ = await make_actors()
+                    room = await make_room_with([(alice, alice_m), (bob, bob_m)])
+                    await new_ticket(alice, f'revoked-{revocation}-{direction}')
+                    a, ok, _ = await connect(f'/ws/chat/rooms/{room}/', f'?ticket=revoked-{revocation}-{direction}')
+                    self.assertTrue(ok)
+                    await a.receive_json_from(timeout=TIMEOUT)
+                    await new_ticket(bob, f'legitimate-{revocation}-{direction}')
+                    b, ok, _ = await connect(f'/ws/chat/rooms/{room}/', f'?ticket=legitimate-{revocation}-{direction}')
+                    self.assertTrue(ok)
+                    await b.receive_json_from(timeout=TIMEOUT)
+                    @database_sync_to_async
+                    def revoke():
+                        if revocation == 'membership_deleted':
+                            Membership.objects.filter(pk=alice_m.pk).delete()
+                        elif revocation == 'membership_inactive':
+                            Membership.objects.filter(pk=alice_m.pk).update(is_active=False)
+                        elif revocation == 'participant_removed':
+                            Participant.objects.filter(conversation_id=room, membership=alice_m).delete()
+                        else:
+                            type(alice).objects.filter(pk=alice.pk).update(is_active=False)
+                    await revoke()
+                    if direction == 'receive':
+                        await a.send_json_to({'type': 'message', 'body': 'must not persist'})
+                    else:
+                        await b.send_json_to({'type': 'typing', 'is_typing': True})
+                        self.assertEqual((await b.receive_json_from(timeout=TIMEOUT))['type'], 'typing')
+                    self.assertEqual(await a.receive_output(timeout=TIMEOUT), {'type': 'websocket.close', 'code': 4403})
+                    self.assertEqual(await message_count(), 0)
+                    await a.disconnect()
+                    await b.disconnect()
+
     async def test_anonymous_is_refused_with_4401(self):
         _, ok, code = await connect("/ws/chat/rooms/1/")
         self.assertFalse(ok)

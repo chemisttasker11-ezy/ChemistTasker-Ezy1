@@ -26,6 +26,7 @@ import {
   deleteExplorerPost,
   fetchUserAvailabilityService,
   getOnboarding,
+  getExplorerPostForEditing,
   getRatingsSummary,
   likeExplorerPost,
   unlikeExplorerPost,
@@ -557,7 +558,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           googlePlaceId: onboarding?.google_place_id || "",
         }));
       }
-      const mine = posts.find((post) => post.authorUserId === user?.id);
+      const mine = await getExplorerPostForEditing();
       if (mine) {
         const minePostKind =
           mine.postKind ||
@@ -606,7 +607,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     } catch (err: any) {
       setPitchError(err?.message || "Failed to load your profile.");
     }
-  }, [user, isExplorer, isPharmacist, isOtherStaff, posts, resetPitchForm]);
+  }, [user, isExplorer, isPharmacist, isOtherStaff, resetPitchForm]);
 
   useEffect(() => {
     if (pitchOpen) {

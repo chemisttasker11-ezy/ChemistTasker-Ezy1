@@ -13,10 +13,10 @@ from django.utils import timezone
 
 from core.task_queue import async_task
 from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
-from shifts.access import ShiftActionRefused
+from shifts.access import ShiftActionRefused, _user_can_perform_shift_role, staff_membership_can_claim_role
 from shifts.emails import build_offer_shift_details, build_shift_offer_context
 from shifts.engagement import staff_assignment_defaults
-from shifts.models import ShiftOffer, ShiftSlotAssignment
+from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from shifts.notifications import notify_shift_users
 
 OFFER_EXPIRY_HOURS = 48
@@ -25,6 +25,8 @@ OFFER_EXPIRY_HOURS = 48
 def offer_shift(*, shift, candidate, slot_id):
     """Offer the shift (or one slot) to a candidate, who must confirm before any assignment exists. A pending offer
     is refreshed instead of duplicated; an expired one is closed first. Returns the response body."""
+    if not _user_can_perform_shift_role(candidate, shift.role_needed):
+        raise ShiftActionRefused('The candidate role does not cover this shift.')
     # For multi-slot shifts, auto-pick when possible (prefer unassigned)
     if not shift.single_user_only and slot_id is None:
         slots_qs = shift.slots.all()
@@ -146,6 +148,9 @@ def roster_direct_staff(*, shift, candidate, assignments):
             "Locum, Shift Hero and external workers must accept a shift offer."
         )
 
+    if not _user_can_perform_shift_role(candidate, shift.role_needed) or not staff_membership_can_claim_role(membership, shift.role_needed):
+        raise ShiftActionRefused('The candidate role does not cover this shift.')
+
     assignment_ids = []
 
     # A submitted roster operation is one user action. If any requested slot is
@@ -166,6 +171,7 @@ def roster_direct_staff(*, shift, candidate, assignments):
                 raise ShiftActionRefused('Invalid slot_date format, use YYYY-MM-DD')
 
             try:
+                guard_roster_assignment(shift=shift, slot=slot, slot_date=slot_date, candidate=candidate)
                 assignment_defaults = staff_assignment_defaults(
                     user=candidate,
                     pharmacy=shift.pharmacy,
@@ -206,6 +212,21 @@ def roster_direct_staff(*, shift, candidate, assignments):
     }
 
 
+def guard_roster_assignment(*, shift, slot, slot_date, candidate=None):
+    """Call inside the assignment transaction; share the slot lock with offer finalization.
+    Offer-booked or payment-pending occurrences are never changed, not even for their own worker; with a candidate,
+    another worker's rostered occurrence is refused too (only the candidate's own may be re-saved or moved)."""
+    ShiftSlot.objects.select_for_update().get(pk=slot.pk)
+    held = ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot_date)
+    held = held.filter(source_offer__isnull=False) if candidate is None else held.exclude(user=candidate, source_offer__isnull=True)
+    pending = ShiftOffer.objects.filter(
+        Q(slot=slot) | Q(slot__isnull=True), Q(offered_slot_date=slot_date) | Q(offered_slot_date__isnull=True),
+        shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+    )
+    if held.exists() or pending.exists():
+        raise DjangoValidationError('This shift occurrence is already assigned or awaiting payment.')
+
+
 def slot_locked_for_shift_offer(*, shift, slot, slot_date=None, ignore_user=None):
     if not slot:
         return False
@@ -216,8 +237,8 @@ def slot_locked_for_shift_offer(*, shift, slot, slot_date=None, ignore_user=None
     if assignment_qs.exists():
         return True
     pending_qs = ShiftOffer.objects.filter(
+        Q(slot=slot) | Q(slot__isnull=True),   # a whole-shift offer awaiting payment holds every slot
         shift=shift,
-        slot=slot,
         status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
     )
     if ignore_user is not None:

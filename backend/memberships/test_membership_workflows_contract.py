@@ -18,7 +18,9 @@ from memberships.models import Membership, MembershipApplication, MembershipInvi
 from notifications.models import Notification
 from onboarding.models import OtherStaffOnboarding
 from organizations.models import Organization, PharmacyAdmin
+from organizations.access import can_manage_roster, can_manage_staff
 from users.models import OrganizationMembership
+from workforce.models import EmploymentEngagement
 
 User = get_user_model()
 API = "/api/v1/"
@@ -198,6 +200,62 @@ class InviteTests(MembershipFixture):
 
 
 class MembershipVisibilityTests(MembershipFixture):
+    def test_owner_removal_revokes_admin_access_when_history_protects_membership(self):
+        worker, membership = self.member(role="ASSISTANT", employment_type="CASUAL")
+        assignment = PharmacyAdmin.objects.create(
+            user=worker, pharmacy=self.pharmacy, membership=membership,
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+        )
+        engagement = EmploymentEngagement.objects.create(
+            membership=membership, effective_from=timezone.localdate(), role=membership.role,
+            employment_type="CASUAL", pay_basis="AWARD", created_by=self.owner, updated_by=self.owner,
+            rate_weekday=30, rate_saturday=35, rate_sunday=40, rate_public_holiday=50,
+        )
+        response, _ = self.call(self.owner, "delete", f"memberships/{membership.id}/")
+        self.assertEqual(response.status_code, 204)
+        membership.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertFalse(membership.is_active)
+        self.assertFalse(assignment.is_active)
+        self.assertFalse(can_manage_staff(worker, self.pharmacy))
+        self.assertTrue(EmploymentEngagement.objects.filter(pk=engagement.pk).exists())
+        self.assertTrue(Membership.objects.filter(pk=membership.pk).exists())
+
+    def test_owner_removal_revokes_admin_access_without_affecting_other_admins(self):
+        worker, membership = self.member()
+        assignment = PharmacyAdmin.objects.create(
+            user=worker, pharmacy=self.pharmacy, membership=membership,
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+        )
+        other_admin = self.admin(PharmacyAdmin.AdminLevel.MANAGER)
+        self.assertTrue(can_manage_staff(worker, self.pharmacy))
+        self.assertTrue(can_manage_roster(worker, self.pharmacy))
+        response, _ = self.call(self.owner, "delete", f"memberships/{membership.id}/")
+        self.assertEqual(response.status_code, 204)
+        assignment.refresh_from_db()
+        self.assertFalse(assignment.is_active)
+        self.assertFalse(can_manage_staff(worker, self.pharmacy))
+        self.assertFalse(can_manage_roster(worker, self.pharmacy))
+        listed, _ = self.call(self.owner, "get", f"pharmacy-admins/?pharmacy={self.pharmacy.id}")
+        rows = listed.data["results"] if isinstance(listed.data, dict) else listed.data
+        self.assertNotIn(assignment.id, {row["id"] for row in rows})
+        self.assertTrue(can_manage_staff(other_admin, self.pharmacy))
+        self.assertTrue(can_manage_roster(other_admin, self.pharmacy))
+
+    def test_manager_cannot_activate_a_pending_invitation(self):
+        worker, pending = self.member(status=Membership.Status.PENDING, active=False)
+        manager = self.admin(PharmacyAdmin.AdminLevel.MANAGER)
+        response, _ = self.call(manager, "patch", f"memberships/{pending.id}/", {"is_active": True})
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("is_active", response.data)
+        pending.refresh_from_db()
+        self.assertEqual((pending.status, pending.is_active), (Membership.Status.PENDING, False))
+
+        accepted, _ = self.call(worker, "post", f"my-memberships/{pending.id}/accept/")
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        pending.refresh_from_db()
+        self.assertEqual((pending.status, pending.is_active), (Membership.Status.ACCEPTED, True))
+
     def test_who_sees_and_who_may_change_the_pharmacy_members(self):
         member_user, membership = self.member()
         _, pending = self.member(status=Membership.Status.PENDING, active=False)
@@ -320,6 +378,50 @@ class MembershipVisibilityTests(MembershipFixture):
 
 
 class InviteLinkTests(MembershipFixture):
+    def test_link_scope_is_immutable_but_owner_can_update_expiry(self):
+        link = MembershipInviteLink.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, category="LOCUM_CASUAL",
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+        _, elsewhere = make_owner_with_pharmacy("Elsewhere")
+        for method in ("patch", "put"):
+            for changes in ({"pharmacy": elsewhere.id}, {"category": "FULL_PART_TIME"}):
+                with self.subTest(method=method, changes=changes):
+                    payload = {"pharmacy": self.pharmacy.id, "category": link.category,
+                               "expires_at": link.expires_at.isoformat(), **changes}
+                    refused, _ = self.call(self.owner, method, f"membership-invite-links/{link.id}/", payload)
+                    self.assertEqual(refused.status_code, 400, refused.data)
+                    link.refresh_from_db()
+                    self.assertEqual((link.pharmacy_id, link.category), (self.pharmacy.id, "LOCUM_CASUAL"))
+        expiry = timezone.now() + timedelta(days=10)
+        updated, _ = self.call(self.owner, "patch", f"membership-invite-links/{link.id}/",
+                               {"expires_at": expiry.isoformat()})
+        self.assertEqual(updated.status_code, 200, updated.data)
+        link.refresh_from_db()
+        self.assertEqual(link.expires_at, expiry)
+
+    def test_removing_a_link_preserves_applications_and_disables_the_token(self):
+        link = MembershipInviteLink.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, category="LOCUM_CASUAL",
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+        application = MembershipApplication.objects.create(
+            invite_link=link, pharmacy=self.pharmacy, category=link.category, role="PHARMACIST",
+            first_name="Ana", last_name="Lee", email="ana@example.com", mobile_number="0412000111",
+        )
+        outsider = make_user("OWNER")
+        refused, _ = self.call(outsider, "delete", f"membership-invite-links/{link.id}/")
+        self.assertEqual(refused.status_code, 404)
+        removed, _ = self.call(self.owner, "delete", f"membership-invite-links/{link.id}/")
+        self.assertEqual(removed.status_code, 204)
+        self.assertTrue(MembershipApplication.objects.filter(pk=application.pk).exists())
+        link.refresh_from_db()
+        self.assertFalse(link.is_active)
+        info, _ = self.call(None, "get", f"magic/memberships/{link.token}/")
+        self.assertEqual(info.status_code, 410)
+        visible, _ = self.call(self.owner, "get", f"membership-applications/{application.pk}/")
+        self.assertEqual(visible.status_code, 200, visible.data)
+
     def test_links_are_created_by_those_who_may_invite_and_resolved_by_anyone(self):
         response, _ = self.call(self.owner, "post", "membership-invite-links/",
                                 {"pharmacy": self.pharmacy.id, "category": "LOCUM_CASUAL", "expires_in_days": 3})
@@ -364,6 +466,31 @@ class InviteLinkTests(MembershipFixture):
 
 
 class ApplicationDecisionTests(MembershipFixture):
+    def test_generic_application_post_cannot_bypass_the_magic_link(self):
+        for index, (active, expiry) in enumerate(((True, timezone.now() + timedelta(days=7)),
+                                                 (True, timezone.now() - timedelta(days=1)),
+                                                 (False, timezone.now() + timedelta(days=7)))):
+            with self.subTest(active=active, expiry=expiry):
+                worker = make_user("PHARMACIST", username=f"sara{index}", mobile_number=f"041200011{index}")
+                link = MembershipInviteLink.objects.create(
+                    pharmacy=self.pharmacy, created_by=self.owner, category="LOCUM_CASUAL",
+                    expires_at=expiry, is_active=active,
+                )
+                payload = {"invite_link": link.pk, "role": "PHARMACIST", "first_name": worker.first_name,
+                           "last_name": worker.last_name, "username": worker.username, "email": worker.email,
+                           "mobile_number": worker.mobile_number, "date_of_birth": "1991-02-03"}
+                refused, _ = self.call(worker, "post", "membership-applications/", payload)
+                self.assertEqual(refused.status_code, 405, refused.data)
+                self.assertFalse(MembershipApplication.objects.filter(invite_link=link).exists())
+                if not link.is_valid():
+                    refused_magic, _ = self.call(worker, "post", f"magic/memberships/{link.token}/apply/", payload)
+                    self.assertEqual(refused_magic.status_code, 410)
+        link.is_active, link.expires_at = True, timezone.now() + timedelta(days=7)
+        link.save(update_fields=["is_active", "expires_at"])
+        accepted, _ = self.call(worker, "post", f"magic/memberships/{link.token}/apply/", payload)
+        self.assertEqual(accepted.status_code, 201, accepted.data)
+        self.assertEqual(MembershipApplication.objects.get(invite_link=link).submitted_by, worker)
+
     def application(self, **extra):
         link = MembershipInviteLink.objects.create(pharmacy=self.pharmacy, created_by=self.owner,
                                                    category=extra.pop("category", "LOCUM_CASUAL"),
@@ -477,6 +604,73 @@ class ApplicationDecisionTests(MembershipFixture):
 
 
 class MyMembershipTests(MembershipFixture):
+    def test_staff_reinvite_does_not_restore_an_old_admin_assignment(self):
+        for legacy in (False, True):
+            with self.subTest(legacy=legacy):
+                worker, membership = self.member(role="ASSISTANT", employment_type="CASUAL")
+                assignment = PharmacyAdmin.objects.create(
+                    user=worker, pharmacy=self.pharmacy, membership=membership,
+                    admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+                )
+                if legacy:
+                    Membership.objects.filter(pk=membership.pk).update(status=Membership.Status.LEFT, is_active=False)
+                    PharmacyAdmin.objects.filter(pk=assignment.pk).update(is_active=False)
+                else:
+                    left, _ = self.call(worker, "post", f"my-memberships/{membership.id}/quit/")
+                    self.assertEqual(left.status_code, 200, left.data)
+                invited, _ = self.call(self.owner, "post", "memberships/", {
+                    "pharmacy": self.pharmacy.id, "email": worker.email,
+                    "role": "ASSISTANT", "employment_type": "CASUAL",
+                })
+                self.assertEqual(invited.status_code, 201, invited.data)
+                accepted, _ = self.call(worker, "post", f"my-memberships/{membership.id}/accept/")
+                self.assertEqual(accepted.status_code, 200, accepted.data)
+                membership.refresh_from_db()
+                assignment.refresh_from_db()
+                self.assertTrue(membership.is_active)
+                self.assertFalse(assignment.is_active)
+                self.assertFalse(can_manage_staff(worker, self.pharmacy))
+                self.assertFalse(can_manage_roster(worker, self.pharmacy))
+                stale, _ = self.call(worker, "post", f"pharmacy-admins/{assignment.id}/accept-invitation/")
+                self.assertEqual(stale.status_code, 404, stale.data)
+
+        admin_worker, pending = self.member(status=Membership.Status.PENDING, active=False)
+        fresh = PharmacyAdmin.objects.create(
+            user=admin_worker, pharmacy=self.pharmacy, membership=pending,
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER, is_active=False,
+        )
+        accepted, _ = self.call(admin_worker, "post", f"my-memberships/{pending.id}/accept/")
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        fresh.refresh_from_db()
+        self.assertTrue(fresh.is_active)
+        self.assertTrue(can_manage_staff(admin_worker, self.pharmacy))
+
+    def test_revoked_inviter_receives_no_worker_responses(self):
+        inviter = self.org_admin()
+        OrganizationMembership.objects.filter(user=inviter, organization=self.org).delete()
+        downgraded_inviter = self.admin(PharmacyAdmin.AdminLevel.MANAGER)
+        PharmacyAdmin.objects.filter(user=downgraded_inviter, pharmacy=self.pharmacy).update(
+            admin_level=PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER,
+        )
+        current_manager = self.admin(PharmacyAdmin.AdminLevel.MANAGER)
+        for sender in (inviter, downgraded_inviter):
+            for action in ("accept", "reject", "quit"):
+                with self.subTest(sender=sender.email, action=action):
+                    worker, membership = self.member(
+                        status=Membership.Status.ACCEPTED if action == "quit" else Membership.Status.PENDING,
+                        active=action == "quit",
+                    )
+                    membership.invited_by = sender
+                    membership.save(update_fields=["invited_by"])
+                    response, work = self.call(worker, "post", f"my-memberships/{membership.id}/{action}/")
+                    self.assertEqual(response.status_code, 200, response.data)
+                    self.assertFalse(Notification.objects.filter(user=sender).exists())
+                    recipients = {email for _, emails in work["emails"] for email in emails}
+                    self.assertNotIn(sender.email, recipients)
+                    self.assertEqual(recipients, {self.owner.email, current_manager.email})
+                    for manager in (self.owner, current_manager):
+                        self.assertTrue(Notification.objects.filter(user=manager, payload__membership_id=membership.id).exists())
+
     def test_listing_keeps_the_owner_membership_a_valid_contact(self):
         Membership.objects.filter(user=self.owner, pharmacy=self.pharmacy).delete()
         response, _ = self.call(self.owner, "get", "my-memberships/")

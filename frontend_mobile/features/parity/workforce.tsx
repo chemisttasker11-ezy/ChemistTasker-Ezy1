@@ -198,18 +198,20 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
         const rows = await workforce.listTimesheets(selectedPeriodId);
         const list = Array.isArray(rows) ? rows : Array.isArray((rows as any)?.results) ? (rows as any).results : [];
         const approved = list.filter((row: any) => ['APPROVED', 'LOCKED'].includes(String(row.status || '').toUpperCase()));
-        const columns = ['timesheet_id','worker','status','regular_hours','overtime_hours','total_hours','gross_pay'];
+        // Export verified hours computed from minutes; unsupported overtime and gross-pay fields are omitted.
+        const toHours = (minutes: number | null | undefined) => (minutes == null ? '0.00' : (Math.round((minutes / 60) * 100) / 100).toFixed(2));
+        const columns = ['timesheet_id', 'worker', 'status', 'rostered_hours', 'worked_hours', 'reviewed_hours', 'approved_leave_hours'];
         const line = (value: any) => '"' + String(value ?? '').replaceAll('"', '""') + '"';
         const csv = [
           columns.join(','),
           ...approved.map((row: any) => [
             row.id,
-            row.worker_name || row.worker?.name || row.user_name || '',
+            row.worker?.name || row.worker_name || row.user_name || '',
             row.status,
-            row.regular_hours ?? row.ordinary_hours ?? '',
-            row.overtime_hours ?? '',
-            row.total_hours ?? row.hours ?? '',
-            row.gross_pay ?? row.total_pay ?? '',
+            toHours(row.rostered_minutes),
+            toHours(row.worked_minutes),
+            toHours(row.reviewed_minutes),
+            toHours(row.approved_leave_minutes),
           ].map(line).join(',')),
         ].join('\n');
         const file = new File(Paths.cache, `chemisttasker-payroll-${selectedPeriodId}.csv`);

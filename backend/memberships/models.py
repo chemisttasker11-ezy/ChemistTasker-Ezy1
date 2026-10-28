@@ -1,5 +1,6 @@
 """Membership models. Django app labels remain client_profile during the code-ownership phase."""
-from django.db import models
+from django.db import models, transaction
+from django.db.models.deletion import ProtectedError
 from django.conf import settings
 import uuid
 from django.utils import timezone
@@ -188,6 +189,24 @@ class Membership(models.Model):
     def is_favorite_staff_member(self) -> bool:
         return self.employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES
 
+
+    def revoke_admin_access(self):
+        # A later staff invitation must not revive a previous admin invitation.
+        PharmacyAdmin.objects.filter(user_id=self.user_id, pharmacy_id=self.pharmacy_id).update(
+            is_active=False, membership=None, updated_at=timezone.now(),
+        )
+
+    def remove(self):
+        """Remove a member from the pharmacy: admin and chat access go, and a membership kept by employment history
+        (PROTECT) is deactivated instead of deleted. Historical chat messages are preserved."""
+        with transaction.atomic():
+            self.revoke_admin_access()
+            self.chat_participations.all().delete()
+            try:
+                self.delete()
+            except ProtectedError:
+                self.is_active = False
+                self.save(update_fields=["is_active"])
 
     def __str__(self):
         if self.pharmacy:

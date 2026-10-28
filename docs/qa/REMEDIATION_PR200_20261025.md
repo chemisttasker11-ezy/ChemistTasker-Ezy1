@@ -1,0 +1,5 @@
+Remediation of seven isolated Django blocker finding IDs from draft PR #200 on frozen main b77e9fd2.
+
+The eleven regression tests keep their original names and assertions in the owning apps: B06/B07 in `backend/team_calendar/test_api.py`, F04-N1/F04-N2 in `backend/shifts/test_shift_actions_contract.py`, B33 in `backend/invoicing/test_integrity.py`, B36 in `backend/workforce/tests/test_roster_admin_capabilities.py`, B15 in `backend/billing/tests.py`, and F10-N5 in `backend/ethical_marketplace/tests.py`. Existing backend steps in `.github/workflows/shared_core_consolidation_ci.yml` run these modules and `client_profile.test_admin_invitations` using their app labels. The existing PostgreSQL concurrency step also runs `rewards.test_rewards.PillSpendPostgresConcurrencyTests` with `core.postgres_test_settings`.
+
+This draft fixes B06/B07/B15/B33/B36/F04-N1/F04-N2/F10-N5. Contract tests run on disposable Django SQLite; no application migrations, staging changes, deployment, or real Stripe charge. Other findings and full cross-platform acceptance remain outstanding.

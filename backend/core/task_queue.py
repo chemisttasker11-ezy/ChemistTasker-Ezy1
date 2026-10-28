@@ -70,7 +70,6 @@ def async_task(func, *args, **kwargs):
                         or context.get("dashboard_url")
                         or context.get("login_url")
                         or context.get("accept_url")
-                        or context.get("reset_url")
                         or context.get("invite_url")
                         or context.get("invitation_url")
                         or context.get("verification_url")

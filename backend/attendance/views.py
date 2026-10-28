@@ -31,6 +31,7 @@ from attendance.approvals import (
 )
 from memberships.models import Membership  # noqa: F401  (ownership contract)
 from organizations.models import Pharmacy
+from organizations.timezone import get_pharmacy_timezone
 from shifts.models import Shift  # noqa: F401  (ownership contract)
 from attendance.models import AttendanceSession
 
@@ -265,6 +266,7 @@ class ManagerSessionTimelineView(APIView):
             "session_id": session.id,
             "pharmacy_id": session.pharmacy_id,
             "pharmacy_name": session.pharmacy.name,
+            "pharmacy_timezone": str(get_pharmacy_timezone(session.pharmacy)),
             "worker_id": session.user_id,
             "worker_name": session.user.get_full_name() or session.user.username,
             "is_provisional": session.is_provisional,

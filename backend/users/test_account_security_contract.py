@@ -16,16 +16,20 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.sessions.models import Session
 from django.core.cache import cache
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from client_profile.characterization_support import make_owner_with_pharmacy, make_user
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from onboarding.models import OwnerOnboarding, PharmacistOnboarding
 from users.models import WebSocketTicket
 
@@ -321,6 +325,148 @@ class MobileOtpTests(TestCase):
 
 
 class SessionTests(TestCase):
+    def test_reset_secret_is_email_only(self):
+        from notifications.models import Notification
+        user = make_user("PHARMACIST")
+        with self.captureOnCommitCallbacks(execute=True):
+            response, _ = post(APIClient(), "password-reset/", {"email": user.email}, eager=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("/reset-password/", mail.outbox[-1].body)
+        notices = Notification.objects.filter(user=user)
+        self.assertTrue(notices.exists())
+        for notice in notices:
+            self.assertNotIn("/reset-password/", str(notice.action_url))
+            self.assertNotIn("reset_url", str(notice.payload))
+
+    def test_logout_removes_only_the_current_users_device(self):
+        from users.models import DeviceToken
+        user = make_user("PHARMACIST")
+        other = make_user("PHARMACIST")
+        device = DeviceToken.objects.create(user=user, token="ExpoPushToken[current]", platform="ios")
+        retained = DeviceToken.objects.create(user=user, token="ExpoPushToken[other-device]", platform="ios")
+        foreign = DeviceToken.objects.create(user=other, token="ExpoPushToken[foreign]", platform="ios")
+        response, _ = post(APIClient(), "logout/", {"refresh": str(RefreshToken.for_user(user)), "device_token": device.token})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(DeviceToken.objects.filter(pk=device.pk, active=True).exists())
+        self.assertTrue(DeviceToken.objects.filter(pk=retained.pk, active=True).exists())
+        post(APIClient(), "logout/", {"refresh": str(RefreshToken.for_user(user)), "device_token": foreign.token})
+        self.assertTrue(DeviceToken.objects.filter(pk=foreign.pk, active=True).exists())
+        from notifications.services import notify_users
+        with mock.patch("notifications.services._send_expo_push") as push:
+            notify_users([user.pk], title="Private alert")
+        self.assertEqual(push.call_args.args[0], [retained.token])
+        client = APIClient()
+        client.force_authenticate(other)
+        registered = client.post("/api/v1/device-tokens/", {"token": device.token, "platform": "ios"}, format="json")
+        self.assertEqual(registered.status_code, 201)
+        self.assertEqual(DeviceToken.objects.get(token=device.token).user_id, other.pk)
+
+    def test_logout_unregisters_device_after_refresh_rotation_but_rejects_access_tokens(self):
+        from users.models import DeviceToken
+        user = make_user("PHARMACIST")
+        refresh = RefreshToken.for_user(user)
+        device = DeviceToken.objects.create(user=user, token="ExpoPushToken[rotated]", platform="ios")
+        post(APIClient(), "logout/", {"refresh": str(refresh.access_token), "device_token": device.token})
+        self.assertTrue(DeviceToken.objects.filter(pk=device.pk).exists())
+        refresh.blacklist()
+        response, _ = post(APIClient(), "logout/", {"refresh": str(refresh), "device_token": device.token})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(DeviceToken.objects.filter(pk=device.pk).exists())
+
+    def test_pending_phone_change_invalidates_old_code_but_same_number_keeps_it(self):
+        user = make_user("EXPLORER", mobile_number="61412345678", mobile_otp_code=make_password("222333"),
+                         mobile_otp_created_at=timezone.now(), is_otp_verified=True)
+        client = APIClient()
+        client.force_authenticate(user)
+        path = "/api/v1/explorer/onboarding/me/"
+        same = client.patch(path, {"tab": "basic", "phone_number": user.mobile_number}, format="json")
+        self.assertEqual(same.status_code, 200, same.data)
+        user.refresh_from_db()
+        good, _ = post(client, "mobile/verify-otp/", {"otp": "222333"})
+        self.assertEqual(good.status_code, 200)
+        user.is_mobile_verified = False
+        user.mobile_otp_code = make_password("444555")
+        user.mobile_otp_created_at = timezone.now()
+        user.save()
+        changed = client.patch(path, {"tab": "basic", "phone_number": "61499999999"}, format="json")
+        self.assertEqual(changed.status_code, 200, changed.data)
+        user.refresh_from_db()
+        bad, _ = post(client, "mobile/verify-otp/", {"otp": "444555"})
+        self.assertEqual(bad.status_code, 400)
+        user.refresh_from_db()
+        self.assertFalse(user.is_mobile_verified)
+        self.assertIsNone(user.mobile_otp_code)
+
+    @override_settings(AXES_ENABLED=False)
+    def test_phone_verification_preserves_both_remember_choices(self):
+        for remember in (False, True):
+            with self.subTest(remember=remember):
+                user = make_user("PHARMACIST", is_otp_verified=True, mobile_number="61412345678",
+                                 mobile_otp_code=make_password("222333"), mobile_otp_created_at=timezone.now())
+                client = APIClient()
+                login, _ = post(client, "login/", {"email": user.email, "password": "test-pass", "remember_me": remember})
+                self.assertEqual(login.status_code, 200, login.data)
+                response, _ = post(client, "mobile/verify-otp/", {"otp": "222333"})
+                self.assertEqual(response.status_code, 200, response.data)
+                cookie = response.cookies["ct_refresh"]
+                self.assertEqual(cookie["max-age"], 604800 if remember else "")
+                self.assertEqual(RefreshToken(cookie.value)["remember_me"], remember)
+                self.assertEqual(RefreshToken(cookie.value)['sid'], RefreshToken(login.data['refresh'])['sid'])
+
+    def test_password_reset_revokes_existing_refresh_tokens_and_sessions(self):
+        user = make_user("PHARMACIST", is_otp_verified=True)
+        other = make_user("PHARMACIST")
+        old_refresh = str(RefreshToken.for_user(user))
+        other_refresh = str(RefreshToken.for_user(other))
+        session_client = APIClient()
+        session_client.force_login(user)
+        session_key = session_client.session.session_key
+        other_client = APIClient()
+        other_client.force_login(other)
+        other_key = other_client.session.session_key
+
+        response, _ = post(APIClient(), "password-reset-confirm/", {
+            "uid": urlsafe_base64_encode(force_bytes(user.pk)),
+            "token": default_token_generator.make_token(user),
+            "new_password1": "NewStrongPassword248!",
+            "new_password2": "NewStrongPassword248!",
+        })
+        self.assertEqual(response.status_code, 200, response.data)
+        refreshed, _ = post(APIClient(), "token/refresh/", {"refresh": old_refresh})
+        self.assertEqual(refreshed.status_code, 401)
+        self.assertFalse(Session.objects.filter(session_key=session_key).exists())
+        self.assertTrue(Session.objects.filter(session_key=other_key).exists())
+        unaffected, _ = post(APIClient(), "token/refresh/", {"refresh": other_refresh})
+        self.assertEqual(unaffected.status_code, 200)
+        login, _ = post(APIClient(), "login/", {"email": user.email, "password": "NewStrongPassword248!"})
+        self.assertEqual(login.status_code, 200, login.data)
+        fresh, _ = post(APIClient(), "token/refresh/", {"refresh": login.data["refresh"]})
+        self.assertEqual(fresh.status_code, 200, fresh.data)
+
+    def test_html_password_reset_revokes_existing_credentials(self):
+        user = make_user("PHARMACIST", is_otp_verified=True)
+        old_refresh = str(RefreshToken.for_user(user))
+        session_client = APIClient()
+        session_client.force_login(user)
+        session_key = session_client.session.session_key
+        client = APIClient()
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        redirect = client.get(f"{API}auth/reset/{uid}/{token}/")
+        self.assertEqual(redirect.status_code, 302)
+        response = client.post(redirect.url, {
+            "new_password1": "NewStrongPassword248!",
+            "new_password2": "NewStrongPassword248!",
+        })
+        self.assertEqual(response.status_code, 302)
+        refreshed, _ = post(APIClient(), "token/refresh/", {"refresh": old_refresh})
+        self.assertEqual(refreshed.status_code, 401)
+        self.assertFalse(Session.objects.filter(session_key=session_key).exists())
+        login, _ = post(APIClient(), "login/", {"email": user.email, "password": "NewStrongPassword248!"})
+        self.assertEqual(login.status_code, 200, login.data)
+        fresh, _ = post(APIClient(), "token/refresh/", {"refresh": login.data["refresh"]})
+        self.assertEqual(fresh.status_code, 200, fresh.data)
+
     def test_logout_blacklists_the_refresh_token_and_clears_cookies(self):
         user = make_user("PHARMACIST")
         refresh = RefreshToken.for_user(user)
@@ -358,6 +504,25 @@ class SessionTests(TestCase):
 
 @override_settings(STORAGES=STORAGES)
 class AccountDeletionTests(TestCase):
+    def test_deletion_removes_authored_and_legacy_talent_posts_but_keeps_other_users(self):
+        from onboarding.models import ExplorerOnboarding
+        from talent.models import ExplorerPost
+
+        user = make_user("EXPLORER")
+        profile = ExplorerOnboarding.objects.create(user=user, verified=True)
+        authored = ExplorerPost.objects.create(author_user=user, headline="personal content", post_kind="FULL_TIME_APPLICATION")
+        legacy = ExplorerPost.objects.create(explorer_profile=profile, headline="legacy personal content")
+        other = make_user("EXPLORER")
+        control = ExplorerPost.objects.create(author_user=other, headline="still available")
+        with queued_emails():
+            response = client_for(user).delete("/api/v1/account/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ExplorerPost.objects.filter(pk__in=[authored.pk, legacy.pk]).exists())
+        self.assertTrue(ExplorerPost.objects.filter(pk=control.pk).exists())
+        for viewer, path in ((None, "public-feed/"), (other, "feed/")):
+            feed = client_for(viewer).get("/api/v1/explorer-posts/" + path)
+            self.assertEqual([row["id"] for row in feed.data["results"]], [control.pk])
+
     def test_deletion_anonymises_revokes_and_removes_identity_documents(self):
         path = "/api/v1/account/"
         pharmacist = make_user("PHARMACIST", mobile_number="61400000000", is_mobile_verified=True)

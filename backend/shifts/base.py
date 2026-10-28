@@ -31,7 +31,7 @@ from shifts.models import (
 )
 from rest_framework.response import Response
 from rest_framework.permissions import SAFE_METHODS
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
 from organizations.access import managed_pharmacies, user_can_manage_pharmacy
@@ -77,7 +77,7 @@ from shifts.selectors import (  # noqa: F401  (historical import path)
     _shift_has_past_slot_exists,
 )
 from shifts.candidates import _log_shift_profile_access, member_status, reveal_candidate  # noqa: F401  (_log_shift_profile_access: historical import path)
-from shifts.interest import express_interest, is_public_shift_member_access, reject_shift
+from shifts.interest import express_interest, is_public_shift_member_access, reject_shift, _require_public_shift_onboarding
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_managers, notify_shift_users
 from shifts.engagement import staff_assignment_defaults
@@ -112,6 +112,25 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     queryset = Shift.objects.all()
     serializer_class = ShiftSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def destroy(self, request, *args, **kwargs):
+        with transaction.atomic():
+            shift = self.get_object()
+            shift = Shift.objects.select_for_update().get(pk=shift.pk)
+            if shift.slot_assignments.exists():
+                return Response(
+                    {'detail': 'This shift has assigned workers and cannot be deleted.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if (shift.payment_status == 'PENDING'
+                    or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()
+                    or shift.payments.filter(status='pending').exists()):
+                return Response(
+                    {'detail': 'This shift has a pending payment. Complete payment before deleting it.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            self.perform_destroy(shift)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def check_permissions(self, request):
         super().check_permissions(request)
@@ -167,6 +186,8 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     _apply_escalation = staticmethod(apply_escalation)
 
     def _build_member_status_response(self, request, shift):
+        if not user_can_manage_pharmacy(request.user, shift.pharmacy):
+            raise PermissionDenied('Only pharmacy managers can view staff response status.')
         return Response(member_status(
             shift=shift,
             requested_visibility=request.query_params.get('visibility'),
@@ -307,6 +328,10 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if request.method == 'POST':
             from onboarding.verification.state import require_public_ahpra
             require_public_ahpra(request.user, shift)
+            if not _user_can_perform_shift_role(request.user, shift.role_needed):
+                raise ValidationError('Your role does not cover this shift.')
+            if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(request.user, shift):
+                _require_public_shift_onboarding(request.user)
 
         if request.method == 'GET':
             from shifts.counter_offers import visible_counter_offers_for_shift

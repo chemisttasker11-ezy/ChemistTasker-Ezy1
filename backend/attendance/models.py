@@ -355,6 +355,7 @@ class AttendanceEvent(models.Model):
         related_name="attendance_events",
     )
     ip_address = models.GenericIPAddressField(null=True, blank=True)
+    request_id = models.UUIDField(null=True, blank=True, db_index=True)
     recorded_at = models.DateTimeField(auto_now_add=True)
 
     objects = ImmutableAttendanceQuerySet.as_manager()
@@ -445,6 +446,41 @@ class KioskAttendanceEvent(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Kiosk attendance evidence is append-only and cannot be deleted.")
+
+
+class KioskAttendanceReview(models.Model):
+    """Separate immutable manager decision on signed suspicious kiosk evidence.
+
+    The signed KioskAttendanceEvent remains append-only and never changes its
+    original assessment after a human review.
+    """
+    class Decision(models.TextChoices):
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+
+    evidence = models.OneToOneField(
+        KioskAttendanceEvent, on_delete=models.PROTECT, related_name="manager_review",
+    )
+    manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="kiosk_attendance_reviews",
+    )
+    decision = models.CharField(max_length=10, choices=Decision.choices)
+    reason = models.TextField()
+    effective_timestamp = models.DateTimeField(null=True, blank=True)
+    attendance_event = models.OneToOneField(
+        AttendanceEvent, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="kiosk_manager_review",
+    )
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Kiosk attendance review decisions are append-only.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Kiosk attendance review decisions cannot be deleted.")
 
 
 class ProvisionalAttendance(models.Model):

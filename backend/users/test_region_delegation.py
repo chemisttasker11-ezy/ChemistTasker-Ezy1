@@ -67,6 +67,8 @@ class RegionDelegationTests(TestCase):
                 self.assertFalse(get_user_model().objects.filter(email=f'blocked-{index}@example.com').exists())
 
     def test_region_directory_and_hub_listing_stay_inside_assigned_pharmacies(self):
+        self.membership.admin_level = 'MANAGER'
+        self.membership.save(update_fields=['admin_level'])
         visible_user = get_user_model().objects.create_user(
             email='visible-region-peer@example.com', password='Password123!', role='ORG_STAFF'
         )
@@ -209,6 +211,8 @@ class RegionDelegationTests(TestCase):
         self.assertFalse(membership.pharmacies.exists())
 
     def test_region_cannot_promote_self_or_expand_scope_through_patch(self):
+        self.membership.admin_level = 'MANAGER'
+        self.membership.save(update_fields=['admin_level'])
         path = f'/api/v1/users/organization-memberships/{self.membership.id}/'
         promote = self.client.patch(path, {'role': 'ORG_ADMIN'}, content_type='application/json')
         expand = self.client.patch(
@@ -222,6 +226,8 @@ class RegionDelegationTests(TestCase):
         self.assertEqual(set(self.membership.pharmacies.values_list('id', flat=True)), {self.pharmacy.id})
 
     def test_region_can_edit_scoped_peer_but_cannot_delete_chief(self):
+        self.membership.admin_level = 'MANAGER'
+        self.membership.save(update_fields=['admin_level'])
         target = get_user_model().objects.create_user(
             email='peer@example.com', password='Password123!', role='ORG_STAFF'
         )

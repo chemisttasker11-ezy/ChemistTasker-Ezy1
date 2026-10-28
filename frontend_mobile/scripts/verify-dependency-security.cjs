@@ -26,6 +26,10 @@ function verifyInstalled() {
   // New GHSA-q3jh-wrc6-jgq8 security release: reject stale redirect clients.
   assert.equal(mobileRequire('follow-redirects/package.json').version, '1.16.1');
   assert.equal(lock.packages['node_modules/follow-redirects'].version, '1.16.1');
+  assert.equal(lock.packages['node_modules/fast-uri'].version, '3.1.9');
+  assert.equal(mobileRequire('fast-uri/package.json').version, '3.1.9');
+  assert.equal(lock.packages['node_modules/undici'].version, '6.29.1');
+  assert.equal(mobileRequire('undici/package.json').version, '6.29.1');
   assert.equal(Object.keys(lock.packages).some(name => name.endsWith('node_modules/sprintf-js')), false);
   return lock;
 }

@@ -4,6 +4,7 @@ import exportOwners from '../contracts/applicationExports.json';
 import { configureApi } from '../transport/application';
 import { camelCaseKeysDeep, buildQuery, toPaginatedList } from '../utils/serialization';
 import { mapShift } from './shifts/mappers';
+import { leaveRequestMemberships } from '../contracts/workforce';
 import { mapMembershipSummary } from './memberships/mappers';
 import { mapChatMessage } from './chat/mappers';
 import { mapPost } from './pharmacyHub/mappers';
@@ -30,11 +31,11 @@ function responses(...payloads: unknown[]) {
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('source-backed wire/domain contracts after extraction',()=>{
-  it('retains 431 runtime exports after retiring seven unused onboarding/application operations',()=>{
+  it('retains 430 runtime exports after retiring eight unused onboarding/application operations',()=>{
     const modules=import.meta.glob('./**/api.ts',{eager:true});
     const retiredExports = ['createOnboarding', 'getShiftApplications',
       'acceptShiftApplication', 'rejectShiftApplication', 'fetchShiftApplicationsService',
-      'acceptShiftApplicationService', 'rejectShiftApplicationService'];
+      'acceptShiftApplicationService', 'rejectShiftApplicationService', 'refereeReject'];
     expect(Object.keys(exportOwners)).toHaveLength(438 - retiredExports.length);
     for (const name of retiredExports) {
       expect(exportOwners).not.toHaveProperty(name);
@@ -54,6 +55,11 @@ describe('source-backed wire/domain contracts after extraction',()=>{
     expect(publicApi.startDirectMessageByUser).toBe(startDirectMessageByUser);
     expect(publicApi.attendance).toBe(attendance);
     expect(publicApi.financeApi).toBe(financeApi);
+  });
+  it('scrubs deleted chat content but preserves a legitimate message',()=>{
+    const row={id:4,conversation:2,body:'Private preview',original_body:'Original',attachment_url:'/media/private.pdf',attachment_filename:'private.pdf',created_at:'2026-10-26T00:00:00Z',sender:null};
+    expect(mapChatMessage({...row,is_deleted:false})).toMatchObject({body:'Private preview',attachment_url:'/media/private.pdf'});
+    expect(mapChatMessage({...row,is_deleted:true})).toMatchObject({body:'',original_body:null,attachment_url:null,attachment_filename:null});
   });
   it('retains array query values, false, zero, and query omission',()=>{
     expect(buildQuery({pharmacy:4,role:['PHARMACIST','INTERN'],active:false,page:0,none:null})).toBe('?pharmacy=4&role=PHARMACIST&role=INTERN&active=false&page=0');
@@ -75,6 +81,14 @@ describe('source-backed wire/domain contracts after extraction',()=>{
     const page={count:1,next:null,results:[{id:2,role_needed:'PHARMACIST',pharmacy_detail:null,slots:[]}]};
     responses(page);
     expect(await getPublicJobBoard({organization:3})).toEqual(page);
+  });
+  it('offers leave only for accepted pharmacy memberships with a membership id',()=>{
+    const rows=[{organization_id:1,role:'ORG_ADMIN'},{pharmacy_id:1,role:'OWNER'},{id:3,pharmacy_id:2,role:'PHARMACIST',status:'ACCEPTED',is_active:true},{id:4,pharmacy_id:5,role:'PHARMACIST',status:'PENDING'}];
+    expect(leaveRequestMemberships(rows as any)).toEqual([rows[2]]);
+  });
+  it('preserves role eligibility through public shift mapping',()=>{
+    expect(mapShift({id:2,role_needed:'TECHNICIAN',can_apply:false})).toMatchObject({canApply:false});
+    expect(mapShift({id:3,role_needed:'PHARMACIST',can_apply:true})).toMatchObject({canApply:true});
   });
   it('keeps mapped shifts and stable nested slot and assignment IDs',()=>{
     const row={id:2,role_needed:'PHARMACIST',pharmacy_detail:null,slots:[{id:5,date:'2026-10-12',start_time:'09:00:00',end_time:'17:00:00'}],slot_assignments:[{id:8,slot_id:5,slot_date:'2026-10-12'}]};
@@ -113,6 +127,10 @@ describe('source-backed wire/domain contracts after extraction',()=>{
   it('preserves chat message wire field names while mapping nested display identity',()=>{
     const row={id:10,conversation:7,sender:{id:3,user_details:{id:9,first_name:'Fixture',last_name:'Worker',email:null}},body:'Test',created_at:'2026-10-06T00:00:00Z'};
     expect(mapChatMessage(row)).toMatchObject({id:10,conversation:7,sender:{id:3,user_details:{id:9,firstName:'Fixture',lastName:'Worker',email:undefined}},body:'Test'});
+  });
+  it('preserves a chat message after its sender membership is removed',()=>{
+    const row={id:10,conversation:7,sender:null,body:'Test',attachment_url:null,created_at:'2026-10-06T00:00:00Z'};
+    expect(mapChatMessage(row)).toMatchObject(row);
   });
   it('retains the PIN pharmacy envelope actually returned by WorkerUpdatePinView',async()=>{
     const data={pharmacies:[{id:4,name:'Fixture Pharmacy',has_pin:true}]};responses(data);

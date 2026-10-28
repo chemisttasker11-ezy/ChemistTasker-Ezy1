@@ -4,8 +4,82 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from client_profile.models import Membership, Organization, Pharmacy, PharmacyAdmin
 from users.models import OrganizationMembership
+
+
+class PharmacyAdminRevocationTests(TestCase):
+    def setUp(self):
+        self.owner, self.pharmacy = make_owner_with_pharmacy("Revocation Pharmacy")
+        self.target = make_user("PHARMACIST")
+        self.owner_client = client_for(self.owner)
+        self.target_client = client_for(self.target)
+        with patch('organizations.views.async_task'):
+            response = self.owner_client.post('/api/v1/pharmacy-admins/', {
+                'pharmacy': self.pharmacy.pk, 'email': self.target.email,
+                'admin_level': 'MANAGER', 'staff_role': 'PHARMACIST',
+            }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assignment = PharmacyAdmin.objects.get(user=self.target, pharmacy=self.pharmacy)
+        self.membership = self.assignment.membership
+
+    def test_manager_cannot_patch_assignment_to_an_unrelated_pharmacy(self):
+        accepted = self.target_client.post(f'/api/v1/pharmacy-admins/{self.assignment.pk}/accept-invitation/')
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        _, unrelated = make_owner_with_pharmacy('Unrelated Pharmacy')
+        response = self.target_client.patch(f'/api/v1/pharmacy-admins/{self.assignment.pk}/', {
+            'pharmacy': unrelated.pk,
+        }, format='json')
+        self.assertEqual(response.status_code, 405, response.data)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.pharmacy_id, self.pharmacy.pk)
+        self.assertEqual(self.assignment.membership_id, self.membership.pk)
+        self.assertTrue(self.assignment.is_active)
+
+    def test_manager_cannot_patch_assignment_inactive(self):
+        accepted = self.target_client.post(f'/api/v1/pharmacy-admins/{self.assignment.pk}/accept-invitation/')
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        response = self.target_client.patch(f'/api/v1/pharmacy-admins/{self.assignment.pk}/', {
+            'is_active': False,
+        }, format='json')
+        self.assertEqual(response.status_code, 405, response.data)
+        self.assignment.refresh_from_db()
+        self.assertTrue(self.assignment.is_active)
+        self.assertEqual(self.assignment.membership_id, self.membership.pk)
+
+    def test_owner_cannot_put_assignment(self):
+        response = self.owner_client.put(f'/api/v1/pharmacy-admins/{self.assignment.pk}/', {
+            'user': self.target.pk, 'pharmacy': self.pharmacy.pk,
+            'membership': self.membership.pk, 'staff_role': 'PHARMACIST',
+        }, format='json')
+        self.assertEqual(response.status_code, 405, response.data)
+
+    def test_revoke_pending_admin_prevents_membership_acceptance(self):
+        self.assertEqual(self.membership.status, Membership.Status.PENDING)
+        removed = self.owner_client.delete(f'/api/v1/pharmacy-admins/{self.assignment.pk}/')
+        self.assertEqual(removed.status_code, 204)
+        accepted = self.target_client.post(f'/api/v1/my-memberships/{self.membership.pk}/accept/')
+        self.assertEqual(accepted.status_code, 400, accepted.data)
+        self.membership.refresh_from_db()
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.membership.status, Membership.Status.REJECTED)
+        self.assertFalse(self.membership.is_active)
+        self.assertIsNotNone(self.membership.responded_at)
+        self.assertFalse(self.assignment.is_active)
+        self.assertIsNone(self.assignment.membership_id)
+
+    def test_revoke_accepted_admin_preserves_staff_membership(self):
+        accepted = self.target_client.post(f'/api/v1/pharmacy-admins/{self.assignment.pk}/accept-invitation/')
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        self.membership.refresh_from_db()
+        responded_at = self.membership.responded_at
+        removed = self.owner_client.delete(f'/api/v1/pharmacy-admins/{self.assignment.pk}/')
+        self.assertEqual(removed.status_code, 204)
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.status, Membership.Status.ACCEPTED)
+        self.assertTrue(self.membership.is_active)
+        self.assertEqual(self.membership.responded_at, responded_at)
 
 
 class AdditionalAdminInvitationTests(TestCase):
@@ -138,5 +212,60 @@ class AdditionalAdminInvitationTests(TestCase):
             admin_level='MANAGER', staff_role='PHARMACIST', is_active=True,
         )
         self.assertEqual(self.invite(target.email).status_code, 409)
+        assignment.refresh_from_db()
+        self.assertTrue(assignment.is_active)
+
+    def test_revoked_admin_cannot_self_restore_without_new_invitation(self):
+        target = get_user_model().objects.create_user(
+            email='revoked-admin@example.com', password='Password123!', role='OTHER_STAFF'
+        )
+        membership = Membership.objects.create(
+            user=target, pharmacy=self.pharmacy, role='ASSISTANT',
+            employment_type='FULL_TIME', is_active=True, status=Membership.Status.ACCEPTED,
+        )
+        assignment = PharmacyAdmin.objects.create(
+            user=target, pharmacy=self.pharmacy, membership=membership,
+            admin_level='MANAGER', staff_role='ASSISTANT', is_active=True,
+        )
+        PharmacyAdmin.objects.create(
+            user=self.inviter, pharmacy=self.pharmacy,
+            admin_level='MANAGER', staff_role='PHARMACIST', is_active=True,
+        )
+        removed = self.client.delete(f'/api/v1/pharmacy-admins/{assignment.pk}/')
+        self.assertEqual(removed.status_code, 204)
+        assignment.refresh_from_db()
+        membership.refresh_from_db()
+        self.assertFalse(assignment.is_active)
+        self.assertIsNone(assignment.membership_id)
+        self.assertTrue(membership.is_active)
+        self.assertEqual(membership.status, Membership.Status.ACCEPTED)
+
+        self.client.force_authenticate(user=target)
+        pending = self.client.get('/api/v1/pharmacy-admins/my-pending-invitations/')
+        self.assertEqual(pending.status_code, 200)
+        self.assertEqual(pending.data, [])
+        forbidden = self.client.post(
+            f'/api/v1/pharmacy-admins/{assignment.pk}/accept-invitation/'
+        )
+        self.assertEqual(forbidden.status_code, 404)
+        assignment.refresh_from_db()
+        self.assertFalse(assignment.is_active)
+
+        # An authorized administrator may deliberately re-invite the same worker.
+        self.client.force_authenticate(user=self.inviter)
+        with patch('organizations.views.async_task'):
+            renewed = self.client.post('/api/v1/pharmacy-admins/', {
+                'pharmacy': self.pharmacy.pk, 'email': target.email,
+                'admin_level': 'MANAGER', 'staff_role': 'ASSISTANT',
+            }, format='json')
+        self.assertEqual(renewed.status_code, 200)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.membership_id, membership.id)
+        self.assertFalse(assignment.is_active)
+        self.client.force_authenticate(user=target)
+        accepted = self.client.post(
+            f'/api/v1/pharmacy-admins/{assignment.pk}/accept-invitation/'
+        )
+        self.assertEqual(accepted.status_code, 200)
         assignment.refresh_from_db()
         self.assertTrue(assignment.is_active)

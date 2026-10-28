@@ -494,3 +494,31 @@ class EmploymentEngagementSuccessorApiTests(TestCase):
         )
         self.assertEqual(successor.job_title, "Senior Pharmacist")
         self.assertEqual(successor.notes, "Successor terms")
+
+    def test_started_junior_engagement_cannot_be_extended_past_birthday_review(self):
+        """C026-N3/C029-N1: PATCHing a started engagement keeps the frozen junior-rate expiry."""
+        from workforce.views import EmploymentEngagementDetailView
+
+        review = self.today + timedelta(days=10)
+        self.previous.award_rate_snapshot = {"next_rate_review_date": str(review)}
+        self.previous.effective_to = review - timedelta(days=1)
+        self.previous.save()
+
+        def patch_end(value):
+            request = self.factory.patch(
+                f"/workforce/employment-engagements/{self.previous.public_id}/",
+                {"effective_to": value},
+                format="json",
+            )
+            force_authenticate(request, user=self.manager)
+            return EmploymentEngagementDetailView.as_view()(request, public_id=self.previous.public_id)
+
+        for value in (None, str(review), str(review + timedelta(days=30))):
+            self.assertEqual(patch_end(value).status_code, 400, value)
+            self.previous.refresh_from_db()
+            self.assertEqual(self.previous.effective_to, review - timedelta(days=1))
+
+        response = patch_end(str(self.today + timedelta(days=3)))
+        self.assertEqual(response.status_code, 200, response.data)
+        self.previous.refresh_from_db()
+        self.assertEqual(self.previous.effective_to, self.today + timedelta(days=3))

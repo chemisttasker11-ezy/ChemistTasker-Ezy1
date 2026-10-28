@@ -1,0 +1,3 @@
+# PR201 B69 payment intent idempotency guard
+
+Two distinct Stripe webhook event IDs may carry the same Checkout payment intent and previously created duplicate ShiftPayment rows. The handler now first retrieves the existing payment by Stripe intent and avoids duplicate downstream offer finalisation on replay. Existing webhook event-ID receipts remain. The historical PR200 B69 expected assertion must be run against PR201 before certification. A database unique constraint is still required for true concurrent first-arrival protection, so B69 remains partly open; this batch avoids a potentially destructive migration until duplicate production data is reviewed. NO-GO.

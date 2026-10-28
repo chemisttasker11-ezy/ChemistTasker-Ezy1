@@ -7,8 +7,9 @@ from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from shifts.models import Shift, ShiftDescriptionTemplate, ShiftOffer
 from shifts.escalation import allowed_tiers
 from shifts.pricing import expand_shift_slots
-from datetime import date
 from django.utils import timezone
+from organizations.access import user_can_manage_pharmacy
+from organizations.timezone import get_pharmacy_timezone
 from organizations.serializers import anonymize_pharmacy_detail, PharmacySerializer, user_can_view_full_pharmacy
 from shifts.posting import ensure_escalation_stamps, normalize_money_value, normalize_slots_payload, post_shift, revise_shift
 from shifts.travel import haversine_km
@@ -103,7 +104,7 @@ class ShiftSerializer(serializers.ModelSerializer):
             'published_rates_visible',
         ]
         read_only_fields = [
-            'id', 'created_by', 'escalation_level',
+            'id', 'created_by', 'escalation_level', 'payment_status',
             'interested_users_count', 'reveal_count',
             'allowed_escalation_levels']
 
@@ -137,6 +138,11 @@ class ShiftSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        if self.instance is not None:
+            target = attrs.get('pharmacy')
+            if (target is not None and target.pk != self.instance.pharmacy_id
+                    and not user_can_manage_pharmacy(self.context['request'].user, target)):
+                raise serializers.ValidationError({'pharmacy': 'Shift pharmacy cannot change during edit.'})
         role = attrs.get('role_needed') or getattr(self.instance, 'role_needed', None)
         # Revalidate the complete requirement set when the vacancy role changes.
         # PATCH must not keep pharmacist-only requirements on a technician shift.
@@ -192,6 +198,9 @@ class ShiftSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None) if request else None
         if instance.post_anonymously and not user_can_view_full_pharmacy(user, instance.pharmacy):
             data['pharmacy_detail'] = anonymize_pharmacy_detail(data.get('pharmacy_detail'))
+        if not user_can_view_full_pharmacy(user, instance.pharmacy):
+            for field in PharmacySerializer.file_fields:
+                data.get('pharmacy_detail', {}).pop(field, None)
         return project_published_rates(data, user=user, pharmacy=instance.pharmacy)
 
     def get_published_rates_visible(self, obj) -> bool:
@@ -370,8 +379,8 @@ class ShiftSerializer(serializers.ModelSerializer):
         if not is_active_endpoint:
             return ShiftSlotSerializer(obj.slots.all(), many=True).data
 
-        now = timezone.now()
-        today = date.today()
+        now = timezone.now().astimezone(get_pharmacy_timezone(obj.pharmacy))
+        today = now.date()
 
         # Get all slots for this shift
         assigned_pairs = {
@@ -437,7 +446,11 @@ class ShiftSerializer(serializers.ModelSerializer):
         # Enforce this on the API projection, not only the profile-detail endpoint.
         view = self.context.get('view')
         history_view = getattr(view, 'assigned_profile_contact', True) is False
-        for assignment in shift.slot_assignments.all():
+        viewer = getattr(self.context.get('request'), 'user', None)
+        visible = shift.slot_assignments.all()
+        if not user_can_manage_pharmacy(viewer, shift.pharmacy):
+            visible = visible.filter(user_id=getattr(viewer, 'pk', None))
+        for assignment in visible:
             user = assignment.user
             user_name = user.get_full_name() or ('' if history_view else user.email) or getattr(user, 'username', '') or 'Assigned candidate'
             assignments.append({
@@ -466,6 +479,9 @@ class ShiftSerializer(serializers.ModelSerializer):
             shift=shift,
             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
         ).select_related('slot', 'user').order_by('offered_slot_date', 'offered_start_time', 'created_at')
+        viewer = getattr(self.context.get('request'), 'user', None)
+        if not user_can_manage_pharmacy(viewer, shift.pharmacy):
+            offers = offers.filter(user_id=getattr(viewer, 'pk', None))
 
         options = []
         for offer in offers:

@@ -1,5 +1,5 @@
 """Membership API: memberships, invite links, magic-link information, applications and a user's own memberships."""
-from rest_framework import permissions, status, viewsets
+from rest_framework import mixins, permissions, status, viewsets
 from memberships.models import Membership, MembershipApplication, MembershipInviteLink  # noqa: F401  (MembershipApplication: ownership contract)
 from organizations.models import (
     Pharmacy,
@@ -16,7 +16,6 @@ from users.normalization import sanitize_email_text as clean_email
 from core.task_queue import async_task
 from datetime import date
 from django.db import transaction
-from django.db.models.deletion import ProtectedError
 from datetime import timedelta
 from users.models import User
 from memberships.serializers import (
@@ -110,27 +109,8 @@ class MembershipViewSet(viewsets.ModelViewSet):
 
 
     def destroy(self, request, *args, **kwargs):
-        """
-        Permanently deletes a membership.
-        First, it removes the member from any chat rooms they are a part of to satisfy the PROTECT rule.
-        Then, it deletes the membership record itself.
-        WARNING: This will also delete all messages sent by this member.
-        """
-        membership = self.get_object()
-
-        with transaction.atomic():
-            # Step 1: Delete the protecting Participant records first.
-            # The related_name on the Participant model is 'chat_participations'.
-            membership.chat_participations.all().delete()
-
-            # Step 2: Now that the protection is removed, delete the membership.
-            # This will also cascade-delete all of their messages.
-            try:
-                membership.delete()
-            except ProtectedError:
-                membership.is_active = False
-                membership.save(update_fields=["is_active"])
-
+        """Remove membership access while preserving historical chat messages."""
+        self.get_object().remove()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _create_membership_invite(self, data, inviter):
@@ -196,6 +176,15 @@ class MembershipInviteLinkViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return visible_invite_links(self.request.user, self.request.query_params)
+
+    def check_object_permissions(self, request, obj):
+        if request.method not in permissions.SAFE_METHODS and not user_can_invite_members_to_pharmacy(request.user, obj.pharmacy):
+            self.permission_denied(request, message="Not allowed to manage links for this pharmacy.")
+
+    def perform_destroy(self, instance):
+        # Preserve applications submitted through this link.
+        instance.is_active = False
+        instance.save(update_fields=['is_active'])
 
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
@@ -307,7 +296,11 @@ class SubmitMembershipApplication(APIView):
         return Response(MembershipApplicationSerializer(app).data, status=201)
 
 
-class MembershipApplicationViewSet(viewsets.ModelViewSet):
+class MembershipApplicationViewSet(mixins.ListModelMixin,
+                                   mixins.RetrieveModelMixin,
+                                   mixins.UpdateModelMixin,
+                                   mixins.DestroyModelMixin,
+                                   viewsets.GenericViewSet):
     """
     Owners/Org Admins/Pharmacy Admins can list pending apps for their pharmacies,
     edit employment-facing fields, and approve/reject.
@@ -467,10 +460,7 @@ class MyMembershipsViewSet(viewsets.ReadOnlyModelViewSet):
             membership.is_active = False
             membership.responded_at = timezone.now()
             membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
-            PharmacyAdmin.objects.filter(membership=membership).update(
-                is_active=False,
-                updated_at=timezone.now(),
-            )
+            membership.revoke_admin_access()
             transaction.on_commit(
                 lambda membership_id=membership.id: _notify_membership_response(
                     Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),
@@ -491,10 +481,7 @@ class MyMembershipsViewSet(viewsets.ReadOnlyModelViewSet):
             membership.is_active = False
             membership.responded_at = timezone.now()
             membership.save(update_fields=['status', 'is_active', 'responded_at', 'updated_at'])
-            PharmacyAdmin.objects.filter(membership=membership).update(
-                is_active=False,
-                updated_at=timezone.now(),
-            )
+            membership.revoke_admin_access()
             transaction.on_commit(
                 lambda membership_id=membership.id: _notify_membership_response(
                     Membership.objects.select_related("user", "pharmacy", "invited_by").get(id=membership_id),

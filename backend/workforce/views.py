@@ -33,6 +33,7 @@ from .employment_terms import correspondence_profile
 from .employment_engagement_service import (
     build_employment_engagement_payload,
     membership_date_of_birth,
+    require_end_before_rate_review,
 )
 
 from .leave_service import create_leave, decide_leave, serialize_leave
@@ -353,7 +354,8 @@ class EmploymentEngagementDetailView(APIView):
     def patch(self, request, public_id):
         try:
             with transaction.atomic():
-                row = EmploymentEngagement.objects.select_for_update().select_related(
+                # Lock only the engagement row: Postgres refuses FOR UPDATE across nullable joins.
+                row = EmploymentEngagement.objects.select_for_update(of=("self",)).select_related(
                     "membership__pharmacy", "membership__user"
                 ).get(public_id=public_id)
                 require_manage_workforce_pharmacy(request.user, row.membership.pharmacy)
@@ -388,6 +390,7 @@ class EmploymentEngagementDetailView(APIView):
                             raise DjangoValidationError(
                                 {"effective_to": "An active engagement may only be closed today or on a future date."}
                             )
+                        require_end_before_rate_review(row.award_rate_snapshot, next_effective_to)
                         row.effective_to = next_effective_to
                     if "notes" in request.data:
                         row.notes = str(request.data.get("notes") or "").strip()

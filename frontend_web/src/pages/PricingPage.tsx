@@ -107,7 +107,7 @@ function PricingPage() {
             return;
         }
 
-        navigate('/dashboard');
+        navigate(dashboardHref);
     };
 
     return (

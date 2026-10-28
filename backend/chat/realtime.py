@@ -1,5 +1,7 @@
 """Chat realtime helpers: unread-message badges, read receipts and who may receive chat updates."""
 from typing import Optional
+from django.db.models import Q
+from chat.models import Conversation
 from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from chat.models import Message, Participant
 from notifications.services import _broadcast
@@ -49,6 +51,8 @@ def broadcast_message_badge(
 
 
 def broadcast_message_read(participant: Participant) -> None:
+    if not participant_can_receive_chat_updates(participant):
+        return
     user = getattr(participant.membership, "user", None)
     if not user or not user.is_active:
         return
@@ -72,16 +76,58 @@ def participant_can_receive_chat_updates(participant: Participant) -> bool:
     """
     membership = getattr(participant, "membership", None)
     conversation = getattr(participant, "conversation", None)
-    if not membership or not conversation:
+    user = getattr(membership, "user", None)
+    if not membership or not conversation or not user or not user.is_active:
         return False
-    if (
-        getattr(conversation, "type", None) == "GROUP"
-        and getattr(conversation, "pharmacy_id", None)
-    ):
+    if membership.status != Membership.Status.ACCEPTED:
+        return False
+    if conversation.type == Conversation.Type.DM and membership.employment_type == "CONTACT":
+        # External contacts have intentionally inactive CONTACT memberships,
+        # not the same as a revoked pharmacy staff membership.
+        return True
+    if not membership.is_active:
+        return False
+    if conversation.type == Conversation.Type.GROUP and conversation.pharmacy_id:
         return (
-            getattr(membership, "is_active", False)
-            and getattr(membership, "status", None) == Membership.Status.ACCEPTED
-            and getattr(membership, "pharmacy_id", None) == conversation.pharmacy_id
-            and getattr(membership, "employment_type", None) in PHARMACY_STAFF_EMPLOYMENT_TYPES
+            membership.pharmacy_id == conversation.pharmacy_id
+            and membership.employment_type in PHARMACY_STAFF_EMPLOYMENT_TYPES
         )
     return True
+
+
+def authorized_participant(conversation_id, user_id):
+    """Legacy rooms may have revoked and valid memberships for the same user."""
+    participants = Participant.objects.filter(
+        conversation_id=conversation_id, membership__user_id=user_id,
+    ).select_related("membership__user", "conversation")
+    return next((p for p in participants if participant_can_receive_chat_updates(p)), None)
+
+
+def accessible_conversations_queryset(user):
+    """REST visibility and WS membership must agree after role revocation.
+
+    Preserve DM-only inactive CONTACT users, but never grant a revoked
+    pharmacy staff membership access to community, custom or direct rooms.
+    """
+    if not user or not getattr(user, "is_authenticated", False) or not user.is_active:
+        return Conversation.objects.none()
+    active = Membership.objects.filter(
+        user=user, is_active=True, status=Membership.Status.ACCEPTED,
+    )
+    active_participants = Participant.objects.filter(
+        membership__in=active,
+    ).values_list("conversation_id", flat=True)
+    contacts = Participant.objects.filter(
+        membership__user=user,
+        membership__employment_type="CONTACT",
+        membership__status=Membership.Status.ACCEPTED,
+        conversation__type=Conversation.Type.DM,
+    ).values_list("conversation_id", flat=True)
+    staff_pharmacies = active.filter(
+        employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+    ).values_list("pharmacy_id", flat=True)
+    return Conversation.objects.filter(
+        Q(pk__in=active_participants, pharmacy__isnull=True)
+        | Q(pk__in=contacts, type=Conversation.Type.DM)
+        | Q(type=Conversation.Type.GROUP, pharmacy_id__in=staff_pharmacies)
+    ).distinct()

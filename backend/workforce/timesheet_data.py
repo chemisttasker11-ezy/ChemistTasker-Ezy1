@@ -13,7 +13,7 @@ from workforce.models import (
     TimesheetPeriod,
     WorkforceLeaveRequest,
 )
-from attendance.models import AttendanceEvent, AttendanceSession, ProvisionalAttendance
+from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
 from workforce.roster.validation import work_interval
 from workforce.employment_terms import correspondence_profile
 from workforce.timesheet_core import _check, _local_date, _minutes, _period_bounds
@@ -147,8 +147,10 @@ def _roster_rows(user_id, period: TimesheetPeriod, tz):
         work_date = assignment.slot_date or assignment.slot.date
         monday = work_date - timedelta(days=work_date.weekday())
         if monday not in published_week_cache:
+            # An archived week is published history (archive requires a published roster), not withdrawn work.
             published_week_cache[monday] = RosterPeriod.objects.filter(
-                pharmacy=period.pharmacy, week_start=monday, status=RosterPeriod.Status.PUBLISHED
+                pharmacy=period.pharmacy, week_start=monday,
+                status__in=(RosterPeriod.Status.PUBLISHED, RosterPeriod.Status.ARCHIVED),
             ).exists()
         if not published_week_cache[monday]:
             continue
@@ -201,14 +203,28 @@ def _pending_leave_count(user_id, period: TimesheetPeriod, start_bound, end_boun
     ).count()
 
 
+def _session_overlap(start_bound, end_bound):
+    # Corrections can extend either raw bound, including across an entire period.
+    corrections = AttendanceCorrection.objects.all()
+    return (
+        (Q(started_at__lt=end_bound) | Q(pk__in=corrections.filter(
+            corrected_timestamp__lt=end_bound,
+        ).values("original_event__session_id")))
+        & (Q(ended_at__isnull=True) | Q(ended_at__gte=start_bound) | Q(pk__in=corrections.filter(
+            corrected_timestamp__gte=start_bound,
+        ).values("original_event__session_id")))
+    )
+
+
 def _session_rows(user_id, period: TimesheetPeriod, start_bound, end_bound, tz):
     sessions = list(
         AttendanceSession.objects.filter(
             user_id=user_id,
             pharmacy=period.pharmacy,
-            started_at__lt=end_bound,
         )
-        .filter(Q(ended_at__isnull=True) | Q(ended_at__gte=start_bound))
+        .filter(_session_overlap(start_bound, end_bound))
+        # Rejected hours are not payable ("won't be added"); the raw evidence stays in attendance for audit.
+        .exclude(provisional_review__status=ProvisionalAttendance.Status.REJECTED)
         .select_related("assignment", "assignment__slot", "assignment__shift", "pharmacy", "user")
         .prefetch_related("events__corrections")
         .order_by("started_at", "pk")
@@ -345,8 +361,7 @@ def _worker_ids_for_period(period):
     ).values_list("user_id", flat=True)
     attendance_ids = AttendanceSession.objects.filter(
         pharmacy=period.pharmacy,
-        started_at__lt=end_bound,
-    ).filter(Q(ended_at__isnull=True) | Q(ended_at__gte=start_bound)).values_list("user_id", flat=True)
+    ).filter(_session_overlap(start_bound, end_bound)).values_list("user_id", flat=True)
     modern_leave_ids = WorkforceLeaveRequest.objects.filter(
         pharmacy=period.pharmacy,
         start_at__lt=end_bound,

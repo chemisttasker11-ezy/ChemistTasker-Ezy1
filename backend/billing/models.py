@@ -78,6 +78,8 @@ class ShiftPayment(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('paid', 'Paid'),
+        ('partially_refunded', 'Partially refunded'),
+        ('refunded', 'Refunded'),
         ('failed', 'Failed'),
     )
 
@@ -92,9 +94,23 @@ class ShiftPayment(models.Model):
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
     
     amount_aud = models.DecimalField(max_digits=10, decimal_places=2)
+    refunded_amount_aud = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Cumulative refund confirmed by Stripe for this payment.",
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("stripe_payment_intent_id",),
+                condition=models.Q(stripe_payment_intent_id__isnull=False)
+                & ~models.Q(stripe_payment_intent_id=""),
+                name="billing_unique_nonempty_payment_intent",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_payment_type_display()} - {self.owner.email} - ${self.amount_aud} ({self.status})"

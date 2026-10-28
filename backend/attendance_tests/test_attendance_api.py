@@ -8,6 +8,7 @@ import os
 import unittest
 from datetime import timedelta
 import zoneinfo
+from uuid import uuid4
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
 
@@ -237,7 +238,7 @@ class AttendanceAPITests(unittest.TestCase):
         self.assertEqual(clock_in_resp.data["action"], "CLOCKED_IN")
         self.assertTrue(clock_in_resp.data["is_provisional"])
 
-        # 3. Clock out with valid PIN
+        # 3. Without a request ID, a new submit toggles immediately.
         clock_out_resp = kiosk_client.post(
             "/attendance/kiosk/pin-clock/",
             {"device_token": raw_token, "identifier": self.worker_user.email, "pin": "1234"},
@@ -245,6 +246,48 @@ class AttendanceAPITests(unittest.TestCase):
         self.assertEqual(clock_out_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(clock_out_resp.data["action"], "CLOCKED_OUT")
         self.assertIsNotNone(clock_out_resp.data["ended_at"])
+
+    def test_kiosk_pin_resubmit_is_a_retry_not_a_toggle(self):
+        """A lost-response resubmit with the same request ID repeats the original action."""
+        _, raw_token = activate_kiosk_device(self.owner_user, self.pharmacy, "Pin Pad")
+        set_worker_personal_code(self.owner_user, self.membership, "1234")
+        kiosk_client = APIClient()
+        body = {"device_token": raw_token, "identifier": self.worker_user.email, "pin": "1234", "request_id": str(uuid4())}
+
+        first = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
+        retry = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
+        self.assertEqual(first.data["action"], "CLOCKED_IN")
+        self.assertEqual(retry.data["action"], "CLOCKED_IN")
+        self.assertEqual(retry.data["session_id"], first.data["session_id"])
+        session = AttendanceSession.objects.get(user=self.worker_user)
+        self.assertIsNone(session.ended_at)
+
+        body["request_id"] = str(uuid4())
+        out = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
+        out_retry = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
+        self.assertEqual(out.data["action"], "CLOCKED_OUT")
+        self.assertEqual(out_retry.data["action"], "CLOCKED_OUT")
+        self.assertEqual(AttendanceSession.objects.filter(user=self.worker_user).count(), 1)
+
+    def test_manager_timeline_includes_the_resolved_pharmacy_timezone(self):
+        """C039-N1: correction editors need the site's zone, including the server fallback."""
+        session = AttendanceSession.objects.create(
+            user=self.worker_user, pharmacy=self.pharmacy, source_membership=self.membership,
+            started_at=timezone.now(),
+        )
+        client = APIClient()
+        client.force_authenticate(user=self.worker_user)
+        url = f"/attendance/manager/timeline/{session.pk}/"
+        self.assertEqual(client.get(url).status_code, status.HTTP_403_FORBIDDEN)
+
+        client.force_authenticate(user=self.owner_user)
+        for stored_zone in ("Australia/Perth", None, "invalid-zone"):
+            self.pharmacy.timezone = stored_zone
+            self.pharmacy.save(update_fields=["timezone"])
+            response = client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            expected = stored_zone if stored_zone == "Australia/Perth" else timezone.get_default_timezone_name()
+            self.assertEqual(response.data.get("pharmacy_timezone"), expected)
 
     def test_worker_mobile_qr_and_break_lifecycle(self):
         # Setup kiosk and generate active QR

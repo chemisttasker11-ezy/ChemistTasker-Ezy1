@@ -1,5 +1,6 @@
 from datetime import date, time, timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 from django.test import TestCase
 
@@ -65,6 +66,13 @@ class OrganizationDashboardFinanceScopeTests(TestCase):
         self.assertEqual(data["invoice_summary"]["unpaid_count"], 1)
         self.assertEqual(data["invoice_summary"]["total_billed"], "$275.00")
 
+    def test_org_admin_summary_skips_a_worker_draft_never_sent(self):
+        Invoice.objects.create(user=make_user("PHARMACIST"), pharmacy=self.pharmacy, source="internal",
+                               request_key=uuid4(), total=Decimal("999.00"), status="draft")
+        data = self.get_dashboard(self.org_admin)
+        self.assertEqual(data["invoice_summary"]["total_count"], 1)
+        self.assertEqual(data["invoice_summary"]["total_billed"], "$275.00")
+
     def test_delegated_org_roles_do_not_receive_finance_totals_or_activity(self):
         for user in (self.chief, self.region):
             with self.subTest(user=user.email):
@@ -106,6 +114,21 @@ class DelegatedPharmacyDashboardFinanceScopeTests(TestCase):
         data = self.get_dashboard(self.owner)
         self.assertEqual(data["invoice_summary"]["total_count"], 1)
         self.assertEqual(data["invoice_summary"]["total_billed"], "$125.00")
+
+    def test_owner_summary_and_activity_skip_a_worker_draft_never_sent(self):
+        Invoice.objects.create(
+            user=make_user("PHARMACIST"),
+            pharmacy=self.pharmacy,
+            pharmacy_name_snapshot=self.pharmacy.name,
+            source="internal",
+            request_key=uuid4(),
+            total=Decimal("999.00"),
+            status="draft",
+        )
+        data = self.get_dashboard(self.owner)
+        self.assertEqual(data["invoice_summary"]["total_count"], 1)
+        self.assertEqual(data["invoice_summary"]["total_billed"], "$125.00")
+        self.assertFalse(any("999" in str(item.get("description")) for item in data["activity"]))
 
     def test_delegated_pharmacy_admin_does_not_receive_finance_summary_or_activity(self):
         data = self.get_dashboard(self.manager)

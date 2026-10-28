@@ -116,6 +116,12 @@ class MembershipSerializer(serializers.ModelSerializer):
         role = attrs.get('role', getattr(self.instance, 'role', None))
         employment_type = attrs.get('employment_type', getattr(self.instance, 'employment_type', None))
 
+        if (
+            attrs.get('status', getattr(self.instance, 'status', Membership.Status.ACCEPTED)) == Membership.Status.PENDING
+            and attrs.get('is_active', getattr(self.instance, 'is_active', True))
+        ):
+            raise serializers.ValidationError({'is_active': 'Pending invitations cannot be activated before acceptance.'})
+
         if self.instance is not None:
             immutable_errors = {}
             if 'user' in attrs and attrs['user'].pk != self.instance.user_id:
@@ -267,6 +273,14 @@ class MembershipInviteLinkSerializer(serializers.ModelSerializer):
         model = MembershipInviteLink
         fields = ['id', 'pharmacy', 'created_by', 'category', 'token', 'expires_at', 'is_active', 'created_at']
         read_only_fields = ['id', 'created_by', 'token', 'created_at']
+
+    def validate(self, attrs):
+        if self.instance is not None:
+            if 'pharmacy' in attrs and attrs['pharmacy'].pk != self.instance.pharmacy_id:
+                raise serializers.ValidationError({'pharmacy': 'Invite link pharmacy cannot be changed.'})
+            if 'category' in attrs and attrs['category'] != self.instance.category:
+                raise serializers.ValidationError({'category': 'Invite link category cannot be changed.'})
+        return attrs
 
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user

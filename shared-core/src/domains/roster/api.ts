@@ -6,7 +6,7 @@ import type { Collection } from '../../contracts/common';
 import { API_ENDPOINTS } from '../../constants/endpoints';
 import { fetchApi } from '../../transport/application';
 import { operationalRequest } from '../../transport/operational';
-import { asList, buildQuery } from '../../utils/serialization';
+import { asList, buildQuery, fetchAllPages } from '../../utils/serialization';
 import { mapPharmacySummaryRecord } from '../organizations/mappers';
 import { getWorkerShiftRequests } from '../shiftRequests/api';
 import { toShiftListParams } from '../shifts/api';
@@ -88,16 +88,16 @@ export function getRosterWorkerPharmacies() {
     return fetchApi<Collection<PharmacyApi>>('/roster-worker/pharmacies/');
 }
 export async function fetchRosterOwnerAssignments(params?: Record<string, unknown>) {
-    const data = await getRosterOwner(toRosterQueryParams(params));
-    return asList(data).map(mapRosterAssignment);
+    const rows = await fetchAllPages((page) => getRosterOwner({ ...toRosterQueryParams(params), page }));
+    return rows.map(mapRosterAssignment);
 }
 export async function fetchRosterWorkerAssignments(params?: Record<string, unknown>) {
-    const data = await getRosterWorker(toRosterQueryParams(params));
-    return asList(data).map(mapRosterAssignment);
+    const rows = await fetchAllPages((page) => getRosterWorker({ ...toRosterQueryParams(params), page }));
+    return rows.map(mapRosterAssignment);
 }
 export async function fetchWorkerShiftRequestsService(params?: Record<string, unknown>): Promise<WorkerShiftRequest[]> {
-    const data = await getWorkerShiftRequests(toRosterQueryParams(params));
-    return asList(data).map(mapWorkerShiftRequest);
+    const rows = await fetchAllPages((page) => getWorkerShiftRequests({ ...toRosterQueryParams(params), page }));
+    return rows.map(mapWorkerShiftRequest);
 }
 export async function fetchOwnerOpenShifts(params?: Record<string, unknown>) {
     const data = await getOwnerOpenShifts(toShiftListParams(params));

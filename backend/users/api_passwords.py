@@ -1,5 +1,8 @@
 """Password reset API: requesting a reset link and confirming a new password."""
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.views import PasswordResetConfirmView
+from django.db import transaction
+from django.urls import reverse_lazy
 from rest_framework import permissions
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -12,9 +15,21 @@ from users.tasks import send_async_email
 from users.delivery import deliver_email_best_effort
 from django.core.exceptions import ValidationError as DjangoValidationError
 from users.login_security import _reset_login_lockout_state
+from users.account_deletion import _revoke_user_sessions, _revoke_user_tokens
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+
+class RevokingPasswordResetConfirmView(PasswordResetConfirmView):
+    success_url = reverse_lazy("api_v1:password_reset_complete")
+
+    @transaction.atomic
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        _revoke_user_tokens(self.user)
+        _revoke_user_sessions(self.user)
+        return response
 
 
 class PasswordResetConfirmAPIView(APIView):
@@ -49,10 +64,13 @@ class PasswordResetConfirmAPIView(APIView):
         except DjangoValidationError as exc:
             return Response({'new_password1': list(exc.messages)}, status=400)
 
-        user.set_password(pw1)
-        user.is_otp_verified = True
-        user.save()
-        _reset_login_lockout_state(user)
+        with transaction.atomic():
+            user.set_password(pw1)
+            user.is_otp_verified = True
+            user.save()
+            _reset_login_lockout_state(user)
+            _revoke_user_tokens(user)
+            _revoke_user_sessions(user)
         return Response({'detail':'Password has been reset.'})
 
 

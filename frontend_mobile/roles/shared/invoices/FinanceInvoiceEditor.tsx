@@ -196,7 +196,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   }, [value]);
   const save = async () => {
     if (running.current) return;
-    if (!value.customer_id || !value.issuer_name.trim() || !value.lines.length) { setError('Select a customer, enter your business name and add an item.'); setBusinessOpen(true); return; }
+    if ((!value.customer_id && !value.source_assignment_ids?.length) || !value.issuer_name.trim() || !value.lines.length) { setError('Select a customer, enter your business name and add an item.'); setBusinessOpen(true); return; }
     running.current = true; setBusy(true); setError('');
     try { await finance.saveInvoice(value, initial?.id); await onSaved(); onClose(); } catch (e: any) { setError(e.message || 'Unable to save invoice.'); } finally { running.current = false; setBusy(false); }
   };

@@ -256,8 +256,8 @@ export default function DashboardTopShell({
           >
             <TopBarActions
               iconSx={{
-                width: { xs: 38, md: 46 },
-                height: { xs: 38, md: 46 },
+                width: { xs: 44, md: 46 },
+                height: { xs: 44, md: 46 },
                 bgcolor: "var(--ct-surface-bg)",
                 color: "var(--ct-text-secondary)",
                 boxShadow: "0 3px 12px rgba(6,18,58,0.05)",

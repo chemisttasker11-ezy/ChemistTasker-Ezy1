@@ -40,6 +40,19 @@ def membership_date_of_birth(membership):
     return application.date_of_birth if application else None
 
 
+def require_end_before_rate_review(rate_snapshot, effective_to):
+    # Above-award snapshots keep the Award resolution under "award_floor".
+    resolved = (rate_snapshot or {}).get("award_floor") or rate_snapshot or {}
+    next_review = parse_date(resolved.get("next_rate_review_date") or "")
+    if next_review and (effective_to is None or effective_to >= next_review):
+        raise DjangoValidationError({
+            "effective_to": (
+                "Junior Award rates change on the employee's next birthday. "
+                f"End this dated engagement by {next_review - timedelta(days=1)} and create successor terms from {next_review}."
+            )
+        })
+
+
 def build_employment_engagement_payload(request_data, membership, *, effective_from=None, effective_to=None, existing=None):
     role = str(request_data.get("role") or getattr(existing, "role", None) or membership.role or "").upper()
     employment_type = str(
@@ -106,14 +119,7 @@ def build_employment_engagement_payload(request_data, membership, *, effective_f
     )
     resolved["adult_rate_confirmed"] = None
     resolved["correspondence"] = correspondence
-    next_review = parse_date(resolved.get("next_rate_review_date") or "")
-    if next_review and (effective_to is None or effective_to >= next_review):
-        raise DjangoValidationError({
-            "effective_to": (
-                "Junior Award rates change on the employee's next birthday. "
-                f"End this dated engagement by {next_review - timedelta(days=1)} and create successor terms from {next_review}."
-            )
-        })
+    require_end_before_rate_review(resolved, effective_to)
 
     payload = {
         "role": role,

@@ -136,18 +136,20 @@ def _find_matching_assignment(
     pharmacy,
     target_time: datetime,
     assignment_id: Optional[int] = None,
+    *,
+    shift_id: Optional[int] = None,
 ) -> Optional[ShiftSlotAssignment]:
-    """Find a confirmed assignment for user at pharmacy matching target_time or assignment_id."""
+    """Find an assignment in its time window; a supplied shift must match uniquely."""
     base_qs = ShiftSlotAssignment.objects.filter(
         user=user,
         shift__pharmacy=pharmacy,
     ).select_related("shift", "slot")
 
     if assignment_id is not None:
-        cand = base_qs.filter(id=assignment_id).first()
-        if cand and is_draft_roster_assignment(cand):
-            return None
-        return cand
+        # An explicit id only narrows the search; the event time must still fall in its shift window.
+        base_qs = base_qs.filter(id=assignment_id)
+    if shift_id is not None:
+        base_qs = base_qs.filter(shift_id=shift_id)
 
     tz = _get_pharmacy_tz(pharmacy, target_time)
     eval_local = target_time.astimezone(tz) if timezone.is_aware(target_time) and tz else target_time
@@ -160,6 +162,7 @@ def _find_matching_assignment(
         | Q(slot_date__isnull=True, slot__date__in=candidate_dates)
     )
 
+    matched = None
     for assignment in candidates:
         if is_draft_roster_assignment(assignment):
             continue
@@ -190,9 +193,13 @@ def _find_matching_assignment(
         window_end = end_dt + timedelta(hours=2)
 
         if window_start <= eval_local <= window_end:
-            return assignment
+            if shift_id is None:
+                return assignment
+            if matched is not None:
+                return None
+            matched = assignment
 
-    return None
+    return matched
 
 
 def resolve_attendance_eligibility(

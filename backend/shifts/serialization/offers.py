@@ -140,6 +140,18 @@ class ShiftCounterOfferSerializer(serializers.ModelSerializer):
         attrs['slots'] = slots_data
         return attrs
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.status == ShiftCounterOffer.Status.PENDING:
+            generated = {(slot_id, str(day) if day else None) for slot_id, day in ShiftOffer.objects.filter(
+                counter_offer=instance,
+                status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, ShiftOffer.Status.ACCEPTED],
+            ).values_list('slot_id', 'offered_slot_date')}
+            data['slots'] = [entry for entry in data['slots'] if (
+                (entry.get('slot') or {}).get('id'), entry.get('slot_date') or (entry.get('slot') or {}).get('date')
+            ) not in generated]
+        return data
+
     def create(self, validated_data):
         shift = self.context['shift']
         user = self.context['request'].user

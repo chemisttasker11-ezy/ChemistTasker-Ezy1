@@ -11,22 +11,22 @@ const mapChatUser = <T extends Partial<ChatUserApi>>(api: T) => {
 export const mapChatMessage = (api: ChatMessageApi) => ({
     id: api.id,
     conversation: api.conversation,
-    sender: {
+    sender: api.sender ? {
         id: api.sender.id,
         user_details: mapChatUser(api.sender.user_details),
         pharmacy: api.sender.pharmacy ?? null,
-    },
-    body: api.body,
-    attachment_url: api.attachment_url,
+    } : null,
+    body: api.is_deleted ? '' : api.body,
+    attachment_url: api.is_deleted ? null : api.attachment_url,
     created_at: api.created_at,
     is_deleted: api.is_deleted,
     is_edited: api.is_edited,
-    original_body: api.original_body ?? null,
+    original_body: api.is_deleted ? null : api.original_body ?? null,
     reactions: api.reactions?.map(reaction => ({
         reaction: reaction.reaction,
         user_id: reaction.user_id,
     })),
-    attachment_filename: api.attachment_filename ?? null,
+    attachment_filename: api.is_deleted ? null : api.attachment_filename ?? null,
     is_pinned: api.is_pinned,
 });
 export const mapChatRoom = (api: ChatRoomApi) => ({
@@ -39,7 +39,8 @@ export const mapChatRoom = (api: ChatRoomApi) => ({
     last_message: api.last_message
         ? {
             id: api.last_message.id,
-            body: api.last_message.body,
+            body: api.last_message.is_deleted ? '' : api.last_message.body,
+            is_deleted: api.last_message.is_deleted,
             created_at: api.last_message.created_at,
             sender: api.last_message.sender,
         }
@@ -58,7 +59,9 @@ export const mapChatParticipantRecord = (api: {
     invited_name?: string | null;
     is_admin?: boolean;
 }) => ({
+    ...mapChatUser(api.user_details ?? {}),
     id: api.id,
+    membership_id: api.id,
     userDetails: mapChatUser(api.user_details ?? {}),
     role: api.role ?? undefined,
     employmentType: api.employment_type ?? undefined,

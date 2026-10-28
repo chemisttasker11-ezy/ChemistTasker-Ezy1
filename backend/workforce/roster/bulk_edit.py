@@ -5,6 +5,7 @@ from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from workforce.roster.permissions import is_authorized_attendance_manager
 from shifts.engagement import staff_assignment_defaults
+from shifts.assignment import guard_roster_assignment
 from workforce.roster.assignment_rates import _validate_and_price
 from workforce.roster.edit_guards import _delete_empty_shift, _parse_date, _parse_time, _protect_assignment_history, _protect_marketplace_slot
 from workforce.roster.periods import get_roster_period_assignments
@@ -148,6 +149,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                 if not worker:
                     raise ValidationError(f"Operation {idx}: User {user_id} not found.")
 
+                guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=slot.date, candidate=worker)
                 assignment_defaults = staff_assignment_defaults(
                     user=worker,
                     pharmacy=roster_period.pharmacy,
@@ -183,6 +185,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
 
                 _protect_marketplace_slot(assignment.slot, idx, roster_period)
                 _protect_assignment_history(assignment)
+                guard_roster_assignment(shift=assignment.shift, slot=assignment.slot, slot_date=assignment.slot_date)
                 assignment.delete()
                 summary["unassigned"] += 1
 
@@ -225,6 +228,8 @@ def bulk_edit_roster_period(roster_period, operations, user):
                 if st == et:
                     raise ValidationError(f"Operation {idx}: start_time and end_time must differ.")
 
+                # Recurring slots never get here (_protect_marketplace_slot), so slot.date is the only occurrence.
+                guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=slot.date)
                 slot.start_time = st
                 slot.end_time = et
                 if "planned_break_minutes" in op:
@@ -242,6 +247,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                 if slot.shift.pharmacy_id != roster_period.pharmacy_id:
                     raise ValidationError(f"Operation {idx}: Slot belongs to a different pharmacy.")
 
+                guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=slot.date)
                 target_date_raw = op.get("target_date")
                 if target_date_raw:
                     target_date = _parse_date(target_date_raw)
@@ -249,6 +255,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                         raise ValidationError(f"Operation {idx}: Target date {target_date} is outside this roster period.")
 
                     if target_date != slot.date:
+                        guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=target_date)
                         slot.date = target_date
                         slot.save(update_fields=["date"])
                         slot.assignments.all().update(slot_date=target_date)
@@ -266,6 +273,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                         worker = User.objects.filter(pk=target_user_id).first()
                         if not worker:
                             raise ValidationError(f"Operation {idx}: User {target_user_id} not found.")
+                        guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=target_date, candidate=worker)
                         assignment_defaults = staff_assignment_defaults(
                             user=worker,
                             pharmacy=roster_period.pharmacy,

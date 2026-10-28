@@ -384,6 +384,90 @@ class PostingDefaultsTests(ShiftPostingFixture):
 
 
 class ShiftEditTests(ShiftPostingFixture):
+    def test_copy_partial_rates_preserves_omitted_defaults_and_allows_explicit_clear(self):
+        self.pharmacy.rate_saturday = Decimal('88.00')
+        self.pharmacy.rate_sunday = Decimal('99.00')
+        self.pharmacy.save(update_fields=['rate_saturday', 'rate_sunday'])
+        response, _ = self.post_shift(apply_rates_to_pharmacy=True, rate_weekday='71.50')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.pharmacy.refresh_from_db()
+        self.assertEqual(self.pharmacy.rate_saturday, Decimal('88.00'))
+        self.assertEqual(self.pharmacy.rate_weekday, Decimal('71.50'))
+        with queued_emails():
+            edited = client_for(self.owner).patch(f'{API}shifts/{response.data["id"]}/',
+                {'description': 'Edited', 'apply_rates_to_pharmacy': True, 'rate_saturday': None}, format='json')
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.pharmacy.refresh_from_db()
+        self.assertIsNone(self.pharmacy.rate_saturday)
+        self.assertEqual(self.pharmacy.rate_sunday, Decimal('99.00'))
+        self.assertEqual(self.pharmacy.rate_weekday, Decimal('71.50'))
+
+    def test_payment_status_only_patch_cannot_mark_shift_paid(self):
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST",
+            employment_type="LOCUM", payment_status="PENDING",
+        )
+        response = client_for(self.owner).patch(
+            f"{API}shifts/{shift.pk}/", {"payment_status": "PAID"}, format="json")
+        self.assertIn(response.status_code, (200, 400), response.data)
+        shift.refresh_from_db()
+        self.assertEqual(shift.payment_status, "PENDING")
+
+    def test_owner_can_edit_description_while_payment_status_is_ignored(self):
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST",
+            employment_type="LOCUM", payment_status="PENDING",
+        )
+        with queued_emails():
+            response = client_for(self.owner).patch(f"{API}shifts/{shift.pk}/", {
+                "description": "Updated cover", "payment_status": "PAID",
+            }, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        shift.refresh_from_db()
+        self.assertEqual((shift.description, shift.payment_status), ("Updated cover", "PENDING"))
+
+    def test_move_to_managed_pharmacy_only_updates_destination_rates(self):
+        _, destination = make_owner_with_pharmacy("Managed destination")
+        destination.owner = self.pharmacy.owner
+        destination.save(update_fields=["owner"])
+        _, unrelated = make_owner_with_pharmacy("Unrelated")
+        response, _ = self.post_shift()
+        shift = Shift.objects.get(pk=response.data["id"])
+        originals = {p.pk: (p.default_rate_type, p.default_fixed_rate, p.rate_weekday)
+                     for p in (self.pharmacy, unrelated)}
+        with queued_emails():
+            edited = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
+                "pharmacy": destination.pk, "role_needed": "PHARMACIST", "rate_type": "FIXED",
+                "fixed_rate": "90.00", "rate_weekday": "71.50", "apply_rates_to_pharmacy": True,
+            }, format="json")
+        self.assertEqual(edited.status_code, 200, edited.data)
+        shift.refresh_from_db()
+        destination.refresh_from_db()
+        self.assertEqual(shift.pharmacy_id, destination.pk)
+        self.assertEqual((destination.default_rate_type, destination.default_fixed_rate, destination.rate_weekday),
+                         ("FIXED", Decimal("90.00"), Decimal("71.50")))
+        for pharmacy in (self.pharmacy, unrelated):
+            pharmacy.refresh_from_db()
+            self.assertEqual((pharmacy.default_rate_type, pharmacy.default_fixed_rate, pharmacy.rate_weekday),
+                             originals[pharmacy.pk])
+
+    def test_move_to_unrelated_pharmacy_cannot_update_its_rates(self):
+        _, destination = make_owner_with_pharmacy("Unrelated destination")
+        original = (destination.default_rate_type, destination.default_fixed_rate, destination.rate_weekday)
+        response, _ = self.post_shift()
+        shift = Shift.objects.get(pk=response.data["id"])
+        with queued_emails():
+            refused = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
+                "pharmacy": destination.pk, "role_needed": "PHARMACIST", "rate_type": "FIXED",
+                "fixed_rate": "90.00", "rate_weekday": "71.50", "apply_rates_to_pharmacy": True,
+            }, format="json")
+        self.assertEqual(refused.status_code, 400, refused.data)
+        self.assertIn("pharmacy", refused.data)
+        shift.refresh_from_db()
+        destination.refresh_from_db()
+        self.assertEqual(shift.pharmacy_id, self.pharmacy.pk)
+        self.assertEqual((destination.default_rate_type, destination.default_fixed_rate, destination.rate_weekday), original)
+
     def test_edit_recalculates_escalation_replaces_slots_and_announces(self):
         response, _ = self.post_shift(visibility="FULL_PART_TIME", employment_type="LOCUM")
         shift = Shift.objects.get(pk=response.data["id"])
@@ -434,3 +518,34 @@ class ShiftEditTests(ShiftPostingFixture):
         self.assertEqual(refused.status_code, 400)
         shift.refresh_from_db()
         self.assertEqual((shift.description, shift.visibility), ("New", "LOCUM_CASUAL"))
+
+    def test_edit_shift_with_confirmed_booking_refuses_slot_replacement_but_allows_text_edit(self):
+        from shifts.models import ShiftSlotAssignment
+        response, _ = self.post_shift()
+        shift = Shift.objects.get(pk=response.data["id"])
+        worker = self.member("LOCUM")
+        slot = shift.slots.first()
+        ShiftSlotAssignment.objects.create(
+            shift=shift,
+            slot=slot,
+            user=worker,
+            slot_date=slot.date,
+        )
+        # Negative test: editing slots must be refused to protect confirmed bookings
+        with queued_emails():
+            refused = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
+                "slots": [{"date": str(DAY + timedelta(days=5)), "start_time": "09:00", "end_time": "17:00"}],
+            }, format="json")
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("Use the roster editor to update existing roster slots in place.", str(refused.data))
+
+        # Positive control: editing text without slots succeeds and retains existing slots and bookings
+        with queued_emails():
+            allowed = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
+                "description": "Updated instructions",
+            }, format="json")
+        self.assertEqual(allowed.status_code, 200)
+        shift.refresh_from_db()
+        self.assertEqual(shift.description, "Updated instructions")
+        self.assertEqual(shift.slot_assignments.count(), 1)
+        self.assertEqual(shift.slots.count(), 2)

@@ -19,7 +19,10 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from chat.text import sanitize_chat_text
-from chat.realtime import broadcast_message_badge, broadcast_message_read
+from chat.realtime import (
+    broadcast_message_badge, broadcast_message_read,
+    accessible_conversations_queryset, authorized_participant,
+)
 from core.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 from datetime import date
 from django.db import transaction
@@ -56,48 +59,19 @@ class ConversationViewSet(mixins.ListModelMixin,
     def get_queryset(self):
         user = self.request.user
 
-        # Get all conversations where the current user is a participant
-        user_conversations = Conversation.objects.filter(
-            participants__membership__user=user
-        )
-
-        # From these, get all DMs and custom groups (not linked to a pharmacy)
-        dms_and_custom_groups = user_conversations.filter(
-            Q(type='DM') | Q(pharmacy__isnull=True)
-        )
-
-        # Hide only "me" ghost custom groups:
-        #   - rooms with no other participants besides me, OR
-        #   - legacy rooms literally titled "me"
+        # One permission boundary for DMs, custom groups and pharmacy rooms.
+        # Revoked memberships are not visible even if legacy Participant rows
+        # or a cached WebSocket membership still exist.
+        visible = accessible_conversations_queryset(user)
         others_exist = Exists(
             Participant.objects.filter(
-                conversation_id=OuterRef('pk')
-            ).exclude(
-                membership__user=user
-            )
+                conversation_id=OuterRef("pk"),
+            ).exclude(membership__user=user)
         )
-        dms_and_custom_groups = dms_and_custom_groups.exclude(
-            Q(type='GROUP') & Q(pharmacy__isnull=True) & (
-                ~others_exist | Q(title__iexact='me')
-            )
-        )
-
-        # --- Include community chats for pharmacies I belong to ---
-        user_pharmacy_ids = Membership.objects.filter(
-            user=user,
-            is_active=True,
-            employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-        ).values_list('pharmacy_id', flat=True).distinct()
-
-        community_chats = Conversation.objects.filter(
-            type='GROUP',
-            pharmacy_id__in=user_pharmacy_ids
-        )
-
-        # Combine everything:
-        # - DMs and custom groups
-        # - Community chats
-        return (dms_and_custom_groups | community_chats).distinct().order_by('-updated_at')
+        return visible.exclude(
+            Q(type="GROUP") & Q(pharmacy__isnull=True)
+            & (~others_exist | Q(title__iexact="me"))
+        ).order_by("-updated_at")
 
     def get_serializer_class(self):
         # All "create DM" actions will serialize the final conversation object
@@ -448,20 +422,18 @@ class ConversationViewSet(mixins.ListModelMixin,
 
         # Case B: Update existing custom group
         if room_id:
-            conv = get_object_or_404(Conversation, pk=room_id, type=Conversation.Type.GROUP)
+            # A revoked creator or admin no longer sees the room, so cannot rename it or remove members.
+            conv = get_object_or_404(accessible_conversations_queryset(user), pk=room_id, type=Conversation.Type.GROUP)
             # Only allow updates on non-pharmacy groups here
             if conv.pharmacy_id:
                 return Response({"detail": "Use pharmacy_id to manage community chats."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Ensure user is creator or an admin participant
-            is_creator = getattr(conv.created_by, 'id', None) == request.user.id
-            is_admin = Participant.objects.filter(conversation=conv, membership__user=request.user, is_admin=True).exists()
-            if not (is_creator or is_admin):
-                return Response({"detail": "Not authorized to modify this group."}, status=status.HTTP_403_FORBIDDEN)
-
             serializer = ConversationCreateSerializer(
                 conv,
-                data={'title': title or conv.title, 'participants': participant_ids},
+                data={
+                    'title': title or conv.title,
+                    **({'participants': participant_ids} if 'participant_ids' in data else {}),
+                },
                 partial=True,
                 context={'request': request},
             )
@@ -664,8 +636,9 @@ class MessageViewSet(viewsets.ModelViewSet):
         user = self.request.user
         return (
             Message.objects
-            .filter(conversation__participants__membership__user=user)
+            .filter(conversation__in=accessible_conversations_queryset(user))
             .select_related("sender__user", "conversation")
+            .distinct()
         )
 
     def create(self, request, *args, **kwargs):
@@ -680,9 +653,9 @@ class MessageViewSet(viewsets.ModelViewSet):
         except Conversation.DoesNotExist:
             return Response({"detail": "Conversation not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        participant = Participant.objects.filter(conversation=conversation, membership__user=user).select_related("membership").first()
+        participant = authorized_participant(conversation.pk, user.pk)
         if not participant:
-            return Response({"detail": "You are not a participant in this conversation."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "You are not an active participant in this conversation."}, status=status.HTTP_403_FORBIDDEN)
 
         attachment_file = request.FILES.get("attachment") if request.FILES else None
         if attachment_file:
@@ -800,7 +773,7 @@ class MessageReactionView(APIView):
         message = get_object_or_404(Message, pk=message_id)
 
         # SECURITY FIX: Ensure the user is actually a participant in the conversation
-        if not Participant.objects.filter(conversation=message.conversation, membership__user=request.user).exists():
+        if not accessible_conversations_queryset(request.user).filter(pk=message.conversation_id).exists():
             return Response({'error': 'Not authorized to react to messages in this conversation.'}, status=status.HTTP_403_FORBIDDEN)
 
         reaction_char = request.data.get('reaction')
@@ -863,7 +836,7 @@ class ChatParticipantView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         # Get all conversations the user is in
-        user_conversations = Conversation.objects.filter(participants__membership__user=user)
+        user_conversations = accessible_conversations_queryset(user)
         # Get all memberships participating in those conversations
         participant_memberships = Membership.objects.filter(
             chat_participations__conversation__in=user_conversations

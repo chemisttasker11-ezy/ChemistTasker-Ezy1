@@ -146,7 +146,7 @@ class HubPollSerializer(serializers.ModelSerializer):
             instance.question = question
         with transaction.atomic():
             instance.save(update_fields=["question"])
-            if option_labels is not None:
+            if option_labels is not None and option_labels != list(instance.options.order_by("position", "id").values_list("label", flat=True)):
                 PharmacyHubPollVote.objects.filter(poll=instance).delete()
                 instance.options.all().delete()
                 new_options = [

@@ -15,6 +15,13 @@ export const WORKFORCE_LEAVE_TYPE_OPTIONS = WORKFORCE_LEAVE_TYPES.map((value) =>
   label: value.replace(/_/g, ' '),
 }));
 
+type SessionMembership = { id?: number | null; pharmacy_id?: number | null; is_active?: boolean; status?: string; role?: string };
+
+// Leave needs a real pharmacy membership id: organization and owner rows in the session payload have none.
+export const leaveRequestMemberships = <T extends SessionMembership>(memberships: T[] = []) =>
+  memberships.filter((m) => m.id != null && m.pharmacy_id != null && m.is_active !== false
+    && String(m.status || 'ACCEPTED').toUpperCase() === 'ACCEPTED' && m.role !== 'CONTACT');
+
 export type WorkforceCheckSeverity = 'BLOCKER' | 'WARNING' | 'INFO';
 export type WorkforceTimesheetStatus = 'OPEN' | 'NEEDS_REVIEW' | 'READY' | 'SUBMITTED' | 'APPROVED' | 'REOPENED';
 

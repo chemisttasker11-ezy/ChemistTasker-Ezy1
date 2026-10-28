@@ -166,11 +166,8 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
             PharmacyAdmin.AdminLevel.ROSTER_MANAGER,
             PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER,
         ),
+        # Roster/staff/admin/comms capabilities come from the chosen admin level.
         organisation_capabilities=(
-            OrgCapability.MANAGE_ROSTER,
-            OrgCapability.MANAGE_COMMS,
-            OrgCapability.MANAGE_STAFF,
-            OrgCapability.MANAGE_ADMINS,
             OrgCapability.INVITE_STAFF,
             OrgCapability.ASSIGN_PHARMACIES,
         ),
@@ -266,7 +263,7 @@ def membership_visible_pharmacies(membership):
         return Pharmacy.objects.filter(organization=membership.organization)
 
     if membership.role == 'REGION_ADMIN':
-        return membership.pharmacies.all()
+        return membership.pharmacies.filter(organization_id=membership.organization_id)
 
     return Pharmacy.objects.none()
 

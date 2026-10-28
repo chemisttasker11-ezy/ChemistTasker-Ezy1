@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from attendance.transitions import clock_in, clock_out, end_break, start_break
+from attendance.eligibility import _find_matching_assignment
 from attendance.models import AttendanceEvent, KioskAttendanceEvent, KioskDevice
 
 
@@ -119,13 +120,26 @@ def _integrity_flags(device, sequence, event_hash, previous_hash, device_time, t
 
 def _apply_business_event(device, employee, event_type, occurred_at, shift_id):
     if event_type == AttendanceEvent.EventType.CLOCK_IN:
+        assignment_id = None
+        if shift_id is not None:
+            assignment = _find_matching_assignment(
+                employee,
+                device.pharmacy,
+                occurred_at,
+                shift_id=shift_id,
+            )
+            if assignment is None:
+                raise ValidationError(
+                    "Shift must resolve to exactly one assignment for this worker and event time."
+                )
+            assignment_id = assignment.id
         _, event = clock_in(
             employee,
             device.pharmacy,
             kiosk_device=device,
             verified_kiosk_event=True,
             occurred_at=occurred_at,
-            assignment_id=shift_id,
+            assignment_id=assignment_id,
         )
         return event
     if event_type == AttendanceEvent.EventType.CLOCK_OUT:
@@ -252,13 +266,10 @@ def ingest_offline_event(device, raw_event):
         processing_status = KioskAttendanceEvent.ProcessingStatus.REJECTED
         rejection_reason = "Employee is inactive."
 
-    blocking_flags = {
-        "SEQUENCE_GAP",
-        "HASH_CHAIN_MISMATCH",
-        "UNEXPECTED_INITIAL_HASH",
-        "DEVICE_REVOKED_DRAIN",
-    }
-    if employee is not None and employee.is_active and not blocking_flags.intersection(flags):
+    # Every integrity flag requires a manager decision.  Never apply a live
+    # event while the signed evidence is marked NEEDS_REVIEW, including a
+    # missing trusted clock or monotonic rollback.
+    if employee is not None and employee.is_active and processing_status == KioskAttendanceEvent.ProcessingStatus.ACCEPTED:
         try:
             with transaction.atomic():
                 attendance_event = _apply_business_event(

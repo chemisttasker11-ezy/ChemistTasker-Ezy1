@@ -2,7 +2,7 @@
 from rest_framework import permissions, status, viewsets
 from memberships.models import Membership
 from organizations.models import Pharmacy
-from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
+from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from memberships.serializers import MembershipSerializer
 from workforce.roster.serializers import RosterAssignmentSerializer
@@ -21,12 +21,14 @@ from shifts.pricing import get_locked_rate_for_slot
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_users
 from shifts.engagement import staff_assignment_defaults
+from shifts.assignment import guard_roster_assignment
 from datetime import date, datetime
 from django.db import transaction
 from datetime import timedelta
 from users.models import User
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.escalation import PUBLIC_LEVEL, apply_escalation, resolve_current_index
+from shifts.history import _protect_assignment_history
 
 
 def _slot_locked_by_published_roster(slot):
@@ -40,6 +42,35 @@ def _slot_locked_by_published_roster(slot):
     ).exists()
 
 
+def _protect_removed_assignments(assignments):
+    try:
+        for assignment in assignments:
+            _protect_assignment_history(assignment)
+    except DjangoValidationError as exc:
+        raise DRFValidationError({"detail": exc.messages}) from exc
+
+
+def _guard_booked_occurrences(assignment, *slot_dates):
+    """Offer-booked or payment-pending occurrences stay as booked; plain rostered staff remain editable."""
+    try:
+        for slot_date in dict.fromkeys(slot_dates):
+            guard_roster_assignment(shift=assignment.shift, slot=assignment.slot, slot_date=slot_date)
+    except DjangoValidationError as exc:
+        raise DRFValidationError({"detail": exc.messages}) from exc
+
+
+def _notify_unassigned(assignments):
+    for assignment in assignments:
+        notify_shift_users(
+            [assignment.user],
+            shift=assignment.shift,
+            title="Shift unassigned",
+            body=f"You are no longer assigned to the {assignment.slot_date or assignment.slot.date} shift at {assignment.shift.pharmacy.name}.",
+            kind="shift_unassigned",
+            payload={"slot_id": assignment.slot_id},
+        )
+
+
 # Roster
 class RosterOwnerViewSet(viewsets.ModelViewSet):
     """
@@ -47,6 +78,7 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
     """
     serializer_class = RosterAssignmentSerializer
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
         user = self.request.user
@@ -86,19 +118,49 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
                 pass
         return qs
 
+    def _validate_assignment_scope(self, serializer):
+        """A PATCHed assignment must stay inside the caller's roster capability and slot."""
+        from workforce.permissions import can_manage_roster_pharmacy
+
+        instance = serializer.instance
+        for field in ('shift', 'slot'):
+            target = serializer.validated_data.get(field)
+            if target is not None and target.pk != getattr(instance, f'{field}_id'):
+                raise DRFValidationError({field: 'Cannot reassign a roster assignment to another shift or slot.'})
+        shift, slot = instance.shift, instance.slot
+        slot_date = serializer.validated_data.get("slot_date", instance.slot_date)
+        if not can_manage_roster_pharmacy(self.request.user, shift.pharmacy):
+            self.permission_denied(self.request)
+        if slot_date is None:
+            raise DRFValidationError({"slot_date": "A roster occurrence date is required."})
+        if slot_date != slot.date and not (
+            slot.is_recurring and slot.recurring_end_date
+            and slot.date <= slot_date <= slot.recurring_end_date
+            and slot_date.weekday() in slot.recurring_days
+        ):
+            raise DRFValidationError({"slot_date": "Date is not a valid slot occurrence."})
+
     def perform_update(self, serializer):
+        self._validate_assignment_scope(serializer)
         if _slot_locked_by_published_roster(serializer.instance.slot):
             raise DRFValidationError(
                 "Unpublish this shift for editing before changing its assignment in a published roster."
             )
-        super().perform_update(serializer)
+        instance = serializer.instance
+        with transaction.atomic():
+            _guard_booked_occurrences(instance, instance.slot_date, serializer.validated_data.get("slot_date", instance.slot_date))
+            super().perform_update(serializer)
 
     def perform_destroy(self, instance):
         if _slot_locked_by_published_roster(instance.slot):
             raise DRFValidationError(
                 "Unpublish this shift for editing before removing its assignment from a published roster."
             )
-        super().perform_destroy(instance)
+        _protect_removed_assignments([instance])
+        with transaction.atomic():
+            _guard_booked_occurrences(instance, instance.slot_date)
+            super().perform_destroy(instance)
+        _notify_unassigned([instance])
 
     @action(detail=False, methods=['get'], url_path='members-for-roster')
     def members_for_roster(self, request):
@@ -133,6 +195,23 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Shift.objects.filter(pharmacy__in=managed_pharmacies_for(self.request.user))
+
+    def perform_create(self, serializer):
+        pharmacy = serializer.validated_data['pharmacy']
+        if not managed_pharmacies_for(self.request.user).filter(pk=pharmacy.pk).exists():
+            self.permission_denied(self.request)
+        serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        # Plain rostered staff on a draft shift may go with it (grill #9); offer-booked or payment-pending may not.
+        with transaction.atomic():
+            shift = Shift.objects.select_for_update().get(pk=self.get_object().pk)
+            if (shift.slot_assignments.filter(source_offer__isnull=False).exists()
+                    or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()):
+                return Response({'detail': 'This shift has a booked or payment-pending worker and cannot be deleted.'},
+                                status=status.HTTP_409_CONFLICT)
+            self.perform_destroy(shift)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_destroy(self, instance):
         if any(_slot_locked_by_published_roster(slot) for slot in instance.slots.select_related("shift")):
@@ -177,10 +256,17 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
             new_user_id = request.data.get('user_id')
             if new_user_id in (None, '', 'null'):
                 # Explicit clear requested by caller.
+                _protect_removed_assignments(existing_assignments.values())
+                for assignment in existing_assignments.values():
+                    _guard_booked_occurrences(assignment, assignment.slot_date)
                 shift_instance.slot_assignments.all().delete()
                 return response
 
             newly_assigned_user = get_object_or_404(User, pk=new_user_id)
+            # Worked, invoiced or leave-linked rows must not be handed to someone else.
+            _protect_removed_assignments(
+                a for a in existing_assignments.values() if a.user_id != newly_assigned_user.pk
+            )
             desired_keys = set()
 
             # Build the desired assignment state first, then remove obsolete rows.
@@ -188,6 +274,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                 slot_date = slot.date
                 desired_keys.add((slot.id, slot_date))
                 try:
+                    guard_roster_assignment(shift=shift_instance, slot=slot, slot_date=slot_date, candidate=newly_assigned_user)
                     assignment_defaults = staff_assignment_defaults(
                         user=newly_assigned_user,
                         pharmacy=shift_instance.pharmacy,
@@ -217,13 +304,11 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                     }
                 )
 
-            obsolete_assignment_ids = [
-                assignment.id
-                for key, assignment in existing_assignments.items()
-                if key not in desired_keys
-            ]
-            if obsolete_assignment_ids:
-                ShiftSlotAssignment.objects.filter(id__in=obsolete_assignment_ids).delete()
+            obsolete = [assignment for key, assignment in existing_assignments.items() if key not in desired_keys]
+            for assignment in obsolete:
+                _guard_booked_occurrences(assignment, assignment.slot_date)
+            if obsolete:
+                ShiftSlotAssignment.objects.filter(id__in=[assignment.id for assignment in obsolete]).delete()
 
             return response
 
@@ -417,10 +502,18 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
 
         try:
             with transaction.atomic():   # the assignments are cleared together with the escalation, or not at all
+                # Lock like offer finalization (shift, then its slots) so no booking lands between guard and delete.
+                Shift.objects.select_for_update(of=("self",)).get(pk=shift.pk)
+                list(ShiftSlot.objects.select_for_update(of=("self",)).filter(shift=shift).order_by("pk"))
+                removed = list(shift.slot_assignments.select_related('user', 'slot', 'shift__pharmacy'))
+                _protect_removed_assignments(removed)
+                for assignment in removed:
+                    _guard_booked_occurrences(assignment, assignment.slot_date)
                 shift.slot_assignments.all().delete()
                 visibility = apply_escalation(shift, allowed_tiers, target_index)
         except DjangoValidationError as exc:   # e.g. the shift belongs to a published roster
             raise DRFValidationError(getattr(exc, "message_dict", {"detail": exc.messages})) from exc
+        _notify_unassigned(removed)
         detail_prefix = f'Shift escalated to {visibility}'.rstrip('.')
         return Response({'detail': f'{detail_prefix} and is now unassigned.'}, status=status.HTTP_200_OK)
 
@@ -542,10 +635,10 @@ class RosterWorkerViewSet(viewsets.ReadOnlyModelViewSet):
         """
         user = self.request.user
         
-        # Get all pharmacies where the user has an active membership
+        # Only accepted staff see a pharmacy's roster; pending, rejected and contact rows do not.
         member_pharmacy_ids = list(Membership.objects.filter(
-            user=user, is_active=True
-        ).values_list('pharmacy_id', flat=True))
+            user=user, is_active=True, status=Membership.Status.ACCEPTED,
+        ).exclude(role="CONTACT").values_list('pharmacy_id', flat=True))
         
         # Start with a base queryset of all assignments either in those pharmacies
         # OR explicitly assigned to the current user (to surface public-pool assignments).

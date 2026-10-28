@@ -5,6 +5,8 @@ The list views compose these instead of repeating the filters.
 from django.db.models import Exists, OuterRef, Q
 
 from organizations.access import managed_pharmacies
+from organizations.models import Pharmacy
+from organizations.timezone import get_pharmacy_timezone
 from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
 
 
@@ -13,20 +15,23 @@ def shifts_managed_by(queryset, user):
     return queryset.filter(Q(created_by=user) | Q(pharmacy__in=managed_pharmacies(user)))
 
 
-def _future_or_current_slot_q(now, today):
-    return (
-        Q(is_recurring=True, recurring_end_date__gte=today) |
-        Q(date__gt=today) |
-        Q(date=today, end_time__gte=now.time())
-    )
+def _future_or_current_slot_q(now, today, prefix=''):
+    result = Q(pk__in=[])
+    for tz_name in Pharmacy.objects.order_by().values_list('timezone', flat=True).distinct():
+        local_now = now.astimezone(get_pharmacy_timezone(Pharmacy(timezone=tz_name)))
+        local_date = local_now.date()
+        clock = local_now.time()
+        result |= Q(**{f'{prefix}shift__pharmacy__timezone': tz_name}) & (
+            Q(**{f'{prefix}is_recurring': True, f'{prefix}recurring_end_date__gt': local_date}) |
+            Q(**{f'{prefix}is_recurring': True, f'{prefix}recurring_end_date': local_date, f'{prefix}end_time__gte': clock}) |
+            Q(**{f'{prefix}date__gt': local_date}) |
+            Q(**{f'{prefix}date': local_date, f'{prefix}end_time__gte': clock})
+        )
+    return result
 
 
 def _past_slot_q(now, today):
-    return (
-        Q(is_recurring=True, recurring_end_date__lt=today) |
-        Q(date__lt=today) |
-        Q(date=today, end_time__lt=now.time())
-    )
+    return ~_future_or_current_slot_q(now, today)
 
 
 def _matching_shift_slot_exists(*, now, today, assigned_user_id=None, state='active'):

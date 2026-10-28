@@ -6,6 +6,7 @@ from shifts.models import (
     ShiftOffer,
     ShiftRejection,
     ShiftSaved,
+    ShiftSlot,
     ShiftSlotAssignment,
 )
 from rest_framework.response import Response
@@ -32,6 +33,9 @@ from django.db import transaction
 from decimal import Decimal
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.base import SHIFT_OFFER_BUZZ_COOLDOWN
+from shifts.assignment import slot_locked_for_shift_offer
+from shifts.access import _user_can_perform_shift_role
+from shifts.interest import _require_public_shift_onboarding, is_public_shift_member_access
 from shifts.serializers import (
     ShiftInterestSerializer,
     ShiftOfferSerializer,
@@ -47,6 +51,7 @@ class ShiftInterestViewSet(viewsets.ModelViewSet):
     """
     serializer_class = ShiftInterestSerializer
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'delete', 'head', 'options']
 
     def get_queryset(self):
         qs = ShiftInterest.objects.select_related('shift', 'slot', 'user').annotate(
@@ -99,6 +104,7 @@ class ShiftRejectionViewSet(viewsets.ModelViewSet):
     queryset = ShiftRejection.objects.all()
     serializer_class = ShiftRejectionSerializer
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'delete', 'head', 'options']
 
     def get_queryset(self):
         qs = ShiftRejection.objects.select_related('shift', 'slot', 'user')
@@ -154,7 +160,7 @@ class ShiftSavedViewSet(viewsets.ModelViewSet):
 
 
 class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
-                        mixins.DestroyModelMixin, viewsets.GenericViewSet):
+                        viewsets.GenericViewSet):
     # Offers are made by the shift's offer actions (every serializer field is read-only), so there is no create here.
     serializer_class = ShiftOfferSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -327,6 +333,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def accept(self, request, pk=None):
         from onboarding.verification.state import require_public_ahpra
         from billing.utils import (
@@ -335,6 +342,9 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         )
 
         offer = self.get_object()
+        shift = Shift.objects.select_for_update().get(pk=offer.shift_id)
+        list(ShiftSlot.objects.select_for_update().filter(shift=shift).order_by('pk'))
+        offer = ShiftOffer.objects.select_for_update().get(pk=offer.pk)
         require_public_ahpra(request.user, offer.shift)
         if offer.user_id != request.user.id:
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
@@ -348,6 +358,22 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
 
         shift = offer.shift
         slot_obj = offer.slot
+        if not _user_can_perform_shift_role(offer.user, shift.role_needed):
+            return Response({'detail': 'Your role does not cover this shift.'}, status=status.HTTP_400_BAD_REQUEST)
+        if shift.visibility == 'PLATFORM' and not is_public_shift_member_access(offer.user, shift):
+            _require_public_shift_onboarding(offer.user)
+        if slot_obj is None:
+            locked = shift.slot_assignments.exists() or shift.offers.filter(
+                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            ).exclude(pk=offer.pk).exists()
+        else:
+            locked = slot_locked_for_shift_offer(shift=shift, slot=slot_obj, slot_date=offer.offered_slot_date)
+            if shift.single_user_only:
+                pending = shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+                locked = (locked or shift.slot_assignments.exclude(user=offer.user).exists()
+                          or pending.exclude(user=offer.user).exists() or pending.filter(slot__isnull=True).exists())
+        if locked:
+            return Response({'detail': 'This shift occurrence is already locked or awaiting payment.'}, status=status.HTTP_400_BAD_REQUEST)
         if not shift.single_user_only and slot_obj is None:
             return Response({'detail': 'Offer is missing slot selection.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -408,7 +434,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                         shift=shift,
                         slot=slot_obj,
                         status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
-                    ).exclude(id=offer.id).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
+                    ).filter(offered_slot_date=offer.offered_slot_date).exclude(id=offer.id).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
                 elif shift.single_user_only:
                     ShiftOffer.objects.filter(
                         shift=shift,
@@ -416,105 +442,108 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                         status__in=[ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
                     ).exclude(id=offer.id).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
 
-        if not requires_payment:
-            transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
-                shift=shift,
-                offers=[offer],
-                paid_by=self._resolve_owner_recipient(shift),
-                payment_method="free",
-            ))
+        def send_acceptance_notifications():
+            if not requires_payment:
+                send_shift_payment_finalized_notifications(
+                    shift=shift,
+                    offers=[offer],
+                    paid_by=self._resolve_owner_recipient(shift),
+                    payment_method="free",
+                )
 
-        pharmacy_display = shift.pharmacy.name
-        if getattr(shift, "post_anonymously", False):
-            suburb = getattr(shift.pharmacy, "suburb", None)
-            pharmacy_display = f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
+            pharmacy_display = shift.pharmacy.name
+            if getattr(shift, "post_anonymously", False):
+                suburb = getattr(shift.pharmacy, "suburb", None)
+                pharmacy_display = f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
 
-        if offer.user and offer.user.email:
-            ctx = build_shift_email_context(shift, user=offer.user, role=offer.user.role.lower())
-            ctx["pharmacy_name"] = pharmacy_display
-            offer_details = build_offer_shift_details(shift, offer)
-            ctx.update(offer_details)
-            ctx["shift_link"] = worker_offer_url(offer.user, shift, offer) if requires_payment else active_shift_url_for_user(offer.user, shift)
-            ctx["payment_required"] = requires_payment
-            ctx["rate"] = offer_details["slot_details"][0].get("rate") if offer_details["slot_details"] else ""
-            worker_title = "Offer accepted - owner payment pending" if requires_payment else "Shift confirmed"
-            worker_body = (
-                f"Thanks for confirming. The owner must complete payment before you are locked in. {offer_details['shift_summary']}"
-                if requires_payment
-                else f"You are confirmed for a shift at {pharmacy_display}. {offer_details['shift_summary']}"
-            )
-            notify_shift_users(
-                [offer.user],
-                shift=shift,
-                title=worker_title,
-                body=worker_body,
-                kind="shift_confirmed",
-                payload={
-                    "offer_id": offer.id,
-                    "assignment_ids": assignment_ids,
-                    "status": offer.status,
-                    "payment_required": requires_payment,
-                    **offer_details,
-                },
-            )
-            async_task(
-                'users.tasks.send_async_email',
-                subject=(
-                    f"Thanks for confirming your shift at {pharmacy_display} - owner payment pending"
+            if offer.user and offer.user.email:
+                ctx = build_shift_email_context(shift, user=offer.user, role=offer.user.role.lower())
+                ctx["pharmacy_name"] = pharmacy_display
+                offer_details = build_offer_shift_details(shift, offer)
+                ctx.update(offer_details)
+                ctx["shift_link"] = worker_offer_url(offer.user, shift, offer) if requires_payment else active_shift_url_for_user(offer.user, shift)
+                ctx["payment_required"] = requires_payment
+                ctx["rate"] = offer_details["slot_details"][0].get("rate") if offer_details["slot_details"] else ""
+                worker_title = "Offer accepted - owner payment pending" if requires_payment else "Shift confirmed"
+                worker_body = (
+                    f"Thanks for confirming. The owner must complete payment before you are locked in. {offer_details['shift_summary']}"
                     if requires_payment
-                    else f"You've been accepted for a shift at {pharmacy_display}"
-                ),
-                recipient_list=[offer.user.email],
-                template_name="emails/shift_accept.html",
-                context=ctx,
-                text_template="emails/shift_accept.txt",
-                suppress_auto_notification=True,
-            )
+                    else f"You are confirmed for a shift at {pharmacy_display}. {offer_details['shift_summary']}"
+                )
+                notify_shift_users(
+                    [offer.user],
+                    shift=shift,
+                    title=worker_title,
+                    body=worker_body,
+                    kind="shift_confirmed",
+                    payload={
+                        "offer_id": offer.id,
+                        "assignment_ids": assignment_ids,
+                        "status": offer.status,
+                        "payment_required": requires_payment,
+                        **offer_details,
+                    },
+                )
+                async_task(
+                    'users.tasks.send_async_email',
+                    subject=(
+                        f"Thanks for confirming your shift at {pharmacy_display} - owner payment pending"
+                        if requires_payment
+                        else f"You've been accepted for a shift at {pharmacy_display}"
+                    ),
+                    recipient_list=[offer.user.email],
+                    template_name="emails/shift_accept.html",
+                    context=ctx,
+                    text_template="emails/shift_accept.txt",
+                    suppress_auto_notification=True,
+                )
 
-        owner_user = self._resolve_owner_recipient(shift)
-        if owner_user and owner_user.email:
-            worker_name = offer.user.get_full_name() or offer.user.email
-            worker_role_label = user_work_role_label(offer.user, "candidate")
-            shift_date = self._first_offer_date(shift, offer)
-            shift_link = active_shift_url_for_user(owner_user, shift)
-            rate_label = self._format_rate_label(shift, assignment_rates=assignment_rates, offer=offer)
-            offer_details = build_offer_shift_details(shift, offer)
-            owner_ctx = {
-                "owner_name": owner_user.get_full_name() or owner_user.email,
-                "worker_name": worker_name,
-                "worker_role_label": worker_role_label,
-                "pharmacy_name": pharmacy_display,
-                "role_needed": shift.role_needed,
-                "shift_date": shift_date,
-                "shift_link": shift_link,
-                "rate": rate_label,
-                "billing_state": billing_state,
-                "payment_required": requires_payment,
-                **offer_details,
-            }
-            notify_shift_users(
-                [owner_user],
-                shift=shift,
-                title=f"{worker_role_label} confirmed: {pharmacy_display}",
-                body=f"{worker_name} confirmed your shift offer." + (" Payment is required to finalize." if requires_payment else ""),
-                kind="shift_worker_confirmed",
-                payload={
-                    "offer_id": offer.id,
-                    "status": offer.status,
-                    "payment_required": requires_payment,
+            owner_user = self._resolve_owner_recipient(shift)
+            if owner_user and owner_user.email:
+                worker_name = offer.user.get_full_name() or offer.user.email
+                worker_role_label = user_work_role_label(offer.user, "candidate")
+                shift_date = self._first_offer_date(shift, offer)
+                shift_link = active_shift_url_for_user(owner_user, shift)
+                rate_label = self._format_rate_label(shift, assignment_rates=assignment_rates, offer=offer)
+                offer_details = build_offer_shift_details(shift, offer)
+                owner_ctx = {
+                    "owner_name": owner_user.get_full_name() or owner_user.email,
+                    "worker_name": worker_name,
+                    "worker_role_label": worker_role_label,
+                    "pharmacy_name": pharmacy_display,
+                    "role_needed": shift.role_needed,
+                    "shift_date": shift_date,
+                    "shift_link": shift_link,
+                    "rate": rate_label,
                     "billing_state": billing_state,
+                    "payment_required": requires_payment,
                     **offer_details,
-                },
-            )
-            async_task(
-                'users.tasks.send_async_email',
-                subject=f"{worker_role_label} confirmed shift offer at {pharmacy_display}" + (" - Action Required" if requires_payment else ""),
-                recipient_list=[owner_user.email],
-                template_name="emails/owner_worker_confirmed.html",
-                context=owner_ctx,
-                text_template="emails/owner_worker_confirmed.txt",
-                suppress_auto_notification=True,
-            )
+                }
+                notify_shift_users(
+                    [owner_user],
+                    shift=shift,
+                    title=f"{worker_role_label} confirmed: {pharmacy_display}",
+                    body=f"{worker_name} confirmed your shift offer." + (" Payment is required to finalize." if requires_payment else ""),
+                    kind="shift_worker_confirmed",
+                    payload={
+                        "offer_id": offer.id,
+                        "status": offer.status,
+                        "payment_required": requires_payment,
+                        "billing_state": billing_state,
+                        **offer_details,
+                    },
+                )
+                async_task(
+                    'users.tasks.send_async_email',
+                    subject=f"{worker_role_label} confirmed shift offer at {pharmacy_display}" + (" - Action Required" if requires_payment else ""),
+                    recipient_list=[owner_user.email],
+                    template_name="emails/owner_worker_confirmed.html",
+                    context=owner_ctx,
+                    text_template="emails/owner_worker_confirmed.txt",
+                    suppress_auto_notification=True,
+                )
+
+        transaction.on_commit(send_acceptance_notifications, robust=True)
 
         return Response({
             'detail': 'Offer accepted.',

@@ -7,6 +7,7 @@ from collections import defaultdict
 
 from django.core.exceptions import ValidationError
 
+from shifts.assignment import guard_roster_assignment
 from shifts.engagement import staff_assignment_defaults
 from shifts.models import ShiftSlotAssignment
 from shifts.pricing import get_locked_rate_for_slot
@@ -112,6 +113,8 @@ def edit_roster_slots(shift, user, command):
                 raise ValidationError("This slot has recurring or marketplace assignments; use its existing assignment workflow.")
             if slot.roster_period_id is None and not attached and not shift.is_roster_container:
                 raise ValidationError("This vacant slot has no roster ownership.")
+            for day in {slot.date, edits[pk].get("date", slot.date)}:
+                guard_roster_assignment(shift=shift, slot=slot, slot_date=day)
             old_period = periods.get(slot.roster_period_id) or _period_for_date(periods, shift.pharmacy_id, slot.date)
             if old_period:
                 affected_period_ids.add(old_period.pk)

@@ -352,7 +352,9 @@ def _segment_rate_key(day_type, clock_time):
 
 
 def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
-    from shifts.pricing import get_day_type
+    # Legal public-holiday scope is owned by shifts.holidays, not the Award
+    # minimum-rate calculator or its state-only legacy get_day_type wrapper.
+    from shifts.holidays import day_type as classify_day, holiday_boundaries, resolve_public_holiday
 
     work_date = date.fromisoformat(str(occurrence["date"]))
     start_time = _parse_time(occurrence["start_time"])
@@ -372,15 +374,29 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
 
     schedule = award_snapshot["schedule"]
     state = getattr(pharmacy, "state", "") or ""
+    region = getattr(pharmacy, "public_holiday_region", "") or ""
     segments = []
     total_hours = Decimal("0")
     total_pay = Decimal("0")
+    holiday_review_reason = None
+    holiday_blocks_payroll = False
     cursor = start_dt
 
     while cursor < end_dt:
         day_end = datetime.combine(cursor.date() + timedelta(days=1), time.min)
         segment_end_limit = min(end_dt, day_end)
-        day_type = get_day_type(cursor.date(), state)
+        holiday = resolve_public_holiday(
+            cursor.date(), state, region, at_time=cursor.time(),
+        )
+        # The statewide floor still applies; an unresolved local date only
+        # flags payroll review, it never removes the Award minimum.
+        if holiday.needs_review and holiday_review_reason is None:
+            holiday_review_reason = (
+                "Verify the posting pharmacy's public-holiday district "
+                "and regional substitution; statewide minimum applied: " + holiday.status
+            )
+        holiday_blocks_payroll |= holiday.blocks_payroll
+        day_type = classify_day(cursor.date(), holiday)
 
         if day_type == "weekday":
             boundary_times = [time(7, 0), time(8, 0), time(19, 0), time(21, 0)]
@@ -391,8 +407,10 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
         else:
             boundary_times = []
 
+        # Region-scoped part-day boundaries (e.g. NSW 12:00/17:00,
+        # Queensland 18:00 Christmas Eve) must split the Award floor.
         boundaries = [segment_end_limit]
-        for boundary_time in boundary_times:
+        for boundary_time in (*boundary_times, *holiday_boundaries(cursor.date(), state, region)):
             boundary = datetime.combine(cursor.date(), boundary_time)
             if cursor < boundary < segment_end_limit:
                 boundaries.append(boundary)
@@ -415,7 +433,7 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
         line_total = rate * hours
         total_hours += hours
         total_pay += line_total
-        segments.append({
+        segment = {
             "date": str(cursor.date()),
             "start_time": cursor.time().strftime("%H:%M:%S"),
             "end_time": next_boundary.time().strftime("%H:%M:%S"),
@@ -424,15 +442,25 @@ def _award_floor_for_occurrence(award_snapshot, occurrence, pharmacy):
             "rate": _money(rate),
             "hours": _money(hours),
             "line_total": _money(line_total),
-        })
+        }
+        # Preserve provenance for holidays and unresolved local dates.
+        if holiday.needs_review or holiday.scope != "NONE":
+            segment.update({
+                "holiday_scope": holiday.scope,
+                "holiday_status": holiday.status,
+                "holiday_source": holiday.source,
+                "holiday_region": holiday.region,
+            })
+        segments.append(segment)
         cursor = next_boundary
 
     if total_hours <= 0:
         raise ValidationError({"shift_time": "Shift duration must be greater than zero."})
     return {
         "rate": _money(total_pay / total_hours),
-        "review_required": False,
-        "review_reason": None,
+        "review_required": holiday_review_reason is not None,
+        "payroll_blocked": holiday_blocks_payroll,
+        "review_reason": holiday_review_reason,
         "segments": segments,
     }
 
@@ -483,10 +511,11 @@ def _build_tfn_award_terms(*, shift, onboarding, occurrences):
         routed["award_review_required"] = floor["review_required"]
         routed["award_review_reason"] = floor["review_reason"]
 
-        if floor["review_required"]:
+        if floor.get("payroll_blocked", floor["review_required"]):
             payroll_review_required = True
             if floor["review_reason"] and floor["review_reason"] not in review_reasons:
                 review_reasons.append(floor["review_reason"])
+        if floor["rate"] is None:
             if posted_rate is None:
                 raise ValidationError({"agreed_rate": "The final agreed hourly rate must be recorded before accepting this shift."})
             routed["agreed_rate"] = _money(posted_rate)

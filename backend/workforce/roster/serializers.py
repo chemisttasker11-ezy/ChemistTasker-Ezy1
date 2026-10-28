@@ -58,6 +58,26 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
             "origin",
         ]
 
+    # A coworker's pay, contact and leave details belong to them and their managers only.
+    COWORKER_HIDDEN_FIELDS = (
+        "unit_rate", "rate_reason", "payment_preference_snapshot", "settlement_channel",
+        "engagement_kind", "engagement_terms_accepted_at",
+    )
+
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        request = self.context.get("request")
+        if request is not None and obj.user_id != request.user.id:
+            from workforce.permissions import can_manage_pharmacy
+            if not can_manage_pharmacy(request.user, obj.shift.pharmacy):
+                for field in self.COWORKER_HIDDEN_FIELDS:
+                    data[field] = None
+                if data.get("user_detail"):
+                    data["user_detail"]["email"] = ""
+                if data.get("leave_request"):
+                    data["leave_request"] = {"status": data["leave_request"]["status"]}
+        return data
+
     def get_is_unpublished(self, obj):
         return bool(getattr(obj.slot, "unpublished_at", None))
 

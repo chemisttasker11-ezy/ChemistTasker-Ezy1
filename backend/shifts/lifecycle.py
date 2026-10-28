@@ -8,6 +8,7 @@ from organizations.models import (
     Pharmacy,
 )
 from memberships.models import (
+    Membership,
     FAVORITE_STAFF_EMPLOYMENT_TYPES,
     PHARMACY_STAFF_EMPLOYMENT_TYPES,
 )
@@ -36,6 +37,8 @@ from users.models import (
 )
 from users.org_roles import ORG_WIDE_ADMIN_ROLES
 from organizations.access import managed_pharmacies as managed_pharmacies_for
+from organizations.access import user_can_manage_pharmacy
+from organizations.timezone import get_pharmacy_timezone
 from shifts.base import BaseShiftViewSet
 from shifts.selectors import (
     _matching_shift_slot_exists,
@@ -51,6 +54,8 @@ class ActiveShiftViewSet(BaseShiftViewSet):
     """Upcoming & unassigned shifts (no slot has an assignment)."""
     @staticmethod
     def _has_open_active_occurrence(shift, *, now, today):
+        now = now.astimezone(get_pharmacy_timezone(shift.pharmacy))
+        today = now.date()
         if shift.employment_type in ['FULL_TIME', 'PART_TIME'] and not shift.slots.exists():
             return True
 
@@ -205,6 +210,9 @@ class ShiftDetailViewSet(BaseShiftViewSet):
         except Pharmacy.DoesNotExist:
             raise NotFound("Pharmacy not found.")
 
+        if not user_can_manage_pharmacy(request.user, pharmacy):
+            return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
         def to_decimal(val):
             if val is None or val == '':
                 return None
@@ -218,6 +226,8 @@ class ShiftDetailViewSet(BaseShiftViewSet):
 
         pharmacy_for_calc = SimpleNamespace(
             state=pharmacy.state,
+            public_holiday_region=pharmacy.public_holiday_region,
+            use_chemisttasker_payroll=pharmacy.use_chemisttasker_payroll,
             rate_weekday=to_decimal(get_override('rate_weekday', 'rateWeekday')) or pharmacy.rate_weekday,
             rate_saturday=to_decimal(get_override('rate_saturday', 'rateSaturday')) or pharmacy.rate_saturday,
             rate_sunday=to_decimal(get_override('rate_sunday', 'rateSunday')) or pharmacy.rate_sunday,
@@ -320,6 +330,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 pharmacy__memberships__user=user,
                 pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
+                pharmacy__memberships__status=Membership.Status.ACCEPTED,
             )
             |
             Q(
@@ -327,6 +338,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 pharmacy__memberships__user=user,
                 pharmacy__memberships__employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
+                pharmacy__memberships__status=Membership.Status.ACCEPTED,
             )
             |
             Q(
@@ -335,6 +347,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 pharmacy__memberships__user=user,
                 pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 pharmacy__memberships__is_active=True,
+                pharmacy__memberships__status=Membership.Status.ACCEPTED,
             )
             |
             Q(
@@ -345,6 +358,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                     PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES
                 ),
                 pharmacy__memberships__is_active=True,
+                pharmacy__memberships__status=Membership.Status.ACCEPTED,
             )
             |
             Q(
@@ -352,6 +366,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 pharmacy__owner__in=Pharmacy.objects.filter(
                     memberships__user=user,
                     memberships__is_active=True,
+                    memberships__status=Membership.Status.ACCEPTED,
                     memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 ).values_list('owner', flat=True),
             )
@@ -361,6 +376,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
                 pharmacy__organization__in=Pharmacy.objects.filter(
                     memberships__user=user,
                     memberships__is_active=True,
+                    memberships__status=Membership.Status.ACCEPTED,
                     memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
                 ).values_list('organization', flat=True),
             )

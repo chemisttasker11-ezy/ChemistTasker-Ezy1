@@ -5,7 +5,7 @@ from typing import Iterable
 
 from users.models import OrganizationMembership
 
-from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
+from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability, user_can_manage_pharmacy
 from organizations.models import PharmacyAdmin
 from notifications.services import notify_users
 
@@ -52,7 +52,8 @@ def shift_manager_recipients(shift) -> list:
             organization_id=organization_id,
             role__in=["ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN"],
         ).select_related("user"):
-            add(org_membership.user)
+            if user_can_manage_pharmacy(org_membership.user, shift.pharmacy):
+                add(org_membership.user)
 
     return list(users_by_id.values())
 
@@ -65,6 +66,7 @@ def notify_shift_users(
     body: str,
     kind: str,
     payload: dict | None = None,
+    deliver_on_commit: bool = False,
 ) -> None:
     base_payload = {
         "shift_id": shift.id,
@@ -81,6 +83,7 @@ def notify_shift_users(
             body=body,
             action_url=shift_url_for_user(shift, recipient),
             payload=base_payload,
+            deliver_on_commit=deliver_on_commit,
         )
         sent += 1
     if sent == 0:
@@ -94,8 +97,10 @@ def notify_shift_managers(
     body: str,
     kind: str,
     payload: dict | None = None,
+    deliver_on_commit: bool = False,
 ) -> list:
     recipients = shift_manager_recipients(shift)
-    notify_shift_users(recipients, shift=shift, title=title, body=body, kind=kind, payload=payload)
+    notify_shift_users(recipients, shift=shift, title=title, body=body, kind=kind, payload=payload,
+                       deliver_on_commit=deliver_on_commit)
     return recipients
 

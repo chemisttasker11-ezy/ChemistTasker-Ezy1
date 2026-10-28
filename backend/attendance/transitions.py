@@ -42,6 +42,7 @@ def clock_in(
     verified_kiosk_event: bool = False,
     occurred_at=None,
     assignment_id: Optional[int] = None,
+    request_id=None,
 ) -> Tuple[AttendanceSession, AttendanceEvent]:
     """
     Clock in a worker at a pharmacy transactionally.
@@ -142,6 +143,7 @@ def clock_in(
             qr_session=qr_session,
             device=device,
             ip_address=ip_address,
+            request_id=request_id,
         )
 
         # If provisional, create ProvisionalAttendance record
@@ -237,6 +239,7 @@ def clock_out(
     ip_address: Optional[str] = None,
     verified_kiosk_event: bool = False,
     occurred_at=None,
+    request_id=None,
 ) -> Tuple[AttendanceSession, AttendanceEvent]:
     """
     Clock out a worker from their active attendance session.
@@ -329,6 +332,7 @@ def clock_out(
             device=device,
             qr_session=qr_session,
             ip_address=ip_address,
+            request_id=request_id,
         )
 
         # Close session

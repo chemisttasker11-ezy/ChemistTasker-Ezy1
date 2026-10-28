@@ -150,6 +150,69 @@ class RosterWorkerActionsDeterministicTests(unittest.TestCase):
             is_rostered=True,
         )
 
+    def _approve_replacement(self, swap):
+        if swap:
+            req, _ = request_direct_swap(self.assignment, self.worker_a, self.worker_b)
+            approve = lambda: approve_direct_swap(req, self.owner_user)
+        else:
+            req, _ = submit_cover_request(self.assignment, self.worker_a)
+            approve = lambda: approve_cover_replacement(req, self.worker_b, self.owner_user)
+        return req, approve
+
+    def _assert_replacement_preserves_history(self, *, swap, invoice):
+        req, approve = self._approve_replacement(swap)
+        if invoice:
+            from invoicing.models import Invoice, InvoiceLineItem
+            bill = Invoice.objects.create(user=self.worker_a, pharmacy=self.pharmacy)
+            history = InvoiceLineItem.objects.create(
+                invoice=bill, source_assignment=self.assignment, shift=self.shift,
+                description="Accepted work", quantity=1, unit_price=57, total=57,
+            )
+        else:
+            history = AttendanceSession.objects.create(
+                pharmacy=self.pharmacy, user=self.worker_a, assignment=self.assignment,
+                started_at=timezone.now(),
+            )
+        terms = self.assignment.engagement_terms_snapshot
+        with self.assertRaises(ValidationError):
+            approve()
+        self.assignment.refresh_from_db()
+        req.refresh_from_db()
+        history.refresh_from_db()
+        self.assertEqual(self.assignment.user_id, self.worker_a.pk)
+        self.assertEqual(self.assignment.engagement_terms_snapshot, terms)
+        self.assertEqual(req.status, "PENDING")
+        self.assertFalse(RosterActionAudit.objects.filter(
+            action_type__in=[RosterActionAudit.ActionType.SWAP_APPROVED, RosterActionAudit.ActionType.COVER_APPROVED],
+        ).exists())
+        self.assertEqual(history.source_assignment_id if invoice else history.assignment_id, self.assignment.pk)
+
+    def test_swap_preserves_attendance_linked_assignment(self):
+        self._assert_replacement_preserves_history(swap=True, invoice=False)
+
+    def test_cover_preserves_attendance_linked_assignment(self):
+        self._assert_replacement_preserves_history(swap=False, invoice=False)
+
+    def test_swap_preserves_invoice_linked_assignment(self):
+        self._assert_replacement_preserves_history(swap=True, invoice=True)
+
+    def test_cover_preserves_invoice_linked_assignment(self):
+        self._assert_replacement_preserves_history(swap=False, invoice=True)
+
+    def test_swap_without_history_can_be_approved(self):
+        req, approve = self._approve_replacement(True)
+        approve()
+        self.assignment.refresh_from_db()
+        req.refresh_from_db()
+        self.assertEqual((self.assignment.user_id, req.status), (self.worker_b.pk, "APPROVED"))
+
+    def test_cover_without_history_can_be_approved(self):
+        req, approve = self._approve_replacement(False)
+        approve()
+        self.assignment.refresh_from_db()
+        req.refresh_from_db()
+        self.assertEqual((self.assignment.user_id, req.status), (self.worker_b.pk, "APPROVED"))
+
     def test_swap_approval_strictly_bound_to_request_target_worker(self):
         """
         Swap approval must deterministically target the worker specified in the

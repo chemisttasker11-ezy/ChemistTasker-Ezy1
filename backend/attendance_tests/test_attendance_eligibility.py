@@ -6,7 +6,7 @@ Does not touch core.settings, unapplied migrations, or the configured database.
 
 import os
 import unittest
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta
 import zoneinfo
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "attendance_tests.settings")
@@ -206,6 +206,37 @@ class AttendanceEligibilityMatrixTests(unittest.TestCase):
         self.assertEqual(result.assignment.id, assignment.id)
         self.assertIsNone(result.cover_type)
         self.assertIsNone(result.source_membership)
+
+    def test_explicit_assignment_id_must_match_event_time_window(self):
+        """B32: a signed kiosk shift_id cannot link an old assignment to today's clock-in."""
+        shift = Shift.objects.create(id=7, pharmacy=self.pharmacy_a, role_needed="PHARMACIST")
+        tz = zoneinfo.ZoneInfo("Australia/Sydney")
+        today = timezone.now().astimezone(tz).date()
+        old_day = today - timedelta(days=30)
+        slot = ShiftSlot.objects.create(
+            id=7, shift=shift, date=old_day, start_time=time(9, 0), end_time=time(17, 0),
+        )
+        old = ShiftSlotAssignment.objects.create(
+            id=7, shift=shift, slot=slot, slot_date=old_day, user=self.user_locum,
+        )
+
+        now_result = resolve_attendance_eligibility(
+            user=self.user_locum,
+            pharmacy=self.pharmacy_a,
+            target_time=datetime.combine(today, time(9, 15), tzinfo=tz),
+            assignment_id=old.id,
+        )
+        self.assertFalse(now_result.is_eligible)
+        self.assertIsNone(now_result.assignment)
+
+        in_window = resolve_attendance_eligibility(
+            user=self.user_locum,
+            pharmacy=self.pharmacy_a,
+            target_time=datetime.combine(old_day, time(9, 15), tzinfo=tz),
+            assignment_id=old.id,
+        )
+        self.assertEqual(in_window.eligibility_type, EligibilityType.CONFIRMED_ASSIGNMENT)
+        self.assertEqual(in_window.assignment.id, old.id)
 
     def test_rostered_permanent_staff_with_assignment_records_local_membership(self):
         """Rostered staff member with scheduled assignment records local membership."""

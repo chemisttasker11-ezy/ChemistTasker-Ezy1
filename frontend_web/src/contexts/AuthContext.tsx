@@ -1,4 +1,6 @@
 import { AhpraProvider } from './AhpraContext';
+import { Box, Button, Stack } from '@mui/material';
+import DashboardContentState from '../components/dashboard/DashboardContentState';
 import {announceSession, bearerBelongsToDifferentUser, claimUserBrowserStorage, logoutSession, watchSession} from '../../landing_next/shared/browser-session';
 // src/contexts/AuthContext.tsx
 
@@ -498,7 +500,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setActivePersona,
       }}
     >
-      {sessionError?<div role="alert" style={{padding:24}}><p>{sessionError}</p><button onClick={()=>window.location.reload()}>Reconnect</button><button onClick={()=>{setSessionError('');void logout();}}>Retry logout</button></div>:<div style={{display:identityPending?'none':'contents'}}><AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider></div>}
+      {sessionError?<Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 640, mx: 'auto' }}><Stack spacing={2}><DashboardContentState kind="error" title={sessionError} actionLabel="Reconnect" onAction={()=>window.location.reload()} /><Button variant="outlined" sx={{ minHeight: 44 }} onClick={()=>{setSessionError('');void logout();}}>Retry logout</Button></Stack></Box>:<div style={{display:identityPending?'none':'contents'}}><AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider></div>}
     </AuthContext.Provider>
   );
 }

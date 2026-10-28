@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -35,7 +36,8 @@ class MyListings(APIView):
     def get(self, request):
         pharmacy, decision = admitted_pharmacy(request.user, request.query_params.get("pharmacy"), "PREPARE_LISTING")
         rows = pharmacy.ethical_listings.select_related("product", "scope_chain").prefetch_related("product__identifiers", "lot_allocations", "lot_allocations__lot", "escalation_steps").order_by("-updated_at")
-        serialized = EthicalListingSerializer(rows, many=True).data
+        rows = [row for row in rows if evaluate_ethical_access(request.user, pharmacy, "PREPARE_LISTING", product=row.product, mode=row.mode).admitted]
+        serialized = EthicalListingSerializer(rows, many=True, context={"request": request}).data
         payload = []
         for row, data in zip(rows, serialized):
             data["can_owner_authorise"] = bool(decision.is_owner)
@@ -58,6 +60,8 @@ class ImportCommit(APIView):
     permission_classes = (IsAuthenticated,)
 
     def post(self, request, pk):
+        if not settings.ETHICAL_INVENTORY_ENABLED:
+            return Response({"code": "ETHICAL_INVENTORY_DISABLED"}, status=503)
         batch = get_object_or_404(EthicalImportBatch.objects.select_related("pharmacy"), pk=pk)
         pharmacy, _ = admitted_pharmacy(request.user, batch.pharmacy_id, "MANAGE_OWN_STOCK")
         if batch.status in {"COMMITTED", "PARTIAL", "REJECTED"}:
@@ -80,6 +84,9 @@ class ImportCommit(APIView):
                     identifier = EthicalProductIdentifier.objects.select_related("product").filter(value=barcode, product__status="APPROVED").first()
                     if not identifier:
                         raise ValueError("Barcode is not mapped to an approved ethical product")
+                    decision = evaluate_ethical_access(request.user, pharmacy, "MANAGE_OWN_STOCK", product=identifier.product)
+                    if not decision.admitted:
+                        raise ValueError(decision.blockers[0]["message"])
                     batch_number = str(payload.get("batch_number") or "").strip()
                     if not batch_number:
                         raise ValueError("Batch number is required")

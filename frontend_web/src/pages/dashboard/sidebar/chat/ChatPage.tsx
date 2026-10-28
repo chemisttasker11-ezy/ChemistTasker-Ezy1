@@ -18,6 +18,7 @@ import { NewChatModal } from './NewChatModal';
 import './chat.css';
 import {
   fetchRooms,
+  fetchRoom,
   fetchShiftContacts,
   fetchRoomMessagesService,
   fetchRoomMessagesByUrl,
@@ -294,15 +295,14 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
       return prev;
     });
 
-    if (messagesMap[activeRoomId]) {
-      markRoomAsReadService(activeRoomId).catch(() => { });
-      return;
-    };
-
+    let cancelled = false;
     const run = async () => {
       setIsLoadingMessages(true); // <-- FIX: Set loading ON
       try {
-        const { messages, next } = await fetchRoomMessagesService(activeRoomId);
+        const [{ messages, next }, refreshedRoom] = await Promise.all([
+          fetchRoomMessagesService(activeRoomId), fetchRoom(activeRoomId),
+        ]);
+        if (cancelled) return;
         const mappedMessages = messages
           .reverse()
           .map((msg: ChatMessage) =>
@@ -311,22 +311,36 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
               : msg,
           );
 
-        setMessagesMap((prev) => ({
-          ...prev,
-          [activeRoomId]: {
-            messages: mappedMessages,
-            nextUrl: next ?? null,
-            hasMore: Boolean(next),
-          },
-        }));
+        setMessagesMap((prev) => {
+          const cached = prev[activeRoomId];
+          const merged = new Map(mappedMessages.map(msg => [msg.id, msg]));
+          const newestFetched = Date.parse(mappedMessages[mappedMessages.length - 1]?.created_at || '') || 0;
+          (cached?.messages || []).forEach(msg => {
+            if ((msg.is_deleted && merged.has(msg.id)) || Date.parse(msg.created_at) > newestFetched) merged.set(msg.id, msg);
+          });
+          return {
+            ...prev,
+            [activeRoomId]: {
+              messages: [...merged.values()].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)),
+              nextUrl: next ?? null,
+              hasMore: Boolean(next),
+            },
+          };
+        });
+        const newLastRead = await markRoomAsReadService(activeRoomId);
+        if (cancelled) return;
+        setRooms(prev => prev.map(room => room.id === activeRoomId
+          ? { ...room, ...refreshedRoom, unread_count: 0, my_last_read_at: newLastRead ?? null } : room));
+        refreshUnreadCount();
       } catch (e) {
         console.error('fetch messages error', e);
       } finally {
-        setIsLoadingMessages(false); // <-- FIX: Set loading OFF
+        if (!cancelled) setIsLoadingMessages(false);
       }
     };
 
     run();
+    return () => { cancelled = true; };
   }, [activeRoomId]);
 
   // Keep my membership id for the active room in sync without re-triggering the websocket effect.
@@ -346,20 +360,6 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
 
       const ws = new WebSocket(makeWsTicketUrl(`/ws/chat/rooms/${activeRoomId}/`, ticket));
       wsRef.current = ws;
-
-      ws.onopen = () => {
-        markRoomAsReadService(activeRoomId)
-          .then((newLastRead) => {
-            if (isCancelled) return;
-            setRooms((prev) =>
-              prev.map((r) =>
-                r.id === activeRoomId ? { ...r, unread_count: 0, my_last_read_at: newLastRead ?? null } : r,
-              ),
-            );
-            refreshUnreadCount();
-          })
-          .catch(() => { });
-      };
 
       ws.onmessage = (evt) => {
         try {
@@ -438,10 +438,16 @@ const ChatPage: FC<ChatPageProps> = ({ initialFilter }) => {
               if (!targetRoomId) return prevMap;
               const roomState = prevMap[targetRoomId];
               const updatedMessages = roomState.messages.map(m =>
-                m.id === message_id ? { ...m, is_deleted: true } : m
+                m.id === message_id ? { ...m, is_deleted: true, body: '', original_body: null, attachment_url: null, attachment_filename: null } : m
               );
               return { ...prevMap, [targetRoomId]: { ...roomState, messages: updatedMessages } };
             });
+            setRooms(prev => prev.map(room => ({
+              ...room,
+              last_message: room.last_message && room.last_message.id === message_id
+                ? { ...room.last_message, body: '', is_deleted: true } : room.last_message,
+              pinned_message: room.pinned_message?.id === message_id ? null : room.pinned_message,
+            })));
             return;
           }
           if (payload.type === 'reaction.updated') {

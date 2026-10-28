@@ -21,6 +21,7 @@ RECORDED = {
         "ethical_marketplace.EthicalListing -> ethical_marketplace.signals.enforce_ethical_listing_scope",
         "marketplace.ListingAudiencePolicy -> marketplace.signals.validate_listing_audience",
         "marketplace.MarketplaceListing -> marketplace.signals.enforce_listing_seller_policy",
+        "workforce.EmploymentEngagement -> workforce.signals.employment_engagement_before_save",
     ],
     "post_save": [
         "attendance.AttendanceCorrection -> workforce.signals.attendance_correction_changed",
@@ -37,6 +38,7 @@ RECORDED = {
         "client_profile.ShiftSlot -> workforce.signals.roster_slot_changed",
         "client_profile.ShiftSlotAssignment -> workforce.signals.assignment_saved",
         "marketplace.ListingAudiencePolicy -> marketplace.signals.initialise_pharmacy_audience",
+        "workforce.EmploymentEngagement -> workforce.signals.employment_engagement_changed",
         "workforce.MembershipWorkSettings -> workforce.signals.work_settings_changed",
         "workforce.RosterPeriod -> workforce.signals.roster_period_changed",
         "workforce.WorkforceLeaveRequest -> workforce.signals.workforce_leave_changed",

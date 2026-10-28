@@ -83,10 +83,10 @@ export const financeApi = {
         detail: string;
         delivery_id: number;
     }>(API_ENDPOINTS.finance.invoiceSend(id), { method: 'POST', body: { version, confirmed: true } }),
-    markPaid: (id: number | string, version?: number) => financeRequest<FinanceInvoice>(API_ENDPOINTS.finance.invoiceMarkPaid(id), { method: 'POST', body: version == null ? {} : { version } }),
+    markPaid: (id: number | string, version?: number, fund_payment_confirmed?: boolean) => financeRequest<FinanceInvoice>(API_ENDPOINTS.finance.invoiceMarkPaid(id), { method: 'POST', body: { ...(version == null ? {} : { version }), ...(fund_payment_confirmed == null ? {} : { fund_payment_confirmed }) } }),
     requestRevision: (id: number | string, version: number, note: string) => financeRequest<FinanceInvoice>(API_ENDPOINTS.finance.receivedRequestRevision(id), { method: 'POST', body: { version, note } }),
     approveForPayment: (id: number | string, version: number, note = '') => financeRequest<FinanceInvoice>(API_ENDPOINTS.finance.receivedApprovePayment(id), { method: 'POST', body: { version, note } }),
-    markReceivedPaid: (id: number | string, version: number, note = '') => financeRequest<FinanceInvoice>(API_ENDPOINTS.finance.receivedMarkPaid(id), { method: 'POST', body: { version, note } }),
+    markReceivedPaid: (id: number | string, version: number, note = '', fund_payment_confirmed?: boolean) => financeRequest<FinanceInvoice>(API_ENDPOINTS.finance.receivedMarkPaid(id), { method: 'POST', body: { version, note, ...(fund_payment_confirmed == null ? {} : { fund_payment_confirmed }) } }),
     receivedPdf: (id: number | string) => financeRequest(API_ENDPOINTS.finance.receivedPdf(id), { responseType: 'blob' }),
     payment: (id: number | string, value: Record<string, unknown>) => financeRequest<FinanceInvoice>(API_ENDPOINTS.finance.invoicePayments(id), { method: 'POST', body: value }),
     pdf: (id: number | string) => financeRequest(API_ENDPOINTS.finance.invoicePdf(id), { responseType: 'blob' }),

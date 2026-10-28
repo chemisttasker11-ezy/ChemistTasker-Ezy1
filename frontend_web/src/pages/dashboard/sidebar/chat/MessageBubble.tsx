@@ -84,7 +84,7 @@ const ToolButton: FC<{ label: string; onClick: () => void; children: React.React
 
 export const MessageBubble: FC<Props> = ({
   msg,
-  isMe,
+  isMe: isMine,
   isGroupRoom,
   position,
   currentUserId,
@@ -113,21 +113,21 @@ export const MessageBubble: FC<Props> = ({
     return Array.from(map.entries());
   }, [msg.reactions, currentUserId]);
 
-  const user = msg.sender?.user_details;
-  if (!user) return null;
-
-  const fallback = resolveMemberDetails ? resolveMemberDetails(msg.sender?.id ?? null) : null;
-  const photo = user.profile_photo_url || fallback?.profile_photo_url || null;
-  const first = user.first_name || fallback?.first_name;
-  const last = user.last_name || fallback?.last_name;
-  const fullName = `${first || ''} ${last || ''}`.trim() || `Member ${msg.sender.id}`;
+  const sender = msg.sender;
+  const user = sender?.user_details;
+  const isMe = Boolean(sender && isMine);
+  const fallback = sender && resolveMemberDetails ? resolveMemberDetails(sender.id) : null;
+  const photo = user?.profile_photo_url || fallback?.profile_photo_url || null;
+  const first = user?.first_name || fallback?.first_name;
+  const last = user?.last_name || fallback?.last_name;
+  const fullName = sender ? `${first || ''} ${last || ''}`.trim() || `Member ${sender.id}` : 'Former member';
   const fileName = msg.attachment_filename || (msg.attachment_url ? decodeURIComponent(msg.attachment_url.split('/').pop() || '') : 'Attachment');
   const attachmentHref = safeChatAttachmentHref(msg.attachment_url);
   const attachmentIsImage = Boolean(attachmentHref && isImage(attachmentHref));
 
   const startsGroup = position === 'single' || position === 'first';
   const endsGroup = position === 'single' || position === 'last';
-  const showName = !isMe && isGroupRoom && startsGroup;
+  const showName = !isMe && (isGroupRoom || !sender) && startsGroup;
   const emojiOnly = !msg.is_deleted && !msg.attachment_url && isEmojiOnly(msg.body);
 
   // Chained corners: the side facing the sender's avatar tightens between grouped messages.
@@ -187,8 +187,8 @@ export const MessageBubble: FC<Props> = ({
           {msg.body && <ToolButton label="Edit message" onClick={() => onRequestEdit(msg)}><Pencil size={16} /></ToolButton>}
           <ToolButton label="Delete message" onClick={() => onRequestDelete(msg)}><Trash2 size={16} /></ToolButton>
         </>
-      ) : (
-        <ToolButton label={`Message ${first || fullName} privately`} onClick={() => onStartDm(msg.sender.id)}><MessageCircle size={16} /></ToolButton>
+      ) : sender && (
+        <ToolButton label={`Message ${first || fullName} privately`} onClick={() => onStartDm(sender.id)}><MessageCircle size={16} /></ToolButton>
       )}
       {pickerOpen && (
         <Paper
@@ -232,7 +232,7 @@ export const MessageBubble: FC<Props> = ({
     >
       {!isMe && (
         <Box sx={{ width: 32, flexShrink: 0 }}>
-          {endsGroup && (
+          {endsGroup && sender && (
             <Avatar
               src={photo || undefined}
               alt={fullName}

@@ -10,7 +10,7 @@ from shifts.models import (
     Shift, ShiftCounterOffer, ShiftInterest, ShiftOffer, ShiftProfileAccessAudit,
     ShiftSlotAssignment,
 )
-from invoicing.models import Invoice
+from invoicing.models import Invoice, manager_visible_state
 from invoicing.navigation import invoice_action_url
 from pharmacy_hub.models import PharmacyHubPost
 from organizations.serializers import PharmacyClaimSerializer
@@ -629,7 +629,7 @@ class OrganizationDashboardView(APIView):
             # organization-wide operational authority. Chief and Region Admins
             # can operate shifts within their scope but do not receive finance
             # totals merely because they can open the organization dashboard.
-            invoices_qs = Invoice.objects.filter(pharmacy__organization=org)
+            invoices_qs = Invoice.objects.filter(manager_visible_state(), pharmacy__organization=org).distinct()
             if requested_pharmacy_id is not None:
                 invoices_qs = invoices_qs.filter(pharmacy_id=requested_pharmacy_id)
         else:
@@ -776,7 +776,7 @@ class OwnerDashboard(APIView):
             for pharmacy in pharmacies.select_related("owner__user", "organization")
             if user_can_manage_billing_for_pharmacy(user, pharmacy)
         ]
-        invoices_qs = Invoice.objects.filter(pharmacy_id__in=billing_pharmacy_ids)
+        invoices_qs = Invoice.objects.filter(manager_visible_state(), pharmacy_id__in=billing_pharmacy_ids).distinct()
         extras = _dashboard_payload_extras(
             shifts_qs=upcoming_shifts,
             confirmed_qs=confirmed_shifts,

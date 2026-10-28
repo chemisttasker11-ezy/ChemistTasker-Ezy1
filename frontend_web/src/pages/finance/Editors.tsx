@@ -97,30 +97,32 @@ export function ExpenseEditor({ initial, onClose, onSaved }: { initial?: Finance
   </FormDialog>;
 }
 
-export function PaymentEditor({ invoice, onClose, onSaved }: { invoice: FinanceInvoice; onClose: () => void; onSaved: () => Promise<void> }) {
+export function PaymentEditor({ invoice, onClose, onSaved, markPaid = false }: { invoice: FinanceInvoice; onClose: () => void; onSaved: () => Promise<void>; markPaid?: boolean }) {
   const [value, setValue] = useState({ request_key: crypto.randomUUID(), date: today(), amount: invoice.balance, reference: '', fund_payment_confirmed: false });
   const amount = Number(value.amount);
   const amountError = !value.amount.trim() || !(amount > 0) ? 'Enter the amount you received.'
     : amount > Number(invoice.balance) ? `That's more than the ${dollars(invoice.balance)} still owed.` : '';
   const fundMissing = invoice.kind === 'super_request' && !value.fund_payment_confirmed;
   const partial = !amountError && amount < Number(invoice.balance);
-  return <FormDialog value={value} title="Record a payment" label="Record payment" onClose={onClose} onSave={async () => {
-    if (amountError) throw new Error(amountError);
+  return <FormDialog value={value} title={markPaid ? `Mark ${invoice.number} as paid?` : 'Record a payment'} label={markPaid ? 'Mark as paid' : 'Record payment'} onClose={onClose} onSave={async () => {
+    if (!markPaid && amountError) throw new Error(amountError);
     if (fundMissing) throw new Error('Confirm the payment went to the super fund.');
-    await finance.payment(invoice.id, value); await onSaved();
+    if (markPaid) await finance.markPaid(invoice.id, invoice.version, value.fund_payment_confirmed);
+    else await finance.payment(invoice.id, value);
+    await onSaved();
   }}>
     <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'var(--ct-page-bg)', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 2 }}>
       <Typography sx={{ color: 'var(--ct-text-secondary)', fontSize: 14 }}>Still owed on {invoice.number}</Typography>
       <Typography sx={{ fontFamily: 'var(--ct-font-display)', fontWeight: 500, fontSize: 22, fontVariantNumeric: 'tabular-nums' }}>{dollars(invoice.balance)}</Typography>
     </Box>
-    <Box sx={grid}>
+    {!markPaid && <Box sx={grid}>
       <TextField label="Amount received" required value={value.amount} inputProps={{ inputMode: 'decimal' }} error={Boolean(amountError) && value.amount !== invoice.balance}
         InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
         helperText={value.amount !== invoice.balance && amountError ? amountError : partial ? `Part payment. ${dollars(Number(invoice.balance) - amount)} will still be owed.` : 'Record only money that has arrived.'}
         onChange={event => setValue({ ...value, amount: event.target.value })} />
       <TextField label="Date received" type="date" required InputLabelProps={{ shrink: true }} value={value.date} onChange={event => setValue({ ...value, date: event.target.value })} />
       <TextField label="Reference (optional)" placeholder="Bank or fund reference" value={value.reference} sx={{ gridColumn: { sm: '1 / -1' } }} onChange={event => setValue({ ...value, reference: event.target.value })} />
-    </Box>
+    </Box>}
     {invoice.kind === 'super_request' && <FormControlLabel control={<Checkbox checked={value.fund_payment_confirmed} onChange={event => setValue({ ...value, fund_payment_confirmed: event.target.checked })} />} label="This payment went to the super fund, not to me" />}
   </FormDialog>;
 }

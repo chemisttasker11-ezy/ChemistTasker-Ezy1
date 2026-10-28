@@ -228,8 +228,8 @@ export function HubFeed({ scope, onBack, targetPostId, onTargetPostHandled, head
     }
     const idNum = typeof scope.id === 'string' ? Number(scope.id) : scope.id;
     if (!Number.isFinite(idNum)) return null;
-    const normalizedType = scope.type === 'orgGroup' ? 'group' : (scope as ScopeBase).type;
-    return { type: normalizedType as ScopeBase['type'], id: idNum };
+    const normalizedType = scope.type === 'orgGroup' ? 'group' : scope.type;
+    return { type: normalizedType, id: idNum };
   }, [scope]);
 
   const scopeValid = Boolean(stableScope);
@@ -493,29 +493,18 @@ export function HubFeed({ scope, onBack, targetPostId, onTargetPostHandled, head
   const load = useCallback(
     async (url?: string, append = false) => {
       if (!stableScope) return;
-      if (url && url === next && append === false) return;
       setLoading(true);
       try {
-        // If a next URL is provided, use it; otherwise fetch for the current scope (include attachments)
-        const data: any = url
-          ? await fetchHubPosts(url as any)
-          : await fetchHubPosts({ ...(stableScope as any), includeAttachments: true });
-        const list = Array.isArray(data?.posts)
-          ? data.posts
-          : Array.isArray(data?.results)
-            ? data.results
-            : Array.isArray(data)
-              ? data
-              : [];
-        setPosts((prev) => (append ? [...prev, ...list] : list));
-        setNext((data as any)?.next ?? null);
+        const data = await fetchHubPosts(stableScope, { cursor: url });
+        setPosts((prev) => (append ? [...prev, ...data.posts] : data.posts));
+        setNext(data.next);
       } catch (err) {
         // swallow for now
       } finally {
         setLoading(false);
       }
     },
-    [stableScope, next],
+    [stableScope],
   );
 
   useEffect(() => {

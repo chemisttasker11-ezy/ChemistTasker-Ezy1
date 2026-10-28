@@ -70,13 +70,22 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const paymentForm = (invoice: FinanceInvoice) => { const requestKey = key(); setSelected(null); setFormError(''); setForm({ title: `Record payment · ${invoice.number}`, fields: { amount: invoice.balance, date: financeToday(), reference: '' }, booleans: invoice.kind === 'super_request' ? { fund_payment_confirmed: false } : {}, save: (fields, flags) => finance.payment(invoice.id, { request_key: requestKey, date: fields.date, amount: fields.amount, reference: fields.reference, fund_payment_confirmed: !!flags.fund_payment_confirmed }) }); };
   const reviewForm = (invoice: FinanceInvoice, kind: 'approve' | 'revise' | 'paid') => {
     setSelected(null); setFormError('');
-    setForm({ title: kind === 'revise' ? 'Request invoice revision' : kind === 'paid' ? 'Mark invoice paid' : 'Approve for payment', fields: { note: '' }, booleans: {}, save: async fields => {
+    const needsFundConfirmation = kind === 'paid' && invoice.kind === 'super_request';
+    setForm({ title: kind === 'revise' ? 'Request invoice revision' : kind === 'paid' ? 'Mark invoice paid' : 'Approve for payment', fields: { note: '' }, booleans: needsFundConfirmation ? { fund_payment_confirmed: false } : {}, save: async (fields, flags) => {
       const note = fields.note.trim();
       if (kind === 'revise' && !note) throw new Error('Add a revision note for the contractor.');
+      if (needsFundConfirmation && !flags.fund_payment_confirmed) throw new Error('Confirm the payment went to the super fund.');
       if (kind === 'revise') return finance.requestRevision(invoice.id, invoice.version, note);
-      if (kind === 'paid') return finance.markReceivedPaid(invoice.id, invoice.version, note);
+      if (kind === 'paid') return finance.markReceivedPaid(invoice.id, invoice.version, note, flags.fund_payment_confirmed);
       return finance.approveForPayment(invoice.id, invoice.version, note);
     }});
+  };
+  const markPaidForm = (invoice: FinanceInvoice) => {
+    setSelected(null); setFormError('');
+    setForm({ title: `Mark ${invoice.number} paid`, fields: {}, booleans: { fund_payment_confirmed: false }, save: async (_fields, flags) => {
+      if (!flags.fund_payment_confirmed) throw new Error('Confirm the payment went to the super fund.');
+      return finance.markPaid(invoice.id, invoice.version, flags.fund_payment_confirmed);
+    } });
   };
   const closeForm = () => { if (!busy) Alert.alert('Discard changes?', 'Unsaved changes will be lost.', [{ text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => setForm(null) }]); };
   if (editor) return <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}><FinanceInvoiceEditor requestKey={editor.key} initial={editor.invoice} previous={invoices.find(i => i.kind === 'invoice')} customers={customers} items={items} onClose={() => setEditor(null)} onSaved={afterSave} /></SafeAreaView>;
@@ -150,7 +159,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
                 'Email revision ' + selected.version + ' to ' + (selected.payload.customer?.email || 'the saved recipient') + '.',
                 async () => { await finance.send(selected.id, selected.version); setSelected(null); await load(); },
               )}>Send email</Button>
-              <Button disabled={selected.status === 'paid'} onPress={() => ask(
+              <Button disabled={selected.status === 'paid'} onPress={() => selected.kind === 'super_request' ? markPaidForm(selected) : ask(
                 'Mark paid?',
                 'This status can still be corrected later by editing and saving a new revision.',
                 async () => { await finance.markPaid(selected.id, selected.version); setSelected(null); await load(); },

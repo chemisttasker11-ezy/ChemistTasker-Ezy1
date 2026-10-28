@@ -22,6 +22,90 @@ Invoice = apps.get_model('invoicing', 'Invoice')
 BASE = '/api/v1/finance/'
 
 
+@skipUnless(not getattr(settings, 'FINANCE_CONTRACT_TESTS', False), 'Requires production invoice and pharmacy models.')
+class MarkPaidReceiptTests(TestCase):
+    def setUp(self):
+        from organizations.models import Pharmacy
+        from onboarding.models import OwnerOnboarding
+        self.worker = get_user_model().objects.create_user(email='receipt-worker@example.test', role='PHARMACIST', is_active=True)
+        self.owner = get_user_model().objects.create_user(email='receipt-owner@example.test', role='OWNER', is_active=True)
+        profile = OwnerOnboarding.objects.create(user=self.owner, role='PHARMACIST')
+        self.pharmacy = Pharmacy.objects.create(name='Receipt pharmacy', owner=profile)
+        self.stranger = get_user_model().objects.create_user(email='receipt-stranger@example.test', role='OWNER', is_active=True)
+        self.today = timezone.localdate()
+
+    def invoice(self, **changes):
+        return Invoice.objects.create(user=self.worker, pharmacy=self.pharmacy, source='internal', request_key=uuid4(), status='sent', payload={'invoice_date': self.today.isoformat()}, calculation={'payable': '1100.00', 'gst': '100.00', 'sales_gross': '1100.00'}, **changes)
+
+    def test_worker_and_pharmacy_mark_paid_record_one_receipt_and_cash_gst(self):
+        client = APIClient()
+        for resource, actor in (('invoices', self.worker), ('received-invoices', self.owner)):
+            with self.subTest(resource=resource):
+                record = self.invoice()
+                path = BASE + f'{resource}/{record.pk}/mark-paid/'
+                client.force_authenticate(self.stranger)
+                self.assertEqual(client.post(path, {'version': 1}, format='json').status_code, 404)
+                self.assertFalse(record.payments.exists())
+                client.force_authenticate(actor)
+                for _ in range(2):
+                    response = client.post(path, {'version': 1}, format='json')
+                    self.assertEqual(response.status_code, 200, response.data)
+                    self.assertEqual(Decimal(response.data['balance']), Decimal('0.00'))
+                self.assertEqual(record.payments.count(), 1)
+                payment = record.payments.get()
+                self.assertEqual((payment.amount, payment.gst, payment.date), (Decimal('1100.00'), Decimal('100.00'), self.today))
+                client.force_authenticate(self.worker)
+                worksheet = client.get(BASE + 'bas-worksheet/', {'start': self.today, 'end': self.today, 'basis': 'cash'})
+                self.assertEqual(worksheet.status_code, 200, worksheet.data)
+                count = Invoice.objects.count()
+                self.assertEqual(Decimal(worksheet.data['G1']), Decimal('1100.00') * count)
+                self.assertEqual(Decimal(worksheet.data['1A']), Decimal('100.00') * count)
+
+    def test_mark_paid_records_only_balance_and_preserves_super_confirmation(self):
+        from worker_finance.services import record_payment
+        record = self.invoice()
+        record_payment(self.worker, record.pk, {'request_key': uuid4(), 'date': self.today, 'amount': Decimal('440.00')})
+        client = APIClient(); client.force_authenticate(self.worker)
+        response = client.post(BASE + f'invoices/{record.pk}/mark-paid/', {'version': 1}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(Decimal(response.data['balance']), Decimal('0.00'))
+        self.assertEqual(list(record.payments.order_by('id').values_list('amount', flat=True)), [Decimal('440.00'), Decimal('660.00')])
+        super_record = self.invoice(kind='super_request')
+        response = client.post(BASE + f'invoices/{super_record.pk}/mark-paid/', {'version': 1}, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(super_record.payments.exists())
+        super_record.calculation = {'payable': '96.00', 'gst': '0.00', 'sales_gross': '0.00'}
+        super_record.save(update_fields=['calculation'])
+        response = client.post(BASE + f'invoices/{super_record.pk}/mark-paid/', {'version': 1, 'fund_payment_confirmed': True}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual((super_record.payments.get().gst, super_record.payments.get().sales), (Decimal('0.00'), Decimal('0.00')))
+
+    def test_super_request_companion_keeps_pharmacy_and_reaches_recipient(self):
+        from django.db import transaction
+        from worker_finance.services import make_super_document
+        customer = Customer.objects.create(owner=self.worker, name='Super pharmacy', email='super@example.test')
+        payload = {'invoice_date': self.today.isoformat(), 'due_date': self.today.isoformat(), 'issuer_name': 'W',
+                   'issuer_abn': '51824753556', 'gst_registered': False, 'super_mode': 'separate', 'super_rate': '12.00',
+                   'super_fund_name': 'F', 'super_usi': 'U', 'super_member_number': 'M',
+                   'customer': {'name': 'Super pharmacy', 'address': '', 'email': 'super@example.test', 'abn': ''}, 'lines': []}
+        record = Invoice.objects.create(user=self.worker, pharmacy=self.pharmacy, customer=customer, source='internal',
+                                        request_key=uuid4(), status='sent', payload=payload,
+                                        calculation={'subtotal': '800.00', 'gst': '0.00', 'super': '96.00', 'payable': '800.00'})
+        with transaction.atomic():
+            companion = make_super_document(self.worker, record.pk, record.version)
+        Invoice.objects.filter(pk=companion.pk).update(status='sent')
+        self.assertEqual(companion.pharmacy_id, self.pharmacy.id)
+        received = APIClient()
+        received.force_authenticate(self.owner)
+        response = received.get(BASE + 'received-invoices/')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn(companion.pk, {row['id'] for row in response.data['results']})
+        worker = APIClient()
+        worker.force_authenticate(self.worker)
+        response = worker.get(BASE + f'invoices/{companion.pk}/')
+        self.assertEqual(response.status_code, 200, response.data)
+
+
 @skipUnless(getattr(settings, 'FINANCE_CONTRACT_TESTS', False), 'Use the isolated finance contract settings.')
 class FinanceApiTests(TestCase):
     def setUp(self):
@@ -153,8 +237,8 @@ class FinanceApiTests(TestCase):
         self.assertEqual(Payment.objects.count(), 1)
         self.assertEqual(self.post(f'invoices/{record["id"]}/mark-paid/', {'version': record['version']}).status_code, 200)
         worksheet = self.client.get(BASE + f'bas-worksheet/?start={self.today}&end={self.today}&basis=cash')
-        self.assertEqual(Decimal(worksheet.data['G1']), Decimal('440.00'))
-        self.assertEqual(Decimal(worksheet.data['1A']), Decimal('40.00'))
+        self.assertEqual(Decimal(worksheet.data['G1']), Decimal('880.00'))
+        self.assertEqual(Decimal(worksheet.data['1A']), Decimal('80.00'))
         self.assertFalse(worksheet.data['lodgement_ready'])
         payment.update(request_key=str(uuid4()), amount='441.00')
         self.assertEqual(self.post(f'invoices/{record["id"]}/payments/', payment).status_code, 400)
