@@ -13,6 +13,7 @@ def protect_shift_deletion(shift):
             status.HTTP_409_CONFLICT,
         )
     if (shift.payment_status == 'PENDING'
+            or shift.fulfillment_checkouts.exclude(state='expired').exists()
             or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()
             or shift.payments.filter(status='pending').exists()):
         raise ShiftActionRefused(

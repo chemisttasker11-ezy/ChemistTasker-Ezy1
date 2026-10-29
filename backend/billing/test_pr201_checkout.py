@@ -1,8 +1,10 @@
 from types import SimpleNamespace
+from datetime import time
+from django.utils import timezone
 from unittest.mock import patch
 from django.test import TestCase
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
-from shifts.models import Shift, ShiftOffer
+from shifts.models import Shift, ShiftOffer, ShiftSlot
 
 class FulfillmentSelectionTests(TestCase):
     def setUp(self):
@@ -10,12 +12,12 @@ class FulfillmentSelectionTests(TestCase):
         self.shift = Shift.objects.create(pharmacy=pharmacy, created_by=self.owner, role_needed="PHARMACIST", employment_type="LOCUM")
         self.worker1 = make_user("PHARMACIST")
         self.worker2 = make_user("PHARMACIST")
-        self.offers = [ShiftOffer.objects.create(shift=self.shift, user=worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT) for worker in (self.worker1, self.worker2)]
+        self.offers = [ShiftOffer.objects.create(shift=self.shift, slot=ShiftSlot.objects.create(shift=self.shift, date=timezone.localdate(), start_time=time(hour), end_time=time(hour + 2)), user=worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT) for worker, hour in ((self.worker1, 9), (self.worker2, 14))]
 
     def checkout(self, payload):
         with (
             patch("billing.views.get_billing_state_for_account", return_value="PAYMENT_REQUIRED"),
-            patch("billing.stripe_support.stripe.checkout.Session.create", return_value=SimpleNamespace(url="https://checkout.example.test")) as create,
+            patch("billing.stripe_support.stripe.checkout.Session.create", return_value=SimpleNamespace(id="cs_test", url="https://checkout.example.test")) as create,
         ):
             response = client_for(self.owner).post(f"/api/v1/billing/charge-fulfillment/{self.shift.pk}/", payload, format="json")
         return response, create

@@ -493,5 +493,7 @@ export {
   getCurrentSubscription,
   updateSubscriptionSeats,
   chargeShiftFulfillment,
+  resumeFulfillmentCheckout,
+  expireFulfillmentCheckout,
   chargeShiftPenalty,
 } from './domains/billing/api';

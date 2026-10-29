@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from shifts.engagement import KIND_STAFF_EMPLOYMENT, staff_assignment_defaults
+from shifts.events import before_fulfillment
 
 
 def offer_occurrence_key(offer):
@@ -36,7 +37,7 @@ def _accepted_offer_rate_for_occurrence(offer, slot_id, slot_date):
     return None
 
 
-def finalize_shift_offer(offer: ShiftOffer):
+def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
     """
     Finalize a worker-confirmed offer by creating slot assignments exactly once.
     Safe to call multiple times (idempotent for already assigned slots).
@@ -53,6 +54,7 @@ def finalize_shift_offer(offer: ShiftOffer):
     with transaction.atomic():
         Shift.objects.select_for_update().get(pk=shift.pk)
         list(ShiftSlot.objects.select_for_update().filter(shift=shift).order_by('pk'))
+        before_fulfillment.send(sender=ShiftOffer, offer=offer, checkout_id=checkout_id)
         # A whole-shift snapshot lists only each slot's first date, so only slot offers narrow to their occurrences.
         occurrences = ((offer.engagement_terms_snapshot or {}).get('occurrences') or []) if slot_obj else []
         accepted_pairs = {(str(entry.get('slot_id')), str(entry.get('date'))) for entry in occurrences}

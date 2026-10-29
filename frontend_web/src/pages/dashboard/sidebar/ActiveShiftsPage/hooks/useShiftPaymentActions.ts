@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
-import { chargeShiftFulfillment, payShiftWithPills, type Shift } from '@chemisttasker/shared-core';
+import { chargeShiftFulfillment, resumeFulfillmentCheckout, expireFulfillmentCheckout, payShiftWithPills, type Shift } from '@chemisttasker/shared-core';
 
 export function useShiftPaymentActions(loadShifts: () => Promise<void>, showSnackbar: (message: string) => void) {
+    const [checkoutConflict, setCheckoutConflict] = useState<{ shift: Shift; offerIds: number[]; checkoutId: string } | null>(null);
+    const [checkoutRecovering, setCheckoutRecovering] = useState(false);
     const [pillPayingShiftId, setPillPayingShiftId] = useState<number | null>(null);
     const [paymentSlotSelection, setPaymentSlotSelection] = useState<Record<number, number[]>>({});
     const handlePayWithPills = useCallback(async (shift: Shift, offerIds: number[] = []) => {
@@ -34,10 +36,34 @@ export function useShiftPaymentActions(loadShifts: () => Promise<void>, showSnac
             } else {
                 showSnackbar('Payment session was not returned.');
             }
-        } catch (err) {
-            console.error(err);
-            showSnackbar('Failed to initiate payment.');
+        } catch (err: any) {
+            const data = err?.response?.data ?? err?.payload;
+            if (err?.status === 409 && data?.checkout_id) {
+                setCheckoutConflict({ shift, offerIds, checkoutId: data.checkout_id });
+            } else {
+                showSnackbar(err?.message || 'Failed to initiate payment.');
+            }
         }
     }, [loadShifts, showSnackbar]);
-    return { pillPayingShiftId, paymentSlotSelection, setPaymentSlotSelection, handlePayWithPills, handlePayWithStripe };
+    const recoverCheckout = useCallback(async (action: 'resume' | 'expire') => {
+        if (!checkoutConflict) return;
+        setCheckoutRecovering(true);
+        try {
+            const { shift, checkoutId, offerIds } = checkoutConflict;
+            if (action === 'resume') {
+                const result = await resumeFulfillmentCheckout(shift.id, checkoutId);
+                window.location.href = result.url;
+            } else {
+                await expireFulfillmentCheckout(shift.id, checkoutId);
+                setCheckoutConflict(null);
+                await handlePayWithStripe(shift, offerIds);
+            }
+        } catch (err: any) {
+            showSnackbar(err?.message || 'Checkout recovery could not be confirmed.');
+        } finally {
+            setCheckoutRecovering(false);
+        }
+    }, [checkoutConflict, handlePayWithStripe, showSnackbar]);
+    return { checkoutConflict, setCheckoutConflict, checkoutRecovering, recoverCheckout,
+        pillPayingShiftId, paymentSlotSelection, setPaymentSlotSelection, handlePayWithPills, handlePayWithStripe };
 }

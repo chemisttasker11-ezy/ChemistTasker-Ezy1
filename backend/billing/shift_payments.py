@@ -1,8 +1,6 @@
 """Authorized shift fulfillment and cancellation checkout workflows."""
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
-from hashlib import sha256
-import json
 import logging
 
 from django.db import transaction
@@ -17,6 +15,8 @@ from .fulfillment import _finalize_pending_offers_for_shift, _normalize_offer_id
 from .stripe_support import stripe
 from .subscriptions import get_subscription_for_account as _get_subscription_for_account
 from .utils import BILLING_STATE_FREE_TRIAL, BILLING_STATE_PRE_LIVE
+from .checkout_reservations import prepare_checkout, open_checkout
+from rest_framework.exceptions import APIException
 
 
 logger = logging.getLogger(__name__)
@@ -164,12 +164,12 @@ def charge_shift_fulfillment(user, shift, shift_id, account, billing_state, data
         else:
             billing_contact = account.get('billing_contact') or user
             session_kwargs['customer_email'] = getattr(billing_contact, 'email', None) or user.email
-        # Key on every param (Stripe rejects a reused key with other params) and the UTC day (the 24h session stays open while reused).
-        request_key = sha256(json.dumps([session_kwargs, str(timezone.now().date())], sort_keys=True, default=str).encode()).hexdigest()
-        checkout_session = stripe.checkout.Session.create(
-            **session_kwargs, idempotency_key=f'shift-fulfillment:{shift.id}:{request_key}',
+        attempt = prepare_checkout(
+            shift_id=shift.pk, actor=user, offer_ids=offer_ids, parameters=session_kwargs,
         )
-        return Response({'url': checkout_session.url})
+        return Response({'url': open_checkout(attempt), 'checkout_id': str(attempt.pk)})
+    except APIException:
+        raise
     except Exception:
         logger.exception('Billing request failed')
         return Response({'error': 'Unable to complete the billing request.'}, status=status.HTTP_400_BAD_REQUEST)

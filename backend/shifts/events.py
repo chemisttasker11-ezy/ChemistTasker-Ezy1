@@ -6,3 +6,6 @@ from django.dispatch import Signal
 # Receivers may refuse a locked period; otherwise persist invalidation now and
 # defer background work until commit. The producer must roll back refusals.
 payroll_activated = Signal()
+
+# Billing may refuse another payment route while a card checkout can collect.
+before_fulfillment = Signal()

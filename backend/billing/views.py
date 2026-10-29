@@ -1,4 +1,5 @@
 """Billing HTTP adapters: authentication, parsing and account authority before owned workflows."""
+import logging
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
@@ -39,6 +40,8 @@ from .utils import (
     user_can_pay_shift_charge_for_pharmacy,
 )
 from .webhooks import _process_stripe_event
+
+logger = logging.getLogger(__name__)
 
 
 def _current_account_for_user(user, pharmacy_id=None):
@@ -198,3 +201,40 @@ def stripe_webhook(request):
     payload = request.body
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
     return webhooks.receive_stripe_webhook(payload, sig_header)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
+def expire_fulfillment_checkout(request, shift_id, checkout_id):
+    from shifts.models import Shift
+    from .models import FulfillmentCheckout
+    from .checkout_reservations import expire_checkout, CheckoutUncertain
+    from rest_framework.exceptions import APIException
+
+    shift = get_object_or_404(Shift, pk=shift_id)
+    if not user_can_pay_shift_charge_for_pharmacy(request.user, shift.pharmacy):
+        return Response({'error': 'Not authorized to pay charges for this shift.'}, status=403)
+    attempt = get_object_or_404(FulfillmentCheckout, pk=checkout_id, shift=shift)
+    try:
+        expire_checkout(attempt)
+    except APIException:
+        raise
+    except Exception:
+        logger.exception('Checkout expiry could not be confirmed')
+        raise CheckoutUncertain('Checkout expiry is uncertain. Reconcile it before creating another payment.')
+    return Response({'status': 'expired', 'checkout_id': str(attempt.pk)})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
+def resume_fulfillment_checkout(request, shift_id, checkout_id):
+    from shifts.models import Shift
+    from .models import FulfillmentCheckout
+    from .checkout_reservations import open_checkout
+    shift = get_object_or_404(Shift, pk=shift_id)
+    if not user_can_pay_shift_charge_for_pharmacy(request.user, shift.pharmacy):
+        return Response({'error': 'Not authorized to pay charges for this shift.'}, status=403)
+    attempt = get_object_or_404(FulfillmentCheckout, pk=checkout_id, shift=shift)
+    return Response({'url': open_checkout(attempt), 'checkout_id': str(attempt.pk)})

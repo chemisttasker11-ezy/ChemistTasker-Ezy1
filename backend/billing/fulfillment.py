@@ -38,7 +38,7 @@ def _normalize_offer_ids(raw_offer_ids=None, raw_offer_id=None):
     return sorted(set(offer_ids))
 
 
-def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None, return_offers=False, unbookable=None):
+def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None, return_offers=False, unbookable=None, checkout_id=None):
     """
     Finalize shift offers waiting on payment.
     If candidate_id/slot_id are provided, narrow the target set.
@@ -70,12 +70,16 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
             unbookable.append(offer)
             continue
         try:
-            finalize_shift_offer(offer)  # its own atomic block rolls back a refused offer
-        except ValidationError:
+            if checkout_id is None:
+                finalize_shift_offer(offer)
+            else:
+                finalize_shift_offer(offer, checkout_id=checkout_id)
+        except ValidationError as exc:
             if unbookable is None:
                 raise
-            offer.status = ShiftOffer.Status.EXPIRED
-            offer.save(update_fields=['status', 'updated_at'])
+            if not isinstance(exc.detail, dict) or exc.detail.get("code") != "checkout_reserved":
+                offer.status = ShiftOffer.Status.EXPIRED
+                offer.save(update_fields=['status', 'updated_at'])
             unbookable.append(offer)
             continue
         finalized_offers.append(offer)

@@ -8,6 +8,7 @@ from django.utils import timezone
 from .fulfillment import _finalize_pending_offers_for_shift
 from .models import ShiftPayment
 from .stripe_support import _stripe_object_value, stripe
+from .checkout_reservations import bind_paid_checkout
 
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,24 @@ def handle_payment_checkout(session, metadata):
             # offers or turn a refunded payment back into paid.
             return
 
+        attempt, binding_error = bind_paid_checkout(session, metadata, payment)
+        if binding_error:
+            payment.reconciliation_required = True
+            payment.reconciliation_reason = binding_error
+            payment.save(update_fields=["reconciliation_required", "reconciliation_reason"])
+            from notifications.services import notify_users
+            notify_users(
+                [payment.owner_id], title="Shift payment needs reconciliation",
+                body="A paid checkout did not match its reserved work. Check the payment before retrying or refunding.",
+                payload={"notification_kind": "shift_payment_refund_required", "payment_id": payment.pk,
+                         "reason": binding_error}, deliver_on_commit=True,
+            )
+            return
+
         if shift_obj is None:
+            payment.reconciliation_required = True
+            payment.reconciliation_reason = "deleted_shift"
+            payment.save(update_fields=["reconciliation_required", "reconciliation_reason"])
             from notifications.services import notify_users
             logger.error('Paid shift checkout %s refers to deleted shift %s: refund required.', payment.pk, shift_id)
             notify_users(
@@ -75,8 +93,12 @@ def handle_payment_checkout(session, metadata):
                 offer_ids=metadata.get('offer_ids'),
                 return_offers=True,
                 unbookable=unbookable_offers,
+                **({"checkout_id": attempt.pk} if attempt is not None else {}),
             )
             if unbookable_offers or not finalized_count:
+                payment.reconciliation_required = True
+                payment.reconciliation_reason = "paid_work_unavailable"
+                payment.save(update_fields=["reconciliation_required", "reconciliation_reason"])
                 # The payment stays recorded; a lost occurrence needs a refund, not a Stripe retry.
                 lost_ids = [offer.id for offer in unbookable_offers]
                 logger.error(
@@ -155,4 +177,6 @@ def handle_charge_refunded(event):
             'refunded' if cumulative >= payment.amount_aud
             else 'partially_refunded'
         )
-        payment.save(update_fields=['refunded_amount_aud', 'status'])
+        if payment.status == 'refunded':
+            payment.reconciliation_required = False
+        payment.save(update_fields=['refunded_amount_aud', 'status', 'reconciliation_required'])
