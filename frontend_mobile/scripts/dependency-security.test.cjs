@@ -17,6 +17,42 @@ function isolated(source) {
 
 test('installed patches and exact supported leaf versions are present', verifyInstalled);
 
+test('patched deepmerge drops __proto__ for every vulnerable merge shape', () => {
+  const merge = require('deepmerge');
+  const malicious = JSON.parse('{ "__proto__": { "isAdmin": true } }');
+
+  const nullTarget = Object.create(null);
+  nullTarget.debug = false;
+  const fromNullTarget = merge(nullTarget, malicious);
+  assert.equal(Object.getPrototypeOf(fromNullTarget), Object.prototype);
+  assert.equal(fromNullTarget.isAdmin, undefined);
+  assert.equal(fromNullTarget.debug, false);
+
+  const nested = merge(
+    { session: null },
+    JSON.parse('{ "session": { "__proto__": { "isAdmin": true } } }'),
+  );
+  assert.equal(Object.getPrototypeOf(nested.session), Object.prototype);
+  assert.equal(nested.session.isAdmin, undefined);
+
+  const poisonedTarget = JSON.parse('{ "__proto__": { "isAdmin": true }, "debug": false }');
+  const fromTarget = merge(poisonedTarget, { verbose: true });
+  assert.equal(Object.getPrototypeOf(fromTarget), Object.prototype);
+  assert.equal(fromTarget.isAdmin, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(fromTarget, '__proto__'), false);
+  assert.equal(fromTarget.debug, false);
+  assert.equal(fromTarget.verbose, true);
+
+  const arrayClone = merge(
+    { list: [] },
+    JSON.parse('{ "list": [ { "__proto__": { "isAdmin": true }, "value": 7 } ] }'),
+  );
+  assert.equal(Object.getPrototypeOf(arrayClone.list[0]), Object.prototype);
+  assert.equal(arrayClone.list[0].isAdmin, undefined);
+  assert.equal(arrayClone.list[0].value, 7);
+  assert.equal({}.isAdmin, undefined);
+});
+
 test('deep brace/parenthesis patterns and direct ASTs stop before recursive overflow', () => {
   isolated(`
     const assert = require('node:assert/strict'), braces = require('braces');
