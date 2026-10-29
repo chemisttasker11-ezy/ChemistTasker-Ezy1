@@ -149,6 +149,39 @@ class RosterAssignmentProtectionTests(TestCase):
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Shift.objects.filter(pk=self.shift.pk).exists())
 
+    def test_bulk_move_refuses_assignment_with_invoice_history(self):
+        from invoicing.models import Invoice, InvoiceLineItem
+
+        row = ShiftSlotAssignment.objects.create(
+            shift=self.shift,
+            slot=self.slot,
+            slot_date=self.day,
+            user=self.worker,
+            is_rostered=True,
+        )
+        invoice = Invoice.objects.create(user=self.worker, pharmacy=self.pharmacy)
+        InvoiceLineItem.objects.create(
+            invoice=invoice,
+            source_assignment=row,
+            description="Frozen prior service",
+            quantity=1,
+            unit_price=70,
+            total=70,
+        )
+        target = self.other_day()
+
+        with self.assertRaisesMessage(ValidationError, "invoice or workforce leave history"):
+            bulk_edit_roster_period(
+                self.period,
+                [{"action": "move_shift", "slot_id": self.slot.pk, "target_date": str(target)}],
+                self.owner,
+            )
+
+        self.slot.refresh_from_db()
+        row.refresh_from_db()
+        self.assertEqual(self.slot.date, self.day)
+        self.assertEqual(row.slot_date, self.day)
+
     def test_bulk_free_occurrence_control(self):
         with patch("workforce.roster.bulk_edit._validate_and_price"):
             bulk_edit_roster_period(self.period, [

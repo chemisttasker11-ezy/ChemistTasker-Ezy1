@@ -256,9 +256,14 @@ def bulk_edit_roster_period(roster_period, operations, user):
 
                     if target_date != slot.date:
                         guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=target_date)
+                        attached_assignments = list(slot.assignments.all())
+                        for assignment in attached_assignments:
+                            _protect_assignment_history(assignment)
                         slot.date = target_date
                         slot.save(update_fields=["date"])
-                        slot.assignments.all().update(slot_date=target_date)
+                        slot.assignments.filter(
+                            pk__in=[assignment.pk for assignment in attached_assignments]
+                        ).update(slot_date=target_date)
                 else:
                     target_date = slot.date
 
