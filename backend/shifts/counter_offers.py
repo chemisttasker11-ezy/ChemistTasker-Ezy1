@@ -4,6 +4,7 @@ Refusals raise `ShiftActionRefused`, whose response body and status are those th
 """
 from datetime import timedelta
 
+from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
 
@@ -222,16 +223,21 @@ def accept_counter_offer(*, shift, offer, slot_id, decided_by):
                 "worker_confirmation_required": True,
                 **offer_details,
             },
+            deliver_on_commit=True,
         )
-        async_task(
-            'users.tasks.send_async_email',
-            subject="Your counter offer was accepted",
-            recipient_list=[offer.user.email],
-            template_name="emails/shift_counter_offer_accepted.html",
-            context=ctx,
-            text_template="emails/shift_counter_offer_accepted.txt",
-            suppress_auto_notification=True,
-        )
+
+        def enqueue_counter_offer_email(recipient_email=offer.user.email, context=ctx):
+            async_task(
+                'users.tasks.send_async_email',
+                subject="Your counter offer was accepted",
+                recipient_list=[recipient_email],
+                template_name="emails/shift_counter_offer_accepted.html",
+                context=context,
+                text_template="emails/shift_counter_offer_accepted.txt",
+                suppress_auto_notification=True,
+            )
+
+        transaction.on_commit(enqueue_counter_offer_email, robust=True)
 
     return {
         'detail': 'Offer sent for candidate confirmation.',

@@ -12,7 +12,7 @@ from decimal import Decimal
 from unittest import mock
 
 from django.test import TestCase, TransactionTestCase, override_settings
-from django.db import close_old_connections, connection
+from django.db import close_old_connections, connection, transaction
 from unittest import skipUnless
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -304,7 +304,10 @@ class AcceptUserTests(ShiftActionFixture):
         shift = self.shift(fixed_rate=Decimal("70.00"))
         before = timezone.now()
 
-        response, sent = self.post(self.owner, f"shifts/{shift.id}/accept_user/", {"user_id": worker.id})
+        with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+            response = self.owner_client.post(
+                f"{API}shifts/{shift.id}/accept_user/", {"user_id": worker.id}, format="json",
+            )
         self.assertEqual(response.status_code, 200, response.data)
         offer = ShiftOffer.objects.get(shift=shift, user=worker)
         self.assertEqual(response.data, {"status": f"Offer sent to {worker.get_full_name()}.", "offer_id": offer.id})
@@ -402,7 +405,10 @@ class CounterOfferTests(ShiftActionFixture):
         self.submit(worker, shift, slot)
         counter = ShiftCounterOffer.objects.get()
 
-        response, sent = self.post(self.owner, f"shifts/{shift.id}/counter-offers/{counter.id}/accept/")
+        with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+            response = self.owner_client.post(
+                f"{API}shifts/{shift.id}/counter-offers/{counter.id}/accept/", {}, format="json",
+            )
         self.assertEqual(response.status_code, 200, response.data)
         generated = ShiftOffer.objects.get(shift=shift, user=worker)
         self.assertEqual(response.data, {
@@ -473,6 +479,141 @@ class CounterOfferTests(ShiftActionFixture):
         counter.refresh_from_db()
         self.assertEqual(counter.status, ShiftCounterOffer.Status.PENDING)
         self.assertEqual(ShiftCounterOfferSlot.objects.filter(offer=counter).count(), 1)
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+class OfferNotificationCommitTests(TransactionTestCase):
+    """Offer rows and their in-app notice commit before either external transport is attempted."""
+
+    def setUp(self):
+        self.owner, self.pharmacy = make_owner_with_pharmacy("Offer notification pharmacy")
+        self.owner_client = client_for(self.owner)
+        self.worker = make_user("PHARMACIST", mobile_number="0411111111")
+        PharmacistOnboarding.objects.create(user=self.worker, verified=True, short_bio="Bio", rate_preference={})
+        Membership.objects.create(
+            user=self.worker, pharmacy=self.pharmacy, role="PHARMACIST", employment_type="LOCUM",
+            status=Membership.Status.ACCEPTED, is_active=True,
+        )
+
+    def request_case(self, kind):
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST", employment_type="LOCUM",
+            visibility="LOCUM_CASUAL", single_user_only=False, rate_type="FLEXIBLE",
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift, date=DAY, start_time=time(9), end_time=time(17), rate=Decimal("70.00"),
+        )
+        if kind == "counteroffer":
+            counter = ShiftCounterOffer.objects.create(shift=shift, user=self.worker, message="Can do")
+            ShiftCounterOfferSlot.objects.create(
+                offer=counter, slot=slot, slot_date=DAY, proposed_start_time=time(9),
+                proposed_end_time=time(17), proposed_rate=Decimal("75.00"),
+            )
+            return shift, counter, f"{API}shifts/{shift.id}/counter-offers/{counter.id}/accept/", {"slot_id": slot.id}
+        return shift, None, f"{API}shifts/{shift.id}/accept_user/", {"user_id": self.worker.id, "slot_id": slot.id}
+
+    def committed_offer(self, shift, counter):
+        offer = ShiftOffer.objects.get(shift=shift, user=self.worker)
+        self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+        self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift).exists())
+        if counter:
+            counter.refresh_from_db()
+            self.assertEqual(counter.status, ShiftCounterOffer.Status.ACCEPTED)
+        return offer
+
+    def test_announcements_wait_for_outer_commit(self):
+        for kind in ("offer", "counteroffer"):
+            with self.subTest(kind=kind):
+                shift, counter, path, data = self.request_case(kind)
+                with mock.patch("notifications.services._deliver_notification") as deliver, \
+                        mock.patch("celery.app.base.Celery.send_task") as enqueue:
+                    with transaction.atomic():
+                        response = self.owner_client.post(path, data, format="json")
+                        self.assertEqual(response.status_code, 200, response.data)
+                        offer = self.committed_offer(shift, counter)
+                        notice = Notification.objects.get(user=self.worker, payload__shift_id=shift.id)
+                        deliver.assert_not_called()
+                        enqueue.assert_not_called()
+                    deliver.assert_called_once()
+                    self.assertEqual(deliver.call_args.args[0].pk, notice.pk)
+                    enqueue.assert_called_once()
+                    self.assertEqual(enqueue.call_args.args[0], "users.tasks.send_email_task")
+                    email = enqueue.call_args.kwargs["kwargs"]
+                    expected_template = "emails/shift_counter_offer_accepted.html" if counter else "emails/shift_offer.html"
+                    self.assertEqual(email["template_name"], expected_template)
+                    self.assertEqual(email["recipient_list"], [self.worker.email])
+                    self.assertIn(f"offer_id={offer.id}", email["context"]["shift_link"])
+                self.assertTrue(Notification.objects.filter(pk=notice.pk).exists())
+
+    def test_rollback_discards_offer_notice_and_external_callbacks(self):
+        for kind in ("offer", "counteroffer"):
+            with self.subTest(kind=kind):
+                shift, counter, path, data = self.request_case(kind)
+                with mock.patch("notifications.services._deliver_notification") as deliver, \
+                        mock.patch("celery.app.base.Celery.send_task") as enqueue:
+                    with self.assertRaisesMessage(RuntimeError, "later business failure"):
+                        with transaction.atomic():
+                            response = self.owner_client.post(path, data, format="json")
+                            self.assertEqual(response.status_code, 200, response.data)
+                            self.assertTrue(Notification.objects.filter(user=self.worker, payload__shift_id=shift.id).exists())
+                            raise RuntimeError("later business failure")
+                    self.assertFalse(ShiftOffer.objects.filter(shift=shift).exists())
+                    self.assertFalse(Notification.objects.filter(user=self.worker, payload__shift_id=shift.id).exists())
+                    if counter:
+                        counter.refresh_from_db()
+                        self.assertEqual(counter.status, ShiftCounterOffer.Status.PENDING)
+                    deliver.assert_not_called()
+                    enqueue.assert_not_called()
+
+    def test_notification_outage_keeps_committed_offer_and_email_attempt(self):
+        for kind in ("offer", "counteroffer"):
+            with self.subTest(kind=kind):
+                shift, counter, path, data = self.request_case(kind)
+                with mock.patch("notifications.services._deliver_notification", side_effect=RuntimeError("notification offline")) as deliver, \
+                        mock.patch("celery.app.base.Celery.send_task") as enqueue, \
+                        self.assertLogs("django.db.backends.base", level="ERROR") as logged:
+                    response = self.owner_client.post(path, data, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                self.committed_offer(shift, counter)
+                self.assertEqual(Notification.objects.filter(user=self.worker, payload__shift_id=shift.id).count(), 1)
+                deliver.assert_called_once()
+                enqueue.assert_called_once()
+                self.assertTrue(any("notification offline" in record.getMessage() and record.exc_info for record in logged.records))
+
+    def test_queue_outage_keeps_committed_offer_and_notice(self):
+        for kind in ("offer", "counteroffer"):
+            with self.subTest(kind=kind):
+                shift, counter, path, data = self.request_case(kind)
+                with mock.patch("notifications.services._deliver_notification") as deliver, \
+                        mock.patch("celery.app.base.Celery.send_task", side_effect=RuntimeError("queue offline")) as enqueue, \
+                        self.assertLogs("django.db.backends.base", level="ERROR") as logged:
+                    response = self.owner_client.post(path, data, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                self.committed_offer(shift, counter)
+                self.assertEqual(Notification.objects.filter(user=self.worker, payload__shift_id=shift.id).count(), 1)
+                deliver.assert_called_once()
+                enqueue.assert_called_once()
+                self.assertTrue(any("queue offline" in record.getMessage() and record.exc_info for record in logged.records))
+
+    def test_repeated_requests_preserve_existing_offer_and_announcement_behavior(self):
+        for kind in ("offer", "counteroffer"):
+            with self.subTest(kind=kind):
+                shift, counter, path, data = self.request_case(kind)
+                with mock.patch("notifications.services._deliver_notification") as deliver, \
+                        mock.patch("celery.app.base.Celery.send_task") as enqueue:
+                    first = self.owner_client.post(path, data, format="json")
+                    repeated = self.owner_client.post(path, data, format="json")
+                self.assertEqual(first.status_code, 200, first.data)
+                self.assertEqual(repeated.status_code, 200, repeated.data)
+                offer = self.committed_offer(shift, counter)
+                id_field = "offer_ids" if counter else "offer_id"
+                expected_id = [offer.id] if counter else offer.id
+                self.assertEqual(first.data[id_field], expected_id)
+                self.assertEqual(repeated.data[id_field], expected_id)
+                # Counteroffer reacceptance currently announces its refreshed offer; ordinary pending offers do not.
+                expected_attempts = 2 if counter else 1
+                self.assertEqual(deliver.call_count, expected_attempts)
+                self.assertEqual(enqueue.call_count, expected_attempts)
 
 
 class RejectShiftTests(ShiftActionFixture):

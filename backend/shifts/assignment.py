@@ -116,16 +116,21 @@ def offer_shift(*, shift, candidate, slot_id):
             body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
             kind="shift_offer_received",
             payload={"offer_id": offer.id, **offer_details},
+            deliver_on_commit=True,
         )
-        async_task(
-            'users.tasks.send_async_email',
-            subject="You have a new shift offer",
-            recipient_list=[candidate.email],
-            template_name="emails/shift_offer.html",
-            context=ctx,
-            text_template="emails/shift_offer.txt",
-            suppress_auto_notification=True,
-        )
+
+        def enqueue_offer_email(recipient_email=candidate.email, context=ctx):
+            async_task(
+                'users.tasks.send_async_email',
+                subject="You have a new shift offer",
+                recipient_list=[recipient_email],
+                template_name="emails/shift_offer.html",
+                context=context,
+                text_template="emails/shift_offer.txt",
+                suppress_auto_notification=True,
+            )
+
+        transaction.on_commit(enqueue_offer_email, robust=True)
 
     return {
         'status': f'Offer sent to {candidate.get_full_name() or candidate.email}.',
