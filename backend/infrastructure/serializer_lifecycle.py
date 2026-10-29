@@ -86,4 +86,3 @@ class RemoveOldFilesMixin:
                 if old_file:
                     _delete_file_if_unreferenced(old_file, current_instance=instance)
         return super().update(instance, validated_data)
-

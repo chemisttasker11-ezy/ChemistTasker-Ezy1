@@ -46,4 +46,3 @@ def _update_locked_user_fields(user, user_data):
 
     if changed_user_fields:
         user.save(update_fields=sorted(set(changed_user_fields)))
-

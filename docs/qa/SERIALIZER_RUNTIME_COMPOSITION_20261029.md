@@ -63,7 +63,8 @@ Its Serializer run exposed three failures caused by a cached mock in `shifts.can
 patched the canonical dispatch adapter before importing the consumer, so the imported module retained that mock.
 This continuation imports the consumer before patching and asserts that its adapter is restored afterwards.
 All existing assertions stay intact. No application cancellation/dispatch implementation is changed.
-The failing sequence is reproduced and checked separately; hosted final-head verification remains independent.
+The local eight-test failing sequence reproduced the same three failures before repair, then passed 8/8
+afterwards (1.112 seconds after setup). Hosted final-head verification remains independent.
 
 ## Next bounded work
 

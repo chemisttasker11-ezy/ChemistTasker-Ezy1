@@ -218,4 +218,3 @@ class FileReferenceDatabaseTests(TestCase):
         self.assertEqual(profile.profile_photo.name, original)
         profile.refresh_from_db()
         self.assertEqual(profile.profile_photo.name, original)
-
