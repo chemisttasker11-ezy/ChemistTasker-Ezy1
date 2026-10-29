@@ -182,7 +182,6 @@ LEGACY_CELERY_TASKS = {
 ALLOWED_MUTUAL_APP_PAIRS = {
     # core is the composition root (URLconfs, ASGI, WebSocket routing, sitemap) and the shared utility package
     ("core", "shifts"),
-    ("core", "users"),
     # the kernel facade re-exports onboarding; onboarding.models uses the migration-bound client_profile.fields
     ("client_profile", "onboarding"),
     # memberships link users to pharmacies and organisations; the organisation, account and session APIs read them

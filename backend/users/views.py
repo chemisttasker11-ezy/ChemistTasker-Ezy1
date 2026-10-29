@@ -4,7 +4,7 @@ The implementation lives in its owner modules (otp, login_security, sessions, ac
 api_otp, api_passwords, api_account, api_organizations); this module re-exports the historical names for the URL
 modules and existing importers."""
 from django.contrib.auth import get_user_model
-from core.task_queue import async_task  # noqa: F401  (historical patch target)
+from users.task_dispatch import async_task  # noqa: F401  (historical patch target)
 from users.otp import (  # noqa: F401
     OTP_MAX_FAILED_ATTEMPTS,
     OTP_LOCKOUT_MINUTES,

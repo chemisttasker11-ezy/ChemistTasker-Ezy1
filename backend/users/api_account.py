@@ -5,7 +5,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from users.models import ContactMessage
 from users.serializers import ContactMessageCreateSerializer
 from django.conf import settings
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from rest_framework.views import APIView
 from users.tasks import send_async_email
 from rest_framework.exceptions import ValidationError
