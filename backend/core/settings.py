@@ -174,6 +174,9 @@ INSTALLED_APPS = [
 
     'billing',
 
+    # Bind shared lifecycle mechanics after all models load, in HTTP and worker processes.
+    'composition.apps.CompositionConfig',
+
 ]
 
 

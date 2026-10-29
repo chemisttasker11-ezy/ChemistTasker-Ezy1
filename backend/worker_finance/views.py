@@ -87,7 +87,7 @@ class CustomerViewSet(OwnedViewSet):
         if not customer.abn:
             raise ValidationError('Save a valid ABN first.')
         # Reuse the existing ABR checker; do not build a second lookup service.
-        from core.integrations.abr import abn_lookup, _parse_abn_html_fields
+        from infrastructure.integrations.abr import abn_lookup, _parse_abn_html_fields
         try:
             legal_name, html = abn_lookup(customer.abn)
             parsed = _parse_abn_html_fields(html or '')

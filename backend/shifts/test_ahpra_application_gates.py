@@ -385,10 +385,15 @@ class AhpraApplicationGateTests(TestCase):
             kept_offers.append(ShiftOffer.objects.create(
                 shift=shift, slot=slot, user=self.user, status=ShiftOffer.Status.ACCEPTED).pk)
         self.set_state('suspended')
+        # Import the consumer before patching its source adapter; otherwise its
+        # module cache retains the temporary adapter after both patches exit.
+        from shifts import cancellation
+        canonical_dispatch = cancellation.async_task
         with patch('users.task_dispatch.async_task'), patch('notifications.services.notify_users'), \
-                patch('shifts.cancellation.async_task'), patch('onboarding.verification.state.close_chat_sockets') as close:
+                patch.object(cancellation, 'async_task'), patch('onboarding.verification.state.close_chat_sockets') as close:
             with self.captureOnCommitCallbacks(execute=True):
                 apply_state_transition(self.profile, {'state': 'ok'})
+        self.assertIs(cancellation.async_task, canonical_dispatch)
         close.assert_not_called()
         self.assertFalse(ShiftSlotAssignment.objects.filter(pk=public_assignment.pk).exists())
         public_offer.refresh_from_db()

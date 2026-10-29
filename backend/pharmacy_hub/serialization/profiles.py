@@ -4,7 +4,7 @@ from organizations.models import Organization, Pharmacy
 from django.db import transaction
 from infrastructure.file_validation import IMAGE_UPLOAD_POLICY
 from users.presentation import _build_absolute_media_url
-from core.serializer_mixins import UploadValidationMixin
+from infrastructure.serializer_mixins import UploadValidationMixin
 
 
 def _delete_profile_file_if_unreferenced(model, field_name, instance_pk, storage, name):

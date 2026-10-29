@@ -10,7 +10,7 @@ from onboarding.models import (
     RefereeResponse,
 )
 from infrastructure.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
-from core.serializer_mixins import UploadValidationMixin
+from infrastructure.serializer_mixins import UploadValidationMixin
 from users.presentation import _build_absolute_media_url
 from onboarding.services.basic import (
     apply_explorer_basic_tab,

@@ -1,23 +1,90 @@
 {
   "schema": "chemisttasker-backend-cycle-baseline-v1",
-  "recorded_sha": "parent:d8a1a476; runtime ownership cleanup",
-  "source": "Runtime ownership cleanup; only removed cyclic edges accepted.",
-  "notes": "No direct mutual pairs or exemptions remain. onboarding-to-client_profile is removed at every depth; the identical encryption implementation is infrastructure-owned and historical migration metadata is bound by the compatibility facade during model discovery. Actual direct cyclic edges fall 23 to 22; combined cyclic edges fall 124 to 123. Longer cycles remain.",
-  "strongly_connected_components": [
+  "recorded_sha": "parent:90534bbe; serializer runtime composition",
+  "source": "All direct runtime cycles are removed. Function-local cycle debt is independently bounded.",
+  "notes": "Direct SCCs and cyclic edges are zero; combined cyclic edges decrease 120 to 114 with no added cyclic edge or component expansion. Explicit file references belong to application composition, bound at worker-safe startup; infrastructure imports no domain. Historical facades remain.",
+  "strongly_connected_components": [],
+  "unapproved_cycle_edges": [],
+  "combined_components": [
     [
+      "attendance",
+      "billing",
       "chat",
+      "client_profile",
       "core",
+      "invoicing",
+      "marketplace",
       "memberships",
+      "notifications",
       "onboarding",
       "organizations",
+      "pharmacy_hub",
+      "public_hub",
+      "ratings",
+      "rewards",
       "shifts",
-      "talent"
+      "talent",
+      "users",
+      "worker_finance",
+      "workforce"
     ]
   ],
-  "unapproved_cycle_edges": [
+  "combined_cyclic_edges": [
+    [
+      "attendance",
+      "memberships"
+    ],
+    [
+      "attendance",
+      "notifications"
+    ],
+    [
+      "attendance",
+      "onboarding"
+    ],
+    [
+      "attendance",
+      "organizations"
+    ],
+    [
+      "attendance",
+      "shifts"
+    ],
+    [
+      "attendance",
+      "users"
+    ],
+    [
+      "attendance",
+      "workforce"
+    ],
+    [
+      "billing",
+      "notifications"
+    ],
+    [
+      "billing",
+      "organizations"
+    ],
+    [
+      "billing",
+      "shifts"
+    ],
+    [
+      "billing",
+      "users"
+    ],
     [
       "chat",
       "memberships"
+    ],
+    [
+      "chat",
+      "notifications"
+    ],
+    [
+      "chat",
+      "onboarding"
     ],
     [
       "chat",
@@ -25,6 +92,38 @@
     ],
     [
       "chat",
+      "shifts"
+    ],
+    [
+      "chat",
+      "users"
+    ],
+    [
+      "client_profile",
+      "chat"
+    ],
+    [
+      "client_profile",
+      "core"
+    ],
+    [
+      "client_profile",
+      "memberships"
+    ],
+    [
+      "client_profile",
+      "onboarding"
+    ],
+    [
+      "client_profile",
+      "organizations"
+    ],
+    [
+      "client_profile",
+      "pharmacy_hub"
+    ],
+    [
+      "client_profile",
       "shifts"
     ],
     [
@@ -33,7 +132,75 @@
     ],
     [
       "core",
+      "client_profile"
+    ],
+    [
+      "core",
+      "marketplace"
+    ],
+    [
+      "core",
+      "notifications"
+    ],
+    [
+      "core",
+      "onboarding"
+    ],
+    [
+      "core",
+      "public_hub"
+    ],
+    [
+      "core",
       "shifts"
+    ],
+    [
+      "core",
+      "users"
+    ],
+    [
+      "core",
+      "worker_finance"
+    ],
+    [
+      "invoicing",
+      "memberships"
+    ],
+    [
+      "invoicing",
+      "notifications"
+    ],
+    [
+      "invoicing",
+      "onboarding"
+    ],
+    [
+      "invoicing",
+      "organizations"
+    ],
+    [
+      "invoicing",
+      "shifts"
+    ],
+    [
+      "invoicing",
+      "users"
+    ],
+    [
+      "invoicing",
+      "worker_finance"
+    ],
+    [
+      "marketplace",
+      "onboarding"
+    ],
+    [
+      "marketplace",
+      "organizations"
+    ],
+    [
+      "memberships",
+      "notifications"
     ],
     [
       "memberships",
@@ -44,20 +211,176 @@
       "organizations"
     ],
     [
+      "memberships",
+      "shifts"
+    ],
+    [
+      "memberships",
+      "users"
+    ],
+    [
+      "memberships",
+      "workforce"
+    ],
+    [
+      "notifications",
+      "users"
+    ],
+    [
       "onboarding",
-      "core"
+      "chat"
+    ],
+    [
+      "onboarding",
+      "memberships"
+    ],
+    [
+      "onboarding",
+      "notifications"
+    ],
+    [
+      "onboarding",
+      "organizations"
+    ],
+    [
+      "onboarding",
+      "rewards"
+    ],
+    [
+      "onboarding",
+      "shifts"
+    ],
+    [
+      "onboarding",
+      "talent"
+    ],
+    [
+      "onboarding",
+      "users"
     ],
     [
       "organizations",
-      "core"
+      "notifications"
     ],
     [
       "organizations",
       "onboarding"
     ],
     [
+      "organizations",
+      "shifts"
+    ],
+    [
+      "organizations",
+      "users"
+    ],
+    [
+      "organizations",
+      "workforce"
+    ],
+    [
+      "pharmacy_hub",
+      "memberships"
+    ],
+    [
+      "pharmacy_hub",
+      "notifications"
+    ],
+    [
+      "pharmacy_hub",
+      "onboarding"
+    ],
+    [
+      "pharmacy_hub",
+      "organizations"
+    ],
+    [
+      "pharmacy_hub",
+      "public_hub"
+    ],
+    [
+      "pharmacy_hub",
+      "users"
+    ],
+    [
+      "public_hub",
+      "core"
+    ],
+    [
+      "public_hub",
+      "onboarding"
+    ],
+    [
+      "public_hub",
+      "pharmacy_hub"
+    ],
+    [
+      "public_hub",
+      "shifts"
+    ],
+    [
+      "public_hub",
+      "talent"
+    ],
+    [
+      "public_hub",
+      "users"
+    ],
+    [
+      "ratings",
+      "organizations"
+    ],
+    [
+      "ratings",
+      "shifts"
+    ],
+    [
+      "ratings",
+      "users"
+    ],
+    [
+      "rewards",
+      "billing"
+    ],
+    [
+      "rewards",
+      "notifications"
+    ],
+    [
+      "rewards",
+      "onboarding"
+    ],
+    [
+      "rewards",
+      "organizations"
+    ],
+    [
+      "rewards",
+      "shifts"
+    ],
+    [
+      "rewards",
+      "users"
+    ],
+    [
+      "shifts",
+      "attendance"
+    ],
+    [
+      "shifts",
+      "billing"
+    ],
+    [
+      "shifts",
+      "invoicing"
+    ],
+    [
       "shifts",
       "memberships"
+    ],
+    [
+      "shifts",
+      "notifications"
     ],
     [
       "shifts",
@@ -72,8 +395,96 @@
       "talent"
     ],
     [
+      "shifts",
+      "users"
+    ],
+    [
+      "shifts",
+      "workforce"
+    ],
+    [
       "talent",
       "onboarding"
+    ],
+    [
+      "talent",
+      "ratings"
+    ],
+    [
+      "users",
+      "billing"
+    ],
+    [
+      "users",
+      "chat"
+    ],
+    [
+      "users",
+      "notifications"
+    ],
+    [
+      "users",
+      "onboarding"
+    ],
+    [
+      "users",
+      "organizations"
+    ],
+    [
+      "users",
+      "public_hub"
+    ],
+    [
+      "users",
+      "rewards"
+    ],
+    [
+      "users",
+      "shifts"
+    ],
+    [
+      "users",
+      "talent"
+    ],
+    [
+      "worker_finance",
+      "invoicing"
+    ],
+    [
+      "worker_finance",
+      "organizations"
+    ],
+    [
+      "workforce",
+      "attendance"
+    ],
+    [
+      "workforce",
+      "memberships"
+    ],
+    [
+      "workforce",
+      "notifications"
+    ],
+    [
+      "workforce",
+      "onboarding"
+    ],
+    [
+      "workforce",
+      "organizations"
+    ],
+    [
+      "workforce",
+      "shifts"
+    ],
+    [
+      "workforce",
+      "talent"
+    ],
+    [
+      "workforce",
+      "users"
     ]
   ]
 }

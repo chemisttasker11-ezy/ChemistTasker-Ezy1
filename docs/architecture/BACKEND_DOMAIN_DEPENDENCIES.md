@@ -151,7 +151,8 @@ All of them were reviewed:
 `shared-core/` is the TypeScript SDK and presentation contract for Vite, Next and Expo.
 Django domains remain authoritative for permissions, amounts, booking and settlement.
 `backend/infrastructure/` contains neutral Python mechanics; it does not import business domains.
-`backend/composition/` binds cross-domain ports before mounting the historical HTTP routes.
+`backend/composition/` binds cross-domain ports before mounting the historical HTTP routes,
+and its application startup hook binds the explicit file-reference registry for workers and commands too.
 Core retains settings, startup, routing and compatibility exports. No second client SDK is introduced.
 
 - Upload validation: `infrastructure.file_validation` (historical core facade retained).
@@ -162,9 +163,16 @@ Core retains settings, startup, routing and compatibility exports. No second cli
 - Parser: `infrastructure.serializer_values`; encryption: `infrastructure.encrypted_fields` with the old field path preserved.
 - Admin policy facts: `access_control.pharmacy_roles`; membership writes/selectors: `memberships`.
 - Organisation and identity projections retain their own adapters, composed through explicit ports.
+- Serializer upload validation, file lifecycle mechanics and numeric coercion: `infrastructure`.
+  `composition.file_references` owns the explicit 28 model/field references; generic infrastructure imports no domains.
+  `users.identity_updates` owns locked identity mutations. ABR transport/parsing: `infrastructure.integrations.abr`.
+  Historical core imports remain object-identical compatibility facades.
 
 The historical table and cycle descriptions above describe earlier source, not current debt.
 The exact current inventory is `RUNTIME_CYCLE_LEDGER_20261029.json`; regenerate/check it with
 `python scripts/runtime_cycle_ledger.py [--check]`. A no-growth baseline is not zero-cycle acceptance.
-Remaining domain-aware file reference/lifecycle services, ABR integration ownership and worker-side
-organisation lookups require separate bounded assessment. Retaining them is explicit debt, not an import failure.
+The serializer-runtime continuation removes every direct module cycle: 15 cyclic edges to zero,
+no direct SCCs or mutual pairs. The combined module/function-local graph still has 114 cyclic edges
+in the retained twenty-app component, down from 120, with no added cyclic edge. CI now rejects
+all direct cycles and separately rejects additions to combined cycle debt. Worker-side organisation
+scope/navigation remains the next bounded ownership assessment. No whole-runtime acyclicity is claimed.
