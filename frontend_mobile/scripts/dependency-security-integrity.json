@@ -9,7 +9,7 @@
     "node_modules/node-forge/lib/rsa.js": "96c154db17c611f81eeb48aed2c064c80d87517df2fff24cf574fbd1ac050492",
     "node_modules/metro/src/Assets.js": "d6c19bdbcd1858c16ee7dce4b2301a18b735d017c4859eb93b1ad9cd12e03cd8",
     "node_modules/metro/src/Assets.js.flow": "11f7bc3869f8c2f6621e393d773eff09530edd4f049e1840740004d57a413bfd",
-    "node_modules/deepmerge/index.js": "281deda15dc48e3f932e7e36310d6bcb5cbc7c851280fd0ee59fd2bf6f56bba1",
+    "node_modules/deepmerge/index.js": "51155f77a9fa7992bb8ec4c50bcd09800daca3425b902e655e546ed50af740bf",
     "node_modules/deepmerge/dist/cjs.js": "976c91f003a1fc609ebe2017babda35eb15dcb972c4bc868637626d3850c2756",
     "node_modules/deepmerge/dist/umd.js": "88e2fb95a180eaa6d0e739d051a2faf9e2d9c7a1111022a4709d56d7da53dfe0"
   }

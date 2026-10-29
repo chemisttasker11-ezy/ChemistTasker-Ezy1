@@ -118,6 +118,26 @@ test('RSA verifier rejects nested padding and preserves valid SHA signatures', (
   assert.ok(expoCertificates.signBufferRSASHA256AndVerify(keys.privateKey, certificate, Buffer.from('valid update')));
 });
 
+test('patched deepmerge rejects returned-object prototype poisoning and preserves normal merges', () => {
+  const merge = require('deepmerge');
+  const values = [
+    merge(Object.create(null), JSON.parse('{"__proto__":{"isAdmin":true}}')),
+    merge({ session: null }, JSON.parse('{"session":{"__proto__":{"isAdmin":true}}}')).session,
+    merge(JSON.parse('{"__proto__":{"isAdmin":true},"debug":false}'), {}),
+    merge({ list: [] }, JSON.parse('{"list":[{"__proto__":{"isAdmin":true}}]}')).list[0],
+  ];
+  for (const value of values) {
+    assert.equal(Object.getPrototypeOf(value), Object.prototype);
+    assert.equal(value.isAdmin, undefined);
+    assert.equal(Object.prototype.hasOwnProperty.call(value, '__proto__'), false);
+  }
+  assert.equal(({}).isAdmin, undefined);
+  assert.deepEqual(
+    merge({ a: { x: 1 }, list: [1] }, { a: { y: 2 }, list: [2] }),
+    { a: { x: 1, y: 2 }, list: [1, 2] },
+  );
+});
+
 test('patched image parsers reject zero-size entries and Metro keeps valid dimensions', () => {
   isolated(`
     const assert=require('node:assert/strict'), size=require('image-size').imageSize;
