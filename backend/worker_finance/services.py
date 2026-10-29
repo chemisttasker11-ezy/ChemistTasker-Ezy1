@@ -1,6 +1,6 @@
 """Transactional worker invoice operations over the canonical Invoice tables."""
 import json
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -11,6 +11,7 @@ from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
+from .assignment_terms import InvalidAssignmentTerms, resolve_invoice_assignment_facts
 
 from .calculations import calculate_invoice, CalculationError, allocate_payment, ZERO
 from .models import (
@@ -221,28 +222,11 @@ def _assignment_queryset(owner, assignment_ids=None, lock=False):
     return qs
 
 
-def _hours_for_assignment(assignment):
-    start = assignment.slot.start_time
-    end = assignment.slot.end_time
-    start_dt = datetime.combine(assignment.slot_date, start)
-    end_dt = datetime.combine(assignment.slot_date, end)
-    if end_dt <= start_dt:
-        end_dt += timedelta(days=1)
-    return (Decimal(str((end_dt - start_dt).total_seconds())) / Decimal("3600")).quantize(Decimal("0.01"))
-
-
-def _accepted_rate(assignment):
-    snapshot = assignment.engagement_terms_snapshot or {}
-    for occurrence in snapshot.get("occurrences") or []:
-        if str(occurrence.get("slot_id") or "") != str(assignment.slot_id):
-            continue
-        if str(occurrence.get("date") or "") != str(assignment.slot_date):
-            continue
-        if occurrence.get("agreed_rate") not in (None, ""):
-            return Decimal(str(occurrence["agreed_rate"]))
-    if assignment.unit_rate is not None:
-        return Decimal(str(assignment.unit_rate))
-    raise ValidationError({"rate": f"Assignment {assignment.pk} is missing an agreed invoice rate."})
+def _assignment_facts(assignment):
+    try:
+        return resolve_invoice_assignment_facts(assignment)
+    except InvalidAssignmentTerms as exc:
+        raise ValidationError({exc.field: str(exc)}) from exc
 
 
 def internal_invoice_sources(owner):
@@ -254,17 +238,18 @@ def internal_invoice_sources(owner):
     for assignment in _assignment_queryset(owner):
         if assignment.id in billed:
             continue
+        facts = _assignment_facts(assignment)
         pharmacy = assignment.shift.pharmacy
         result.append(
             {
                 "assignment_id": assignment.id,
                 "shift_id": assignment.shift_id,
                 "slot_id": assignment.slot_id,
-                "date": str(assignment.slot_date),
-                "start_time": assignment.slot.start_time.strftime("%H:%M"),
-                "end_time": assignment.slot.end_time.strftime("%H:%M"),
-                "hours": str(_hours_for_assignment(assignment)),
-                "rate": str(_accepted_rate(assignment).quantize(Decimal("0.01"))),
+                "date": str(facts.occurrence_date),
+                "start_time": facts.start_time.strftime("%H:%M"),
+                "end_time": facts.end_time.strftime("%H:%M"),
+                "hours": str(facts.hours),
+                "rate": str(facts.rate.quantize(Decimal("0.01"))),
                 "pharmacy": {
                     "id": pharmacy.id,
                     "name": pharmacy.name,
@@ -281,6 +266,19 @@ def internal_invoice_sources(owner):
 def _source_snapshot(assignments):
     pharmacy = assignments[0].shift.pharmacy if assignments else None
     owner_user = getattr(getattr(pharmacy, "owner", None), "user", None) if pharmacy else None
+    accepted_terms = []
+    for assignment in assignments:
+        facts = _assignment_facts(assignment)
+        accepted_terms.append({
+            "assignment_id": facts.assignment_id,
+            "source_offer_id": facts.source_offer_id,
+            "settlement_channel": assignment.settlement_channel,
+            "engagement_kind": assignment.engagement_kind,
+            "accepted_at": facts.accepted_at.isoformat() if facts.accepted_at else None,
+            "terms": assignment.engagement_terms_snapshot or {},
+            "original_hours": str(facts.hours),
+            "original_rate": str(facts.rate.quantize(Decimal("0.01"))),
+        })
     return {
         "version": 3,
         "source": "INTERNAL_ABN_SHIFT_ASSIGNMENTS",
@@ -294,19 +292,7 @@ def _source_snapshot(assignments):
             "email": getattr(pharmacy, "email", "") or getattr(owner_user, "email", "") or "",
             "address": _pharmacy_address(pharmacy),
         } if pharmacy else {},
-        "accepted_terms": [
-            {
-                "assignment_id": a.id,
-                "source_offer_id": a.source_offer_id,
-                "settlement_channel": a.settlement_channel,
-                "engagement_kind": a.engagement_kind,
-                "accepted_at": a.engagement_terms_accepted_at.isoformat() if a.engagement_terms_accepted_at else None,
-                "terms": a.engagement_terms_snapshot or {},
-                "original_hours": str(_hours_for_assignment(a)),
-                "original_rate": str(_accepted_rate(a).quantize(Decimal("0.01"))),
-            }
-            for a in assignments
-        ],
+        "accepted_terms": accepted_terms,
     }
 
 
@@ -337,22 +323,23 @@ def internal_invoice_prefill(owner, assignment_ids):
     gst_registered = bool(defaults["gst_registered"])
     lines = []
     for assignment in assignments:
+        facts = _assignment_facts(assignment)
         lines.append(
             {
                 "item_id": None,
                 "description": (
                     f"{assignment.shift.get_role_needed_display() if hasattr(assignment.shift, 'get_role_needed_display') else assignment.shift.role_needed} "
-                    f"services — {assignment.slot_date} "
-                    f"{assignment.slot.start_time.strftime('%H:%M')}-{assignment.slot.end_time.strftime('%H:%M')}"
+                    f"services — {facts.occurrence_date} "
+                    f"{facts.start_time.strftime('%H:%M')}-{facts.end_time.strftime('%H:%M')}"
                 ),
                 "category_code": "ProfessionalServices",
                 "unit": "Hours",
-                "quantity": str(_hours_for_assignment(assignment)),
-                "unit_price": str(_accepted_rate(assignment).quantize(Decimal("0.01"))),
+                "quantity": str(facts.hours),
+                "unit_price": str(facts.rate.quantize(Decimal("0.01"))),
                 "discount": "0.00",
                 "tax_code": "GST" if gst_registered else "OUT_OF_SCOPE",
-                "super_eligible": bool((assignment.engagement_terms_snapshot or {}).get("super_payable_confirmed", False)),
-                "worked_on": str(assignment.slot_date),
+                "super_eligible": facts.super_payable_confirmed,
+                "worked_on": str(facts.occurrence_date),
                 "source_assignment_id": assignment.id,
                 "shift_id": assignment.shift_id,
             }

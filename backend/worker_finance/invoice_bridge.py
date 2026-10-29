@@ -5,6 +5,7 @@ invoice with workspace revisions, reviews, payments and deliveries. Keep those
 integration details behind this module so invoicing does not reach into
 worker-finance models/services directly.
 """
+from .assignment_terms import InvalidAssignmentTerms, resolve_invoice_assignment_facts
 
 
 def adopt_generated_internal_invoice(owner, invoice):

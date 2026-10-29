@@ -1,6 +1,5 @@
 """Invoice generation: preview and create invoices from accepted shifts, recalculate totals, render the PDF."""
 import json
-from datetime import time
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Pharmacy
 from shifts.models import ShiftSlotAssignment
@@ -10,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.template.loader import render_to_string
 from weasyprint import HTML
-from shifts.pricing import _decimal_hours, _resolve_shift_bounds
+from worker_finance.invoice_bridge import InvalidAssignmentTerms, resolve_invoice_assignment_facts
 
 
 INVOICE_SETTLEMENT_CHANNEL = "INVOICE"
@@ -67,70 +66,36 @@ def validate_internal_invoice_shifts(user, shift_ids, pharmacy_id=None, *, assig
     return assignments
 
 
-def _accepted_invoice_rate(assignment, slot_date):
-    snapshot = assignment.engagement_terms_snapshot or {}
-    for occurrence in snapshot.get("occurrences") or []:
-        if str(occurrence.get("slot_id") or "") != str(assignment.slot_id):
-            continue
-        if str(occurrence.get("date") or "") != str(slot_date):
-            continue
-        agreed_rate = occurrence.get("agreed_rate")
-        if agreed_rate not in (None, ""):
-            rate = Decimal(str(agreed_rate))
-            if rate > 0:
-                return rate
-
-    if assignment.unit_rate is not None and assignment.unit_rate > 0:
-        return Decimal(str(assignment.unit_rate))
-
-    raise ValidationError({
-        "rate": (
-            f"Accepted invoice terms for assignment {assignment.pk} do not contain a positive agreed rate. "
-            "Resolve the shift terms before invoicing."
-        )
-    })
-
-
 def _invoice_line_from_assignment(assignment):
-    slot = assignment.slot
-    slot_date = assignment.slot_date
-    start_time, end_time = slot.start_time, slot.end_time
-    for occurrence in (assignment.engagement_terms_snapshot or {}).get('occurrences') or []:
-        if str(occurrence.get('slot_id')) == str(slot.id) and str(occurrence.get('date')) == str(slot_date):
-            start_time = time.fromisoformat(occurrence['start_time']) if occurrence.get('start_time') else start_time
-            end_time = time.fromisoformat(occurrence['end_time']) if occurrence.get('end_time') else end_time
-            break
-    start_dt, end_dt = _resolve_shift_bounds(slot_date, start_time, end_time)
-    # InvoiceLineItem.quantity is a 2-decimal field. Freeze the billed hours
-    # at that precision before calculating money so DB, workspace and PDF agree.
-    hours = _decimal_hours(start_dt, end_dt).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    rate = _accepted_invoice_rate(assignment, slot_date)
-    total = (hours * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    snapshot = assignment.engagement_terms_snapshot or {}
+    try:
+        facts = resolve_invoice_assignment_facts(assignment)
+    except InvalidAssignmentTerms as exc:
+        raise ValidationError({exc.field: str(exc)}) from exc
+    total = (facts.hours * facts.rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return {
-        "id": f"{assignment.shift_id}-{slot.id}-{slot_date}",
-        "assignmentId": assignment.id,
-        "shiftId": assignment.shift_id,
-        "shiftSlotId": slot.id,
-        "date": str(slot_date),
-        "start_time": start_time.strftime("%H:%M:%S"),
-        "end_time": end_time.strftime("%H:%M:%S"),
-        "description": f"{str(slot_date)} {start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')}",
+        "id": f"{facts.shift_id}-{facts.slot_id}-{facts.occurrence_date}",
+        "assignmentId": facts.assignment_id,
+        "shiftId": facts.shift_id,
+        "shiftSlotId": facts.slot_id,
+        "date": str(facts.occurrence_date),
+        "start_time": facts.start_time.strftime("%H:%M:%S"),
+        "end_time": facts.end_time.strftime("%H:%M:%S"),
+        "description": f"{facts.occurrence_date} {facts.start_time.strftime('%H:%M')}-{facts.end_time.strftime('%H:%M')}",
         "category": "ProfessionalServices",
         "category_code": "ProfessionalServices",
         "unit": "Hours",
-        "quantity": float(hours),
-        "unit_price": float(rate),
+        "quantity": float(facts.hours),
+        "unit_price": float(facts.rate),
         "discount": 0,
         "total": float(total),
-        "gst_applicable": bool(snapshot.get("gst_registered", False)),
-        "super_applicable": bool(snapshot.get("super_payable_confirmed", False)),
+        "gst_applicable": facts.gst_registered,
+        "super_applicable": facts.super_payable_confirmed,
         "was_modified": False,
         "locked": True,
         "rate_reason": {
             "source": "AcceptedShiftTerms",
-            "assignment_id": assignment.id,
-            "offer_id": assignment.source_offer_id,
+            "assignment_id": facts.assignment_id,
+            "offer_id": facts.source_offer_id,
             "settlement_channel": assignment.settlement_channel,
         },
     }
