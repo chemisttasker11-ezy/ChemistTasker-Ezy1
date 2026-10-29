@@ -1,11 +1,14 @@
 from copy import deepcopy
 from datetime import date, time, timedelta
 from decimal import Decimal
+import json
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 from unittest.mock import patch
@@ -22,7 +25,7 @@ from client_profile.characterization_support import client_for, make_owner_with_
 from invoicing.models import Invoice, InvoiceLineItem, manager_visible_state
 from notifications.models import Notification
 from invoicing.serializers import InvoiceSerializer
-from invoicing.services import generate_invoice_from_shifts
+from invoicing.services import generate_invoice_from_shifts, recalculate_invoice_totals
 from invoicing.views import InvoiceDetailView, send_invoice_email
 from worker_finance.views import InvoiceViewSet, ReceivedInvoiceViewSet
 from worker_finance.models import CatalogueItem, Customer, Delivery, InvoiceRevision
@@ -1260,6 +1263,554 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(updated.version, 2)
         self.assertEqual(updated.status, "draft")
         self.assertEqual(InvoiceRevision.objects.filter(invoice=updated).count(), 2)
+
+
+class InvoiceGenerationPreviewIntegrityTests(TestCase):
+    """The retained generator previews its actual saved route without reserving work."""
+
+    # Reuse the established accepted-assignment fixture without inheriting its tests.
+    setUp = AcceptedShiftInvoiceIntegrityTests.setUp
+    _billing_data = AcceptedShiftInvoiceIntegrityTests._billing_data
+    _generate_via_api = AcceptedShiftInvoiceIntegrityTests._generate_via_api
+
+    def _financial_payload(self, **overrides):
+        return {
+            "external": False, "pharmacy": self.pharmacy.pk,
+            "shift_ids": [self.shift.pk], "line_items": [],
+            "gst_registered": True, "super_rate_snapshot": "12.00",
+            **overrides,
+        }
+
+    def _accepted_terms(self, *, rate="70.00", gst=True, super_eligible=False):
+        self.assignment.unit_rate = Decimal(rate)
+        self.assignment.engagement_terms_snapshot = {
+            "gst_registered": gst, "super_review_required": True,
+            "super_payable_confirmed": super_eligible,
+            "occurrences": [{
+                "slot_id": self.slot.pk, "date": str(self.slot.date),
+                "start_time": "09:00:00", "end_time": "10:00:00", "agreed_rate": rate,
+            }],
+        }
+        self.assignment.save(update_fields=["unit_rate", "engagement_terms_snapshot"])
+
+    def _custom_line(self, **overrides):
+        return {
+            "description": "Reviewed extra", "category_code": "Transportation", "unit": "Hours",
+            "quantity": "1.50", "unit_price": "3.03", "discount": "0.00", "total": "999.00",
+            "gst_applicable": False, "super_applicable": False,
+            **overrides,
+        }
+
+    def _preview(self, payload, *, actor=None, anonymous=False, expected_status=200, raw_json=False):
+        models = (Invoice, InvoiceLineItem, Customer, CatalogueItem, InvoiceRevision, Delivery, Notification)
+        counts = [model.objects.count() for model in models]
+        assignments = list(ShiftSlotAssignment.objects.order_by("pk").values())
+        client = client_for(None if anonymous else (actor or self.worker))
+        client.raise_request_exception = False
+        with (
+            self.captureOnCommitCallbacks(execute=True) as callbacks,
+            CaptureQueriesContext(connection) as captured,
+            patch("celery.app.task.Task.apply_async") as apply_async,
+            patch("celery.app.base.Celery.send_task") as send_task,
+            patch("django.core.mail.message.EmailMessage.send") as send_email,
+        ):
+            options = {"content_type": "application/json"} if raw_json else {"format": "json"}
+            response = client.post("/api/v1/invoices/generate/preview/", payload, **options)
+        detail = getattr(response, "data", response.content[:300])
+        if isinstance(expected_status, tuple):
+            self.assertIn(response.status_code, expected_status, detail)
+        else:
+            self.assertEqual(response.status_code, expected_status, detail)
+        self.assertEqual([model.objects.count() for model in models], counts)
+        self.assertEqual(list(ShiftSlotAssignment.objects.order_by("pk").values()), assignments)
+        writes = [query["sql"] for query in captured.captured_queries
+                  if query["sql"].lstrip().split(" ", 1)[0].upper() in {"INSERT", "UPDATE", "DELETE"}]
+        self.assertEqual(writes, [], "Preview must not create temporary records and roll them back either.")
+        self.assertEqual(callbacks, [])
+        apply_async.assert_not_called()
+        send_task.assert_not_called()
+        send_email.assert_not_called()
+        return response
+
+    def _assert_preview_matches_generation(self, payload, *, subtotal, gst, total, super_amount="0.00"):
+        preview = self._preview(payload).data
+        expected = {"subtotal": subtotal, "gst_amount": gst, "super_amount": super_amount, "total": total}
+        for field, amount in expected.items():
+            self.assertIsInstance(preview[field], str)
+            self.assertEqual(preview[field], amount)
+        response = self._generate_via_api(**payload)
+        self.assertEqual(response.status_code, 201, response.data)
+        invoice = Invoice.objects.get(pk=response.data["id"])
+        lines = list(invoice.line_items.order_by("id"))
+        returned_lines = {row["id"]: row for row in response.data["line_items"]}
+        self.assertEqual(set(returned_lines), {line.pk for line in lines})
+        self.assertEqual(len(preview["line_items"]), len(lines))
+        for projected, saved in zip(preview["line_items"], lines, strict=True):
+            self.assertEqual(projected["category_code"], saved.category_code)
+            self.assertEqual(projected["description"], saved.description)
+            self.assertEqual(projected["gst_applicable"], saved.gst_applicable)
+            self.assertEqual(projected["super_applicable"], saved.super_applicable)
+            for field in ("quantity", "unit_price", "discount", "total"):
+                self.assertIsInstance(projected[field], str)
+                self.assertEqual(Decimal(projected[field]), getattr(saved, field), (field, projected))
+                self.assertEqual(Decimal(str(returned_lines[saved.pk][field])), Decimal(projected[field]))
+        for field, amount in expected.items():
+            self.assertEqual(Decimal(str(response.data[field])), Decimal(amount))
+            self.assertEqual(getattr(invoice, field), Decimal(amount))
+        if invoice.external:
+            self.assertIsNone(invoice.request_key)
+            self.assertEqual(invoice.revisions.count(), 0)
+        else:
+            self.assertIsNotNone(invoice.request_key)
+            revision = invoice.revisions.get(version=1)
+            self.assertEqual(invoice.version, 1)
+            self.assertEqual(revision.calculation, invoice.calculation)
+            self.assertEqual(revision.payload, invoice.payload)
+            self.assertEqual(revision.source_snapshot, invoice.source_snapshot)
+            for field, key in (("subtotal", "subtotal"), ("gst_amount", "gst"),
+                               ("super_amount", "super"), ("total", "payable")):
+                self.assertEqual(Decimal(revision.calculation[key]), Decimal(preview[field]))
+            self.assertEqual([Decimal(line["net"]) for line in revision.calculation["lines"]],
+                             [line.total for line in lines])
+        return preview, invoice
+
+    def test_preview_preserves_internal_and_external_half_cent_rounding(self):
+        self._accepted_terms(gst=False)
+        for external, line_total, payable in ((False, "4.55", "74.55"), (True, "4.54", "4.54")):
+            with self.subTest(external=external):
+                payload = self._financial_payload(
+                    external=external, shift_ids=[] if external else [self.shift.pk], gst_registered=False,
+                    line_items=[self._custom_line(category_code="ProfessionalServices" if external else "Transportation")],
+                )
+                preview, invoice = self._assert_preview_matches_generation(
+                    payload, subtotal=payable, gst="0.00", total=payable,
+                )
+                custom = next(row for row in preview["line_items"] if row["origin"] == "custom")
+                self.assertEqual((custom["custom_index"], custom["total"]), (0, line_total))
+                self.assertEqual(invoice.line_items.get(description="Reviewed extra").total, Decimal(line_total))
+
+    def test_preview_preserves_internal_per_line_and_external_aggregate_gst(self):
+        self._accepted_terms(rate="70.06")
+        slot = ShiftSlot.objects.create(
+            shift=self.shift, date=self.slot.date + timedelta(days=1), start_time=time(9), end_time=time(10),
+        )
+        terms = deepcopy(self.assignment.engagement_terms_snapshot)
+        terms["occurrences"][0].update(slot_id=slot.pk, date=str(slot.date))
+        ShiftSlotAssignment.objects.create(
+            shift=self.shift, slot=slot, slot_date=slot.date, user=self.worker, unit_rate="70.06",
+            settlement_channel="INVOICE", engagement_kind="INDEPENDENT_CONTRACTOR",
+            engagement_terms_accepted_at=self.assignment.engagement_terms_accepted_at,
+            engagement_terms_snapshot=terms,
+        )
+        for external, gst, total in ((False, "14.02", "154.14"), (True, "14.01", "154.13")):
+            with self.subTest(external=external):
+                payload = self._financial_payload(external=external, shift_ids=[] if external else [self.shift.pk])
+                if external:
+                    payload["line_items"] = [self._custom_line(
+                        description=f"External service {index}", category_code="ProfessionalServices",
+                        quantity="1.00", unit_price="70.06", gst_applicable=True,
+                    ) for index in range(2)]
+                self._assert_preview_matches_generation(payload, subtotal="140.12", gst=gst, total=total)
+
+    def test_preview_preserves_the_materialized_super_before_internal_adoption(self):
+        self._accepted_terms(gst=False, super_eligible=True)
+        payload = self._financial_payload(gst_registered=False, line_items=[self._custom_line(super_applicable=True)])
+        preview, invoice = self._assert_preview_matches_generation(
+            payload, subtotal="74.55", gst="0.00", total="74.55", super_amount="8.94",
+        )
+        [contribution] = [row for row in preview["line_items"] if row["origin"] == "generated_super"]
+        self.assertEqual((contribution["category_code"], contribution["total"]), ("Superannuation", "8.94"))
+        self.assertIsNone(contribution.get("custom_index"))
+        saved = invoice.line_items.get(category_code="Superannuation")
+        self.assertTrue(saved.is_manual)
+        self.assertFalse(saved.was_modified or saved.gst_applicable or saved.super_applicable)
+        self.assertEqual(invoice.calculation["automatic_super"], "0.00")
+
+    def test_preview_keeps_accepted_false_flags_and_ignores_forged_professional_inputs(self):
+        self._accepted_terms(gst=False, super_eligible=False)
+        accepted = deepcopy(self.assignment.engagement_terms_snapshot)
+        payload = self._financial_payload(line_items=[{
+            "category_code": "ProfessionalServices", "assignmentId": self.assignment.pk,
+            "quantity": "NaN", "unit_price": "not a decimal", "discount": True,
+            "gst_applicable": True, "super_applicable": True, "locked": False, "was_modified": True,
+        }, self._custom_line(quantity="1.00", unit_price="10.00")])
+        preview, invoice = self._assert_preview_matches_generation(
+            payload, subtotal="80.00", gst="0.00", total="80.00",
+        )
+        [source] = [row for row in preview["line_items"] if row["origin"] == "assignment"]
+        self.assertEqual((source["assignmentId"], source["shiftId"], source["shiftSlotId"]),
+                         (self.assignment.pk, self.shift.pk, self.slot.pk))
+        self.assertEqual((source["date"], source["start_time"], source["end_time"]),
+                         (str(self.slot.date), "09:00:00", "10:00:00"))
+        self.assertEqual(source["id"], f"{self.shift.pk}-{self.slot.pk}-{self.slot.date}")
+        self.assertEqual(source["rate_reason"], {
+            "source": "AcceptedShiftTerms", "assignment_id": self.assignment.pk,
+            "offer_id": self.assignment.source_offer_id, "settlement_channel": "INVOICE",
+        })
+        self.assertEqual((Decimal(source["quantity"]), Decimal(source["unit_price"])),
+                         (Decimal("1.00"), Decimal("70.00")))
+        self.assertTrue(source["locked"])
+        self.assertFalse(source["gst_applicable"] or source["super_applicable"] or source["was_modified"])
+        [custom] = [row for row in preview["line_items"] if row["origin"] == "custom"]
+        self.assertEqual(custom["custom_index"], 1, "Indices refer to submitted rows, including ignored source rows.")
+        self.assertEqual(invoice.source_snapshot["accepted_terms"][0]["terms"], accepted)
+        self.assertFalse(invoice.line_items.filter(category_code="Superannuation").exists())
+
+    def test_preview_respects_explicit_invoice_gst_false_without_rewriting_accepted_flags(self):
+        self._accepted_terms(rate="70.05", gst=True)
+        preview, invoice = self._assert_preview_matches_generation(
+            self._financial_payload(gst_registered=False), subtotal="70.05", gst="0.00", total="70.05",
+        )
+        self.assertTrue(preview["line_items"][0]["gst_applicable"])
+        self.assertFalse(invoice.gst_registered)
+        self.assertTrue(invoice.source_snapshot["accepted_terms"][0]["terms"]["gst_registered"])
+        self.assertTrue(OtherStaffOnboarding.objects.get(user=self.worker).gst_registered)
+
+    def test_preview_manual_super_replaces_generated_super_and_stays_out_of_payable(self):
+        self._accepted_terms(gst=False, super_eligible=True)
+        payload = self._financial_payload(gst_registered=False, line_items=[self._custom_line(
+            category_code="Superannuation", description="Worker entered contribution", was_modified=False,
+        )])
+        preview, invoice = self._assert_preview_matches_generation(
+            payload, subtotal="70.00", gst="0.00", total="70.00", super_amount="4.55",
+        )
+        self.assertFalse(any(row["origin"] == "generated_super" for row in preview["line_items"]))
+        [contribution] = [row for row in preview["line_items"] if row["category_code"] == "Superannuation"]
+        self.assertEqual((contribution["origin"], contribution["custom_index"]), ("custom", 0))
+        saved = invoice.line_items.get(category_code="Superannuation")
+        self.assertTrue(saved.was_modified and saved.is_manual)
+        self.assertEqual(invoice.calculation["automatic_super"], "0.00")
+
+    def test_preview_applies_discount_before_each_routes_existing_rounding(self):
+        self._accepted_terms(gst=False)
+        for external, subtotal in ((False, "74.55"), (True, "4.54")):
+            with self.subTest(external=external):
+                payload = self._financial_payload(
+                    external=external, shift_ids=[] if external else [self.shift.pk], gst_registered=False,
+                    line_items=[self._custom_line(
+                        category_code="Accommodation", quantity="1.00", unit_price="9.09", discount="50.00",
+                    )],
+                )
+                self._assert_preview_matches_generation(payload, subtotal=subtotal, gst="0.00", total=subtotal)
+
+    def test_preview_requires_authentication_and_a_worker_issuer_profile(self):
+        payload = self._financial_payload(external=True, shift_ids=[], line_items=[self._custom_line()])
+        self._preview(payload, anonymous=True, expected_status=(401, 403))
+        response = self._preview(payload, actor=self.owner, expected_status=400)
+        self.assertIn("issuer", response.data)
+
+    def test_preview_rejects_foreign_pharmacy_worker_unaccepted_and_payroll_sources(self):
+        payload = self._financial_payload()
+        other = User.objects.create_user(email="preview-other@example.com", password="test-pass", role="OTHER_STAFF")
+        OtherStaffOnboarding.objects.create(user=other, role_type="ASSISTANT", payment_preference="ABN", abn="51824753556")
+        response = self._preview(payload, actor=other, expected_status=400)
+        self.assertIn("shift_ids", response.data)
+        pharmacy = Pharmacy.objects.create(name="Other preview pharmacy", owner=self.owner_onboarding)
+        response = self._preview({**payload, "pharmacy": pharmacy.pk}, expected_status=400)
+        self.assertIn("pharmacy", response.data)
+        response = self._preview({**payload, "shift_ids": [self.shift.pk + 100000]}, expected_status=400)
+        self.assertIn("shift_ids", response.data)
+        accepted_at = self.assignment.engagement_terms_accepted_at
+        for changes in ({"engagement_terms_accepted_at": None}, {"settlement_channel": "PAYROLL"},
+                        {"settlement_channel": "TIMESHEET_ONLY"}):
+            with self.subTest(changes=changes):
+                ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).update(
+                    engagement_terms_accepted_at=accepted_at, settlement_channel="INVOICE",
+                )
+                ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).update(**changes)
+                response = self._preview(payload, expected_status=400)
+                self.assertIn("shift_ids", response.data)
+
+    def test_generation_revalidates_after_preview_and_preview_does_not_reserve_assignment(self):
+        self._accepted_terms(gst=False)
+        payload = self._financial_payload(gst_registered=False)
+        self._preview(payload)
+        accepted_at = self.assignment.engagement_terms_accepted_at
+        ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).update(engagement_terms_accepted_at=None)
+        rejected = self._generate_via_api(**payload)
+        self.assertEqual(rejected.status_code, 400, rejected.data)
+        self.assertIn("shift_ids", rejected.data)
+        self.assertFalse(Invoice.objects.exists())
+        self.assertFalse(InvoiceRevision.objects.exists())
+        ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).update(engagement_terms_accepted_at=accepted_at)
+        response = self._generate_via_api(**payload)
+        self.assertEqual(response.status_code, 201, response.data)
+        # Another creation may win after a successful preview; neither preview
+        # nor its result replaces generation's locked duplicate/source checks.
+        self._preview(payload, expected_status=400)
+        duplicate = self._generate_via_api(**payload)
+        self.assertEqual(duplicate.status_code, 400, duplicate.data)
+        self.assertEqual(Invoice.objects.count(), 1)
+        self.assertEqual(InvoiceRevision.objects.count(), 1)
+        self.assertEqual(InvoiceLineItem.objects.filter(source_assignment=self.assignment).count(), 1)
+
+    def test_preview_normalizes_model_boolean_values_and_equivalent_decimal_zeroes(self):
+        for false_value in (False, "False", "0", 0):
+            with self.subTest(false_value=false_value):
+                payload = self._financial_payload(
+                    external=True, shift_ids=[], super_rate_snapshot="12.000",
+                    line_items=[self._custom_line(
+                        quantity="1.000", unit_price="70.0500", discount="0.000",
+                        gst_applicable=false_value, super_applicable=false_value,
+                    )],
+                )
+                preview, _ = self._assert_preview_matches_generation(
+                    payload, subtotal="70.05", gst="0.00", total="70.05",
+                )
+                self.assertIs(preview["line_items"][0]["gst_applicable"], False)
+                self.assertIs(preview["line_items"][0]["super_applicable"], False)
+
+    def test_preview_accepts_serialized_form_lists_and_finite_json_numbers(self):
+        payload = self._financial_payload(
+            external="true", pharmacy=None, shift_ids="[]", gst_registered="false", super_rate_snapshot=0,
+            line_items=json.dumps([self._custom_line(quantity=1.5, unit_price=3.03, discount=0)]),
+        )
+        self._assert_preview_matches_generation(payload, subtotal="4.54", gst="0.00", total="4.54")
+
+    def test_preview_preserves_external_zero_and_negative_line_compatibility(self):
+        for quantity, total in (("0.00", "0.00"), ("-1.00", "-2.50")):
+            with self.subTest(quantity=quantity):
+                payload = self._financial_payload(
+                    external=True, shift_ids=[], gst_registered=False, super_rate_snapshot="0.00",
+                    line_items=[self._custom_line(quantity=quantity, unit_price="2.50")],
+                )
+                self._assert_preview_matches_generation(payload, subtotal=total, gst="0.00", total=total)
+
+    def test_preview_rejects_malformed_collections_and_invalid_line_booleans_cleanly(self):
+        for changes in (
+            {"line_items": "[broken"}, {"line_items": {"quantity": "1.00"}}, {"line_items": [None]},
+            {"shift_ids": "[broken"}, {"shift_ids": {"id": self.shift.pk}},
+            {"line_items": [self._custom_line(gst_applicable="false")]},
+        ):
+            with self.subTest(changes=changes):
+                self._preview(self._financial_payload(**changes), expected_status=400)
+
+    def test_preview_rejects_non_finite_overprecision_and_unrepresentable_decimal_values(self):
+        bad_lines = (
+            ("quantity", "NaN"), ("quantity", "Infinity"), ("quantity", "-Infinity"),
+            ("quantity", "1.001"), ("quantity", "10000.00"), ("quantity", True), ("quantity", None),
+            ("unit_price", "NaN"), ("unit_price", "1.001"), ("unit_price", "100000000.00"),
+            ("unit_price", "1e999"), ("discount", "NaN"), ("discount", "0.001"), ("discount", "1000.00"),
+        )
+        for field, value in bad_lines:
+            with self.subTest(field=field, value=value):
+                payload = self._financial_payload(
+                    external=True, shift_ids=[], line_items=[self._custom_line(**{field: value})],
+                )
+                self._preview(payload, expected_status=400)
+        for value in ("NaN", "Infinity", "12.001", "1000.00", True):
+            with self.subTest(super_rate_snapshot=value):
+                self._preview(self._financial_payload(super_rate_snapshot=value), expected_status=400)
+
+    def test_preview_rejects_raw_json_pharmacy_exponent_overflow_without_writes(self):
+        # A valid JSON number can overflow float parsing without an Infinity token.
+        raw = ('{"external": false, "pharmacy": 1e309, "shift_ids": [%d], "line_items": [], '
+               '"gst_registered": false, "super_rate_snapshot": "12.00"}'
+               % self.shift.pk)
+        response = self._preview(raw, expected_status=400, raw_json=True)
+        self.assertIn("shift_ids", response.data)
+
+    def test_preview_rejects_raw_json_custom_assignment_overflow_without_writes(self):
+        self._accepted_terms(gst=False)
+        for external in (False, True):
+            for alias in ("assignmentId", "assignment_id"):
+                with self.subTest(external=external, alias=alias):
+                    payload = self._financial_payload(
+                        external=external, shift_ids=[] if external else [self.shift.pk],
+                        gst_registered=False, line_items=[self._custom_line(**{alias: "OVERFLOW"})],
+                    )
+                    raw = json.dumps(payload).replace('"OVERFLOW"', "1e309")
+                    response = self._preview(raw, expected_status=400, raw_json=True)
+                    self.assertEqual(response.data, {
+                        "line_items": ["cannot convert float infinity to integer"],
+                    })
+
+        # The established internal route ignores submitted professional rows
+        # before validating their values or identifiers and rebuilds its own.
+        ignored = self._financial_payload(
+            gst_registered=False, line_items=[self._custom_line(
+                category_code="ProfessionalServices", assignmentId="OVERFLOW", assignment_id="OVERFLOW",
+                shiftId="OVERFLOW", id="OVERFLOW", quantity="OVERFLOW", unit_price="OVERFLOW",
+            )],
+        )
+        response = self._preview(json.dumps(ignored).replace('"OVERFLOW"', "1e309"), raw_json=True)
+        [accepted] = response.data["line_items"]
+        self.assertEqual((accepted["origin"], accepted["assignmentId"], accepted["total"]),
+                         ("assignment", self.assignment.pk, "70.00"))
+
+    def test_preview_omits_untrusted_custom_metadata_from_rendered_response(self):
+        self._accepted_terms(gst=False)
+        metadata = {name: "OVERFLOW" for name in (
+            "id", "shiftId", "shift_id", "shiftSlotId", "date", "start_time", "end_time",
+        )}
+        metadata["rate_reason"] = {"untrusted": ["OVERFLOW"]}
+        for external in (False, True):
+            for name, value in metadata.items():
+                with self.subTest(external=external, field=name):
+                    payload = self._financial_payload(
+                        external=external, shift_ids=[] if external else [self.shift.pk],
+                        gst_registered=False, line_items=[self._custom_line(**{name: value})],
+                    )
+                    raw = json.dumps(payload).replace('"OVERFLOW"', "1e309")
+                    response = self._preview(raw, raw_json=True)
+                    rendered = json.loads(response.content)
+                    [custom] = [row for row in rendered["line_items"] if row["origin"] == "custom"]
+                    self.assertEqual(custom, {
+                        "origin": "custom", "custom_index": 0,
+                        "description": "Reviewed extra", "category_code": "Transportation", "unit": "Hours",
+                        "quantity": "1.50", "unit_price": "3.03", "discount": "0.00",
+                        "total": "4.54" if external else "4.55",
+                        "gst_applicable": False, "super_applicable": False,
+                        "is_manual": True, "was_modified": True, "locked": False,
+                    })
+
+    def test_preview_custom_identity_cannot_impersonate_accepted_source_metadata(self):
+        self._accepted_terms(gst=False)
+        for external, subtotal in ((False, "74.55"), (True, "4.54")):
+            with self.subTest(external=external):
+                payload = self._financial_payload(
+                    external=external, shift_ids=[] if external else [self.shift.pk], gst_registered=False,
+                    line_items=[self._custom_line(
+                        origin="assignment", custom_index=99, locked=True, was_modified=False,
+                        id="forged", assignmentId=self.assignment.pk, shiftId=self.shift.pk,
+                        shiftSlotId=self.slot.pk, date="1900-01-01", start_time="00:00:00",
+                        end_time="01:00:00", rate_reason={"source": "forged"},
+                    )],
+                )
+                preview, _ = self._assert_preview_matches_generation(
+                    payload, subtotal=subtotal, gst="0.00", total=subtotal,
+                )
+                [custom] = [row for row in preview["line_items"] if row["origin"] == "custom"]
+                self.assertEqual(custom["custom_index"], 0)
+                self.assertFalse(custom["locked"])
+                self.assertTrue(custom["is_manual"] and custom["was_modified"])
+                for name in ("id", "assignmentId", "shiftId", "shiftSlotId", "date", "start_time",
+                             "end_time", "rate_reason"):
+                    self.assertNotIn(name, custom)
+
+    def test_preview_overprecision_refusal_does_not_change_legacy_generation_acceptance(self):
+        payload = self._financial_payload(
+            external=True, shift_ids=[], gst_registered=False, super_rate_snapshot="0.00",
+            line_items=[self._custom_line(quantity="1.001", unit_price="10.00")],
+        )
+        self._preview(payload, expected_status=400)
+        response = self._generate_via_api(**payload)
+        self.assertEqual(response.status_code, 201, response.data)
+        invoice = Invoice.objects.get(pk=response.data["id"])
+        [line] = invoice.line_items.all()
+        self.assertEqual((line.quantity, line.total, invoice.total),
+                         (Decimal("1.00"), Decimal("10.01"), Decimal("10.01")))
+        self.assertIsNone(invoice.request_key)
+
+
+class LegacyInvoiceRecalculationPreservationTests(TestCase):
+    """Shared preview arithmetic must preserve legacy serializer mutations."""
+
+    def setUp(self):
+        self.worker = User.objects.create_user(email="legacy-recalc@example.com", role="OTHER_STAFF")
+
+    def _line(self, **overrides):
+        return {
+            "description": "Legacy service", "category_code": "ProfessionalServices", "unit": "Hours",
+            "quantity": "1.00", "unit_price": "70.06", "discount": "0.00",
+            "gst_applicable": True, "super_applicable": True, **overrides,
+        }
+
+    def _create(self):
+        serializer = InvoiceSerializer(data={
+            "external": True, "gst_registered": True, "super_rate_snapshot": "12.00",
+            "line_items": [self._line(), self._line()],
+        })
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        return serializer.save(user=self.worker)
+
+    def _update(self, invoice, **data):
+        serializer = InvoiceSerializer(invoice, data=data, partial=True)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        return serializer.save()
+
+    def _amounts(self, invoice, *, subtotal="140.12", gst="14.01", super_amount="16.81", total="154.13"):
+        invoice.refresh_from_db()
+        self.assertEqual(
+            (invoice.subtotal, invoice.gst_amount, invoice.super_amount, invoice.total),
+            tuple(Decimal(value) for value in (subtotal, gst, super_amount, total)),
+        )
+        self.assertIsNone(invoice.request_key)
+        self.assertFalse(invoice.revisions.exists())
+
+    def _generated(self, invoice, **overrides):
+        return InvoiceLineItem.objects.create(
+            invoice=invoice, **{
+                "description": "Stale generated contribution", "category_code": "Superannuation",
+                "unit": "Lump Sum", "quantity": Decimal("1.00"), "unit_price": Decimal("99.00"),
+                "discount": Decimal("0.00"), "total": Decimal("99.00"),
+                "gst_applicable": False, "super_applicable": False,
+                "is_manual": True, "was_modified": False, **overrides,
+            },
+        )
+
+    def test_serializer_create_and_header_edits_preserve_generated_super_lifecycle(self):
+        invoice = self._create()
+        self._amounts(invoice)
+        primary = invoice.line_items.get(category_code="Superannuation")
+        self.assertEqual((primary.unit, primary.total, primary.is_manual, primary.was_modified),
+                         ("Lump Sum", Decimal("16.81"), True, False))
+        InvoiceLineItem.objects.filter(pk=primary.pk).update(
+            description="Stale", quantity=2, unit_price=1, discount=5, total=2,
+            gst_applicable=True, super_applicable=True, is_manual=False,
+        )
+        duplicate = self._generated(invoice)
+
+        self._update(invoice, super_rate_snapshot="10.00")
+        self._amounts(invoice, super_amount="14.01")
+        [updated] = invoice.line_items.filter(category_code="Superannuation")
+        self.assertEqual(updated.pk, primary.pk)
+        self.assertFalse(InvoiceLineItem.objects.filter(pk=duplicate.pk).exists())
+        self.assertEqual(
+            (updated.description, updated.quantity, updated.unit_price, updated.discount, updated.total,
+             updated.gst_applicable, updated.super_applicable, updated.is_manual, updated.was_modified),
+            ("Superannuation", Decimal("1.00"), Decimal("14.01"), Decimal("0.00"), Decimal("14.01"),
+             False, False, True, False),
+        )
+
+        self._update(invoice, super_rate_snapshot="0.00")
+        self._amounts(invoice, super_amount="0.00")
+        self.assertFalse(invoice.line_items.filter(category_code="Superannuation").exists())
+
+    def test_serializer_line_replacement_keeps_zero_manual_super_authoritative(self):
+        invoice = self._create()
+        old_ids = list(invoice.line_items.values_list("pk", flat=True))
+        self._update(invoice, line_items=[
+            self._line(unit_price="50.00", gst_applicable=False),
+            self._line(category_code="Superannuation", description="Explicit zero contribution",
+                       unit="Lump Sum", unit_price="0.00", gst_applicable=False, super_applicable=False),
+        ])
+        self._amounts(invoice, subtotal="50.00", gst="0.00", super_amount="0.00", total="50.00")
+        self.assertFalse(InvoiceLineItem.objects.filter(pk__in=old_ids).exists())
+        manual = invoice.line_items.get(category_code="Superannuation")
+        self.assertEqual((manual.total, manual.is_manual, manual.was_modified), (Decimal("0.00"), True, True))
+
+        # An explicit manual row wins even when automatic row creation is disabled.
+        stale = self._generated(invoice)
+        recalculate_invoice_totals(invoice, ensure_generated_super_line=False)
+        self._amounts(invoice, subtotal="50.00", gst="0.00", super_amount="0.00", total="50.00")
+        self.assertFalse(InvoiceLineItem.objects.filter(pk=stale.pk).exists())
+        self.assertEqual(list(invoice.line_items.filter(category_code="Superannuation").values_list("pk", flat=True)), [manual.pk])
+
+    def test_recalculate_without_generation_preserves_existing_rows_and_does_not_create_them(self):
+        invoice = self._create()
+        self._generated(invoice)
+        before = list(invoice.line_items.order_by("pk").values())
+        invoice.super_rate_snapshot = Decimal("10.00")
+        invoice.save(update_fields=["super_rate_snapshot"])
+        recalculate_invoice_totals(invoice, ensure_generated_super_line=False)
+        self._amounts(invoice, super_amount="14.01")
+        self.assertEqual(list(invoice.line_items.order_by("pk").values()), before)
+
+        invoice.line_items.filter(category_code="Superannuation").delete()
+        recalculate_invoice_totals(invoice, ensure_generated_super_line=False)
+        self._amounts(invoice, super_amount="14.01")
+        self.assertFalse(invoice.line_items.filter(category_code="Superannuation").exists())
 
 
 class InvoiceIssuerProfileTests(TestCase):

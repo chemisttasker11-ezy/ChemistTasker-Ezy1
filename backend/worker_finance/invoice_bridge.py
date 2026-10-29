@@ -14,6 +14,12 @@ def adopt_generated_internal_invoice(owner, invoice):
     return adopt_internal_invoice(owner, invoice)
 
 
+def preview_generated_internal_invoice(invoice, lines):
+    from worker_finance.services import calculate_generated_internal_invoice
+
+    return calculate_generated_internal_invoice(invoice, lines)[1]
+
+
 def reserve_delivery(invoice, recipient):
     from .delivery import reserve_delivery as reserve
 

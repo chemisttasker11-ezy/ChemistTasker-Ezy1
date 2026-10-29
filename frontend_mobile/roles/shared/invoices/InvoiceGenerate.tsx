@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -26,9 +26,20 @@ import {
   getMyHistoryShifts,
   getOnboarding,
   previewInvoice,
+  previewGeneratedInvoice,
   SUPER_GUARANTEE_PERCENT,
+  type InvoiceGenerationPreview,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
+import {
+  acceptedGenerationLines,
+  customGenerationLine,
+  editGenerationLine,
+  generationDisplayLines,
+  generationInput,
+  GENERATION_CATEGORIES,
+  type GeneratorLine,
+} from './invoiceGeneration';
 
 type Shift = {
   id: number;
@@ -42,43 +53,7 @@ type Shift = {
   end_datetime?: string;
 };
 
-type LineItem = {
-  id?: string | number;
-  shiftSlotId?: number;
-  date?: string;
-  start_time?: string;
-  end_time?: string;
-  description: string;
-  category_code: string;
-  unit: string;
-  quantity: number;
-  unit_price: number;
-  discount: number;
-  total?: number;
-  gst_applicable?: boolean;
-  super_applicable?: boolean;
-  locked?: boolean;
-};
-
-const CATEGORY_CHOICES = [
-  { code: 'ProfessionalServices', label: 'Professional services' },
-  { code: 'Superannuation', label: 'Superannuation' },
-  { code: 'Transportation', label: 'Transportation' },
-  { code: 'Accommodation', label: 'Accommodation' },
-  { code: 'Miscellaneous', label: 'Miscellaneous' },
-];
 const UNIT_CHOICES = ['Hours', 'Lump Sum'];
-
-const defaultLineItem = (): LineItem => ({
-  id: String(Date.now()),
-  description: '',
-  category_code: 'ProfessionalServices',
-  unit: 'Lump Sum',
-  quantity: 1,
-  unit_price: 0,
-  discount: 0,
-  total: 0,
-});
 
 type Props = { basePath?: string };
 
@@ -99,9 +74,17 @@ export default function InvoiceGenerate({ basePath }: Props) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [selectedShiftId, setSelectedShiftId] = useState<number | null>(null);
   const [loadingShifts, setLoadingShifts] = useState(false);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [sourceLoading, setSourceLoading] = useState(false);
+  const [sourceError, setSourceError] = useState('');
+  const [loadedShiftId, setLoadedShiftId] = useState<number | null>(null);
+  const [financialPreview, setFinancialPreview] = useState<{
+    key: string; result?: InvoiceGenerationPreview; error?: string;
+  } | null>(null);
   const [categoryMenuFor, setCategoryMenuFor] = useState<string | number | null>(null);
   const [unitMenuFor, setUnitMenuFor] = useState<string | number | null>(null);
+  const editedDefaults = useRef(new Set<string>());
+  const nextLineId = useRef(0);
+  const saving = useRef(false);
 
   // Core fields
   const [invoiceDate, setInvoiceDate] = useState(today);
@@ -113,7 +96,7 @@ export default function InvoiceGenerate({ basePath }: Props) {
   const [issuerLastName, setIssuerLastName] = useState('');
   const [issuerAbn, setIssuerAbn] = useState('');
   const issuerEmail = user?.email ?? '';
-  const [superRateSnapshot, setSuperRateSnapshot] = useState<number>(SUPER_GUARANTEE_PERCENT);
+  const [superRateSnapshot, setSuperRateSnapshot] = useState(String(SUPER_GUARANTEE_PERCENT));
   const [superFundName, setSuperFundName] = useState('');
   const [superUsi, setSuperUsi] = useState('');
   const [superMemberNumber, setSuperMemberNumber] = useState('');
@@ -134,32 +117,39 @@ export default function InvoiceGenerate({ basePath }: Props) {
   const [customBillToAddress, setCustomBillToAddress] = useState('');
 
   // Line items
-  const [lineItems, setLineItems] = useState<LineItem[]>([defaultLineItem()]);
+  const [lineItems, setLineItems] = useState<GeneratorLine[]>([]);
 
-  const loadOnboarding = useCallback(async () => {
+  useEffect(() => {
     if (!user) return;
+    let active = true;
     setLoading(true);
-    try {
-      const onboarding = await getOnboarding((user.role || 'pharmacist').toLowerCase());
-      setIssuerFirstName(onboarding?.first_name || '');
-      setIssuerLastName(onboarding?.last_name || '');
-      setIssuerAbn(onboarding?.abn || '');
-      if (onboarding?.bank_account_name) setBankAccountName(onboarding.bank_account_name);
-      if (onboarding?.bsb) setBsb(onboarding.bsb);
-      if (onboarding?.account_number) setAccountNumber(onboarding.account_number);
-      if (onboarding?.super_fund_name) setSuperFundName(onboarding.super_fund_name);
-      if (onboarding?.super_usi) setSuperUsi(onboarding.super_usi);
-      if (onboarding?.super_member_number) setSuperMemberNumber(onboarding.super_member_number);
-      if (onboarding?.super_rate_snapshot)
-        setSuperRateSnapshot(Number(onboarding.super_rate_snapshot));
-      if (onboarding?.gst_registered !== undefined)
+    getOnboarding((user.role || 'pharmacist').toLowerCase()).then(onboarding => {
+      if (!active) return;
+      const apply = (key: string, value: unknown, setter: (value: string) => void) => {
+        if (value != null && !editedDefaults.current.has(key)) setter(String(value));
+      };
+      apply('first_name', onboarding?.first_name, setIssuerFirstName);
+      apply('last_name', onboarding?.last_name, setIssuerLastName);
+      apply('abn', onboarding?.abn, setIssuerAbn);
+      apply('bank_account_name', onboarding?.bank_account_name, setBankAccountName);
+      apply('bsb', onboarding?.bsb, setBsb);
+      apply('account_number', onboarding?.account_number, setAccountNumber);
+      apply('super_fund_name', onboarding?.super_fund_name, setSuperFundName);
+      apply('super_usi', onboarding?.super_usi, setSuperUsi);
+      apply('super_member_number', onboarding?.super_member_number, setSuperMemberNumber);
+      apply('super_rate_snapshot', onboarding?.super_rate_snapshot, setSuperRateSnapshot);
+      if (onboarding?.gst_registered !== undefined && !editedDefaults.current.has('gst_registered'))
         setGstRegistered(!!onboarding.gst_registered);
-    } catch (err: any) {
-      setSnackbar(err?.message || 'Failed to load onboarding');
-    } finally {
-      setLoading(false);
-    }
+    }).catch((err: any) => {
+      if (active) setSnackbar(err?.message || 'Failed to load onboarding');
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [user]);
+
+  const editDefault = (key: string, setter: (value: string) => void, value: string) => {
+    editedDefaults.current.add(key);
+    setter(value);
+  };
 
   const loadShifts = useCallback(async () => {
     if (mode !== 'internal') return;
@@ -176,10 +166,6 @@ export default function InvoiceGenerate({ basePath }: Props) {
   }, [mode]);
 
   useEffect(() => {
-    void loadOnboarding();
-  }, [loadOnboarding]);
-
-  useEffect(() => {
     void loadShifts();
   }, [loadShifts]);
 
@@ -188,155 +174,73 @@ export default function InvoiceGenerate({ basePath }: Props) {
     [selectedShiftId, shifts],
   );
 
-  const fetchPreview = useCallback(
-    async (shiftId: number) => {
-      setPreviewLoading(true);
-      try {
-        const res = await previewInvoice(shiftId);
-        const items = Array.isArray((res as any)?.line_items)
-          ? (res as any).line_items
-          : Array.isArray(res)
-          ? (res as any)
-          : [];
-
-        const mapped = items.map((li: any, idx: number) => ({
-          id: li.id || `${shiftId}-${idx}`,
-          shiftSlotId: li.shiftSlotId,
-          date: li.date || '',
-          start_time: li.start_time || '',
-          end_time: li.end_time || '',
-          description: li.description || li.category || 'Shift line item',
-          category_code: li.category_code || li.category || 'ProfessionalServices',
-          unit: li.unit || 'Hours',
-          quantity: Number(li.quantity ?? 1),
-          unit_price: Number(li.unit_price ?? 0),
-          discount: Number(li.discount ?? 0),
-          locked: li.category_code === 'Superannuation' || li.category === 'Superannuation',
-        }));
-        setLineItems(mapped);
-
-        if (selectedShift) {
-          const addressParts = [
-            selectedShift.pharmacy_detail?.street_address,
-            selectedShift.pharmacy_detail?.suburb,
-            selectedShift.pharmacy_detail?.state,
-            selectedShift.pharmacy_detail?.postcode,
-          ].filter(Boolean);
-          setPharmacyNameSnapshot(selectedShift.pharmacy_detail?.name || '');
-          setPharmacyAbnSnapshot(selectedShift.pharmacy_detail?.abn || '');
-          setPharmacyAddressSnapshot(addressParts.join(', '));
-          setBillToFirstName(selectedShift.created_by_first_name || '');
-          setBillToLastName(selectedShift.created_by_last_name || '');
-          setBillToEmail(selectedShift.created_by_email || '');
-          setBillToAbn(selectedShift.bill_to_abn || '');
-        }
-      } catch (err: any) {
-        setSnackbar(err?.message || 'Failed to load preview');
-      } finally {
-        setPreviewLoading(false);
-      }
-    },
-    [selectedShift],
-  );
+  useEffect(() => {
+    let active = true;
+    setLoadedShiftId(null);
+    setSourceError('');
+    setLineItems(mode === 'external' ? [customGenerationLine(`custom-${++nextLineId.current}`, mode)] : []);
+    if (mode !== 'internal' || !selectedShiftId) {
+      setSourceLoading(false);
+      return () => { active = false; };
+    }
+    setSourceLoading(true);
+    previewInvoice(selectedShiftId).then(rows => {
+      if (!active) return;
+      setLineItems(acceptedGenerationLines(rows));
+      setLoadedShiftId(selectedShiftId);
+    }).catch((err: any) => {
+      if (active) setSourceError(err?.message || 'Failed to load accepted shift terms');
+    }).finally(() => { if (active) setSourceLoading(false); });
+    return () => { active = false; };
+  }, [mode, selectedShiftId]);
 
   useEffect(() => {
-    if (mode === 'internal' && selectedShiftId) {
-      void fetchPreview(selectedShiftId);
-    } else if (mode === 'external') {
-      setLineItems([defaultLineItem()]);
+    if (mode === 'internal' && selectedShift) {
+      const addressParts = [
+        selectedShift.pharmacy_detail?.street_address,
+        selectedShift.pharmacy_detail?.suburb,
+        selectedShift.pharmacy_detail?.state,
+        selectedShift.pharmacy_detail?.postcode,
+      ].filter(Boolean);
+      setPharmacyNameSnapshot(selectedShift.pharmacy_detail?.name || '');
+      setPharmacyAbnSnapshot(selectedShift.pharmacy_detail?.abn || '');
+      setPharmacyAddressSnapshot(addressParts.join(', '));
+      setBillToFirstName(selectedShift.created_by_first_name || '');
+      setBillToLastName(selectedShift.created_by_last_name || '');
+      setBillToEmail(selectedShift.created_by_email || '');
+      setBillToAbn(selectedShift.bill_to_abn || '');
     }
-  }, [mode, selectedShiftId, fetchPreview]);
+  }, [mode, selectedShift]);
 
-  const recalcLine = useCallback((li: LineItem) => {
-    const total = Number(li.quantity || 0) * Number(li.unit_price || 0) * (1 - Number(li.discount || 0) / 100);
-    return { ...li, total: Math.round(total * 100) / 100 };
-  }, []);
+  const financialInput = useMemo(() => generationInput({
+    mode, pharmacy: selectedShift?.pharmacy_detail?.id, shiftId: selectedShiftId ?? undefined,
+    lines: lineItems, gstRegistered, superRate: superRateSnapshot,
+  }), [mode, selectedShift, selectedShiftId, lineItems, gstRegistered, superRateSnapshot]);
+  const previewKey = JSON.stringify(financialInput);
+  const canPreview = mode === 'external' ? financialInput.line_items.length > 0
+    : Boolean(selectedShiftId && selectedShift?.pharmacy_detail?.id && loadedShiftId === selectedShiftId);
+  const currentPreview = canPreview && financialPreview?.key === previewKey ? financialPreview.result ?? null : null;
+  const previewError = canPreview && financialPreview?.key === previewKey ? financialPreview.error : '';
 
-  const calcHours = (date?: string, start?: string, end?: string) => {
-    if (!date || !start || !end) return 0;
-    const startValue = new Date(`${date}T${start}`);
-    const endValue = new Date(`${date}T${end}`);
-    if (Number.isNaN(startValue.getTime()) || Number.isNaN(endValue.getTime())) return 0;
-    const diffMs = endValue.getTime() - startValue.getTime();
-    return diffMs > 0 ? Math.round((diffMs / 3600000) * 100) / 100 : 0;
-  };
-
-  const updateRow = (lineId: string | number, field: keyof LineItem, value: any) => {
-    setLineItems(items => {
-      const next = items.map(li => {
-        if (li.id !== lineId) return li;
-        const updated = { ...li, [field]: value };
-        if (field === 'start_time' || field === 'end_time' || field === 'date') {
-          updated.quantity = calcHours(updated.date, updated.start_time, updated.end_time);
-        }
-        if (field === 'category_code' && ['Transportation', 'Accommodation'].includes(value)) {
-          updated.quantity = 1;
-        }
-        return recalcLine(updated);
+  useEffect(() => {
+    let active = true;
+    setFinancialPreview(null);
+    if (!canPreview) return () => { active = false; };
+    const timer = setTimeout(() => {
+      previewGeneratedInvoice(financialInput).then(result => {
+        if (active) setFinancialPreview({ key: previewKey, result });
+      }).catch((err: any) => {
+        if (active) setFinancialPreview({ key: previewKey, error: err?.message || 'Unable to calculate this invoice' });
       });
-      return next;
-    });
-  };
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [canPreview, financialInput, previewKey]);
 
-  const withSuperAndGst = useCallback(
-    (items: LineItem[]): LineItem[] => {
-      const mapped = items.map(recalcLine).map(li => ({
-        ...li,
-        gst_applicable: !['Superannuation', 'Transportation', 'Accommodation'].includes(
-          li.category_code,
-        ),
-        super_applicable: li.category_code !== 'Superannuation',
-      }));
-      const hasSuper = mapped.some(li => li.category_code === 'Superannuation');
-      if (!hasSuper && superRateSnapshot) {
-        const profSubtotal = mapped
-          .filter(li => li.category_code === 'ProfessionalServices')
-          .reduce((acc, li) => acc + Number(li.total || 0), 0);
-        const superAmt = Math.round((profSubtotal * (superRateSnapshot / 100)) * 100) / 100;
-        if (superAmt > 0) {
-          mapped.push({
-            id: `super-${Date.now()}`,
-            description: 'Superannuation',
-            category_code: 'Superannuation',
-            unit: 'Lump Sum',
-            quantity: 1,
-            unit_price: superAmt,
-            discount: 0,
-            total: superAmt,
-            gst_applicable: false,
-            super_applicable: false,
-            locked: true,
-          });
-        }
-      }
-      return mapped;
-    },
-    [recalcLine, superRateSnapshot],
-  );
-
-  const displayLineItems = useMemo(() => withSuperAndGst(lineItems), [lineItems, withSuperAndGst]);
-
-  const totals = useMemo(() => {
-    const subtotal = displayLineItems.reduce((acc, li) => acc + Number(li.total || 0), 0);
-    const gst = gstRegistered
-      ? displayLineItems
-          .filter(li => li.gst_applicable !== false && li.category_code !== 'Superannuation')
-          .reduce((acc, li) => acc + Number(li.total || 0), 0) * 0.1
-      : 0;
-    const superAmt =
-      displayLineItems.find(li => li.category_code === 'Superannuation')?.total || 0;
-    const total = subtotal + gst + Number(superAmt || 0);
-    return {
-      subtotal: Math.round(subtotal * 100) / 100,
-      gst: Math.round(gst * 100) / 100,
-      superAmt: Math.round(Number(superAmt || 0) * 100) / 100,
-      total: Math.round(total * 100) / 100,
-    };
-  }, [displayLineItems, gstRegistered]);
-
-  const addItem = () => setLineItems(items => [...items, defaultLineItem()]);
-  const removeItem = (id: string | number) =>
-    setLineItems(items => items.filter(li => li.id !== id));
+  const displayLineItems = generationDisplayLines(lineItems, mode, currentPreview);
+  const updateRow = (lineId: string, field: Parameters<typeof editGenerationLine>[1], value: string) =>
+    setLineItems(items => items.map(line => line.id === lineId ? editGenerationLine(line, field, value) : line));
+  const addItem = () => setLineItems(items => [...items, customGenerationLine(`custom-${++nextLineId.current}`, mode)]);
+  const removeItem = (id: string) => setLineItems(items => items.filter(line => line.id !== id || line.origin !== 'custom'));
 
   const validate = () => {
     if (mode === 'internal' && !selectedShiftId) {
@@ -359,38 +263,18 @@ export default function InvoiceGenerate({ basePath }: Props) {
   };
 
   const handleSubmit = async () => {
+    if (!currentPreview || sourceLoading || loading || saving.current) return;
     if (!validate()) return;
+    saving.current = true;
     setSubmitting(true);
     try {
-      const itemsForSubmit = withSuperAndGst(lineItems).map(li => {
-        const baseDescription = li.description?.trim();
-        const canDescribe =
-          li.category_code === 'ProfessionalServices' && li.date && li.start_time && li.end_time;
-        const startLabel = li.start_time ? li.start_time.slice(0, 5) : '';
-        const endLabel = li.end_time ? li.end_time.slice(0, 5) : '';
-        const description = baseDescription || (canDescribe
-          ? `${li.date} ${startLabel}-${endLabel}`
-          : '');
-        return {
-          description,
-          category_code: li.category_code,
-          unit: li.unit,
-          quantity: Number(li.quantity || 0),
-          unit_price: Number(li.unit_price || 0),
-          discount: Number(li.discount || 0),
-          total: Number(li.total || 0),
-          gst_applicable: li.gst_applicable !== false,
-          super_applicable: li.super_applicable !== false,
-        };
-      });
-
       const fd = new FormData();
       fd.append('issuer_first_name', issuerFirstName);
       fd.append('issuer_last_name', issuerLastName);
       fd.append('issuer_email', issuerEmail);
       fd.append('issuer_abn', issuerAbn);
-      fd.append('gst_registered', gstRegistered ? 'true' : 'false');
-      fd.append('super_rate_snapshot', String(superRateSnapshot));
+      fd.append('gst_registered', financialInput.gst_registered ? 'true' : 'false');
+      fd.append('super_rate_snapshot', financialInput.super_rate_snapshot);
       fd.append('super_fund_name', superFundName);
       fd.append('super_usi', superUsi);
       fd.append('super_member_number', superMemberNumber);
@@ -419,7 +303,7 @@ export default function InvoiceGenerate({ basePath }: Props) {
         fd.append('bill_to_abn', billToAbn);
       }
 
-      fd.append('line_items', JSON.stringify(itemsForSubmit));
+      fd.append('line_items', JSON.stringify(financialInput.line_items));
 
       await generateInvoice(fd as any);
       setSnackbar('Invoice generated');
@@ -427,6 +311,7 @@ export default function InvoiceGenerate({ basePath }: Props) {
     } catch (err: any) {
       setSnackbar(err?.message || 'Failed to generate invoice');
     } finally {
+      saving.current = false;
       setSubmitting(false);
     }
   };
@@ -441,7 +326,7 @@ export default function InvoiceGenerate({ basePath }: Props) {
         <View style={{ width: 48 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} pointerEvents={submitting ? 'none' : 'auto'}>
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -508,12 +393,13 @@ export default function InvoiceGenerate({ basePath }: Props) {
                   )}
                 </View>
               )}
-              {previewLoading && (
+              {sourceLoading && (
                 <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <ActivityIndicator />
                   <Text>Loading preview...</Text>
                 </View>
               )}
+              {!!sourceError && <HelperText type="error" visible>{sourceError}</HelperText>}
             </Card.Content>
           </Card>
         )}
@@ -565,14 +451,14 @@ export default function InvoiceGenerate({ basePath }: Props) {
             <TextInput
               label="First name"
               value={issuerFirstName}
-              onChangeText={setIssuerFirstName}
+              onChangeText={value => editDefault('first_name', setIssuerFirstName, value)}
               mode="outlined"
               style={styles.input}
             />
             <TextInput
               label="Last name"
               value={issuerLastName}
-              onChangeText={setIssuerLastName}
+              onChangeText={value => editDefault('last_name', setIssuerLastName, value)}
               mode="outlined"
               style={styles.input}
             />
@@ -586,26 +472,28 @@ export default function InvoiceGenerate({ basePath }: Props) {
             <TextInput
               label="ABN"
               value={issuerAbn}
-              onChangeText={setIssuerAbn}
+              onChangeText={value => editDefault('abn', setIssuerAbn, value)}
               mode="outlined"
               style={styles.input}
             />
             <View style={styles.switchRow}>
               <Text>GST registered</Text>
-              <Switch value={gstRegistered} onValueChange={setGstRegistered} />
+              <Switch value={gstRegistered} onValueChange={value => {
+                editedDefaults.current.add('gst_registered'); setGstRegistered(value);
+              }} />
             </View>
             <TextInput
               label="Bank account name"
               value={bankAccountName}
-              onChangeText={setBankAccountName}
+              onChangeText={value => editDefault('bank_account_name', setBankAccountName, value)}
               mode="outlined"
               style={styles.input}
             />
-            <TextInput label="BSB" value={bsb} onChangeText={setBsb} mode="outlined" style={styles.input} />
+            <TextInput label="BSB" value={bsb} onChangeText={value => editDefault('bsb', setBsb, value)} mode="outlined" style={styles.input} />
             <TextInput
               label="Account number"
               value={accountNumber}
-              onChangeText={setAccountNumber}
+              onChangeText={value => editDefault('account_number', setAccountNumber, value)}
               mode="outlined"
               style={styles.input}
             />
@@ -626,8 +514,8 @@ export default function InvoiceGenerate({ basePath }: Props) {
             </Text>
             <TextInput
               label="Super rate snapshot (%)"
-              value={String(superRateSnapshot)}
-              onChangeText={v => setSuperRateSnapshot(Number(v) || 0)}
+              value={superRateSnapshot}
+              onChangeText={value => editDefault('super_rate_snapshot', setSuperRateSnapshot, value)}
               mode="outlined"
               style={styles.input}
               keyboardType="numeric"
@@ -635,21 +523,21 @@ export default function InvoiceGenerate({ basePath }: Props) {
             <TextInput
               label="Super fund name"
               value={superFundName}
-              onChangeText={setSuperFundName}
+              onChangeText={value => editDefault('super_fund_name', setSuperFundName, value)}
               mode="outlined"
               style={styles.input}
             />
             <TextInput
               label="Super USI"
               value={superUsi}
-              onChangeText={setSuperUsi}
+              onChangeText={value => editDefault('super_usi', setSuperUsi, value)}
               mode="outlined"
               style={styles.input}
             />
             <TextInput
               label="Super member number"
               value={superMemberNumber}
-              onChangeText={setSuperMemberNumber}
+              onChangeText={value => editDefault('super_member_number', setSuperMemberNumber, value)}
               mode="outlined"
               style={styles.input}
             />
@@ -662,12 +550,13 @@ export default function InvoiceGenerate({ basePath }: Props) {
               <Text variant="titleMedium" style={styles.sectionTitle}>
                 Line items
               </Text>
-              <IconButton icon="plus" onPress={addItem} />
+              <IconButton icon="plus" onPress={addItem} disabled={mode === 'internal' && (!selectedShiftId || loadedShiftId !== selectedShiftId)} />
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator style={styles.tableScroll}>
               <View style={styles.table}>
                 <View style={[styles.tableRow, styles.tableHeader]}>
                   <Text style={[styles.cell, styles.cellCategory]}>Category</Text>
+                  <Text style={[styles.cell, styles.cellDescription]}>Description</Text>
                   <Text style={[styles.cell, styles.cellDate]}>Date</Text>
                   <Text style={[styles.cell, styles.cellTime]}>Start</Text>
                   <Text style={[styles.cell, styles.cellTime]}>End</Text>
@@ -680,10 +569,9 @@ export default function InvoiceGenerate({ basePath }: Props) {
                 </View>
                 {displayLineItems.map(li => {
                   const isProfessional = li.category_code === 'ProfessionalServices';
-                  const disablePrice = Boolean(li.shiftSlotId) || li.category_code === 'Superannuation';
-                  const disableRow = li.category_code === 'Superannuation';
+                  const disableRow = li.locked || li.origin !== 'custom';
                   const hoursLabel = isProfessional
-                    ? li.quantity.toFixed(2)
+                    ? li.quantity
                     : ['Transportation', 'Accommodation'].includes(li.category_code)
                     ? '1.00'
                     : '';
@@ -701,11 +589,11 @@ export default function InvoiceGenerate({ basePath }: Props) {
                               disabled={disableRow}
                               style={styles.selectButton}
                             >
-                              {CATEGORY_CHOICES.find(c => c.code === li.category_code)?.label || 'Select'}
+                              {GENERATION_CATEGORIES.find(c => c.code === li.category_code)?.label || 'Select'}
                             </Button>
                           }
                         >
-                          {CATEGORY_CHOICES.map(choice => (
+                          {GENERATION_CATEGORIES.filter(choice => mode === 'external' || choice.code !== 'ProfessionalServices').map(choice => (
                             <Menu.Item
                               key={choice.code}
                               onPress={() => {
@@ -718,6 +606,17 @@ export default function InvoiceGenerate({ basePath }: Props) {
                         </Menu>
                       </View>
 
+                      <TextInput
+                        value={li.description}
+                        onChangeText={value => updateRow(li.id, 'description', value)}
+                        mode="outlined"
+                        style={[styles.cell, styles.cellDescription]}
+                        placeholder="Description"
+                        accessibilityLabel="Line description"
+                        dense
+                        disabled={disableRow}
+                      />
+
                       {isProfessional ? (
                         <>
                           <TextInput
@@ -727,6 +626,7 @@ export default function InvoiceGenerate({ basePath }: Props) {
                             style={[styles.cell, styles.cellDate]}
                             placeholder="YYYY-MM-DD"
                             dense
+                            disabled={disableRow}
                           />
                           <TextInput
                             value={li.start_time?.slice(0, 5) || ''}
@@ -735,6 +635,7 @@ export default function InvoiceGenerate({ basePath }: Props) {
                             style={[styles.cell, styles.cellTime]}
                             placeholder="HH:MM"
                             dense
+                            disabled={disableRow}
                           />
                           <TextInput
                             value={li.end_time?.slice(0, 5) || ''}
@@ -743,6 +644,7 @@ export default function InvoiceGenerate({ basePath }: Props) {
                             style={[styles.cell, styles.cellTime]}
                             placeholder="HH:MM"
                             dense
+                            disabled={disableRow}
                           />
                           <Text style={[styles.cell, styles.cellHours]}>{hoursLabel}</Text>
                         </>
@@ -784,28 +686,30 @@ export default function InvoiceGenerate({ basePath }: Props) {
                       </View>
 
                       <TextInput
-                        value={String(li.unit_price)}
-                        onChangeText={text => updateRow(li.id!, 'unit_price', Number(text) || 0)}
+                        value={li.unit_price}
+                        onChangeText={text => updateRow(li.id!, 'unit_price', text)}
                         mode="outlined"
                         style={[styles.cell, styles.cellPrice]}
                         keyboardType="numeric"
+                        accessibilityLabel="Line unit price"
                         dense
-                        disabled={disablePrice}
+                        disabled={disableRow}
                       />
                       <TextInput
-                        value={String(li.discount)}
-                        onChangeText={text => updateRow(li.id!, 'discount', Number(text) || 0)}
+                        value={li.discount}
+                        onChangeText={text => updateRow(li.id!, 'discount', text)}
                         mode="outlined"
                         style={[styles.cell, styles.cellDiscount]}
                         keyboardType="numeric"
+                        accessibilityLabel="Line discount"
                         dense
                         disabled={disableRow}
                       />
                       <Text style={[styles.cell, styles.cellAmount]}>
-                        {li.total?.toFixed(2) ?? '0.00'}
+                        {li.total ?? '—'}
                       </Text>
                       <View style={[styles.cell, styles.cellAction]}>
-                        <IconButton icon="delete" size={18} onPress={() => removeItem(li.id!)} />
+                        <IconButton icon="delete" size={18} disabled={disableRow} onPress={() => removeItem(li.id!)} />
                       </View>
                     </View>
                   );
@@ -813,7 +717,8 @@ export default function InvoiceGenerate({ basePath }: Props) {
               </View>
             </ScrollView>
             <HelperText type="info" visible>
-              Line items follow the web table. Super is auto-inserted when needed.
+              {mode === 'internal' ? 'Accepted shift terms are read-only here. ' : ''}
+              Use + to add extra items. Super is shown separately from the amount payable to you.
             </HelperText>
           </Card.Content>
         </Card>
@@ -823,21 +728,25 @@ export default function InvoiceGenerate({ basePath }: Props) {
             <Text variant="titleMedium" style={styles.sectionTitle}>
               Totals
             </Text>
+            {!currentPreview && !previewError && <HelperText type="info" visible>
+              {canPreview ? 'Calculating invoice…' : mode === 'internal' ? 'Select a shift to preview this invoice.' : 'Add an item to preview this invoice.'}
+            </HelperText>}
+            {!!previewError && <HelperText type="error" visible>{previewError}</HelperText>}
             <View style={styles.totalRow}>
               <Text>Subtotal</Text>
-              <Text>${totals.subtotal.toFixed(2)}</Text>
+              <Text>{currentPreview ? `$${currentPreview.subtotal}` : '—'}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>GST</Text>
-              <Text>${totals.gst.toFixed(2)}</Text>
+              <Text>{currentPreview ? `$${currentPreview.gst_amount}` : '—'}</Text>
             </View>
             <View style={styles.totalRow}>
-              <Text>Superannuation</Text>
-              <Text>${totals.superAmt.toFixed(2)}</Text>
+              <Text>Super contribution</Text>
+              <Text>{currentPreview ? `$${currentPreview.super_amount}` : '—'}</Text>
             </View>
             <View style={styles.totalRow}>
-              <Text variant="titleMedium">Total</Text>
-              <Text variant="titleMedium">${totals.total.toFixed(2)}</Text>
+              <Text variant="titleMedium">Worker payable</Text>
+              <Text variant="titleMedium">{currentPreview ? `$${currentPreview.total}` : '—'}</Text>
             </View>
           </Card.Content>
         </Card>
@@ -846,6 +755,7 @@ export default function InvoiceGenerate({ basePath }: Props) {
           mode="contained"
           onPress={handleSubmit}
           loading={submitting}
+          disabled={!currentPreview || loading || sourceLoading || submitting}
           style={{ marginBottom: 24, marginHorizontal: 12 }}
         >
           Generate invoice
@@ -891,7 +801,7 @@ const styles = StyleSheet.create({
   rowInputs: { flexDirection: 'row', gap: 10, marginTop: 8 },
   halfInput: { flex: 1 },
   tableScroll: { marginTop: 6 },
-  table: { minWidth: 920 },
+  table: { minWidth: 1120 },
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -902,6 +812,7 @@ const styles = StyleSheet.create({
   tableHeader: { backgroundColor: '#F3F4F6' },
   cell: { paddingHorizontal: 6, paddingVertical: 4 },
   cellCategory: { width: 180 },
+  cellDescription: { width: 200 },
   cellDate: { width: 120 },
   cellTime: { width: 90 },
   cellHours: { width: 70, textAlign: 'center' },

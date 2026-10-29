@@ -13,6 +13,7 @@ from django.test import TestCase, TransactionTestCase
 from rest_framework.exceptions import ValidationError as FinanceValidationError
 
 from attendance.test_cover_terms_acceptance import CoverTermsFixture
+from client_profile.characterization_support import client_for
 from invoicing.models import Invoice, InvoiceLineItem
 from invoicing.services import generate_invoice_from_shifts, generate_preview_invoice_lines
 from shifts.models import ShiftSlot, ShiftSlotAssignment
@@ -66,6 +67,12 @@ class AcceptedCoverInvoiceFactsTests(AcceptedCoverInvoiceFixture, TestCase):
         [legacy] = generate_preview_invoice_lines(assignment.shift, self.worker)
         [source] = internal_invoice_sources(self.worker)
         prefill = internal_invoice_prefill(self.worker, [assignment.pk])
+        preview_response = client_for(self.worker).post("/api/v1/invoices/generate/preview/", {
+            "external": False, "pharmacy": self.pharmacy.pk, "shift_ids": [assignment.shift_id],
+            "line_items": [], "gst_registered": False, "super_rate_snapshot": "0.00",
+        }, format="json")
+        self.assertEqual(preview_response.status_code, 200, preview_response.data)
+        self.assertEqual((Invoice.objects.count(), InvoiceLineItem.objects.count(), InvoiceRevision.objects.count()), (0, 0, 0))
         record = save_draft(self.worker, prefill)
         [evidence] = record.source_snapshot["accepted_terms"]
         expected_times = (occurrence["start_time"][:5], occurrence["end_time"][:5])
@@ -73,6 +80,17 @@ class AcceptedCoverInvoiceFactsTests(AcceptedCoverInvoiceFixture, TestCase):
         with self.subTest(consumer="legacy_preview"):
             self.assertEqual((legacy["start_time"][:5], legacy["end_time"][:5]), expected_times)
             self.assertEqual((legacy["quantity"], legacy["unit_price"], legacy["total"]), (1.0, 73.5, 73.5))
+        with self.subTest(consumer="generation_preview"):
+            preview = preview_response.data
+            [line] = preview["line_items"]
+            self.assertEqual((line["start_time"][:5], line["end_time"][:5]), expected_times)
+            self.assertEqual((line["quantity"], line["unit_price"], line["total"]), ("1.00", "73.50", "73.50"))
+            self.assertEqual(line["assignmentId"], assignment.pk)
+            self.assertEqual((line["origin"], line["locked"], line["was_modified"]), ("assignment", True, False))
+            self.assertTrue(line["gst_applicable"])
+            self.assertFalse(line["super_applicable"])
+            self.assertEqual((preview["subtotal"], preview["gst_amount"], preview["super_amount"], preview["total"]),
+                             ("73.50", "0.00", "0.00", "73.50"))
         with self.subTest(consumer="finance_sources"):
             self.assertEqual((source["start_time"], source["end_time"]), expected_times)
             self.assertEqual((source["hours"], source["rate"]), ("1.00", "73.50"))
