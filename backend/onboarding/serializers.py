@@ -9,7 +9,7 @@ from onboarding.models import (
     PharmacistOnboarding,
     RefereeResponse,
 )
-from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
+from infrastructure.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
 from core.serializer_mixins import UploadValidationMixin
 from users.presentation import _build_absolute_media_url
 from onboarding.services.basic import (

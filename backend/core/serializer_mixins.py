@@ -1,7 +1,7 @@
 """Serializer mixins shared across backend domains."""
 from rest_framework import serializers
 
-from core.file_validation import validate_upload_mapping
+from infrastructure.file_validation import validate_upload_mapping
 
 
 class UploadValidationMixin:
