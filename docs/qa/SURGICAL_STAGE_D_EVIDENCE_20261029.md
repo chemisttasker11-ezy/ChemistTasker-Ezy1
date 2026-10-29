@@ -2,7 +2,7 @@
 
 Date: 29 October 2026 (Australia/Brisbane). Initial reviewed head: `0bc2da97c8d31c511bd0f7ccece60a7d9f834e91`; base: completed E17 `0e2a4a14344492cddab1ed2998c14340d538ad30`.
 
-**Status: STAGE D LIGHT COMPLETE for the named invariants and writer inventory; published-head release acceptance remains separate.** All demonstrated continuation gaps are repaired and the source-pinned Stage D PostgreSQL selection passed. That 73-test result predates the additive billing-helper integration; hosted execution of the latest integrated head remains forthcoming. This ledger records source ownership, reproduced defects and named executable controls. PR #213 remains draft, unmerged and undeployed. No live provider operation is part of this evidence.
+**Status: STAGE D COMPLETE for the named production invariants and writer inventory on integrated source head `f72d7fa25be075c569acf4b54b798225dfd0a61a`; whole-release acceptance remains separate.** All demonstrated continuation gaps are repaired. Exact-head hosted Serializer PostgreSQL executed 587 tests successfully, including the full `shifts` app and `workforce.tests`; the dedicated Shared Core PostgreSQL concurrency selection executed 448 tests successfully and includes `shifts.test_shift_actions_contract` plus `workforce.tests.test_roster_slot_concurrency`. The previously source-pinned 73-test Stage D selection remains corroborating evidence rather than the integrated-head claim. PR #213 remains draft, unmerged and undeployed. No live provider operation is part of this evidence.
 
 ## Rules and deliberate boundaries
 
@@ -146,3 +146,17 @@ python backend/manage.py test \
 A final read-only Django suite-construction check used the actual workflow labels on the integrated source, with database connection attempts forbidden. Serializer PostgreSQL discovered **587 unique test IDs**, including each of the six offer races, `test_bulk_move_refuses_assignment_with_invoice_history` and `test_roster_lock_does_not_hide_unrelated_database_failures` exactly once. Shared Core PostgreSQL discovered **448 unique IDs**, including all six races and the unrelated-error control exactly once. It does not select the bulk-move history module; that regression belongs to Serializer PostgreSQL and Shared Core's SQLite workforce selection. None of these eight named controls had a class/method skip flag under PostgreSQL. All 814 inspected source/workflow hashes were unchanged during discovery. This establishes configured discovery, not a new test execution or future CI pass.
 
 Published-head hosted CI belongs to the final integration checkpoint. Earlier-head results are not relabeled as current passes, and skipped workflows are not passes. Stage D's bounded source review and targeted verification are separate from whole-release, browser/native and live-provider acceptance.
+
+### Integrated-head hosted closure — `f72d7fa25be075c569acf4b54b798225dfd0a61a`
+
+The final integrated source received hosted execution after the billing-helper and mobile dependency-security integration:
+
+- **Serializer Decomposition Contracts / PostgreSQL:** **587 tests passed**, no failures. The workflow selects the full `shifts` app and `workforce.tests`, so this run executes the finalisation-vs-manual-assignment race, the bulk invoice-history move regression, the repaired single-assignment/history controls, parent-delete protection and the roster conflict controls discovered by that selection.
+- **Shared Core Consolidation / PostgreSQL concurrency:** **448 tests passed**, no failures, in 159.245 seconds. The workflow explicitly includes `shifts.test_shift_actions_contract` and `workforce.tests.test_roster_slot_concurrency`, so the six booking races and controlled-conflict/lock-order behavior execute on PostgreSQL at this integrated head.
+- **Backend Finalization Contracts:** passed on both PostgreSQL and SQLite.
+- **Large-module ratchet:** passed on the same source; `billing/views.py` no longer requires a large-module exception.
+- **Mobile exact-head security path:** install, exploit/compatibility regressions and the live dependency advisory gate passed. This is separate release evidence but confirms the Stage D source was not being tested on a superseded pre-security tree.
+- **Public Repository Security, Frontend Static/Mobile Lint and E2E Runner Smoke:** passed.
+- **Full Isolated QA** and **Architecture Mainline Native Full QA** were skipped by workflow conditions and are not counted as passes.
+
+At the time this closure paragraph was written, the broad `Shared Core Consolidation / backend` child was still completing later unrelated domain groups; its Stage D-critical PostgreSQL concurrency child had already completed successfully. Stage D is therefore closed for the named reachable production writers and accepted superadmin exception, while whole-release readiness still depends on the remaining release-acceptance work.
