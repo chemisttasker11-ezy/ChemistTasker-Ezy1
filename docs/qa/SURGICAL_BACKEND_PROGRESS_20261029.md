@@ -1,5 +1,7 @@
 # Surgical backend implementation checkpoint — 29 October 2026
 
+This is the first-batch historical checkpoint. The subsequent [E17 integration and invoice-source batch](SURGICAL_E17_INVOICE_BATCH_20261029.md) uses completed E17 `0e2a4a14` and records the next implementation and verification. References below to unfinished E17 describe the earlier checkpoint only.
+
 ## Status and baseline
 
 This checkpoint implements stages **B1, B2, B3, G and H** of the surgical backend plan. It is an isolated review branch based on the completed followups, with one code commit per stage. It is **NOT MERGE-READY**: this record establishes the focused local evidence below, not the complete release package in `SENIOR_PACKAGE_TESTING.md`.
