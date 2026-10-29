@@ -16,7 +16,7 @@ from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from shifts.access import ShiftActionRefused, _user_can_perform_shift_role, staff_membership_can_claim_role
 from shifts.emails import build_offer_shift_details, build_shift_offer_context
 from shifts.engagement import keep_accepted_terms, staff_assignment_defaults
-from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
+from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from shifts.notifications import notify_shift_users
 
 OFFER_EXPIRY_HOURS = 48
@@ -162,6 +162,8 @@ def roster_direct_staff(*, shift, candidate, assignments):
     # invalid or belongs to a published roster week, do not leave earlier slots
     # from the same request persisted.
     with transaction.atomic():
+        # Match offer finalization's Shift -> Slot order; an insert's deferred Shift FK otherwise deadlocks.
+        get_object_or_404(Shift.objects.select_for_update(), pk=shift.pk)
         for entry in assignments:
             slot_id = entry.get('slot_id')
             slot_date = entry.get('slot_date')

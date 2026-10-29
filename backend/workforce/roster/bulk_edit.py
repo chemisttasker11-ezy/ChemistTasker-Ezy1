@@ -9,6 +9,7 @@ from shifts.assignment import guard_roster_assignment
 from workforce.roster.assignment_rates import _validate_and_price
 from workforce.roster.edit_guards import _delete_empty_shift, _parse_date, _parse_time, _protect_assignment_history, _protect_marketplace_slot
 from workforce.roster.periods import get_roster_period_assignments
+from workforce.roster.slot_locking import lock_roster_shifts
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -64,6 +65,16 @@ def bulk_edit_roster_period(roster_period, operations, user):
                         except (TypeError, ValueError):
                             raise ValidationError("Worker ID must be an integer.")
         list(User.objects.select_for_update().filter(pk__in=worker_ids).order_by("pk"))
+
+        # Finalization locks Shift before Slot. Lock every existing target parent in one
+        # order before taking slot locks, including the deferred FK check of a new assignment.
+        slot_ids = [op.get("slot_id") for op in operations if isinstance(op, dict) and op.get("action")
+                    in {"assign_worker", "delete_slot", "update_slot_times", "move_shift"}]
+        assignment_ids = [op.get("assignment_id") for op in operations
+                          if isinstance(op, dict) and op.get("action") == "unassign_worker"]
+        shift_ids = set(ShiftSlot.objects.filter(pk__in=slot_ids).values_list("shift_id", flat=True))
+        shift_ids.update(ShiftSlotAssignment.objects.filter(pk__in=assignment_ids).values_list("shift_id", flat=True))
+        lock_roster_shifts(shift_ids)
 
         changed_slots = set()
         for idx, op in enumerate(operations):

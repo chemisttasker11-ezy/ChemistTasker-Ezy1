@@ -1189,6 +1189,224 @@ class BookingSafetyTests(ShiftActionFixture):
 
 @skipUnless(connection.vendor == 'postgresql', 'Requires PostgreSQL row locks')
 class OfferConfirmationRaceTests(TransactionTestCase):
+    def test_finalization_commits_when_bulk_roster_reports_a_retryable_lock_conflict(self):
+        self._assert_finalization_commits_when_roster_conflicts('bulk')
+
+    def test_finalization_commits_when_slot_patch_reports_a_retryable_lock_conflict(self):
+        self._assert_finalization_commits_when_roster_conflicts('slot_patch')
+
+    def _assert_finalization_commits_when_roster_conflicts(self, route):
+        from threading import Event
+        from time import sleep
+        from billing.utils import BILLING_STATE_FREE_TRIAL
+        from workforce.models import RosterRevisionState
+
+        owner, pharmacy = make_owner_with_pharmacy('Booking and roster lock order')
+        staff_worker, offered_worker = make_user('PHARMACIST'), make_user('PHARMACIST')
+        Membership.objects.create(
+            user=staff_worker, pharmacy=pharmacy, role='PHARMACIST', employment_type='FULL_TIME',
+            status=Membership.Status.ACCEPTED, is_active=True,
+        )
+        period = RosterPeriod.objects.create(
+            pharmacy=pharmacy, created_by=owner, week_start=DAY - timedelta(days=DAY.weekday()),
+        )
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', visibility='LOCUM_CASUAL', single_user_only=False,
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift, date=DAY, start_time=time(9), end_time=time(17), rate=70, roster_period=period,
+        )
+        other_shift = (Shift.objects.create(pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST')
+                       if route == 'bulk' else shift)
+        other_slot = ShiftSlot.objects.create(
+            shift=other_shift, date=DAY, start_time=time(7), end_time=time(8), roster_period=period,
+        )
+        prior_assignment = ShiftSlotAssignment.objects.create(
+            shift=other_shift, slot=other_slot, slot_date=DAY, user=offered_worker, is_rostered=True,
+        )
+        revision = RosterRevisionState.objects.get(period=period)
+        original_revision = revision.draft_revision
+        revision.validated_revision = original_revision
+        revision.save(update_fields=['validated_revision'])
+        offer = ShiftOffer.objects.create(shift=shift, slot=slot, user=offered_worker, offered_slot_date=DAY)
+        offer_locked, roster_attempted, roster_finished = Event(), Event(), Event()
+        pids, bodies = {}, {}
+
+        def release_offer_after_roster_conflicts(*args, **kwargs):
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT pg_backend_pid()')
+                pids['offer'] = cursor.fetchone()[0]
+            offer_locked.set()
+            self.assertTrue(roster_attempted.wait(timeout=10))
+            for _ in range(200):
+                if roster_finished.is_set():
+                    return BILLING_STATE_FREE_TRIAL
+                with connection.cursor() as cursor:
+                    cursor.execute('SELECT pg_blocking_pids(%s)', [pids['roster']])
+                    if pids['offer'] in cursor.fetchone()[0]:
+                        # On the old implementation, release into the actual Period/Shift
+                        # deadlock rather than letting the test synchronization hide it.
+                        return BILLING_STATE_FREE_TRIAL
+                sleep(0.025)
+            self.fail('Roster write did not contend with the finalization transaction.')
+
+        def request_as(user_id, path, body, is_roster=False):
+            close_old_connections()
+            try:
+                client = client_for(User.objects.get(pk=user_id))
+                client.raise_request_exception = False
+                if not is_roster:
+                    return client.post(path, body, format='json').status_code
+                self.assertTrue(offer_locked.wait(timeout=10))
+                with connection.cursor() as cursor:
+                    cursor.execute('SELECT pg_backend_pid()')
+                    pids['roster'] = cursor.fetchone()[0]
+
+                def observe_shift_lock(execute, sql, params, many, context):
+                    if '"client_profile_shift"' in sql and 'FOR UPDATE' in sql.upper():
+                        roster_attempted.set()
+                    return execute(sql, params, many, context)
+
+                with connection.execute_wrapper(observe_shift_lock):
+                    request = client.post if route == 'bulk' else client.patch
+                    response = request(path, body, format='json')
+                    bodies['roster'] = response.content.decode()
+                    roster_finished.set()
+                    return response.status_code
+            finally:
+                close_old_connections()
+
+        path, body = (
+            (f'{API}attendance/roster/bulk-edit/', {
+                'period_id': period.pk,
+                'operations': [{'action': 'assign_worker', 'slot_id': slot.pk, 'user_id': staff_worker.pk}],
+            }) if route == 'bulk' else
+            (f'{API}roster-shifts/{shift.pk}/', {'slots': [{'id': slot.pk, 'start_time': '10:00:00'}]})
+        )
+        with mock.patch('billing.utils.get_billing_state_for_pharmacy', side_effect=release_offer_after_roster_conflicts), \
+                mock.patch('shifts.engagement.build_shift_engagement_terms', return_value={}), \
+                mock.patch('shifts.offers.notify_shift_users'), mock.patch('shifts.offers.async_task'), \
+                mock.patch('shifts.offers.send_shift_payment_finalized_notifications'), \
+                ThreadPoolExecutor(max_workers=2) as pool:
+            accepted = pool.submit(request_as, offered_worker.pk, f'{API}shift-offers/{offer.pk}/accept/', {})
+            rostered = pool.submit(request_as, owner.pk, path, body, True)
+            results = (accepted.result(timeout=20), rostered.result(timeout=20))
+
+        self.assertEqual(results, (200, 400), results)
+        self.assertIn('Refresh and retry the roster change.', bodies['roster'])
+        assigned = ShiftSlotAssignment.objects.get(slot=slot, slot_date=DAY)
+        self.assertEqual((assigned.user_id, assigned.source_offer_id), (offered_worker.pk, offer.pk))
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(pk=prior_assignment.pk, user=offered_worker).exists())
+        slot.refresh_from_db()
+        self.assertEqual(slot.start_time, time(9))
+        revision.refresh_from_db()
+        self.assertGreater(revision.draft_revision, original_revision)
+        self.assertIsNone(revision.validated_revision)
+
+    def test_manual_assignment_commits_when_finalization_waits_for_its_locks(self):
+        self._assert_assignment_commits_when_finalization_waits('manual')
+
+    def test_bulk_assignment_commits_when_finalization_waits_for_its_locks(self):
+        self._assert_assignment_commits_when_finalization_waits('bulk')
+
+    def _assert_assignment_commits_when_finalization_waits(self, route):
+        from threading import Event
+        from time import sleep
+        from billing.utils import BILLING_STATE_FREE_TRIAL
+        from shifts.assignment import guard_roster_assignment as real_guard
+        from shifts.offers import ShiftOfferViewSet
+
+        owner, pharmacy = make_owner_with_pharmacy('Assignment lock order')
+        shift = Shift.objects.create(
+            pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
+            employment_type='LOCUM', visibility='LOCUM_CASUAL', single_user_only=False,
+        )
+        slot = ShiftSlot.objects.create(shift=shift, date=DAY, start_time=time(9), end_time=time(17), rate=70)
+        if route == 'bulk':
+            period = RosterPeriod.objects.create(
+                pharmacy=pharmacy, created_by=owner, week_start=DAY - timedelta(days=DAY.weekday()),
+            )
+            slot.roster_period = period
+            slot.save(update_fields=['roster_period'])
+        staff_worker, offered_worker = make_user('PHARMACIST'), make_user('PHARMACIST')
+        Membership.objects.create(
+            user=staff_worker, pharmacy=pharmacy, role='PHARMACIST', employment_type='FULL_TIME',
+            status=Membership.Status.ACCEPTED, is_active=True,
+        )
+        offer = ShiftOffer.objects.create(shift=shift, slot=slot, user=offered_worker, offered_slot_date=DAY)
+        manual_locked, offer_read = Event(), Event()
+        pids = {}
+        original_get = ShiftOfferViewSet.get_object
+
+        def read_offer_after_manual_lock(view):
+            self.assertTrue(manual_locked.wait(timeout=10))
+            row = original_get(view)
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT pg_backend_pid()')
+                pids['offer'] = cursor.fetchone()[0]
+            offer_read.set()
+            return row
+
+        def guard_until_finalization_waits(**kwargs):
+            real_guard(**kwargs)
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT pg_backend_pid()')
+                pids['manual'] = cursor.fetchone()[0]
+            manual_locked.set()
+            self.assertTrue(offer_read.wait(timeout=10))
+            # Observe real PostgreSQL contention before allowing the assignment insert/commit.
+            # With the former Slot -> Shift-FK order this forced a deadlock against finalization's Shift -> Slot.
+            for _ in range(200):
+                with connection.cursor() as cursor:
+                    cursor.execute('SELECT pg_blocking_pids(%s)', [pids['offer']])
+                    blockers = cursor.fetchone()[0]
+                if pids['manual'] in blockers:
+                    return
+                sleep(0.025)
+            self.fail('Finalization never contended on the manual assignment transaction.')
+
+        def request_as(user_id, path, body):
+            close_old_connections()
+            try:
+                client = client_for(User.objects.get(pk=user_id))
+                client.raise_request_exception = False
+                return client.post(path, body, format='json').status_code
+            finally:
+                close_old_connections()
+
+        guard_path = ('workforce.roster.bulk_edit.guard_roster_assignment' if route == 'bulk'
+                      else 'shifts.assignment.guard_roster_assignment')
+        path, body = (
+            (f'{API}attendance/roster/bulk-edit/', {
+                'period_id': period.pk,
+                'operations': [{'action': 'assign_worker', 'slot_id': slot.pk, 'user_id': staff_worker.pk}],
+            }) if route == 'bulk' else
+            (f'{API}shifts/{shift.pk}/manual-assign/', {
+                'user_id': staff_worker.pk, 'assignments': [{'slot_id': slot.pk, 'slot_date': str(DAY)}],
+            })
+        )
+        with mock.patch.object(ShiftOfferViewSet, 'get_object', read_offer_after_manual_lock), \
+                mock.patch(guard_path, side_effect=guard_until_finalization_waits), \
+                mock.patch('shifts.engagement.build_shift_engagement_terms', return_value={}), \
+                mock.patch('billing.utils.get_billing_state_for_pharmacy', return_value=BILLING_STATE_FREE_TRIAL), \
+                mock.patch('shifts.assignment.notify_shift_users'), mock.patch('shifts.offers.notify_shift_users'), \
+                mock.patch('shifts.offers.async_task'), \
+                mock.patch('shifts.offers.send_shift_payment_finalized_notifications'), \
+                ThreadPoolExecutor(max_workers=2) as pool:
+            manual = pool.submit(request_as, owner.pk, path, body)
+            accepted = pool.submit(request_as, offered_worker.pk, f'{API}shift-offers/{offer.pk}/accept/', {})
+            results = (manual.result(timeout=20), accepted.result(timeout=20))
+
+        self.assertEqual(results, (200, 400), results)
+        row = ShiftSlotAssignment.objects.get(slot=slot, slot_date=DAY)
+        self.assertEqual(row.user_id, staff_worker.pk)
+        self.assertIsNone(row.source_offer_id)
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+
     def test_finalize_and_manual_assignment_serialize_on_the_same_occurrence(self):
         from billing.utils import BILLING_STATE_FREE_TRIAL
         from shifts.assignment import roster_direct_staff as real_roster_direct_staff
