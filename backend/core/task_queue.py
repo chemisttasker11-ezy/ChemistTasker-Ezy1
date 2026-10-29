@@ -1,109 +1,20 @@
-from __future__ import annotations
+"""Historical queue import surface; implementations live with their owners.
 
-from threading import Lock
-from typing import Any
-
-from celery import current_app
-from django.db import transaction
-from django.utils import timezone
-
-
-CELERY_TASK_ALIASES = {
-    "users.tasks.send_async_email": "users.tasks.send_email_task",
-}
-
-_TASK_REGISTRY_LOAD_LOCK = Lock()
-
-def _celery_options(q_options: dict[str, Any] | None) -> dict[str, Any]:
-    if not q_options:
-        return {}
-    options: dict[str, Any] = {}
-    eta = q_options.get("eta")
-    if eta is not None:
-        options["eta"] = eta if timezone.is_aware(eta) else timezone.make_aware(eta)
-    if "timeout" in q_options:
-        options["time_limit"] = q_options["timeout"]
-    return options
-
-
-def registered_task_name(name: str) -> str:
-    """The registered Celery task name for `name` (after aliases), or LookupError when Celery does not know it.
-
-    A web process only knows the tasks whose modules something has imported. Dispatching by name must not depend on
-    that, so on a miss the autodiscovered task modules are loaded (what a worker does at start-up) and the name is
-    looked up again.
-    """
-    task_name = CELERY_TASK_ALIASES.get(name, name)
-    if task_name in current_app.tasks:
-        return task_name
-
-    # Celery 5.5 autodiscovery uses a process-global race-protection flag, not a
-    # lock. Two concurrent first web requests can therefore make the second
-    # caller skip autodiscovery and observe a partially populated registry.
-    # Serialize the miss path and re-check after acquiring the lock so only one
-    # request performs the initial import pass.
-    with _TASK_REGISTRY_LOAD_LOCK:
-        if task_name not in current_app.tasks:
-            current_app.loader.import_default_modules()
-
-    if task_name in current_app.tasks:
-        return task_name
-    raise LookupError(f"Celery task is not registered: {task_name}")
-
-
-def async_task(func, *args, **kwargs):
-    q_options = kwargs.pop("q_options", None)
-    options = _celery_options(q_options)
-
-    if isinstance(func, str):
-        task_name = CELERY_TASK_ALIASES.get(func, func)
-        if task_name == "users.tasks.send_email_task":
-            notification = kwargs.pop("notification", None)
-            suppress_auto_notification = kwargs.pop("suppress_auto_notification", False)
-            if not notification and not suppress_auto_notification:
-                context = kwargs.get("context") or {}
-                if isinstance(context, dict):
-                    action_url = (
-                        context.get("action_url")
-                        or context.get("shift_link")
-                        or context.get("manage_url")
-                        or context.get("dashboard_url")
-                        or context.get("login_url")
-                        or context.get("accept_url")
-                        or context.get("invite_url")
-                        or context.get("invitation_url")
-                        or context.get("verification_url")
-                        or context.get("profile_url")
-                        or context.get("roster_url")
-                        or context.get("url")
-                        or context.get("link")
-                    )
-                else:
-                    action_url = None
-                action_url = action_url or "/dashboard"
-                notification = {
-                    "title": kwargs.get("subject") or "",
-                    "body": "",
-                    "action_url": action_url,
-                    "payload": {
-                        "notification_kind": "email_notification",
-                        "template_name": kwargs.get("template_name") or "",
-                    },
-                }
-            if notification:
-                from users.tasks import _dispatch_notification
-
-                recipients = list(kwargs.get("recipient_list") or [])
-                subject = kwargs.get("subject") or ""
-                transaction.on_commit(
-                    lambda: _dispatch_notification(notification, recipients, subject)
-                )
-        task_name = registered_task_name(task_name)
-        if current_app.conf.task_always_eager:
-            return current_app.tasks[task_name].apply_async(args=args, kwargs=kwargs, **options)
-        return current_app.send_task(task_name, args=args, kwargs=kwargs, **options)
-
-    if hasattr(func, "apply_async"):
-        return func.apply_async(args=args, kwargs=kwargs, **options)
-
-    raise TypeError(f"Expected a registered Celery task or task name, got {func!r}")
+Email-aware dispatch belongs to users. Neutral options and registry locking
+belong to infrastructure. This module keeps existing callers and task payloads
+compatible and owns no second dispatch implementation.
+"""
+from infrastructure.task_queue import (
+    Any,
+    Lock,
+    _TASK_REGISTRY_LOAD_LOCK,
+    _celery_options,
+    current_app,
+    timezone,
+)
+from users.task_dispatch import (
+    CELERY_TASK_ALIASES,
+    async_task,
+    registered_task_name,
+    transaction,
+)

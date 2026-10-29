@@ -19,7 +19,7 @@ from users.org_roles import (
     role_requires_field,
 )
 from django.conf import settings
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from users.delivery import deliver_email_best_effort
 from rest_framework.views import APIView
 from users.utils import build_org_invite_context
