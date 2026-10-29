@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Iterable, Optional, Sequence
+import logging
 import requests
 
 from asgiref.sync import async_to_sync
@@ -14,6 +15,7 @@ from notifications.models import Notification
 from users.models import DeviceToken
 
 USER_GROUP_FMT = "user.{user_id}"
+logger = logging.getLogger(__name__)
 
 
 def _serialize_notification(notification: Notification) -> dict:
@@ -94,8 +96,17 @@ def notify_users(
 
 
 def _deliver_notification(notification: Notification) -> None:
-    _broadcast(notification.user_id, "notification.created", {"notification": _serialize_notification(notification)})
-    _broadcast_notification_counter(notification.user_id)
+    payload = {"notification": _serialize_notification(notification)}
+    try:
+        _broadcast(notification.user_id, "notification.created", payload)
+    except Exception:
+        logger.exception("Notification %s WebSocket delivery failed", notification.pk)
+    # Read durable state outside the transport catch, including for a PostgreSQL-backed channel layer.
+    unread = Notification.objects.filter(user_id=notification.user_id, read_at__isnull=True).count()
+    try:
+        _broadcast(notification.user_id, "notification.counter", {"unread": unread})
+    except Exception:
+        logger.exception("Notification %s counter delivery failed", notification.pk)
     tokens = list(
         DeviceToken.objects.filter(user_id=notification.user_id, active=True).values_list("token", flat=True)
     )

@@ -2,6 +2,10 @@
 
 29 October 2026 (Australia/Brisbane). Starting head: `e046c7c563d62c69082f124fad004c165ce0f7e9`, branch `fix/surgical-backend-consistency-20261029`. PR remains draft and unmerged. No deployment, live Stripe, email or other provider action.
 
+## Later continuation
+
+The channel-isolation and payment/acceptance confirmation candidates are advanced in [SURGICAL_CONFIRMATION_DELIVERY_20261029.md](SURGICAL_CONFIRMATION_DELIVERY_20261029.md). Its final results supersede those specific open candidates below. Other queue, timing and per-recipient candidates remain open; this original inventory is retained as the route ledger.
+
 ## Protected rule and concrete repair
 
 A successfully committed shift post or edit must return its ordinary success result even when its after-commit announcement transport raises. Failure of the posted-shift callback must not suppress the separately registered availability callback. An enclosing rollback must discard both business writes and announcements.

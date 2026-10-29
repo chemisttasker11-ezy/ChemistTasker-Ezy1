@@ -1,4 +1,6 @@
 """Shift e-mails and links: contexts for offer, counter-offer and interest e-mails, worker dashboard URLs and the payment/update notifications."""
+import logging
+
 from organizations.access import is_admin_of
 from users.role_labels import user_work_role_label
 from shifts.pricing import expand_shift_slots
@@ -14,6 +16,9 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from notifications.models import Notification
+
+
+logger = logging.getLogger(__name__)
 
 
 def build_shift_email_context(shift, user=None, extra=None, role=None, shift_type=None):
@@ -186,6 +191,14 @@ def _worker_display_name(user):
     return user.get_full_name() or user.email or getattr(user, "username", "") or "A candidate"
 
 
+def _queue_payment_notification_email(**kwargs):
+    """A post-commit confirmation queue failure must not suppress other recipients."""
+    try:
+        async_task("users.tasks.send_async_email", **kwargs)
+    except Exception:
+        logger.exception("Could not enqueue a shift payment confirmation email")
+
+
 def send_shift_not_selected_after_payment_notifications(*, shift, selected_offers):
     from notifications.services import notify_users
 
@@ -262,8 +275,7 @@ def send_shift_not_selected_after_payment_notifications(*, shift, selected_offer
                 "availability_link": worker_availability_url(worker),
                 "interests_link": worker_interests_url(worker),
             })
-            async_task(
-                "users.tasks.send_async_email",
+            _queue_payment_notification_email(
                 subject=f"Shift filled at {shift.pharmacy.name}",
                 recipient_list=[worker.email],
                 template_name="emails/shift_not_selected_after_payment.html",
@@ -309,8 +321,7 @@ def send_shift_payment_finalized_notifications(*, shift, offers, paid_by=None, p
                 "payment_method": payment_label,
                 "rate": details["slot_details"][0].get("rate") if details["slot_details"] else "",
             })
-            async_task(
-                "users.tasks.send_async_email",
+            _queue_payment_notification_email(
                 subject=f"Your shift is locked in at {shift.pharmacy.name}",
                 recipient_list=[worker.email],
                 template_name="emails/shift_payment_finalized_worker.html",
@@ -375,8 +386,7 @@ def send_shift_payment_finalized_notifications(*, shift, offers, paid_by=None, p
             "payment_method": payment_label,
             "rate": details["slot_details"][0].get("rate") if details["slot_details"] else "",
         })
-        async_task(
-            "users.tasks.send_async_email",
+        _queue_payment_notification_email(
             subject=(
                 f"Shift finalized at {shift.pharmacy.name}"
                 if method_key == "free"

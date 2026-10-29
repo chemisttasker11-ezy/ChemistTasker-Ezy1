@@ -440,6 +440,11 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                     ).exclude(id=offer.id).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
 
         def send_acceptance_notifications():
+            def enqueue_confirmation_email(**kwargs):
+                def enqueue():
+                    async_task('users.tasks.send_async_email', **kwargs)
+                transaction.on_commit(enqueue, robust=True)
+
             if not requires_payment:
                 send_shift_payment_finalized_notifications(
                     shift=shift,
@@ -481,8 +486,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                         **offer_details,
                     },
                 )
-                async_task(
-                    'users.tasks.send_async_email',
+                enqueue_confirmation_email(
                     subject=(
                         f"Thanks for confirming your shift at {pharmacy_display} - owner payment pending"
                         if requires_payment
@@ -530,8 +534,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                         **offer_details,
                     },
                 )
-                async_task(
-                    'users.tasks.send_async_email',
+                enqueue_confirmation_email(
                     subject=f"{worker_role_label} confirmed shift offer at {pharmacy_display}" + (" - Action Required" if requires_payment else ""),
                     recipient_list=[owner_user.email],
                     template_name="emails/owner_worker_confirmed.html",

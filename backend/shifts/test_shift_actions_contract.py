@@ -1075,6 +1075,23 @@ class BookingSafetyTests(ShiftActionFixture):
             self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
             self.assertTrue(notice.called)
 
+    def test_acceptance_email_queue_failure_still_attempts_owner_confirmation(self):
+        from billing.utils import BILLING_STATE_PAYMENT_REQUIRED
+        offer = self.offer(self.shift(), self.worker())
+        with mock.patch('shifts.engagement.build_shift_engagement_terms', return_value={}), \
+                mock.patch('billing.utils.get_billing_state_for_pharmacy', return_value=BILLING_STATE_PAYMENT_REQUIRED), \
+                mock.patch('shifts.offers.async_task', side_effect=[RuntimeError('queue offline'), None]) as email, \
+                self.captureOnCommitCallbacks(execute=True):
+            response = client_for(offer.user).post(f'{API}shift-offers/{offer.pk}/accept/', {}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.assertEqual(email.call_count, 2)
+        self.assertEqual([c.kwargs['template_name'] for c in email.call_args_list], [
+            'emails/shift_accept.html', 'emails/owner_worker_confirmed.html',
+        ])
+        self.assertEqual(email.call_args.kwargs['recipient_list'], [self.owner.email])
+
     def test_c020_n1_f05_n3_wrong_role_cannot_be_rostered_offered_or_confirmed(self):
         from onboarding.models import OtherStaffOnboarding
         technician = make_user('OTHER_STAFF')
