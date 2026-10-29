@@ -8,6 +8,7 @@ from django.db.models.signals import post_delete, post_save, pre_delete, pre_sav
 from django.dispatch import receiver
 
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
+from shifts.events import payroll_activated
 from workforce.models import RosterPeriod
 from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
 
@@ -51,6 +52,14 @@ def _session_dates(session):
     except Exception:
         dates = [moment.date() for moment in moments]
     return min(dates), max(dates)
+
+
+@receiver(payroll_activated)
+def payroll_settlement_changed(sender, pharmacy_id, user_id, work_dates, **kwargs):
+    # This receiver participates in the activation transaction: a failed durable
+    # invalidation must roll it back. Queue dispatch is already robust/on-commit.
+    for work_date in work_dates:
+        _enqueue(pharmacy_id, user_id, work_date)
 
 
 @receiver(post_save, sender=AttendanceSession)

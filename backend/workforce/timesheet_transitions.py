@@ -146,6 +146,11 @@ def lock_period(period, user):
         payroll_enabled = bool(getattr(period.pharmacy, "use_chemisttasker_payroll", False))
         for timesheet in period.timesheets.select_related("user").order_by("user_id"):
             revision = _latest_revision(timesheet)
+            if (
+                payroll_enabled and period.status != TimesheetPeriod.Status.LOCKED
+                and "roster" not in revision.snapshot
+            ):
+                raise ValidationError("Recalculate and review timesheets before locking payroll settlement routing.")
             roster_rows = revision.snapshot.get("roster", []) or []
             payroll_assignment_ids = [
                 row.get("assignment_id")

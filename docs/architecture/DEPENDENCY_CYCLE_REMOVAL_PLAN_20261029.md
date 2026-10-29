@@ -161,3 +161,20 @@ Direct runtime cycles remain zero; combined cyclic edges fall **114 → 113**, r
 users → organizations with no additions or component expansion. Seven baseline database controls
 passed before movement; worker-before-HTTP and no-startup-I/O controls cover the new binding.
 See `docs/qa/WORKER_ORGANIZATION_BOUNDARY_20261029.md` for verification and retained programme debt.
+
+## Release-hardening continuation
+
+The user has adopted M1–M5 release milestones and authorized implementation. The next
+work is integration and production integrity, not more dependency removal by count.
+#225's Full Isolated QA, Shared Core, authenticated E2E and security checks succeeded
+on `e80a89784d6481da2604dee86c342281bf92bbfe`. The isolated integration rehearsal used
+that exact tree above main; the bounded identity/discovery/verification assessment retains
+the reviewed owners. Source changes require their own new-head acceptance.
+
+`docs/qa/PRELAUNCH_RISK_REGISTER_20261029.md` is the current launch-impact register.
+This continuation repairs demonstrated payroll retry, projection invalidation and frozen
+settlement export defects while preserving accepted terms and already locked manifests.
+Paid fulfillment duplication remains an unresolved blocker for that enabled workflow;
+refund alerts do not establish prevention. Cancellation and notification candidates require
+bounded reproductions and policy separation. Zero direct cyclic edges and the retained
+113 combined edges remain guarded. M4 is in progress; M5 is not release-certified.

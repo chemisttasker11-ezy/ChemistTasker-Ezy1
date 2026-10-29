@@ -17,6 +17,7 @@ from django.db.models import Avg
 from django.utils import timezone
 from shifts.pricing import expand_shift_slots
 from shifts.finalize import finalize_shift_offer
+from shifts.events import payroll_activated
 from shifts.emails import (
     active_shift_url_for_user,
     build_offer_shift_details,
@@ -612,22 +613,37 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            activated_at = timezone.now()
-            offer.settlement_channel = SETTLEMENT_PAYROLL
-            offer.payroll_activated_at = activated_at
-            offer.save(update_fields=[
-                "settlement_channel",
-                "payroll_activated_at",
-                "updated_at",
-            ])
-            assignment_count = ShiftSlotAssignment.objects.filter(
+            activated_at = offer.payroll_activated_at or timezone.now()
+            if offer.settlement_channel != SETTLEMENT_PAYROLL or offer.payroll_activated_at is None:
+                offer.settlement_channel = SETTLEMENT_PAYROLL
+                offer.payroll_activated_at = activated_at
+                offer.save(update_fields=[
+                    "settlement_channel",
+                    "payroll_activated_at",
+                    "updated_at",
+                ])
+            assignments = list(ShiftSlotAssignment.objects.filter(
                 source_offer=offer,
                 payment_preference_snapshot=PAYMENT_TFN,
                 engagement_kind=KIND_SHIFT_EMPLOYMENT,
-            ).update(
-                settlement_channel=SETTLEMENT_PAYROLL,
-                payroll_activated_at=activated_at,
-            )
+            ).select_related("slot").order_by("pk"))
+            assignment_count = len(assignments)
+            changed = [row for row in assignments if (
+                row.settlement_channel != SETTLEMENT_PAYROLL or row.payroll_activated_at != activated_at
+            )]
+            if changed:
+                # Settlement activation is not a published-roster edit. Keep the
+                # bounded bulk write, then let workforce invalidate its projections.
+                ShiftSlotAssignment.objects.filter(pk__in=[row.pk for row in changed]).update(
+                    settlement_channel=SETTLEMENT_PAYROLL,
+                    payroll_activated_at=activated_at,
+                )
+                payroll_activated.send(
+                    sender=ShiftOffer,
+                    pharmacy_id=shift.pharmacy_id,
+                    user_id=offer.user_id,
+                    work_dates=tuple(sorted({row.slot_date or row.slot.date for row in changed})),
+                )
 
         return Response({
             'status': 'payroll_activated',
