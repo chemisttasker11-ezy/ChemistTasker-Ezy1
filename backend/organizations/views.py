@@ -27,7 +27,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from users.task_dispatch import async_task
-from core.integrations.abr import _parse_abn_html_fields, abn_lookup
+from infrastructure.integrations.abr import _parse_abn_html_fields, abn_lookup
 from organizations.access import _get_org_pharmacies_queryset
 from django.db import IntegrityError, transaction
 from django.contrib.auth import get_user_model

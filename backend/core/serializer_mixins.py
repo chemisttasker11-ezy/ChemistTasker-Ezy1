@@ -1,12 +1,2 @@
-"""Serializer mixins shared across backend domains."""
-from rest_framework import serializers
-
-from infrastructure.file_validation import validate_upload_mapping
-
-
-class UploadValidationMixin:
-    upload_validation_map = {}
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        return validate_upload_mapping(attrs, self.upload_validation_map)
+"""Historical serializer mixin imports."""
+from infrastructure.serializer_mixins import UploadValidationMixin, serializers, validate_upload_mapping

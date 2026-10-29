@@ -21,7 +21,7 @@ from django.core.signing import TimestampSigner
 from django.db import transaction
 from django.utils import timezone
 
-from core.integrations.abr import _parse_abn_html_fields, abn_lookup
+from infrastructure.integrations.abr import _parse_abn_html_fields, abn_lookup
 from users.task_dispatch import async_task
 from onboarding.emails import get_candidate_role, simple_name_match
 from onboarding.services.work_profile import referee_profile_target

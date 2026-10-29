@@ -2,8 +2,9 @@
 
 RECORDED pins every model-signal receiver the project connects (sender -> receiver). A receiver that appears twice,
 from a compatibility path or from a new module shows up here for review instead of silently changing what a save
-does. ready() hooks may only import their own app's signals module: no queries, task dispatch or other work at
-startup. Third-party receivers (axes) and Django's post_migrate handlers are not pinned.
+does. Domain ready() hooks only import their own signals. The composition hook has one exact,
+configuration-only registry binding, checked in a cold process: no queries, HTTP or task dispatch.
+Third-party receivers (axes) and Django's post_migrate handlers are not pinned.
 """
 import ast
 import weakref
@@ -135,6 +136,9 @@ class SignalRegistryContractTests(SimpleTestCase):
 
         hooks = list(ready_hooks())
         for app, _node in hooks:
+            if app == "composition":
+                # Its exact configuration-only hook is checked below and in cold-process tests.
+                continue
             path = BACKEND / app / "signals.py"
             self.assertTrue(path.is_file(), f"{app}.apps.ready imports signals but {path} is missing")
             tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -159,10 +163,17 @@ class SignalRegistryContractTests(SimpleTestCase):
                 f"{app}.signals executes work at import time; move it into a receiver/service: {forbidden}",
             )
 
-    def test_ready_hooks_only_import_their_own_signals_module(self):
+    def test_ready_hooks_only_register_signals_or_the_exact_composition_binding(self):
         hooks = list(ready_hooks())
         self.assertTrue(hooks)
         for app, node in hooks:
+            if app == "composition":
+                self.assertEqual(
+                    ast.dump(ast.Module(body=node.body, type_ignores=[])),
+                    ast.dump(ast.parse("from .file_references import configure_file_cleanup\nconfigure_file_cleanup()")),
+                    "Only the explicit, no-I/O application registry binding is allowed at composition startup.",
+                )
+                continue
             body = [
                 statement for statement in node.body
                 if not (isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Constant))

@@ -125,3 +125,26 @@ Cross-client audit: Django remains authority; kiosk representative cases share o
 with TypeScript, and multipart transport preserves FormData and lets transport set boundaries.
 Pricing helpers remain compatibility estimates; the inaccurate Django-import claim is removed.
 Any observed policy mismatch is documented for discussion instead of normalised silently.
+
+## Longer-cycle continuation — serializer/runtime composition
+
+Fixed parent: PR #222, `90534bbe93c5c64e586ffaaba86df089415731e7`. Hosted checks continue
+independently; the user explicitly requested further dependency work without waiting for gates.
+
+The remaining domain-to-core serializer and ABR imports close the seven-app direct component.
+Neutral cleanup/validation/numeric/provider mechanics move to infrastructure; locked identity
+updates move to users. The domain-aware file-reference list stays above the domains, in explicit
+application composition. Its configuration-only AppConfig hook runs after model discovery in
+workers and commands as well as HTTP; cold-process tests forbid startup SQL, HTTP and task dispatch.
+Historical core exports and old pickles still resolve to identical objects. No migration changes.
+
+Result: actual direct cyclic edges **15 → 0**, no direct SCCs/mutual pairs. Combined cyclic edges
+**120 → 114**, removing six edges with no additions or component expansion. Existing legitimate
+domain dependencies remain; removing the reverse core imports makes them acyclic at module level.
+The direct zero-cycle gate is enabled, and the baseline independently bounds function-local cycle
+edges and components. This is not a claim that the combined twenty-app runtime graph is acyclic.
+
+Next bounded work: worker-safe organisation scope/navigation ownership. Preserve existing
+query ordering and selection semantics, including the distinction between navigation and
+action-specific authorization; use the startup composition owner rather than HTTP-only binding.
+Financial, settlement and notification workflow decisions remain deferred as previously recorded.

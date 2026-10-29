@@ -143,6 +143,40 @@ class ModuleImportGraphTests(unittest.TestCase):
     def test_real_guard_allowlist_is_parseable_without_django_import(self):
         self.assertEqual(approved_mutual_pairs(), set())
 
+    def test_combined_baseline_catches_a_delayed_edge_without_direct_cycles(self):
+        baseline = {
+            "schema": "chemisttasker-backend-cycle-baseline-v1",
+            "strongly_connected_components": [], "unapproved_cycle_edges": [],
+            "combined_components": [], "combined_cyclic_edges": [],
+        }
+        report = {
+            "strongly_connected_components": [], "unapproved_cycle_edges": [],
+            "module_edges": [{"from": "alpha", "to": "beta"}],
+            "delayed_edges": [{"from": "beta", "to": "alpha"}],
+        }
+        result = check_cycle_baseline(report, baseline)
+        self.assertEqual(result["new_unapproved_cycle_edges"], [])
+        self.assertEqual(result["new_combined_cyclic_edges"], [("alpha", "beta"), ("beta", "alpha")])
+        self.assertEqual(result["new_combined_components"], [["alpha", "beta"]])
+
+    def test_combined_baseline_accepts_removal_but_not_a_new_edge_inside_same_component(self):
+        baseline = {
+            "schema": "chemisttasker-backend-cycle-baseline-v1",
+            "strongly_connected_components": [], "unapproved_cycle_edges": [],
+            "combined_components": [["alpha", "beta", "gamma"]],
+            "combined_cyclic_edges": [["alpha", "beta"], ["beta", "alpha"]],
+        }
+        report = {
+            "strongly_connected_components": [], "unapproved_cycle_edges": [],
+            "module_edges": [{"from": "alpha", "to": "beta"}],
+            "delayed_edges": [{"from": "beta", "to": "alpha"}],
+        }
+        self.assertTrue(all(not findings for findings in check_cycle_baseline(report, baseline).values()))
+        report["delayed_edges"] += [{"from": "beta", "to": "gamma"}, {"from": "gamma", "to": "alpha"}]
+        result = check_cycle_baseline(report, baseline)
+        self.assertEqual(result["new_combined_cyclic_edges"], [("beta", "gamma"), ("gamma", "alpha")])
+        self.assertEqual(result["new_combined_components"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

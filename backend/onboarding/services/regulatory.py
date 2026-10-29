@@ -3,7 +3,7 @@ evidence documents (qualification certificate, university ID, ...). Documents ea
 document verification task; they never block submission (onboarding/verification/policy.py)."""
 from rest_framework import serializers
 
-from core.serializer_lifecycle import _delete_file_if_unreferenced
+from infrastructure.serializer_lifecycle import _delete_file_if_unreferenced
 from users.task_dispatch import async_task
 
 
