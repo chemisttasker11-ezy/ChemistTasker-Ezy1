@@ -1,13 +1,9 @@
 {
   "schema": "chemisttasker-backend-cycle-baseline-v1",
-  "recorded_sha": "2545f52096b254d9239624fde61fbcc31dd48bbe",
-  "source": "Shared Core Consolidation architecture-audit job 118986249355, successful exact-head run 39527740762",
-  "notes": "Grandfather existing cyclic imports only; no new cyclic edges or SCC expansions are accepted. Reductions are allowed.",
+  "recorded_sha": "737e82bcc433e7513fd341251570f1ac2af86073",
+  "source": "Behavior-preserving upload infrastructure cleanup from this immutable baseline; see docs/qa/NO_LOGIC_UPLOAD_CLEANUP_20261029.md",
+  "notes": "Actual cyclic edges shrink from 43 to 42. chat-to-core is removed. The retained core-to-chat composition edge is reclassified from the retired mutual-pair exemption into the longer-cycle ledger; no new underlying cyclic dependency is accepted. Historical attendance/workforce SCC removed because it is already absent.",
   "strongly_connected_components": [
-    [
-      "attendance",
-      "workforce"
-    ],
     [
       "chat",
       "client_profile",
@@ -62,6 +58,10 @@
     [
       "client_profile",
       "shifts"
+    ],
+    [
+      "core",
+      "chat"
     ],
     [
       "core",

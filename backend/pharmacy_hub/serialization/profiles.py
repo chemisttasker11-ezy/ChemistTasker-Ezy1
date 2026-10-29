@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from organizations.models import Organization, Pharmacy
 from django.db import transaction
-from core.file_validation import IMAGE_UPLOAD_POLICY
+from infrastructure.file_validation import IMAGE_UPLOAD_POLICY
 from users.presentation import _build_absolute_media_url
 from core.serializer_mixins import UploadValidationMixin
 

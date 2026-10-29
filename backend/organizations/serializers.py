@@ -12,7 +12,7 @@ from organizations.chains import active_owner_chains_for_pharmacy
 from core.task_queue import async_task
 from core.serializer_lifecycle import RemoveOldFilesMixin
 from core.serializer_mixins import UploadValidationMixin
-from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
+from infrastructure.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
 from users.models import OrganizationMembership
 from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
