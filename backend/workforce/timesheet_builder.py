@@ -182,6 +182,7 @@ def _timesheet_projection(timesheet, period, *, timezone_name=None):
         },
         "period": {"id": period.pk, "start_date": str(period.start_date), "end_date": str(period.end_date), "timezone": tz_name},
         "employment_engagements": engagement_rows,
+        "roster": source_payload["roster"],
         "days": day_rows,
         "leave": leave_rows,
         "totals": {
@@ -209,10 +210,11 @@ def build_timesheet(timesheet_id: int, *, actor=None, force=False):
         previous = _latest_revision(timesheet)
         membership, source_payload, snapshot, segments, checks = _timesheet_projection(timesheet, period)
         fingerprint = _hash(source_payload)
-        unchanged = previous and previous.source_fingerprint == fingerprint
+        unchanged = previous and "roster" in previous.snapshot and previous.source_fingerprint == fingerprint
         previous_timezone = previous.snapshot.get("period", {}).get("timezone") if previous else None
         if (
             previous and timesheet.status == Timesheet.Status.APPROVED
+            and "roster" in previous.snapshot
             and previous_timezone and previous_timezone != tz_name and not unchanged
         ):
             _, previous_zone_payload, _, _, _ = _timesheet_projection(

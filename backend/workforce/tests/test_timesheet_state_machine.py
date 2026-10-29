@@ -41,6 +41,64 @@ class TimesheetStateMachineTests(TestCase):
         self.timesheet.refresh_from_db()
         return revision
 
+    def test_payroll_manifest_uses_frozen_assignment_settlement(self):
+        from shifts.models import ShiftSlotAssignment
+
+        self.pharmacy.use_chemisttasker_payroll = True
+        self.pharmacy.save(update_fields=["use_chemisttasker_payroll"])
+        ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).update(settlement_channel="PAYROLL")
+        self.built()
+        manifest = self.lock_all()
+        self.assertEqual(manifest.snapshot["payroll_export"][0]["assignment_ids"], [self.assignment.pk])
+        self.assertEqual(manifest.snapshot["payroll_export"][0]["days"][0]["assignment_id"], self.assignment.pk)
+        # Later source edits cannot rewrite an already locked manifest.
+        ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).update(settlement_channel="INVOICE")
+        self.assertEqual(lock_period(self.period, self.owner).manifest_hash, manifest.manifest_hash)
+
+    def test_invoice_assignments_stay_out_of_payroll_export(self):
+        from shifts.models import ShiftSlotAssignment
+
+        self.pharmacy.use_chemisttasker_payroll = True
+        self.pharmacy.save(update_fields=["use_chemisttasker_payroll"])
+        ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).update(settlement_channel="INVOICE")
+        self.built()
+        manifest = self.lock_all()
+        routing = manifest.snapshot["timesheets"][0]["settlement_routing"]
+        self.assertEqual(routing["invoice_assignment_ids"], [self.assignment.pk])
+        self.assertEqual(routing["payroll_assignment_ids"], [])
+        self.assertEqual(manifest.snapshot["payroll_export"], [])
+
+    def test_timesheet_only_assignments_stay_out_of_payroll_export(self):
+        from shifts.models import ShiftSlotAssignment
+
+        self.pharmacy.use_chemisttasker_payroll = True
+        self.pharmacy.save(update_fields=["use_chemisttasker_payroll"])
+        ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).update(settlement_channel="TIMESHEET_ONLY")
+        self.built()
+        manifest = self.lock_all()
+        routing = manifest.snapshot["timesheets"][0]["settlement_routing"]
+        self.assertEqual(routing["timesheet_only_assignment_ids"], [self.assignment.pk])
+        self.assertEqual(routing["payroll_assignment_ids"], [])
+        self.assertEqual(manifest.snapshot["payroll_export"], [])
+
+    def test_legacy_payroll_revision_requires_rebuild_and_review_before_lock(self):
+        self.pharmacy.use_chemisttasker_payroll = True
+        self.pharmacy.save(update_fields=["use_chemisttasker_payroll"])
+        revision = self.built()
+        approve_timesheet(self.timesheet, self.owner, revision.revision_number)
+        legacy = dict(revision.snapshot)
+        legacy.pop("roster", None)
+        type(revision).objects.filter(pk=revision.pk).update(snapshot=legacy)
+        with self.assertRaisesMessage(ValidationError, "Recalculate and review"):
+            lock_period(self.period, self.owner)
+        replacement = self.built()
+        self.assertGreater(replacement.revision_number, revision.revision_number)
+        self.assertIn("roster", replacement.snapshot)
+        self.timesheet.refresh_from_db()
+        self.assertNotEqual(self.timesheet.status, Timesheet.Status.APPROVED)
+        approve_timesheet(self.timesheet, self.owner, replacement.revision_number)
+        self.assertEqual(lock_period(self.period, self.owner).period_id, self.period.pk)
+
     def test_submit_is_the_workers_own_and_revision_checked(self):
         revision = self.built()
         with self.assertRaisesMessage(PermissionDenied, "Workers can only submit their own timesheets."):

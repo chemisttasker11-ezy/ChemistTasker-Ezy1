@@ -37,7 +37,8 @@ from invoicing.services import validate_internal_invoice_shifts
 from memberships.views import MembershipApplicationViewSet, SubmitMembershipApplication
 from shifts.offers import ShiftOfferViewSet
 from shifts.finalize import finalize_shift_offer
-from workforce.models import Timesheet, TimesheetPeriod
+from workforce.models import RosterPeriod, Timesheet, TimesheetPeriod
+from workforce.timesheets import build_timesheet
 
 
 User = get_user_model()
@@ -935,3 +936,106 @@ class DeferredPayrollActivationTests(TestCase):
         assignment = ShiftSlotAssignment.objects.get(pk=assignment_ids[0])
         self.assertEqual(assignment.settlement_channel, SETTLEMENT_PAYROLL)
         self.assertEqual(assignment.payroll_activated_at, offer.payroll_activated_at)
+
+    def _complete_payroll_profile(self):
+        self.onboarding.tfn_number = "123456789"
+        self.onboarding.super_fund_name = "Example Super"
+        self.onboarding.super_usi = "EXAMPLE123"
+        self.onboarding.super_member_number = "MEMBER123"
+        self.onboarding.save()
+
+    def _timesheet(self, *, locked=False):
+        period = TimesheetPeriod.objects.create(
+            pharmacy=self.pharmacy,
+            start_date=self.slot.date,
+            end_date=self.slot.date,
+            created_by=self.manager,
+            status=TimesheetPeriod.Status.LOCKED if locked else TimesheetPeriod.Status.OPEN,
+        )
+        return Timesheet.objects.create(period=period, user=self.worker, needs_rebuild=False)
+
+    def test_activation_invalidates_open_timesheet_settlement_routing(self):
+        self._complete_payroll_profile()
+        timesheet = self._timesheet()
+        # A fulfilled external offer is rostered; payroll activation must also
+        # work after publication without treating settlement as a roster edit.
+        ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).update(is_rostered=True)
+        RosterPeriod.objects.create(
+            pharmacy=self.pharmacy,
+            week_start=self.slot.date - timedelta(days=self.slot.date.weekday()),
+            status=RosterPeriod.Status.PUBLISHED,
+            created_by=self.manager,
+        )
+        before = build_timesheet(timesheet.pk, actor=self.manager)
+        self.assertEqual(before.snapshot["roster"][0]["settlement_channel"], SETTLEMENT_TIMESHEET_ONLY)
+        with patch(
+            "workforce.signals.rebuild_timesheet_task.delay"
+        ) as rebuild, self.captureOnCommitCallbacks(execute=True):
+            response = self._activate()
+        self.assertEqual(response.status_code, 200, response.data)
+        timesheet.refresh_from_db()
+        self.assertTrue(timesheet.needs_rebuild)
+        rebuild.assert_called_once_with(timesheet.period_id, self.worker.id)
+        after = build_timesheet(timesheet.pk, actor=self.manager)
+        self.assertEqual(after.snapshot["roster"][0]["settlement_channel"], SETTLEMENT_PAYROLL)
+        self.assertEqual(after.revision_number, before.revision_number + 1)
+
+    def test_activation_retry_preserves_first_timestamp_and_does_not_invalidate_again(self):
+        self._complete_payroll_profile()
+        timesheet = self._timesheet()
+        first = self._activate()
+        self.assertEqual(first.status_code, 200, first.data)
+        self.offer.refresh_from_db()
+        self.assignment.refresh_from_db()
+        activated_at = self.offer.payroll_activated_at
+        Timesheet.objects.filter(pk=timesheet.pk).update(needs_rebuild=False)
+
+        with patch("shifts.offers.timezone.now", return_value=activated_at + timedelta(hours=1)):
+            second = self._activate()
+
+        self.assertEqual(second.status_code, 200, second.data)
+        self.assertEqual(second.data, first.data)
+        self.offer.refresh_from_db()
+        self.assignment.refresh_from_db()
+        timesheet.refresh_from_db()
+        self.assertEqual(self.offer.payroll_activated_at, activated_at)
+        self.assertEqual(self.assignment.payroll_activated_at, activated_at)
+        self.assertFalse(timesheet.needs_rebuild)
+
+    def test_activation_does_not_enqueue_rebuild_for_locked_timesheet(self):
+        self._complete_payroll_profile()
+        timesheet = self._timesheet(locked=True)
+        with patch(
+            "workforce.signals.rebuild_timesheet_task.delay"
+        ) as rebuild, self.captureOnCommitCallbacks(execute=True):
+            response = self._activate()
+        self.assertEqual(response.status_code, 200, response.data)
+        timesheet.refresh_from_db()
+        self.assertFalse(timesheet.needs_rebuild)
+        rebuild.assert_not_called()
+
+    def test_activation_survives_rebuild_queue_outage_with_durable_dirty_marker(self):
+        self._complete_payroll_profile()
+        timesheet = self._timesheet()
+        with patch(
+            "workforce.signals.rebuild_timesheet_task.delay", side_effect=RuntimeError("queue unavailable")
+        ), self.assertLogs("django.test", level="ERROR"), self.captureOnCommitCallbacks(execute=True):
+            response = self._activate()
+        self.assertEqual(response.status_code, 200, response.data)
+        timesheet.refresh_from_db()
+        self.assignment.refresh_from_db()
+        self.assertTrue(timesheet.needs_rebuild)
+        self.assertEqual(self.assignment.settlement_channel, SETTLEMENT_PAYROLL)
+
+    def test_durable_invalidation_failure_rolls_back_activation(self):
+        self._complete_payroll_profile()
+        self._timesheet()
+        with patch("workforce.signals._enqueue", side_effect=RuntimeError("invalidation failed")):
+            with self.assertRaisesMessage(RuntimeError, "invalidation failed"):
+                self._activate()
+        self.offer.refresh_from_db()
+        self.assignment.refresh_from_db()
+        self.assertIsNone(self.offer.payroll_activated_at)
+        self.assertIsNone(self.assignment.payroll_activated_at)
+        self.assertEqual(self.offer.settlement_channel, SETTLEMENT_TIMESHEET_ONLY)
+        self.assertEqual(self.assignment.settlement_channel, SETTLEMENT_TIMESHEET_ONLY)
