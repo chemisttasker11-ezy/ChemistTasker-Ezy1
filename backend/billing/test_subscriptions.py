@@ -3,14 +3,16 @@ from django.utils import timezone
 
 from billing.models import OwnerSubscription
 from billing.subscriptions import (
-    build_extra_seat_metadata,
-    build_subscription_metadata,
     get_or_create_subscription_for_account,
     get_subscription_for_account,
-    get_subscription_from_customer,
-    get_subscription_from_metadata,
     serialize_subscription,
     subscription_lookup_from_account,
+)
+from billing.views import (
+    _build_extra_seat_metadata as build_extra_seat_metadata,
+    _build_subscription_metadata as build_subscription_metadata,
+    _get_subscription_from_customer as get_subscription_from_customer,
+    _get_subscription_from_metadata as get_subscription_from_metadata,
 )
 from client_profile.characterization_support import make_owner_with_pharmacy, make_user
 from organizations.models import Organization

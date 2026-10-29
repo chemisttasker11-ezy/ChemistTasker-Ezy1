@@ -1,4 +1,10 @@
-"""Billing subscription-account operations shared by HTTP endpoints and webhook handlers."""
+"""Local subscription account selection, persistence and response projection.
+
+Read selection may use an active owner subscription for an organization whose
+own plan is inactive. Creating a subscription always targets the primary
+account. HTTP authorization, provider operations and transaction ownership stay
+with the caller.
+"""
 
 from .models import OwnerSubscription
 
@@ -46,55 +52,6 @@ def get_or_create_subscription_for_account(account):
     if updated_fields:
         subscription.save(update_fields=updated_fields)
     return subscription
-
-
-def build_subscription_metadata(account, *, actor_user, staff_count=None, pharmacy=None):
-    metadata = {
-        'billing_scope': account['scope'],
-        'actor_user_id': actor_user.id,
-    }
-    if staff_count is not None:
-        metadata['staff_count'] = staff_count
-    if pharmacy is not None:
-        metadata['pharmacy_id'] = pharmacy.id
-    if account.get('owner_user') is not None:
-        metadata['owner_user_id'] = account['owner_user'].id
-    if account.get('organization') is not None:
-        metadata['organization_id'] = account['organization'].id
-    if account.get('billing_contact') is not None:
-        metadata['billing_contact_user_id'] = account['billing_contact'].id
-    return metadata
-
-
-def build_extra_seat_metadata(account, *, actor_user, extra_seat_count, pharmacy=None):
-    metadata = build_subscription_metadata(
-        account,
-        actor_user=actor_user,
-        staff_count=5 + max(extra_seat_count, 0),
-        pharmacy=pharmacy,
-    )
-    metadata['subscription_kind'] = 'extra_seats'
-    metadata['extra_seat_count'] = max(extra_seat_count, 0)
-    return metadata
-
-
-def get_subscription_from_metadata(metadata):
-    organization_id = metadata.get('organization_id')
-    owner_user_id = metadata.get('owner_user_id')
-    if organization_id:
-        return OwnerSubscription.objects.filter(organization_id=organization_id).first()
-    if owner_user_id:
-        return OwnerSubscription.objects.filter(owner_id=owner_user_id).first()
-    actor_user_id = metadata.get('actor_user_id')
-    if actor_user_id:
-        return OwnerSubscription.objects.filter(owner_id=actor_user_id).first()
-    return None
-
-
-def get_subscription_from_customer(customer_id):
-    if not customer_id:
-        return None
-    return OwnerSubscription.objects.filter(stripe_customer_id=customer_id).first()
 
 
 def serialize_subscription(subscription):

@@ -1,5 +1,7 @@
 # Stage D — Booking / roster assignment protection evidence
 
+**Historical checkpoint — superseded by [the completed Stage D route/writer ledger](SURGICAL_STAGE_D_EVIDENCE_20261029.md).** Subsequent deterministic verification found additional invoice/leave-history gaps, parent deletion cascades and lock-order deadlocks. In particular, the single-assignment PATCH and obsolete-recurring-cleanup rows below were not fully history-guarded at the stated evidence head. The later ledger records the actual reproductions, surgical fixes, positive controls and final execution results. This preserved checkpoint is not the final closure evidence.
+
 **Date:** 29 October 2026, Australia/Brisbane  
 **Repository / draft PR:** `chemisttasker11-ezy/ChemistTasker-Ezy1`, PR #213  
 **Branch:** `fix/surgical-backend-consistency-20261029`  
