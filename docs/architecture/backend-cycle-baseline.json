@@ -1,12 +1,11 @@
 {
   "schema": "chemisttasker-backend-cycle-baseline-v1",
-  "recorded_sha": "f97712b35cd746b27405e4506f0ceedeb6896b43",
-  "source": "Onboarding encryption boundary with preserved migration metadata; see DEPENDENCY_CYCLE_REMOVAL_PLAN_20261029.md",
+  "recorded_sha": "parent:d8a1a476; runtime ownership cleanup",
+  "source": "Runtime ownership cleanup; only removed cyclic edges accepted.",
   "notes": "No direct mutual pairs or exemptions remain. onboarding-to-client_profile is removed at every depth; the identical encryption implementation is infrastructure-owned and historical migration metadata is bound by the compatibility facade during model discovery. Actual direct cyclic edges fall 23 to 22; combined cyclic edges fall 124 to 123. Longer cycles remain.",
   "strongly_connected_components": [
     [
       "chat",
-      "client_profile",
       "core",
       "memberships",
       "onboarding",
@@ -18,10 +17,6 @@
   "unapproved_cycle_edges": [
     [
       "chat",
-      "client_profile"
-    ],
-    [
-      "chat",
       "memberships"
     ],
     [
@@ -30,26 +25,6 @@
     ],
     [
       "chat",
-      "shifts"
-    ],
-    [
-      "client_profile",
-      "core"
-    ],
-    [
-      "client_profile",
-      "memberships"
-    ],
-    [
-      "client_profile",
-      "onboarding"
-    ],
-    [
-      "client_profile",
-      "organizations"
-    ],
-    [
-      "client_profile",
       "shifts"
     ],
     [
@@ -59,10 +34,6 @@
     [
       "core",
       "shifts"
-    ],
-    [
-      "memberships",
-      "core"
     ],
     [
       "memberships",

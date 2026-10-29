@@ -9,7 +9,7 @@ from users.serializers import UserProfileSerializer
 from django.db import transaction
 from organizations.access import org_wide_admin_organization_ids, user_can_edit_pharmacy_record, user_can_manage_pharmacy
 from organizations.chains import active_owner_chains_for_pharmacy
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from core.serializer_lifecycle import RemoveOldFilesMixin
 from core.serializer_mixins import UploadValidationMixin
 from infrastructure.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY

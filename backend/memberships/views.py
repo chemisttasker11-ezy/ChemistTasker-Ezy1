@@ -13,7 +13,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from users.normalization import sanitize_email_text as clean_email
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from datetime import date
 from django.db import transaction
 from datetime import timedelta

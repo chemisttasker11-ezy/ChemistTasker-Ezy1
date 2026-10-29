@@ -1,7 +1,7 @@
 /**
- * ChemistTasker Pricing Logic
- * This module is imported by both the Frontend (to show prices)
- * and the Backend (to generate Stripe invoices/checkout sessions).
+ * Client-side pricing estimates retained for compatibility.
+ * Django owns checkout, Stripe price selection and settlement decisions.
+ * These helpers are not imported by the Python backend and are not quotes.
  */
 
 export const PRICING_CONSTANTS = {
@@ -31,7 +31,7 @@ export function calculateSubscriptionCost(staffCount: number): number {
 }
 
 /**
- * Calculates the exact fee to charge an owner when a shift is successfully filled.
+ * Estimates a fulfillment fee for presentation; Django selects the actual checkout price.
  */
 export function calculateFulfillmentFee(
     shiftType: 'locum' | 'pt-ft',

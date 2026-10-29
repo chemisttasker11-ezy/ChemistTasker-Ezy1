@@ -15,7 +15,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.conf import settings
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from organizations.access import _collect_org_access_scope
 from django.db import transaction
 from users.models import OrganizationMembership, User

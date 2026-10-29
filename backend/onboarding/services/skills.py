@@ -10,7 +10,7 @@ from django.utils.text import slugify
 from rest_framework import serializers
 
 from infrastructure.file_validation import DOCUMENT_UPLOAD_POLICY, validate_uploaded_file
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from onboarding.services.skill_identity import canonical_skill, registry
 
 def _load_skills_catalog():

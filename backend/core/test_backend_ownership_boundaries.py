@@ -128,14 +128,6 @@ def module_level_app_edges():
 
 # (file, module) -> (names, reason). Keep this list short and every reason specific.
 ALLOWED_LEGACY_IMPORTS = {
-    ("chat/models.py", "client_profile.models.common"): (
-        {"chat_upload_path"},
-        "upload_to callable that chat.0001_initial and client_profile.0001 reference by its client_profile path",
-    ),
-    ("pharmacy_hub/models.py", "client_profile.models.common"): (
-        {"hub_attachment_upload_path"},
-        "upload_to callable that client_profile.0001 references by its client_profile path",
-    ),
     ("core/websocket_testing.py", "client_profile.characterization_support"): (
         {"make_owner_with_pharmacy", "make_staff_member", "make_user"},
         "test-support factories shared by the chat and notifications WebSocket tests",
@@ -178,7 +170,7 @@ LEGACY_CELERY_TASKS = {
 ALLOWED_MUTUAL_APP_PAIRS = set()
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
-KERNEL_CODE_LINE_CEILING = 260
+KERNEL_CODE_LINE_CEILING = 259
 
 # Top-level definitions per kernel runtime module. A module may lose names; it may not gain any.
 KERNEL_DEFINITIONS = {

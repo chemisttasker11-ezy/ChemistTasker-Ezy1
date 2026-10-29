@@ -214,7 +214,7 @@ class VerificationStateTests(TestCase):
         verification = client_for(profile.user).get(STAFF_URL).data['verification']
         self.assertEqual((verification['verified'], verification['outstanding'], verification['grace_until']),
                          (True, ['referees'], '2099-01-01'))
-        with mock.patch('onboarding.tasks.final_evaluation.apply_async'), mock.patch('core.task_queue.async_task'), \
+        with mock.patch('onboarding.tasks.final_evaluation.apply_async'), mock.patch('users.task_dispatch.async_task'), \
              mock.patch('onboarding.tasks._marker_get', return_value=False), mock.patch('onboarding.tasks._marker_set', return_value=True):
             final_evaluation.run('otherstaffonboarding', profile.pk)
         profile.refresh_from_db()
@@ -300,7 +300,7 @@ class NewcomerTransitionTests(TestCase):
                                        referee1_relation='manager', referee1_workplace='Clinic')
         token = TimestampSigner().sign(f'exploreronboarding:{profile.pk}:1')
         upgrade_newcomer(user.pk, 'OTHER_STAFF', 'ASSISTANT')
-        with mock.patch('onboarding.views.async_task', create=True), mock.patch('core.task_queue.async_task'):
+        with mock.patch('onboarding.views.async_task', create=True), mock.patch('users.task_dispatch.async_task'):
             response = client_for(None).post(BASE + f'onboarding/referee-reject/{token}/', {}, format='json')
         self.assertEqual(response.status_code, 200, getattr(response, 'data', None))
         self.assertTrue(OtherStaffOnboarding.objects.get(user=user).referee1_rejected)
@@ -483,7 +483,7 @@ class ConsumedRefereeLinkTests(TestCase):
         ExplorerOnboarding.objects.filter(pk=profile.pk).update(referee1_confirmed=True)  # answered Yes before upgrade
         token = TimestampSigner().sign(f'exploreronboarding:{profile.pk}:1')
         upgrade_newcomer(user.pk, 'OTHER_STAFF', 'ASSISTANT')
-        with mock.patch('core.task_queue.async_task'):
+        with mock.patch('users.task_dispatch.async_task'):
             rejected = client_for(None).post(BASE + f'onboarding/referee-reject/{token}/', {}, format='json')
             answered = client_for(None).post(BASE + f'onboarding/submit-reference/{token}/', {'would_rehire': 'NO'}, format='json')
         self.assertEqual(rejected.status_code, 200)

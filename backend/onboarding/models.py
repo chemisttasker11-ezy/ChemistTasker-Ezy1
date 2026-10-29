@@ -7,7 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 # Historical migrations serialise this field by its client_profile.fields path, so it stays defined there.
 from infrastructure.encrypted_fields import EncryptedTextField
-from core.uploads import unique_upload_path as _unique_upload_path
+from infrastructure.uploads import unique_upload_path as _unique_upload_path
 from onboarding.qualifications import DISPENSARY_QUALIFICATION_CHOICES
 
 
