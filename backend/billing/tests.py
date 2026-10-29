@@ -203,10 +203,11 @@ class ShiftFulfillmentCheckoutTests(TestCase):
         second = self.client.post(self.url, selection, format='json')
         self.assertEqual(first.status_code, 200, first.data)
         self.assertEqual(second.status_code, 200, second.data)
-        self.assertEqual(self.checkout.call_count, 2)
+        self.assertEqual(self.checkout.call_count, 1)
         first_key = self.checkout.call_args_list[0].kwargs.get('idempotency_key')
         self.assertTrue(first_key)
-        self.assertEqual(first_key, self.checkout.call_args_list[1].kwargs.get('idempotency_key'))
+        self.assertEqual(first.data['checkout_id'], second.data['checkout_id'])
+        self.assertEqual(self.checkout.call_count, 1)
 
     def test_slot_selection_and_offer_selection_use_same_idempotency_key(self):
         first = self.client.post(self.url, {'slot_ids': [self.slot.pk]}, format='json')
@@ -215,33 +216,35 @@ class ShiftFulfillmentCheckoutTests(TestCase):
         self.assertEqual(second.status_code, 200, second.data)
         first_key = self.checkout.call_args_list[0].kwargs.get('idempotency_key')
         self.assertTrue(first_key)
-        self.assertEqual(first_key, self.checkout.call_args_list[1].kwargs.get('idempotency_key'))
+        self.assertEqual(first.data['checkout_id'], second.data['checkout_id'])
+        self.assertEqual(self.checkout.call_count, 1)
 
-    def test_offer_order_does_not_change_key_but_selection_does(self):
-        from shifts.models import ShiftOffer
-
+    def test_offer_order_reuses_attempt_and_overlapping_subset_conflicts(self):
+        from datetime import time
+        from shifts.models import ShiftOffer, ShiftSlot
+        slot = ShiftSlot.objects.create(shift=self.shift, date=self.slot.date, start_time=time(18), end_time=time(21))
         other_offer = ShiftOffer.objects.create(
-            shift=self.shift, user=self.worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            shift=self.shift, slot=slot, user=self.worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
         )
-        for offer_ids in ([self.offer.pk, other_offer.pk], [other_offer.pk, self.offer.pk], [self.offer.pk]):
+        for offer_ids in ([self.offer.pk, other_offer.pk], [other_offer.pk, self.offer.pk]):
             response = self.client.post(self.url, {'offer_ids': offer_ids}, format='json')
             self.assertEqual(response.status_code, 200, response.data)
-        keys = [call.kwargs.get('idempotency_key') for call in self.checkout.call_args_list]
-        self.assertTrue(keys[0])
-        self.assertEqual(keys[0], keys[1])
-        self.assertNotEqual(keys[0], keys[2])
-        self.assertEqual(self.checkout.call_args_list[0].kwargs['line_items'][0]['quantity'], 2)
+        response = self.client.post(self.url, {'offer_ids': [self.offer.pk]}, format='json')
+        self.assertEqual(response.status_code, 409, response.data)
+        self.checkout.assert_called_once()
+        self.assertEqual(self.checkout.call_args.kwargs['line_items'][0]['quantity'], 2)
 
-    def test_changed_params_or_next_day_get_a_new_idempotency_key(self):
+    def test_changed_platform_conflicts_and_next_day_reuses_collectible_session(self):
         from datetime import timedelta
-
         selection = {'offer_ids': [self.offer.pk]}
-        self.client.post(self.url, selection, format='json')
-        self.client.post(self.url, {**selection, 'platform': 'mobile'}, format='json')
+        first = self.client.post(self.url, selection, format='json')
+        changed = self.client.post(self.url, {**selection, 'platform': 'mobile'}, format='json')
+        self.assertEqual(changed.status_code, 409, changed.data)
         with patch('django.utils.timezone.now', return_value=timezone.now() + timedelta(days=1)):
-            self.client.post(self.url, selection, format='json')
-        keys = [call.kwargs.get('idempotency_key') for call in self.checkout.call_args_list]
-        self.assertEqual(len(set(keys)), 3)
+            replay = self.client.post(self.url, selection, format='json')
+        self.assertEqual(replay.status_code, 200, replay.data)
+        self.assertEqual(first.data, replay.data)
+        self.checkout.assert_called_once()
 
     def test_candidate_mismatch_does_not_charge_offers_the_webhook_would_skip(self):
         mismatch = self.client.post(self.url, {'candidate_id': self.worker.pk + 999, 'offer_ids': [self.offer.pk]}, format='json')

@@ -46,13 +46,20 @@ export function updateSubscriptionSeats(payload: {
 }
 export function chargeShiftFulfillment(shiftId: number | string, payload?: { offerIds?: number[]; platform?: 'mobile' | 'web' }) {
     // The backend requires an explicit offer selection via offer_ids.
-    return fetchApi<{ url?: string; free?: boolean; message?: string }>(`/billing/charge-fulfillment/${shiftId}/`, {
+    return fetchApi<{ url?: string; free?: boolean; message?: string; checkoutId?: string }>(`/billing/charge-fulfillment/${shiftId}/`, {
         method: 'POST',
         ...(payload ? { body: JSON.stringify({
             ...(payload.offerIds?.length ? { offer_ids: payload.offerIds } : {}),
             ...(payload.platform ? { platform: payload.platform } : {})
         }) } : {})
     });
+}
+/** Explicit recovery actions preserve the server's original provider request. */
+export function resumeFulfillmentCheckout(shiftId: number | string, checkoutId: string) {
+    return fetchApi<{ url: string; checkoutId: string }>(`/billing/charge-fulfillment/${shiftId}/checkouts/${encodeURIComponent(checkoutId)}/resume/`, { method: 'POST' });
+}
+export function expireFulfillmentCheckout(shiftId: number | string, checkoutId: string) {
+    return fetchApi<{ status: string; checkoutId: string }>(`/billing/charge-fulfillment/${shiftId}/checkouts/${encodeURIComponent(checkoutId)}/expire/`, { method: 'POST' });
 }
 export function chargeShiftPenalty(shiftId: number | string, payload: {
     hours: number;

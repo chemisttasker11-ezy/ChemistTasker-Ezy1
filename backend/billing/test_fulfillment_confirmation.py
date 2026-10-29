@@ -60,19 +60,19 @@ class PaidOfferReconciliationTests(_ShiftBase):
                                          content_type="application/json")
         return response, notify
 
-    def test_claim1_two_sessions_for_one_offer_are_creatable_control(self):
+    def test_platform_change_cannot_open_second_collectible_session(self):
         from shifts.models import ShiftOffer
-        o = self.offer(ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, self.day)
+        offer = self.offer(ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, self.day)
         url = reverse("api_v1:billing:charge_fulfillment", args=[self.shift.pk])
         with patch("billing.views.get_billing_state_for_account", return_value="PAYMENT_REQUIRED"), \
                 patch("billing.stripe_support.stripe.checkout.Session.create",
                       return_value=_S(id="cs", url="https://x.test/cs")) as create:
-            for platform in ("web", "mobile"):
-                self.assertEqual(client_for(self.owner).post(url, {"offer_ids": [o.pk], "platform": platform},
-                                                             format="json").status_code, 200)
-        keys = {c.kwargs["idempotency_key"] for c in create.call_args_list}
-        offers = {c.kwargs["metadata"]["offer_ids"] for c in create.call_args_list}
-        self.assertEqual((len(keys), offers), (2, {str(o.pk)}))  # two distinct Stripe sessions, same offer
+            first = client_for(self.owner).post(url, {"offer_ids": [offer.pk], "platform": "web"}, format="json")
+            second = client_for(self.owner).post(url, {"offer_ids": [offer.pk], "platform": "mobile"}, format="json")
+        self.assertEqual(first.status_code, 200, first.data)
+        self.assertEqual(second.status_code, 409, second.data)
+        self.assertEqual(second.data["checkout_id"], first.data["checkout_id"])
+        create.assert_called_once()
 
     def test_claim1_second_paid_session_for_booked_offer_alerts_refund_bug(self):
         from shifts.models import ShiftOffer
