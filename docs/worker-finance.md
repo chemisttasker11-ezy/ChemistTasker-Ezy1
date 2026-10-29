@@ -22,6 +22,16 @@ Record actual full or partial payments with idempotency and overpayment checks. 
 
 Super is separate from the service invoice's worker-payable amount. Enabling it requires confirmation of the contractual/statutory basis; a requirement to review contractor super is not confirmation that it is payable. Automatic super applies only to eligible net lines; a manual Superannuation item replaces automatic super. Separate contribution requests link to a saved service invoice with a positive contribution and separate-super mode, require fund details, and have their own send/payment actions. Recording payment requires confirmation that it went to the fund. These requests are not tax invoices. Eligibility, actual applicable rate, earnings basis, company obligations and payment deadlines must be reviewed; this is not SuperStream.
 
+## Monetary calculation and accepted evidence
+
+New finance saves and revisions use the existing finance calculator: Decimal line amounts and per-line GST are rounded with `ROUND_HALF_UP`, then summed. New internal invoices created through the retained generator use that same result when first adopted into finance. Their canonical amounts, stored line totals and first finance revision agree. Adoption changes monetary projections only; original line identities, modification flags and issuer/recipient/source snapshots remain intact.
+
+Accepted GST evidence, current onboarding defaults and explicit invoice choices remain separate. The legacy generated professional line takes applicability from the accepted terms; finance prefill initializes tax choices from current onboarding, and the worker can review those choices. This projection rule does not change registration defaults, tax codes, inclusive/exclusive inputs or accepted evidence.
+
+The contribution already materialized by legacy generation remains an explicit Superannuation line during adoption; its eligibility, rate and base are not re-evaluated. A fractional or discounted manual contribution uses the same finance line rounding as other manual items. Super remains separate from worker payable.
+
+Already managed invoices and imported revisions are not recalculated by adoption. Unmanaged external compatibility invoices retain their existing calculation path. This saved-revision rule does not establish parity for the retained mobile generator's independent pre-save preview.
+
 ## Expenses and receipts
 
 Expenses record actual gross/GST amounts, creditable business use, declared registration/evidence, supplier/reference and incurred/full-payment dates. No automatic deduction or reimbursement invoice is created. Unsupported prepayments and future payment dates are rejected. Receipt signatures are checked for PDF/PNG/JPEG, limited to 5 MB per file and 50 MB per account. Downloads require ownership/authentication, use attachment disposition and are not public MEDIA_URL files. Duplicate receipt checks use SHA-256. No OCR or antivirus scanning is claimed.

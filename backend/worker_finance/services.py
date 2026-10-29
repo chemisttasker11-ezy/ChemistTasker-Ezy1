@@ -497,8 +497,9 @@ def adopt_internal_invoice(owner, invoice):
     if source_snapshot.get("source") != "INTERNAL_ABN_SHIFT_ASSIGNMENTS":
         raise ValidationError("Only accepted-shift internal invoices can be adopted into this workspace.")
     customer = _customer_for_internal_invoice(owner, invoice)
+    canonical_lines = list(invoice.line_items.select_related("source_assignment").order_by("id"))
     payload_lines = []
-    for line in invoice.line_items.select_related("source_assignment").order_by("id"):
+    for line in canonical_lines:
         payload_lines.append(
             {
                 "item_id": None,
@@ -551,6 +552,15 @@ def adopt_internal_invoice(owner, invoice):
         super_mode=payload["super_mode"],
         super_rate=payload["super_rate"],
     )
+    # Initial adoption shares the managed calculation without rewriting source
+    # identities, edit flags or contact snapshots through the correction writer.
+    for line, calculated in zip(canonical_lines, calc["lines"], strict=True):
+        line.total = Decimal(calculated["net"])
+    InvoiceLineItem.objects.bulk_update(canonical_lines, ["total"])
+    invoice.subtotal = Decimal(calc["subtotal"])
+    invoice.gst_amount = Decimal(calc["gst"])
+    invoice.super_amount = Decimal(calc["super"])
+    invoice.total = Decimal(calc["payable"])
     invoice.customer = customer
     invoice.kind = "invoice"
     invoice.source = "internal"
@@ -559,6 +569,7 @@ def adopt_internal_invoice(owner, invoice):
     invoice.calculation = json_safe(calc)
     invoice.save(update_fields=[
         "customer", "kind", "source", "request_key", "payload", "calculation", "updated_at",
+        "subtotal", "gst_amount", "super_amount", "total",
     ])
     record = Invoice.objects.get(pk=invoice.pk)
     _record_revision(record)

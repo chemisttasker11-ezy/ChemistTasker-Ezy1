@@ -180,6 +180,28 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         }
         return client_for(self.worker).post("/api/v1/invoices/generate/", data, format="json")
 
+    def _assert_generated_amounts(self, response, *, subtotal, gst, payable, super_amount="0.00"):
+        self.assertEqual(response.status_code, 201, response.data)
+        invoice = Invoice.objects.get(pk=response.data["id"])
+        self.assertEqual((invoice.version, invoice.status, invoice.revisions.count()), (1, "draft", 1))
+        revision = invoice.revisions.get(version=1)
+        self.assertEqual(revision.calculation, invoice.calculation)
+        self.assertEqual(revision.payload, invoice.payload)
+        self.assertEqual(revision.source_snapshot, invoice.source_snapshot)
+        for field, calculation_key, expected in (
+            ("subtotal", "subtotal", subtotal), ("gst_amount", "gst", gst),
+            ("total", "payable", payable), ("super_amount", "super", super_amount),
+        ):
+            for representation, amount in (
+                ("generation response", response.data[field]),
+                ("canonical invoice", getattr(invoice, field)),
+                ("finance calculation", invoice.calculation[calculation_key]),
+                ("initial revision", revision.calculation[calculation_key]),
+            ):
+                with self.subTest(field=field, representation=representation):
+                    self.assertEqual(Decimal(str(amount)), Decimal(expected))
+        return invoice
+
     def test_internal_invoice_snapshots_accepted_assignment_and_does_not_assume_super(self):
         invoice = self._generate()
         service_line = invoice.line_items.get(category_code="ProfessionalServices")
@@ -779,11 +801,12 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         self.assertEqual(self.assignment.engagement_terms_accepted_at, original_acceptance)
         self.assertEqual(self.assignment.unit_rate, Decimal("70.03"))
 
-    def test_generated_rounding_change_preserves_manual_and_external_line_calculation(self):
-        # Those input paths retain their existing rounding and never trust a supplied total.
-        for external, category, payable in (
-            (False, "Transportation", "564.54"),
-            (True, "ProfessionalServices", "4.54"),
+    def test_adopted_manual_line_matches_finance_and_external_rounding_stays_unchanged(self):
+        # Managed internal invoices use their finance result; unmanaged external
+        # invoices retain the compatibility calculation. Neither trusts a total.
+        for external, category, line_total, payable in (
+            (False, "Transportation", "4.55", "564.55"),
+            (True, "ProfessionalServices", "4.54", "4.54"),
         ):
             with self.subTest(external=external):
                 response = self._generate_via_api(
@@ -806,11 +829,178 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
                 self.assertEqual(response.status_code, 201, response.data)
                 invoice = Invoice.objects.get(pk=response.data["id"])
                 line = invoice.line_items.get(description="Manual half-cent control")
-                self.assertEqual(line.total, Decimal("4.54"))
-                self.assertEqual(invoice.total, Decimal(payable))
                 self.assertIsNone(line.source_assignment_id)
                 self.assertTrue(line.is_manual)
                 self.assertTrue(line.was_modified)
+                if external:
+                    self.assertIsNone(invoice.request_key)
+                    self.assertFalse(invoice.revisions.exists())
+                    self.assertEqual(invoice.total, Decimal(payable))
+                else:
+                    invoice = self._assert_generated_amounts(
+                        response, subtotal=payable, gst="0.00", payable=payable,
+                    )
+                    calculated = next(row for row in invoice.calculation["lines"] if row["category_code"] == category)
+                    self.assertEqual(calculated["net"], line_total)
+                self.assertEqual(line.total, Decimal(line_total))
+
+    def test_adopted_gst_rounding_agrees_across_saved_representations_and_pdfs(self):
+        import fitz
+        from invoicing.services import render_invoice_to_pdf
+        from worker_finance.documents import render_pdf
+        from worker_finance.services import adopt_internal_invoice
+
+        for rate, count, subtotal, gst, payable in (
+            ("70.05", 1, "70.05", "7.01", "77.06"),
+            ("70.06", 2, "140.12", "14.02", "154.14"),
+            ("70.04", 2, "140.08", "14.00", "154.08"),
+        ):
+            with self.subTest(rate=rate, count=count):
+                shift = Shift.objects.create(
+                    pharmacy=self.pharmacy, created_by=self.owner,
+                    role_needed="ASSISTANT", employment_type="LOCUM",
+                )
+                assignments = []
+                for offset in range(count):
+                    slot = ShiftSlot.objects.create(
+                        shift=shift, date=self.slot.date + timedelta(days=offset),
+                        start_time=time(9), end_time=time(10),
+                    )
+                    assignments.append(ShiftSlotAssignment.objects.create(
+                        shift=shift, slot=slot, slot_date=slot.date, user=self.worker,
+                        unit_rate=rate, settlement_channel="INVOICE",
+                        engagement_kind="INDEPENDENT_CONTRACTOR",
+                        engagement_terms_accepted_at=self.assignment.engagement_terms_accepted_at,
+                        engagement_terms_snapshot={
+                            "gst_registered": True, "super_payable_confirmed": False,
+                            "occurrences": [{"slot_id": slot.pk, "date": str(slot.date),
+                                             "start_time": "09:00:00", "end_time": "10:00:00",
+                                             "agreed_rate": rate}],
+                        },
+                    ))
+                original_terms = [(row.pk, deepcopy(row.engagement_terms_snapshot), row.engagement_terms_accepted_at)
+                                  for row in assignments]
+                before = {}
+                preserved_fields = (
+                    "issuer_first_name", "issuer_last_name", "issuer_email", "issuer_abn",
+                    "bill_to_first_name", "bill_to_last_name", "bill_to_email", "cc_emails",
+                    "custom_bill_to_name", "custom_bill_to_address", "pharmacy_id",
+                    "pharmacy_name_snapshot", "pharmacy_address_snapshot", "pharmacy_abn_snapshot",
+                    "source_snapshot", "due_date", "bank_account_name", "bsb", "account_number",
+                )
+                line_fields = (
+                    "id", "source_assignment_id", "shift_id", "description", "category_code",
+                    "unit", "quantity", "unit_price", "discount", "is_manual", "was_modified",
+                    "gst_applicable", "super_applicable",
+                )
+
+                def observe_adoption(owner, invoice):
+                    before["invoice"] = Invoice.objects.filter(pk=invoice.pk).values(*preserved_fields).get()
+                    before["lines"] = list(invoice.line_items.order_by("id").values(*line_fields))
+                    return adopt_internal_invoice(owner, invoice)
+
+                with patch("worker_finance.invoice_bridge.adopt_generated_internal_invoice", side_effect=observe_adoption):
+                    response = self._generate_via_api(shift_ids=[shift.pk], cc_emails="accounts@example.test")
+                self.assertEqual(response.status_code, 201, response.data)
+                invoice = Invoice.objects.get(pk=response.data["id"])
+                self.assertEqual(Invoice.objects.filter(pk=invoice.pk).values(*preserved_fields).get(), before["invoice"])
+                self.assertEqual(list(invoice.line_items.order_by("id").values(*line_fields)), before["lines"])
+                self.assertFalse(invoice.line_items.filter(was_modified=True).exists())
+                self.assertEqual(list(invoice.line_items.order_by("id").values_list("total", flat=True)),
+                                 [Decimal(rate)] * count)
+                for assignment_id, terms, accepted_at in original_terms:
+                    assignment = ShiftSlotAssignment.objects.get(pk=assignment_id)
+                    self.assertEqual(assignment.engagement_terms_snapshot, terms)
+                    self.assertEqual(assignment.engagement_terms_accepted_at, accepted_at)
+                invoice = self._assert_generated_amounts(
+                    response, subtotal=subtotal, gst=gst, payable=payable,
+                )
+                if rate == "70.06":
+                    for name, renderer in (("legacy", render_invoice_to_pdf), ("finance", render_pdf)):
+                        with self.subTest(pdf=name):
+                            pdf = renderer(invoice)
+                            self.assertTrue(pdf.startswith(b"%PDF-"))
+                            with fitz.open(stream=pdf, filetype="pdf") as document:
+                                text = "\n".join(page.get_text() for page in document)
+                            self.assertIn("154.14", text)
+                            self.assertIn("14.02", text)
+                            self.assertNotIn("154.13", text)
+
+    def test_adopted_discounted_extra_uses_the_saved_finance_amount(self):
+        response = self._generate_via_api(gst_registered=False, line_items=[{
+            "description": "Discounted accommodation", "category_code": "Accommodation",
+            "quantity": "1.00", "unit_price": "9.09", "discount": "50.00",
+            "total": "999.00", "gst_applicable": False, "super_applicable": False,
+        }])
+        invoice = self._assert_generated_amounts(response, subtotal="564.55", gst="0.00", payable="564.55")
+        row = invoice.line_items.get(category_code="Accommodation")
+        self.assertEqual((row.total, row.discount), (Decimal("4.55"), Decimal("50.00")))
+        self.assertTrue(row.is_manual and row.was_modified)
+        self.assertIsNone(row.source_assignment_id)
+        self.assertEqual(next(line for line in invoice.calculation["lines"]
+                              if line["category_code"] == "Accommodation")["net"], "4.55")
+
+    def test_adopted_manual_super_rounding_stays_separate_from_worker_payable(self):
+        response = self._generate_via_api(gst_registered=False, line_items=[{
+            "description": "Explicit contribution", "category_code": "Superannuation",
+            "quantity": "1.50", "unit_price": "3.03", "discount": "0.00",
+            "gst_applicable": False, "super_applicable": False,
+        }])
+        invoice = self._assert_generated_amounts(
+            response, subtotal="560.00", gst="0.00", payable="560.00", super_amount="4.55",
+        )
+        row = invoice.line_items.get(category_code="Superannuation")
+        self.assertEqual(row.total, Decimal("4.55"))
+        self.assertTrue(row.is_manual and row.was_modified)
+        self.assertFalse(row.gst_applicable or row.super_applicable)
+        self.assertEqual(invoice.calculation["automatic_super"], "0.00")
+        self.assertEqual(invoice.payload["super_mode"], "summary")
+
+    def test_adopted_generated_super_keeps_the_existing_fixed_contribution(self):
+        self.slot.end_time = time(10)
+        self.slot.save(update_fields=["end_time"])
+        self.assignment.engagement_terms_snapshot["super_payable_confirmed"] = True
+        self.assignment.save(update_fields=["engagement_terms_snapshot"])
+        original_terms = deepcopy(self.assignment.engagement_terms_snapshot)
+        response = self._generate_via_api(gst_registered=False, line_items=[{
+            "description": "Eligible transport", "category_code": "Transportation",
+            "quantity": "1.50", "unit_price": "3.03", "discount": "0.00",
+            "gst_applicable": False, "super_applicable": True,
+        }])
+        # Existing generation fixes 12% of 74.54 at 8.94 before adoption.
+        # Projecting the rounded 74.55 service subtotal must not recalculate it as 8.95.
+        invoice = self._assert_generated_amounts(
+            response, subtotal="74.55", gst="0.00", payable="74.55", super_amount="8.94",
+        )
+        row = invoice.line_items.get(category_code="Superannuation")
+        self.assertEqual((row.quantity, row.unit_price, row.total),
+                         (Decimal("1.00"), Decimal("8.94"), Decimal("8.94")))
+        self.assertTrue(row.is_manual)
+        self.assertFalse(row.was_modified or row.gst_applicable or row.super_applicable)
+        self.assertEqual(invoice.line_items.get(category_code="Transportation").total, Decimal("4.55"))
+        self.assertEqual(invoice.calculation["automatic_super"], "0.00")
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.engagement_terms_snapshot, original_terms)
+
+    def test_adoption_does_not_recalculate_existing_managed_or_imported_invoices(self):
+        from worker_finance.services import adopt_internal_invoice
+
+        invoice = self._generate()
+        for imported in (False, True):
+            with self.subTest(legacy_snapshot=imported):
+                # The migration marker selects the same managed-record early return;
+                # this preservation test does not replay the historical migration.
+                Invoice.objects.filter(pk=invoice.pk).update(legacy_snapshot=imported, status="sent")
+                invoice.refresh_from_db()
+                before = Invoice.objects.filter(pk=invoice.pk).values().get()
+                lines = list(invoice.line_items.order_by("id").values())
+                revisions = list(invoice.revisions.order_by("version").values())
+                with patch("worker_finance.services.calculate_invoice", side_effect=AssertionError("Existing invoice recalculated")):
+                    returned = adopt_internal_invoice(self.worker, invoice)
+                self.assertEqual(returned.pk, invoice.pk)
+                self.assertEqual(Invoice.objects.filter(pk=invoice.pk).values().get(), before)
+                self.assertEqual(list(invoice.line_items.order_by("id").values()), lines)
+                self.assertEqual(list(invoice.revisions.order_by("version").values()), revisions)
 
     def test_generated_invoice_rolls_back_if_finance_adoption_fails_then_can_retry(self):
         from rest_framework.exceptions import ValidationError as FinanceValidationError
