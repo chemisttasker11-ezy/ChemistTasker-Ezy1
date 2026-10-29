@@ -1,6 +1,6 @@
-# Core/shifts dependency-boundary continuation
+# Historical independent core/shifts verification
 
-29 October 2026 (Australia/Brisbane). Fixed parent: PR #216, `230ccff2d798d0672bea46d356616b758ea1148f`. Stack: #213 → #214 → #215 → #216 → this continuation. This source batch implements package 2 of `docs/architecture/DEPENDENCY_CYCLE_REMOVAL_PLAN_20261029.md`.
+29 October 2026 (Australia/Brisbane). This record belongs to the independent checkpoint `c51ddf594bd9a9739088f90ef1a8da32ddb2c0de`, based on PR #216 at `230ccff2d798d0672bea46d356616b758ea1148f`. PR #217 at `e88438810424472b5f1167b900a9f32a1fee8778` was subsequently found to have already completed package 2. Its source and tests are preserved as an additional ancestor of the continuation. The current work implements package 3 above #217; see `ORGANIZATION_MEMBERSHIP_BOUNDARY_20261029.md`. The figures below remain historical checkpoint evidence, not new-head test claims.
 
 ## Protected invariant and source ledger
 

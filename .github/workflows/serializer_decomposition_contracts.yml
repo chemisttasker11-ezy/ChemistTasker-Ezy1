@@ -90,10 +90,14 @@ jobs:
           core.test_promoted_model_import_ownership
           core.test_module_size_ratchet
           core.test_backend_ownership_boundaries
-          core.test_upload_infrastructure_contract
+          core.test_upload_infrastructure_contract core.test_serializer_values_boundary
           core.test_public_error_surface
           core.test_serializer_lifecycle_ownership
           chat.test_api.ChatAttachmentTests
           users.test_task_dispatch_boundary
+          organizations memberships
+          client_profile.test_admin_invitations
+          client_profile.test_characterization_chains
+          client_profile.test_characterization_claims
           shifts pharmacy_hub dashboards workforce.tests
           --settings=${{ matrix.settings }} --verbosity=1 --noinput

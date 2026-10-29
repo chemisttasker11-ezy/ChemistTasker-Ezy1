@@ -84,7 +84,8 @@ backend_run python manage.py check --settings=core.contract_test_settings
 backend_run python manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
 backend_run python manage.py test users.tests users.test_task_dispatch_boundary billing.tests --settings=core.contract_test_settings
 backend_run python manage.py test shifts.test_dependency_boundary core.test_task_dispatch_registration core.test_task_contracts --settings=core.contract_test_settings
-backend_run python manage.py test chat.test_api.ChatAttachmentTests --settings=core.contract_test_settings
+backend_run python manage.py test chat.test_api.ChatAttachmentTests core.test_serializer_values_boundary --settings=core.contract_test_settings
+backend_run python manage.py test organizations memberships client_profile.test_admin_invitations client_profile.test_characterization_chains client_profile.test_characterization_claims --settings=core.contract_test_settings
 # Explicitly execute the follow-up contract modules; users.tests alone does not
 # discover users/test_current_user_newcomer_contract.py or shifts listing contracts.
 backend_run python manage.py test users.test_current_user_newcomer_contract shifts.test_shift_listing_contract.AssignedProfileTests --settings=core.contract_test_settings
