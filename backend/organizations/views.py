@@ -72,6 +72,18 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         self.required_roles = list(ORG_WIDE_ADMIN_ROLES)
         return [permissions.IsAuthenticated(), OrganizationRolePermission()]
 
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        from shifts.deletion import protect_pharmacy_shift_deletion
+
+        organization = get_object_or_404(Organization.objects.select_for_update(), pk=instance.pk)
+        pharmacy_ids = list(
+            Pharmacy.objects.select_for_update().filter(organization=organization)
+            .order_by('pk').values_list('pk', flat=True)
+        )
+        protect_pharmacy_shift_deletion(pharmacy_ids)
+        organization.delete()
+
 
 # Chain, Pharmacy and membership
 class PharmacyViewSet(viewsets.ModelViewSet):
@@ -84,6 +96,15 @@ class PharmacyViewSet(viewsets.ModelViewSet):
     queryset = Pharmacy.objects.all()
     serializer_class = PharmacyWithEditSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        from shifts.deletion import protect_pharmacy_shift_deletion
+
+        pharmacy = get_object_or_404(Pharmacy.objects.select_for_update(), pk=instance.pk)
+        self.check_object_permissions(self.request, pharmacy)
+        protect_pharmacy_shift_deletion([pharmacy.pk])
+        pharmacy.delete()
 
     def check_permissions(self, request):
         super().check_permissions(request)
