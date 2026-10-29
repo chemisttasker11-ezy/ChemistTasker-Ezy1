@@ -32,6 +32,7 @@ async function worker({ active = true, reject = true } = {}) {
         if (!Object.is(next, state[index])) { state[index] = next; dirty = true; }
       }];
     },
+    useMemo(fn) { return fn(); },
     useEffect(fn, next) {
       const index = cursor++;
       if (!deps[index] || next.some((value, i) => !Object.is(value, deps[index][i]))) {
@@ -66,17 +67,21 @@ async function worker({ active = true, reject = true } = {}) {
       return { status: active ? 'CLOCKED_OUT' : 'CLOCKED_IN', session_id: 8, pharmacy_name: 'CLOCK Pharmacy' };
     } },
   });
+  attendance.getWorkerCoverTerms = async () => [];
   attendance.getWorkerStatus = async () => { reloads++; return { has_active_session: active, pharmacy_name: 'CLOCK Pharmacy' }; };
   const names = new Proxy({}, { get: (_, name) => String(name) });
   const exports = load('./WorkerAttendancePage.tsx', {
     react: hooks, 'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
     '@mui/material': names, 'lucide-react': names, moment: () => ({ format: () => '' }),
+    'react-router-dom': { useNavigate: () => () => {} },
     '@chemisttasker/shared-core': { attendance, rosterV2: { getWorkerRoster: async () => ({ shifts: [] }) },
       formatAttendanceMinutes: load('../../../../shared-core/src/utils/attendanceDisplay.ts', {}).formatAttendanceMinutes,
     },
     '../../components/ui/PageHeader': 'PageHeader', '../../components/ui/IconTile': 'IconTile',
     '../../components/dashboard/DashboardContentState': 'DashboardContentState',
     '../../components/ui/Hint': { Hint: 'Hint' }, '../../components/ui/Pill': { Pill: 'Pill' },
+    '../dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog': { __esModule: true, default: 'ShiftEngagementTermsDialog' },
+    '../../contexts/AuthContext': { useAuth: () => ({ user: { role: 'PHARMACIST' } }) },
     '../../utils/labels': { humanizeEnum: (value) => value },
   });
   async function flush() {

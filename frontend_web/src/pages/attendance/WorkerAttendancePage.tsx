@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -15,9 +15,13 @@ import {
   Typography,
   Alert,
 } from "@mui/material";
-import { CalendarCheck, Clock, Coffee, KeyRound, LogOut, Pause, Play, QrCode } from "lucide-react";
+import { CalendarCheck, Clock, Coffee, FileText, KeyRound, LogOut, Pause, Play, QrCode } from "lucide-react";
 import moment from "moment";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import { attendance, rosterV2, formatAttendanceMinutes } from "@chemisttasker/shared-core";
+import type { ShiftOffer, WorkerCoverTerms } from "@chemisttasker/shared-core";
+import ShiftEngagementTermsDialog from "../dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog";
 import PageHeader from "../../components/ui/PageHeader";
 import IconTile from "../../components/ui/IconTile";
 import DashboardContentState from "../../components/dashboard/DashboardContentState";
@@ -42,8 +46,35 @@ export interface WorkerRosterShift {
   is_acknowledged: boolean;
 }
 
+// The cover-terms API is snake_case; the shared terms dialog reads the camelCase offer preview.
+const camelize = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(camelize)
+    : value && typeof value === "object"
+      ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key.replace(/_([a-z])/g, (_, c) => c.toUpperCase()), camelize(item)]))
+      : value;
+
+const canAcceptCover = (cover: WorkerCoverTerms) => {
+  const terms = cover.engagement_terms_preview;
+  return !terms.blocked && terms.acceptance_required && terms.settlement_channel === "INVOICE";
+};
+
 export default function WorkerAttendancePage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const roleSegment = user?.role === "OTHER_STAFF" ? "otherstaff" : user?.role === "PHARMACIST" ? "pharmacist" : null;
+  const openPaymentProfile = roleSegment ? () => navigate(`/dashboard/${roleSegment}/onboarding?step=payment`) : undefined;
   const [loading, setLoading] = useState(true);
+  const [covers, setCovers] = useState<WorkerCoverTerms[]>([]);
+  const [coversFailed, setCoversFailed] = useState(false);
+  const [coverDialogId, setCoverDialogId] = useState<number | null>(null);
+  const [acceptingCover, setAcceptingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  const dialogCover = covers.find((cover) => cover.assignment_id === coverDialogId);
+  const dialogOffers = useMemo(
+    () => (dialogCover ? ([{ engagementTermsPreview: camelize(dialogCover.engagement_terms_preview) }] as unknown as ShiftOffer[]) : null),
+    [dialogCover],
+  );
   const [statusInfo, setStatusInfo] = useState<{
     has_active_session: boolean;
     session_id?: number | null;
@@ -168,6 +199,32 @@ export default function WorkerAttendancePage() {
     }
   };
 
+  // Approved emergency cover is closed, so it is listed apart from the live clock-in status.
+  const fetchCovers = async () => {
+    try {
+      setCovers(await attendance.getWorkerCoverTerms());
+      setCoversFailed(false);
+    } catch {
+      setCoversFailed(true);
+    }
+  };
+
+  const handleAcceptCover = async (payload: { engagementTermsAccepted?: boolean; independentContractorStatusConfirmed?: boolean }) => {
+    if (coverDialogId == null) return;
+    setAcceptingCover(true);
+    setCoverError(null);
+    try {
+      await attendance.acceptWorkerCoverTerms(coverDialogId, payload);
+      setCoverDialogId(null);
+      setSuccessMsg("Engagement terms accepted for your approved cover.");
+      await fetchCovers();
+    } catch (err: any) {
+      setCoverError(err?.message || "Could not accept the terms. Try again.");
+    } finally {
+      setAcceptingCover(false);
+    }
+  };
+
   // Acknowledge a published roster period
   const handleAcknowledgePeriod = async (periodId: number) => {
     try {
@@ -188,6 +245,7 @@ export default function WorkerAttendancePage() {
   useEffect(() => {
     fetchStatus();
     fetchRosterShifts();
+    fetchCovers();
   }, []);
 
   // Live stopwatch timer
@@ -311,6 +369,9 @@ export default function WorkerAttendancePage() {
       .filter((shift, index) => shift.period_id && rosterShifts.findIndex((s) => s.period_id === shift.period_id) === index)
       .map((shift) => shift.assignment_id),
   );
+  const shownCovers = covers.filter((cover) =>
+    cover.status === "APPROVED"
+    && (cover.engagement_terms_accepted_at || cover.engagement_terms_preview.payment_profile_incomplete || canAcceptCover(cover)));
   const statusPill = isClockedIn
     ? isOnBreak
       ? <Pill tone="amber" label="On break" />
@@ -488,6 +549,72 @@ export default function WorkerAttendancePage() {
           </Button>
         </Paper>
       </Box>
+
+      {/* Approved cover awaiting the worker's engagement terms */}
+      {(coversFailed || shownCovers.length > 0) && (
+        <Paper component="section" aria-labelledby="cover-terms-heading" sx={{ ...cardSx, p: { xs: 2, md: 2.5 }, mt: 3 }}>
+          <Stack direction="row" spacing={1.5} alignItems="flex-start">
+            <IconTile icon={<FileText size={22} />} tone="blue" />
+            <Box sx={{ minWidth: 0 }}>
+              <Typography id="cover-terms-heading" component="h2" sx={cardTitleSx}>Approved cover</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Accept the engagement terms for cover a manager approved so it can be invoiced.
+              </Typography>
+            </Box>
+          </Stack>
+          {coversFailed && (
+            <Alert severity="error" sx={{ mt: 2 }} action={<Button color="inherit" size="small" onClick={() => void fetchCovers()}>Try again</Button>}>
+              Unable to load your approved cover terms.
+            </Alert>
+          )}
+          <Stack spacing={1.5} sx={{ mt: 2 }}>
+            {shownCovers.map((cover) => {
+              const terms = cover.engagement_terms_preview;
+              const first = terms.occurrences[0];
+              return (
+                <Box key={cover.assignment_id} sx={{ border: "1px solid var(--ct-border-color)", borderRadius: "var(--ct-card-radius)", p: 1.5 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" sx={{ gap: 1 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography fontWeight={600}>{cover.pharmacy_name}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {humanizeEnum(cover.cover_type)}
+                        {first ? ` · ${first.date} · ${first.start_time.slice(0, 5)}–${first.end_time.slice(0, 5)}` : ""}
+                      </Typography>
+                    </Box>
+                    {cover.engagement_terms_accepted_at ? (
+                      <Pill tone="green" label="Terms accepted" />
+                    ) : terms.blocked ? null : (
+                      <Button variant="contained" sx={{ minHeight: 44 }} onClick={() => { setCoverError(null); setCoverDialogId(cover.assignment_id); }}>
+                        Accept terms
+                      </Button>
+                    )}
+                  </Stack>
+                  {!cover.engagement_terms_accepted_at && terms.payment_profile_incomplete && (
+                    <Alert
+                      severity="warning"
+                      sx={{ mt: 1.5 }}
+                      action={openPaymentProfile ? <Button color="inherit" size="small" onClick={openPaymentProfile}>Complete payment profile</Button> : undefined}
+                    >
+                      {terms.notice || "Your payment details are incomplete."}
+                    </Alert>
+                  )}
+                </Box>
+              );
+            })}
+          </Stack>
+        </Paper>
+      )}
+      {dialogOffers && (
+        <ShiftEngagementTermsDialog
+          open
+          offers={dialogOffers}
+          loading={acceptingCover}
+          error={coverError}
+          onClose={() => setCoverDialogId(null)}
+          onConfirm={handleAcceptCover}
+          onOpenPaymentProfile={openPaymentProfile}
+        />
+      )}
 
       {/* Published shifts & acknowledgements */}
       <Box component="section" aria-labelledby="published-shifts-heading" sx={{ mt: 3 }}>

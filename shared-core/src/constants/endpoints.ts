@@ -219,6 +219,8 @@ export const API_ENDPOINTS = {
         workerBreakEnd: '/attendance/worker/break-end/',
         workerClockOut: '/attendance/worker/clock-out/',
         workerPinUpdate: '/attendance/worker/pin/update/',
+        workerCoverTerms: '/attendance/worker/cover-terms/',
+        workerCoverTermsAccept: (assignmentId: number | string) => `/attendance/worker/cover-terms/${assignmentId}/accept/`,
         managerPending: '/attendance/manager/pending/',
         managerApprove: '/attendance/manager/approve/',
         managerReject: '/attendance/manager/reject/',

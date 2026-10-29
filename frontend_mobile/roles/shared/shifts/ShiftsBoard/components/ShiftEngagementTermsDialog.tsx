@@ -11,6 +11,7 @@ type Props = {
   visible: boolean;
   offers: ShiftOffer[];
   loading?: boolean;
+  error?: string | null;
   onDismiss: () => void;
   onConfirm: (payload: ShiftOfferAcceptancePayload) => Promise<void> | void;
   onOpenPaymentProfile?: () => void;
@@ -23,6 +24,7 @@ export default function ShiftEngagementTermsDialog({
   visible,
   offers,
   loading = false,
+  error = null,
   onDismiss,
   onConfirm,
   onOpenPaymentProfile,
@@ -58,6 +60,7 @@ export default function ShiftEngagementTermsDialog({
         <Dialog.Title>Review shift engagement terms</Dialog.Title>
         <Dialog.ScrollArea style={styles.scrollArea}>
           <ScrollView contentContainerStyle={styles.content}>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
             {blocked ? (
               <View style={styles.callout}>
                 <Text style={styles.error}>

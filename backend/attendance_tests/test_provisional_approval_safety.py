@@ -31,6 +31,7 @@ from client_profile.models import (
     Chain,
     Membership,
     Organization,
+    OtherStaffOnboarding,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,
@@ -51,6 +52,7 @@ from attendance.models import (
 SCHEMA_MODELS = (
     User,
     Organization,
+    OtherStaffOnboarding,
     OwnerOnboarding,
     Pharmacy,
     PharmacyAdmin,

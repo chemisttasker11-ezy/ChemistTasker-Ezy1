@@ -38,6 +38,26 @@ def direct_pharmacy_staff_membership(*, user, pharmacy):
     ).first()
 
 
+ACCEPTED_TERMS_FIELDS = (
+    "payment_preference_snapshot", "settlement_channel", "engagement_kind",
+    "engagement_terms_snapshot", "engagement_terms_accepted_at", "unit_rate", "rate_reason",
+)
+
+
+def keep_accepted_terms(defaults, *, slot, slot_date):
+    """Re-rostering the same worker keeps the engagement terms (and agreed rate) that worker already accepted."""
+    from shifts.models import ShiftSlotAssignment
+    # Lock the occurrence (unfiltered by acceptance) so a concurrent acceptance commits first and is seen here;
+    # the caller's transaction keeps the lock through its write. Order: slot -> assignment, as acceptance ends.
+    current = ShiftSlotAssignment.objects.select_for_update(of=("self",)).filter(
+        slot=slot, slot_date=slot_date,
+    ).values_list("user_id", "engagement_terms_accepted_at").first()
+    user_id = getattr(defaults["user"], "pk", defaults["user"])
+    if current and current[0] == user_id and current[1] is not None:
+        return {key: value for key, value in defaults.items() if key not in ACCEPTED_TERMS_FIELDS}
+    return defaults
+
+
 def staff_assignment_defaults(*, user, pharmacy, work_date):
     """Build the immutable payroll snapshot for a direct pharmacy-staff roster assignment."""
     if isinstance(work_date, str):

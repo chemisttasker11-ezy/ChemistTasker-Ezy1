@@ -4,6 +4,8 @@ import { Button, Chip, Icon, Text } from 'react-native-paper';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { attendance, canManageKioskDevices, workforce } from '@chemisttasker/shared-core';
+import type { ShiftOffer, WorkerCoverTerms } from '@chemisttasker/shared-core';
+import ShiftEngagementTermsDialog from '../../roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useAuth } from '@/context/AuthContext';
 import { ActionButtons, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
@@ -124,6 +126,7 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
       {label:'Break',value:status?.is_on_break?'On break':'Working',tone:status?.is_on_break?'warning':'success'},
     ]}/>
     <ProvisionalNote status={status}/>
+    <CoverTerms/>
     <Section title="Attendance tools">
       <ScreenLink title="Clock & breaks" subtitle="Clock in/out from a pharmacy QR token and manage breaks." onPress={()=>router.push('/attendance/clock' as any)}/>
       <ScreenLink title="Attendance correction" subtitle={manager?'Append an audited correction to a recorded event.':'Request a missing-punch correction through your timesheet.'} onPress={()=>router.push('/attendance/corrections/new' as any)}/>
@@ -137,6 +140,73 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
 const UNBOOKED_HINT='No booking or membership here: a manager must approve this before any time is payable.';
 function coverInfo(type:string){
   return type==='UNBOOKED_LOCUM_COVER'?{label:'Unbooked locum cover',hint:UNBOOKED_HINT}:{label:replaceUnderscore(type),hint:''};
+}
+
+// The cover-terms API is snake_case; the shared terms dialog reads the camelCase offer preview.
+function camelize(value:any):any{
+  if(Array.isArray(value)) return value.map(camelize);
+  if(value&&typeof value==='object') return Object.fromEntries(Object.entries(value).map(([key,item])=>[key.replace(/_([a-z])/g,(_,c)=>c.toUpperCase()),camelize(item)]));
+  return value;
+}
+
+// Approved emergency cover is closed, so it is listed apart from the live clock-in status.
+function CoverTerms() {
+  const router=useRouter();
+  const {user}=useAuth();
+  const [covers,setCovers]=useState<WorkerCoverTerms[]>([]);
+  const [failed,setFailed]=useState(false);
+  const [selectedId,setSelectedId]=useState<number|null>(null);
+  const [accepting,setAccepting]=useState(false);
+  const [acceptError,setAcceptError]=useState('');
+  const acceptingRef=useRef(false);
+  const paymentPath=user?.role==='PHARMACIST'?'/pharmacist/profile-payment':user?.role==='OTHER_STAFF'?'/otherstaff/profile-payment':null;
+  const loadCovers=useCallback(async()=>{
+    try{setCovers(asArray(await attendance.getWorkerCoverTerms()));setFailed(false);}
+    catch{setFailed(true);}
+  },[]);
+  useEffect(()=>{void loadCovers();},[loadCovers]);
+
+  const selected=covers.find((cover)=>cover.assignment_id===selectedId);
+  const offers=useMemo(()=>selected?([{engagementTermsPreview:camelize(selected.engagement_terms_preview)}] as unknown as ShiftOffer[]):null,[selected]);
+  const shown=covers.filter((cover)=>{
+    const terms=cover.engagement_terms_preview;
+    return cover.status==='APPROVED'&&(cover.engagement_terms_accepted_at||terms.payment_profile_incomplete||(terms.acceptance_required&&terms.settlement_channel==='INVOICE'));
+  });
+  const openPaymentProfile=paymentPath?()=>router.push(paymentPath as any):undefined;
+  const accept=async(payload:{engagementTermsAccepted?:boolean;independentContractorStatusConfirmed?:boolean})=>{
+    if(selectedId==null||acceptingRef.current) return;
+    acceptingRef.current=true;
+    setAccepting(true);setAcceptError('');
+    try{
+      await attendance.acceptWorkerCoverTerms(selectedId,payload);
+      setSelectedId(null);
+      await loadCovers();
+    }catch(e:any){setAcceptError(errorMessage(e,'Could not accept the terms. Try again.'));}
+    finally{acceptingRef.current=false;setAccepting(false);}
+  };
+
+  if(!failed&&!shown.length) return null;
+  return <Section title="Approved cover" description="Accept the engagement terms for cover a manager approved so it can be invoiced.">
+    {failed?<>
+      <InfoNote title="Cover terms" tone="warning">Unable to load your approved cover terms.</InfoNote>
+      <Button mode="outlined" onPress={()=>void loadCovers()}>Try again</Button>
+    </>:null}
+    {shown.map((cover)=>{
+      const terms=cover.engagement_terms_preview;
+      const first=terms.occurrences[0];
+      const accepted=Boolean(cover.engagement_terms_accepted_at);
+      const when=first?` · ${first.date} ${first.start_time.slice(0,5)}–${first.end_time.slice(0,5)}`:'';
+      return <View key={cover.assignment_id} style={scannerStyles.coverRow}>
+        <DataRow title={cover.pharmacy_name} subtitle={`${coverInfo(cover.cover_type).label}${when}${accepted?' · Terms accepted':''}`}/>
+        {!accepted&&terms.payment_profile_incomplete?<>
+          <InfoNote title="Payment details incomplete" tone="warning">{terms.notice||'Your payment details are incomplete.'}</InfoNote>
+          {openPaymentProfile?<Button mode="outlined" onPress={openPaymentProfile}>Complete payment profile</Button>:null}
+        </>:null}
+        {!accepted&&!terms.blocked?<ActionButtons><Button mode="contained" onPress={()=>{setAcceptError('');setSelectedId(cover.assignment_id);}}>Accept terms</Button></ActionButtons>:null}
+      </View>;
+    })}
+    {offers?<ShiftEngagementTermsDialog visible offers={offers} loading={accepting} error={acceptError} onDismiss={()=>setSelectedId(null)} onConfirm={accept} onOpenPaymentProfile={openPaymentProfile}/>:null}
+  </Section>;
 }
 
 function ProvisionalNote({status}:{status:any}) {
@@ -273,6 +343,7 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
 }
 
 const scannerStyles=StyleSheet.create({
+  coverRow:{gap:8},
   scannerShell:{gap:12},
   cameraFrame:{height:360,borderRadius:16,overflow:'hidden',backgroundColor:'#07111F',position:'relative'},
   scanOverlay:{...StyleSheet.absoluteFillObject,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(7,17,31,0.24)'},

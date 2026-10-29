@@ -4,7 +4,7 @@ from django.db import transaction
 from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from workforce.roster.permissions import is_authorized_attendance_manager
-from shifts.engagement import staff_assignment_defaults
+from shifts.engagement import keep_accepted_terms, staff_assignment_defaults
 from shifts.assignment import guard_roster_assignment
 from workforce.roster.assignment_rates import _validate_and_price
 from workforce.roster.edit_guards import _delete_empty_shift, _parse_date, _parse_time, _protect_assignment_history, _protect_marketplace_slot
@@ -158,12 +158,12 @@ def bulk_edit_roster_period(roster_period, operations, user):
                 ShiftSlotAssignment.objects.update_or_create(
                     slot=slot,
                     slot_date=slot.date,
-                    defaults={
+                    defaults=keep_accepted_terms({
                         "shift": slot.shift,
                         "user": worker,
                         "is_rostered": True,
                         **assignment_defaults,
-                    },
+                    }, slot=slot, slot_date=slot.date),
                 )
                 changed_slots.add(slot.pk)
                 summary["assigned"] += 1
@@ -281,13 +281,13 @@ def bulk_edit_roster_period(roster_period, operations, user):
                         )
                         ShiftSlotAssignment.objects.update_or_create(
                             slot=slot,
-                            defaults={
+                            defaults=keep_accepted_terms({
                                 "shift": slot.shift,
                                 "user": worker,
                                 "slot_date": target_date,
                                 "is_rostered": True,
                                 **assignment_defaults,
-                            },
+                            }, slot=slot, slot_date=target_date),
                         )
                 changed_slots.add(slot.pk)
                 summary["updated"] += 1

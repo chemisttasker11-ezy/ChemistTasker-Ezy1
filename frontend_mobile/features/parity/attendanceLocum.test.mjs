@@ -86,11 +86,13 @@ async function attendanceScreen({ screen = 'reviews', rows = [locum], status = p
     '@/context/AuthContext': { useAuth: () => ({ user: { role: manager ? 'OWNER' : 'PHARMACIST' } }) },
     '@chemisttasker/shared-core': {
       attendance: {
+        async getWorkerCoverTerms() { return []; },
         async getManagerPending(id) { calls.push(['pending', id]); return structuredClone(rows); },
         async getManagerTimeline(id) { calls.push(['timeline', id]); return { timeline: [] }; },
         async getWorkerStatus() { calls.push(['status']); return structuredClone(status); },
       }, workforce: {}, canManageKioskDevices: () => false,
     },
+    '../../roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog': { __esModule: true, default: 'ShiftEngagementTermsDialog' },
     './ParityUI': {
       ...Object.fromEntries(['ActionButtons', 'DataRow', 'EmptyState', 'Field', 'InfoNote', 'MetricGrid', 'ParityPage', 'PharmacyRequired', 'ScreenLink', 'Section'].map(name => [name, name])), palette: {},
     },
