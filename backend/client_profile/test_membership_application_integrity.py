@@ -1002,14 +1002,14 @@ class DeferredPayrollActivationTests(TestCase):
         self.assertEqual(self.assignment.payroll_activated_at, activated_at)
         self.assertFalse(timesheet.needs_rebuild)
 
-    def test_activation_does_not_enqueue_rebuild_for_locked_timesheet(self):
+    def test_activation_refuses_locked_timesheet_without_enqueueing_rebuild(self):
         self._complete_payroll_profile()
         timesheet = self._timesheet(locked=True)
         with patch(
             "workforce.signals.rebuild_timesheet_task.delay"
         ) as rebuild, self.captureOnCommitCallbacks(execute=True):
             response = self._activate()
-        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.status_code, 409, response.data)
         timesheet.refresh_from_db()
         self.assertFalse(timesheet.needs_rebuild)
         rebuild.assert_not_called()

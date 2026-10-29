@@ -18,6 +18,7 @@ from django.utils import timezone
 from shifts.pricing import expand_shift_slots
 from shifts.finalize import finalize_shift_offer
 from shifts.events import payroll_activated
+from shifts.payroll import activation_work_dates
 from shifts.emails import (
     active_shift_url_for_user,
     build_offer_shift_details,
@@ -567,7 +568,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         with transaction.atomic():
             offer = (
                 ShiftOffer.objects
-                .select_for_update()
+                .select_for_update(of=("self",))
                 .select_related("shift__pharmacy", "user")
                 .get(pk=pk)
             )
@@ -614,7 +615,8 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                 )
 
             activated_at = offer.payroll_activated_at or timezone.now()
-            if offer.settlement_channel != SETTLEMENT_PAYROLL or offer.payroll_activated_at is None:
+            offer_changed = offer.settlement_channel != SETTLEMENT_PAYROLL or offer.payroll_activated_at is None
+            if offer_changed:
                 offer.settlement_channel = SETTLEMENT_PAYROLL
                 offer.payroll_activated_at = activated_at
                 offer.save(update_fields=[
@@ -638,12 +640,25 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                     settlement_channel=SETTLEMENT_PAYROLL,
                     payroll_activated_at=activated_at,
                 )
-                payroll_activated.send(
-                    sender=ShiftOffer,
-                    pharmacy_id=shift.pharmacy_id,
-                    user_id=offer.user_id,
-                    work_dates=tuple(sorted({row.slot_date or row.slot.date for row in changed})),
-                )
+            if changed or offer_changed:
+                try:
+                    payroll_activated.send(
+                        sender=ShiftOffer,
+                        pharmacy_id=shift.pharmacy_id,
+                        user_id=offer.user_id,
+                        work_dates=activation_work_dates(offer, changed, include_pending=offer_changed),
+                    )
+                except DjangoValidationError as exc:
+                    if getattr(exc, "code", None) != "locked_payroll_period":
+                        raise
+                    # The workforce refusal happens inside this transaction;
+                    # returning a conflict must roll back offer and assignment writes.
+                    transaction.set_rollback(True)
+                    return Response({
+                        "code": exc.code,
+                        "detail": exc.message,
+                        "period_ids": exc.params["period_ids"],
+                    }, status=status.HTTP_409_CONFLICT)
 
         return Response({
             'status': 'payroll_activated',

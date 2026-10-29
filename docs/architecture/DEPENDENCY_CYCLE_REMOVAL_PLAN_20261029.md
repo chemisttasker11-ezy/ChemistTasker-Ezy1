@@ -178,3 +178,11 @@ Paid fulfillment duplication remains an unresolved blocker for that enabled work
 refund alerts do not establish prevention. Cancellation and notification candidates require
 bounded reproductions and policy separation. Zero direct cyclic edges and the retained
 113 combined edges remain guarded. M4 is in progress; M5 is not release-certified.
+
+30 October: #226's Full Isolated QA and all other non-skipped workflows passed, including
+474/474 PostgreSQL contracts. The next bounded batch guards deferred payroll activation
+against existing timesheet-period locks and requires the established audited correction
+workflow. `docs/qa/PAYROLL_PERIOD_FREEZE_20261030.md` records the real-HTTP reproduction,
+writer/caller map, local evidence and independent PostgreSQL race controls. New source
+needs new-head evidence. Paid obligation ownership remains the next financial repair;
+no key-only shortcut, merge or deployment is authorized by this checkpoint.
