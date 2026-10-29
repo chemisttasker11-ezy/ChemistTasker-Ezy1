@@ -57,7 +57,7 @@ A candidate in this table is source-grounded but is not labelled an independentl
 
 The existing posting contract suite supplies real recipient, visibility, anonymity, dedicated-offer, context and edit positive controls. `shifts/test_shift_posting_commit.py` adds five real-commit tests, discovered automatically by the full `shifts` selections in both Serializer Decomposition and Shared Core workflows. No CI discovery change is needed.
 
-Local targeted command (Python 3.12.12, Django 5.2.17, isolated in-memory SQLite with the real migration graph and hermetic `core.contract_test_settings`):
+Local targeted command (Python 3.12.14, Django 5.2.17, isolated in-memory SQLite with the real migration graph and hermetic `core.contract_test_settings`):
 
 ```bash
 python backend/manage.py test shifts.test_shift_posting_commit shifts.test_shift_posting_contract shifts.test_shift_posting_lock core.test_module_size_ratchet core.test_backend_ownership_boundaries --settings=core.contract_test_settings --verbosity=1
@@ -68,3 +68,4 @@ python backend/manage.py test shifts.test_shift_posting_commit shifts.test_shift
 Initial exact-head hosted checkpoint `e046c7c…`: all six automatic non-skipped workflows succeeded; Full Isolated QA and Architecture Mainline Native Full QA skipped. Shared Core run `40831004781` had all ten child jobs successful. New production changes require new-head CI; inherited results are not new-head passes.
 
 This workspace has no Docker executable and no Android/iOS simulator or physical device. Full isolated Docker QA, native/device, invoice-specific browser, real broker/provider and authorized staging remain separate acceptance items. No merge-readiness declaration is made.
+
