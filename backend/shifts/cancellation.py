@@ -7,7 +7,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from shifts.interest import is_public_shift_member_access
 from shifts.models import ShiftOffer, ShiftSlotAssignment
 from shifts.notifications import notify_shift_managers
