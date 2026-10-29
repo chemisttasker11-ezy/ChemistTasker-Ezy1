@@ -27,7 +27,7 @@ from shifts.assignment import slot_locked_for_shift_offer
 from shifts.selectors import _future_or_current_slot_q
 from shifts.access import staff_membership_can_claim_role
 from shifts.emails import build_roster_email_link, build_shift_email_context
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from datetime import date
 from organizations.timezone import get_pharmacy_timezone
 from shifts.access import (

@@ -10,7 +10,7 @@ from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
 from django.db import transaction
 from django.utils import timezone
 from shifts.emails import build_roster_email_link
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from datetime import date
 from shifts.access import _normalized_role_code, _otherstaff_onboarding_role
 from users.models import OrganizationMembership

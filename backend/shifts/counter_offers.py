@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
 
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from shifts.access import ShiftActionRefused, _user_can_perform_shift_role
 from shifts.assignment import OFFER_EXPIRY_HOURS, slot_locked_for_shift_offer
 from shifts.emails import (

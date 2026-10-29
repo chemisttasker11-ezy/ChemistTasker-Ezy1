@@ -82,7 +82,7 @@ from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_managers, notify_shift_users
 from shifts.engagement import staff_assignment_defaults
 from shifts.deletion import protect_shift_deletion
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from datetime import datetime
 from shifts.access import (  # noqa: F401  (role rules re-exported at their historical path)
     ShiftActionRefused,

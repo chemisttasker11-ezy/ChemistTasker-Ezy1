@@ -1,7 +1,7 @@
 """Shift-owned workload and accompanying-staff validation."""
 from rest_framework import serializers
 
-from core.serializer_values import json_list
+from infrastructure.serializer_values import json_list
 from onboarding.services.skill_identity import registry
 
 
