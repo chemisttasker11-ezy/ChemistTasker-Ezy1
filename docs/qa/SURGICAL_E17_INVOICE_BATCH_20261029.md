@@ -93,6 +93,14 @@ Only that positive control changes: it explicitly enables enforcement, proves th
 
 This specific base-reproducing fixture issue is not a classification of the owner's separately reported 25 AHPRA failures.
 
+### Clean web/mobile test dependency resolution
+
+The first published head, `04de253d`, passed Backend Finalization on SQLite/PostgreSQL, but clean Vite and mobile jobs exposed another inherited E17 test-harness issue. `shared-core/test-support/coverTermsHarness.mjs` imported TypeScript from its own directory even though those jobs install dependencies only in the selected client app. Both stopped with `ERR_MODULE_NOT_FOUND` before the cover-terms assertions ran.
+
+The same error reproduced for both wrappers on an exact E17 archive with only each app's locked compiler installed. The harness now uses Node's `createRequire` anchored to the selected app's `package.json`. It retains all assertions and client behavior, uses the already-pinned web/mobile compiler, and adds no dependency/install step. The change is three added lines and one removed line, including its explanation.
+
+In that deliberately minimal app-only layout, direct wrapper execution passes all 26 web and 21 mobile cover-terms cases, with no skips. The web compiler is the lockfile's 5.7.3 and mobile's is 5.9.3; downloaded package integrity was verified against the lockfiles. Local execution used Node 24.22.1, so the automatic final-head jobs provide Node 22/full-app verification. Broader local attendance commands were not claimed green in this minimal layout: unrelated modules require the absent dayjs/date-fns dependencies. Their actual app dependencies are installed by hosted CI. No client runtime or dependency version changed.
+
 ## Executed evidence
 
 The owner requested targeted tests while coding and the broader applicable gate after completion. The implementation followed that cadence. Tests use pinned repository dependencies and disposable local databases, not production data.
@@ -111,6 +119,7 @@ The owner requested targeted tests while coding and the broader applicable gate 
 | First completed-batch PostgreSQL concurrency workflow | 436 run: 435 passed, one inherited E17 public-booking fixture failure, subsequently corrected as above |
 | Exact E17 base public-booking control | Same 403-versus-200 failure reproduced before its test-only repair |
 | Public-booking fixture repair with related eligibility controls | 11 passed on PostgreSQL, no skips |
+| Clean app-only E17 cover-terms test wrappers after compiler-resolution repair | Web 26 passed; mobile 21 passed; no skips; local Node 24.22.1 |
 | Migration drift | No changes detected |
 | Import graph against reviewed baseline | Passed, no new violations; existing cycles remain |
 | Offline public-holiday reconciliation | Passed; pending declarations remain explicitly pending, with no calendar changes |
