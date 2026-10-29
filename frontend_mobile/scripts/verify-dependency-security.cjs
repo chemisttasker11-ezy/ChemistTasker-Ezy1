@@ -30,9 +30,6 @@ function verifyInstalled() {
   assert.equal(mobileRequire('fast-uri/package.json').version, '3.1.9');
   assert.equal(lock.packages['node_modules/undici'].version, '6.29.1');
   assert.equal(mobileRequire('undici/package.json').version, '6.29.1');
-  // GHSA-gcqx-w48m-w2h4 has no released patched version; patch-package hardens the exact installed 4.3.1 copy.
-  assert.equal(lock.packages['node_modules/deepmerge'].version, '4.3.1');
-  assert.equal(mobileRequire('deepmerge/package.json').version, '4.3.1');
   assert.equal(lock.packages['node_modules/qs'].version, '6.16.1');
   assert.equal(mobileRequire('qs/package.json').version, '6.16.1');
   const placesRequire = createRequire(mobileRequire.resolve('react-native-google-places-autocomplete/package.json'));
@@ -66,7 +63,6 @@ function verifyAudit(report) {
   const patched = {
     'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm': 'braces',
     'https://github.com/advisories/GHSA-86w9-cpqp-85rv': 'node-forge',
-    'https://github.com/advisories/GHSA-gcqx-w48m-w2h4': 'deepmerge',
     // No upstream fixed release: both shipped builds are fingerprinted above.
     'https://github.com/advisories/GHSA-gcqx-w48m-w2h4': 'deepmerge',
   };

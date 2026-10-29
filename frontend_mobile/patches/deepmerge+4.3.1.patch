@@ -1,23 +1,52 @@
+diff --git a/node_modules/deepmerge/dist/cjs.js b/node_modules/deepmerge/dist/cjs.js
+index 7c36cbd..65499f6 100644
+--- a/node_modules/deepmerge/dist/cjs.js
++++ b/node_modules/deepmerge/dist/cjs.js
+@@ -80,11 +80,14 @@ function mergeObject(target, source, options) {
+ 	var destination = {};
+ 	if (options.isMergeableObject(target)) {
+ 		getKeys(target).forEach(function(key) {
++			if (key === '__proto__') {
++				return
++			}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
+ 		});
+ 	}
+ 	getKeys(source).forEach(function(key) {
+-		if (propertyIsUnsafe(target, key)) {
++		if (key === '__proto__' || propertyIsUnsafe(target, key)) {
+ 			return
+ 		}
+ 
+diff --git a/node_modules/deepmerge/dist/umd.js b/node_modules/deepmerge/dist/umd.js
+index 4071e7c..439778f 100644
+--- a/node_modules/deepmerge/dist/umd.js
++++ b/node_modules/deepmerge/dist/umd.js
+@@ -84,11 +84,14 @@
+ 		var destination = {};
+ 		if (options.isMergeableObject(target)) {
+ 			getKeys(target).forEach(function(key) {
++				if (key === '__proto__') {
++					return
++				}
+ 				destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
+ 			});
+ 		}
+ 		getKeys(source).forEach(function(key) {
+-			if (propertyIsUnsafe(target, key)) {
++			if (key === '__proto__' || propertyIsUnsafe(target, key)) {
+ 				return
+ 			}
+ 
 diff --git a/node_modules/deepmerge/index.js b/node_modules/deepmerge/index.js
-index 77968ae..1197319 100644
+index 77968ae..1183fa4 100644
 --- a/node_modules/deepmerge/index.js
 +++ b/node_modules/deepmerge/index.js
-@@ -45,6 +45,10 @@ function propertyIsOnObject(object, property) {
- }
- 
- // Protects from prototype poisoning and unexpected merging up the prototype chain.
-+function propertyIsForbidden(key) {
-+	return key === '__proto__'
-+}
-+
- function propertyIsUnsafe(target, key) {
- 	return propertyIsOnObject(target, key) // Properties are safe to merge if they don't exist in the target yet,
- 		&& !(Object.hasOwnProperty.call(target, key) // unsafe if they exist up the prototype chain,
-@@ -55,11 +59,14 @@ function mergeObject(target, source, options) {
+@@ -55,11 +55,14 @@ function mergeObject(target, source, options) {
  	var destination = {}
  	if (options.isMergeableObject(target)) {
  		getKeys(target).forEach(function(key) {
-+			if (propertyIsForbidden(key)) {
++			if (key === '__proto__') {
 +				return
 +			}
  			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options)
@@ -25,6 +54,7 @@ index 77968ae..1197319 100644
  	}
  	getKeys(source).forEach(function(key) {
 -		if (propertyIsUnsafe(target, key)) {
-+		if (propertyIsForbidden(key) || propertyIsUnsafe(target, key)) {
++		if (key === '__proto__' || propertyIsUnsafe(target, key)) {
  			return
  		}
+ 
