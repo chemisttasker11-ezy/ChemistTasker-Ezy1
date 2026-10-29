@@ -29,7 +29,7 @@ def inventory(parent):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
-    parser.add_argument('--parent', default='e80a89784d6481da2604dee86c342281bf92bbfe')
+    parser.add_argument('--parent', default='912d26b9470dbb7b2226d7b1d4b60e36a3bc9f73')
     options = parser.parse_args()
     result = inventory(options.parent)
     if options.check:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
@@ -58,6 +59,22 @@ def _session_dates(session):
 def payroll_settlement_changed(sender, pharmacy_id, user_id, work_dates, **kwargs):
     # This receiver participates in the activation transaction: a failed durable
     # invalidation must roll it back. Queue dispatch is already robust/on-commit.
+    if not work_dates:
+        return
+    # Freeze, correction and settlement changes take the same period locks.
+    # NO KEY UPDATE still permits the FK checks made by projection invalidation.
+    periods = list(TimesheetPeriod.objects.select_for_update(of=("self",), no_key=True).filter(
+        pharmacy_id=pharmacy_id, start_date__lte=max(work_dates), end_date__gte=min(work_dates),
+    ).order_by("pk"))
+    locked = [period.pk for period in periods if (
+        period.status == TimesheetPeriod.Status.LOCKED
+        and any(period.start_date <= work_date <= period.end_date for work_date in work_dates)
+    )]
+    if locked:
+        raise ValidationError(
+            "Correct the locked timesheet period with an audit reason before activating payroll, then recalculate and review it.",
+            code="locked_payroll_period", params={"period_ids": locked},
+        )
     for work_date in work_dates:
         _enqueue(pharmacy_id, user_id, work_date)
 
