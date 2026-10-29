@@ -93,5 +93,6 @@ jobs:
           core.test_upload_infrastructure_contract
           core.test_public_error_surface
           core.test_serializer_lifecycle_ownership
+          chat.test_api.ChatAttachmentTests
           shifts pharmacy_hub dashboards workforce.tests
           --settings=${{ matrix.settings }} --verbosity=1 --noinput

@@ -597,8 +597,10 @@ class ConversationViewSet(mixins.ListModelMixin,
         created_messages = []
         sender_membership = my_part.membership
         if attachments:
+            # Reject an invalid batch before saving any message, file or callback.
             for attachment_file in attachments:
                 validate_uploaded_file(attachment_file, ATTACHMENT_UPLOAD_POLICY, "attachment")
+            for attachment_file in attachments:
                 msg = Message.objects.create(conversation=conv, sender=sender_membership, body=body if not created_messages else "", attachment=attachment_file, attachment_filename=attachment_file.name)
                 created_messages.append(msg)
         elif body:
