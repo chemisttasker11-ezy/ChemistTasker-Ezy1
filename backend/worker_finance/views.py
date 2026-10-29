@@ -29,6 +29,7 @@ from .calculations import CalculationError, expense_gst_credit, shift_hours, ZER
 from .models import Customer, CatalogueItem, InvoiceReviewRequest, Expense, Receipt, Delivery, Payment
 from .delivery import reserve_delivery, preparation_failed, begin_delivery, delivery_uncertain, finish_delivery
 from .delivery_states import PUBLISHED_DELIVERY_STATUSES
+from .preview import preview_draft
 from .serializers import CustomerSerializer, ItemSerializer, InvoiceInput, ExpenseSerializer, MoneyField
 from .services import (
     save_draft, snapshot_lines, calculate, serialize_record, duplicate,
@@ -214,8 +215,7 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         schema = InvoiceInput(data=request.data)
         schema.is_valid(raise_exception=True)
         data = schema.validated_data
-        get_object_or_404(Customer, pk=data['customer_id'], owner=request.user, active=True)
-        return Response(calculate(data, snapshot_lines(request.user, data)))
+        return Response(preview_draft(request.user, data))
 
     @action(detail=True, methods=['post'])
     def duplicate(self, request, pk=None):
