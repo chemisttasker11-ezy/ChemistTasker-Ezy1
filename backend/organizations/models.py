@@ -1,5 +1,6 @@
 """Organisations, pharmacies, chains, pharmacy admins and pharmacy claims."""
 from django.db import models
+from access_control.pharmacy_roles import PharmacyAdminPolicy
 from django.db.models import Q
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -353,38 +354,12 @@ class PharmacyClaim(models.Model):
 
 
 class PharmacyAdmin(models.Model):
-    class AdminLevel(models.TextChoices):
-        OWNER = "OWNER", "Owner"
-        MANAGER = "MANAGER", "Manager"
-        ROSTER_MANAGER = "ROSTER_MANAGER", "Roster Manager"
-        COMMUNICATION_MANAGER = "COMMUNICATION_MANAGER", "Communication Manager"
-
-    CAPABILITY_MANAGE_ADMINS = "MANAGE_ADMINS"
-    CAPABILITY_MANAGE_STAFF = "MANAGE_STAFF"
-    CAPABILITY_MANAGE_ROSTER = "MANAGE_ROSTER"
-    CAPABILITY_MANAGE_COMMS = "MANAGE_COMMUNICATIONS"
-
-    CAPABILITY_MATRIX = {
-        AdminLevel.OWNER: {
-            CAPABILITY_MANAGE_ADMINS,
-            CAPABILITY_MANAGE_STAFF,
-            CAPABILITY_MANAGE_ROSTER,
-            CAPABILITY_MANAGE_COMMS,
-        },
-        AdminLevel.MANAGER: {
-            CAPABILITY_MANAGE_ADMINS,
-            CAPABILITY_MANAGE_STAFF,
-            CAPABILITY_MANAGE_ROSTER,
-            CAPABILITY_MANAGE_COMMS,
-        },
-        AdminLevel.ROSTER_MANAGER: {
-            CAPABILITY_MANAGE_ROSTER,
-            CAPABILITY_MANAGE_COMMS,
-        },
-        AdminLevel.COMMUNICATION_MANAGER: {
-            CAPABILITY_MANAGE_COMMS,
-        },
-    }
+    AdminLevel = PharmacyAdminPolicy.AdminLevel
+    CAPABILITY_MANAGE_ADMINS = PharmacyAdminPolicy.CAPABILITY_MANAGE_ADMINS
+    CAPABILITY_MANAGE_STAFF = PharmacyAdminPolicy.CAPABILITY_MANAGE_STAFF
+    CAPABILITY_MANAGE_ROSTER = PharmacyAdminPolicy.CAPABILITY_MANAGE_ROSTER
+    CAPABILITY_MANAGE_COMMS = PharmacyAdminPolicy.CAPABILITY_MANAGE_COMMS
+    CAPABILITY_MATRIX = PharmacyAdminPolicy.CAPABILITY_MATRIX
 
     ADMIN_STAFF_ROLE_CHOICES = [
         ("PHARMACIST", "Pharmacist"),

@@ -1,21 +1,18 @@
 {
   "schema": "chemisttasker-backend-cycle-baseline-v1",
-  "recorded_sha": "50560020bb8049b7a5742b5d2a37b5fa87c329a9",
-  "source": "Identity/membership services ownership; see DEPENDENCY_CYCLE_REMOVAL_PLAN_20261029.md",
-  "notes": "Actual direct cyclic edges shrink from 39 to 38. users-to-memberships is removed at every depth. The retained membership-to-identity edge is reclassified into the non-mutual ledger. Application composition belongs to no direct or combined cyclic component.",
+  "recorded_sha": "e13b7008708e96ffa3077a37b6bfd20ed40d2e53",
+  "source": "Identity/organization module boundary and shared policy facts; see DEPENDENCY_CYCLE_REMOVAL_PLAN_20261029.md",
+  "notes": "Direct users-to-organizations is removed. Direct cyclic edges fall 38 to 23 and the SCC shrinks from 11 to eight apps. Existing delayed scope/navigation imports remain; combined cyclic edges remain 124. Shared access-control facts have no business import and belong to no cyclic component.",
   "strongly_connected_components": [
     [
       "chat",
       "client_profile",
       "core",
       "memberships",
-      "notifications",
       "onboarding",
       "organizations",
-      "public_hub",
       "shifts",
-      "talent",
-      "users"
+      "talent"
     ]
   ],
   "unapproved_cycle_edges": [
@@ -29,19 +26,11 @@
     ],
     [
       "chat",
-      "notifications"
-    ],
-    [
-      "chat",
       "organizations"
     ],
     [
       "chat",
       "shifts"
-    ],
-    [
-      "chat",
-      "users"
     ],
     [
       "client_profile",
@@ -65,27 +54,11 @@
     ],
     [
       "core",
-      "notifications"
-    ],
-    [
-      "core",
-      "public_hub"
-    ],
-    [
-      "core",
       "shifts"
-    ],
-    [
-      "core",
-      "users"
     ],
     [
       "memberships",
       "core"
-    ],
-    [
-      "memberships",
-      "notifications"
     ],
     [
       "memberships",
@@ -96,44 +69,20 @@
       "organizations"
     ],
     [
-      "memberships",
-      "users"
-    ],
-    [
-      "notifications",
-      "users"
-    ],
-    [
       "onboarding",
       "core"
     ],
     [
-      "onboarding",
-      "users"
-    ],
-    [
       "organizations",
       "core"
-    ],
-    [
-      "organizations",
-      "notifications"
     ],
     [
       "organizations",
       "onboarding"
     ],
     [
-      "public_hub",
-      "users"
-    ],
-    [
       "shifts",
       "memberships"
-    ],
-    [
-      "shifts",
-      "notifications"
     ],
     [
       "shifts",
@@ -146,10 +95,6 @@
     [
       "shifts",
       "talent"
-    ],
-    [
-      "shifts",
-      "users"
     ],
     [
       "talent",

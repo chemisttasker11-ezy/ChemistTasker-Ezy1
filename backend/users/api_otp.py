@@ -5,11 +5,11 @@ import secrets
 import logging
 import requests
 from users.membership_port import membership_services
+from users.organization_port import organization_reads
 from users.tokens import RefreshToken
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
-from organizations.access import admin_assignments_for
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from users.task_dispatch import async_task
@@ -234,7 +234,7 @@ class VerifyOTPView(APIView):
           ]
 
         admin_assignments = (
-            admin_assignments_for(user)
+            organization_reads().admin_assignments_for(user)
             .select_related("pharmacy")
         )
         admin_payload = [

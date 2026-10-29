@@ -184,7 +184,6 @@ ALLOWED_MUTUAL_APP_PAIRS = {
     # the kernel facade re-exports onboarding; onboarding.models uses the migration-bound client_profile.fields
     ("client_profile", "onboarding"),
     # memberships link users to pharmacies and organisations; the organisation, account and session APIs read them
-    ("organizations", "users"),
 
 }
 
