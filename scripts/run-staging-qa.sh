@@ -91,7 +91,7 @@ backend_run python manage.py test organizations memberships client_profile.test_
 backend_run python manage.py test users.test_current_user_newcomer_contract shifts.test_shift_listing_contract.AssignedProfileTests --settings=core.contract_test_settings
 backend_run python manage.py test marketplace.tests ethical_marketplace.tests --settings=core.contract_test_settings
 backend_run python manage.py test public_hub.tests --settings=public_hub.test_settings
-backend_run python manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity --settings=core.contract_test_settings
+backend_run python manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity invoicing.test_smtp_protocol core.test_invoice_acceptance_fixture --settings=core.contract_test_settings
 backend_run python manage.py test workforce.tests worker_finance.tests --settings=core.contract_test_settings
 backend_run python manage.py test worker_finance.tests --settings=worker_finance.tests.settings
 

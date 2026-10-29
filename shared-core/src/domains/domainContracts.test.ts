@@ -31,12 +31,17 @@ function responses(...payloads: unknown[]) {
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('source-backed wire/domain contracts after extraction',()=>{
-  it('retains 430 runtime exports after retiring eight unused onboarding/application operations',()=>{
+  it('retains existing runtime exports and explicitly owns the two checkout recovery operations',()=>{
     const modules=import.meta.glob('./**/api.ts',{eager:true});
     const retiredExports = ['createOnboarding', 'getShiftApplications',
       'acceptShiftApplication', 'rejectShiftApplication', 'fetchShiftApplicationsService',
       'acceptShiftApplicationService', 'rejectShiftApplicationService', 'refereeReject'];
-    expect(Object.keys(exportOwners)).toHaveLength(438 - retiredExports.length);
+    const checkoutRecoveryExports = ['resumeFulfillmentCheckout', 'expireFulfillmentCheckout'] as const;
+    expect(Object.keys(exportOwners)).toHaveLength(438 - retiredExports.length + checkoutRecoveryExports.length);
+    for (const name of checkoutRecoveryExports) {
+      expect(exportOwners[name]).toBe('domains/billing/api.ts');
+      expect(typeof publicApi[name]).toBe('function');
+    }
     for (const name of retiredExports) {
       expect(exportOwners).not.toHaveProperty(name);
       expect(publicApi).not.toHaveProperty(name);

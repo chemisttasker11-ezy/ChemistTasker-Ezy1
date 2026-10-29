@@ -159,6 +159,8 @@ jobs:
                   staff_role="PHARMACIST",
                   is_active=True,
               )
+          from testing.invoice_acceptance_fixture import seed_invoice_work
+          seed_invoice_work(user, Pharmacy.objects.order_by('pk').first())
           PY
             python manage.py shell < /tmp/seed_native_smoke.py
             nohup python manage.py runserver 0.0.0.0:8000 --noreload > /tmp/native-backend.log 2>&1 &
@@ -407,6 +409,7 @@ jobs:
           set -euo pipefail
           trap 'status=$?; if [ "$status" -ne 0 ]; then echo "=== backend ==="; cat /tmp/native-backend.log || true; echo "=== emulator ==="; cat /tmp/android-emulator.log || true; fi' EXIT
           curl -fsS http://127.0.0.1:8000/api/v1/users/mobile/app-config/ >/dev/null
+          cp frontend_mobile/.maestro/invoice-acceptance.yaml /tmp/invoice-acceptance.yaml
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
@@ -476,10 +479,12 @@ jobs:
               direction: DOWN
               timeout: 30000
           - assertVisible: "Attendance QR camera"
+          - runFlow: /tmp/invoice-acceptance.yaml
           YAML
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=180000
           export MAESTRO_CLI_NO_ANALYTICS=1
           maestro --device "$ANDROID_SERIAL" test /tmp/native-acceptance.yaml
+          python backend/manage.py shell -c "from testing.invoice_acceptance_fixture import verify_invoice_work; verify_invoice_work()"
 
       - name: Capture Android diagnostics
         if: always()
@@ -615,6 +620,8 @@ jobs:
                   staff_role="PHARMACIST",
                   is_active=True,
               )
+          from testing.invoice_acceptance_fixture import seed_invoice_work
+          seed_invoice_work(user, Pharmacy.objects.order_by('pk').first())
           PY
             python manage.py shell < /tmp/seed_native_smoke.py
             nohup python manage.py runserver 127.0.0.1:8000 --noreload > /tmp/native-backend.log 2>&1 &
@@ -822,6 +829,7 @@ jobs:
           maestro --device "$SIM_UDID" test /tmp/native-link-consent.yaml
           sleep 5
 
+          cp frontend_mobile/.maestro/invoice-acceptance.yaml /tmp/invoice-acceptance.yaml
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
@@ -901,8 +909,10 @@ jobs:
           - extendedWaitUntil:
               visible: "Centre the kiosk QR inside the frame"
               timeout: 30000
+          - runFlow: /tmp/invoice-acceptance.yaml
           YAML
           maestro --device "$SIM_UDID" test /tmp/native-acceptance.yaml
+          python backend/manage.py shell -c "from testing.invoice_acceptance_fixture import verify_invoice_work; verify_invoice_work()"
 
       - name: Capture iOS diagnostics
         if: always()

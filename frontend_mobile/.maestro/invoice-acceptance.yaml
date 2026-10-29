@@ -1,0 +1,76 @@
+appId: com.chemisttasker.app
+---
+- openLink: "frontendmobile://pharmacist/invoice"
+- runFlow:
+    when:
+      visible: 'Open in .*ChemistTasker.*'
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "Invoices & finances"
+    timeout: 30000
+- tapOn: "Create invoice"
+- extendedWaitUntil:
+    visible: "Choose accepted shift"
+    timeout: 30000
+- tapOn: "Choose accepted shift"
+- tapOn: "Native Pharmacy A"
+- scrollUntilVisible:
+    element:
+      text: "Qty"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "Qty"
+- eraseText: 20
+- inputText: "7.5"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: ".*577.50.*"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "Save invoice"
+- extendedWaitUntil:
+    visible: "View invoice"
+    timeout: 30000
+- tapOn: "View invoice"
+- tapOn: "Edit invoice"
+- scrollUntilVisible:
+    element:
+      text: "Qty"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "Qty"
+- eraseText: 20
+- inputText: "8"
+- hideKeyboard
+- tapOn: "Save revision"
+- extendedWaitUntil:
+    visible: "View invoice"
+    timeout: 30000
+- tapOn: "View invoice"
+- assertVisible: "Revision 2.*"
+- scrollUntilVisible:
+    element:
+      text: "Send email"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "Send email"
+- tapOn: "Confirm"
+- extendedWaitUntil:
+    visible: "View invoice"
+    timeout: 30000
+- tapOn: "View invoice"
+- assertVisible: "Sent"
+- assertVisible: ".*616.00.*"
+- scrollUntilVisible:
+    element:
+      text: "Share PDF"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Share PDF"
+    index: 0
+- extendedWaitUntil:
+    visible: "Copy|Save to Files|Quick Share|Bluetooth|Nearby Share"
+    timeout: 30000
