@@ -94,7 +94,7 @@ jobs:
           core.test_public_error_surface
           core.test_serializer_lifecycle_ownership
           chat.test_api.ChatAttachmentTests
-          users.test_task_dispatch_boundary users.test_membership_read_boundary
+          users.test_task_dispatch_boundary users.test_membership_read_boundary users.test_organization_boundary
           organizations memberships
           client_profile.test_admin_invitations
           client_profile.test_characterization_chains

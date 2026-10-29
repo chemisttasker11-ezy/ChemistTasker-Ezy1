@@ -1,9 +1,8 @@
 """Authenticated sessions: browser vs native clients, the httpOnly JWT cookies and the signed-in user
 payload."""
 from users.membership_port import membership_services
+from users.organization_port import organization_reads
 from users.models import OrganizationMembership
-from organizations.access import admin_assignments_for
-from organizations.models import Pharmacy
 from django.conf import settings
 from users.serializers import serialize_org_memberships
 
@@ -93,7 +92,7 @@ def _build_authenticated_user_payload(user):
         }
         for pm in pharm_memberships
     ]
-    owned_pharmacies = Pharmacy.objects.filter(owner__user=user)
+    owned_pharmacies = organization_reads().owned_pharmacies(user)
     for pharmacy in owned_pharmacies:
         pharm_payload.append(
             {
@@ -106,7 +105,7 @@ def _build_authenticated_user_payload(user):
         {entry["pharmacy_id"]: entry for entry in pharm_payload}.values()
     )
 
-    admin_assignments = admin_assignments_for(user).select_related("pharmacy")
+    admin_assignments = organization_reads().admin_assignments_for(user).select_related("pharmacy")
     admin_payload = [
         {
             "id": assignment.id,

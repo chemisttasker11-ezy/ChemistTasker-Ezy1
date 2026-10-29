@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from django.conf import settings
+from access_control.pharmacy_roles import PharmacyAdminPolicy
 
 from users.models import OrganizationMembership
 from users.org_roles import (
@@ -179,12 +180,10 @@ def build_pharmacy_manager_invite_context(
     Uses the organisation invite template; the person is a pharmacy-level MANAGER admin, not an
     organisation role, so the scope is that single pharmacy.
     """
-    from organizations.models import PharmacyAdmin
-
     inviter_name = inviter.get_full_name() if callable(getattr(inviter, "get_full_name", None)) else ""
     if not inviter_name:
         inviter_name = getattr(inviter, "email", None) or "A ChemistTasker admin"
-    level = get_admin_level_definition(PharmacyAdmin.AdminLevel.MANAGER)
+    level = get_admin_level_definition(PharmacyAdminPolicy.AdminLevel.MANAGER)
     return {
         "org_name": getattr(organization, "name", "") or "",
         "role_label": "Pharmacy Manager",
