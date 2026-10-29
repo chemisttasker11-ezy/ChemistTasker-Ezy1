@@ -770,6 +770,150 @@ connection.close()
             event_id=response.data["created_event_id"], created_by=self.manager,
         ).exists())
 
+    def check_timesheet_rebuild_clock_out_fk_race(self, *, manager_after_commit):
+        """Force the later period/timesheet/FK cycle, after the session lock is released."""
+        from workforce.tasks import rebuild_timesheet_task
+
+        worker, session, timesheet = self.prepare_missing_punch()
+        qr = generate_signed_pharmacy_qr(self.device)["signed_token"]
+        period_table = connection.ops.quote_name(TimesheetPeriod._meta.db_table)
+        timesheet_table = connection.ops.quote_name(Timesheet._meta.db_table)
+        pharmacy_table = connection.ops.quote_name(self.pharmacy._meta.db_table)
+        session_held, release_manager, manager_committed = Event(), Event(), Event()
+        period_held, timesheet_updated, release_clock_out = Event(), Event(), Event()
+        observed = {"period_locked": False, "invalidations": 0, "invalidation_rows": [], "builder_waited": False}
+        original = {}
+
+        def manager_post():
+            response = self.post_missing_punch(timesheet, session)
+            if response.status_code == 201:
+                event_id = response.data["created_event_id"]
+                original["event"] = AttendanceEvent.objects.filter(pk=event_id).values().get()
+                original["audit"] = ManagerAttendanceEventAudit.objects.filter(event_id=event_id).values().get()
+            return response
+
+        def manager_request_with_callbacks():
+            with transaction.atomic():
+                AttendanceSession.objects.select_for_update(of=("self",)).get(pk=session.pk)
+                # Registered before the real signal callbacks so the hook ignores
+                # the view's initial build and stops only its after-commit rebuild.
+                transaction.on_commit(manager_committed.set)
+                session_held.set()
+                if not release_manager.wait(timeout=10):
+                    raise AssertionError("Manager request was not released.")
+                return manager_post()
+
+        def hold_builder_period(execute, sql, params, many, context):
+            result = execute(sql, params, many, context)
+            if (
+                manager_committed.is_set() and not observed["period_locked"]
+                and f"FROM {period_table}" in sql and f"JOIN {pharmacy_table}" in sql
+                and ("FOR UPDATE" in sql or "FOR NO KEY UPDATE" in sql)
+            ):
+                observed["period_locked"] = True
+                period_held.set()
+                if not timesheet_updated.wait(timeout=10):
+                    raise AssertionError("Clock-out did not invalidate the timesheet.")
+            return result
+
+        def hold_clock_out_invalidation(execute, sql, params, many, context):
+            invalidation = (
+                sql.startswith(f"UPDATE {timesheet_table} SET")
+                and '"needs_rebuild"' in sql and params and params[0] is True
+            )
+            if invalidation and observed["invalidations"] == 0:
+                if not period_held.wait(timeout=10):
+                    raise AssertionError("Rebuild did not acquire its period lock.")
+            result = execute(sql, params, many, context)
+            if invalidation:
+                observed["invalidations"] += 1
+                observed["invalidation_rows"].append(context["cursor"].rowcount)
+                if observed["invalidations"] == 1:
+                    timesheet_updated.set()
+                    if not release_clock_out.wait(timeout=10):
+                        raise AssertionError("Clock-out was not released for its second invalidation and commit.")
+            return result
+
+        def online_clock_out():
+            request = APIRequestFactory().post(
+                "/api/v1/attendance/worker/clock-out/", {"qr_token": qr},
+                format="json", HTTP_X_CLIENT_PLATFORM="mobile",
+            )
+            force_authenticate(request, user=worker)
+            return WorkerClockOutView.as_view()(request)
+
+        if not manager_after_commit:
+            response = manager_post()
+            self.assertEqual(response.status_code, 201, response.data)
+            manager_committed.set()
+
+        tasks = []
+        try:
+            rebuild = self.start(
+                "manager-after-commit-rebuild" if manager_after_commit else "separate-timesheet-rebuild",
+                manager_request_with_callbacks if manager_after_commit else
+                lambda: rebuild_timesheet_task.run(timesheet.period_id, worker.pk),
+                hold_builder_period,
+            )
+            tasks.append(rebuild)
+            self.assertTrue((session_held if manager_after_commit else period_held).wait(timeout=10))
+            online = self.start("qr-clock-out-with-invalidation", online_clock_out, hold_clock_out_invalidation)
+            tasks.append(online)
+            if manager_after_commit:
+                self.wait_until_blocked_or_done(online, rebuild[2])
+                self.assertFalse(online[3].is_set(), "Clock-out must wait for the manager's session lock.")
+                release_manager.set()
+            self.assertTrue(period_held.wait(timeout=10))
+            self.assertTrue(timesheet_updated.wait(timeout=10))
+            self.wait_until_blocked_or_done(rebuild, online[2])
+            self.assertFalse(rebuild[3].is_set(), "Rebuild must reach the timesheet held by clock-out.")
+            observed["builder_waited"] = True
+        finally:
+            # Release every gate before joining either connection, including a
+            # failed setup/assertion path. Observations are recorded separately.
+            release_manager.set()
+            period_held.set()
+            timesheet_updated.set()
+            release_clock_out.set()
+            for thread, *_ in tasks:
+                thread.join(timeout=15)
+            outcomes = [self.finish(task) for task in tasks]
+
+        self.assertTrue(observed["period_locked"] and observed["builder_waited"], observed)
+        self.assertGreaterEqual(observed["invalidations"], 2, observed)
+        self.assertEqual(observed["invalidation_rows"][:2], [1, 1], observed)
+        self.assertFalse(self.sql_errors, (outcomes, self.sql_errors))
+        self.assertTrue(all(kind == "ok" for kind, _ in outcomes), outcomes)
+        rebuilt, online_response = [value for _, value in outcomes]
+        if manager_after_commit:
+            self.assertEqual(rebuilt.status_code, 201, rebuilt.data)
+        else:
+            self.assertEqual((rebuilt["status"], rebuilt["timesheet_id"]), ("rebuilt", timesheet.pk))
+        self.assertEqual(online_response.status_code, 200, online_response.data)
+        self.assertEqual((online_response.data["status"], online_response.data["session_id"]),
+                         ("CLOCKED_OUT", session.pk))
+        session.refresh_from_db()
+        self.assertEqual(session.ended_at, self.now)
+        self.assertEqual(session.events.count(), 2)
+        self.assertEqual(AttendanceEvent.objects.filter(pk=original["event"]["id"]).values().get(), original["event"])
+        self.assertEqual(ManagerAttendanceEventAudit.objects.filter(pk=original["audit"]["id"]).values().get(),
+                         original["audit"])
+        self.assertEqual(session.events.get(event_type="CLOCK_IN").source, "MANAGER")
+        clock_out_event = session.events.get(event_type="CLOCK_OUT")
+        self.assertEqual((clock_out_event.source, clock_out_event.occurred_at), ("MOBILE_QR", self.now))
+        timesheet.refresh_from_db()
+        self.assertEqual(timesheet.worked_minutes, 180)
+        self.assertFalse(timesheet.needs_rebuild)
+        latest = timesheet.revisions.order_by("-revision_number").first()
+        self.assertEqual((latest.worked_minutes, latest.snapshot["totals"]["worked_minutes"]), (180, 180))
+        self.assertFalse(latest.checks.filter(code__in=["MISSING_CLOCK_IN", "MISSING_CLOCK_OUT"]).exists())
+
+    def test_manager_after_commit_rebuild_racing_qr_clock_out_finishes_without_fk_deadlock(self):
+        self.check_timesheet_rebuild_clock_out_fk_race(manager_after_commit=True)
+
+    def test_separate_timesheet_rebuild_racing_qr_clock_out_finishes_without_fk_deadlock(self):
+        self.check_timesheet_rebuild_clock_out_fk_race(manager_after_commit=False)
+
     def check_verified_close_preserves_setup_otp(self, channel):
         worker, _ = self.prepare_worker()
         membership = Membership.objects.get(user=worker, pharmacy=self.pharmacy)
