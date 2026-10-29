@@ -103,7 +103,7 @@ class LocumCoverFixture(KioskReviewFixture):
         self.assertFalse(AttendanceEvent.objects.filter(session__user=worker).exists())
 
     def assert_refused(self, response, worker=None):
-        self.assertIn(response.status_code, (400, 401, 403), response.data)
+        self.assertIn(response.status_code, (400, 401, 403), response.content)
         self.assert_no_attendance(worker)
 
     def assert_cover(self, response, cover_type=UNBOOKED, *, source_membership=None):

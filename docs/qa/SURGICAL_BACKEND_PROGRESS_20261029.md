@@ -7,12 +7,12 @@ This checkpoint implements stages **B1, B2, B3, G and H** of the surgical backen
 - Repository: `chemisttasker11-ezy/ChemistTasker-Ezy1`.
 - Base: `fix/pr211-followups` at `2f7c40dd1ff4c5a8fd888184c3fd3ad5ca551a98`.
 - Branch: `fix/surgical-backend-consistency-20261029`.
-- Final tested code snapshot: `d19acce4ae4876f8cec1a4eac98e98f00667c545` (tree `98dbe558357ac09cd0bf1aedf7f8718c95f9c311`); the following documentation commit does not change application or test code.
+- Original five code patches: `d19acce4ae4876f8cec1a4eac98e98f00667c545` (tree `98dbe558357ac09cd0bf1aedf7f8718c95f9c311`). The subsequent CI correction below changes test applicability only.
 - Main remains `25ef200f0c32b2b6fc764a4d05a648b604038794`.
 - E17 remains the unfinished snapshot `12c6dc639f4d450333f7fdbdaa87baea92efc420` on `wip/e17-cover-terms`.
 - Work was performed in an isolated checkout. No changes were made to another developer's worktree or to the E17 branch.
 
-The production diff is 90 added and 56 removed lines across ten files, or 34 net added lines. Four existing test files gain the regression and characterization coverage. No model, schema, endpoint, pricing, tax-policy or frontend changes are included.
+The production diff is 90 added and 56 removed lines across ten files, or 34 net added lines. Four existing test files gain the regression and characterization coverage; two further test files receive the small CI fixture corrections described below. No model, schema, endpoint, pricing, tax-policy or frontend changes are included.
 
 ## Implemented changes and preserved behavior
 
@@ -115,6 +115,26 @@ An initial G selection used SQLite for a class that explicitly requires PostgreS
 
 Independent read-only review found no blocking issue in B1/B2 or G/H. Production and test diffs were also reviewed centrally. Each remote code tree is compared with an independently computed local Git tree hash from the tested file snapshot before publication.
 
+### Hosted integration follow-up
+
+The first published head, `eb0c51f00e002ee23405d1959130aa68354cc501`, received additional hosted evidence:
+
+- [Backend Finalization Contracts](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40793553599) passed on SQLite and PostgreSQL. The 71-test PostgreSQL selection had no skips; SQLite had eight intentional skips and also passed its three isolated adapter selections.
+- [Serializer PostgreSQL](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40793553596/job/123184377635) passed all 546 tests with no skips.
+- [Serializer SQLite](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40793553596/job/123184377451) exposed a fixture setup error followed by eight offer-callback subcase failures. This was investigated and corrected, not treated as passing evidence.
+
+`LocumApprovalGateTests` inherits a PostgreSQL-only fixture and Django `TestCase`. The fixture called `super().setUpClass()` before rejecting SQLite, opening a class transaction before raising. Unittest does not run `tearDownClass` after failed class setup, so the transaction remained open and suppressed subsequent `TransactionTestCase` commit callbacks. A reduced selection of the locum approval class followed by the new offer transaction tests reproduced exactly eight failures and one setup error.
+
+The correction is a class-level PostgreSQL applicability guard in `workforce/tests/test_locum_approval_gate.py`, evaluated before fixture setup. It adds five lines, changes no production behavior, and leaves every approval assertion and the PostgreSQL workflow selection intact. All ten tests in the locum-approval plus offer-transaction selection pass on PostgreSQL after this correction, with no skips. The full corrected SQLite serializer selection runs 546 tests successfully: 529 passed and 17 intentional skips. Five of those skips are this PostgreSQL-only class, whose tests execute and pass on PostgreSQL.
+
+The first [Shared Core PostgreSQL job](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40793553587/job/123184377813) also found one existing test-helper error across 339 tests. A suspended-worker request was correctly denied by the AHPRA middleware's Django `JsonResponse`, but the refusal helper evaluated DRF-only `response.data` as its assertion-message argument. That crashed before completing its status and no-attendance assertions. The same single test reproduced the error locally with enforcement enabled.
+
+The one-line correction uses the common `response.content` attribute for that diagnostic message. It does not alter the accepted denial statuses, no-attendance assertions, middleware or eligibility policy. All 43 unbooked-locum and workforce-approval tests pass on PostgreSQL with enforcement enabled after the correction. This line in `attendance/test_unbooked_locum_cover.py` should be preserved when integrating the final E17 test changes; it does not modify the active E17 branch.
+
+The initial mobile job also fails the live dependency audit for `GHSA-gcqx-w48m-w2h4` (`deepmerge`). The [same failure on main before this work](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40650008013/job/122687825085), together with identical base-to-head dependency and security-gate blob IDs, establishes a separate existing blocker. Mobile lint, type checking and dependency regression checks passed before the live audit rejection. The audit stops at the first unhandled advisory, so this evidence does not establish that it is the only remaining advisory. The backend patch does not change or waive the mobile gate.
+
+Hosted results above belong to their stated source head. The test-only correction requires fresh final-head CI evidence; earlier successful jobs are not relabeled as final-head passes. PR #213's description and the plan execution status record the later observed results without forcing a new application-code commit for status-only changes.
+
 ### Reproducible selections
 
 Run these from the repository root using the pinned dependencies and the workflow's dummy environment. For PostgreSQL, point `LOCAL_DB_*` at a disposable PostgreSQL 16 database and set `APP_ENV=test`.
@@ -161,6 +181,26 @@ python backend/manage.py test \
 python backend/manage.py makemigrations --check --dry-run \
   --settings=core.contract_test_settings
 python3 scripts/module_import_graph.py --check --check-baseline
+```
+
+The CI fixture correction is verified with the exact SQLite serializer selection and a required PostgreSQL preservation control:
+
+```bash
+python backend/manage.py test \
+  core.test_serializer_decomposition core.test_runtime_contract \
+  core.test_promoted_model_import_ownership core.test_module_size_ratchet \
+  core.test_backend_ownership_boundaries core.test_public_error_surface \
+  core.test_serializer_lifecycle_ownership shifts pharmacy_hub dashboards workforce.tests \
+  --settings=core.contract_test_settings --verbosity=1 --noinput
+
+python backend/manage.py test \
+  workforce.tests.test_locum_approval_gate \
+  shifts.test_shift_actions_contract.OfferNotificationCommitTests \
+  --settings=core.postgres_test_settings --verbosity=2 --noinput
+
+AHPRA_ENFORCEMENT_ENABLED=true python backend/manage.py test \
+  attendance.test_unbooked_locum_cover workforce.tests.test_locum_approval_gate \
+  --settings=core.postgres_test_settings --verbosity=1 --noinput
 ```
 
 The 14-test B2 result predates H's extra counteroffer characterization method. Running that particular selection on the combined branch includes the additional method; H's combined gate already includes all B2 tests on the final production source.
