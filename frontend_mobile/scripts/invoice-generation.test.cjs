@@ -6,6 +6,26 @@ const vm = require('node:vm');
 const ts = require('typescript');
 
 const directory = path.resolve(__dirname, '../roles/shared/invoices');
+// Load the shared owner and its real imports, without extracting expressions
+// from component source or copying the production default into this fixture.
+const sharedModules = new Map();
+function loadSharedModule(filename) {
+  if (sharedModules.has(filename)) return sharedModules.get(filename);
+  const exports = {};
+  sharedModules.set(filename, exports);
+  const { outputText } = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 },
+  });
+  vm.runInNewContext(outputText, {
+    exports,
+    require(name) {
+      assert.ok(name.startsWith('.'), `Unexpected shared module dependency: ${name}`);
+      return loadSharedModule(path.resolve(path.dirname(filename), `${name}.ts`));
+    },
+  }, { filename });
+  return exports;
+}
+const { SUPER_GUARANTEE_PERCENT } = loadSharedModule(path.resolve(__dirname, '../../shared-core/src/domains/shifts/postingDraft.ts'));
 const accepted = {
   id: '11-31-2026-10-29', assignmentId: 41, shiftId: 11, shiftSlotId: 31,
   date: '2026-10-29', start_time: '09:00:00', end_time: '10:00:00',
@@ -45,7 +65,7 @@ function text(node) {
 
 // Execute the real screen and its adjacent helper. Native controls are a small
 // inert host; API responses are server contract fixtures, never a JS tax calculator.
-async function mount({ onboarding, source, preview } = {}) {
+async function mount({ onboarding, source, preview, sharedSuperRate = SUPER_GUARANTEE_PERCENT } = {}) {
   const slots = [], calls = { preview: [], saved: [], routes: [] }, timers = new Map();
   let cursor = 0, dirty = true, tree, effects = [], timerId = 0;
   const equal = (a, b) => a && b && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
@@ -80,7 +100,7 @@ async function mount({ onboarding, source, preview } = {}) {
   const Menu = Object.assign('Menu', { Item: 'Menu.Item' });
   const native = { View: 'View', ScrollView: 'ScrollView', Alert: { alert() {} }, StyleSheet: { create: value => value } };
   const api = {
-    SUPER_GUARANTEE_PERCENT: 12,
+    SUPER_GUARANTEE_PERCENT: sharedSuperRate,
     getOnboarding: async () => onboarding ? onboarding() : profile,
     getMyHistoryShifts: async () => shifts,
     previewInvoice: async id => source ? source(id) : [{ ...accepted, shiftId: id }],
@@ -170,6 +190,27 @@ test('a generated contribution is displayed separately and never submitted as a 
   assert.deepEqual(JSON.parse(ui.calls.saved[0].line_items), [], 'Only deliberate extras belong in custom line_items.');
 });
 
+for (const { label, onboardingRate, sharedSuperRate = SUPER_GUARANTEE_PERCENT, expected } of [
+  { label: 'missing onboarding rate uses the shared SG default', expected: String(SUPER_GUARANTEE_PERCENT) },
+  // This distinct imported value catches a hardcoded screen default. It is a
+  // test fixture, not an alternative financial policy.
+  { label: 'missing onboarding rate follows the imported default', sharedSuperRate: 19.75, expected: '19.75' },
+  { label: 'agreed onboarding rate preserves decimal text', onboardingRate: '11.50', expected: '11.50' },
+  { label: 'explicit zero onboarding rate stays zero', onboardingRate: '0.00', expected: '0.00' },
+  { label: 'numeric zero onboarding rate stays zero', onboardingRate: 0, expected: '0' },
+]) test(`super rate screen, preview and save: ${label}`, async () => {
+  const onboardingProfile = { ...profile };
+  delete onboardingProfile.super_rate_snapshot;
+  if (onboardingRate !== undefined) onboardingProfile.super_rate_snapshot = onboardingRate;
+  const ui = await mount({ onboarding: () => onboardingProfile, sharedSuperRate });
+  assert.equal(ui.all('TextInput').find(node => node.props.label === 'Super rate snapshot (%)').props.value, expected);
+  await ui.selectShift();
+  assert.equal(ui.calls.preview.at(-1).super_rate_snapshot, expected);
+  await ui.press(ui.button('Generate invoice'));
+  assert.equal(ui.calls.saved.length, 1);
+  assert.equal(ui.calls.saved[0].super_rate_snapshot, expected);
+});
+
 test('a late onboarding response preserves an explicit false GST choice and an explicit super rate', async () => {
   const late = deferred();
   const ui = await mount({ onboarding: () => late.promise });
@@ -178,6 +219,13 @@ test('a late onboarding response preserves an explicit false GST choice and an e
   late.resolve(profile); await ui.flush();
   assert.equal(ui.all('Switch')[0].props.value, false);
   assert.equal(ui.all('TextInput').find(node => node.props.label === 'Super rate snapshot (%)').props.value, '0.00');
+  await ui.selectShift();
+  assert.equal(ui.calls.preview.at(-1).gst_registered, false);
+  assert.equal(ui.calls.preview.at(-1).super_rate_snapshot, '0.00');
+  await ui.press(ui.button('Generate invoice'));
+  assert.equal(ui.calls.saved.length, 1);
+  assert.equal(ui.calls.saved[0].gst_registered, 'false');
+  assert.equal(ui.calls.saved[0].super_rate_snapshot, '0.00');
 });
 
 test('pending and rejected previews cannot be saved or display the previous total', async () => {
