@@ -1,7 +1,7 @@
 diff --git a/node_modules/deepmerge/dist/cjs.js b/node_modules/deepmerge/dist/cjs.js
 --- a/node_modules/deepmerge/dist/cjs.js
 +++ b/node_modules/deepmerge/dist/cjs.js
-@@ -44,6 +44,10 @@ function propertyIsOnObject(object, property) {
+@@ -69,6 +69,10 @@ function propertyIsOnObject(object, property) {
  	}
  }
  
@@ -12,7 +12,7 @@ diff --git a/node_modules/deepmerge/dist/cjs.js b/node_modules/deepmerge/dist/cj
  // Protects from prototype poisoning and unexpected merging up the prototype chain.
  function propertyIsUnsafe(target, key) {
  	return propertyIsOnObject(target, key) // Properties are safe to merge if they don't exist in the target yet,
-@@ -55,11 +59,14 @@ function mergeObject(target, source, options) {
+@@ -80,11 +84,14 @@ function mergeObject(target, source, options) {
  	var destination = {};
  	if (options.isMergeableObject(target)) {
  		getKeys(target).forEach(function(key) {
