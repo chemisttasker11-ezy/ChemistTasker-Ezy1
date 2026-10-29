@@ -163,9 +163,9 @@ export default function InvoiceManagePage() {
   const handleSend = async () => {
     if (!menuInvoiceId) return;
     try {
-      await sendInvoiceEmail(menuInvoiceId);
-      updateLocalStatus(menuInvoiceId, 'sent');
-      setSnackbar({ open: true, msg: `Invoice #${menuInvoiceId} sent.` });
+      const result = await sendInvoiceEmail(menuInvoiceId);
+      updateLocalStatus(menuInvoiceId, result.status);
+      setSnackbar({ open: true, msg: result.detail || 'Invoice email request accepted.' });
     } catch {
       setSnackbar({ open: true, msg: 'Failed to send invoice.' });
     } finally {

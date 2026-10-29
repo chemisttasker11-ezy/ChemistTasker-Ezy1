@@ -451,6 +451,77 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         worker_view = InvoiceDetailView.as_view()(worker_request, pk=record.pk)
         self.assertEqual(worker_view.status_code, 200)
 
+    @patch("worker_finance.documents.render_document_pdf", return_value=b"%PDF-issued-v1")
+    def test_legacy_delivery_progress_preserves_issued_history_without_publishing_new_draft(self, render_pdf):
+        record = self._generate()
+        original_payload = deepcopy(record.payload)
+        original_calculation = deepcopy(record.calculation)
+        issued = Delivery.objects.create(
+            invoice=record, version=1, recipient=self.owner.email, status="legacy_queued",
+        )
+        record.status = "sent"
+        record.save(update_fields=["status"])
+        private_note = "Private correction awaiting publication"
+        saved = client_for(self.worker).patch(
+            f"/api/v1/finance/invoices/{record.pk}/",
+            {**deepcopy(record.payload), "version": 1, "notes": private_note},
+            format="json",
+        )
+        self.assertEqual(saved.status_code, 200, saved.data)
+        record.refresh_from_db()
+        self.assertEqual((record.version, record.status), (2, "draft"))
+        pending = Delivery.objects.create(
+            invoice=record, version=2, recipient=self.owner.email, status="preparing",
+        )
+        owner = client_for(self.owner)
+        collection = "/api/v1/finance/received-invoices/"
+        detail_url = f"{collection}{record.pk}/"
+
+        # These are independently specified public/private workflow examples;
+        # importing the production status constant would hide a classification bug.
+        for published_state in ("legacy_queued", "legacy_sending", "legacy_uncertain", "legacy_failed"):
+            Delivery.objects.filter(pk=issued.pk).update(status=published_state)
+            for private_state in ("preparing", "sending", "uncertain", "queue_uncertain"):
+                with self.subTest(published=published_state, private=private_state):
+                    Delivery.objects.filter(pk=pending.pk).update(status=private_state)
+                    listed = owner.get(collection)
+                    self.assertEqual(listed.status_code, 200, listed.data)
+                    self.assertEqual(listed.data["count"], 1)
+                    self.assertEqual(listed.data["results"][0]["version"], 1)
+
+                    for path in (detail_url, detail_url + "revisions/1/"):
+                        visible = owner.get(path)
+                        self.assertEqual(visible.status_code, 200, visible.data)
+                        self.assertEqual((visible.data["version"], visible.data["current_version"]), (1, 2))
+                        self.assertFalse(visible.data["is_current"])
+                        self.assertTrue(visible.data["has_unsent_revision"])
+                        self.assertEqual([row["version"] for row in visible.data["revisions"]], [1])
+                        self.assertEqual(visible.data["payload"], original_payload)
+                        self.assertEqual(visible.data["calculation"], original_calculation)
+
+                    render_pdf.reset_mock()
+                    for path in (detail_url + "pdf/", detail_url + "revisions/1/pdf/"):
+                        pdf = owner.get(path)
+                        self.assertEqual(pdf.status_code, 200, pdf.content[:100])
+                        self.assertEqual(pdf.content, b"%PDF-issued-v1")
+                        rendered = render_pdf.call_args.args[0]
+                        self.assertEqual(rendered["version"], 1)
+                        self.assertEqual(rendered["payload"], original_payload)
+                        self.assertEqual(rendered["calculation"], original_calculation)
+                    self.assertEqual(render_pdf.call_count, 2)
+
+                    self.assertEqual(owner.get(detail_url + "revisions/2/").status_code, 404)
+                    self.assertEqual(owner.get(detail_url + "revisions/2/pdf/").status_code, 404)
+                    self.assertEqual(render_pdf.call_count, 2)
+                    denied = owner.post(detail_url + "approve-payment/", {"version": 2}, format="json")
+                    self.assertEqual(denied.status_code, 400, denied.data)
+                    self.assertIn("version", denied.data)
+                    self.assertFalse(Invoice.objects.filter(manager_visible_state(), pk=record.pk).exists())
+                    record.refresh_from_db()
+                    self.assertEqual((record.version, record.status, record.review_status), (2, "draft", "NONE"))
+                    self.assertEqual(record.payload["notes"], private_note)
+                    self.assertEqual(record.revisions.get(version=1).payload, original_payload)
+
     def test_owner_can_request_revision_and_worker_save_resolves_request(self):
         draft = internal_invoice_prefill(self.worker, [self.assignment.id])
         record = save_draft(self.worker, draft)
@@ -877,8 +948,8 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
             return req
 
         with patch("invoicing.views.render_invoice_to_pdf", return_value=b"%PDF-test"), patch(
-            "invoicing.views.async_task"
-        ) as enqueue:
+            "invoicing.tasks.async_task"
+        ) as enqueue, self.captureOnCommitCallbacks(execute=True):
             first = send_invoice_email(request(), invoice.id)
             second = send_invoice_email(request(), invoice.id)
 

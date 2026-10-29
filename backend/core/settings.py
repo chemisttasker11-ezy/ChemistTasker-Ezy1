@@ -245,6 +245,7 @@ ETHICAL_ESCALATION_ENABLED = env.bool("ETHICAL_ESCALATION_ENABLED", default=Fals
 ETHICAL_S8_ENABLED = env.bool("ETHICAL_S8_ENABLED", default=False)
 CELERY_TASK_ROUTES = {
     "users.tasks.send_email_task": {"queue": "email"},
+    "invoicing.tasks.deliver_invoice_email": {"queue": "email"},
     "client_profile.tasks.run_all_verifications": {"queue": "default"},
     "client_profile.tasks.final_evaluation": {"queue": "default"},
     "client_profile.tasks.send_shift_reminders": {"queue": "notifications"},

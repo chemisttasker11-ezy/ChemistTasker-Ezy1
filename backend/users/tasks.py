@@ -101,7 +101,7 @@ def _dispatch_notification_before_queue(kwargs):
         transaction.on_commit(lambda: _dispatch_notification(notification, recipients, subject))
 
 
-def send_email_now(
+def prepare_email_message(
     subject,
     recipient_list,
     template_name,
@@ -110,8 +110,8 @@ def send_email_now(
     text_template=None,
     cc=None,
     attachments=None,
-    notification=None,
 ):
+    """Build the established template, inline logo and attachments without SMTP."""
     from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
 
@@ -126,44 +126,47 @@ def send_email_now(
     safe_recipient_list = [e.strip().replace("\u200f", "").replace("\u200e", "") for e in recipient_list]
     logger.info("Safe Recipient List: %s", safe_recipient_list)
 
-    try:
-        html_content = render_to_string(template_name, context)
-        text_content = render_to_string(text_template, context) if text_template else html_content
-
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=text_content,
-            from_email=from_email,
-            to=safe_recipient_list,
-            cc=[e.strip() for e in (cc or []) if e and e.strip()],
-        )
-        msg.mixed_subtype = "related"
-
-        logo_filename = "clipsnap-edit-6-1-2026.png"
+    html_content = render_to_string(template_name, context)
+    text_content = render_to_string(text_template, context) if text_template else html_content
+    msg = EmailMultiAlternatives(
+        subject=subject, body=text_content, from_email=from_email,
+        to=safe_recipient_list,
+        cc=[e.strip() for e in (cc or []) if e and e.strip()],
+    )
+    msg.mixed_subtype = "related"
+    logo_filename = "clipsnap-edit-6-1-2026.png"
+    logo_path = settings.BASE_DIR / "templates" / "emails" / logo_filename
+    if not logo_path.exists():
+        logo_filename = "logo.png"
         logo_path = settings.BASE_DIR / "templates" / "emails" / logo_filename
-        if not logo_path.exists():
-            logo_filename = "logo.png"
-            logo_path = settings.BASE_DIR / "templates" / "emails" / logo_filename
-        if logo_path.exists():
-            with logo_path.open("rb") as logo_file:
-                logo = MIMEImage(logo_file.read())
-            logo.add_header("Content-ID", "<chemisttasker-logo-banner>")
-            logo.add_header("Content-Disposition", "inline", filename=logo_filename)
-            msg.attach(logo)
-        else:
-            logger.warning("Email logo file not found: %s", logo_path)
+    if logo_path.exists():
+        with logo_path.open("rb") as logo_file:
+            logo = MIMEImage(logo_file.read())
+        logo.add_header("Content-ID", "<chemisttasker-logo-banner>")
+        logo.add_header("Content-Disposition", "inline", filename=logo_filename)
+        msg.attach(logo)
+    else:
+        logger.warning("Email logo file not found: %s", logo_path)
+    if attachments:
+        for fname, content, mimetype in attachments:
+            if content:
+                msg.attach(fname, content, mimetype)
+    msg.attach_alternative(html_content, "text/html")
+    return msg
 
-        if attachments:
-            for fname, content, mimetype in attachments:
-                if content:
-                    msg.attach(fname, content, mimetype)
 
-        msg.attach_alternative(html_content, "text/html")
+def send_email_now(
+    subject, recipient_list, template_name, context, from_email=None,
+    text_template=None, cc=None, attachments=None, notification=None,
+):
+    try:
+        msg = prepare_email_message(
+            subject, recipient_list, template_name, context, from_email,
+            text_template, cc, attachments,
+        )
         msg.send(fail_silently=False)
-
         if notification:
-            _dispatch_notification(notification, safe_recipient_list, subject)
-
+            _dispatch_notification(notification, msg.to, subject)
         logger.info("Email sent successfully.")
     except Exception:
         logger.exception("Failed to send email.")

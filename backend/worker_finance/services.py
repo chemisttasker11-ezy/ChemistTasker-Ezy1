@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from .assignment_terms import InvalidAssignmentTerms, resolve_invoice_assignment_facts
+from .delivery_states import PUBLISHED_DELIVERY_STATUSES, public_delivery_status
 
 from .calculations import calculate_invoice, CalculationError, allocate_payment, ZERO
 from .models import (
@@ -716,7 +717,7 @@ def serialize_revision(record, revision):
         "editable": False,
         "status": "void" if record.voided_at else revision.invoice_status,
         "review_status": revision.review_status,
-        "delivery_status": delivery.status if delivery else None,
+        "delivery_status": public_delivery_status(delivery.status) if delivery else None,
         "balance": str(payable - paid),
     })
     return document
@@ -732,7 +733,7 @@ def serialize_owner_revision(record, revision):
     document = serialize_revision(record, revision)
     visible_versions = set(
         record.deliveries
-        .filter(status__in=["sent", "legacy_queued"])
+        .filter(status__in=PUBLISHED_DELIVERY_STATUSES)
         .values_list("version", flat=True)
     )
     if (
@@ -758,7 +759,7 @@ def owner_visible_document(record):
     """
     current_delivery = record.deliveries.filter(
         version=record.version,
-        status__in=["sent", "legacy_queued"],
+        status__in=PUBLISHED_DELIVERY_STATUSES,
     ).first()
     # A worker's paid attestation does not deliver their current draft to the pharmacy.
     current_is_visible = (
@@ -769,7 +770,7 @@ def owner_visible_document(record):
     )
     visible_versions = set(
         record.deliveries
-        .filter(status__in=["sent", "legacy_queued"])
+        .filter(status__in=PUBLISHED_DELIVERY_STATUSES)
         .values_list("version", flat=True)
     )
     if current_is_visible:
@@ -778,7 +779,7 @@ def owner_visible_document(record):
     else:
         delivered = (
             record.deliveries
-            .filter(status__in=["sent", "legacy_queued"])
+            .filter(status__in=PUBLISHED_DELIVERY_STATUSES)
             .order_by("-version")
             .first()
         )
@@ -825,7 +826,7 @@ def serialize_record(record):
         "review_status": record.review_status,
         "last_review_note": record.last_review_note,
         "last_reviewed_at": record.last_reviewed_at.isoformat() if record.last_reviewed_at else None,
-        "delivery_status": delivery.status if delivery else None,
+        "delivery_status": public_delivery_status(delivery.status) if delivery else None,
         "paid": str(paid),
         "balance": str(Decimal(record.calculation["payable"]) - paid),
         "super_document_id": companion.pk if companion else None,

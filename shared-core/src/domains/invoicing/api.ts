@@ -35,7 +35,11 @@ export function getInvoicePdfUrl(id: number | string) {
     return `${baseURL}/invoices/${id}/pdf/`;
 }
 export function sendInvoiceEmail(id: number | string) {
-    return fetchApi(`/invoices/${id}/send/`, { method: 'POST' });
+    return fetchApi<{
+        status: 'draft' | 'sent' | 'paid';
+        detail?: string;
+        delivery_status?: string | null;
+    }>(`/invoices/${id}/send/`, { method: 'POST' });
 }
 export function reportInvoiceIssue(id: number | string, data: unknown = {}) {
     return fetchApi(`/invoices/${id}/report-issue/`, { method: 'POST', body: JSON.stringify(data) });
