@@ -1,17 +1,18 @@
 diff --git a/node_modules/deepmerge/index.js b/node_modules/deepmerge/index.js
+index 77968ae..1197319 100644
 --- a/node_modules/deepmerge/index.js
 +++ b/node_modules/deepmerge/index.js
-@@ -44,6 +44,10 @@ function propertyIsOnObject(object, property) {
- 	}
+@@ -45,6 +45,10 @@ function propertyIsOnObject(object, property) {
  }
  
+ // Protects from prototype poisoning and unexpected merging up the prototype chain.
 +function propertyIsForbidden(key) {
 +	return key === '__proto__'
 +}
 +
- // Protects from prototype poisoning and unexpected merging up the prototype chain.
  function propertyIsUnsafe(target, key) {
  	return propertyIsOnObject(target, key) // Properties are safe to merge if they don't exist in the target yet,
+ 		&& !(Object.hasOwnProperty.call(target, key) // unsafe if they exist up the prototype chain,
 @@ -55,11 +59,14 @@ function mergeObject(target, source, options) {
  	var destination = {}
  	if (options.isMergeableObject(target)) {
