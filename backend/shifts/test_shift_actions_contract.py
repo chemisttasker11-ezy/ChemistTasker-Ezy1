@@ -1190,7 +1190,7 @@ class BookingSafetyTests(ShiftActionFixture):
 @skipUnless(connection.vendor == 'postgresql', 'Requires PostgreSQL row locks')
 class OfferConfirmationRaceTests(TransactionTestCase):
     def test_finalize_and_manual_assignment_serialize_on_the_same_occurrence(self):
-        from billing.utils import BILLING_STATE_FREE
+        from billing.utils import BILLING_STATE_FREE_TRIAL
         from shifts.assignment import roster_direct_staff as real_roster_direct_staff
         from shifts.offers import ShiftOfferViewSet
 
@@ -1271,7 +1271,7 @@ class OfferConfirmationRaceTests(TransactionTestCase):
         with mock.patch.object(ShiftOfferViewSet, 'get_object', read_offer_together), \
                 mock.patch('shifts.base.roster_direct_staff', side_effect=roster_together), \
                 mock.patch('shifts.engagement.build_shift_engagement_terms', return_value={}), \
-                mock.patch('billing.utils.get_billing_state_for_pharmacy', return_value=BILLING_STATE_FREE), \
+                mock.patch('billing.utils.get_billing_state_for_pharmacy', return_value=BILLING_STATE_FREE_TRIAL), \
                 mock.patch('shifts.offers.notify_shift_users'), mock.patch('shifts.offers.async_task'), \
                 mock.patch('shifts.offers.send_shift_payment_finalized_notifications'), \
                 ThreadPoolExecutor(max_workers=2) as pool:
