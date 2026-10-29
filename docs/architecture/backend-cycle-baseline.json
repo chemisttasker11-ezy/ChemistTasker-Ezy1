@@ -1,8 +1,8 @@
 {
   "schema": "chemisttasker-backend-cycle-baseline-v1",
-  "recorded_sha": "86979ca5dc4ec91dfd153c0f689a507eb3282948",
-  "source": "Behaviour-preserving core/users task boundary extraction; see docs/architecture/DEPENDENCY_CYCLE_REMOVAL_PLAN_20261029.md",
-  "notes": "Actual cyclic edges shrink from 42 to 41: users-to-core is removed. The existing core-to-users composition edge is reclassified from the retired mutual-pair exemption into the longer-cycle ledger; no new underlying cyclic edge is accepted.",
+  "recorded_sha": "230ccff2d798d0672bea46d356616b758ea1148f",
+  "source": "Behaviour-preserving core/shifts boundary continuation; see DEPENDENCY_CYCLE_REMOVAL_PLAN_20261029.md",
+  "notes": "Removed shifts-to-core. Retained core-to-shifts composition is reclassified in the longer-cycle ledger; no new actual cyclic edge accepted.",
   "strongly_connected_components": [
     [
       "chat",
@@ -70,6 +70,10 @@
     [
       "core",
       "public_hub"
+    ],
+    [
+      "core",
+      "shifts"
     ],
     [
       "core",

@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from memberships.models import Membership
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Chain

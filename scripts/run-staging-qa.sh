@@ -83,6 +83,7 @@ backend_run() {
 backend_run python manage.py check --settings=core.contract_test_settings
 backend_run python manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
 backend_run python manage.py test users.tests users.test_task_dispatch_boundary billing.tests --settings=core.contract_test_settings
+backend_run python manage.py test shifts.test_dependency_boundary core.test_task_dispatch_registration core.test_task_contracts --settings=core.contract_test_settings
 backend_run python manage.py test chat.test_api.ChatAttachmentTests --settings=core.contract_test_settings
 # Explicitly execute the follow-up contract modules; users.tests alone does not
 # discover users/test_current_user_newcomer_contract.py or shifts listing contracts.

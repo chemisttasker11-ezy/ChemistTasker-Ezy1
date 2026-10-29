@@ -177,11 +177,9 @@ LEGACY_CELERY_TASKS = {
     "workforce.tasks.rebuild_timesheet_task",
 }
 
-# Pairs of apps that already import each other at module level: mostly `users` (identity models plus the account API,
-# which reads organisations, memberships and shifts) and `core` (settings, URLs, shared utilities). New pairs fail.
+# Remaining reviewed pairs include identity/account projections and the migration-bound field facade.
+# Resolved core/users and core/shifts exemptions are retired. New pairs fail.
 ALLOWED_MUTUAL_APP_PAIRS = {
-    # core is the composition root (URLconfs, ASGI, WebSocket routing, sitemap) and the shared utility package
-    ("core", "shifts"),
     # the kernel facade re-exports onboarding; onboarding.models uses the migration-bound client_profile.fields
     ("client_profile", "onboarding"),
     # memberships link users to pharmacies and organisations; the organisation, account and session APIs read them

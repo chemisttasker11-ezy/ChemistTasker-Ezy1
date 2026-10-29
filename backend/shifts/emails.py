@@ -10,7 +10,7 @@ from shifts.travel import (
 )
 from memberships.models import Membership
 from shifts.models import ShiftCounterOffer, ShiftInterest, ShiftOffer
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from datetime import date, datetime, time
 from decimal import Decimal
 from django.conf import settings

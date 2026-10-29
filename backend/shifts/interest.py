@@ -10,7 +10,7 @@ from rest_framework import status
 
 from memberships.models import FAVORITE_STAFF_EMPLOYMENT_TYPES, Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from shifts.access import ShiftActionRefused, _user_can_perform_shift_role
 from shifts.emails import build_offer_shift_details, build_shift_email_context, build_shift_interest_context
 from shifts.escalation import PUBLIC_LEVEL

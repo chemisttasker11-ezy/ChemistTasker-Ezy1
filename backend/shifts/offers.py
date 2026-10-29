@@ -27,7 +27,7 @@ from shifts.emails import (
 )
 from users.role_labels import user_work_role_label
 from shifts.notifications import notify_shift_users
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from shifts.access import Http400
 from django.db import transaction
 from decimal import Decimal

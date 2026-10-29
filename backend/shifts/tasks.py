@@ -10,7 +10,7 @@ from celery import shared_task
 from django.db.models import Q
 from django.utils import timezone
 
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from organizations.timezone import get_pharmacy_timezone
 from shifts.emails import build_shift_email_context
 from shifts.models import ShiftSlotAssignment
