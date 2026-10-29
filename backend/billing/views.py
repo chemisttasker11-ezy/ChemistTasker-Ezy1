@@ -3,7 +3,6 @@ import logging
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta, timezone as dt_timezone
 from hashlib import sha256
-from urllib.parse import urlencode
 import stripe
 from django.conf import settings
 from django.shortcuts import get_object_or_404
@@ -40,52 +39,12 @@ BASE_SUB_PRICE = 'price_1T52ikBQXaySV5ukpVrv7EcZ' # $30 AUD
 EXTRA_SEAT_PRICE = 'price_1T52ilBQXaySV5uk2fmUWXlw' # $5 AUD
 
 
-def _frontend_base_url():
-    return getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173').rstrip('/')
-
-
-def _mobile_base_url():
-    scheme = getattr(settings, 'MOBILE_APP_SCHEME', 'frontendmobile')
-    return f'{scheme}://'
-
-
-def _mobile_bridge_url(path, **params):
-    base = _frontend_base_url()
-    query = urlencode({
-        'path': path,
-        **{key: value for key, value in params.items() if value is not None},
-    })
-    return f"{base}/mobile-checkout-return?{query}"
-
-
-def _subscription_return_urls(account, platform='web'):
-    if platform == 'mobile':
-        if account['scope'] == 'organization':
-            return _mobile_bridge_url('organization/profile', checkout='success', billing='1'), _mobile_bridge_url('organization/profile', checkout='cancel', billing='1')
-        return _mobile_bridge_url('owner/subscription-seats', checkout='success'), _mobile_bridge_url('owner/subscription-seats', checkout='cancel')
-    base = _frontend_base_url()
-    if account['scope'] == 'organization':
-        success = f"{base}/dashboard/organization/overview?checkout=success&billing=1"
-        cancel = f"{base}/dashboard/organization/overview?checkout=cancel&billing=1"
-    else:
-        success = f"{base}/dashboard/owner/overview?view=billing&checkout=success"
-        cancel = f"{base}/dashboard/owner/overview?view=billing&checkout=cancel"
-    return success, cancel
-
-
-def _extra_seat_return_urls(account, platform='web'):
-    if platform == 'mobile':
-        if account['scope'] == 'organization':
-            return _mobile_bridge_url('organization/profile', checkout='seat_success', billing='1'), _mobile_bridge_url('organization/profile', checkout='seat_cancel', billing='1')
-        return _mobile_bridge_url('owner/subscription-seats', checkout='seat_success'), _mobile_bridge_url('owner/subscription-seats', checkout='seat_cancel')
-    base = _frontend_base_url()
-    if account['scope'] == 'organization':
-        success = f"{base}/dashboard/organization/overview?checkout=seat_success&billing=1"
-        cancel = f"{base}/dashboard/organization/overview?checkout=seat_cancel&billing=1"
-    else:
-        success = f"{base}/dashboard/owner/overview?view=billing&checkout=seat_success&mode=seats"
-        cancel = f"{base}/dashboard/owner/overview?view=billing&checkout=seat_cancel&mode=seats"
-    return success, cancel
+from .checkout_urls import (
+    frontend_base_url as _frontend_base_url,
+    mobile_bridge_url as _mobile_bridge_url,
+    subscription_return_urls as _subscription_return_urls,
+    extra_seat_return_urls as _extra_seat_return_urls,
+)
 
 
 def _shift_dashboard_context(user, pharmacy):
