@@ -169,7 +169,7 @@ class SubscriptionAccountEndpointContracts(TestCase):
         OrganizationMembership.objects.create(
             user=self.chief, organization=self.organization, role="CHIEF_ADMIN",
         )
-        provider = patch("billing.views.stripe")
+        provider = patch("billing.subscription_operations.stripe")
         self.provider = provider.start()
         self.addCleanup(provider.stop)
         self.provider.Customer.create.return_value = SimpleNamespace(id="cus_new")

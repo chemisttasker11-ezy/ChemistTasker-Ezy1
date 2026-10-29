@@ -110,7 +110,7 @@ class CancellationWageContracts(ShiftActionFixture):
                 slot.start_time, slot.end_time = start, end
                 slot.save(update_fields=["start_time", "end_time"])
                 now = timezone.make_aware(datetime.combine(slot.date, start)) - timedelta(hours=6)
-                with mock.patch("django.utils.timezone.now", return_value=now), mock.patch("billing.views.stripe.checkout.Session.create") as checkout:
+                with mock.patch("django.utils.timezone.now", return_value=now), mock.patch("billing.stripe_support.stripe.checkout.Session.create") as checkout:
                     checkout.return_value.url = "https://checkout.example.test/cancellation"
                     response = self.owner_client.post(f"{API}billing/charge-penalty/{shift.pk}/", {}, format="json")
                 self.assertEqual(response.status_code, 200, response.data)

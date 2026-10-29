@@ -27,7 +27,7 @@ class Claim2DeletedShiftWebhook(_ShiftMixin, TransactionTestCase):
             mode="payment", payment_status="paid", amount_total=1500, payment_intent="pi_204",
             metadata={"shift_id": str(shift_id), "type": "fulfillment", "offer_ids": str(self.o.pk),
                       "owner_user_id": str(self.owner.pk), "actor_user_id": str(self.owner.pk)})))
-        with (patch("billing.views.stripe.Webhook.construct_event", return_value=event),
+        with (patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=event),
               patch("shifts.emails.send_shift_payment_finalized_notifications"),
               patch("shifts.notifications.notify_shift_managers") as notify):
             r = client_for().post(reverse("api_v1:billing:stripe_webhook"), data=b"{}",

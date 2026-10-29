@@ -2,6 +2,10 @@
 
 Date: 29 October 2026 (Australia/Brisbane). Continuation baseline: `0bc2da97c8d31c511bd0f7ccece60a7d9f834e91` on `fix/surgical-backend-consistency-20261029`, targeting completed E17 on `fix/pr211-followups`.
 
+## Later authorized decomposition
+
+The user subsequently authorized completing billing responsibility separation. [SURGICAL_BILLING_RESPONSIBILITIES_20261029.md](SURGICAL_BILLING_RESPONSIBILITIES_20261029.md) supersedes this checkpoint's decision to stop at account helpers. This file remains the historical evidence for the earlier bounded extraction.
+
 ## Outcome and scope
 
 The earlier checkout-return URL extraction remains in `billing/checkout_urls.py`. The final bounded continuation extracts four local subscription-account helpers into `billing/subscriptions.py`: account lookup, current subscription selection, get-or-create/contact refresh, and response serialization. HTTP authorization, metadata construction, provider identity resolution and provider lifecycle ownership stay in `billing/views.py`.

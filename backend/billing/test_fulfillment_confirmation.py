@@ -52,7 +52,7 @@ class PaidOfferReconciliationTests(_ShiftBase):
             mode="payment", payment_status="paid", amount_total=1500, payment_intent=intent,
             metadata={"shift_id": str(self.shift.pk), "type": "fulfillment", "offer_ids": str(offer.pk),
                       "owner_user_id": str(self.owner.pk), "actor_user_id": str(self.owner.pk)})))
-        with (patch("billing.views.stripe.Webhook.construct_event", return_value=event),
+        with (patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=event),
               patch("shifts.emails.send_shift_payment_finalized_notifications"),
               patch("shifts.notifications.notify_shift_managers") as notify,
               self.captureOnCommitCallbacks(execute=True)):
@@ -65,7 +65,7 @@ class PaidOfferReconciliationTests(_ShiftBase):
         o = self.offer(ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, self.day)
         url = reverse("api_v1:billing:charge_fulfillment", args=[self.shift.pk])
         with patch("billing.views.get_billing_state_for_account", return_value="PAYMENT_REQUIRED"), \
-                patch("billing.views.stripe.checkout.Session.create",
+                patch("billing.stripe_support.stripe.checkout.Session.create",
                       return_value=_S(id="cs", url="https://x.test/cs")) as create:
             for platform in ("web", "mobile"):
                 self.assertEqual(client_for(self.owner).post(url, {"offer_ids": [o.pk], "platform": platform},
@@ -107,7 +107,7 @@ class _ChargeBase(_ShiftBase):
     def charge(self, offer_ids, state):
         url = reverse("api_v1:billing:charge_fulfillment", args=[self.shift.pk])
         with patch("billing.views.get_billing_state_for_account", return_value=state), \
-                patch("billing.views.stripe.checkout.Session.create",
+                patch("billing.stripe_support.stripe.checkout.Session.create",
                       return_value=_S(id="cs", url="https://x.test/cs")) as create, \
                 patch("shifts.emails.send_shift_payment_finalized_notifications") as notif, \
                 self.captureOnCommitCallbacks(execute=True):

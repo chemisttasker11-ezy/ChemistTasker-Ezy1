@@ -39,8 +39,8 @@ class RefundLedgerContracts(TestCase):
             )),
         )
         with (
-            patch("billing.views.stripe.Webhook.construct_event", return_value=event),
-            patch("billing.views.stripe.checkout.Session.list", return_value=Object(data=list(sessions))),
+            patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=event),
+            patch("billing.stripe_support.stripe.checkout.Session.list", return_value=Object(data=list(sessions))),
         ):
             return APIClient().post(
                 reverse("api_v1:billing:stripe_webhook"), b"{}",
@@ -93,7 +93,7 @@ class RefundLedgerContracts(TestCase):
                 metadata={"shift_id": str(shift_id), "owner_user_id": str(owner_id), "type": "cancellation"},
             )),
         )
-        with patch("billing.views.stripe.Webhook.construct_event", return_value=checkout):
+        with patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=checkout):
             response = APIClient().post(
                 reverse("api_v1:billing:stripe_webhook"), b"{}", content_type="application/json",
             )

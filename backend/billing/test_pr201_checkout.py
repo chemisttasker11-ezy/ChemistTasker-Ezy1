@@ -15,7 +15,7 @@ class FulfillmentSelectionTests(TestCase):
     def checkout(self, payload):
         with (
             patch("billing.views.get_billing_state_for_account", return_value="PAYMENT_REQUIRED"),
-            patch("billing.views.stripe.checkout.Session.create", return_value=SimpleNamespace(url="https://checkout.example.test")) as create,
+            patch("billing.stripe_support.stripe.checkout.Session.create", return_value=SimpleNamespace(url="https://checkout.example.test")) as create,
         ):
             response = client_for(self.owner).post(f"/api/v1/billing/charge-fulfillment/{self.shift.pk}/", payload, format="json")
         return response, create
@@ -44,9 +44,9 @@ class FulfillmentSelectionTests(TestCase):
         from unittest.mock import patch
         with (
             patch("billing.views.get_billing_state_for_account", return_value="PRE_LIVE"),
-            patch("billing.views._finalize_pending_offers_for_shift", return_value=(2, self.offers)) as finalize,
+            patch("billing.shift_payments._finalize_pending_offers_for_shift", return_value=(2, self.offers)) as finalize,
             patch("shifts.emails.send_shift_payment_finalized_notifications") as notify,
-            patch("billing.views.stripe.checkout.Session.create") as create,
+            patch("billing.stripe_support.stripe.checkout.Session.create") as create,
             self.captureOnCommitCallbacks(execute=True),
         ):
             response = client_for(self.owner).post(

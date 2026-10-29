@@ -86,7 +86,7 @@ class PaymentNotificationIsolationTests(TestCase):
         ), mock.patch("notifications.services._broadcast", side_effect=RuntimeError("socket offline")), mock.patch(
             "notifications.services._send_expo_push",
         ), mock.patch("shifts.emails.async_task", side_effect=enqueue) as email, mock.patch(
-            "billing.views.stripe.checkout.Session.create",
+            "billing.stripe_support.stripe.checkout.Session.create",
         ) as stripe, self.captureOnCommitCallbacks(execute=True):
             response = client_for(self.owner).post(
                 f"/api/v1/billing/charge-fulfillment/{self.shift.pk}/",
