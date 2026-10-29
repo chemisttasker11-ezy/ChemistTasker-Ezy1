@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import date, time, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -168,6 +169,16 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
             external=False,
             billing_data=self._billing_data(),
         )
+
+    def _generate_via_api(self, **overrides):
+        data = {
+            **self._billing_data(),
+            "pharmacy": self.pharmacy.pk,
+            "issuer_abn": "51824753556",
+            "bill_to_email": self.owner.email,
+            **overrides,
+        }
+        return client_for(self.worker).post("/api/v1/invoices/generate/", data, format="json")
 
     def test_internal_invoice_snapshots_accepted_assignment_and_does_not_assume_super(self):
         invoice = self._generate()
@@ -600,6 +611,155 @@ class AcceptedShiftInvoiceIntegrityTests(TestCase):
         revised.refresh_from_db()
         self.assertEqual(revised.review_status, "NONE")
         self.assertEqual(revised.status, "draft")
+
+    def test_generated_half_cent_total_agrees_across_api_revision_and_pdfs(self):
+        import fitz
+        from invoicing.services import render_invoice_to_pdf
+        from worker_finance.documents import render_pdf
+
+        self.slot.end_time = time(16, 30)
+        self.slot.save(update_fields=["end_time"])
+        self.assignment.unit_rate = Decimal("70.03")
+        self.assignment.engagement_terms_snapshot = {
+            **self.assignment.engagement_terms_snapshot,
+            "gst_registered": False,
+            "occurrences": [{
+                "slot_id": self.slot.pk,
+                "date": str(self.slot.date),
+                "start_time": "09:00:00",
+                "end_time": "16:30:00",
+                "agreed_rate": "70.03",
+            }],
+        }
+        self.assignment.save(update_fields=["unit_rate", "engagement_terms_snapshot"])
+        original_terms = deepcopy(self.assignment.engagement_terms_snapshot)
+        original_acceptance = self.assignment.engagement_terms_accepted_at
+
+        preview = client_for(self.worker).get(f"/api/v1/invoices/preview/{self.shift.pk}/")
+        self.assertEqual(preview.status_code, 200, preview.data)
+        [preview_line] = preview.data
+        self.assertEqual(Decimal(str(preview_line["total"])), Decimal("525.23"))
+
+        data = {
+            "gst_registered": False,
+            "super_rate_snapshot": "0.00",
+            # Internal professional lines must still come from the accepted assignment.
+            "line_items": [{
+                "category_code": "ProfessionalServices",
+                "assignmentId": self.assignment.pk,
+                "quantity": "99.00",
+                "unit_price": "999.00",
+                "total": "0.01",
+            }],
+        }
+        response = self._generate_via_api(**data)
+        self.assertEqual(response.status_code, 201, response.data)
+        invoice = Invoice.objects.get(pk=response.data["id"])
+        line = invoice.line_items.get(category_code="ProfessionalServices")
+        self.assertEqual(invoice.line_items.count(), 1)
+        self.assertEqual(line.source_assignment_id, self.assignment.pk)
+        self.assertEqual(line.quantity, Decimal("7.50"))
+        self.assertEqual(line.unit_price, Decimal("70.03"))
+        self.assertEqual(invoice.gst_amount, Decimal("0.00"))
+        self.assertEqual(invoice.super_amount, Decimal("0.00"))
+        self.assertEqual((invoice.version, invoice.status), (1, "draft"))
+        self.assertEqual(invoice.revisions.count(), 1)
+        revision = invoice.revisions.get(version=1)
+        self.assertEqual(revision.invoice_status, "draft")
+        self.assertEqual(revision.calculation, invoice.calculation)
+        self.assertEqual(revision.payload, invoice.payload)
+        self.assertEqual(revision.source_snapshot, invoice.source_snapshot)
+        self.assertEqual(invoice.source_snapshot["accepted_terms"][0]["terms"], original_terms)
+
+        amounts = {
+            "response line": response.data["line_items"][0]["total"],
+            "response payable": response.data["total"],
+            "persisted line": line.total,
+            "canonical subtotal": invoice.subtotal,
+            "canonical payable": invoice.total,
+            "finance line": invoice.calculation["lines"][0]["net"],
+            "finance subtotal": invoice.calculation["subtotal"],
+            "finance payable": invoice.calculation["payable"],
+            "initial revision line": revision.calculation["lines"][0]["net"],
+            "initial revision payable": revision.calculation["payable"],
+        }
+        for representation, amount in amounts.items():
+            with self.subTest(representation=representation):
+                self.assertEqual(Decimal(str(amount)), Decimal("525.23"))
+
+        for representation, render in (("legacy", render_invoice_to_pdf), ("finance", render_pdf)):
+            with self.subTest(pdf=representation):
+                pdf = render(invoice)
+                self.assertTrue(pdf.startswith(b"%PDF-"))
+                with fitz.open(stream=pdf, filetype="pdf") as document:
+                    self.assertGreaterEqual(document.page_count, 1)
+                    text = "\n".join(page.get_text() for page in document)
+                self.assertIn("525.23", text)
+                self.assertNotIn("525.22", text)
+
+        duplicate = self._generate_via_api(**data)
+        self.assertEqual(duplicate.status_code, 400, duplicate.data)
+        self.assertIn("shift_ids", duplicate.data)
+        self.assertEqual(Invoice.objects.count(), 1)
+        self.assertEqual(InvoiceRevision.objects.count(), 1)
+        self.assertEqual(InvoiceLineItem.objects.filter(source_assignment=self.assignment).count(), 1)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.engagement_terms_snapshot, original_terms)
+        self.assertEqual(self.assignment.engagement_terms_accepted_at, original_acceptance)
+        self.assertEqual(self.assignment.unit_rate, Decimal("70.03"))
+
+    def test_generated_rounding_change_preserves_manual_and_external_line_calculation(self):
+        # Those input paths retain their existing rounding and never trust a supplied total.
+        for external, category, payable in (
+            (False, "Transportation", "564.54"),
+            (True, "ProfessionalServices", "4.54"),
+        ):
+            with self.subTest(external=external):
+                response = self._generate_via_api(
+                    external=external,
+                    shift_ids=[] if external else [self.shift.pk],
+                    gst_registered=False,
+                    super_rate_snapshot="0.00",
+                    custom_bill_to_name="External test customer" if external else "",
+                    line_items=[{
+                        "description": "Manual half-cent control",
+                        "category_code": category,
+                        "quantity": "1.50",
+                        "unit_price": "3.03",
+                        "discount": "0.00",
+                        "total": "999.00",
+                        "gst_applicable": False,
+                        "super_applicable": False,
+                    }],
+                )
+                self.assertEqual(response.status_code, 201, response.data)
+                invoice = Invoice.objects.get(pk=response.data["id"])
+                line = invoice.line_items.get(description="Manual half-cent control")
+                self.assertEqual(line.total, Decimal("4.54"))
+                self.assertEqual(invoice.total, Decimal(payable))
+                self.assertIsNone(line.source_assignment_id)
+                self.assertTrue(line.is_manual)
+                self.assertTrue(line.was_modified)
+
+    def test_generated_invoice_rolls_back_if_finance_adoption_fails_then_can_retry(self):
+        from rest_framework.exceptions import ValidationError as FinanceValidationError
+
+        with patch(
+            "worker_finance.invoice_bridge.adopt_generated_internal_invoice",
+            side_effect=FinanceValidationError("Adoption rejected for this regression."),
+        ):
+            response = self._generate_via_api()
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("finance_workspace", response.data)
+        self.assertEqual(Invoice.objects.count(), 0)
+        self.assertEqual(InvoiceLineItem.objects.count(), 0)
+        self.assertEqual(InvoiceRevision.objects.count(), 0)
+
+        retry = self._generate_via_api()
+        self.assertEqual(retry.status_code, 201, retry.data)
+        self.assertEqual(Invoice.objects.count(), 1)
+        self.assertEqual(InvoiceRevision.objects.count(), 1)
+        self.assertEqual(InvoiceLineItem.objects.filter(source_assignment=self.assignment).count(), 1)
 
     def test_partial_hour_invoice_uses_same_precision_for_quantity_and_total(self):
         self.slot.end_time = time(16, 37)

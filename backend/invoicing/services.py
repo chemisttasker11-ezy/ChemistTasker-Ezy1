@@ -400,7 +400,12 @@ def generate_invoice_from_shifts(
                 qty = Decimal(str(line.get("quantity", 0)))
                 rate = Decimal(str(line.get("unit_price", 0)))
                 discount = Decimal(str(line.get("discount", 0))) / Decimal("100")
-                total = (qty * rate * (1 - discount)).quantize(Decimal("0.01"))
+                if not external and category_code == "ProfessionalServices":
+                    # These lines were rebuilt above from locked accepted assignments.
+                    # Persist the server-rounded preview amount without rounding it again.
+                    total = Decimal(str(line["total"]))
+                else:
+                    total = (qty * rate * (1 - discount)).quantize(Decimal("0.01"))
                 shift_id = line.get("shiftId") or line.get("shift_id")
                 assignment_id = line.get("assignmentId") or line.get("assignment_id")
                 source_assignment = assignment_by_id.get(int(assignment_id)) if assignment_id else None
