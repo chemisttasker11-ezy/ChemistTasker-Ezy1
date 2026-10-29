@@ -633,6 +633,7 @@ def bas_worksheet(request):
         raise ValidationError('Choose cash/accrual and a period of at most 366 days.')
     records = Invoice.objects.filter(
         user=request.user,
+        request_key__isnull=False,
         kind='invoice',
         voided_at__isnull=True,
     )
