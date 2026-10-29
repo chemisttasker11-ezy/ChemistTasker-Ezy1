@@ -31,4 +31,6 @@ worker = create_user("worker", "PHARMACIST")
 PharmacistOnboarding.objects.create(user=worker, verified=True, gov_id_verified=True, ahpra_verified=True, suburb="Bendigo", state="VIC", postcode="3550")
 membership = Membership.objects.create(user=worker, pharmacy=p1, role="PHARMACIST", status="ACCEPTED")
 PharmacyAdmin.objects.create(user=worker, pharmacy=p1, membership=membership, admin_level="MANAGER", staff_role="PHARMACIST", created_by=owner)
-print("Seeded disposable owner, two pharmacies, and a delegated pharmacist.")
+from testing.invoice_acceptance_fixture import seed_invoice_work
+seed_invoice_work(worker, p1)
+print("Seeded disposable owner, two pharmacies, delegated pharmacist and accepted invoice work.")
