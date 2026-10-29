@@ -56,13 +56,14 @@ An old callback cannot publish a newer edited draft. Deletion is refused with HT
 
 The queued PDF bytes and financial/recipient context remain frozen even when the live legacy invoice changes. **Unmanaged invoices do not gain finance revision archives or automatic finance adoption**: no Customer/request key is created, and their editable current invoice is not represented as a new archived finance payload.
 
-The three active legacy clients now consume the typed canonical response instead of setting `sent` after every successful HTTP response:
+The two active mobile legacy handlers now consume the typed canonical response instead of setting `sent` after every successful HTTP response:
 
-- Web `LegacyInvoiceManagePage.tsx` applies `result.status` and displays `result.detail`.
-- Mobile `InvoiceList.tsx` does the same for its row and message.
+- Mobile `InvoiceList.tsx`, mounted under Existing tools, applies `result.status` and displays `result.detail`.
 - Mobile `InvoiceDetail.tsx` does the same and disables its send button while a request is in progress.
 
 `shared-core/src/domains/invoicing/api.ts` types the response as the existing draft/sent/paid status with optional explanatory detail. These changes preserve pending-commit truthfulness without introducing a new user-visible invoice status or changing the normal acknowledged legacy publication workflow.
+
+Final route verification confirmed that the current web invoice routes render `FinanceWorkspace`; the retained `LegacyInvoiceManagePage.tsx` is not imported by those routes. Its initially proposed companion edit was removed, so the web legacy source is unchanged by this batch. No separate Next invoice copy or active Next legacy-send path was found.
 
 ## Executed targeted evidence
 
