@@ -174,11 +174,31 @@ test('failed logout does not announce success and can be retried',async()=>{
  const originalFetch=globalThis.fetch,originalWindow=globalThis.window,originalStorage=globalThis.localStorage;
  globalThis.window=new EventTarget();globalThis.localStorage=undefined;let announcements=0;window.addEventListener('ct:session-changed',()=>announcements++);
  globalThis.fetch=async url=>String(url).endsWith('/csrf/')?Response.json({csrfToken:'csrf'}):Response.json({detail:'Try again'},{status:503});
- try{await assert.rejects(logoutSession(),/Try again/);assert.equal(announcements,0);globalThis.localStorage={setItem(){}};globalThis.fetch=async url=>String(url).endsWith('/csrf/')?Response.json({csrfToken:'csrf'}):new Response(null,{status:204});
+ try{const leaving=logoutSession();const concurrent=assert.rejects(refreshBrowserSession(),error=>error.status===503);await assert.rejects(leaving,/Try again/);await concurrent;assert.equal(announcements,0);globalThis.localStorage={setItem(){}};globalThis.fetch=async url=>String(url).endsWith('/csrf/')?Response.json({csrfToken:'csrf'}):new Response(null,{status:204});
  // Web Locks is absent in Node; provide the minimal lease storage used by this browser fallback.
  const store=new Map();globalThis.localStorage={getItem:key=>store.get(key)??null,setItem:(key,value)=>store.set(key,value),removeItem:key=>store.delete(key)};
  await logoutSession();assert.equal(announcements,1);}
  finally{globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.localStorage=originalStorage;}
+});
+
+test('refresh cannot signal signed-out state before the pending logout response is consumed',async()=>{
+ const originalFetch=globalThis.fetch,originalWindow=globalThis.window,originalStorage=globalThis.localStorage;
+ const store=new Map();globalThis.localStorage={getItem:key=>store.get(key)??null,setItem:(key,value)=>store.set(key,value),removeItem:key=>store.delete(key)};
+ globalThis.window=new EventTarget();let announcements=0;window.addEventListener('ct:session-changed',()=>announcements++);
+ let release,started;const response=new Promise(resolve=>{release=resolve;});const requested=new Promise(resolve=>{started=resolve;});
+ let refreshRequests=0;
+ globalThis.fetch=async url=>{if(String(url).endsWith('/csrf/'))return Response.json({csrfToken:'csrf'});if(String(url).includes('/token/refresh/'))refreshRequests++;started();return response;};
+ const leaving=logoutSession();
+ try{
+  await requested;
+  let settled=false;const blocked=refreshBrowserSession().catch(error=>{settled=true;return error;});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(settled,false,'401 handlers must not redirect while logout is still pending');
+  assert.equal(announcements,0);
+  release(new Response(null,{status:204}));await leaving;
+  assert.equal((await blocked).status,401);
+  assert.equal(announcements,1);assert.equal(refreshRequests,0);
+ }finally{release(new Response(null,{status:204}));await leaving.catch(()=>{});globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.localStorage=originalStorage;}
 });
 
 test('pharmacy admins inherit the owner-side workspace while capabilities remain separately enforceable',()=>{

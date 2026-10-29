@@ -54,7 +54,10 @@ let signingOut:Promise<void>|undefined;
 type BrowserRefresh={access:string;refresh?:string};
 let pending:Promise<BrowserRefresh>|undefined;
 export function refreshBrowserSession(root='/api/v1') {
- if(signingOut)return Promise.reject(Object.assign(new Error('You have signed out.'),{status:401}));
+ // A synthetic 401 would let background callers redirect and abort the logout
+ // response before the browser applies its cookie deletions. Failed logout
+ // retains its real error so callers can keep the current session and retry.
+ if(signingOut)return signingOut.then<BrowserRefresh>(()=>{throw Object.assign(new Error('You have signed out.'),{status:401});});
  if(pending)return pending;
  const renew=async()=>decode<BrowserRefresh>(await fetch(`${root}/users/token/refresh/`,{method:'POST',credentials:'include',cache:'no-store',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json','X-CSRFToken':await csrfToken(root),'X-Client-Platform':'web'},body:'{}'}));
  // Read cookies only once the lock is acquired, so rotation in another tab is visible.
