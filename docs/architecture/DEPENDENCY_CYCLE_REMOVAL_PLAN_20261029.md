@@ -148,3 +148,16 @@ Next bounded work: worker-safe organisation scope/navigation ownership. Preserve
 query ordering and selection semantics, including the distinction between navigation and
 action-specific authorization; use the startup composition owner rather than HTTP-only binding.
 Financial, settlement and notification workflow decisions remain deferred as previously recorded.
+
+## Worker-side organisation ownership continuation
+
+Fixed parent: #223 at `4cba71348a912e599b8b2d2a84260677d2bb946b`. Organisation scope and manager
+dashboard queries now belong to organisation selectors, reached through the existing immutable
+identity port. The explicit application startup hook binds that port for workers, commands and HTTP.
+The scope body and navigation queryset preserve the parent's AST; navigation does not gain the
+stricter actor filtering of action authorization. No workflow or permission change.
+
+Direct runtime cycles remain zero; combined cyclic edges fall **114 → 113**, removing only
+users → organizations with no additions or component expansion. Seven baseline database controls
+passed before movement; worker-before-HTTP and no-startup-I/O controls cover the new binding.
+See `docs/qa/WORKER_ORGANIZATION_BOUNDARY_20261029.md` for verification and retained programme debt.

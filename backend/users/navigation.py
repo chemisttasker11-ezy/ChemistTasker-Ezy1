@@ -1,5 +1,6 @@
 """Frontend navigation helpers derived from user identity and role."""
 from django.conf import settings
+from users.organization_port import organization_reads
 
 
 def get_frontend_dashboard_url(user):
@@ -27,14 +28,7 @@ def get_frontend_dashboard_url(user):
 
 def _pharmacy_manager_dashboard_url(user):
     """A PHARMACY_MANAGER has no dashboard of its own: it lands on the admin dashboard of the pharmacy it manages."""
-    from organizations.models import PharmacyAdmin
-
-    pharmacy_id = (
-        PharmacyAdmin.objects.filter(user=user, is_active=True)
-        .order_by("id")
-        .values_list("pharmacy_id", flat=True)
-        .first()
-    )
+    pharmacy_id = organization_reads().manager_dashboard_pharmacy_id(user)
     if pharmacy_id is None:
         return f"{settings.FRONTEND_BASE_URL}/dashboard/admin-invitations"
     return f"{settings.FRONTEND_BASE_URL}/dashboard/admin/{pharmacy_id}"

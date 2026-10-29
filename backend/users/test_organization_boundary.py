@@ -127,7 +127,10 @@ import django
 django.setup()
 assert 'composition.urls' not in sys.modules
 from users.organization_port import _reads
-assert _reads is None
+assert _reads is not None
+from users.organization_port import organization_reads
+from organizations import identity_reads
+assert organization_reads().visible_pharmacies_for_membership is identity_reads.visible_pharmacies_for_membership
 from users.org_roles import membership_visible_pharmacies
 from users.navigation import get_frontend_dashboard_url
 from organizations.models import Pharmacy, PharmacyAdmin

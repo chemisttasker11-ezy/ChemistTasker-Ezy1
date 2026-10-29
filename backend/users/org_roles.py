@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Iterable, Mapping, MutableMapping, Sequence
 
 from access_control.pharmacy_roles import PharmacyAdminPolicy
+from users.organization_port import organization_reads
 
 
 class OrgCapability:
@@ -254,18 +255,7 @@ def membership_has_org_wide_scope(membership) -> bool:
 
 
 def membership_visible_pharmacies(membership):
-    from organizations.models import Pharmacy  # Local import to avoid circular loading
-
-    if not membership:
-        return Pharmacy.objects.none()
-
-    if membership_has_org_wide_scope(membership):
-        return Pharmacy.objects.filter(organization=membership.organization)
-
-    if membership.role == 'REGION_ADMIN':
-        return membership.pharmacies.filter(organization_id=membership.organization_id)
-
-    return Pharmacy.objects.none()
+    return organization_reads().visible_pharmacies_for_membership(membership)
 
 
 def membership_visible_pharmacy_ids(membership) -> list[int]:

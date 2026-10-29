@@ -13,6 +13,8 @@ class OrganizationReads:
     pharmacies_in_organization: Callable
     owned_pharmacies: Callable
     admin_assignments_for: Callable
+    visible_pharmacies_for_membership: Callable
+    manager_dashboard_pharmacy_id: Callable
 
 
 _reads: OrganizationReads | None = None
@@ -25,5 +27,5 @@ def configure_organization_reads(reads: OrganizationReads) -> None:
 
 def organization_reads() -> OrganizationReads:
     if _reads is None:
-        raise ImproperlyConfigured('Application URL composition must configure identity organization reads.')
+        raise ImproperlyConfigured('Application startup must configure identity organization reads.')
     return _reads

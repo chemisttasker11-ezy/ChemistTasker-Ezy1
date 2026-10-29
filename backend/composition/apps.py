@@ -8,3 +8,5 @@ class CompositionConfig(AppConfig):
     def ready(self):
         from .file_references import configure_file_cleanup
         configure_file_cleanup()
+        from .identity_organizations import configure_identity_organization_reads
+        configure_identity_organization_reads()

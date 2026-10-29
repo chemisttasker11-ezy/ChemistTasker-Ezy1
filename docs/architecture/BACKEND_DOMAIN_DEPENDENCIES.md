@@ -172,7 +172,8 @@ The historical table and cycle descriptions above describe earlier source, not c
 The exact current inventory is `RUNTIME_CYCLE_LEDGER_20261029.json`; regenerate/check it with
 `python scripts/runtime_cycle_ledger.py [--check]`. A no-growth baseline is not zero-cycle acceptance.
 The serializer-runtime continuation removes every direct module cycle: 15 cyclic edges to zero,
-no direct SCCs or mutual pairs. The combined module/function-local graph still has 114 cyclic edges
-in the retained twenty-app component, down from 120, with no added cyclic edge. CI now rejects
-all direct cycles and separately rejects additions to combined cycle debt. Worker-side organisation
-scope/navigation remains the next bounded ownership assessment. No whole-runtime acyclicity is claimed.
+no direct SCCs or mutual pairs. Worker-side organisation scope/navigation now reaches organisation
+selectors through the identity port, configured at application startup without HTTP URL loading.
+The combined module/function-local graph retains 113 cyclic edges in the twenty-app component,
+down from 120 through the two continuations, with no added cyclic edge. CI rejects all direct cycles
+and separately rejects additions to combined cycle debt. No whole-runtime acyclicity is claimed.

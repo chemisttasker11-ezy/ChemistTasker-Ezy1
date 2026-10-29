@@ -3,7 +3,7 @@
 RECORDED pins every model-signal receiver the project connects (sender -> receiver). A receiver that appears twice,
 from a compatibility path or from a new module shows up here for review instead of silently changing what a save
 does. Domain ready() hooks only import their own signals. The composition hook has one exact,
-configuration-only registry binding, checked in a cold process: no queries, HTTP or task dispatch.
+configuration-only binding sequence, checked in a cold process: no queries, HTTP or task dispatch.
 Third-party receivers (axes) and Django's post_migrate handlers are not pinned.
 """
 import ast
@@ -170,7 +170,7 @@ class SignalRegistryContractTests(SimpleTestCase):
             if app == "composition":
                 self.assertEqual(
                     ast.dump(ast.Module(body=node.body, type_ignores=[])),
-                    ast.dump(ast.parse("from .file_references import configure_file_cleanup\nconfigure_file_cleanup()")),
+                    ast.dump(ast.parse("from .file_references import configure_file_cleanup\nconfigure_file_cleanup()\nfrom .identity_organizations import configure_identity_organization_reads\nconfigure_identity_organization_reads()")),
                     "Only the explicit, no-I/O application registry binding is allowed at composition startup.",
                 )
                 continue
