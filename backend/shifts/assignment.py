@@ -285,32 +285,34 @@ def offer_dedicated_shift(shift, dedicated_user):
 
     if offers and dedicated_user.email:
         offer_for_email = offers[0]
-        def _send_offer_email():
-            ctx = build_shift_offer_context(
-                shift,
-                offer_for_email,
-                recipient=dedicated_user,
-                ignore_slot_filter=True,
-            )
-            offer_details = build_offer_shift_details(shift, offer_for_email)
-            ctx.update(offer_details)
-            notify_shift_users(
-                [dedicated_user],
-                shift=shift,
-                title="Shift offer received",
-                body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
-                kind="shift_offer_received",
-                payload={"offer_id": offer_for_email.id, **offer_details},
-            )
+        ctx = build_shift_offer_context(
+            shift,
+            offer_for_email,
+            recipient=dedicated_user,
+            ignore_slot_filter=True,
+        )
+        offer_details = build_offer_shift_details(shift, offer_for_email)
+        ctx.update(offer_details)
+        notify_shift_users(
+            [dedicated_user],
+            shift=shift,
+            title="Shift offer received",
+            body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
+            kind="shift_offer_received",
+            payload={"offer_id": offer_for_email.id, **offer_details},
+            deliver_on_commit=True,
+        )
+
+        def enqueue_offer_email(recipient_email=dedicated_user.email, context=ctx):
             async_task(
                 'users.tasks.send_async_email',
                 subject="You have a new shift offer",
-                recipient_list=[dedicated_user.email],
+                recipient_list=[recipient_email],
                 template_name="emails/shift_offer.html",
-                context=ctx,
+                context=context,
                 text_template="emails/shift_offer.txt",
                 suppress_auto_notification=True,
             )
 
-        transaction.on_commit(_send_offer_email)
+        transaction.on_commit(enqueue_offer_email, robust=True)
 
