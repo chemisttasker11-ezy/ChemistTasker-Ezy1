@@ -15,7 +15,7 @@ from core.task_queue import async_task
 from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from shifts.access import ShiftActionRefused, _user_can_perform_shift_role, staff_membership_can_claim_role
 from shifts.emails import build_offer_shift_details, build_shift_offer_context
-from shifts.engagement import staff_assignment_defaults
+from shifts.engagement import keep_accepted_terms, staff_assignment_defaults
 from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from shifts.notifications import notify_shift_users
 
@@ -186,14 +186,14 @@ def roster_direct_staff(*, shift, candidate, assignments):
                 assn, _ = ShiftSlotAssignment.objects.update_or_create(
                     slot=slot,
                     slot_date=slot_date,
-                    defaults={
+                    defaults=keep_accepted_terms({
                         "shift": shift,
                         "user": candidate,
                         "unit_rate": Decimal('0.00'),
                         "rate_reason": {"source": "Rostered manual assign"},
                         "is_rostered": True,
                         **assignment_defaults,
-                    }
+                    }, slot=slot, slot_date=slot_date),
                 )
             except DjangoValidationError as exc:
                 raise ShiftActionRefused(getattr(exc, "message_dict", {"detail": exc.messages}))

@@ -87,6 +87,7 @@ async function clock({ active = true, reject = true } = {}) {
     'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => ({}) },
     '@chemisttasker/shared-core': { attendance }, '@/context/WorkspaceContext': {}, '@/context/AuthContext': {},
     './ParityUI': { ...Object.fromEntries(['ActionButtons', 'DataRow', 'EmptyState', 'Field', 'InfoNote', 'MetricGrid', 'ParityPage', 'PharmacyRequired', 'ScreenLink', 'Section'].map((name) => [name, name])), palette: {} },
+    '../../roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog': { __esModule: true, default: 'ShiftEngagementTermsDialog' },
     './utils': utils,
   }, { Date: ControlledDate, crypto: { randomUUID }, console }, '\nexports.__ClockScreen = ClockScreen;');
   // Expose the private screen only in the transpiled test module; app code is untouched.

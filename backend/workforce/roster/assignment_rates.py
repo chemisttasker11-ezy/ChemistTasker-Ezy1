@@ -1,5 +1,7 @@
 """Roster assignment pricing: refreshing an assignment's locked rate and validating and pricing a period's slots."""
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from shifts.models import ShiftSlotAssignment
 from workforce.roster.periods import get_roster_period_assignments, validate_roster_period
 from django.contrib.auth import get_user_model
 
@@ -7,6 +9,13 @@ User = get_user_model()
 
 
 def refresh_assignment_rate(assignment):
+    with transaction.atomic():
+        # Reprice the locked current row: a stale copy must not reprice terms the worker accepted meanwhile.
+        assignment.refresh_from_db(from_queryset=ShiftSlotAssignment.objects.select_for_update(of=("self",)))
+        _refresh_locked_rate(assignment)
+
+
+def _refresh_locked_rate(assignment):
     from shifts.pricing import get_locked_rate_for_slot
     terms = assignment.engagement_terms_snapshot or {}
     staff_terms = None
@@ -15,7 +24,7 @@ def refresh_assignment_rate(assignment):
         if not terms.get('rates') and terms.get('settlement_channel') != 'TIMESHEET_ONLY':
             return
         staff_terms = terms
-    elif assignment.source_offer_id:
+    elif assignment.source_offer_id or (assignment.engagement_kind == 'INDEPENDENT_CONTRACTOR' and assignment.engagement_terms_accepted_at):
         # An accepted worker offer remains authoritative when roster dates are edited.
         return
     assignment.unit_rate, assignment.rate_reason = get_locked_rate_for_slot(

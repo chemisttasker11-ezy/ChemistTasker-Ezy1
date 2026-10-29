@@ -1,5 +1,6 @@
 """URL ownership for the attendance domain under the canonical API-v1 composition."""
 from django.urls import path
+from attendance.cover_terms import WorkerAcceptCoverTermsView, WorkerCoverTermsView
 from attendance.kiosk_review import ManagerPendingKioskReviewView, ManagerDecideKioskReviewView
 from attendance.views import (
     KioskActivateView,
@@ -49,6 +50,8 @@ urlpatterns = [
     path('attendance/worker/break-start/', WorkerBreakStartView.as_view(), name='attendance-worker-break-start'),
     path('attendance/worker/break-end/', WorkerBreakEndView.as_view(), name='attendance-worker-break-end'),
     path('attendance/worker/clock-out/', WorkerClockOutView.as_view(), name='attendance-worker-clock-out'),
+    path('attendance/worker/cover-terms/', WorkerCoverTermsView.as_view(), name='attendance-worker-cover-terms'),
+    path('attendance/worker/cover-terms/<int:assignment_id>/accept/', WorkerAcceptCoverTermsView.as_view(), name='attendance-worker-cover-terms-accept'),
     path('attendance/worker/pin/update/', WorkerUpdatePinView.as_view(), name='attendance-worker-pin-update'),
     path('attendance/manager/pending/', ManagerPendingAttendancesView.as_view(), name='attendance-manager-pending'),
     path('attendance/manager/approve/', ManagerApproveAttendanceView.as_view(), name='attendance-manager-approve'),

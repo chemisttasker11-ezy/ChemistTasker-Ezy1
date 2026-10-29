@@ -1,0 +1,51 @@
+{
+  "assignment_id": 39,
+  "cover_type": "UNBOOKED_LOCUM_COVER",
+  "engagement_terms_accepted_at": "2026-10-29T00:00:00Z",
+  "engagement_terms_preview": {
+    "acceptance_required": true,
+    "accepted_at": "2026-10-29T00:00:00+00:00",
+    "accepted_by_user_id": 105,
+    "blocked": false,
+    "cover_type": "UNBOOKED_LOCUM_COVER",
+    "engagement_kind": "INDEPENDENT_CONTRACTOR",
+    "facilitator_notice": "ChemistTasker provides the technology that facilitates the connection and records the agreed shift terms. The services engagement is between the pharmacy/principal and the assignee/provider; ChemistTasker is not the employer or engaging principal for the shift.",
+    "gst_registered": true,
+    "invoice_notice": "The worked shift remains visible in roster and timesheet records, but settlement is routed to the existing ChemistTasker invoicing system rather than payroll.",
+    "legal_review_notice": "This electronic terms record captures the agreed shift details and routing; it is not a substitute for legal advice about employee/contractor classification.",
+    "occurrences": [
+      {
+        "agreed_rate": "73.50",
+        "date": "2026-10-29",
+        "end_time": "09:00:00",
+        "slot_id": 38,
+        "start_time": "08:00:00"
+      }
+    ],
+    "payment_preference": "ABN",
+    "payment_profile_incomplete": false,
+    "pharmacy_abn": "51 824 753 556",
+    "pharmacy_id": 34,
+    "pharmacy_name": "Evidence Review Pharmacy",
+    "provider_abn": "51 824 753 556",
+    "provider_entity_name": "Cover Provider",
+    "provisional_id": 37,
+    "relationship_notice": "The parties confirm they intend an independent services engagement. An ABN or invoice does not by itself determine legal contractor status, and these terms do not waive workplace rights that apply by law.",
+    "role": "PHARMACIST",
+    "settlement_channel": "INVOICE",
+    "shift_id": 38,
+    "source": "COVER_TERMS_ACCEPTANCE",
+    "source_visibility": "PLATFORM",
+    "super_notice": "Invoice settlement does not by itself remove superannuation obligations. The pharmacy/principal must review whether super is payable for a labour-only contractor.",
+    "super_payable_confirmed": false,
+    "super_review_required": true,
+    "version": 1,
+    "worker_id": 105,
+    "worker_name": "First105 Last105"
+  },
+  "pharmacy_id": 34,
+  "pharmacy_name": "Evidence Review Pharmacy",
+  "provisional_id": 37,
+  "session_id": 37,
+  "status": "APPROVED"
+}

@@ -20,7 +20,7 @@ from django.db.models import Count, Q
 from shifts.pricing import get_locked_rate_for_slot
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_users
-from shifts.engagement import staff_assignment_defaults
+from shifts.engagement import keep_accepted_terms, staff_assignment_defaults
 from shifts.assignment import guard_roster_assignment
 from datetime import date, datetime
 from django.db import transaction
@@ -127,6 +127,9 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
             target = serializer.validated_data.get(field)
             if target is not None and target.pk != getattr(instance, f'{field}_id'):
                 raise DRFValidationError({field: 'Cannot reassign a roster assignment to another shift or slot.'})
+        target_user = serializer.validated_data.get('user')
+        if instance.engagement_terms_accepted_at and target_user is not None and target_user.pk != instance.user_id:
+            raise DRFValidationError({'user': 'Terms accepted by this worker cannot be transferred to another worker.'})
         shift, slot = instance.shift, instance.slot
         slot_date = serializer.validated_data.get("slot_date", instance.slot_date)
         if not can_manage_roster_pharmacy(self.request.user, shift.pharmacy):
@@ -139,6 +142,19 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
             and slot_date.weekday() in slot.recurring_days
         ):
             raise DRFValidationError({"slot_date": "Date is not a valid slot occurrence."})
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        with transaction.atomic():
+            # Validate and save the locked current row (slot -> assignment, as roster writers lock): a full save
+            # of a stale copy would erase terms the worker accepted meanwhile.
+            ShiftSlot.objects.select_for_update().get(pk=instance.slot_id)
+            instance = ShiftSlotAssignment.objects.select_for_update(of=("self",)).get(pk=instance.pk)
+            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+        return Response(serializer.data)
 
     def perform_update(self, serializer):
         self._validate_assignment_scope(serializer)
@@ -210,6 +226,8 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                     or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()):
                 return Response({'detail': 'This shift has a booked or payment-pending worker and cannot be deleted.'},
                                 status=status.HTTP_409_CONFLICT)
+            # Worked, accepted or invoiced cover must not cascade away with the shift.
+            _protect_removed_assignments(shift.slot_assignments.all())
             self.perform_destroy(shift)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -294,14 +312,14 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                 ShiftSlotAssignment.objects.update_or_create(
                     slot=slot,
                     slot_date=slot_date,
-                    defaults={
+                    defaults=keep_accepted_terms({
                         'shift': shift_instance,
                         'user': newly_assigned_user,
                         'unit_rate': rate,
                         'rate_reason': rate_reason,
                         'is_rostered': True,
                         **assignment_defaults,
-                    }
+                    }, slot=slot, slot_date=slot_date),
                 )
 
             obsolete = [assignment for key, assignment in existing_assignments.items() if key not in desired_keys]

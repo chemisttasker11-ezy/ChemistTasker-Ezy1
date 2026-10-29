@@ -9,6 +9,8 @@ import type {
     PendingKioskReview,
     DecideKioskReviewPayload,
     KioskReviewDecisionResponse,
+    WorkerCoverTerms,
+    AcceptWorkerCoverTermsPayload,
 } from '../../contracts/attendanceRoster';
 /** Domain-owned operations extracted from the established shared API. */
 import { API_ENDPOINTS } from '../../constants/endpoints';
@@ -22,6 +24,15 @@ export const attendance = {
         if (opts.request_id !== undefined) body.request_id = opts.request_id;
         return operationalRequest<AttendanceClockResult>(API_ENDPOINTS.attendance.workerClockIn, { method: 'POST', body });
     },
+    getWorkerCoverTerms: () => operationalRequest<WorkerCoverTerms[]>(API_ENDPOINTS.attendance.workerCoverTerms),
+    acceptWorkerCoverTerms: (assignmentId: number | string, payload: AcceptWorkerCoverTermsPayload) =>
+        operationalRequest<WorkerCoverTerms>(API_ENDPOINTS.attendance.workerCoverTermsAccept(assignmentId), {
+            method: 'POST',
+            body: {
+                engagement_terms_accepted: payload.engagementTermsAccepted,
+                independent_contractor_status_confirmed: payload.independentContractorStatusConfirmed,
+            },
+        }),
     breakStart: () => operationalRequest<AttendanceBreakResult>(API_ENDPOINTS.attendance.workerBreakStart, { method: 'POST', body: {} }),
     breakEnd: () => operationalRequest<AttendanceBreakResult>(API_ENDPOINTS.attendance.workerBreakEnd, { method: 'POST', body: {} }),
     clockOut: (qrToken: string, options?: boolean | AttendanceClockOptions) => {

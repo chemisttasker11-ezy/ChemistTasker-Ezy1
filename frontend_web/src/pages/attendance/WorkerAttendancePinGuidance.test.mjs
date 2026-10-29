@@ -50,6 +50,7 @@ async function worker({ active = false, saveError = null, status = {} } = {}) {
         if (!Object.is(next, state[index])) { state[index] = next; dirty = true; }
       }];
     },
+    useMemo(fn) { return fn(); },
     useEffect(fn, next) {
       const index = cursor++;
       if (!deps[index] || next.some((value, i) => !Object.is(value, deps[index][i]))) {
@@ -63,9 +64,10 @@ async function worker({ active = false, saveError = null, status = {} } = {}) {
   const exports = load('./WorkerAttendancePage.tsx', {
     react: hooks, 'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
     '@mui/material': names, 'lucide-react': names, moment: () => ({ format: () => '' }),
-    'react-router-dom': { Link: 'Link', NavLink: 'NavLink' },
+    'react-router-dom': { Link: 'Link', NavLink: 'NavLink', useNavigate: () => () => {} },
     '@chemisttasker/shared-core': {
       attendance: {
+        async getWorkerCoverTerms() { return []; },
         getWorkerStatus: async () => ({ has_active_session: active, pharmacy_name: 'Guidance Pharmacy', started_at: '2026-10-29T00:00:00Z', ...status }),
         getPinPharmacies() { pinLoads++; return pinResponse; },
         async updatePin(pharmacyId, pin) {
@@ -79,6 +81,8 @@ async function worker({ active = false, saveError = null, status = {} } = {}) {
     '../../components/ui/PageHeader': 'PageHeader', '../../components/ui/IconTile': 'IconTile',
     '../../components/dashboard/DashboardContentState': 'DashboardContentState',
     '../../components/ui/Hint': { Hint: 'Hint' }, '../../components/ui/Pill': { Pill: 'Pill' },
+    '../dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog': { __esModule: true, default: 'ShiftEngagementTermsDialog' },
+    '../../contexts/AuthContext': { useAuth: () => ({ user: { role: 'PHARMACIST' } }) },
     '../../utils/labels': { humanizeEnum: value => value },
   }, { Date: ControlledDate, setInterval(fn) { timer = fn; return 1; }, clearInterval() {} });
   function render() {

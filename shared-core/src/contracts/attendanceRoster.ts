@@ -209,6 +209,48 @@ export interface DecideKioskReviewPayload {
   corrected_timestamp?: string;
 }
 
+export interface WorkerCoverTermsOccurrence {
+  slot_id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+  agreed_rate?: string | null;
+}
+
+export interface WorkerCoverTermsPreview {
+  version: number;
+  acceptance_required: boolean;
+  settlement_channel: string;
+  engagement_kind: string;
+  payment_preference: string;
+  worker_id?: number;
+  provider_abn?: string | null;
+  provider_entity_name?: string | null;
+  relationship_notice?: string | null;
+  accepted_at: string | null;
+  blocked?: boolean;
+  payment_profile_incomplete?: boolean;
+  notice?: string | null;
+  occurrences: WorkerCoverTermsOccurrence[];
+}
+
+export interface WorkerCoverTerms {
+  assignment_id: number;
+  provisional_id: number;
+  session_id: number;
+  pharmacy_id: number;
+  pharmacy_name: string;
+  cover_type: string;
+  status: string;
+  engagement_terms_accepted_at: string | null;
+  engagement_terms_preview: WorkerCoverTermsPreview;
+}
+
+export interface AcceptWorkerCoverTermsPayload {
+  engagementTermsAccepted?: boolean;
+  independentContractorStatusConfirmed?: boolean;
+}
+
 export interface KioskReviewDecisionResponse {
   decision: string;
   review_id: number;
