@@ -8,7 +8,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.exceptions import ValidationError as FinanceValidationError
 
 from attendance.models import ProvisionalAttendance
@@ -421,6 +421,7 @@ class CoverTermsExistingControls(CoverTermsFixture, TestCase):
         self.assertNotEqual(assignment.settlement_channel, "INVOICE")
         self.assert_unaccepted(assignment)
 
+    @override_settings(AHPRA_ENFORCEMENT_ENABLED=True)
     def test_booked_abn_offer_acceptance_still_records_consent_and_invoice_sources(self):
         shift, slot, assignment = make_assignment(self.pharmacy, self.owner, self.worker, self.now.date() + timedelta(days=2))
         assignment.delete()
@@ -428,6 +429,21 @@ class CoverTermsExistingControls(CoverTermsFixture, TestCase):
         shift.fixed_rate = Decimal("73.50")
         shift.save(update_fields=["role_needed", "fixed_rate"])
         offer = ShiftOffer.objects.create(shift=shift, slot=slot, user=self.worker, offered_rate=Decimal("73.50"))
+        # Attendance evaluates live evidence; posted shifts also require the persisted public-profile decision.
+        self.profile.refresh_from_db()
+        self.assertFalse(self.profile.verified)
+        response = client_for(self.worker).post(f"/api/v1/shift-offers/{offer.pk}/accept/", CONSENT, format="json")
+        self.assertEqual(response.status_code, 403, response.content[:300])
+        self.assertIn("Verify your profile", str(response.data))
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+        self.assertIsNone(offer.engagement_terms_accepted_at)
+        self.assertFalse(ShiftSlotAssignment.objects.filter(source_offer=offer).exists())
+
+        from onboarding.verification.policy import refresh_verified
+        self.assertTrue(refresh_verified(self.profile))
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.verified)
         with self.captureOnCommitCallbacks(execute=True):
             response = client_for(self.worker).post(f"/api/v1/shift-offers/{offer.pk}/accept/", CONSENT, format="json")
         self.assertEqual(response.status_code, 200, response.content[:300])

@@ -26,8 +26,10 @@ def ensure_period_timesheets(period):
 def _locked_timesheet_and_period_for_build(timesheet_id):
     """Lock the period before the timesheet so builds share transition/lock order."""
     period_id = Timesheet.objects.values_list("period_id", flat=True).get(pk=timesheet_id)
+    # Source invalidation holds the timesheet until its period FK check commits.
+    # Keep period writers serialized while allowing that check's KEY SHARE lock.
     period = (
-        TimesheetPeriod.objects.select_for_update(of=("self",))
+        TimesheetPeriod.objects.select_for_update(of=("self",), no_key=True)
         .select_related("pharmacy")
         .get(pk=period_id)
     )

@@ -30,6 +30,29 @@ function verifyInstalled() {
   assert.equal(mobileRequire('fast-uri/package.json').version, '3.1.9');
   assert.equal(lock.packages['node_modules/undici'].version, '6.29.1');
   assert.equal(mobileRequire('undici/package.json').version, '6.29.1');
+  assert.equal(lock.packages['node_modules/qs'].version, '6.16.1');
+  assert.equal(mobileRequire('qs/package.json').version, '6.16.1');
+  const placesRequire = createRequire(mobileRequire.resolve('react-native-google-places-autocomplete/package.json'));
+  assert.equal(placesRequire.resolve('qs'), mobileRequire.resolve('qs'));
+  assert.equal(lock.packages['node_modules/deepmerge'].version, '4.3.1');
+  assert.equal(mobileRequire('deepmerge/package.json').version, '4.3.1');
+  const expoConfigRequire = createRequire(mobileRequire.resolve('@expo/config/package.json'));
+  assert.equal(expoConfigRequire.resolve('deepmerge'), mobileRequire.resolve('deepmerge'));
+
+  // CVE-2026-93753 has no fixed upstream deepmerge release. The local patch
+  // drops __proto__ in both mergeObject write loops, matching the upstream
+  // proposed remediation while preserving every other key's legacy behavior.
+  const deepmerge = mobileRequire('deepmerge');
+  const malicious = JSON.parse('{ "__proto__": { "isAdmin": true } }');
+  const nullTarget = Object.create(null);
+  nullTarget.debug = false;
+  const merged = deepmerge(nullTarget, malicious);
+  assert.equal(Object.getPrototypeOf(merged), Object.prototype);
+  assert.equal(merged.isAdmin, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(merged, '__proto__'), false);
+  assert.equal(merged.debug, false);
+  assert.equal({}.isAdmin, undefined);
+
   assert.equal(Object.keys(lock.packages).some(name => name.endsWith('node_modules/sprintf-js')), false);
   return lock;
 }
@@ -40,8 +63,11 @@ function verifyAudit(report) {
   const patched = {
     'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm': 'braces',
     'https://github.com/advisories/GHSA-86w9-cpqp-85rv': 'node-forge',
+    // No upstream fixed release: both shipped builds are fingerprinted above.
+    'https://github.com/advisories/GHSA-gcqx-w48m-w2h4': 'deepmerge',
   };
   const seenAdvisories = new Set();
+  const unresolved = new Set();
   function leaves(name, active = new Set()) {
     if (active.has(name)) return new Set();
     const finding = report.vulnerabilities[name];
@@ -59,12 +85,16 @@ function verifyAudit(report) {
         assert.ok(report.vulnerabilities[via], `Missing advisory dependency: ${via}`);
         continue;
       }
-      assert.equal(patched[via.url], name, `Unresolved advisory: ${via.url}`);
+      if (patched[via.url] !== name) {
+        unresolved.add(`${name}: ${via.url}`);
+        continue;
+      }
       assert.equal(finding.nodes.length, 1, `An unpatched duplicate of ${name} is installed`);
       assert.equal(finding.nodes[0], `node_modules/${name}`);
       seenAdvisories.add(via.url);
     }
   }
+  assert.equal(unresolved.size, 0, `Unresolved advisory entries:\n${[...unresolved].join('\n')}`);
   console.log(`Raw npm audit: ${report.metadata.vulnerabilities.total} reported dependency entries; ${seenAdvisories.size} advisories remain in upstream version metadata.`);
   console.log('Every remaining advisory is covered by verified installed patch fingerprints. No other advisory is accepted.');
 }

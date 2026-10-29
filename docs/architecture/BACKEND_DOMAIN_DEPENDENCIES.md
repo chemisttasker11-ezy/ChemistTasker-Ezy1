@@ -41,7 +41,7 @@ change, made only through the procedure in `BACKEND_APPS.md`, in its own change.
 | `onboarding` | `OwnerOnboarding`, `PharmacistOnboarding`, `OtherStaffOnboarding`, `ExplorerOnboarding`, `RefereeResponse`, `OnboardingNotification` (label `client_profile`); `GENDER_CHOICES` | `onboarding.models`, `onboarding.serializers`, `onboarding.emails`, `onboarding.tasks` (verification, orchestration and referee-reminder Celery tasks), `onboarding.verification.*` | `users`, `core`; kernel: `client_profile.fields` (allowed) | `client_profile.models[.onboarding]` |
 | `shifts` | `Shift`, `ShiftSlot`, `ShiftSlotAssignment`, `ShiftInterest`, `ShiftRejection`, `ShiftOffer`, `ShiftCounterOffer[Slot]`, `ShiftSaved`, `ShiftDescriptionTemplate`, `ShiftProfileAccessAudit`, `LeaveRequest`, `WorkerShiftRequest` (label `client_profile`) | `shifts.models`, `shifts.base`, `shifts.serializers`, `shifts.pricing`, `shifts.emails`, `shifts.access` (role and request helpers), `shifts.tasks` (shift reminders), … | `organizations`, `memberships`, `onboarding`, `users`, `notifications`, `talent`, `core` | `client_profile.models[.shifts]`, `client_profile.domains.common.access` (request and role helpers) |
 | `workforce` | roster, leave, timesheets, employment engagements (label `workforce`) | `workforce.roster.*`, `workforce.*_service` | `shifts`, `organizations`, `memberships`, `onboarding`, `attendance`, `talent`, `users`, `core` | — |
-| `attendance` | kiosk, sessions, events, approvals (label `attendance`) | `attendance.*` | `organizations`, `memberships`, `shifts`, `workforce` | — |
+| `attendance` | kiosk, sessions, events, approvals (label `attendance`) | `attendance.*` | `organizations`, `memberships`, `shifts`; workforce permission/model lookups are deferred until called | — |
 | `dashboards` | no models (read model) | `dashboards.views` | `shifts`, `organizations`, `memberships`, `invoicing`, `pharmacy_hub`, `users` | — |
 | `chat`, `pharmacy_hub`, `team_calendar`, `talent`, `rewards`, `ratings`, `invoicing`, `notifications` | their own models (#99 relabelled) | their modules | the owning domain apps above, never `client_profile` (except the two upload callables) | — |
 | `users`, `billing`, `worker_finance`, `marketplace`, `ethical_marketplace`, `public_hub` | unchanged | unchanged | the owning domain apps above | — |
@@ -70,9 +70,7 @@ the real owners shows what those pairs were:
 * `memberships ↔ organizations`
 * `client_profile ↔ onboarding`: the kernel facade imports its owners, and `onboarding.models` uses
   `client_profile.fields` (migration-bound).
-* `attendance ↔ workforce`: attendance approvals use the roster-management capability (one authorisation contract for
-  roster, attendance and workforce routes), and workforce timesheets read attendance sessions.
-* `core ↔ chat/memberships/organizations/shifts/users/workforce`: `core` is the composition root (URLconfs, ASGI,
+* `core ↔ chat/shifts/users`: `core` is the composition root (URLconfs, ASGI,
   WebSocket routing, sitemap) as well as the shared utility package.
 
 Resolved by importing at call time where the reverse direction was a single lookup (plan §57):
@@ -81,6 +79,16 @@ removes a load-order cycle between the two model modules), `core ↔ onboarding/
 registry in `core.serializer_lifecycle` reads the domain models when it is consulted), `client_profile ↔ core` (the
 WebSocket test helpers load the kernel factories when they build actors), `users ↔ onboarding` and `users ↔ shifts`
 (a role label and the referral-shift lookup).
+
+The former `attendance ↔ workforce` import-time pair is also resolved: attendance calls the existing workforce
+permission through a deferred bridge in `attendance.approvals` and resolves the roster model inside its eligibility
+function. Workforce still reads attendance models. This changes import timing, not roster/attendance authority.
+
+The 29 October 2026 PR #213 continuation scan records 97 module-level app edges, 72 delayed edges, seven mutual
+pairs and one existing 11-app strongly connected component. The checked baseline rejects additions; it does not
+certify an acyclic backend. Billing's local helper extraction and the shift-owned parent-deletion guard leave those
+edge sets unchanged. Further cycle removal requires a concrete ownership improvement, not moving domain behavior
+to generic utilities or replacing module imports solely to reduce the count.
 
 The model modules themselves import acyclically. These pairs are listed in `ALLOWED_MUTUAL_APP_PAIRS`. A new pair
 fails CI, and a resolved pair must be removed from the list.
@@ -131,7 +139,8 @@ All of them were reviewed:
 * Two route patterns.
 * The kernel URLconf include.
 * The `INSTALLED_APPS` entry.
-* Two pricing data files: `shifts/pricing.py` reads `client_profile/data/*.json`. Moving the files is a follow-up.
+* Pricing data is already owned by `shifts/pricing_data.py` and `shifts/data/`: the Award schedules,
+  statewide holidays and local/part-day holidays are no longer a kernel data-file dependency.
 
 ## Not in this change
 

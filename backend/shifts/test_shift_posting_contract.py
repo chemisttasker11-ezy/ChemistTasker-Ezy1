@@ -337,6 +337,41 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertEqual([e["to"] for e in sent if e["template"] == "emails/shift_offer.html"], [(worker.email,)])
         self.assertEqual(Notification.objects.filter(user=worker, title="Shift offer received").count(), 1)
 
+    def test_dedicated_offer_notification_delivery_outage_does_not_fail_post_or_email_queue(self):
+        worker = self.member("LOCUM")
+        with queued_emails() as sent, mock.patch(
+            "notifications.services._deliver_notification",
+            side_effect=RuntimeError("notification transport offline"),
+        ), self.captureOnCommitCallbacks(execute=True):
+            response = client_for(self.owner).post(
+                f"{API}shifts/",
+                self.payload(dedicated_user=worker.id),
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(
+            [item["to"] for item in sent if item["template"] == "emails/shift_offer.html"],
+            [(worker.email,)],
+        )
+        self.assertEqual(Notification.objects.filter(user=worker, title="Shift offer received").count(), 1)
+
+    def test_dedicated_offer_email_queue_outage_does_not_fail_post_or_notification(self):
+        worker = self.member("LOCUM")
+        with mock.patch(
+            "shifts.assignment.async_task",
+            side_effect=RuntimeError("email queue offline"),
+        ), self.captureOnCommitCallbacks(execute=True):
+            response = client_for(self.owner).post(
+                f"{API}shifts/",
+                self.payload(dedicated_user=worker.id),
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Notification.objects.filter(user=worker, title="Shift offer received").count(), 1)
+        self.assertTrue(ShiftOffer.objects.filter(shift_id=response.data["id"], user=worker).exists())
+
     def test_single_user_dedicated_shift_gets_one_shift_level_offer(self):
         worker = self.member("LOCUM")
         response, _ = self.post_shift(dedicated_user=worker.id, single_user_only=True, rate_type="FIXED",

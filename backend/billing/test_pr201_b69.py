@@ -30,7 +30,7 @@ class PaymentIntentDeduplicationTests(TestCase):
                 metadata={"shift_id": str(self.shift.pk), "type": "cancellation",
                     "owner_user_id": str(self.owner.pk), "actor_user_id": str(self.owner.pk)},
             )))
-        with patch("billing.views.stripe.Webhook.construct_event", return_value=event):
+        with patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=event):
             return APIClient().post(
                 reverse("api_v1:billing:stripe_webhook"), b"{}",
                 content_type="application/json", HTTP_STRIPE_SIGNATURE="synthetic")

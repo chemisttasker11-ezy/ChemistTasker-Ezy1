@@ -20,6 +20,7 @@ Provides the secure credential and physical-presence verification layer:
 from datetime import datetime, timedelta
 import base64
 import hashlib
+import logging
 import secrets
 import uuid
 from typing import Optional, Tuple
@@ -44,6 +45,7 @@ from attendance.models import KioskDevice, KioskPairingAuthorization, PharmacyQR
 QR_SALT = "chemisttasker_attendance_kiosk_qr"
 DEVICE_TOKEN_PREFIX = "ctk_kiosk_"
 security_cache = caches["security"]
+logger = logging.getLogger(__name__)
 
 
 def _count_security_attempt(key: str, *, limit: int, window: int) -> None:
@@ -978,22 +980,39 @@ def setup_worker_kiosk_pin(
         )
         transaction.on_commit(lambda: consume_worker_pin_otp(worker.id))
 
-    # Send confirmation email
-    try:
-        from users.tasks import send_async_email
-        pharmacy_name = kiosk_device.pharmacy.name
-        send_async_email(
-            subject=f"ChemistTasker - Attendance PIN Created",
-            message=(
-                f"Hello {worker.first_name or worker.username},\n\n"
-                f"Your attendance PIN has been successfully set on the counter kiosk at {pharmacy_name}.\n\n"
-                f"You can change this PIN at any time from your ChemistTasker web or mobile app dashboard.\n\n"
-                f"Thank you,\nChemistTasker Team"
-            ),
-            recipient_list=[worker.email],
-        )
-    except Exception:
-        pass
+    # Announce the saved PIN only after its enclosing transaction commits.
+    # Capture message values now rather than reading mutable model objects in the callback.
+    recipient = worker.email
+    worker_id, pharmacy_id = worker.pk, kiosk_device.pharmacy_id
+    pharmacy_name = kiosk_device.pharmacy.name
+    confirmation_message = (
+        f"Hello {worker.first_name or worker.username},\n\n"
+        f"Your attendance PIN has been successfully set on the counter kiosk at {pharmacy_name}.\n\n"
+        f"You can change this PIN at any time from your ChemistTasker web or mobile app dashboard.\n\n"
+        f"Thank you,\nChemistTasker Team"
+    )
+
+    def send_confirmation():
+        try:
+            from users.tasks import send_async_email
+
+            accepted = send_async_email(
+                subject="ChemistTasker - Attendance PIN Created",
+                message=confirmation_message,
+                recipient_list=[recipient],
+            )
+            if not accepted:
+                logger.warning(
+                    "PIN confirmation email was not accepted for worker %s at pharmacy %s.",
+                    worker_id, pharmacy_id,
+                )
+        except Exception:
+            logger.exception(
+                "Failed to send PIN confirmation email for worker %s at pharmacy %s.",
+                worker_id, pharmacy_id,
+            )
+
+    transaction.on_commit(send_confirmation, robust=True)
 
     return membership, worker_pin
 

@@ -77,13 +77,15 @@ from shifts.selectors import (  # noqa: F401  (historical import path)
     _shift_has_past_slot_exists,
 )
 from shifts.candidates import _log_shift_profile_access, member_status, reveal_candidate  # noqa: F401  (_log_shift_profile_access: historical import path)
-from shifts.interest import express_interest, is_public_shift_member_access, reject_shift, _require_public_shift_onboarding
+from shifts.interest import express_interest, is_public_shift_member_access, reject_shift
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_managers, notify_shift_users
 from shifts.engagement import staff_assignment_defaults
+from shifts.deletion import protect_shift_deletion
 from core.task_queue import async_task
 from datetime import datetime
 from shifts.access import (  # noqa: F401  (role rules re-exported at their historical path)
+    ShiftActionRefused,
     ALL_OTHER_STAFF_SHIFT_ROLES,
     NON_INTERN_OTHER_STAFF_SHIFT_ROLES,
     _get_request_ip,
@@ -117,18 +119,11 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             shift = self.get_object()
             shift = Shift.objects.select_for_update().get(pk=shift.pk)
-            if shift.slot_assignments.exists():
-                return Response(
-                    {'detail': 'This shift has assigned workers and cannot be deleted.'},
-                    status=status.HTTP_409_CONFLICT,
-                )
-            if (shift.payment_status == 'PENDING'
-                    or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()
-                    or shift.payments.filter(status='pending').exists()):
-                return Response(
-                    {'detail': 'This shift has a pending payment. Complete payment before deleting it.'},
-                    status=status.HTTP_409_CONFLICT,
-                )
+            try:
+                protect_shift_deletion(shift)
+            except ShiftActionRefused as exc:
+                # Keep the existing refusal/commit boundary for queryset lookup side effects.
+                return Response({'detail': exc.detail}, status=exc.status_code)
             self.perform_destroy(shift)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -330,8 +325,6 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             require_public_ahpra(request.user, shift)
             if not _user_can_perform_shift_role(request.user, shift.role_needed):
                 raise ValidationError('Your role does not cover this shift.')
-            if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(request.user, shift):
-                _require_public_shift_onboarding(request.user)
 
         if request.method == 'GET':
             from shifts.counter_offers import visible_counter_offers_for_shift

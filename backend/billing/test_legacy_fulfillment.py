@@ -35,7 +35,7 @@ class LegacyFulfillmentTests(_ShiftMixin, TestCase):
         metadata.update(meta)
         event = _S(id=event_id or f"evt_{uuid4().hex}", type="checkout.session.completed", data=_S(object=_S(
             mode="payment", payment_status="paid", amount_total=1500, payment_intent=pi, metadata=metadata)))
-        with (patch("billing.views.stripe.Webhook.construct_event", return_value=event),
+        with (patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=event),
               patch("shifts.emails.send_shift_payment_finalized_notifications")):
             return client_for().post(reverse("api_v1:billing:stripe_webhook"), data=b"{}",
                                      content_type="application/json")

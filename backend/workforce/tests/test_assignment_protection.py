@@ -149,6 +149,39 @@ class RosterAssignmentProtectionTests(TestCase):
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Shift.objects.filter(pk=self.shift.pk).exists())
 
+    def test_bulk_move_refuses_assignment_with_invoice_history(self):
+        from invoicing.models import Invoice, InvoiceLineItem
+
+        row = ShiftSlotAssignment.objects.create(
+            shift=self.shift,
+            slot=self.slot,
+            slot_date=self.day,
+            user=self.worker,
+            is_rostered=True,
+        )
+        invoice = Invoice.objects.create(user=self.worker, pharmacy=self.pharmacy)
+        InvoiceLineItem.objects.create(
+            invoice=invoice,
+            source_assignment=row,
+            description="Frozen prior service",
+            quantity=1,
+            unit_price=70,
+            total=70,
+        )
+        target = self.other_day()
+
+        with self.assertRaisesMessage(ValidationError, "invoice or workforce leave history"):
+            bulk_edit_roster_period(
+                self.period,
+                [{"action": "move_shift", "slot_id": self.slot.pk, "target_date": str(target)}],
+                self.owner,
+            )
+
+        self.slot.refresh_from_db()
+        row.refresh_from_db()
+        self.assertEqual(self.slot.date, self.day)
+        self.assertEqual(row.slot_date, self.day)
+
     def test_bulk_free_occurrence_control(self):
         with patch("workforce.roster.bulk_edit._validate_and_price"):
             bulk_edit_roster_period(self.period, [
@@ -208,6 +241,83 @@ class RosterAssignmentProtectionTests(TestCase):
         self.assertEqual((row.user_id, str(row.unit_rate), row.slot_date), (self.other.pk, "55.00", target))
         self.assertEqual(client_for(self.owner).delete(url).status_code, 204)
         self.assertFalse(ShiftSlotAssignment.objects.filter(pk=row.pk).exists())
+
+    def invoice_history(self, row):
+        from invoicing.models import Invoice, InvoiceLineItem
+
+        invoice = Invoice.objects.create(user=row.user, pharmacy=self.pharmacy)
+        return InvoiceLineItem.objects.create(
+            invoice=invoice, source_assignment=row, description="Frozen prior service",
+            quantity=1, unit_price=70, total=70,
+        )
+
+    def test_single_assignment_patch_refuses_invoice_history_identity_edits(self):
+        target = self.next_week()
+        row = self.row("plain")
+        line = self.invoice_history(row)
+        original_rate = row.unit_rate
+        responses = [
+            client_for(self.owner).patch(f"/api/v1/roster-owner/{row.pk}/", body, format="json")
+            for body in ({"user": self.other.pk}, {"slot_date": str(target)})
+        ]
+
+        self.assertEqual([response.status_code for response in responses], [400, 400],
+                         [response.data for response in responses])
+        row.refresh_from_db()
+        line.refresh_from_db()
+        self.assertEqual((row.user_id, row.slot_date, row.unit_rate),
+                         (self.worker.pk, self.day, original_rate))
+        self.assertEqual(line.source_assignment_id, row.pk)
+
+    def test_single_assignment_history_keeps_same_identity_patch_available(self):
+        row = self.row("plain")
+        self.invoice_history(row)
+
+        response = client_for(self.owner).patch(
+            f"/api/v1/roster-owner/{row.pk}/",
+            {"user": self.worker.pk, "slot_date": str(self.day), "is_rostered": True}, format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        row.refresh_from_db()
+        self.assertEqual((row.user_id, row.slot_date, row.is_rostered), (self.worker.pk, self.day, True))
+
+    def test_roster_recurring_cleanup_refuses_invoice_history(self):
+        later = self.next_week()
+        row = self.row("plain", later)
+        line = self.invoice_history(row)
+        client = client_for(self.owner)
+        client.raise_request_exception = False
+
+        response = client.patch(
+            f"/api/v1/roster-shifts/{self.shift.pk}/", {"user_id": self.worker.pk}, format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.content[:300])
+        row.refresh_from_db()
+        line.refresh_from_db()
+        self.assertEqual((row.user_id, row.slot_date), (self.worker.pk, later))
+        self.assertEqual(line.source_assignment_id, row.pk)
+        self.assertEqual(list(self.slot.assignments.values_list("pk", flat=True)), [row.pk])
+
+    def test_roster_recurring_cleanup_preserves_leave_history(self):
+        from workforce.models import WorkforceLeaveRequest
+
+        later = self.next_week()
+        row = self.row("plain", later)
+        leave = WorkforceLeaveRequest.objects.create(
+            pharmacy=self.pharmacy, slot_assignment=row, user=self.worker, leave_type="SICK",
+            start_at=timezone.now(), end_at=timezone.now() + timedelta(hours=1),
+        )
+
+        response = client_for(self.owner).patch(
+            f"/api/v1/roster-shifts/{self.shift.pk}/", {"user_id": self.worker.pk}, format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        leave.refresh_from_db()
+        self.assertEqual(leave.slot_assignment_id, row.pk)
+        self.assertEqual(list(self.slot.assignments.values_list("pk", flat=True)), [row.pk])
 
     def row(self, state, slot_date=None):
         """The worker's row on an occurrence that is booked, payment-pending (another worker's offer) or plain."""

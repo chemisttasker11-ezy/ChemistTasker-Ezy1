@@ -1,265 +1,44 @@
-import json
-import logging
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime, timedelta, timezone as dt_timezone
-from hashlib import sha256
-from urllib.parse import urlencode
-import stripe
-from django.conf import settings
+"""Billing HTTP adapters: authentication, parsing and account authority before owned workflows."""
 from django.shortcuts import get_object_or_404
-from django.db import transaction
-from django.db.models import Q
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
-from django.utils import timezone
-from .models import OwnerSubscription, ShiftPayment, StripeWebhookEvent
-from shifts.finalize import expire_competing_offers, offer_occurrence_key
+
+from . import shift_payments, subscription_operations, webhooks
+from .checkout_context import _shift_checkout_return_urls, _shift_dashboard_context
+from .checkout_urls import (
+    extra_seat_return_urls as _extra_seat_return_urls,
+    frontend_base_url as _frontend_base_url,
+    mobile_bridge_url as _mobile_bridge_url,
+    subscription_return_urls as _subscription_return_urls,
+)
+from .fulfillment import _finalize_pending_offers_for_shift, _normalize_offer_ids, _normalize_slot_ids
+from .stripe_support import (
+    BASE_SUB_PRICE,
+    EXTRA_SEAT_PRICE,
+    _build_extra_seat_metadata,
+    _build_subscription_metadata,
+    _get_subscription_from_customer,
+    _get_subscription_from_metadata,
+    _stripe_object_value,
+    stripe,
+)
+from .subscriptions import (
+    get_or_create_subscription_for_account as _get_or_create_subscription_for_account,
+    get_subscription_for_account as _get_subscription_for_account,
+    serialize_subscription as _serialize_subscription,
+    subscription_lookup_from_account as _subscription_lookup_from_account,
+)
 from .utils import (
-    BILLING_STATE_FREE_TRIAL,
-    BILLING_STATE_PRE_LIVE,
-    billing_account_display_name,
     get_billing_state_for_account,
     resolve_billing_account,
     user_can_manage_billing_for_pharmacy,
     user_can_pay_shift_charge_for_pharmacy,
 )
-
-# NOTE: Will be importing shared-core pricing methods shortly
-# from billing.pricing import calculateFulfillmentFee ...
-
-stripe.api_key = settings.STRIPE_SECRET_KEY
-
-logger = logging.getLogger(__name__)
-
-
-# Product & Price IDs (from MCP)
-BASE_SUB_PRICE = 'price_1T52ikBQXaySV5ukpVrv7EcZ' # $30 AUD
-EXTRA_SEAT_PRICE = 'price_1T52ilBQXaySV5uk2fmUWXlw' # $5 AUD
-
-
-def _frontend_base_url():
-    return getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173').rstrip('/')
-
-
-def _mobile_base_url():
-    scheme = getattr(settings, 'MOBILE_APP_SCHEME', 'frontendmobile')
-    return f'{scheme}://'
-
-
-def _mobile_bridge_url(path, **params):
-    base = _frontend_base_url()
-    query = urlencode({
-        'path': path,
-        **{key: value for key, value in params.items() if value is not None},
-    })
-    return f"{base}/mobile-checkout-return?{query}"
-
-
-def _subscription_return_urls(account, platform='web'):
-    if platform == 'mobile':
-        if account['scope'] == 'organization':
-            return _mobile_bridge_url('organization/profile', checkout='success', billing='1'), _mobile_bridge_url('organization/profile', checkout='cancel', billing='1')
-        return _mobile_bridge_url('owner/subscription-seats', checkout='success'), _mobile_bridge_url('owner/subscription-seats', checkout='cancel')
-    base = _frontend_base_url()
-    if account['scope'] == 'organization':
-        success = f"{base}/dashboard/organization/overview?checkout=success&billing=1"
-        cancel = f"{base}/dashboard/organization/overview?checkout=cancel&billing=1"
-    else:
-        success = f"{base}/dashboard/owner/overview?view=billing&checkout=success"
-        cancel = f"{base}/dashboard/owner/overview?view=billing&checkout=cancel"
-    return success, cancel
-
-
-def _extra_seat_return_urls(account, platform='web'):
-    if platform == 'mobile':
-        if account['scope'] == 'organization':
-            return _mobile_bridge_url('organization/profile', checkout='seat_success', billing='1'), _mobile_bridge_url('organization/profile', checkout='seat_cancel', billing='1')
-        return _mobile_bridge_url('owner/subscription-seats', checkout='seat_success'), _mobile_bridge_url('owner/subscription-seats', checkout='seat_cancel')
-    base = _frontend_base_url()
-    if account['scope'] == 'organization':
-        success = f"{base}/dashboard/organization/overview?checkout=seat_success&billing=1"
-        cancel = f"{base}/dashboard/organization/overview?checkout=seat_cancel&billing=1"
-    else:
-        success = f"{base}/dashboard/owner/overview?view=billing&checkout=seat_success&mode=seats"
-        cancel = f"{base}/dashboard/owner/overview?view=billing&checkout=seat_cancel&mode=seats"
-    return success, cancel
-
-
-def _shift_dashboard_context(user, pharmacy):
-    from organizations.models import PharmacyAdmin
-    from users.models import OrganizationMembership
-
-    organization_id = getattr(pharmacy, 'organization_id', None)
-    if organization_id and OrganizationMembership.objects.filter(
-        user=user,
-        organization_id=organization_id,
-        role__in=['ORG_ADMIN', 'CHIEF_ADMIN', 'REGION_ADMIN'],
-    ).exists():
-        return {'scope': 'organization'}
-
-    admin_assignment = PharmacyAdmin.objects.filter(
-        user=user,
-        pharmacy=pharmacy,
-        is_active=True,
-    ).first()
-    if admin_assignment and admin_assignment.admin_level != PharmacyAdmin.AdminLevel.OWNER:
-        return {'scope': 'admin', 'pharmacy_id': pharmacy.id}
-
-    return {'scope': 'owner'}
-
-
-def _shift_checkout_return_urls(shift, *, acting_user, platform='web', query_key='payment'):
-    context = _shift_dashboard_context(acting_user, shift.pharmacy)
-    success_value = 'success'
-    cancel_value = 'cancel'
-
-    if platform == 'mobile':
-        if context['scope'] == 'organization':
-            path = f"organization/shifts/{shift.id}"
-        elif context['scope'] == 'admin':
-            path = "admin/shifts"
-        else:
-            path = f"owner/shifts/{shift.id}"
-        return (
-            _mobile_bridge_url(path, **{query_key: success_value}),
-            _mobile_bridge_url(path, **{query_key: cancel_value}),
-        )
-
-    base = _frontend_base_url()
-    if context['scope'] == 'organization':
-        route = f"{base}/dashboard/organization/shifts/{shift.id}"
-    elif context['scope'] == 'admin':
-        route = f"{base}/dashboard/admin/{context['pharmacy_id']}/shifts/{shift.id}"
-    else:
-        route = f"{base}/dashboard/owner/shifts/{shift.id}"
-    return (
-        f"{route}?{query_key}={success_value}",
-        f"{route}?{query_key}={cancel_value}",
-    )
-
-
-def _subscription_lookup_from_account(account):
-    if account['scope'] == 'organization' and account.get('organization') is not None:
-        return {'organization': account['organization']}
-    owner_user = account.get('owner_user')
-    if owner_user is None:
-        raise ValueError('No billing owner found for this pharmacy.')
-    return {'owner': owner_user}
-
-
-def _get_subscription_for_account(account):
-    lookup = _subscription_lookup_from_account(account)
-    primary = OwnerSubscription.objects.filter(**lookup).first()
-    if account['scope'] != 'organization':
-        return primary
-
-    if primary and primary.status == 'active':
-        return primary
-
-    owner_user = account.get('owner_user')
-    if owner_user is not None:
-        owner_subscription = OwnerSubscription.objects.filter(owner=owner_user).first()
-        if owner_subscription and owner_subscription.status == 'active':
-            return owner_subscription
-
-    return primary
-
-
-def _get_or_create_subscription_for_account(account):
-    lookup = _subscription_lookup_from_account(account)
-    defaults = {
-        'billing_contact': account.get('billing_contact') or account.get('owner_user'),
-    }
-    subscription, _created = OwnerSubscription.objects.get_or_create(
-        defaults=defaults,
-        **lookup,
-    )
-    updated_fields = []
-    if account.get('billing_contact') and subscription.billing_contact_id != account['billing_contact'].id:
-        subscription.billing_contact = account['billing_contact']
-        updated_fields.append('billing_contact')
-    if updated_fields:
-        subscription.save(update_fields=updated_fields)
-    return subscription
-
-
-def _build_subscription_metadata(account, *, actor_user, staff_count=None, pharmacy=None):
-    metadata = {
-        'billing_scope': account['scope'],
-        'actor_user_id': actor_user.id,
-    }
-    if staff_count is not None:
-        metadata['staff_count'] = staff_count
-    if pharmacy is not None:
-        metadata['pharmacy_id'] = pharmacy.id
-    if account.get('owner_user') is not None:
-        metadata['owner_user_id'] = account['owner_user'].id
-    if account.get('organization') is not None:
-        metadata['organization_id'] = account['organization'].id
-    if account.get('billing_contact') is not None:
-        metadata['billing_contact_user_id'] = account['billing_contact'].id
-    return metadata
-
-
-def _build_extra_seat_metadata(account, *, actor_user, extra_seat_count, pharmacy=None):
-    metadata = _build_subscription_metadata(
-        account,
-        actor_user=actor_user,
-        staff_count=5 + max(extra_seat_count, 0),
-        pharmacy=pharmacy,
-    )
-    metadata['subscription_kind'] = 'extra_seats'
-    metadata['extra_seat_count'] = max(extra_seat_count, 0)
-    return metadata
-
-
-def _get_subscription_from_metadata(metadata):
-    organization_id = metadata.get('organization_id')
-    owner_user_id = metadata.get('owner_user_id')
-    if organization_id:
-        return OwnerSubscription.objects.filter(organization_id=organization_id).first()
-    if owner_user_id:
-        return OwnerSubscription.objects.filter(owner_id=owner_user_id).first()
-    actor_user_id = metadata.get('actor_user_id')
-    if actor_user_id:
-        return OwnerSubscription.objects.filter(owner_id=actor_user_id).first()
-    return None
-
-
-def _get_subscription_from_customer(customer_id):
-    if not customer_id:
-        return None
-    return OwnerSubscription.objects.filter(stripe_customer_id=customer_id).first()
-
-
-def _serialize_subscription(subscription):
-    if not subscription:
-        return {
-            'exists': False,
-            'active': False,
-            'status': 'inactive',
-            'staffCount': 5,
-            'extraSeatCount': 0,
-            'stripeCustomerId': None,
-            'stripeSubscriptionId': None,
-            'currentPeriodEnd': None,
-        }
-
-    staff_count = max(subscription.staff_count or 5, 5)
-    return {
-        'exists': True,
-        'active': subscription.status == 'active',
-        'status': subscription.status,
-        'staffCount': staff_count,
-        'extraSeatCount': max(0, staff_count - 5),
-        'stripeCustomerId': subscription.stripe_customer_id,
-        'stripeSubscriptionId': subscription.stripe_subscription_id,
-        'stripeExtraSeatSubscriptionId': subscription.stripe_extra_seat_subscription_id,
-        'currentPeriodEnd': subscription.current_period_end.isoformat() if subscription.current_period_end else None,
-    }
+from .webhooks import _process_stripe_event
 
 
 def _current_account_for_user(user, pharmacy_id=None):
@@ -287,89 +66,6 @@ def _current_account_for_user(user, pharmacy_id=None):
     )
 
 
-def _normalize_slot_ids(raw_slot_ids=None, raw_slot_id=None):
-    values = raw_slot_ids if raw_slot_ids is not None else raw_slot_id
-    if values in (None, '', []):
-        return []
-    if isinstance(values, str):
-        values = [part.strip() for part in values.split(',') if part.strip()]
-    elif not isinstance(values, (list, tuple, set)):
-        values = [values]
-
-    slot_ids = []
-    for value in values:
-        try:
-            slot_ids.append(int(value))
-        except (TypeError, ValueError):
-            continue
-    return sorted(set(slot_ids))
-
-
-def _normalize_offer_ids(raw_offer_ids=None, raw_offer_id=None):
-    values = raw_offer_ids if raw_offer_ids is not None else raw_offer_id
-    if values in (None, '', []):
-        return []
-    if isinstance(values, str):
-        values = [part.strip() for part in values.split(',') if part.strip()]
-    elif not isinstance(values, (list, tuple, set)):
-        values = [values]
-
-    offer_ids = []
-    for value in values:
-        try:
-            offer_ids.append(int(value))
-        except (TypeError, ValueError):
-            continue
-    return sorted(set(offer_ids))
-
-
-def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None, return_offers=False, unbookable=None):
-    """
-    Finalize shift offers waiting on payment.
-    If candidate_id/slot_id are provided, narrow the target set.
-    With an `unbookable` list, refused pending offers are expired and collected instead of
-    failing the whole call; explicitly paid offers in other states are collected unchanged.
-    """
-    from rest_framework.exceptions import ValidationError
-    from shifts.models import ShiftOffer
-    from shifts.finalize import finalize_shift_offer
-
-    target_offer_ids = _normalize_offer_ids(offer_ids)
-    offers = ShiftOffer.objects.filter(shift=shift).order_by("created_at")
-    if not (target_offer_ids and unbookable is not None):
-        offers = offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
-
-    if candidate_id:
-        offers = offers.filter(user_id=candidate_id)
-    if target_offer_ids:
-        offers = offers.filter(id__in=target_offer_ids)
-    target_slot_ids = _normalize_slot_ids(slot_ids, slot_id)
-    if target_slot_ids:
-        offers = offers.filter(slot_id__in=target_slot_ids)
-
-    finalized = 0
-    finalized_offers = []
-    for offer in offers:
-        if offer.status != ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT:
-            # This new payment cannot book an offer already consumed or withdrawn.
-            unbookable.append(offer)
-            continue
-        try:
-            finalize_shift_offer(offer)  # its own atomic block rolls back a refused offer
-        except ValidationError:
-            if unbookable is None:
-                raise
-            offer.status = ShiftOffer.Status.EXPIRED
-            offer.save(update_fields=['status', 'updated_at'])
-            unbookable.append(offer)
-            continue
-        finalized_offers.append(offer)
-        finalized += 1
-    expire_competing_offers(shift, finalized_offers)
-    if return_offers:
-        return finalized, finalized_offers
-    return finalized
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @throttle_classes([ScopedRateThrottle])
@@ -390,83 +86,14 @@ def create_subscription_checkout(request):
     if error_response is not None:
         return error_response
 
-    # 1. Ensure the billing account has a Stripe customer ID
-    try:
-        subscription = _get_or_create_subscription_for_account(account)
-    except ValueError as exc:
-        return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-
-    if subscription.status == 'active' and subscription.stripe_subscription_id:
-        return Response({'error': 'An active subscription already exists for this billing account.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    success_url, cancel_url = _subscription_return_urls(account, platform=platform)
-
-    billing_contact = account.get('billing_contact') or user
-    customer_email = getattr(billing_contact, 'email', None) or user.email
-    customer_name = billing_account_display_name(account)
-    if not subscription.stripe_customer_id:
-        try:
-            customer = stripe.Customer.create(
-                email=customer_email,
-                name=customer_name
-            )
-            subscription.stripe_customer_id = customer.id
-            subscription.save()
-        except Exception:
-            logger.exception('Stripe customer creation failed')
-            return Response({'error': 'Unable to initialise billing with the payment provider.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    # 2. Line Items Configuration
-    line_items = [
-        {'price': BASE_SUB_PRICE, 'quantity': 1}
-    ]
-
-    try:
-        # 3. IF INVOICE: Create subscription directly without checkout, set to send_invoice
-        if payment_method_input == 'invoice':
-            sub = stripe.Subscription.create(
-                customer=subscription.stripe_customer_id,
-                items=line_items,
-                collection_method='send_invoice',
-                days_until_due=7,
-                metadata=_build_subscription_metadata(
-                    account,
-                    actor_user=user,
-                    staff_count=staff_count,
-                    pharmacy=pharmacy,
-                ),
-            )
-            # Sync to local DB
-            subscription.stripe_subscription_id = sub.id
-            subscription.staff_count = staff_count
-            subscription.status = 'inactive' # remains inactive until invoice is paid
-            subscription.save()
-            return Response({
-                'message': 'Invoice sent. Check your email.', 
-                'subscription_id': sub.id
-            })
-
-        # 4. IF CARD: Create a Stripe Checkout Session for collection
-        else:
-            checkout_session = stripe.checkout.Session.create(
-                customer=subscription.stripe_customer_id,
-                payment_method_types=['card'],
-                line_items=line_items,
-                mode='subscription',
-                success_url=success_url,
-                cancel_url=cancel_url,
-                metadata=_build_subscription_metadata(
-                    account,
-                    actor_user=user,
-                    staff_count=staff_count,
-                    pharmacy=pharmacy,
-                ),
-            )
-            return Response({'url': checkout_session.url})
-
-    except Exception:
-        logger.exception('Billing request failed')
-        return Response({'error': 'Unable to complete the billing request.'}, status=status.HTTP_400_BAD_REQUEST)
+    return subscription_operations.create_subscription_checkout(
+        user=user,
+        account=account,
+        pharmacy=pharmacy,
+        staff_count=staff_count,
+        payment_method_input=payment_method_input,
+        platform=platform,
+    )
 
 
 @api_view(['GET'])
@@ -478,21 +105,7 @@ def current_subscription(request):
     )
     if error_response is not None:
         return error_response
-
-    subscription = _get_subscription_for_account(account)
-    payload = _serialize_subscription(subscription)
-    payload.update({
-        'billingScope': account['scope'],
-        'accountName': billing_account_display_name(account),
-    })
-    return Response(payload)
-
-
-def _stripe_object_value(obj, key, default=None):
-    """Read StripeObject/dict safely; Stripe returns both shapes in adapters."""
-    if isinstance(obj, dict):
-        return obj.get(key, default)
-    return getattr(obj, key, default)
+    return subscription_operations.current_subscription(account=account)
 
 
 @api_view(['POST'])
@@ -510,101 +123,12 @@ def update_subscription_seats(request):
     )
     if error is not None:
         return error
-
-    scope = {'owner': account['owner_user']} if account['scope'] == 'owner' else {
-        'organization': account['organization'],
-    }
-    try:
-        with transaction.atomic():
-            subscription = OwnerSubscription.objects.select_for_update().filter(**scope).first()
-            if not subscription or subscription.status != 'active' or not subscription.stripe_subscription_id:
-                return Response({'error': 'No active subscription found for this billing account.'}, status=400)
-            desired_extra = desired_staff_count - 5
-            current_extra = max(0, (subscription.staff_count or 5) - 5)
-
-            if subscription.stripe_extra_seat_subscription_id:
-                if desired_extra == current_extra:
-                    payload = _serialize_subscription(subscription)
-                    payload.update({
-                        'message': 'No seat change detected.',
-                        'billingScope': account['scope'],
-                        'accountName': billing_account_display_name(account),
-                    })
-                    return Response(payload)
-
-                # Verify the existing subscription and its item at Stripe:
-                # never mutate a different customer's or unrelated price item.
-                provider = stripe.Subscription.retrieve(subscription.stripe_extra_seat_subscription_id)
-                if _stripe_object_value(provider, 'customer') != subscription.stripe_customer_id:
-                    return Response({'error': 'Stripe subscription customer does not match this billing account.'}, status=409)
-                if _stripe_object_value(provider, 'status') not in ('active', 'trialing'):
-                    return Response({'error': 'Extra-seat subscription is not active at Stripe.'}, status=409)
-                items = _stripe_object_value(_stripe_object_value(provider, 'items', {}), 'data', [])
-                matching = [
-                    item for item in items
-                    if _stripe_object_value(_stripe_object_value(item, 'price', {}), 'id') == EXTRA_SEAT_PRICE
-                ]
-                if len(matching) != 1 or len(items) != 1:
-                    return Response({'error': 'Cannot safely identify the single extra-seat price item.'}, status=409)
-
-                # Stripe creates the appropriate next-invoice proration for
-                # additions/downgrades; base subscription remains untouched.
-                updated = stripe.Subscription.modify(
-                    subscription.stripe_extra_seat_subscription_id,
-                    items=[{'id': _stripe_object_value(matching[0], 'id'),
-                            'quantity': desired_extra}],
-                    proration_behavior='create_prorations',
-                    payment_behavior='error_if_incomplete',
-                )
-                updated_items = _stripe_object_value(_stripe_object_value(updated, 'items', {}), 'data', [])
-                matching_updated = [
-                    item for item in updated_items
-                    if _stripe_object_value(_stripe_object_value(item, 'price', {}), 'id') == EXTRA_SEAT_PRICE
-                ]
-                if (_stripe_object_value(updated, 'status') not in ('active', 'trialing')
-                        or len(matching_updated) != 1
-                        or int(_stripe_object_value(matching_updated[0], 'quantity', -1)) != desired_extra):
-                    raise ValueError('Stripe did not confirm the requested seat quantity.')
-                subscription.staff_count = desired_staff_count
-                subscription.save(update_fields=['staff_count', 'updated_at'])
-                payload = _serialize_subscription(subscription)
-                payload.update({
-                    'message': 'Existing extra-seat subscription quantity updated at Stripe.',
-                    'billingScope': account['scope'],
-                    'accountName': billing_account_display_name(account),
-                })
-                return Response(payload)
-
-            if desired_extra == current_extra:
-                return Response({
-                    **_serialize_subscription(subscription),
-                    'message': 'No seat change detected.',
-                    'billingScope': account['scope'],
-                    'accountName': billing_account_display_name(account),
-                })
-            if desired_extra < 1:
-                return Response({'error': 'No purchased extra-seat subscription exists to resize.'}, status=409)
-            success_url, cancel_url = _extra_seat_return_urls(account, platform=platform)
-            checkout_session = stripe.checkout.Session.create(
-                customer=subscription.stripe_customer_id,
-                payment_method_types=['card'],
-                line_items=[{'price': EXTRA_SEAT_PRICE, 'quantity': desired_extra}],
-                mode='subscription',
-                success_url=success_url, cancel_url=cancel_url,
-                metadata=_build_extra_seat_metadata(
-                    account, actor_user=request.user, extra_seat_count=desired_extra,
-                ),
-            )
-            return Response({
-                'url': checkout_session.url,
-                'message': 'Redirecting to Stripe to purchase extra seats.',
-            })
-    except stripe.error.StripeError:
-        logger.exception('Stripe extra-seat quantity adjustment failed')
-        return Response({'error': 'Stripe could not update the extra-seat subscription.'}, status=400)
-    except Exception:
-        logger.exception('Unexpected extra-seat billing reconciliation error')
-        return Response({'error': 'Unable to confirm the seat adjustment.'}, status=409)
+    return subscription_operations.update_subscription_seats(
+        user=request.user,
+        account=account,
+        desired_staff_count=desired_staff_count,
+        platform=platform,
+    )
 
 
 @api_view(['POST'])
@@ -616,7 +140,7 @@ def charge_shift_fulfillment(request, shift_id):
     Generates a checkout session for the fulfillment fee.
     """
     user = request.user
-    from shifts.models import Shift, ShiftOffer
+    from shifts.models import Shift
 
     shift = get_object_or_404(Shift, id=shift_id)
 
@@ -626,156 +150,14 @@ def charge_shift_fulfillment(request, shift_id):
 
     account = resolve_billing_account(shift.pharmacy, acting_user=user)
     billing_state = get_billing_state_for_account(account)
-    platform = request.data.get('platform', 'web')
-
-    candidate_id = request.data.get('candidate_id')
-    slot_id = request.data.get('slot_id')
-    slot_ids = _normalize_slot_ids(request.data.get('slot_ids') or request.data.get('slotIds'), slot_id)
-    offer_ids = _normalize_offer_ids(request.data.get('offer_ids') or request.data.get('offerIds'), request.data.get('offer_id') or request.data.get('offerId'))
-
-    # No selector is only legitimate for the free PRE_LIVE/FREE_TRIAL whole-shift confirmation below.
-    if offer_ids or slot_ids or candidate_id:
-        offers = ShiftOffer.objects.filter(shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
-        if candidate_id:  # match the webhook's finalize filter so we never charge for offers it won't finalize
-            offers = offers.filter(user_id=candidate_id)
-        if offer_ids:
-            offers = offers.filter(id__in=offer_ids)
-        if slot_ids:
-            offers = offers.filter(slot_id__in=slot_ids)
-        selected_offers = list(offers.order_by('id'))
-        if not selected_offers:
-            return Response({'error': 'No selected offers require payment.'}, status=status.HTTP_400_BAD_REQUEST)
-        if offer_ids and len(selected_offers) != len(offer_ids):
-            return Response({'error': 'One or more selected offers do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
-        selected_slot_ids = [offer.slot_id for offer in selected_offers if offer.slot_id]
-        if slot_ids and set(selected_slot_ids) != set(slot_ids):
-            return Response({'error': 'One or more selected slots do not require payment.'}, status=status.HTTP_400_BAD_REQUEST)
-        selected_occurrences = [offer_occurrence_key(offer) for offer in selected_offers if offer.slot_id]
-        if len(selected_occurrences) != len(set(selected_occurrences)):
-            return Response({'error': 'Select only one candidate per slot.'}, status=status.HTTP_400_BAD_REQUEST)
-        offer_ids = [offer.id for offer in selected_offers]
-        slot_ids = sorted(set(selected_slot_ids)) if len(selected_slot_ids) == len(selected_offers) else []
-
-    # --- Honeymoon period / free trial: finalize for free ---
-    if billing_state in [BILLING_STATE_PRE_LIVE, BILLING_STATE_FREE_TRIAL]:
-        with transaction.atomic():
-            finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
-                shift,
-                candidate_id=candidate_id,
-                slot_ids=slot_ids,
-                offer_ids=offer_ids,
-                return_offers=True,
-            )
-            from shifts.emails import send_shift_payment_finalized_notifications
-            has_pending_payment = ShiftOffer.objects.filter(
-                shift=shift,
-                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-            ).exists()
-            shift.payment_status = 'PENDING' if has_pending_payment else 'PAID'
-            shift.save(update_fields=['payment_status'])
-            transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
-                shift=shift,
-                offers=finalized_offers,
-                paid_by=request.user,
-                payment_method="free",
-            ), robust=True)
-        if billing_state == BILLING_STATE_PRE_LIVE:
-            return Response({
-                'free': True,
-                'billing_state': billing_state,
-                'finalized_offers': finalized_count,
-                'message': 'Payments not active yet - shift confirmed for free.',
-            })
-        return Response({
-            'free': True,
-            'billing_state': billing_state,
-            'finalized_offers': finalized_count,
-            'message': 'Free trial applied - shift confirmed for free.',
-        })
-
-
-    # The legacy PRE_LIVE/FREE_TRIAL flow legitimately confirms a whole
-    # shift without a selector; paid Stripe checkout must have a bounded
-    # selection so one charged unit cannot finalize an unselected group.
-    if not offer_ids and not slot_ids and not candidate_id:
-        return Response(
-            {'error': 'Select a pending offer or slot before checkout.'},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    # Price Logic
-    # We could also use `shared-core` logic if we had a node backend, 
-    # but since this is Django, we map it internally here for the Stripe Price IDs.
-    
-    is_subscriber = False
-    sub = _get_subscription_for_account(account)
-    if sub and sub.status == 'active':
-        is_subscriber = True
-
-    # Determine base price based on shift type
-    # PT/FT standard: price_1T52ilBQXaySV5uksvQy2RTk ($80)
-    # PT/FT subscriber: price_1T52imBQXaySV5ukuwLH3ikI ($40)
-    # Locum standard: price_1T52jFBQXaySV5ukezd5JmzS ($30)
-    # Locum subscriber: price_1T52jFBQXaySV5ukkXOKPHSV ($15)
-    
-    is_locum = shift.employment_type == 'LOCUM'
-
-    if is_locum:
-        price_id = (
-            'price_1T52jFBQXaySV5ukkXOKPHSV'
-            if is_subscriber else 'price_1T52jFBQXaySV5ukezd5JmzS'
-        )
-    else:
-        price_id = (
-            'price_1T52imBQXaySV5ukuwLH3ikI'
-            if is_subscriber else 'price_1T52ilBQXaySV5uksvQy2RTk'
-        )
-
-    success_url, cancel_url = _shift_checkout_return_urls(
-        shift,
-        acting_user=user,
-        platform=platform,
-        query_key='payment',
+    return shift_payments.charge_shift_fulfillment(
+        user=user,
+        shift=shift,
+        shift_id=shift_id,
+        account=account,
+        billing_state=billing_state,
+        data=request.data,
     )
-
-    try:
-        session_kwargs = {
-            'payment_method_types': ['card'],
-            'line_items': [{
-                'price': price_id,
-                'quantity': len(offer_ids),
-            }],
-            'mode': 'payment',
-            'success_url': success_url,
-            'cancel_url': cancel_url,
-            'metadata': {
-                'shift_id': shift.id, 
-                'actor_user_id': user.id,
-                'owner_user_id': account['owner_user'].id if account.get('owner_user') else '',
-                'organization_id': account['organization'].id if account.get('organization') else '',
-                'billing_contact_user_id': account['billing_contact'].id if account.get('billing_contact') else '',
-                'billing_scope': account['scope'],
-                'type': 'fulfillment',
-                'candidate_id': candidate_id,
-                'slot_id': slot_ids[0] if len(slot_ids) == 1 else '',
-                'slot_ids': ','.join(str(value) for value in slot_ids),
-                'offer_ids': ','.join(str(value) for value in offer_ids),
-            }
-        }
-        if sub and sub.stripe_customer_id:
-            session_kwargs['customer'] = sub.stripe_customer_id
-        else:
-            billing_contact = account.get('billing_contact') or user
-            session_kwargs['customer_email'] = getattr(billing_contact, 'email', None) or user.email
-        # Key on every param (Stripe rejects a reused key with other params) and the UTC day (the 24h session stays open while reused).
-        request_key = sha256(json.dumps([session_kwargs, str(timezone.now().date())], sort_keys=True, default=str).encode()).hexdigest()
-        checkout_session = stripe.checkout.Session.create(
-            **session_kwargs, idempotency_key=f'shift-fulfillment:{shift.id}:{request_key}',
-        )
-        return Response({'url': checkout_session.url})
-    except Exception:
-        logger.exception('Billing request failed')
-        return Response({'error': 'Unable to complete the billing request.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
@@ -789,8 +171,7 @@ def charge_penalty(request, shift_id):
     """
     user = request.user
     from shifts.models import Shift, ShiftSlotAssignment
-    from django.utils import timezone
-    
+
     shift = get_object_or_404(Shift, id=shift_id)
 
     # 0. Authorization check
@@ -799,404 +180,15 @@ def charge_penalty(request, shift_id):
 
     account = resolve_billing_account(shift.pharmacy, acting_user=user)
     sub = _get_subscription_for_account(account)
-    platform = request.data.get('platform', 'web')
-
-    # Calculate expected wage
-    assignments = ShiftSlotAssignment.objects.filter(shift=shift)
-    total_wage = Decimal('0')
-
-    now = timezone.now()
-    earliest_start = None
-
-    for assignment in assignments:
-        slot = assignment.slot
-        slot_date = assignment.slot_date or slot.date
-        
-        # Combine date and time
-        start_dt = timezone.make_aware(datetime.combine(slot_date, slot.start_time))
-        end_dt = timezone.make_aware(datetime.combine(slot_date, slot.end_time))
-        if slot.end_time <= slot.start_time:
-            end_dt += timedelta(days=1)
-        
-        if not earliest_start or start_dt < earliest_start:
-            earliest_start = start_dt
-
-        hours = Decimal(str((end_dt - start_dt).total_seconds())) / Decimal('3600')
-        rate = assignment.unit_rate or Decimal('0')
-        total_wage += (hours * rate)
-
-    if not earliest_start or total_wage <= 0:
-        return Response({'message': 'No penalty required, shift had no value or assignments.'})
-
-    # Calculate Penalty Percentage
-    hours_until_shift = (earliest_start - now).total_seconds() / 3600.0
-
-    penalty_percentage = Decimal('0')
-    if hours_until_shift <= 24:
-        penalty_percentage = Decimal('0.20')
-    elif hours_until_shift <= 72:
-        penalty_percentage = Decimal('0.10')
-
-    if penalty_percentage == 0:
-        return Response({'message': 'No penalty required, cancelled > 72 hours in advance.'})
-
-    penalty_amount_aud = total_wage * penalty_percentage
-    # Round once at the Stripe boundary so half cents are not truncated.
-    penalty_amount_cents = int((penalty_amount_aud * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
-    success_url, cancel_url = _shift_checkout_return_urls(
-        shift,
-        acting_user=user,
-        platform=platform,
-        query_key='penalty',
+    return shift_payments.charge_penalty(
+        user=user,
+        shift=shift,
+        shift_id=shift_id,
+        account=account,
+        sub=sub,
+        data=request.data,
     )
 
-    try:
-        session_kwargs = {
-            'payment_method_types': ['card'],
-            'line_items': [{
-                'price_data': {
-                    'currency': 'aud',
-                    'product_data': {
-                        'name': f'Cancellation Penalty for Shift #{shift.id}',
-                    },
-                    'unit_amount': penalty_amount_cents,
-                },
-                'quantity': 1,
-            }],
-            'mode': 'payment',
-            'success_url': success_url,
-            'cancel_url': cancel_url,
-            'metadata': {
-                'shift_id': shift.id,
-                'actor_user_id': user.id,
-                'owner_user_id': account['owner_user'].id if account.get('owner_user') else '',
-                'organization_id': account['organization'].id if account.get('organization') else '',
-                'billing_contact_user_id': account['billing_contact'].id if account.get('billing_contact') else '',
-                'billing_scope': account['scope'],
-                'type': 'cancellation',
-            }
-        }
-        if sub and sub.stripe_customer_id:
-            session_kwargs['customer'] = sub.stripe_customer_id
-        else:
-            billing_contact = account.get('billing_contact') or user
-            session_kwargs['customer_email'] = getattr(billing_contact, 'email', None) or user.email
-        checkout_session = stripe.checkout.Session.create(**session_kwargs)
-        return Response({'url': checkout_session.url})
-    except Exception:
-        logger.exception('Billing request failed')
-        return Response({'error': 'Unable to complete the billing request.'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
-
-def _process_stripe_event(event):
-    if event.type == 'checkout.session.completed':
-        session = event.data.object
-        metadata = session.get('metadata', {})
-        subscription_kind = metadata.get('subscription_kind', 'base')
-        
-        # If it was a subscription checkout
-        if session.mode == 'subscription':
-            try:
-                sub = _get_subscription_from_metadata(metadata)
-                if not sub:
-                    sub = _get_subscription_from_customer(session.customer)
-                if not sub:
-                    logger.warning('Stripe subscription checkout completed but no local subscription matched.')
-                    raise OwnerSubscription.DoesNotExist
-                # Metadata cannot authorize a different Stripe customer.
-                sub = OwnerSubscription.objects.select_for_update().get(pk=sub.pk)
-                if sub.stripe_customer_id != session.get('customer'):
-                    logger.warning('Ignoring subscription checkout for mismatched account.')
-                    return
-                if sub.status == 'canceled':
-                    # Only a new, paid base plan can replace a canceled subscription.
-                    if (subscription_kind == 'extra_seats'
-                            or not session.get('subscription')
-                            or session.subscription == sub.stripe_subscription_id
-                            or session.get('payment_status') != 'paid'):
-                        return
-                # A completed checkout may arrive after the subscription became unpaid.
-                current = stripe.Subscription.retrieve(session.subscription)
-                if (_stripe_object_value(current, 'id') != session.subscription
-                        or _stripe_object_value(current, 'customer') != sub.stripe_customer_id):
-                    return
-                is_active = _stripe_object_value(current, 'status') in ('active', 'trialing')
-                if sub.status == 'canceled' and not is_active:
-                    return
-                if subscription_kind == 'extra_seats':
-                    sub.stripe_extra_seat_subscription_id = session.subscription
-                    if not is_active:
-                        sub.staff_count = 5
-                    elif 'extra_seat_count' in metadata:
-                        sub.staff_count = 5 + int(metadata['extra_seat_count'])
-                    updated_fields = ['stripe_extra_seat_subscription_id', 'staff_count', 'updated_at']
-                else:
-                    sub.stripe_subscription_id = session.subscription
-                    sub.status = 'active' if is_active else 'inactive'
-                    sub.staff_count = 5
-                    updated_fields = ['stripe_subscription_id', 'status', 'staff_count', 'updated_at']
-                sub.save(update_fields=updated_fields)
-            except OwnerSubscription.DoesNotExist:
-                logger.warning(
-                    'Stripe checkout.session.completed subscription event ignored because no matching OwnerSubscription was found.'
-                )
-                
-        # If it was a fulfillment or penalty payment
-        elif session.mode == 'payment' and session.payment_status == 'paid':
-            shift_id = metadata.get('shift_id')
-            payment_type = metadata.get('type')
-            if shift_id and payment_type in ('fulfillment', 'cancellation'):
-                amount_aud = Decimal('0')
-                if session.amount_total is not None:
-                    amount_aud = Decimal(session.amount_total) / Decimal('100')
-
-                owner_id = metadata.get('owner_user_id') or metadata.get('billing_contact_user_id') or metadata.get('actor_user_id')
-
-                if not session.get('payment_intent'):
-                    raise ValueError('Paid Stripe checkout missing required payment_intent.')
-
-                from shifts.models import Shift as ShiftModel, ShiftOffer
-                shift_obj = ShiftModel.objects.select_for_update().filter(id=shift_id).first()
-                # Distinct Stripe webhook event IDs may describe the same
-                # payment intent. Never create a second local paid ledger debit.
-                payment, created = ShiftPayment.objects.get_or_create(
-                    stripe_payment_intent_id=session.payment_intent,
-                    defaults={
-                        'owner_id': owner_id,
-                        'shift': shift_obj,
-                        'amount_aud': amount_aud,
-                        'payment_type': payment_type,
-                        'payment_method': 'card',
-                        'status': 'paid',
-                        'paid_at': timezone.now(),
-                    },
-                )
-                if not created:
-                    # A duplicate checkout completion must not re-finalize
-                    # offers or turn a refunded payment back into paid.
-                    return
-
-                if shift_obj is None:
-                    from notifications.services import notify_users
-                    logger.error('Paid shift checkout %s refers to deleted shift %s: refund required.', payment.pk, shift_id)
-                    notify_users(
-                        [payment.owner_id],
-                        title='Shift payment needs a refund',
-                        body='The paid shift no longer exists. The payment needs a refund or manual follow-up.',
-                        payload={'notification_kind': 'shift_payment_refund_required',
-                                 'payment_id': payment.pk, 'shift_id': shift_id},
-                        deliver_on_commit=True,
-                    )
-                    return
-
-                # Cancellation penalty payment must not finalize worker offers.
-                if payment_type != 'fulfillment':
-                    return
-
-                # Mark shift paid, then finalize pending offers waiting on payment.
-                try:
-                    unbookable_offers = []
-                    finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
-                        shift_obj,
-                        candidate_id=metadata.get('candidate_id'),
-                        slot_id=metadata.get('slot_id'),
-                        slot_ids=metadata.get('slot_ids'),
-                        offer_ids=metadata.get('offer_ids'),
-                        return_offers=True,
-                        unbookable=unbookable_offers,
-                    )
-                    if unbookable_offers or not finalized_count:
-                        # The payment stays recorded; a lost occurrence needs a refund, not a Stripe retry.
-                        lost_ids = [offer.id for offer in unbookable_offers]
-                        logger.error(
-                            'Paid shift checkout %s could not book offers %s: refund or manual action required.',
-                            payment.pk, lost_ids,
-                        )
-                        from shifts.notifications import notify_shift_managers
-                        # The unique payment intent gates alert creation in this transaction too.
-                        notify_shift_managers(
-                            shift_obj,
-                            title='Shift payment needs a refund',
-                            body='A paid shift offer could not be booked because it is no longer available. '
-                                 'The payment needs a refund or manual follow-up.',
-                            kind='shift_payment_refund_required',
-                            payload={'payment_id': payment.pk, 'offer_ids': lost_ids},
-                            deliver_on_commit=True,
-                        )
-                    from shifts.emails import (
-                        send_shift_payment_finalized_notifications,
-                    )
-                    from users.models import User
-                    paid_by_user = User.objects.filter(id=metadata.get('actor_user_id')).first()
-                    # Notifications must see committed payment and offer changes.
-                    transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
-                        shift=shift_obj,
-                        offers=finalized_offers,
-                        paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
-                        payment_method='stripe',
-                    ), robust=True)
-                    has_pending_payment = ShiftOffer.objects.filter(
-                        shift=shift_obj,
-                        status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-                    ).exists()
-                    shift_obj.payment_status = 'PENDING' if has_pending_payment else 'PAID'
-                    shift_obj.save(update_fields=['payment_status'])
-                except Exception as e:
-                    logger.warning('Could not finalize paid shift offers: %s', e)
-                    # Roll back payment and offer changes together so Stripe can
-                    # retry instead of permanently acknowledging partial work.
-                    raise
-
-
-    elif event.type == 'customer.subscription.updated':
-        provider = event.data.object
-        sub_id = provider.get('id')
-        customer_id = provider.get('customer')
-        # A billing event may only affect the exact local provider subscription.
-        base = OwnerSubscription.objects.select_for_update().filter(
-            stripe_subscription_id=sub_id, stripe_customer_id=customer_id,
-        ).first()
-        addon = None if base else OwnerSubscription.objects.select_for_update().filter(
-            stripe_extra_seat_subscription_id=sub_id, stripe_customer_id=customer_id,
-        ).first()
-        sub = base or addon
-        if not sub or sub.status == 'canceled':
-            return
-        # Stripe events can arrive out of order; read current state while holding the row lock.
-        provider = stripe.Subscription.retrieve(sub_id)
-        if (_stripe_object_value(provider, 'id') != sub_id
-                or _stripe_object_value(provider, 'customer') != customer_id):
-            return
-        sub_status = _stripe_object_value(provider, 'status')
-        if base:
-            base.status = 'active' if sub_status in ('active', 'trialing') else 'inactive'
-            base.save(update_fields=['status', 'updated_at'])
-            return
-        if addon:
-            items = _stripe_object_value(_stripe_object_value(provider, 'items', {}), 'data', [])
-            matched = [
-                item for item in items
-                if _stripe_object_value(_stripe_object_value(item, 'price', {}), 'id') == EXTRA_SEAT_PRICE
-            ]
-            if len(matched) != 1:
-                logger.warning('Stripe extra-seat update contains no unique recognized price.')
-                return
-            quantity = int(_stripe_object_value(matched[0], 'quantity', 0))
-            addon.staff_count = 5 + quantity if sub_status in ('active', 'trialing') else 5
-            addon.save(update_fields=['staff_count', 'updated_at'])
-            return
-
-    elif event.type == 'invoice.paid':
-        invoice = event.data.object
-        sub_id = invoice.get('subscription')
-        customer_id = invoice.get('customer')
-        if sub_id:
-            try:
-                sub = OwnerSubscription.objects.select_for_update().filter(
-                    stripe_subscription_id=sub_id, stripe_customer_id=customer_id,
-                ).first()
-                if not sub:
-                    sub = OwnerSubscription.objects.select_for_update().filter(
-                        stripe_extra_seat_subscription_id=sub_id,
-                        stripe_customer_id=customer_id,
-                    ).first()
-                # The first invoice can precede checkout; canceled plans retain their old ID.
-                if not sub and customer_id:
-                    sub = OwnerSubscription.objects.select_for_update().filter(
-                        Q(stripe_subscription_id__isnull=True) | Q(stripe_subscription_id=''),
-                        stripe_customer_id=customer_id,
-                    ).first()
-                if not sub:
-                    raise OwnerSubscription.DoesNotExist
-                if sub.status == 'canceled':
-                    logger.info('Ignoring paid invoice for canceled Stripe subscription %s', sub_id)
-                    return
-                # Paid invoices can arrive after Stripe has withdrawn entitlement.
-                current = stripe.Subscription.retrieve(sub_id)
-                if (_stripe_object_value(current, 'id') != sub_id
-                        or _stripe_object_value(current, 'customer') != customer_id):
-                    return
-                if sub_id != sub.stripe_extra_seat_subscription_id:
-                    sub.status = 'active' if _stripe_object_value(current, 'status') in ('active', 'trialing') else 'inactive'
-                period_end = invoice.get('lines', {}).get('data', [])
-                if period_end:
-                    period_end_ts = period_end[0].get('period', {}).get('end')
-                    if period_end_ts:
-                        sub.current_period_end = datetime.fromtimestamp(period_end_ts, tz=dt_timezone.utc)
-                sub.save(update_fields=['status', 'current_period_end', 'updated_at'])
-            except OwnerSubscription.DoesNotExist:
-                logger.warning(
-                    'Stripe invoice.paid could not find matching local subscription.',
-                )
-
-    elif event.type == 'charge.refunded':
-        charge = event.data.object
-        payment_intent_id = charge.get('payment_intent')
-        if not payment_intent_id:
-            logger.warning('Stripe refund event does not include a payment intent.')
-            return
-        # Stripe amount_refunded is cumulative in cents for this charge.
-        # Never mark a partially reversed payment as fully refunded.
-        refunded_cents = charge.get('amount_refunded') or 0
-        try:
-            refunded_cents = int(refunded_cents)
-        except (ValueError, TypeError):
-            logger.warning('Stripe refund callback has invalid amount_refunded.')
-            return
-        if refunded_cents < 0:
-            return
-        payments = list(ShiftPayment.objects.select_for_update().filter(
-            stripe_payment_intent_id=payment_intent_id, payment_method='card'
-        ))
-        if not payments:
-            # Retry only shift checkout refunds that beat checkout; other charges (e.g. invoices) are not ours.
-            sessions = stripe.checkout.Session.list(payment_intent=payment_intent_id, limit=1)
-            session = next(iter(_stripe_object_value(sessions, 'data', None) or []), None)
-            if _stripe_object_value(_stripe_object_value(session, 'metadata', None) or {}, 'type') in ('fulfillment', 'cancellation'):
-                raise ValueError('Stripe refund payment is not recorded yet.')
-            logger.info('Ignoring refund for a charge without a shift payment.')
-            return
-        for payment in payments:
-            cumulative = min(payment.amount_aud, Decimal(refunded_cents) / Decimal(100))
-            if cumulative <= payment.refunded_amount_aud:
-                continue
-            payment.refunded_amount_aud = cumulative
-            payment.status = (
-                'refunded' if cumulative >= payment.amount_aud
-                else 'partially_refunded'
-            )
-            payment.save(update_fields=['refunded_amount_aud', 'status'])
-
-    elif event.type == 'customer.subscription.deleted':
-        sub_id = event.data.object.id
-        customer_id = event.data.object.get('customer')
-        lookup = {'stripe_subscription_id': sub_id}
-        if customer_id:
-            lookup['stripe_customer_id'] = customer_id
-        try:
-            sub = OwnerSubscription.objects.select_for_update().filter(**lookup).first()
-            if sub:
-                sub.status = 'canceled'
-                sub.save(update_fields=['status'])
-            else:
-                addon_lookup = {'stripe_extra_seat_subscription_id': sub_id}
-                if customer_id:
-                    addon_lookup['stripe_customer_id'] = customer_id
-                sub = OwnerSubscription.objects.select_for_update().filter(**addon_lookup).first()
-                if not sub:
-                    raise OwnerSubscription.DoesNotExist
-                sub.stripe_extra_seat_subscription_id = None
-                sub.staff_count = 5
-                sub.save(update_fields=['stripe_extra_seat_subscription_id', 'staff_count'])
-        except OwnerSubscription.DoesNotExist:
-            logger.warning(
-                'Stripe customer.subscription.deleted could not find matching local subscription.',
-            )
-    else:
-        pass
 
 @csrf_exempt
 @api_view(['POST'])
@@ -1205,63 +197,4 @@ def stripe_webhook(request):
     """Verify, deduplicate, and process one Stripe webhook delivery."""
     payload = request.body
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
-
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-        )
-    except ValueError:
-        logger.warning('Stripe webhook rejected due to invalid payload.')
-        return HttpResponse(status=400)
-    except stripe.error.SignatureVerificationError:
-        logger.warning('Stripe webhook signature verification failed.')
-        return HttpResponse(status=400)
-
-    event_id = str(getattr(event, 'id', '') or '')
-    event_type = str(getattr(event, 'type', '') or '')
-    if not event_id or not event_type:
-        logger.warning('Stripe webhook rejected because event identity was missing.')
-        return HttpResponse(status=400)
-
-    try:
-        with transaction.atomic():
-            delivery, created = StripeWebhookEvent.objects.select_for_update().get_or_create(
-                event_id=event_id,
-                defaults={
-                    'event_type': event_type,
-                    'status': StripeWebhookEvent.Status.PROCESSING,
-                },
-            )
-            if not created and delivery.status == StripeWebhookEvent.Status.PROCESSED:
-                return HttpResponse(status=200)
-
-            delivery.event_type = event_type
-            delivery.status = StripeWebhookEvent.Status.PROCESSING
-            delivery.failed_at = None
-            delivery.save(update_fields=['event_type', 'status', 'failed_at'])
-
-            _process_stripe_event(event)
-
-            delivery.status = StripeWebhookEvent.Status.PROCESSED
-            delivery.processed_at = timezone.now()
-            delivery.save(update_fields=['status', 'processed_at'])
-    except Exception:
-        logger.exception(
-            'Stripe webhook processing failed for event_id=%s event_type=%s',
-            event_id,
-            event_type,
-        )
-        with transaction.atomic():
-            delivery, _ = StripeWebhookEvent.objects.select_for_update().get_or_create(
-                event_id=event_id,
-                defaults={'event_type': event_type},
-            )
-            # Another delivery may have succeeded after this transaction rolled
-            # back. Never downgrade its processed marker and enable a replay.
-            if delivery.status != StripeWebhookEvent.Status.PROCESSED:
-                delivery.status = StripeWebhookEvent.Status.FAILED
-                delivery.failed_at = timezone.now()
-                delivery.save(update_fields=['status', 'failed_at'])
-        return HttpResponse(status=500)
-
-    return HttpResponse(status=200)
+    return webhooks.receive_stripe_webhook(payload, sig_header)

@@ -6,7 +6,7 @@ docstrings) and they live here once instead of inline in the views.
 from organizations.access import CAPABILITY_MANAGE_STAFF, has_admin_capability
 from organizations.models import Pharmacy
 from users.models import OrganizationMembership
-from users.org_roles import OrgCapability, membership_capabilities, membership_visible_pharmacy_ids
+from users.org_roles import OrgCapability, membership_capabilities, membership_covers_pharmacy
 
 
 def user_can_invite_members_to_pharmacy(user, pharmacy):
@@ -36,9 +36,7 @@ def user_can_invite_members_to_pharmacy(user, pharmacy):
         )
         if not can_invite:
             continue
-        if OrgCapability.VIEW_ALL_PHARMACIES in caps:
-            return True
-        if pharmacy.id in membership_visible_pharmacy_ids(membership):
+        if membership_covers_pharmacy(membership, pharmacy):
             return True
 
     return False
@@ -71,9 +69,7 @@ def user_can_change_membership(user, membership):
         for org_membership in org_memberships:
             caps = membership_capabilities(org_membership)
             if OrgCapability.MANAGE_STAFF in caps or OrgCapability.MANAGE_ADMINS in caps:
-                if OrgCapability.VIEW_ALL_PHARMACIES in caps:
-                    return True
-                if pharm.id in membership_visible_pharmacy_ids(org_membership):
+                if membership_covers_pharmacy(org_membership, pharm):
                     return True
 
     # Pharmacy Admin of THIS pharmacy
@@ -109,9 +105,7 @@ def user_can_decide_applications(user, pharmacy):
             or OrgCapability.MANAGE_ADMINS in caps
         ):
             continue
-        if OrgCapability.VIEW_ALL_PHARMACIES in caps:
-            return True
-        if pharmacy.id in membership_visible_pharmacy_ids(membership):
+        if membership_covers_pharmacy(membership, pharmacy):
             return True
 
     return False

@@ -1,0 +1,162 @@
+# PR #213 — Stage D booking and roster evidence
+
+Date: 29 October 2026 (Australia/Brisbane). Initial reviewed head: `0bc2da97c8d31c511bd0f7ccece60a7d9f834e91`; base: completed E17 `0e2a4a14344492cddab1ed2998c14340d538ad30`.
+
+**Status: STAGE D COMPLETE for the named production invariants and writer inventory on integrated source head `f72d7fa25be075c569acf4b54b798225dfd0a61a`; whole-release acceptance remains separate.** All demonstrated continuation gaps are repaired. Exact-head hosted Serializer PostgreSQL executed 587 tests successfully, including the full `shifts` app and `workforce.tests`; the dedicated Shared Core PostgreSQL concurrency selection executed 448 tests successfully and includes `shifts.test_shift_actions_contract` plus `workforce.tests.test_roster_slot_concurrency`. The previously source-pinned 73-test Stage D selection remains corroborating evidence rather than the integrated-head claim. PR #213 remains draft, unmerged and undeployed. No live provider operation is part of this evidence.
+
+## Rules and deliberate boundaries
+
+1. **One owner per occurrence.** A `(slot, slot_date)` has at most one assignment. A confirmed offer awaiting payment reserves its occurrence against ordinary roster replacement; concurrent legitimate writers must serialize or receive a controlled retry without partial writes.
+2. **Preserve identity and history.** Ordinary roster operations cannot erase or hand another worker an assignment linked to invoices, leave, attendance or accepted emergency-cover provenance, or move that history to another occurrence. A no-offer E17 assignment is not unprotected merely because `source_offer` is null.
+3. **Retain accepted terms.** Same-worker roster maintenance does not replace accepted engagement evidence. Manager approval is not worker consent. Ordinary unaccepted cover rate edits, classification changes and harmless same-value/readonly PATCH input retain their existing behavior.
+4. **Respect publication.** A published roster must be explicitly made editable through the existing publication workflow. A roster archive retains its assignments and history.
+
+History protection is owned by `backend/shifts/history.py:7`; booked/pending occurrence protection is owned by `backend/shifts/assignment.py:222`. They are distinct decisions. The assignment model's unique constraint (`backend/shifts/models.py:512`) is the final duplicate barrier; model `save()`/`delete()` enforce publication, not the whole history invariant.
+
+**Intentional privileged superadmin exception:** `ShiftSlotAssignment` is directly registered in `backend/shifts/admin.py:35`; admin/model/queryset use is not claimed to have the same action guards as the application routes. The product owner expressly accepts this exception. No new model-wide restriction or admin policy is introduced here.
+
+Time-only staff roster edits and unaccepted cover rate edits are intentionally supported. This ledger does not redefine them as identity transfer. It also does not certify every theoretically possible database interleaving, live Stripe configuration, or a platform-wide notification audit.
+
+## Route and writer ledger
+
+Paths below are relative to the repository root; line anchors identify the implementation inspected at this continuation checkpoint. Test entries identify coverage; execution is reported separately below.
+
+| Route / writer | Rule | Guard / ownership evidence | Executable evidence | Status |
+| --- | --- | --- | --- | --- |
+| `POST /api/v1/shifts/{id}/manual-assign/` | 1, 3, 4 | `backend/shifts/base.py:415` delegates to `roster_direct_staff`; `assignment.py:141` keeps the action atomic, validates direct staff/role, now locks Shift before the slot guard, then uses `keep_accepted_terms`. | `shifts.test_assignment_protection`; `ManualAssignTests` positive, invalid/published and whole-request rollback controls; simultaneous and forced-order cross-entry races. | Guarded; demonstrated Shift/Slot lock inversion repaired. |
+| `POST /api/v1/shift-offers/{id}/accept/` | 1, 3 | `backend/shifts/offers.py:334` locks Shift → ordered slots → offer, rechecks pending/current ownership, records consent and either reserves payment or finalizes. | `OfferConfirmationRaceTests`; `test_b54_second_confirmation_cannot_reserve_the_same_occurrence`; distinct-date and single-worker positive controls. | Guarded. The new race's invalid billing constant is corrected in this continuation. |
+| `finalize_shift_offer` | 1, 3 | `backend/shifts/finalize.py:39` locks Shift → ordered slots, refuses a different source offer, permits idempotent own replay, checks the accepted occurrence set, and persists accepted rates/terms. | `test_b54_finalization_refuses_a_losing_offer_and_is_idempotent_for_the_winner`; accepted-occurrence/recurrence tests; both offer races. | Guarded. |
+| Community `claim-shift` | 1, 3 | `backend/shifts/browse.py:249` locks membership and rechecks tier/role; lines 353–389 lock shift/slots and call `slot_locked_for_shift_offer` before creation. External/favourite workers must use consent-bearing offers. | `shifts.test_claim_eligibility`: free-slot success, taken-slot refusal, whole-shift pending refusal, tier-change recheck and membership-lock controls. | Guarded. |
+| Generic shift PATCH / serializer slot replacement | 1, 2 | `backend/shifts/serialization/shifts.py:347` delegates to `posting.revise_shift`; `backend/shifts/posting.py:142` locks Shift, prevents pharmacy transfer of booked work, blocks terms/slot replacement while payment is pending, and refuses replacing roster-owned/assigned slots. | `shifts.test_payment_edit_guards`; `test_f01_n2_pending_payment_blocks_terms_and_slot_replacement`; `test_generic_shift_endpoint_cannot_replace_roster_slots`. | Guarded. Description-only edits retain their existing permission. |
+| Generic shift DELETE | 1, 2 | `backend/shifts/base.py:118` locks Shift; shared `backend/shifts/deletion.py:8` refuses any assignments or pending shift/offer/payment before cascading. The local exception catch retains the original 409 transaction boundary. | `shifts.test_assignment_protection` booked/manual delete refusals; `organizations.test_cascade_booking_protection` direct-shift transaction equivalence. | Guarded; shared deletion rule preserves existing route behavior. |
+| Roster shift PATCH with `slots` | 1–4 | `backend/workforce/roster/slot_locking.py:52` locks period → worker → Shift → slots → assignments and rejects a changed graph; shared Shift acquisition at line 32 returns a controlled retry on real row contention; `slot_edit.py:79` preserves existing identities, guards both dates and protects history before a date move, replacement or removal. | `workforce.tests.test_roster_slot_http_contract`; `test_roster_slot_concurrency`; E17 same-worker preservation controls. | Guarded. No slot delete/recreate workaround. |
+| Roster shift PATCH clearing/changing `user_id` | 1–4 | `backend/workforce/roster/views.py:245` delegates shift changes to the locked serializer path, protects removed/replaced assignments and checks each occurrence before `update_or_create`/delete. | `test_roster_patch_refuses_protected_occurrences`; `test_user_id_only_patch_keeps_an_invoiced_assignment`; plain-row cleanup/clear positives. | Guarded for explicit clear/replacement. |
+| Roster PATCH obsolete recurring rows | 1, 2 | `views.py:329–330` materializes obsolete rows and now calls the existing history guard before checking bookings and deleting. | New invoice-history controlled-refusal and leave-history preservation tests; existing plain recurring cleanup positive. | Demonstrated gap repaired and targeted PostgreSQL controls passed. |
+| `PATCH /api/v1/roster-owner/{assignment}/` | 1–4 | `backend/workforce/roster/views.py:146` locks slot/current assignment, validates scope/date/accepted worker; `perform_update` at 159 retains booked/pending checks and now checks history only when worker or date actually changes. Serializer consent/routing fields remain readonly. | New invoice-linked identity/date negative and same-identity positive; existing plain assignment edit/delete; full `CoverTermsAuthorityTests` positives. | Demonstrated gap repaired and targeted PostgreSQL controls passed. |
+| `DELETE /api/v1/roster-owner/{assignment}/` | 1, 2, 4 | `backend/workforce/roster/views.py:174` uses publication, assignment-history and booked/pending guards before deletion. | `test_single_assignment_patch_and_delete_refuse_booked_or_pending_occurrences`; ordinary single-row delete positive. | Guarded. |
+| Bulk `assign_worker` | 1, 3, 4 | `backend/workforce/roster/bulk_edit.py:18` owns the transaction/period lock; line 77 acquires all existing target Shift rows in PK order before slots through the same controlled-conflict helper. The assign branch validates slot ownership, calls the occurrence guard with candidate and preserves accepted terms. | `test_bulk_assign_and_move_refuse_protected_occurrences`; `test_bulk_free_occurrence_control`; forced bulk-vs-finalization race; E17 same-worker accepted-source preservation. | Guarded; demonstrated Shift/Slot inversion repaired. |
+| Bulk `unassign_worker` | 1, 2, 4 | `bulk_edit.py:182` includes the assignment's Shift in ordered parent prelocks, checks roster ownership, history and booked/pending before deleting inside the atomic batch. | `test_bulk_unassign_and_time_edits_refuse_booked_or_pending_occurrences_and_keep_their_rate`; plain unassign positive. | Guarded. |
+| Bulk `move_shift` | 1–4 | `bulk_edit.py:252` guards source/destination; materializes attached assignments, protects every history row, then updates only those PKs. Worker removal/replacement uses existing guards. | `test_bulk_move_refuses_assignment_with_invoice_history`; move-and-assign/pending/no-worker refusal; `test_plain_rostered_staff_stay_editable`. | Gap closed by `0bc2da97`; regression and positive controls executed on PostgreSQL. |
+| Bulk `update_slot_times` | 1, 3, 4 | `bulk_edit.py:225` calls the booked/pending guard before changing times; `_validate_and_price` delegates to `assignment_rates.py:11`, which locks/reloads assignments and preserves accepted contractor/source-offer rates. | Booked/pending rate-preservation test plus ordinary time-edit positive; E17 accepted-rate refresh tests. | Guarded for the stated rules; ordinary time edits remain supported. |
+| Bulk `delete_slot` | 1, 2, 4 | `bulk_edit.py:203` protects marketplace/roster ownership and every attached assignment history, refuses shifts with offers, then deletes; `edit_guards.py:29` deletes an emptied shift only when it has no remaining related records. | `attendance_tests.test_roster_safety_regression` marketplace mutation controls; copy/template/bulk acceptance controls. | Guarded. |
+| Roster-shift DELETE | 1, 2, 4 | `backend/workforce/roster/views.py:225` locks Shift/slots, checks booked/pending and histories, then performs the intentional safe cascade. | `test_roster_shift_delete_refuses_booked_or_pending_occurrences`; `CoverTermsRosterReviewTests` accepted-cover refusal and plain-draft success. | Guarded. |
+| Roster escalation | 1, 2, 4 | `views.py:491` locks Shift → slots, materializes/guards all removed assignments before clearing and escalating atomically. | `test_roster_escalation_lock` actual PostgreSQL contention; leave/booked/pending refusals and ordinary escalation success. | Guarded. |
+| Direct swap approval | 1, 2, 3 | `backend/workforce/roster/worker_actions.py:147` locks/rechecks request/current assignee and replacement eligibility; `_reassign` at line 66 checks booked/history, then applies the replacement's own staff terms. | `test_swap_cover_and_release_refuse_booked_or_pending_occurrences` and plain-row success. | Guarded. Request submission itself retains the original assignment. |
+| Cover replacement approval | 1, 2, 3 | `worker_actions.py:279` shares `_reassign`, request state, owner/scope and worker eligibility checks. | Same negative/positive matrix plus existing worker action acceptance. | Guarded. |
+| Manager release / linked worker request approval | 1, 2 | `worker_actions.py:353` checks history and booked/pending before removal; `backend/shifts/worker_requests.py:227` delegates linked approvals to this service. Unlinked approval creates a new vacancy under a request lock. | Swap/cover/release matrix; linked approval refusal; `UnlinkedCoverApprovalRaceTests`. | Guarded. |
+| AHPRA cancellation task/service | 2 | `backend/shifts/cancellation.py:20` is a deliberate cancellation workflow: locked assignments, explicit history guard, safe rows only deleted, history-linked rows retained/reported, robust commit-time announcement. | `onboarding.test_ahpra_access` cancellation/retention tests and verification-transition concurrency. | Guarded intentional cancellation, not ordinary replacement. |
+| Leave creation/decision, including compatibility routes | 2 | `backend/workforce/leave_service.py:197` locks the assignment when creating linked leave; line 300 locks decision state and worker overlapping approvals. It does not delete/reassign assignments. `backend/shifts/leave.py` delegates to this owner. | `workforce.tests.test_timesheets` canonical linkage, stale-assignee refusal, overlapping/separate approval and concurrency controls. | Guarded; assignment writer absent. |
+| Billing free/Pills/Stripe fulfilment | 1, 3 | `backend/billing/views.py:221` delegates every assignment creation to `finalize_shift_offer`; unbookable paid offers follow existing compensation handling. Provider identities/replay semantics remain owned by billing. | Existing finance/replay/concurrency tests; finalization controls. | Guarded assignment writer. Mocks do not certify live provider configuration. |
+| Provisional attendance approval and E17 consent | 2, 3 | `backend/attendance/approvals.py:113` locks review/session and creates separate backfill identities once; `cover_terms.py:122` locks review/session/assignment and requires worker acceptance of frozen terms. | `attendance.test_cover_terms_acceptance`, `test_cover_terms_concurrency`, `test_cover_terms_review`; `workforce.tests.test_cover_terms_authority`. | Guarded. Manager approval never supplies worker consent. |
+| Copy week / apply template / create-and-assign / bulk create | 1–4 | New shifts/slots/assignments are distinct identities; target draft period is locked. Overwrite calls `backend/workforce/roster/copying.py:14`, which rejects offers and protects every assignment history before clearing. `week_templates.py:121` shares that owner. | `attendance_tests.test_roster_copy_templates`; `test_roster_safety_regression`; create/authorization controls. | Guarded; no source assignment is repurposed as copied work. |
+| Publish / unpublish / archive | 3, 4 | `backend/workforce/roster/publication.py:30`, `:101`, `:123` lock period state; publication's queryset update only classifies `is_rostered`. Archive changes period status without deleting any assignment. | Publication/revision/slot concurrency tests; E17 archive endpoint source-preservation test. | Guarded. |
+| Background reminders / calendar and signals | 2, 3 | `backend/shifts/tasks.py:22` and `backend/team_calendar/tasks.py` read assignment facts; calendar writes only notification markers. `backend/workforce/signals.py:89–153` invalidates projections/revisions, not assignment ownership/terms. | Source writer inventory; existing task contracts. | No production assignment writer here. |
+| Management commands / QA seed helpers | 1–4 | Assignment-name/writer scan of management commands found no application assignment rewrite. `attendance_tests/seed_runtime.py` and `client_profile/characterization_support.py` create test fixtures, not customer API operations. | Source/call-site inventory. | Not a production mutation entry point. |
+| Chain deletion | 2 | `backend/organizations/models.py:515` links pharmacies with a many-to-many relation; deleting the chain removes that relation, not Pharmacy or Shift rows. | Source cascade inventory. | No assignment cascade. |
+| Account deletion cascade | 2 | `backend/users/api_account.py:68` delegates anonymization to `account_deletion.py:96`; it preserves the User row and thus assignment FKs. | `users.test_account_security_contract` account deletion positives/security controls. | Guarded by soft deletion. |
+| Pharmacy / organization DELETE cascade | 1, 2 | `backend/organizations/views.py:76`/`:101` now lock the authorized parent and descendant pharmacies; `backend/shifts/deletion.py:24` locks descendant Shifts in PK order and applies the same assignment/payment guard as direct Shift DELETE before cascading. | `organizations.test_cascade_booking_protection`: 8 protected parent-delete subcases, safe 204, outsider refusal and direct-shift equivalence; scoped-org permission controls. | Demonstrated gap repaired; final targeted PostgreSQL selection includes this complete module. |
+| Django admin / direct privileged ORM | 1–4 | `backend/shifts/admin.py:35`, `models.py:523`/`:527`; model hooks enforce publication, not the whole application invariant. | Source inspection and explicit owner decision. | **Intentional privileged superadmin exception.** |
+
+## Demonstrated findings in this continuation
+
+### New cross-entry race could not execute
+
+At initial head `0bc2da97`, both the serializer PostgreSQL job (578 selected tests) and consolidated PostgreSQL job (443 selected tests) reported the same `ImportError`: the new race imported nonexistent `BILLING_STATE_FREE`. Therefore the older handover's test description was an intended assertion, not successful PostgreSQL evidence.
+
+The test now uses the real `BILLING_STATE_FREE_TRIAL` constant. Its endpoint/locking/assertion logic is unchanged: exactly one request returns 200, the other 400, exactly one assignment survives, and source-offer/status evidence matches the winning worker. No production billing logic changed.
+
+### Single assignment PATCH could retarget invoice history
+
+An owner could `PATCH /api/v1/roster-owner/{id}/` with another `user` or a different valid recurring `slot_date` on a plain/no-offer invoice-linked row. On unchanged production code, both requests returned 200 and mutated the linked source. The route already locked the current row; the missing rule was the history check. The repair calls the existing guard only for an actual user/date change, preserving no-op PATCH, readonly consent handling, classification and unaccepted-rate workflows.
+
+### Same-worker recurring cleanup omitted assignment history
+
+`PATCH /api/v1/roster-shifts/{id}/` with the same `user_id` can remove obsolete recurring assignment dates. The old removal loop checked bookings/pending offers but missed history for the same worker. Invoice FK `PROTECT` caused an uncontrolled 500; leave/attendance use nullable links and require the application history guard. The repair protects the complete obsolete list before deleting any row. Ordinary cleanup remains available and rollback preserves the original occurrence and links when protection refuses the request.
+
+### Parent pharmacy / organization DELETE bypassed shift deletion rules
+
+Ordinary authorized users could delete a parent pharmacy or organization while a descendant shift was assigned or payment-pending. Django cascade deletion bypasses a child viewset's `destroy` method. The repair locks the authorized parent and descendant Shift rows, then uses the same refusal rule as direct Shift DELETE. Safe unassigned parent deletion and unrelated-user denial remain covered. Direct Shift DELETE retains its original refusal payload and its transaction boundary, including lookup-triggered commit callbacks.
+
+### Manual/bulk assignment and finalization acquired Shift/Slot locks in opposite order
+
+The original new simultaneous race used an invalid billing constant. After correcting that fixture, deterministic PostgreSQL controls exposed a real inverse order: roster assignment held Slot before an inserted assignment's deferred Shift foreign-key check, while offer finalization held Shift before Slot. Manual assignment now locks Shift first. Bulk editing acquires every existing target Shift in sorted order before slot locks. The forced roster-first controls require a successful assignment, a controlled refusal of the competing offer, one surviving row and correct source/status evidence.
+
+### Booking-first concurrency also exposed a Period/Shift inversion
+
+A second deterministic interleaving holds an offer's Shift while bulk editing or slot PATCH holds its RosterPeriod. Finalization's synchronous assignment/revision signal then needs that period, while the roster operation needs the Shift. Both real endpoint reproductions returned **booking 200 / roster 500**, with PostgreSQL reporting a deadlock. A proposed weaker User lock did not fix this; the final source retains the original worker row lock and its serialization semantics.
+
+`workforce.roster.slot_locking.lock_roster_shifts` owns the narrow repair shared by bulk editing and the existing slot lifecycle. It acquires ordered Shift rows with `FOR UPDATE OF self NOWAIT` inside a savepoint. Only PostgreSQL lock-not-available (`55P03`) becomes the existing validation response: **“A shift is being booked or edited. Refresh and retry the roster change.”** Other database failures propagate. This lets the losing roster request roll back its period/worker locks promptly and the booking commit normally.
+
+This is an intentional concurrent-conflict behavior change: a roster request may need to refresh and retry when another transaction already owns its Shift. Ordinary uncontended edits, opposite cross-week moves and the roster-first winning case remain successful. The repair does not move revision invalidation after commit, change billing/provider transaction boundaries, or swallow arbitrary database errors. The new tests also prove original assignment identity, slot times and accepted offer evidence remain intact, while successful finalization still increments the roster revision and clears stale validation in its transaction.
+
+## Validation record
+
+The earlier history regressions established a real identity mutation (`[200, 200]` for forbidden worker/date changes) and an escaping invoice `ProtectedError` before the safeguards; the positive control passed. Their final history/leave/positive controls are included in the current PostgreSQL selection.
+
+### Fresh immutable-baseline corroboration
+
+An independent continuation run repeated the history and parent-cascade regressions against production source fixed at **`0bc2da97c8d31c511bd0f7ccece60a7d9f834e91`**. Only the regression test source files were copied into that baseline checkout; none of the candidate product safeguards was included. The retained log is `pr213-history-baseline-fresh-red-retry.log`.
+
+The run executed **7 test methods in 0.913 seconds**: **2 positive methods passed**, and **5 negative methods produced 7 expected assertion failures** because the two parent-delete methods each exercise pharmacy and organization subcases. There were **no unittest errors or skips**. The captured HTTP 500 below is a demonstrated application response, not a fixture/setup failure.
+
+| Baseline request / control | Observed evidence |
+| --- | --- |
+| Invoice-linked assignment PATCH changing worker or occurrence date | Both forbidden requests returned **200** instead of 400; their returned payloads reflected the requested identity changes. |
+| Same-worker recurring cleanup with invoice history | Returned **500** instead of 400; the log records the escaping `InvoiceLineItem.source_assignment` `ProtectedError`. |
+| Same-worker recurring cleanup with leave history | Returned **200** instead of the required refusal. |
+| Parent DELETE with an accepted offer awaiting payment | Both pharmacy and organization requests returned **204** instead of 409. |
+| Parent DELETE with a plain assignment and no source offer | Both pharmacy and organization requests returned **204** instead of 409. |
+| Same-identity assignment PATCH positive control | Passed. |
+| Authorized parent DELETE with an unassigned shift positive control | Passed for pharmacy and organization. |
+
+These negative methods stopped at their failing response assertions. This baseline run does **not** establish the later preservation assertions on those failing paths; those assertions execute successfully in the repaired Stage D selection. The baseline counts corroborate the demonstrated gaps and are not additional passing release coverage.
+
+### Repaired Stage D snapshot
+
+Independent continuation verification before the final conflict repair passed **70/70** targeted PostgreSQL tests, with no skips, in 15.959 seconds after fresh migrations. This already included the named bulk-move invoice-history regression, parent cascades, four booking races, E17 positive controls and roster/escalation concurrency. It did not include the subsequently added reverse-winner tests.
+
+On the isolated continuation source, both reverse-winner regressions failed as expected before the repair: **2 tests, 2 assertion failures, no setup errors or skips, 4.128 seconds**. The actual statuses were `(200, 500)` in both cases, and the disposable PostgreSQL server log identified `Shift ↔ RosterPeriod` waits. After the narrow repair, the complete booking/slot concurrency selection passed **11/11**, no skips, in 13.153 seconds. This includes the original opposite cross-week successful-move control and the non-`55P03` database-error propagation control.
+
+The **combined repaired Stage D snapshot selection passed 73/73, with no failures, errors or skips, in 20.570 seconds**. This includes parent cascades and authorized/unauthorized controls; invoice and leave history preservation; harmless same-identity and ordinary staff edits; the original handover's bulk-move regression; all six booking/manual/bulk races; accepted E17 consent/rate/history controls; original roster lock-order, publication and opposite cross-week success controls; non-contention error propagation; and the booking-versus-escalation race. Whitespace and targeted Python compilation checks also passed. Independent read-only review approved the controlled-conflict implementation and preserved transaction/positive-workflow behavior.
+
+Concurrent work in the original checkout required an isolated continuation checkout. A clean earlier combined run passed 73/73 in 22.193 seconds; one subsequent repeat on a shared disposable database had five Django teardown/flush errors because another runner concurrently truncated the same tables. That repeat is not recorded as a pass. The successful source-pinned run above used a uniquely named disposable database (`test_pr213_stage_d_review_b92406`). SHA-256 manifests of all **811 backend Python files** were identical before and after that run: `4f1fe858d12c90d8ebe4e4e62fb35638233e5dff52eaa8e4ee58ca9c11ae1952`.
+
+That manifest identifies the tested Stage D snapshot **before** the later billing integration and adoption of upstream test cases. It is not the manifest of the subsequent integrated source. The integration's separate billing equivalence evidence and latest-head hosted results must be assessed on their own source; this document does not relabel the 73-test run as execution of that later head.
+
+Counts overlap and must not be added into a unique project test total. The local runner uses pinned Python dependencies, dummy test settings and only the disposable localhost PostgreSQL 16 database. No live Stripe, email or provider operation was used.
+
+Reproduce the final targeted selection from the repository root with the repository test environment and a disposable PostgreSQL database:
+
+```bash
+python backend/manage.py test \
+  organizations.test_cascade_booking_protection \
+  workforce.tests.test_assignment_protection \
+  shifts.test_assignment_protection \
+  shifts.test_shift_actions_contract.OfferConfirmationRaceTests \
+  workforce.tests.test_cover_terms_authority \
+  workforce.tests.test_roster_slot_concurrency \
+  workforce.tests.test_roster_escalation_lock \
+  --settings=core.postgres_test_settings --verbosity=2 --noinput
+```
+
+### Test discovery
+
+`.github/workflows/serializer_decomposition_contracts.yml:95` selects the entire `shifts` app and `workforce.tests` on SQLite and PostgreSQL, so it discovers the six offer races, the bulk-move invoice regression and the new slot-lock error control. The race classes deliberately skip SQLite and must pass on PostgreSQL. `.github/workflows/shared_core_consolidation_ci.yml:312` explicitly selects `shifts.test_shift_actions_contract` and `workforce.tests.test_roster_slot_concurrency` for PostgreSQL; line 271 includes `test_assignment_protection` on SQLite. Its line 248 selects the full `organizations` app and therefore the new parent cascade module. Merely passing Backend Finalization Contracts does not establish execution of every new regression.
+
+A final read-only Django suite-construction check used the actual workflow labels on the integrated source, with database connection attempts forbidden. Serializer PostgreSQL discovered **587 unique test IDs**, including each of the six offer races, `test_bulk_move_refuses_assignment_with_invoice_history` and `test_roster_lock_does_not_hide_unrelated_database_failures` exactly once. Shared Core PostgreSQL discovered **448 unique IDs**, including all six races and the unrelated-error control exactly once. It does not select the bulk-move history module; that regression belongs to Serializer PostgreSQL and Shared Core's SQLite workforce selection. None of these eight named controls had a class/method skip flag under PostgreSQL. All 814 inspected source/workflow hashes were unchanged during discovery. This establishes configured discovery, not a new test execution or future CI pass.
+
+Published-head hosted CI belongs to the final integration checkpoint. Earlier-head results are not relabeled as current passes, and skipped workflows are not passes. Stage D's bounded source review and targeted verification are separate from whole-release, browser/native and live-provider acceptance.
+
+### Integrated-head hosted closure — `f72d7fa25be075c569acf4b54b798225dfd0a61a`
+
+The final integrated source received hosted execution after the billing-helper and mobile dependency-security integration:
+
+- **Serializer Decomposition Contracts / PostgreSQL:** **587 tests passed**, no failures. The workflow selects the full `shifts` app and `workforce.tests`, so this run executes the finalisation-vs-manual-assignment race, the bulk invoice-history move regression, the repaired single-assignment/history controls, parent-delete protection and the roster conflict controls discovered by that selection.
+- **Shared Core Consolidation / PostgreSQL concurrency:** **448 tests passed**, no failures, in 159.245 seconds. The workflow explicitly includes `shifts.test_shift_actions_contract` and `workforce.tests.test_roster_slot_concurrency`, so the six booking races and controlled-conflict/lock-order behavior execute on PostgreSQL at this integrated head.
+- **Backend Finalization Contracts:** passed on both PostgreSQL and SQLite.
+- **Large-module ratchet:** passed on the same source; `billing/views.py` no longer requires a large-module exception.
+- **Mobile exact-head security path:** install, exploit/compatibility regressions and the live dependency advisory gate passed. This is separate release evidence but confirms the Stage D source was not being tested on a superseded pre-security tree.
+- **Public Repository Security, Frontend Static/Mobile Lint and E2E Runner Smoke:** passed.
+- **Full Isolated QA** and **Architecture Mainline Native Full QA** were skipped by workflow conditions and are not counted as passes.
+
+At the time this closure paragraph was written, the broad `Shared Core Consolidation / backend` child was still completing later unrelated domain groups; its Stage D-critical PostgreSQL concurrency child had already completed successfully. Stage D is therefore closed for the named reachable production writers and accepted superadmin exception, while whole-release readiness still depends on the remaining release-acceptance work.

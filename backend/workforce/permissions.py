@@ -16,7 +16,7 @@ def _org_has_capability(user, pharmacy, capability: str) -> bool:
         return False
 
     from users.models import OrganizationMembership
-    from users.org_roles import OrgCapability, membership_capabilities, membership_visible_pharmacy_ids
+    from users.org_roles import membership_capabilities, membership_covers_pharmacy
 
     memberships = (
         OrganizationMembership.objects.filter(
@@ -29,9 +29,7 @@ def _org_has_capability(user, pharmacy, capability: str) -> bool:
         capabilities = membership_capabilities(membership)
         if capability not in capabilities:
             continue
-        if OrgCapability.VIEW_ALL_PHARMACIES in capabilities:
-            return True
-        if pharmacy.id in membership_visible_pharmacy_ids(membership):
+        if membership_covers_pharmacy(membership, pharmacy):
             return True
     return False
 

@@ -25,8 +25,8 @@ class SeatQuantityContracts(TestCase):
 
     def update(self, count, provider=None):
         with (
-            patch("billing.views.stripe.Subscription.retrieve", return_value=provider or stripe_result(2)) as retrieve,
-            patch("billing.views.stripe.Subscription.modify", return_value=stripe_result(count - 5 if isinstance(count, int) else 2)) as modify,
+            patch("billing.stripe_support.stripe.Subscription.retrieve", return_value=provider or stripe_result(2)) as retrieve,
+            patch("billing.stripe_support.stripe.Subscription.modify", return_value=stripe_result(count - 5 if isinstance(count, int) else 2)) as modify,
         ):
             resp = client_for(self.owner).post(URL, {"staff_count": count}, format="json")
         return resp, retrieve, modify
@@ -72,8 +72,8 @@ class SeatQuantityContracts(TestCase):
             data=SimpleNamespace(object=stripe_result(event_quantity)),
         )
         with (
-            patch("billing.views.stripe.Webhook.construct_event", return_value=event),
-            patch("billing.views.stripe.Subscription.retrieve", return_value=current, side_effect=error) as retrieve,
+            patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=event),
+            patch("billing.stripe_support.stripe.Subscription.retrieve", return_value=current, side_effect=error) as retrieve,
         ):
             response = self.client.post("/api/v1/billing/webhook/", b"{}", content_type="application/json")
         self.sub.refresh_from_db()

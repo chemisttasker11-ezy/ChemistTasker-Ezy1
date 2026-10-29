@@ -27,6 +27,8 @@ Invoice = apps.get_model('invoicing', 'Invoice')
 Notification = apps.get_model('notifications', 'Notification')
 from .calculations import CalculationError, expense_gst_credit, shift_hours, ZERO
 from .models import Customer, CatalogueItem, InvoiceReviewRequest, Expense, Receipt, Delivery, Payment
+from .delivery import reserve_delivery, preparation_failed, begin_delivery, delivery_uncertain, finish_delivery
+from .delivery_states import PUBLISHED_DELIVERY_STATUSES
 from .serializers import CustomerSerializer, ItemSerializer, InvoiceInput, ExpenseSerializer, MoneyField
 from .services import (
     save_draft, snapshot_lines, calculate, serialize_record, duplicate,
@@ -275,45 +277,50 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
                 raise ValidationError('Confirm sending this saved invoice.')
             recipient = record.payload['customer']['email']
             serializers.EmailField().run_validation(recipient)
-            delivery, created = Delivery.objects.get_or_create(invoice=record, version=record.version,
-                                                               defaults={'recipient': recipient})
+            delivery, created = reserve_delivery(record, recipient)
             if not created:
-                if delivery.status == 'failed':
-                    # A preparation failure occurred before any SMTP attempt;
-                    # it is safe to try rendering again while holding this lock.
-                    delivery.status = 'preparing'
-                    delivery.save(update_fields=['status'])
-                else:
-                    return Response({'detail': 'This send has already been attempted. Check delivery status before retrying.',
-                                     'document': serialize_record(record)}, status=200)
+                return Response({'detail': 'This send has already been attempted. Check delivery status before retrying.',
+                                 'document': serialize_record(record)}, status=200)
         # Persist the attempt before external IO. Never automatically resend after
         # SMTP timeout: acceptance may have occurred even when the response was lost.
         from .documents import render_pdf
         try:
             attachment = render_pdf(record)
+            number = serialize_record(record)['number']
+            message = EmailMessage(subject=f'{number} from {record.payload["issuer_name"]}',
+                                   body=f'Please find attached {number}.\nPayment instructions are in the document.',
+                                   to=[recipient], reply_to=[request.user.email],
+                                   connection=get_connection(timeout=getattr(settings, 'EMAIL_TIMEOUT', 30) or 30))
+            message.attach(f'{number}.pdf', attachment, 'application/pdf')
+            message.message()
         except Exception:
-            Delivery.objects.filter(pk=delivery.pk).update(status='failed')
-            logger.exception('Finance document rendering failed')
-            return Response({'detail': 'PDF preparation failed. No email was attempted.'}, status=503)
-        Delivery.objects.filter(pk=delivery.pk).update(status='sending')
-        number = serialize_record(record)['number']
-        message = EmailMessage(subject=f'{number} from {record.payload["issuer_name"]}',
-                               body=f'Please find attached {number}.\nPayment instructions are in the document.',
-                               to=[recipient], reply_to=[request.user.email],
-                               connection=get_connection(timeout=getattr(settings, 'EMAIL_TIMEOUT', 30) or 30))
-        message.attach(f'{number}.pdf', attachment, 'application/pdf')
+            preparation_failed(delivery.pk)
+            logger.exception('Finance email preparation failed')
+            return Response({'detail': 'Email preparation failed. No email was attempted.'}, status=503)
+        try:
+            claimed, _published_now = begin_delivery(delivery.pk)
+        except RuntimeError:
+            # The durable claim refuses an enclosing transaction before SMTP.
+            preparation_failed(delivery.pk)
+            logger.exception('Finance send requires a committed delivery reservation')
+            return Response({'detail': 'Email preparation could not commit. No email was attempted; you can retry.'}, status=503)
+        if not claimed:
+            record.refresh_from_db()
+            return Response({'detail': 'This send is no longer available. Reload the document.',
+                             'document': serialize_record(record)}, status=409)
         try:
             accepted = message.send(fail_silently=False)
             if accepted != 1:
                 raise RuntimeError('Mail backend did not confirm acceptance')
+            if not finish_delivery(delivery.pk):
+                raise RuntimeError('Invoice delivery completion was not recorded')
         except Exception:
-            Delivery.objects.filter(pk=delivery.pk).update(status='uncertain')
             logger.exception('Finance email acceptance is uncertain')
+            try:
+                delivery_uncertain(delivery.pk)
+            except Exception:
+                logger.exception('Could not record finance email outcome; committed send claim remains blocked')
             return Response({'detail': 'Email acceptance is uncertain. Do not resend until checked with your mail provider.'}, status=503)
-        with transaction.atomic():
-            Delivery.objects.filter(pk=delivery.pk).update(status='sent', sent_at=timezone.now())
-            Invoice.objects.filter(pk=record.pk, version=delivery.version).update(status='sent')
-            record.revisions.filter(version=delivery.version).update(invoice_status='sent')
         record.refresh_from_db()
         return Response({'detail': 'Accepted by the email provider; inbox delivery is not guaranteed.',
                          'document': serialize_record(record)})
@@ -336,7 +343,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         return (
             Invoice.objects.filter(source='internal', pharmacy__in=managed, request_key__isnull=False)
             .filter(
-                models.Q(deliveries__status__in=['sent', 'legacy_queued'])
+                models.Q(deliveries__status__in=PUBLISHED_DELIVERY_STATUSES)
                 | models.Q(status='sent')
                 | ~models.Q(review_status='NONE')
                 | models.Q(legacy_snapshot=True, version=1, status__in=['sent', 'paid'])
@@ -359,7 +366,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     def _require_current_delivered(record):
         delivered = record.deliveries.filter(
             version=record.version,
-            status__in=['sent', 'legacy_queued'],
+            status__in=PUBLISHED_DELIVERY_STATUSES,
         ).exists()
         current_visible = (
             delivered
@@ -403,7 +410,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         revision = get_object_or_404(record.revisions.all(), version=int(version))
         delivered = record.deliveries.filter(
             version=revision.version,
-            status__in=['sent', 'legacy_queued'],
+            status__in=PUBLISHED_DELIVERY_STATUSES,
         ).exists()
         if not delivered:
             visible = owner_visible_document(record)
@@ -417,7 +424,7 @@ class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
         revision = get_object_or_404(record.revisions.all(), version=int(version))
         delivered = record.deliveries.filter(
             version=revision.version,
-            status__in=['sent', 'legacy_queued'],
+            status__in=PUBLISHED_DELIVERY_STATUSES,
         ).exists()
         if not delivered and not (legacy_current_visible(record) and revision.version == record.version):
             raise Http404
@@ -626,6 +633,7 @@ def bas_worksheet(request):
         raise ValidationError('Choose cash/accrual and a period of at most 366 days.')
     records = Invoice.objects.filter(
         user=request.user,
+        request_key__isnull=False,
         kind='invoice',
         voided_at__isnull=True,
     )

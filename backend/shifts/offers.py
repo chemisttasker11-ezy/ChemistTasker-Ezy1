@@ -35,7 +35,6 @@ from organizations.access import managed_pharmacies as managed_pharmacies_for, u
 from shifts.base import SHIFT_OFFER_BUZZ_COOLDOWN
 from shifts.assignment import slot_locked_for_shift_offer
 from shifts.access import _user_can_perform_shift_role
-from shifts.interest import _require_public_shift_onboarding, is_public_shift_member_access
 from shifts.serializers import (
     ShiftInterestSerializer,
     ShiftOfferSerializer,
@@ -360,8 +359,6 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         slot_obj = offer.slot
         if not _user_can_perform_shift_role(offer.user, shift.role_needed):
             return Response({'detail': 'Your role does not cover this shift.'}, status=status.HTTP_400_BAD_REQUEST)
-        if shift.visibility == 'PLATFORM' and not is_public_shift_member_access(offer.user, shift):
-            _require_public_shift_onboarding(offer.user)
         if slot_obj is None:
             locked = shift.slot_assignments.exists() or shift.offers.filter(
                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -443,6 +440,11 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                     ).exclude(id=offer.id).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
 
         def send_acceptance_notifications():
+            def enqueue_confirmation_email(**kwargs):
+                def enqueue():
+                    async_task('users.tasks.send_async_email', **kwargs)
+                transaction.on_commit(enqueue, robust=True)
+
             if not requires_payment:
                 send_shift_payment_finalized_notifications(
                     shift=shift,
@@ -484,8 +486,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                         **offer_details,
                     },
                 )
-                async_task(
-                    'users.tasks.send_async_email',
+                enqueue_confirmation_email(
                     subject=(
                         f"Thanks for confirming your shift at {pharmacy_display} - owner payment pending"
                         if requires_payment
@@ -533,8 +534,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                         **offer_details,
                     },
                 )
-                async_task(
-                    'users.tasks.send_async_email',
+                enqueue_confirmation_email(
                     subject=f"{worker_role_label} confirmed shift offer at {pharmacy_display}" + (" - Action Required" if requires_payment else ""),
                     recipient_list=[owner_user.email],
                     template_name="emails/owner_worker_confirmed.html",

@@ -1,5 +1,6 @@
 """Invoices raised for completed shifts and in the finance workspace, with their line items."""
 from django.db import models
+from worker_finance.delivery_states import PUBLISHED_DELIVERY_STATUSES
 from datetime import date
 
 
@@ -10,7 +11,7 @@ def manager_visible_state():
         | models.Q(legacy_snapshot=True, version=1, status__in=["sent", "paid"])  # only the migrated revision
         | models.Q(
             deliveries__version=models.F("version"),
-            deliveries__status__in=["sent", "legacy_queued"],
+            deliveries__status__in=PUBLISHED_DELIVERY_STATUSES,
         )
         | models.Q(status="sent")
         | ~models.Q(review_status="NONE")

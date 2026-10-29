@@ -30,6 +30,7 @@ from attendance.test_kiosk_review import KioskReviewFixture
 from attendance.transitions import clock_in, clock_out
 from attendance.worker_api import WorkerClockOutView
 from memberships.models import Membership
+from notifications.models import Notification
 from users.models import User
 from workforce.models import ManagerAttendanceEventAudit, Timesheet, TimesheetPeriod
 from workforce.views import TimesheetMissingPunchView
@@ -453,6 +454,18 @@ connection.close()
         cache.set(key, otp)
         return cache, key, otp
 
+    @contextmanager
+    def observe_pin_confirmation_delivery(self):
+        transaction_states = []
+
+        def accept_email(**kwargs):
+            transaction_states.append((connection.in_atomic_block, connection.get_autocommit()))
+            return 1
+
+        with patch("django.core.mail.send_mail", side_effect=accept_email) as email, \
+             patch("notifications.services._deliver_notification") as notification:
+            yield email, notification, transaction_states
+
     def test_pin_setup_commit_failure_keeps_otp_usable_and_rolls_back_pin_and_attendance(self):
         worker, _ = self.prepare_worker()
         membership = Membership.objects.get(user=worker, pharmacy=self.pharmacy)
@@ -470,7 +483,8 @@ connection.close()
             ))
             raise IntegrityError("Forced failure after PIN/session writes, before commit.")
 
-        with patch.object(credentials, "security_cache", cache), patch("users.tasks.send_async_email"):
+        with patch.object(credentials, "security_cache", cache), \
+             patch("users.tasks.send_async_email") as confirmation:
             with patch.object(connection, "_commit", side_effect=fail_commit) as commit:
                 response = self.post_pin_setup(worker)
             commit.assert_called_once_with()
@@ -479,9 +493,11 @@ connection.close()
             self.assertEqual(WorkerPIN.objects.filter(pk=pin.pk).values().get(), pin_before)
             self.assertFalse(AttendanceSession.objects.filter(user=worker).exists())
             self.assertFalse(AttendanceEvent.objects.filter(session__user=worker).exists())
+            confirmation.assert_not_called()
             cached_after_rollback = cache.get(key)
             retry = self.post_pin_setup(worker)
             self.assertEqual(retry.status_code, 201, retry.data)
+            confirmation.assert_called_once()
             self.assertEqual(cached_after_rollback, otp)
             self.assertIsNone(cache.get(key), "Successful retry must consume the OTP on commit.")
             self.assertTrue(WorkerPIN.objects.get(pk=pin.pk).check_pin("2468"))
@@ -492,20 +508,24 @@ connection.close()
         worker, _ = self.prepare_worker()
         membership = Membership.objects.get(user=worker, pharmacy=self.pharmacy)
         cache, key, otp = self.seed_setup_otp(worker, membership)
-        with patch.object(credentials, "security_cache", cache), patch("users.tasks.send_async_email"):
+        with patch.object(credentials, "security_cache", cache), \
+             patch("users.tasks.send_async_email") as confirmation:
             with self.assertRaisesMessage(IntegrityError, "Forced outer rollback"):
                 with transaction.atomic():
                     response = self.post_pin_setup(worker)
                     self.assertEqual(response.status_code, 201, response.data)
                     self.assertTrue(WorkerPIN.objects.get(membership=membership).check_pin("2468"))
                     self.assertEqual(AttendanceEvent.objects.filter(session__user=worker).count(), 1)
+                    confirmation.assert_not_called()
                     raise IntegrityError("Forced outer rollback")
             self.assertFalse(WorkerPIN.objects.filter(membership=membership).exists())
             self.assertFalse(AttendanceSession.objects.filter(user=worker).exists())
             self.assertFalse(AttendanceEvent.objects.filter(session__user=worker).exists())
+            confirmation.assert_not_called()
             cached_after_rollback = cache.get(key)
             retry = self.post_pin_setup(worker)
             self.assertEqual(retry.status_code, 201, retry.data)
+            confirmation.assert_called_once()
             self.assertEqual(cached_after_rollback, otp)
             self.assertIsNone(cache.get(key))
 
@@ -513,11 +533,20 @@ connection.close()
         worker, _ = self.prepare_worker()
         membership = Membership.objects.get(user=worker, pharmacy=self.pharmacy)
         cache, key, _ = self.seed_setup_otp(worker, membership)
-        with patch.object(credentials, "security_cache", cache), patch("users.tasks.send_async_email"):
+        with patch.object(credentials, "security_cache", cache), \
+             self.observe_pin_confirmation_delivery() as (email, notification, transaction_states):
             response = self.post_pin_setup(worker)
             self.assertEqual(response.status_code, 201, response.data)
             self.assertFalse(connection.in_atomic_block, "This proof requires a real commit, including callbacks.")
             self.assertIsNone(cache.get(key))
+            email.assert_called_once()
+            self.assertEqual(email.call_args.kwargs["recipient_list"], [worker.email])
+            self.assertEqual(email.call_args.kwargs["subject"], "ChemistTasker - Attendance PIN Created")
+            self.assertIn(self.pharmacy.name, email.call_args.kwargs["message"])
+            self.assertEqual(transaction_states, [(False, True)])
+            notification.assert_called_once()
+            notice = Notification.objects.get(user=worker, title="ChemistTasker - Attendance PIN Created")
+            self.assertEqual(notification.call_args.args[0].pk, notice.pk)
             before = WorkerPIN.objects.filter(membership=membership).values().get()
             reuse = self.post_pin_setup(worker)
             self.assertEqual(reuse.status_code, 400, reuse.data)
@@ -525,6 +554,62 @@ connection.close()
             self.assertEqual(WorkerPIN.objects.filter(membership=membership).values().get(), before)
             self.assertEqual(AttendanceSession.objects.filter(user=worker).count(), 1)
             self.assertEqual(AttendanceEvent.objects.filter(session__user=worker).count(), 1)
+            email.assert_called_once()
+            notification.assert_called_once()
+
+    def test_pin_setup_clock_in_validation_400_commits_pin_and_confirmation(self):
+        worker, session = self.prepare_worker("CLOCK_OUT")
+        membership = Membership.objects.get(user=worker, pharmacy=self.pharmacy)
+        cache, key, otp = self.seed_setup_otp(worker, membership)
+        events_before = list(session.events.order_by("pk").values())
+
+        with patch.object(credentials, "security_cache", cache), \
+             self.observe_pin_confirmation_delivery() as (email, notification, transaction_states):
+            with transaction.atomic():
+                response = self.post_pin_setup(worker)
+                self.assertEqual(response.status_code, 400, response.data)
+                self.assertIn("already has an open attendance session", response.data["error"])
+                self.assertTrue(WorkerPIN.objects.get(membership=membership).check_pin("2468"))
+                self.assertEqual(cache.get(key), otp)
+                email.assert_not_called()
+                notification.assert_not_called()
+                self.assertFalse(Notification.objects.filter(user=worker).exists())
+
+            self.assertFalse(connection.in_atomic_block)
+            self.assertIsNone(cache.get(key))
+            self.assertTrue(WorkerPIN.objects.get(membership=membership).check_pin("2468"))
+            self.assertEqual(list(session.events.order_by("pk").values()), events_before)
+            self.assertEqual(AttendanceSession.objects.filter(user=worker).count(), 1)
+            email.assert_called_once()
+            self.assertEqual(transaction_states, [(False, True)])
+            notification.assert_called_once()
+            self.assertEqual(Notification.objects.filter(user=worker).count(), 1)
+
+    def test_pin_setup_confirmation_failure_preserves_committed_pin_and_attendance(self):
+        for failure in ("not_accepted", "provider_error", "unexpected_error"):
+            with self.subTest(failure=failure):
+                worker, _ = self.prepare_worker()
+                membership = Membership.objects.get(user=worker, pharmacy=self.pharmacy)
+                cache, key, _ = self.seed_setup_otp(worker, membership)
+                if failure == "unexpected_error":
+                    delivery = patch("users.tasks.send_async_email", side_effect=RuntimeError("Confirmation failed"))
+                elif failure == "provider_error":
+                    delivery = patch("django.core.mail.send_mail", side_effect=RuntimeError("Mail backend failed"))
+                else:
+                    delivery = patch("django.core.mail.send_mail", return_value=0)
+
+                with patch.object(credentials, "security_cache", cache), delivery as send, \
+                     patch("notifications.services._deliver_notification"), \
+                     self.assertLogs("attendance.credentials", level="WARNING"):
+                    response = self.post_pin_setup(worker)
+
+                self.assertEqual(response.status_code, 201, response.data)
+                self.assertFalse(connection.in_atomic_block)
+                self.assertIsNone(cache.get(key))
+                self.assertTrue(WorkerPIN.objects.get(membership=membership).check_pin("2468"))
+                self.assertEqual(AttendanceSession.objects.filter(user=worker).count(), 1)
+                self.assertEqual(AttendanceEvent.objects.filter(session__user=worker).count(), 1)
+                send.assert_called_once()
 
     def test_concurrent_pin_setups_cannot_reuse_otp_between_commit_and_callbacks(self):
         worker, _ = self.prepare_worker()
@@ -685,6 +770,150 @@ connection.close()
             event_id=response.data["created_event_id"], created_by=self.manager,
         ).exists())
 
+    def check_timesheet_rebuild_clock_out_fk_race(self, *, manager_after_commit):
+        """Force the later period/timesheet/FK cycle, after the session lock is released."""
+        from workforce.tasks import rebuild_timesheet_task
+
+        worker, session, timesheet = self.prepare_missing_punch()
+        qr = generate_signed_pharmacy_qr(self.device)["signed_token"]
+        period_table = connection.ops.quote_name(TimesheetPeriod._meta.db_table)
+        timesheet_table = connection.ops.quote_name(Timesheet._meta.db_table)
+        pharmacy_table = connection.ops.quote_name(self.pharmacy._meta.db_table)
+        session_held, release_manager, manager_committed = Event(), Event(), Event()
+        period_held, timesheet_updated, release_clock_out = Event(), Event(), Event()
+        observed = {"period_locked": False, "invalidations": 0, "invalidation_rows": [], "builder_waited": False}
+        original = {}
+
+        def manager_post():
+            response = self.post_missing_punch(timesheet, session)
+            if response.status_code == 201:
+                event_id = response.data["created_event_id"]
+                original["event"] = AttendanceEvent.objects.filter(pk=event_id).values().get()
+                original["audit"] = ManagerAttendanceEventAudit.objects.filter(event_id=event_id).values().get()
+            return response
+
+        def manager_request_with_callbacks():
+            with transaction.atomic():
+                AttendanceSession.objects.select_for_update(of=("self",)).get(pk=session.pk)
+                # Registered before the real signal callbacks so the hook ignores
+                # the view's initial build and stops only its after-commit rebuild.
+                transaction.on_commit(manager_committed.set)
+                session_held.set()
+                if not release_manager.wait(timeout=10):
+                    raise AssertionError("Manager request was not released.")
+                return manager_post()
+
+        def hold_builder_period(execute, sql, params, many, context):
+            result = execute(sql, params, many, context)
+            if (
+                manager_committed.is_set() and not observed["period_locked"]
+                and f"FROM {period_table}" in sql and f"JOIN {pharmacy_table}" in sql
+                and ("FOR UPDATE" in sql or "FOR NO KEY UPDATE" in sql)
+            ):
+                observed["period_locked"] = True
+                period_held.set()
+                if not timesheet_updated.wait(timeout=10):
+                    raise AssertionError("Clock-out did not invalidate the timesheet.")
+            return result
+
+        def hold_clock_out_invalidation(execute, sql, params, many, context):
+            invalidation = (
+                sql.startswith(f"UPDATE {timesheet_table} SET")
+                and '"needs_rebuild"' in sql and params and params[0] is True
+            )
+            if invalidation and observed["invalidations"] == 0:
+                if not period_held.wait(timeout=10):
+                    raise AssertionError("Rebuild did not acquire its period lock.")
+            result = execute(sql, params, many, context)
+            if invalidation:
+                observed["invalidations"] += 1
+                observed["invalidation_rows"].append(context["cursor"].rowcount)
+                if observed["invalidations"] == 1:
+                    timesheet_updated.set()
+                    if not release_clock_out.wait(timeout=10):
+                        raise AssertionError("Clock-out was not released for its second invalidation and commit.")
+            return result
+
+        def online_clock_out():
+            request = APIRequestFactory().post(
+                "/api/v1/attendance/worker/clock-out/", {"qr_token": qr},
+                format="json", HTTP_X_CLIENT_PLATFORM="mobile",
+            )
+            force_authenticate(request, user=worker)
+            return WorkerClockOutView.as_view()(request)
+
+        if not manager_after_commit:
+            response = manager_post()
+            self.assertEqual(response.status_code, 201, response.data)
+            manager_committed.set()
+
+        tasks = []
+        try:
+            rebuild = self.start(
+                "manager-after-commit-rebuild" if manager_after_commit else "separate-timesheet-rebuild",
+                manager_request_with_callbacks if manager_after_commit else
+                lambda: rebuild_timesheet_task.run(timesheet.period_id, worker.pk),
+                hold_builder_period,
+            )
+            tasks.append(rebuild)
+            self.assertTrue((session_held if manager_after_commit else period_held).wait(timeout=10))
+            online = self.start("qr-clock-out-with-invalidation", online_clock_out, hold_clock_out_invalidation)
+            tasks.append(online)
+            if manager_after_commit:
+                self.wait_until_blocked_or_done(online, rebuild[2])
+                self.assertFalse(online[3].is_set(), "Clock-out must wait for the manager's session lock.")
+                release_manager.set()
+            self.assertTrue(period_held.wait(timeout=10))
+            self.assertTrue(timesheet_updated.wait(timeout=10))
+            self.wait_until_blocked_or_done(rebuild, online[2])
+            self.assertFalse(rebuild[3].is_set(), "Rebuild must reach the timesheet held by clock-out.")
+            observed["builder_waited"] = True
+        finally:
+            # Release every gate before joining either connection, including a
+            # failed setup/assertion path. Observations are recorded separately.
+            release_manager.set()
+            period_held.set()
+            timesheet_updated.set()
+            release_clock_out.set()
+            for thread, *_ in tasks:
+                thread.join(timeout=15)
+            outcomes = [self.finish(task) for task in tasks]
+
+        self.assertTrue(observed["period_locked"] and observed["builder_waited"], observed)
+        self.assertGreaterEqual(observed["invalidations"], 2, observed)
+        self.assertEqual(observed["invalidation_rows"][:2], [1, 1], observed)
+        self.assertFalse(self.sql_errors, (outcomes, self.sql_errors))
+        self.assertTrue(all(kind == "ok" for kind, _ in outcomes), outcomes)
+        rebuilt, online_response = [value for _, value in outcomes]
+        if manager_after_commit:
+            self.assertEqual(rebuilt.status_code, 201, rebuilt.data)
+        else:
+            self.assertEqual((rebuilt["status"], rebuilt["timesheet_id"]), ("rebuilt", timesheet.pk))
+        self.assertEqual(online_response.status_code, 200, online_response.data)
+        self.assertEqual((online_response.data["status"], online_response.data["session_id"]),
+                         ("CLOCKED_OUT", session.pk))
+        session.refresh_from_db()
+        self.assertEqual(session.ended_at, self.now)
+        self.assertEqual(session.events.count(), 2)
+        self.assertEqual(AttendanceEvent.objects.filter(pk=original["event"]["id"]).values().get(), original["event"])
+        self.assertEqual(ManagerAttendanceEventAudit.objects.filter(pk=original["audit"]["id"]).values().get(),
+                         original["audit"])
+        self.assertEqual(session.events.get(event_type="CLOCK_IN").source, "MANAGER")
+        clock_out_event = session.events.get(event_type="CLOCK_OUT")
+        self.assertEqual((clock_out_event.source, clock_out_event.occurred_at), ("MOBILE_QR", self.now))
+        timesheet.refresh_from_db()
+        self.assertEqual(timesheet.worked_minutes, 180)
+        self.assertFalse(timesheet.needs_rebuild)
+        latest = timesheet.revisions.order_by("-revision_number").first()
+        self.assertEqual((latest.worked_minutes, latest.snapshot["totals"]["worked_minutes"]), (180, 180))
+        self.assertFalse(latest.checks.filter(code__in=["MISSING_CLOCK_IN", "MISSING_CLOCK_OUT"]).exists())
+
+    def test_manager_after_commit_rebuild_racing_qr_clock_out_finishes_without_fk_deadlock(self):
+        self.check_timesheet_rebuild_clock_out_fk_race(manager_after_commit=True)
+
+    def test_separate_timesheet_rebuild_racing_qr_clock_out_finishes_without_fk_deadlock(self):
+        self.check_timesheet_rebuild_clock_out_fk_race(manager_after_commit=False)
+
     def check_verified_close_preserves_setup_otp(self, channel):
         worker, _ = self.prepare_worker()
         membership = Membership.objects.get(user=worker, pharmacy=self.pharmacy)
@@ -713,7 +942,7 @@ connection.close()
             return result
 
         tasks = []
-        with patch.object(credentials, "security_cache", cache), patch("users.tasks.send_async_email"), \
+        with patch.object(credentials, "security_cache", cache), patch("users.tasks.send_async_email") as confirmation, \
              patch.object(kiosk_api, "check_clock_in_double_guard", side_effect=after_precheck):
             try:
                 setup = self.start("verified-race-setup", lambda: self.post_pin_setup(worker))
@@ -738,6 +967,7 @@ connection.close()
                 self.assertEqual(closed["results"][0]["result"], "accepted", closed)
             self.assertEqual(response.status_code, 409, response.data)
             self.assertEqual(response.data.get("code"), "CONFIRM_OPPOSITE_ACTION")
+            confirmation.assert_not_called()
             self.assertEqual(cache.get(key), otp, "409 consumed an OTP validated before the concurrent close.")
             self.assertEqual(WorkerPIN.objects.filter(pk=pin.pk).values().get(), pin_before)
             self.assertTrue(WorkerPIN.objects.get(pk=pin.pk).check_pin("1357"))
@@ -750,6 +980,7 @@ connection.close()
             retry = self.post_pin_setup(worker, confirm=True)
             self.assertEqual(retry.status_code, 201, retry.data)
             self.assertEqual(retry.data["action"], "CLOCKED_IN")
+            confirmation.assert_called_once()
             self.assertIsNone(cache.get(key))
             self.assertTrue(WorkerPIN.objects.get(pk=pin.pk).check_pin("2468"))
             self.assertEqual(AttendanceSession.objects.filter(user=worker).count(), 2)

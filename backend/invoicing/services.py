@@ -1,6 +1,5 @@
 """Invoice generation: preview and create invoices from accepted shifts, recalculate totals, render the PDF."""
 import json
-from datetime import time
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Pharmacy
 from shifts.models import ShiftSlotAssignment
@@ -10,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.template.loader import render_to_string
 from weasyprint import HTML
-from shifts.pricing import _decimal_hours, _resolve_shift_bounds
+from worker_finance.invoice_bridge import InvalidAssignmentTerms, resolve_invoice_assignment_facts
 
 
 INVOICE_SETTLEMENT_CHANNEL = "INVOICE"
@@ -67,70 +66,36 @@ def validate_internal_invoice_shifts(user, shift_ids, pharmacy_id=None, *, assig
     return assignments
 
 
-def _accepted_invoice_rate(assignment, slot_date):
-    snapshot = assignment.engagement_terms_snapshot or {}
-    for occurrence in snapshot.get("occurrences") or []:
-        if str(occurrence.get("slot_id") or "") != str(assignment.slot_id):
-            continue
-        if str(occurrence.get("date") or "") != str(slot_date):
-            continue
-        agreed_rate = occurrence.get("agreed_rate")
-        if agreed_rate not in (None, ""):
-            rate = Decimal(str(agreed_rate))
-            if rate > 0:
-                return rate
-
-    if assignment.unit_rate is not None and assignment.unit_rate > 0:
-        return Decimal(str(assignment.unit_rate))
-
-    raise ValidationError({
-        "rate": (
-            f"Accepted invoice terms for assignment {assignment.pk} do not contain a positive agreed rate. "
-            "Resolve the shift terms before invoicing."
-        )
-    })
-
-
 def _invoice_line_from_assignment(assignment):
-    slot = assignment.slot
-    slot_date = assignment.slot_date
-    start_time, end_time = slot.start_time, slot.end_time
-    for occurrence in (assignment.engagement_terms_snapshot or {}).get('occurrences') or []:
-        if str(occurrence.get('slot_id')) == str(slot.id) and str(occurrence.get('date')) == str(slot_date):
-            start_time = time.fromisoformat(occurrence['start_time']) if occurrence.get('start_time') else start_time
-            end_time = time.fromisoformat(occurrence['end_time']) if occurrence.get('end_time') else end_time
-            break
-    start_dt, end_dt = _resolve_shift_bounds(slot_date, start_time, end_time)
-    # InvoiceLineItem.quantity is a 2-decimal field. Freeze the billed hours
-    # at that precision before calculating money so DB, workspace and PDF agree.
-    hours = _decimal_hours(start_dt, end_dt).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    rate = _accepted_invoice_rate(assignment, slot_date)
-    total = (hours * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    snapshot = assignment.engagement_terms_snapshot or {}
+    try:
+        facts = resolve_invoice_assignment_facts(assignment)
+    except InvalidAssignmentTerms as exc:
+        raise ValidationError({exc.field: str(exc)}) from exc
+    total = (facts.hours * facts.rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return {
-        "id": f"{assignment.shift_id}-{slot.id}-{slot_date}",
-        "assignmentId": assignment.id,
-        "shiftId": assignment.shift_id,
-        "shiftSlotId": slot.id,
-        "date": str(slot_date),
-        "start_time": start_time.strftime("%H:%M:%S"),
-        "end_time": end_time.strftime("%H:%M:%S"),
-        "description": f"{str(slot_date)} {start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')}",
+        "id": f"{facts.shift_id}-{facts.slot_id}-{facts.occurrence_date}",
+        "assignmentId": facts.assignment_id,
+        "shiftId": facts.shift_id,
+        "shiftSlotId": facts.slot_id,
+        "date": str(facts.occurrence_date),
+        "start_time": facts.start_time.strftime("%H:%M:%S"),
+        "end_time": facts.end_time.strftime("%H:%M:%S"),
+        "description": f"{facts.occurrence_date} {facts.start_time.strftime('%H:%M')}-{facts.end_time.strftime('%H:%M')}",
         "category": "ProfessionalServices",
         "category_code": "ProfessionalServices",
         "unit": "Hours",
-        "quantity": float(hours),
-        "unit_price": float(rate),
+        "quantity": float(facts.hours),
+        "unit_price": float(facts.rate),
         "discount": 0,
         "total": float(total),
-        "gst_applicable": bool(snapshot.get("gst_registered", False)),
-        "super_applicable": bool(snapshot.get("super_payable_confirmed", False)),
+        "gst_applicable": facts.gst_registered,
+        "super_applicable": facts.super_payable_confirmed,
         "was_modified": False,
         "locked": True,
         "rate_reason": {
             "source": "AcceptedShiftTerms",
-            "assignment_id": assignment.id,
-            "offer_id": assignment.source_offer_id,
+            "assignment_id": facts.assignment_id,
+            "offer_id": facts.source_offer_id,
             "settlement_channel": assignment.settlement_channel,
         },
     }
@@ -147,8 +112,8 @@ def generate_preview_invoice_lines(shift, user):
     return [_invoice_line_from_assignment(assignment) for assignment in assignments]
 
 
-def recalculate_invoice_totals(invoice, *, ensure_generated_super_line=True):
-    line_items = list(invoice.line_items.all().order_by("id"))
+def _legacy_invoice_amounts(line_items, *, gst_registered, super_rate_snapshot):
+    """The existing compatibility arithmetic, without persistence or adoption."""
     non_super = [line for line in line_items if line.category_code != "Superannuation"]
     manual_super = [
         line for line in line_items
@@ -166,22 +131,51 @@ def recalculate_invoice_totals(invoice, *, ensure_generated_super_line=True):
     )
     gst_amount = (
         (gst_base * Decimal("0.10")).quantize(Decimal("0.01"))
-        if invoice.gst_registered
+        if gst_registered
         else Decimal("0.00")
     )
 
     if manual_super:
         super_amount = sum((line.total for line in manual_super), Decimal("0.00")).quantize(Decimal("0.01"))
-        for line in generated_super:
-            line.delete()
     else:
         super_base = sum(
             (line.total for line in non_super if line.super_applicable),
             Decimal("0.00"),
         )
         super_amount = (
-            super_base * (invoice.super_rate_snapshot / Decimal("100"))
+            super_base * (super_rate_snapshot / Decimal("100"))
         ).quantize(Decimal("0.01"))
+
+    return {
+        "subtotal": subtotal,
+        "gst_amount": gst_amount,
+        "super_amount": super_amount,
+        # Super remains a separate contribution, outside worker payable.
+        "total": (subtotal + gst_amount).quantize(Decimal("0.01")),
+    }, manual_super, generated_super
+
+
+def _generated_super_values(super_amount):
+    return {
+        "description": "Superannuation", "category_code": "Superannuation",
+        "unit": "Lump Sum", "quantity": Decimal("1.00"),
+        "unit_price": super_amount, "discount": Decimal("0.00"),
+        "total": super_amount, "gst_applicable": False, "super_applicable": False,
+        "is_manual": True, "was_modified": False,
+    }
+
+
+def recalculate_invoice_totals(invoice, *, ensure_generated_super_line=True):
+    amounts, manual_super, generated_super = _legacy_invoice_amounts(
+        list(invoice.line_items.all().order_by("id")),
+        gst_registered=invoice.gst_registered,
+        super_rate_snapshot=invoice.super_rate_snapshot,
+    )
+    super_amount = amounts["super_amount"]
+    if manual_super:
+        for line in generated_super:
+            line.delete()
+    else:
         if ensure_generated_super_line:
             primary = generated_super[0] if generated_super else None
             for extra in generated_super[1:]:
@@ -190,17 +184,7 @@ def recalculate_invoice_totals(invoice, *, ensure_generated_super_line=True):
                 if primary is None:
                     InvoiceLineItem.objects.create(
                         invoice=invoice,
-                        description="Superannuation",
-                        category_code="Superannuation",
-                        unit="Lump Sum",
-                        quantity=Decimal("1.00"),
-                        unit_price=super_amount,
-                        discount=Decimal("0.00"),
-                        total=super_amount,
-                        gst_applicable=False,
-                        super_applicable=False,
-                        is_manual=True,
-                        was_modified=False,
+                        **_generated_super_values(super_amount),
                     )
                 else:
                     primary.description = "Superannuation"
@@ -218,13 +202,9 @@ def recalculate_invoice_totals(invoice, *, ensure_generated_super_line=True):
             elif primary is not None:
                 primary.delete()
 
-    invoice.subtotal = subtotal
-    invoice.gst_amount = gst_amount
-    invoice.super_amount = super_amount
-    # Worker payable excludes super. Super is a separate contribution, matching
-    # the worker_finance workspace and optional separate super document.
-    invoice.total = (subtotal + gst_amount).quantize(Decimal("0.01"))
-    invoice.save(update_fields=["subtotal", "gst_amount", "super_amount", "total"])
+    for field, amount in amounts.items():
+        setattr(invoice, field, amount)
+    invoice.save(update_fields=list(amounts))
     return invoice
 
 
@@ -252,6 +232,82 @@ def _internal_invoice_source_snapshot(assignments):
     }
 
 
+def _invoice_issuer_profile(user):
+    try:
+        return PharmacistOnboarding.objects.get(user=user)
+    except PharmacistOnboarding.DoesNotExist:
+        try:
+            return OtherStaffOnboarding.objects.get(user=user)
+        except OtherStaffOnboarding.DoesNotExist:
+            # Invoices are issued from a worker's own ABN/bank profile. Owners and
+            # organisation staff receive invoices; they have no issuer profile.
+            raise ValidationError({
+                "issuer": "Invoices are issued from a pharmacist or other-staff profile; this account has none."
+            })
+
+
+def _validate_unbilled_assignments(assignments):
+    already_invoiced = (
+        InvoiceLineItem.objects
+        .filter(
+            source_assignment_id__in=[assignment.id for assignment in assignments],
+            category_code="ProfessionalServices",
+        )
+        .select_related("invoice", "source_assignment")
+        .first()
+    )
+    if already_invoiced:
+        raise ValidationError({
+            "shift_ids": (
+                f"Assignment {already_invoiced.source_assignment_id} is already billed "
+                f"on invoice #{already_invoiced.invoice_id}."
+            )
+        })
+
+
+def _generation_line_values(assignments, custom_lines, *, external):
+    """Rebuild authoritative source rows, then prepare the existing custom rows."""
+    effective_lines = []
+    if not external:
+        effective_lines.extend(
+            (_invoice_line_from_assignment(assignment), "assignment", None)
+            for assignment in assignments
+        )
+    for index, line in enumerate(custom_lines):
+        category = line.get("category_code") or line.get("category") or "ProfessionalServices"
+        if not external and category == "ProfessionalServices":
+            continue
+        effective_lines.append((line, "custom", index))
+
+    assignment_by_id = {assignment.id: assignment for assignment in assignments}
+    for line, origin, custom_index in effective_lines:
+        category_code = line.get("category_code") or line.get("category") or "ProfessionalServices"
+        qty = Decimal(str(line.get("quantity", 0)))
+        rate = Decimal(str(line.get("unit_price", 0)))
+        discount = Decimal(str(line.get("discount", 0))) / Decimal("100")
+        if not external and category_code == "ProfessionalServices":
+            # Source amounts already use the accepted-assignment rounding rule.
+            total = Decimal(str(line["total"]))
+        else:
+            total = (qty * rate * (1 - discount)).quantize(Decimal("0.01"))
+        shift_id = line.get("shiftId") or line.get("shift_id")
+        assignment_id = line.get("assignmentId") or line.get("assignment_id")
+        source_assignment = assignment_by_id.get(int(assignment_id)) if assignment_id else None
+        yield {
+            "shift_id": shift_id if shift_id else None,
+            "source_assignment": source_assignment,
+            "description": line.get("description", ""),
+            "category_code": category_code,
+            "unit": line.get("unit", "Item"),
+            "quantity": qty, "unit_price": rate,
+            "discount": discount * Decimal("100"), "total": total,
+            "gst_applicable": line.get("gst_applicable", True),
+            "super_applicable": line.get("super_applicable", True),
+            "is_manual": external or category_code != "ProfessionalServices",
+            "was_modified": external or category_code != "ProfessionalServices",
+        }, {**line, "origin": origin, "custom_index": custom_index}
+
+
 def generate_invoice_from_shifts(
     user,
     pharmacy_id=None,
@@ -263,18 +319,7 @@ def generate_invoice_from_shifts(
 ):
     billing_data = billing_data or {}
     custom_lines = list(custom_lines or [])
-
-    try:
-        ob = PharmacistOnboarding.objects.get(user=user)
-    except PharmacistOnboarding.DoesNotExist:
-        try:
-            ob = OtherStaffOnboarding.objects.get(user=user)
-        except OtherStaffOnboarding.DoesNotExist:
-            # Invoices are issued from a worker's own ABN/bank profile. Owners and
-            # organisation staff receive invoices; they have no issuer profile.
-            raise ValidationError({
-                "issuer": "Invoices are issued from a pharmacist or other-staff profile; this account has none."
-            })
+    ob = _invoice_issuer_profile(user)
 
     gst_registered = billing_data.get("gst_registered", False)
     if isinstance(gst_registered, str):
@@ -294,6 +339,9 @@ def generate_invoice_from_shifts(
         with transaction.atomic():
             locked_assignments = []
             if not external:
+                # Match finance Save/adoption: worker -> assignments -> invoice.
+                # The opposite order deadlocks concurrent legacy and finance saves.
+                user.__class__.objects.select_for_update().get(pk=user.pk)
                 locked_assignments = list(
                     _invoice_routed_assignments(
                         user,
@@ -307,23 +355,7 @@ def generate_invoice_from_shifts(
                     pharmacy_id=pharmacy_id,
                     assignments=locked_assignments,
                 )
-                assignment_ids = [assignment.id for assignment in locked_assignments]
-                already_invoiced = (
-                    InvoiceLineItem.objects
-                    .filter(
-                        source_assignment_id__in=assignment_ids,
-                        category_code="ProfessionalServices",
-                    )
-                    .select_related("invoice", "source_assignment")
-                    .first()
-                )
-                if already_invoiced:
-                    raise ValidationError({
-                        "shift_ids": (
-                            f"Assignment {already_invoiced.source_assignment_id} is already billed "
-                            f"on invoice #{already_invoiced.invoice_id}."
-                        )
-                    })
+                _validate_unbilled_assignments(locked_assignments)
 
             invoice = Invoice.objects.create(
                 user=user,
@@ -378,49 +410,8 @@ def generate_invoice_from_shifts(
                 invoice.bill_to_abn = billing_data.get("bill_to_abn", "")
             invoice.save()
 
-            effective_lines = []
-            if not external:
-                effective_lines.extend(
-                    _invoice_line_from_assignment(assignment)
-                    for assignment in locked_assignments
-                )
-                for line in custom_lines:
-                    category_code = line.get("category_code") or line.get("category") or "ProfessionalServices"
-                    if category_code == "ProfessionalServices":
-                        continue
-                    effective_lines.append(line)
-            else:
-                effective_lines = custom_lines
-
-            assignment_by_id = {
-                assignment.id: assignment for assignment in locked_assignments
-            }
-            for line in effective_lines:
-                category_code = line.get("category_code") or line.get("category") or "ProfessionalServices"
-                qty = Decimal(str(line.get("quantity", 0)))
-                rate = Decimal(str(line.get("unit_price", 0)))
-                discount = Decimal(str(line.get("discount", 0))) / Decimal("100")
-                total = (qty * rate * (1 - discount)).quantize(Decimal("0.01"))
-                shift_id = line.get("shiftId") or line.get("shift_id")
-                assignment_id = line.get("assignmentId") or line.get("assignment_id")
-                source_assignment = assignment_by_id.get(int(assignment_id)) if assignment_id else None
-
-                InvoiceLineItem.objects.create(
-                    invoice=invoice,
-                    shift_id=shift_id if shift_id else None,
-                    source_assignment=source_assignment,
-                    description=line.get("description", ""),
-                    category_code=category_code,
-                    unit=line.get("unit", "Item"),
-                    quantity=qty,
-                    unit_price=rate,
-                    discount=discount * Decimal("100"),
-                    total=total,
-                    gst_applicable=line.get("gst_applicable", True),
-                    super_applicable=line.get("super_applicable", True),
-                    is_manual=external or category_code != "ProfessionalServices",
-                    was_modified=external or category_code != "ProfessionalServices",
-                )
+            for values, _ in _generation_line_values(locked_assignments, custom_lines, external=external):
+                InvoiceLineItem.objects.create(invoice=invoice, **values)
 
             recalculate_invoice_totals(invoice)
             if not external:

@@ -270,3 +270,16 @@ def membership_visible_pharmacies(membership):
 
 def membership_visible_pharmacy_ids(membership) -> list[int]:
     return list(membership_visible_pharmacies(membership).values_list('id', flat=True))
+
+
+def membership_covers_pharmacy(membership, pharmacy) -> bool:
+    """Resolve organisation scope only; callers retain their actor and action-capability checks."""
+    if not membership or not pharmacy:
+        return False
+    organization_id = getattr(membership, "organization_id", None)
+    if organization_id is None or organization_id != getattr(pharmacy, "organization_id", None):
+        return False
+    return (
+        membership_has_org_wide_scope(membership)
+        or pharmacy.pk in membership_visible_pharmacy_ids(membership)
+    )

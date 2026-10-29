@@ -165,6 +165,10 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
         instance = serializer.instance
         with transaction.atomic():
             _guard_booked_occurrences(instance, instance.slot_date, serializer.validated_data.get("slot_date", instance.slot_date))
+            target_user = serializer.validated_data.get("user")
+            if ((target_user is not None and target_user.pk != instance.user_id)
+                    or serializer.validated_data.get("slot_date", instance.slot_date) != instance.slot_date):
+                _protect_removed_assignments([instance])
             super().perform_update(serializer)
 
     def perform_destroy(self, instance):
@@ -323,6 +327,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                 )
 
             obsolete = [assignment for key, assignment in existing_assignments.items() if key not in desired_keys]
+            _protect_removed_assignments(obsolete)
             for assignment in obsolete:
                 _guard_booked_occurrences(assignment, assignment.slot_date)
             if obsolete:

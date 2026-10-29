@@ -28,7 +28,7 @@ class B53OutOfOrderSubscriptionEvents(TestCase):
             owner=owner, stripe_customer_id="cus_b53",
             stripe_subscription_id="sub_b53", status="active",
         )
-        self.enterContext(patch("billing.views.stripe.Subscription.retrieve", side_effect=lambda sub_id: {
+        self.enterContext(patch("billing.stripe_support.stripe.Subscription.retrieve", side_effect=lambda sub_id: {
             "id": sub_id, "customer": "cus_b53", "status": "active",
         }))
 
@@ -37,7 +37,7 @@ class B53OutOfOrderSubscriptionEvents(TestCase):
             id=event_id, type=event_type,
             data=_StripeObject(object=_StripeObject(obj)),
         )
-        with patch("billing.views.stripe.Webhook.construct_event", return_value=event):
+        with patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=event):
             response = APIClient().post(
                 reverse("api_v1:billing:stripe_webhook"),
                 b"{}", content_type="application/json",
@@ -157,7 +157,7 @@ class B53OutOfOrderSubscriptionEvents(TestCase):
     def test_new_paid_checkout_reactivates_canceled_customer(self):
         self.sub.status = "canceled"
         self.sub.save(update_fields=["status"])
-        with patch("billing.views.stripe.Subscription.retrieve", return_value={
+        with patch("billing.stripe_support.stripe.Subscription.retrieve", return_value={
             "id": "sub_b53_new", "customer": "cus_b53", "status": "active",
         }) as retrieve:
             self.deliver("evt_b53_rejoin", "checkout.session.completed", {
@@ -172,7 +172,7 @@ class B53OutOfOrderSubscriptionEvents(TestCase):
     def test_new_checkout_with_canceled_stripe_subscription_stays_canceled(self):
         self.sub.status = "canceled"
         self.sub.save(update_fields=["status"])
-        with patch("billing.views.stripe.Subscription.retrieve", return_value={
+        with patch("billing.stripe_support.stripe.Subscription.retrieve", return_value={
             "id": "sub_b53_new", "customer": "cus_b53", "status": "canceled",
         }):
             self.deliver("evt_b53_stale_new", "checkout.session.completed", {
@@ -186,7 +186,7 @@ class B53OutOfOrderSubscriptionEvents(TestCase):
     def test_unpaid_new_checkout_cannot_reactivate_canceled_customer(self):
         self.sub.status = "canceled"
         self.sub.save(update_fields=["status"])
-        with patch("billing.views.stripe.Subscription.retrieve") as retrieve:
+        with patch("billing.stripe_support.stripe.Subscription.retrieve") as retrieve:
             self.deliver("evt_b53_unpaid_rejoin", "checkout.session.completed", {
                 "mode": "subscription", "customer": "cus_b53",
                 "subscription": "sub_b53_new", "payment_status": "unpaid",

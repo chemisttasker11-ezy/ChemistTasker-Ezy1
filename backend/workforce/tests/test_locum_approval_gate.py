@@ -1,6 +1,8 @@
 """PR-L/E9: unbooked provisional cover needs destination review before sign-off."""
 from datetime import timedelta
+from unittest import skipUnless
 
+from django.db import connection
 from django.test import TestCase
 
 from attendance.models import AttendanceEvent, AttendanceSession, ProvisionalAttendance
@@ -9,6 +11,9 @@ from client_profile.characterization_support import client_for
 from workforce.models import Timesheet, TimesheetApproval, TimesheetCheckDecision, TimesheetPeriod
 
 
+# Skip before TestCase opens its class transaction; the fixture rejects SQLite.
+# The PostgreSQL matrix still runs every approval contract below.
+@skipUnless(connection.vendor == "postgresql", "Unbooked locum approval contracts require PostgreSQL.")
 class LocumApprovalGateTests(LocumCoverFixture, TestCase):
     def setUp(self):
         super().setUp()

@@ -258,19 +258,8 @@ test('legacy invoice recipients follow the active dashboard, including worker ad
   }
 });
 
-test('legacy mobile invoice suggests the shared SG rate and preserves an agreed onboarding rate', () => {
-  const source = fs.readFileSync(new URL('../../frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx', import.meta.url), 'utf8');
-  const shared = fs.readFileSync(new URL('../../shared-core/src/domains/shifts/postingDraft.ts', import.meta.url), 'utf8');
-  const rate = shared.match(/export const SUPER_GUARANTEE_PERCENT = (\d+);/)[1];
-  const initial = source.match(/const \[superRateSnapshot, setSuperRateSnapshot\] = useState<number>\((.+)\);/)[1];
-  const override = source.match(/if \(onboarding\?\.super_rate_snapshot\)[\s\S]*?setSuperRateSnapshot\(Number\(onboarding.super_rate_snapshot\)\);/)[0];
-  for (const [onboarding, expected] of [[{}, 12], [{ super_rate_snapshot: '11.50' }, 11.5]]) {
-    let actual = evaluateInvoiceCode(initial, { SUPER_GUARANTEE_PERCENT: Number(rate) });
-    evaluateInvoiceCode(override, { onboarding, setSuperRateSnapshot: value => { actual = value; } });
-    assert.equal(actual, expected);
-  }
-});
-
+// Mobile invoice super defaults and onboarding overrides are exercised through
+// the actual screen in frontend_mobile/scripts/invoice-generation.test.cjs.
 test('cached chat activation refreshes missed messages before marking them read', async () => {
   const source = fs.readFileSync(new URL('../src/pages/dashboard/sidebar/chat/ChatPage.tsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const start = source.indexOf('  useEffect(() => {\n    if (!activeRoomId) return;');

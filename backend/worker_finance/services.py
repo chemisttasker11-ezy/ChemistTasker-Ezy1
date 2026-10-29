@@ -1,6 +1,6 @@
 """Transactional worker invoice operations over the canonical Invoice tables."""
 import json
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -11,6 +11,8 @@ from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
+from .assignment_terms import InvalidAssignmentTerms, resolve_invoice_assignment_facts
+from .delivery_states import PUBLISHED_DELIVERY_STATUSES, public_delivery_status
 
 from .calculations import calculate_invoice, CalculationError, allocate_payment, ZERO
 from .models import (
@@ -221,28 +223,11 @@ def _assignment_queryset(owner, assignment_ids=None, lock=False):
     return qs
 
 
-def _hours_for_assignment(assignment):
-    start = assignment.slot.start_time
-    end = assignment.slot.end_time
-    start_dt = datetime.combine(assignment.slot_date, start)
-    end_dt = datetime.combine(assignment.slot_date, end)
-    if end_dt <= start_dt:
-        end_dt += timedelta(days=1)
-    return (Decimal(str((end_dt - start_dt).total_seconds())) / Decimal("3600")).quantize(Decimal("0.01"))
-
-
-def _accepted_rate(assignment):
-    snapshot = assignment.engagement_terms_snapshot or {}
-    for occurrence in snapshot.get("occurrences") or []:
-        if str(occurrence.get("slot_id") or "") != str(assignment.slot_id):
-            continue
-        if str(occurrence.get("date") or "") != str(assignment.slot_date):
-            continue
-        if occurrence.get("agreed_rate") not in (None, ""):
-            return Decimal(str(occurrence["agreed_rate"]))
-    if assignment.unit_rate is not None:
-        return Decimal(str(assignment.unit_rate))
-    raise ValidationError({"rate": f"Assignment {assignment.pk} is missing an agreed invoice rate."})
+def _assignment_facts(assignment):
+    try:
+        return resolve_invoice_assignment_facts(assignment)
+    except InvalidAssignmentTerms as exc:
+        raise ValidationError({exc.field: str(exc)}) from exc
 
 
 def internal_invoice_sources(owner):
@@ -254,17 +239,18 @@ def internal_invoice_sources(owner):
     for assignment in _assignment_queryset(owner):
         if assignment.id in billed:
             continue
+        facts = _assignment_facts(assignment)
         pharmacy = assignment.shift.pharmacy
         result.append(
             {
                 "assignment_id": assignment.id,
                 "shift_id": assignment.shift_id,
                 "slot_id": assignment.slot_id,
-                "date": str(assignment.slot_date),
-                "start_time": assignment.slot.start_time.strftime("%H:%M"),
-                "end_time": assignment.slot.end_time.strftime("%H:%M"),
-                "hours": str(_hours_for_assignment(assignment)),
-                "rate": str(_accepted_rate(assignment).quantize(Decimal("0.01"))),
+                "date": str(facts.occurrence_date),
+                "start_time": facts.start_time.strftime("%H:%M"),
+                "end_time": facts.end_time.strftime("%H:%M"),
+                "hours": str(facts.hours),
+                "rate": str(facts.rate.quantize(Decimal("0.01"))),
                 "pharmacy": {
                     "id": pharmacy.id,
                     "name": pharmacy.name,
@@ -281,6 +267,19 @@ def internal_invoice_sources(owner):
 def _source_snapshot(assignments):
     pharmacy = assignments[0].shift.pharmacy if assignments else None
     owner_user = getattr(getattr(pharmacy, "owner", None), "user", None) if pharmacy else None
+    accepted_terms = []
+    for assignment in assignments:
+        facts = _assignment_facts(assignment)
+        accepted_terms.append({
+            "assignment_id": facts.assignment_id,
+            "source_offer_id": facts.source_offer_id,
+            "settlement_channel": assignment.settlement_channel,
+            "engagement_kind": assignment.engagement_kind,
+            "accepted_at": facts.accepted_at.isoformat() if facts.accepted_at else None,
+            "terms": assignment.engagement_terms_snapshot or {},
+            "original_hours": str(facts.hours),
+            "original_rate": str(facts.rate.quantize(Decimal("0.01"))),
+        })
     return {
         "version": 3,
         "source": "INTERNAL_ABN_SHIFT_ASSIGNMENTS",
@@ -294,19 +293,7 @@ def _source_snapshot(assignments):
             "email": getattr(pharmacy, "email", "") or getattr(owner_user, "email", "") or "",
             "address": _pharmacy_address(pharmacy),
         } if pharmacy else {},
-        "accepted_terms": [
-            {
-                "assignment_id": a.id,
-                "source_offer_id": a.source_offer_id,
-                "settlement_channel": a.settlement_channel,
-                "engagement_kind": a.engagement_kind,
-                "accepted_at": a.engagement_terms_accepted_at.isoformat() if a.engagement_terms_accepted_at else None,
-                "terms": a.engagement_terms_snapshot or {},
-                "original_hours": str(_hours_for_assignment(a)),
-                "original_rate": str(_accepted_rate(a).quantize(Decimal("0.01"))),
-            }
-            for a in assignments
-        ],
+        "accepted_terms": accepted_terms,
     }
 
 
@@ -337,22 +324,23 @@ def internal_invoice_prefill(owner, assignment_ids):
     gst_registered = bool(defaults["gst_registered"])
     lines = []
     for assignment in assignments:
+        facts = _assignment_facts(assignment)
         lines.append(
             {
                 "item_id": None,
                 "description": (
                     f"{assignment.shift.get_role_needed_display() if hasattr(assignment.shift, 'get_role_needed_display') else assignment.shift.role_needed} "
-                    f"services — {assignment.slot_date} "
-                    f"{assignment.slot.start_time.strftime('%H:%M')}-{assignment.slot.end_time.strftime('%H:%M')}"
+                    f"services — {facts.occurrence_date} "
+                    f"{facts.start_time.strftime('%H:%M')}-{facts.end_time.strftime('%H:%M')}"
                 ),
                 "category_code": "ProfessionalServices",
                 "unit": "Hours",
-                "quantity": str(_hours_for_assignment(assignment)),
-                "unit_price": str(_accepted_rate(assignment).quantize(Decimal("0.01"))),
+                "quantity": str(facts.hours),
+                "unit_price": str(facts.rate.quantize(Decimal("0.01"))),
                 "discount": "0.00",
                 "tax_code": "GST" if gst_registered else "OUT_OF_SCOPE",
-                "super_eligible": bool((assignment.engagement_terms_snapshot or {}).get("super_payable_confirmed", False)),
-                "worked_on": str(assignment.slot_date),
+                "super_eligible": facts.super_payable_confirmed,
+                "worked_on": str(facts.occurrence_date),
                 "source_assignment_id": assignment.id,
                 "shift_id": assignment.shift_id,
             }
@@ -496,21 +484,14 @@ def write_canonical(record):
         )
 
 
-@transaction.atomic
-def adopt_internal_invoice(owner, invoice):
-    owner.__class__.objects.select_for_update().get(pk=owner.pk)
-    # The pharmacy link is nullable for external invoices. Keep the lock query
-    # on the invoice row so PostgreSQL does not reject a nullable outer join.
-    invoice = Invoice.objects.select_related(None).select_for_update().get(pk=invoice.pk)
-    existing = Invoice.objects.filter(pk=invoice.pk, request_key__isnull=False).first()
-    if existing:
-        return existing
-    source_snapshot = invoice.source_snapshot or {}
-    if source_snapshot.get("source") != "INTERNAL_ABN_SHIFT_ASSIGNMENTS":
-        raise ValidationError("Only accepted-shift internal invoices can be adopted into this workspace.")
-    customer = _customer_for_internal_invoice(owner, invoice)
+def calculate_generated_internal_invoice(invoice, canonical_lines):
+    """Map and value generated rows without creating workspace state.
+
+    A materialized super row remains a fixed contribution during adoption.
+    The read-only generation preview uses these same inputs and calculation.
+    """
     payload_lines = []
-    for line in invoice.line_items.select_related("source_assignment").order_by("id"):
+    for line in canonical_lines:
         payload_lines.append(
             {
                 "item_id": None,
@@ -527,6 +508,31 @@ def adopt_internal_invoice(owner, invoice):
                 "shift_id": line.shift_id,
             }
         )
+    calc = calculate_invoice(
+        payload_lines,
+        gst_registered=bool(invoice.gst_registered),
+        price_mode="exclusive",
+        super_mode="summary" if invoice.super_amount > 0 else "none",
+        super_rate=str(invoice.super_rate_snapshot),
+    )
+    return payload_lines, calc
+
+
+@transaction.atomic
+def adopt_internal_invoice(owner, invoice):
+    owner.__class__.objects.select_for_update().get(pk=owner.pk)
+    # The pharmacy link is nullable for external invoices. Keep the lock query
+    # on the invoice row so PostgreSQL does not reject a nullable outer join.
+    invoice = Invoice.objects.select_related(None).select_for_update().get(pk=invoice.pk)
+    existing = Invoice.objects.filter(pk=invoice.pk, request_key__isnull=False).first()
+    if existing:
+        return existing
+    source_snapshot = invoice.source_snapshot or {}
+    if source_snapshot.get("source") != "INTERNAL_ABN_SHIFT_ASSIGNMENTS":
+        raise ValidationError("Only accepted-shift internal invoices can be adopted into this workspace.")
+    customer = _customer_for_internal_invoice(owner, invoice)
+    canonical_lines = list(invoice.line_items.select_related("source_assignment").order_by("id"))
+    payload_lines, calc = calculate_generated_internal_invoice(invoice, canonical_lines)
     payload = {
         "request_key": str(uuid4()),
         "customer_id": customer.pk,
@@ -556,13 +562,15 @@ def adopt_internal_invoice(owner, invoice):
             for key in ("name", "legal_name", "address", "abn", "email", "contact_name")
         },
     }
-    calc = calculate_invoice(
-        payload_lines,
-        gst_registered=payload["gst_registered"],
-        price_mode=payload["price_mode"],
-        super_mode=payload["super_mode"],
-        super_rate=payload["super_rate"],
-    )
+    # Initial adoption shares the managed calculation without rewriting source
+    # identities, edit flags or contact snapshots through the correction writer.
+    for line, calculated in zip(canonical_lines, calc["lines"], strict=True):
+        line.total = Decimal(calculated["net"])
+    InvoiceLineItem.objects.bulk_update(canonical_lines, ["total"])
+    invoice.subtotal = Decimal(calc["subtotal"])
+    invoice.gst_amount = Decimal(calc["gst"])
+    invoice.super_amount = Decimal(calc["super"])
+    invoice.total = Decimal(calc["payable"])
     invoice.customer = customer
     invoice.kind = "invoice"
     invoice.source = "internal"
@@ -571,6 +579,7 @@ def adopt_internal_invoice(owner, invoice):
     invoice.calculation = json_safe(calc)
     invoice.save(update_fields=[
         "customer", "kind", "source", "request_key", "payload", "calculation", "updated_at",
+        "subtotal", "gst_amount", "super_amount", "total",
     ])
     record = Invoice.objects.get(pk=invoice.pk)
     _record_revision(record)
@@ -729,7 +738,7 @@ def serialize_revision(record, revision):
         "editable": False,
         "status": "void" if record.voided_at else revision.invoice_status,
         "review_status": revision.review_status,
-        "delivery_status": delivery.status if delivery else None,
+        "delivery_status": public_delivery_status(delivery.status) if delivery else None,
         "balance": str(payable - paid),
     })
     return document
@@ -745,7 +754,7 @@ def serialize_owner_revision(record, revision):
     document = serialize_revision(record, revision)
     visible_versions = set(
         record.deliveries
-        .filter(status__in=["sent", "legacy_queued"])
+        .filter(status__in=PUBLISHED_DELIVERY_STATUSES)
         .values_list("version", flat=True)
     )
     if (
@@ -771,7 +780,7 @@ def owner_visible_document(record):
     """
     current_delivery = record.deliveries.filter(
         version=record.version,
-        status__in=["sent", "legacy_queued"],
+        status__in=PUBLISHED_DELIVERY_STATUSES,
     ).first()
     # A worker's paid attestation does not deliver their current draft to the pharmacy.
     current_is_visible = (
@@ -782,7 +791,7 @@ def owner_visible_document(record):
     )
     visible_versions = set(
         record.deliveries
-        .filter(status__in=["sent", "legacy_queued"])
+        .filter(status__in=PUBLISHED_DELIVERY_STATUSES)
         .values_list("version", flat=True)
     )
     if current_is_visible:
@@ -791,7 +800,7 @@ def owner_visible_document(record):
     else:
         delivered = (
             record.deliveries
-            .filter(status__in=["sent", "legacy_queued"])
+            .filter(status__in=PUBLISHED_DELIVERY_STATUSES)
             .order_by("-version")
             .first()
         )
@@ -838,7 +847,7 @@ def serialize_record(record):
         "review_status": record.review_status,
         "last_review_note": record.last_review_note,
         "last_reviewed_at": record.last_reviewed_at.isoformat() if record.last_reviewed_at else None,
-        "delivery_status": delivery.status if delivery else None,
+        "delivery_status": public_delivery_status(delivery.status) if delivery else None,
         "paid": str(paid),
         "balance": str(Decimal(record.calculation["payable"]) - paid),
         "super_document_id": companion.pk if companion else None,

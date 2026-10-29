@@ -16,7 +16,7 @@ from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from shifts.access import ShiftActionRefused, _user_can_perform_shift_role, staff_membership_can_claim_role
 from shifts.emails import build_offer_shift_details, build_shift_offer_context
 from shifts.engagement import keep_accepted_terms, staff_assignment_defaults
-from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
+from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from shifts.notifications import notify_shift_users
 
 OFFER_EXPIRY_HOURS = 48
@@ -116,16 +116,21 @@ def offer_shift(*, shift, candidate, slot_id):
             body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
             kind="shift_offer_received",
             payload={"offer_id": offer.id, **offer_details},
+            deliver_on_commit=True,
         )
-        async_task(
-            'users.tasks.send_async_email',
-            subject="You have a new shift offer",
-            recipient_list=[candidate.email],
-            template_name="emails/shift_offer.html",
-            context=ctx,
-            text_template="emails/shift_offer.txt",
-            suppress_auto_notification=True,
-        )
+
+        def enqueue_offer_email(recipient_email=candidate.email, context=ctx):
+            async_task(
+                'users.tasks.send_async_email',
+                subject="You have a new shift offer",
+                recipient_list=[recipient_email],
+                template_name="emails/shift_offer.html",
+                context=context,
+                text_template="emails/shift_offer.txt",
+                suppress_auto_notification=True,
+            )
+
+        transaction.on_commit(enqueue_offer_email, robust=True)
 
     return {
         'status': f'Offer sent to {candidate.get_full_name() or candidate.email}.',
@@ -157,6 +162,8 @@ def roster_direct_staff(*, shift, candidate, assignments):
     # invalid or belongs to a published roster week, do not leave earlier slots
     # from the same request persisted.
     with transaction.atomic():
+        # Match offer finalization's Shift -> Slot order; an insert's deferred Shift FK otherwise deadlocks.
+        get_object_or_404(Shift.objects.select_for_update(), pk=shift.pk)
         for entry in assignments:
             slot_id = entry.get('slot_id')
             slot_date = entry.get('slot_date')
@@ -280,32 +287,34 @@ def offer_dedicated_shift(shift, dedicated_user):
 
     if offers and dedicated_user.email:
         offer_for_email = offers[0]
-        def _send_offer_email():
-            ctx = build_shift_offer_context(
-                shift,
-                offer_for_email,
-                recipient=dedicated_user,
-                ignore_slot_filter=True,
-            )
-            offer_details = build_offer_shift_details(shift, offer_for_email)
-            ctx.update(offer_details)
-            notify_shift_users(
-                [dedicated_user],
-                shift=shift,
-                title="Shift offer received",
-                body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
-                kind="shift_offer_received",
-                payload={"offer_id": offer_for_email.id, **offer_details},
-            )
+        ctx = build_shift_offer_context(
+            shift,
+            offer_for_email,
+            recipient=dedicated_user,
+            ignore_slot_filter=True,
+        )
+        offer_details = build_offer_shift_details(shift, offer_for_email)
+        ctx.update(offer_details)
+        notify_shift_users(
+            [dedicated_user],
+            shift=shift,
+            title="Shift offer received",
+            body=f"You have received a shift offer. Please confirm to lock it in. {offer_details['shift_summary']}",
+            kind="shift_offer_received",
+            payload={"offer_id": offer_for_email.id, **offer_details},
+            deliver_on_commit=True,
+        )
+
+        def enqueue_offer_email(recipient_email=dedicated_user.email, context=ctx):
             async_task(
                 'users.tasks.send_async_email',
                 subject="You have a new shift offer",
-                recipient_list=[dedicated_user.email],
+                recipient_list=[recipient_email],
                 template_name="emails/shift_offer.html",
-                context=ctx,
+                context=context,
                 text_template="emails/shift_offer.txt",
                 suppress_auto_notification=True,
             )
 
-        transaction.on_commit(_send_offer_email)
+        transaction.on_commit(enqueue_offer_email, robust=True)
 

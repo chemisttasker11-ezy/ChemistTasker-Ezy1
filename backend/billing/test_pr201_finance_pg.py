@@ -137,7 +137,7 @@ class FinancePostgresConcurrency(TransactionTestCase):
                 )),
             )
 
-        with patch("billing.views.stripe.Webhook.construct_event", side_effect=fake_event):
+        with patch("billing.stripe_support.stripe.Webhook.construct_event", side_effect=fake_event):
             rows = self._threads(
                 lambda i: self._deliver_event(f"evt_pg_same_{i}", None),
             )
@@ -166,7 +166,7 @@ class FinancePostgresConcurrency(TransactionTestCase):
                     amount_refunded=cents, refunded=(cents == 4500),
                 )),
             )
-        with patch("billing.views.stripe.Webhook.construct_event", side_effect=fake_event):
+        with patch("billing.stripe_support.stripe.Webhook.construct_event", side_effect=fake_event):
             rows = self._threads(
                 lambda i: self._deliver_event(
                     "evt_pg_refund_full" if i else "evt_pg_refund_partial", None,

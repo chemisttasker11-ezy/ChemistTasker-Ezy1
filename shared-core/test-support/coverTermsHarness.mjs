@@ -2,8 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import ts from 'typescript';
 
 const root = new URL('../../', import.meta.url);
 // Captured from E17_ACCEPTED_LIST_ROW in the Postgres backend contract test.
@@ -47,6 +47,8 @@ export function text(node) {
 
 async function mount(platform, { rows = [cover], loadError = false, acceptError = false, pending = false, acceptPending = false, dialogOnly = false, pathname = '/dashboard/pharmacist/attendance', role = 'PHARMACIST' } = {}) {
   const mobile = platform === 'mobile';
+  // Resolve from the app under test: clean CI installs each app separately.
+  const ts = createRequire(new URL(mobile ? 'frontend_mobile/package.json' : 'frontend_web/package.json', root))('typescript');
   const instances = new Map(), calls = [], routes = [], dialogsUsed = [];
   let active, dirty = true, effects = [], tree, release, releaseAccept, loads = 0, attempts = 0;
   const deferred = new Promise(resolve => { release = resolve; });

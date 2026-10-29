@@ -20,10 +20,12 @@ from workforce.timesheet_core import _hash
 def _locked_timesheet_and_period(timesheet):
     """Lock the period first, then this timesheet, so transitions serialize with period locking.
 
+    Allow source invalidation's period FK check to commit and release the timesheet;
+    the NO KEY UPDATE parent lock still excludes other period writers.
     The caller must already be inside transaction.atomic().
     """
     period = (
-        TimesheetPeriod.objects.select_for_update(of=("self",))
+        TimesheetPeriod.objects.select_for_update(of=("self",), no_key=True)
         .select_related("pharmacy")
         .get(pk=timesheet.period_id)
     )
