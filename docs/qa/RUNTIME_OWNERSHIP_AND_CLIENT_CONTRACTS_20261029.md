@@ -89,3 +89,30 @@ and ceiling failures are not represented as production fixes. Final source check
 
 This finishes the selected ownership extractions and representative contract audit. It does
 not declare global acyclicity, complete cross-language parity or production acceptance.
+
+## Publication and F07 compatibility follow-up
+
+Published as draft PR #222, stacked on the unchanged #221. Initial published commit
+`ec4b65b1f38734b934ec2ca6a4e54d00489a55fc` has tree
+`915784f8a838eaf2eb19050db390d0733cbb9142`, identical to tested local commit `672bfc26`.
+The connected GitHub publisher assigned different commit metadata; no source difference exists.
+
+The manual F07 security block still asserted `core.urls` even though #218 intentionally made
+`composition.urls` the entrypoint. It now requires the composition entrypoint and the exact
+historical URL-pattern object, retaining every mounted handler and permission implementation.
+Route contracts compare all existing domain prefixes and representative protected handlers;
+the same contracts run in Shared Core, isolated QA and the manual F07 security job.
+The corrected security block and `check --deploy --tag security --fail-level WARNING` pass
+locally under the workflow's production settings. This is not a pass of the whole hosted F07
+workflow or deployed acceptance. No application routing or permission behavior changes.
+The final local route/permission selection passed **20/20**, zero skips/failures/errors:
+`core.test_client_profile_api_composition`, `organizations.test_pharmacy_access_characterization`
+and `users.test_cross_client_authority_contract` (0.910 seconds after disposable SQLite setup).
+This includes permitted actors and cross-site/unauthenticated denials. Shell syntax, whitespace
+and the unchanged runtime-cycle ledger also pass.
+
+Hosted verification must use the final follow-up head. Enable `full-qa` so isolated QA runs
+instead of skipping. Authenticated logout acceptance, PostgreSQL, browser and full isolated
+results remain pending until their final-head jobs finish. Native/device, provider, deployment
+and stacked merge integration remain separate release evidence. Financial/delivery policy
+changes and further longer-cycle work remain bounded by the revised remaining work above.
