@@ -1,8 +1,8 @@
 """Authenticated sessions: browser vs native clients, the httpOnly JWT cookies and the signed-in user
 payload."""
+from users.membership_port import membership_services
 from users.models import OrganizationMembership
 from organizations.access import admin_assignments_for
-from memberships.models import Membership
 from organizations.models import Pharmacy
 from django.conf import settings
 from users.serializers import serialize_org_memberships
@@ -82,11 +82,7 @@ def _build_authenticated_user_payload(user):
     org_memberships = OrganizationMembership.objects.filter(user=user)
     org_payload = serialize_org_memberships(org_memberships)
 
-    pharm_memberships = Membership.objects.filter(
-        user=user,
-        is_active=True,
-        status=Membership.Status.ACCEPTED,
-    ).select_related("pharmacy")
+    pharm_memberships = membership_services().accepted_for_user(user)
     pharm_payload = [
         {
             "id": pm.id,

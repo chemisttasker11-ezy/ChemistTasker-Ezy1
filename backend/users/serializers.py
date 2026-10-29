@@ -1,4 +1,5 @@
 # users/serializers.py
+from users.membership_port import membership_services
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
@@ -15,7 +16,6 @@ import secrets
 from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
 from organizations.models import Pharmacy
-from memberships.models import Membership as PharmacyMembership
 from organizations.access import admin_assignments_for
 from .org_roles import (
     ADMIN_LEVEL_DEFINITIONS,
@@ -379,11 +379,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         org_payload = serialize_org_memberships(org_memberships)
 
         # 2) Pharmacy memberships
-        pharm_memberships = PharmacyMembership.objects.filter(
-            user=self.user,
-            is_active=True,
-            status=PharmacyMembership.Status.ACCEPTED,
-        ).select_related('pharmacy')
+        pharm_memberships = membership_services().accepted_for_user(self.user)
 
         pharm_payload = [
             {
@@ -455,11 +451,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             org_memberships = OrganizationMembership.objects.filter(user=user)
             org_payload = serialize_org_memberships(org_memberships)
 
-            pharm_memberships = PharmacyMembership.objects.filter(
-                user=user,
-                is_active=True,
-                status=PharmacyMembership.Status.ACCEPTED,
-            ).select_related('pharmacy')
+            pharm_memberships = membership_services().accepted_for_user(user)
 
             pharm_payload = [
                 {
