@@ -1,6 +1,6 @@
 """Ownership claims: owner onboarding claims and pharmacy claim review."""
 from rest_framework import mixins, permissions, status, viewsets
-from memberships.models import Membership
+from organizations.membership_port import membership_operations
 from organizations.models import Pharmacy, PharmacyAdmin, PharmacyClaim
 from onboarding.models import OwnerOnboarding
 from notifications.models import Notification
@@ -229,31 +229,7 @@ class OwnerOnboardingClaim(APIView):
             # The onboarded contact manages this one pharmacy through a full delegated MANAGER assignment.
             # Existing worker accounts keep a concrete pharmacy membership role immediately; a new
             # PHARMACY_MANAGER stays CONTACT until their personal worker type is known.
-            from memberships.role_resolution import personal_pharmacy_role
-            worker_role = personal_pharmacy_role(user)
-            pharmacy_membership, _ = Membership.objects.get_or_create(
-                user=user,
-                pharmacy=pharmacy,
-                defaults={
-                    'role': worker_role or 'CONTACT',
-                    'employment_type': 'FULL_TIME',
-                    'status': Membership.Status.ACCEPTED,
-                    'is_active': True,
-                    'invited_by': request.user,
-                }
-            )
-            assignment, _ = PharmacyAdmin.objects.update_or_create(
-                user=user,
-                pharmacy=pharmacy,
-                defaults={
-                    'membership': pharmacy_membership,
-                    'admin_level': PharmacyAdmin.AdminLevel.MANAGER,
-                    'staff_role': worker_role,
-                    'job_title': 'Pharmacy Manager',
-                    'is_active': True,
-                    'created_by': request.user,
-                }
-            )
+            pharmacy_membership, assignment = membership_operations().bootstrap_contact(user, pharmacy, request.user)
         self._send_org_invite_email(user, organization, pharmacy, request.user, temp_password=temp_password)
         serialized = PharmacySerializer(pharmacy, context={'request': request}).data
         return {

@@ -1,8 +1,8 @@
 {
   "schema": "chemisttasker-backend-cycle-baseline-v1",
-  "recorded_sha": "230ccff2d798d0672bea46d356616b758ea1148f",
-  "source": "Behaviour-preserving core/shifts infrastructure boundary extraction; see docs/architecture/DEPENDENCY_CYCLE_REMOVAL_PLAN_20261029.md",
-  "notes": "Actual cyclic edges shrink from 41 to 40: shifts-to-core is removed. The existing core-to-shifts composition edge is reclassified from the retired mutual-pair exemption into the longer-cycle ledger; no new actual cyclic edge is accepted.",
+  "recorded_sha": "e88438810424472b5f1167b900a9f32a1fee8778",
+  "source": "Organisation/membership ownership inversion; see DEPENDENCY_CYCLE_REMOVAL_PLAN_20261029.md",
+  "notes": "Actual direct cyclic edges shrink from 40 to 39. organizations-to-memberships is removed at every depth. The membership-to-organization facts edge is reclassified into the non-mutual ledger. Composition sits above both domains and belongs to no direct or combined cyclic component.",
   "strongly_connected_components": [
     [
       "chat",
@@ -90,6 +90,10 @@
     [
       "memberships",
       "onboarding"
+    ],
+    [
+      "memberships",
+      "organizations"
     ],
     [
       "notifications",
