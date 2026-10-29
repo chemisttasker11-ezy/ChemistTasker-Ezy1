@@ -374,6 +374,32 @@ class CounterOfferTests(ShiftActionFixture):
         }], "message": "Can do"}
         return self.post(worker, f"shifts/{shift.id}/counter-offers/", payload)
 
+    def test_public_counteroffer_preserves_onboarding_outcomes_with_enforcement_on_or_off(self):
+        for enforcement in (True, False):
+            with self.subTest(enforcement=enforcement), override_settings(AHPRA_ENFORCEMENT_ENABLED=enforcement):
+                shift = self.shift(single_user_only=False, visibility="PLATFORM", rate_type="FLEXIBLE")
+                slot = shift.slots.get()
+                cases = [
+                    ("missing", make_user("PHARMACIST"), 400,
+                     "Please complete your pharmacist onboarding before applying for public shifts."),
+                    ("unverified", self.worker(employment_type=None, verified=False), 403,
+                     "Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts."),
+                    ("verified", self.worker(employment_type=None, verified=True), 201, None),
+                ]
+                for profile_state, worker, expected_status, detail in cases:
+                    with self.subTest(profile=profile_state):
+                        response, sent = self.submit(worker, shift, slot)
+                        self.assertEqual(response.status_code, expected_status, response.data)
+                        if detail:
+                            self.assertEqual(response.data["detail"], detail)
+                            self.assertFalse(ShiftCounterOffer.objects.filter(shift=shift, user=worker).exists())
+                            self.assertEqual(sent, [])
+                        else:
+                            counter = ShiftCounterOffer.objects.get(shift=shift, user=worker)
+                            self.assertEqual((response.data["id"], counter.status), (counter.pk, ShiftCounterOffer.Status.PENDING))
+                self.assertFalse(ShiftOffer.objects.filter(shift=shift).exists())
+                self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift).exists())
+
     def test_submit_records_interest_and_notifies_managers(self):
         worker = self.worker()
         shift = self.shift(single_user_only=False, slots=2, rate_type="FLEXIBLE")
@@ -904,6 +930,31 @@ class BookingSafetyTests(ShiftActionFixture):
                 mock.patch('shifts.offers.send_shift_payment_finalized_notifications'), \
                 self.captureOnCommitCallbacks(execute=True):
             return client_for(offer.user).post(f'{API}shift-offers/{offer.id}/accept/', {}, format='json')
+
+    def test_public_accept_preserves_onboarding_outcomes_with_enforcement_on_or_off(self):
+        for enforcement in (True, False):
+            with self.subTest(enforcement=enforcement), override_settings(AHPRA_ENFORCEMENT_ENABLED=enforcement):
+                cases = [
+                    ("missing", make_user("PHARMACIST"), 400,
+                     "Please complete your pharmacist onboarding before applying for public shifts."),
+                    ("unverified", self.worker(employment_type=None, verified=False), 403,
+                     "Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts."),
+                    ("verified", self.worker(employment_type=None, verified=True), 200, None),
+                ]
+                for profile_state, worker, expected_status, detail in cases:
+                    with self.subTest(profile=profile_state):
+                        shift = self.shift(single_user_only=False, visibility="PLATFORM")
+                        offer = self.offer(shift, worker)
+                        response = self.accept(offer)
+                        self.assertEqual(response.status_code, expected_status, response.data)
+                        offer.refresh_from_db()
+                        if detail:
+                            self.assertEqual(response.data["detail"], detail)
+                            self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+                            self.assertIsNone(offer.engagement_terms_accepted_at)
+                        else:
+                            self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+                        self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift).exists())
 
     def test_b54_second_confirmation_cannot_reserve_the_same_occurrence(self):
         for payment in (True, False):

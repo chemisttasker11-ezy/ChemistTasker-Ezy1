@@ -35,7 +35,6 @@ from organizations.access import managed_pharmacies as managed_pharmacies_for, u
 from shifts.base import SHIFT_OFFER_BUZZ_COOLDOWN
 from shifts.assignment import slot_locked_for_shift_offer
 from shifts.access import _user_can_perform_shift_role
-from shifts.interest import _require_public_shift_onboarding, is_public_shift_member_access
 from shifts.serializers import (
     ShiftInterestSerializer,
     ShiftOfferSerializer,
@@ -360,8 +359,6 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         slot_obj = offer.slot
         if not _user_can_perform_shift_role(offer.user, shift.role_needed):
             return Response({'detail': 'Your role does not cover this shift.'}, status=status.HTTP_400_BAD_REQUEST)
-        if shift.visibility == 'PLATFORM' and not is_public_shift_member_access(offer.user, shift):
-            _require_public_shift_onboarding(offer.user)
         if slot_obj is None:
             locked = shift.slot_assignments.exists() or shift.offers.filter(
                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
