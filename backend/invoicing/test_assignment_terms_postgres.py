@@ -104,3 +104,99 @@ class AcceptedCoverInvoiceFactsTests(AcceptedCoverInvoiceFixture, TestCase):
         self.assertEqual(assignment.engagement_terms_snapshot, original_terms)
         self.assertEqual(assignment.engagement_terms_accepted_at, accepted_at)
         self.assert_no_payment()
+
+
+@POSTGRES_ONLY
+class MixedInvoiceRouteConcurrencyTests(AcceptedCoverInvoiceFixture, TransactionTestCase):
+    def start_invoice(self, route, assignment, prefill, reached, finished, pids, outcomes):
+        user_model, worker_pk = type(self.worker), self.worker.pk
+        user_table = connection.ops.quote_name(user_model._meta.db_table)
+
+        def observe(execute, sql, params, many, context):
+            if "FOR UPDATE" in sql and user_table in sql:
+                reached.set()
+            return execute(sql, params, many, context)
+
+        def create():
+            close_old_connections()
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET lock_timeout = '6s'")
+                    cursor.execute("SET statement_timeout = '12s'")
+                    cursor.execute("SELECT pg_backend_pid()")
+                    pids.put(cursor.fetchone()[0])
+                worker = user_model.objects.get(pk=worker_pk)
+                with connection.execute_wrapper(observe):
+                    if route == "finance":
+                        invoice = save_draft(worker, deepcopy(prefill))
+                    else:
+                        invoice = generate_invoice_from_shifts(
+                            worker, pharmacy_id=self.pharmacy.pk, shift_ids=[assignment.shift_id],
+                            billing_data=self.billing_data(),
+                        )
+                outcomes.put((route, "created", invoice.pk))
+            except (DjangoValidationError, FinanceValidationError) as exc:
+                outcomes.put((route, "validation", str(exc)))
+            except Exception as exc:
+                outcomes.put((route, "error", repr(exc)))
+            finally:
+                finished.set()
+                connection.close()
+
+        thread = Thread(target=create, daemon=True)
+        thread.start()
+        return thread
+
+    def assert_waiting_on_owner_queue(self, pid, earlier_pids, finished):
+        # Query the actual lock graph so finance is queued first, rather than
+        # relying on thread-start timing or sleeps to expose opposite lock order.
+        # PostgreSQL can name an earlier waiter instead of the holder itself.
+        deadline = monotonic() + 3
+        blockers = []
+        while monotonic() < deadline and not finished.is_set():
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_blocking_pids(%s)", [pid])
+                blockers = cursor.fetchone()[0]
+                if set(blockers).intersection(earlier_pids):
+                    return
+        self.fail(f"Invoice request {pid} never joined the held worker queue; blockers={blockers}")
+
+    def test_legacy_and_finance_racing_for_accepted_cover_create_one_invoice_without_deadlock(self):
+        _, assignment = self.accepted_cover()
+        prefill = internal_invoice_prefill(self.worker, [assignment.pk])
+        outcomes, threads = Queue(), []
+        try:
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute("SET LOCAL lock_timeout = '6s'")
+                    cursor.execute("SET LOCAL statement_timeout = '12s'")
+                    cursor.execute("SELECT pg_backend_pid()")
+                    parent_pid = cursor.fetchone()[0]
+                type(self.worker).objects.select_for_update().get(pk=self.worker.pk)
+                # Both routes contend for the same accepted assignment. Finance
+                # queues first on the worker row; legacy must not hold an
+                # assignment row while waiting for that same worker.
+                earlier_pids = [parent_pid]
+                for route in ("finance", "legacy"):
+                    reached, finished, pids = Event(), Event(), Queue()
+                    threads.append(self.start_invoice(route, assignment, prefill, reached, finished, pids, outcomes))
+                    self.assertTrue(reached.wait(3), f"{route} never attempted the worker lock")
+                    pid = pids.get(timeout=2)
+                    self.assert_waiting_on_owner_queue(pid, earlier_pids, finished)
+                    earlier_pids.append(pid)
+            for thread in threads:
+                thread.join(15)
+                self.assertFalse(thread.is_alive(), "Invoice request exceeded bounded PostgreSQL timeouts")
+            results = [outcomes.get(timeout=2) for _ in threads]
+            self.assertEqual(sorted(kind for _, kind, _ in results), ["created", "validation"], results)
+            self.assertEqual(Invoice.objects.count(), 1)
+            self.assertEqual(InvoiceLineItem.objects.filter(source_assignment=assignment).count(), 1)
+            self.assertEqual(InvoiceRevision.objects.count(), 1)
+            invoice = Invoice.objects.get()
+            self.assertEqual((invoice.version, invoice.status), (1, "draft"))
+            self.assertEqual(invoice.source_snapshot["assignment_ids"], [assignment.pk])
+            self.assertIsNone(invoice.source_snapshot["accepted_terms"][0]["source_offer_id"])
+            self.assert_no_payment()
+        finally:
+            for thread in threads:
+                thread.join(15)

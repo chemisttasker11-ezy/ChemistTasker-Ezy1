@@ -259,6 +259,9 @@ def generate_invoice_from_shifts(
         with transaction.atomic():
             locked_assignments = []
             if not external:
+                # Match finance Save/adoption: worker -> assignments -> invoice.
+                # The opposite order deadlocks concurrent legacy and finance saves.
+                user.__class__.objects.select_for_update().get(pk=user.pk)
                 locked_assignments = list(
                     _invoice_routed_assignments(
                         user,
