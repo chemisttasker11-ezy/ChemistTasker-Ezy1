@@ -22,6 +22,9 @@ function verifyInstalled() {
   const yamlRequire = createRequire(mobileRequire.resolve('@istanbuljs/load-nyc-config/package.json'));
   assert.equal(yamlRequire('js-yaml/package.json').version, '4.3.2');
   const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
+  const decoderPackage = path.join(path.dirname(mobileRequire.resolve('decode-uri-component')), 'package.json');
+  assert.equal(JSON.parse(readFileSync(decoderPackage, 'utf8')).version, '0.5.1');
+  assert.equal(lock.packages['node_modules/decode-uri-component'].version, '0.5.1');
   assert.equal(lock.packages['node_modules/image-size'].version, '2.0.4');
   // New GHSA-q3jh-wrc6-jgq8 security release: reject stale redirect clients.
   assert.equal(mobileRequire('follow-redirects/package.json').version, '1.16.1');

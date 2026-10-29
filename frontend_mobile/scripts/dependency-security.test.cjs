@@ -17,6 +17,40 @@ function isolated(source) {
 
 test('installed patches and exact supported leaf versions are present', verifyInstalled);
 
+test('percent-encoded runs decode promptly without quadratic fallback replacement', () => {
+  isolated(`
+    const assert = require('node:assert/strict');
+    const decoder = require('decode-uri-component');
+    const decode = typeof decoder === 'function' ? decoder : decoder.default;
+    let input = '';
+    for (let i = 0; i < 32000; i++) {
+      input += '%' + Math.floor(i / 256).toString(16).padStart(2, '0')
+        + '%' + (i % 256).toString(16).padStart(2, '0') + 'x';
+    }
+    input += '%zz';
+    assert.ok(decode(input).endsWith('%zz'));
+  `);
+});
+
+test('percent-encoded links keep valid Unicode and legacy query-string decoding', () => {
+  isolated(`
+    const assert = require('node:assert/strict');
+    const decoder = require('decode-uri-component');
+    const decode = typeof decoder === 'function' ? decoder : decoder.default;
+    const { createRequire } = require('node:module');
+    const routerRequire = createRequire(require.resolve('expo-router/package.json'));
+    const query = routerRequire('query-string');
+    for (const text of ['Chemist Tasker', 'Ångström', 'صيدلية', 'a/b?c=d&x=1']) {
+      assert.equal(decode(encodeURIComponent(text)), text);
+    }
+    const parsed = query.parse('name=Chemist+Tasker&role=%D8%B5%D9%8A%D8%AF%D9%84%D9%8A&bad=%zz&tag=a&tag=b');
+    assert.equal(parsed.name, 'Chemist Tasker');
+    assert.equal(parsed.role, 'صيدلي');
+    assert.equal(parsed.bad, '%zz');
+    assert.deepEqual(parsed.tag, ['a', 'b']);
+  `);
+});
+
 test('patched deepmerge drops __proto__ for every vulnerable merge shape', () => {
   const merge = require('deepmerge');
   const malicious = JSON.parse('{ "__proto__": { "isAdmin": true } }');
