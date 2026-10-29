@@ -1,5 +1,6 @@
 """Organization membership API: inviting organization users, listing and changing their roles
 (with delegation limits) and the role definitions."""
+from users.membership_port import membership_services
 from rest_framework import viewsets, permissions, generics, status, mixins
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
@@ -7,7 +8,6 @@ from django.utils.encoding import force_bytes
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from users.models import OrganizationMembership
-from memberships.models import Membership
 from users.serializers import InviteOrgUserSerializer, OrganizationMembershipDetailSerializer
 from users.permissions import OrganizationRolePermission
 from users.org_roles import (
@@ -325,14 +325,8 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
             if full_access
             else set(membership_visible_pharmacy_ids(actor_membership))
         )
-        membership_qs = Membership.objects.filter(
-            pharmacy__organization_id=organization_id,
-            is_active=True,
-        )
-        if visible_pharmacy_ids is not None:
-            membership_qs = membership_qs.filter(pharmacy_id__in=visible_pharmacy_ids)
-        memberships = list(
-            membership_qs.select_related("user", "pharmacy").order_by("id")
+        memberships = membership_services().directory_memberships(
+            organization_id, visible_pharmacy_ids,
         )
         membership_by_user = {}
         for membership in memberships:

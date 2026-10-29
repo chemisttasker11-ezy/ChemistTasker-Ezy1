@@ -4,6 +4,7 @@ Logs go to the historical "users.views" channel that operators filter on."""
 import secrets
 import logging
 import requests
+from users.membership_port import membership_services
 from users.tokens import RefreshToken
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -209,7 +210,6 @@ class VerifyOTPView(APIView):
 
         # Build memberships payload exactly like your serializers
         from .models import OrganizationMembership
-        from memberships.models import Membership as PharmacyMembership
 
         org_memberships = OrganizationMembership.objects.filter(user=user)
         org_payload = [
@@ -222,11 +222,7 @@ class VerifyOTPView(APIView):
             for m in org_memberships
         ]
 
-        pharm_memberships = PharmacyMembership.objects.filter(
-            user=user,
-            is_active=True,
-            status=PharmacyMembership.Status.ACCEPTED,
-        ).select_related('pharmacy')
+        pharm_memberships = membership_services().accepted_for_user(user)
 
         pharm_payload = [
             {
