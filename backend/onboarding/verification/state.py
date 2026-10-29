@@ -291,7 +291,7 @@ def close_chat_sockets(user_id):
 def announce_suspension(profile, state, bookings):
     from django.conf import settings
     from django.core.mail import send_mail
-    from core.task_queue import async_task
+    from users.task_dispatch import async_task
     from notifications.services import notify_users
 
     type_not_accepted = state['state'] == 'type_not_accepted'
@@ -333,7 +333,7 @@ def announce_rejected_bookings(profile, bookings):
 
 
 def announce_member_suspension(user, status):
-    from core.task_queue import async_task
+    from users.task_dispatch import async_task
     from memberships.models import Membership
     from notifications.services import notify_users
     from organizations.models import PharmacyAdmin

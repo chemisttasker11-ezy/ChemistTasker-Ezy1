@@ -2,7 +2,7 @@
 with super details, and the ABN lookup queued on submit."""
 from rest_framework import serializers
 
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 
 
 def abn_details_match(instance) -> bool:

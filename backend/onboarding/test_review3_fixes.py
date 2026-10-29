@@ -196,7 +196,7 @@ class Review3FixTests(TestCase):
         for status in ('Suspended', 'Cancelled', 'Surrendered'):
             with self.subTest(status=status):
                 self.apply()  # A recovery permits a new suspension transition.
-                with patch('notifications.services.notify_users') as notify, patch('core.task_queue.async_task') as email, \
+                with patch('notifications.services.notify_users') as notify, patch('users.task_dispatch.async_task') as email, \
                         patch('shifts.cancellation.notify_shift_managers', return_value=[]):
                     with self.captureOnCommitCallbacks(execute=True):
                         self.apply(registration_status=status)

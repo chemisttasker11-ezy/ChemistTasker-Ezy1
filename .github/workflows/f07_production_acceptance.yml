@@ -426,9 +426,17 @@ jobs:
           assert settings.JWT_COOKIE_PATH == "/"
           assert settings.USE_REDIS_CHANNEL_LAYER is True
           assert "rest_framework.permissions.IsAuthenticated" in settings.REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"]
-          assert settings.ROOT_URLCONF == "core.urls"
+          assert settings.ROOT_URLCONF == "composition.urls"
+          from composition.urls import urlpatterns as composed_patterns
+          from core.urls import urlpatterns as historical_patterns
+          from django.urls import get_resolver
+          assert composed_patterns is historical_patterns
+          assert get_resolver().url_patterns is historical_patterns
           print("PRODUCTION_SECURITY=PASS")
           PY
+
+      - name: Verify historical routes and permission handlers through composition
+        run: python backend/manage.py test core.test_client_profile_api_composition --settings=core.contract_test_settings
 
   native-mobile:
     name: Real Android and iOS native journeys

@@ -10,7 +10,7 @@ from django.conf import settings
 from django.core.mail import get_connection
 from kombu.serialization import dumps
 
-from core.task_queue import async_task, registered_task_name
+from users.task_dispatch import async_task, registered_task_name
 from users.tasks import _dispatch_notification, prepare_email_message
 from worker_finance.invoice_bridge import (
     begin_delivery, delivery_uncertain, finish_delivery,

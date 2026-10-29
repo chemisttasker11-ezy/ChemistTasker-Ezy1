@@ -49,7 +49,7 @@ class Review3ReproTests(TestCase):
     def test_p1a_name_mismatch_on_suspended_record_must_not_freeze(self):
         owner, pharmacy = make_owner_with_pharmacy()
         _, _, future = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
-        with patch('notifications.services.notify_users'), patch('core.task_queue.async_task'), \
+        with patch('notifications.services.notify_users'), patch('users.task_dispatch.async_task'), \
                 patch('shifts.cancellation.async_task'), patch('shifts.cancellation.notify_shift_managers', return_value=[]):
             check = self.apply(name='Someone Else', registration_status='Suspended')
         state = ahpra_state(self.profile)['state']  # Before the number change below resets it.
@@ -86,7 +86,7 @@ class Review3ReproTests(TestCase):
         owner, pharmacy = make_owner_with_pharmacy()
         _, _, future = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
         with patch('shifts.cancellation.cancel_upcoming_assignments', side_effect=RuntimeError('db blip')), \
-                patch('notifications.services.notify_users'), patch('core.task_queue.async_task'), \
+                patch('notifications.services.notify_users'), patch('users.task_dispatch.async_task'), \
                 self.assertRaises(RuntimeError):
             self.apply(registration_status='Suspended')
         self.profile.refresh_from_db()

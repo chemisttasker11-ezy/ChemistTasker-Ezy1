@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from users.navigation import get_frontend_dashboard_url
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from django.core.signing import BadSignature, TimestampSigner
 from django.contrib.contenttypes.models import ContentType
 from django.apps import apps

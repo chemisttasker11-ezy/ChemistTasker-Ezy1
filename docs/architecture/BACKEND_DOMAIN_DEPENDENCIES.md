@@ -32,7 +32,7 @@ models that keep `app_label = "client_profile"`, with their tables, ContentTypes
 `ForeignKey("client_profile.Pharmacy")` is correct and must not be "fixed": changing a label or a table is a database
 change, made only through the procedure in `BACKEND_APPS.md`, in its own change.
 
-## Domains
+## Historical domain-split snapshot (superseded by current ownership below)
 
 | Domain app | Owns (models) | Public interface | Imports at module level | Legacy paths kept in the kernel |
 | --- | --- | --- | --- | --- |
@@ -60,7 +60,7 @@ choices and upload helpers those modules need now live with their owners (`membe
 `core.uploads`). So `organizations.models`, `memberships.models` and `onboarding.models` import no kernel module except
 `client_profile.fields`, which is a plain module outside the facade package.
 
-### Module-level cycles that exist (ratcheted, not new)
+### Historical module-level cycles (before PRs #214–#221)
 
 Before this change, `users`, `shifts` and `memberships` each formed a pair with `client_profile`. Pointing imports at
 the real owners shows what those pairs were:
@@ -145,3 +145,26 @@ All of them were reviewed:
 ## Not in this change
 
 * Moving or renaming tables, labels or migrations.
+
+## Current ownership after the runtime cleanup (29 October 2026)
+
+`shared-core/` is the TypeScript SDK and presentation contract for Vite, Next and Expo.
+Django domains remain authoritative for permissions, amounts, booking and settlement.
+`backend/infrastructure/` contains neutral Python mechanics; it does not import business domains.
+`backend/composition/` binds cross-domain ports before mounting the historical HTTP routes.
+Core retains settings, startup, routing and compatibility exports. No second client SDK is introduced.
+
+- Upload validation: `infrastructure.file_validation` (historical core facade retained).
+- Upload naming: `infrastructure.uploads`; attachment paths: `chat.uploads`, `pharmacy_hub.uploads`.
+  The kernel binds historical callable metadata for migration and pickle compatibility.
+- Queue registry/options: `infrastructure.task_queue`; email-aware dispatch: `users.task_dispatch`.
+  All runtime consumers import the owner; `core.task_queue` remains a compatibility adapter.
+- Parser: `infrastructure.serializer_values`; encryption: `infrastructure.encrypted_fields` with the old field path preserved.
+- Admin policy facts: `access_control.pharmacy_roles`; membership writes/selectors: `memberships`.
+- Organisation and identity projections retain their own adapters, composed through explicit ports.
+
+The historical table and cycle descriptions above describe earlier source, not current debt.
+The exact current inventory is `RUNTIME_CYCLE_LEDGER_20261029.json`; regenerate/check it with
+`python scripts/runtime_cycle_ledger.py [--check]`. A no-growth baseline is not zero-cycle acceptance.
+Remaining domain-aware file reference/lifecycle services, ABR integration ownership and worker-side
+organisation lookups require separate bounded assessment. Retaining them is explicit debt, not an import failure.

@@ -12,7 +12,7 @@ from organizations.models import PharmacyAdmin
 from shifts.models import ShiftSlotAssignment
 from organizations.timezone import get_pharmacy_timezone
 from shifts.emails import build_roster_email_link
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from users.models import OrganizationMembership, User
 from users.org_roles import ORG_WIDE_ADMIN_ROLES
 

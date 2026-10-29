@@ -101,3 +101,27 @@ Full graph comparison removes only onboarding → client_profile from actual cyc
 `docs/architecture/RUNTIME_CYCLE_LEDGER_20261029.json` contains every current direct and combined cyclic edge with all source locations and import kinds. It is generated from the unchanged scanner and must be regenerated after each source batch. Zero direct mutual pairs is enforced, but the full graph still has 22 direct cyclic edges and 123 combined cyclic edges; zero-cycle completion is not claimed.
 
 Next bounded assessment: reverse domain-to-core task/utility imports and the migration-bound historical attachment upload helper, preserving existing function/pickle paths, task names and bootstrap order. Then separate remaining domain projections and workflow dependencies. The two original delayed identity/organization scope/navigation helpers require worker-safe ownership proof before movement; do not impose HTTP-only URL composition or hide those imports. Existing financial, eligibility, settlement and delivery policy remains unchanged. Enforce a true full-graph zero-cycle gate only when actual module and combined cycle sets, not just the mutual-pair allowlist, are empty.
+
+## Revised completion scope and package 7 checkpoint
+
+The user's revised direction prioritises ownership and import safety over a forced zero count.
+Preserve the existing TypeScript SDK and Django authority. The six direct pairs are closed.
+Continue only extractions with a concrete ownership benefit; retained domain dependencies are
+explicitly assessed debt. Do not describe a nonzero graph as acyclic.
+
+This continuation moves unchanged generic upload mechanics below core, puts attachment path
+functions in chat/pharmacy_hub, binds their historical migration/pickle metadata in the kernel,
+and redirects remaining queue callers to the identical users-owned dispatch adapter.
+No task registration, failure policy, file naming, model identity or database migration changes.
+The legacy core adapters remain available. Existing tests patching a function-local core dispatch
+lookup now patch the canonical users dispatch lookup; their assertions remain unchanged.
+
+The direct SCC shrinks 8 to 7 apps; direct cyclic edges 22 to 15; combined edges 123 to 120.
+The direct cyclic set shrinks; the combined set removes five edges and adds two explicit
+facade-to-owner compatibility edges without expanding the component. Full evidence and next decision boundaries are recorded in
+`docs/qa/RUNTIME_OWNERSHIP_AND_CLIENT_CONTRACTS_20261029.md`.
+
+Cross-client audit: Django remains authority; kiosk representative cases share one fixture
+with TypeScript, and multipart transport preserves FormData and lets transport set boundaries.
+Pricing helpers remain compatibility estimates; the inaccurate Django-import claim is removed.
+Any observed policy mismatch is documented for discussion instead of normalised silently.

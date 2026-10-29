@@ -3,7 +3,7 @@ details, with verification resets on change, per-type validation on submit and t
 from rest_framework import serializers
 
 from core.serializer_lifecycle import _delete_file_if_unreferenced
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from onboarding.models import OwnerOnboarding
 from onboarding.verification.policy import revoke_for_changed_evidence
 

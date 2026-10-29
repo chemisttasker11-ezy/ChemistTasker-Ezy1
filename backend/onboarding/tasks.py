@@ -22,7 +22,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.integrations.abr import _parse_abn_html_fields, abn_lookup
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from onboarding.emails import get_candidate_role, simple_name_match
 from onboarding.services.work_profile import referee_profile_target
 from onboarding.verification.ahpra import (
@@ -569,7 +569,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     from onboarding.emails import send_referee_emails
     from users.navigation import get_frontend_dashboard_url
     from django.contrib.contenttypes.models import ContentType
-    from core.task_queue import async_task
+    from users.task_dispatch import async_task
 
     Model = apps.get_model("client_profile", model_name)
     try:

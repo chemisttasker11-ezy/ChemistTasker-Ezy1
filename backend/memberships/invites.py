@@ -14,7 +14,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
 
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from memberships.access import user_can_invite_members_to_pharmacy
 from memberships.labels import membership_role_label
 from memberships.models import Membership, MembershipApplication

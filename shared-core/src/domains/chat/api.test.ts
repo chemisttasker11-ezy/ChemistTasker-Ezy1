@@ -45,3 +45,21 @@ describe('chat participant identity contract', () => {
         expect(JSON.parse((fetchImpl.mock.calls[1] as any)[1].body)).toEqual({ partner_membership_id: 7 });
     });
 });
+
+describe('chat multipart ownership contract', () => {
+    it('passes the same FormData to transport without forcing a JSON boundary', async () => {
+        const { sendRoomMessage } = await import('./api');
+        const fetchImpl = vi.fn(async () => new Response(JSON.stringify([{ id: 71 }]), {
+            status: 201, headers: { 'Content-Type': 'application/json' },
+        }));
+        configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'fixture-token', fetchImpl });
+        const form = new FormData();
+        form.append('attachments', new Blob(['%PDF-1.4 test']), 'report.pdf');
+        form.append('attachments', new Blob(['test image']), 'image.png');
+        await sendRoomMessage(12, form);
+        const [, options] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+        expect(options.body).toBe(form);
+        expect(new Headers(options.headers).has('Content-Type')).toBe(false);
+        expect(form.getAll('attachments')).toHaveLength(2);
+    });
+});

@@ -4,7 +4,7 @@ document verification task; they never block submission (onboarding/verification
 from rest_framework import serializers
 
 from core.serializer_lifecycle import _delete_file_if_unreferenced
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 
 
 def check_role_unchanged(instance, vdata: dict) -> None:

@@ -5,7 +5,7 @@ from django.db.models import Q
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from core.uploads import unique_upload_path as _unique_upload_path
+from infrastructure.uploads import unique_upload_path as _unique_upload_path
 from onboarding.models import OwnerOnboarding
 
 

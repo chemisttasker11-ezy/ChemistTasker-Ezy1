@@ -143,7 +143,7 @@ class AhpraAccessTests(TestCase):
         internal_shift.save(update_fields=['visibility'])
         with patch('notifications.services.notify_users') as notify, \
                 patch('shifts.cancellation.notify_shift_managers', return_value=[owner]) as managers, \
-                patch('core.task_queue.async_task') as email, patch('shifts.cancellation.async_task', new=email), \
+                patch('users.task_dispatch.async_task') as email, patch('shifts.cancellation.async_task', new=email), \
                 patch('onboarding.verification.state.close_chat_sockets') as close:
             with self.captureOnCommitCallbacks(execute=True):
                 check = check_fixture(self.profile)
@@ -323,7 +323,7 @@ class AhpraAccessTests(TestCase):
         profile.role, profile.ahpra_number = 'PHARMACIST', NUMBER
         profile.save()
         with patch('notifications.services.notify_users') as notify, \
-                patch('core.task_queue.async_task'), \
+                patch('users.task_dispatch.async_task'), \
                 patch('onboarding.verification.state.close_chat_sockets') as close:
             with self.captureOnCommitCallbacks(execute=True):
                 for _ in range(2):
@@ -469,7 +469,7 @@ class AhpraAccessTests(TestCase):
         payload = result(check.pk, registration_status='Suspended')
         with patch('notifications.services.notify_users') as notify, \
                 patch('shifts.cancellation.notify_shift_managers', return_value=[owner]) as managers, \
-                patch('core.task_queue.async_task') as email, \
+                patch('users.task_dispatch.async_task') as email, \
                 patch('shifts.cancellation.async_task', new=email):
             with self.captureOnCommitCallbacks(execute=True):
                 self.assertTrue(apply_ahpra_result(check, payload))
@@ -548,7 +548,7 @@ class AhpraAccessTests(TestCase):
         LeaveRequest.objects.create(slot_assignment=assignment, user=self.user, leave_type='SICK')
         expected = {'id': shift.pk, 'date': slot.date.isoformat(), 'pharmacy': pharmacy.name}
         with patch('shifts.cancellation.notify_shift_managers') as managers, \
-                patch('core.task_queue.async_task'), patch('notifications.services.notify_users'):
+                patch('users.task_dispatch.async_task'), patch('notifications.services.notify_users'):
             with self.captureOnCommitCallbacks(execute=True):
                 report = cancel_upcoming_assignments(self.user)
             self.assertEqual(report, {'cancelled': [], 'retained': [expected]})

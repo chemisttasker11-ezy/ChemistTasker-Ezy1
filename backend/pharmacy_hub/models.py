@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from client_profile.models.common import hub_attachment_upload_path
+from pharmacy_hub.uploads import hub_attachment_upload_path
 from memberships.models import Membership
 
 

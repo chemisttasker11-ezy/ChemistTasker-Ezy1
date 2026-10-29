@@ -456,7 +456,7 @@ class FinalEvaluationContractTests(SimpleTestCase):
                     notification_already_sent=lambda o, kind: False,
                     mark_notification_sent=lambda o, kind: calls.sent.append(kind),
                 ), \
-                mock.patch("core.task_queue.async_task") as async_task, \
+                mock.patch("users.task_dispatch.async_task") as async_task, \
                 mock.patch("onboarding.emails.send_referee_emails") as referee_emails, \
                 mock.patch.object(final_evaluation, "apply_async", side_effect=enqueue_error) as apply_async:
             final_evaluation.run("PharmacistOnboarding", 5, **kwargs)

@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from memberships.access import user_can_decide_applications
 from memberships.invites import create_membership_invite
 from memberships.models import MembershipApplication
