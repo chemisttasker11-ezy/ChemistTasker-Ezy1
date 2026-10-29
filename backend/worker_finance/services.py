@@ -484,20 +484,12 @@ def write_canonical(record):
         )
 
 
-@transaction.atomic
-def adopt_internal_invoice(owner, invoice):
-    owner.__class__.objects.select_for_update().get(pk=owner.pk)
-    # The pharmacy link is nullable for external invoices. Keep the lock query
-    # on the invoice row so PostgreSQL does not reject a nullable outer join.
-    invoice = Invoice.objects.select_related(None).select_for_update().get(pk=invoice.pk)
-    existing = Invoice.objects.filter(pk=invoice.pk, request_key__isnull=False).first()
-    if existing:
-        return existing
-    source_snapshot = invoice.source_snapshot or {}
-    if source_snapshot.get("source") != "INTERNAL_ABN_SHIFT_ASSIGNMENTS":
-        raise ValidationError("Only accepted-shift internal invoices can be adopted into this workspace.")
-    customer = _customer_for_internal_invoice(owner, invoice)
-    canonical_lines = list(invoice.line_items.select_related("source_assignment").order_by("id"))
+def calculate_generated_internal_invoice(invoice, canonical_lines):
+    """Map and value generated rows without creating workspace state.
+
+    A materialized super row remains a fixed contribution during adoption.
+    The read-only generation preview uses these same inputs and calculation.
+    """
     payload_lines = []
     for line in canonical_lines:
         payload_lines.append(
@@ -516,6 +508,31 @@ def adopt_internal_invoice(owner, invoice):
                 "shift_id": line.shift_id,
             }
         )
+    calc = calculate_invoice(
+        payload_lines,
+        gst_registered=bool(invoice.gst_registered),
+        price_mode="exclusive",
+        super_mode="summary" if invoice.super_amount > 0 else "none",
+        super_rate=str(invoice.super_rate_snapshot),
+    )
+    return payload_lines, calc
+
+
+@transaction.atomic
+def adopt_internal_invoice(owner, invoice):
+    owner.__class__.objects.select_for_update().get(pk=owner.pk)
+    # The pharmacy link is nullable for external invoices. Keep the lock query
+    # on the invoice row so PostgreSQL does not reject a nullable outer join.
+    invoice = Invoice.objects.select_related(None).select_for_update().get(pk=invoice.pk)
+    existing = Invoice.objects.filter(pk=invoice.pk, request_key__isnull=False).first()
+    if existing:
+        return existing
+    source_snapshot = invoice.source_snapshot or {}
+    if source_snapshot.get("source") != "INTERNAL_ABN_SHIFT_ASSIGNMENTS":
+        raise ValidationError("Only accepted-shift internal invoices can be adopted into this workspace.")
+    customer = _customer_for_internal_invoice(owner, invoice)
+    canonical_lines = list(invoice.line_items.select_related("source_assignment").order_by("id"))
+    payload_lines, calc = calculate_generated_internal_invoice(invoice, canonical_lines)
     payload = {
         "request_key": str(uuid4()),
         "customer_id": customer.pk,
@@ -545,13 +562,6 @@ def adopt_internal_invoice(owner, invoice):
             for key in ("name", "legal_name", "address", "abn", "email", "contact_name")
         },
     }
-    calc = calculate_invoice(
-        payload_lines,
-        gst_registered=payload["gst_registered"],
-        price_mode=payload["price_mode"],
-        super_mode=payload["super_mode"],
-        super_rate=payload["super_rate"],
-    )
     # Initial adoption shares the managed calculation without rewriting source
     # identities, edit flags or contact snapshots through the correction writer.
     for line, calculated in zip(canonical_lines, calc["lines"], strict=True):

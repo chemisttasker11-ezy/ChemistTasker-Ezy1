@@ -27,6 +27,7 @@ from django.http import HttpResponse
 from invoicing.serializers import InvoiceSerializer
 from organizations.access import _get_org_pharmacies_queryset
 from invoicing.navigation import invoice_action_url
+from invoicing.generation_preview import preview_invoice_generation
 
 
 logger = logging.getLogger(__name__)
@@ -199,6 +200,16 @@ class GenerateInvoiceView(APIView):
             return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def preview_generated_invoice(request):
+    try:
+        return Response(preview_invoice_generation(request.user, request.data))
+    except DjangoValidationError as exc:
+        payload = exc.message_dict if hasattr(exc, "message_dict") else {"error": exc.messages}
+        return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])

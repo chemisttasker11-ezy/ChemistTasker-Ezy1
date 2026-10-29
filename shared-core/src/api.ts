@@ -314,6 +314,7 @@ export {
   deleteInvoice,
   generateInvoice,
   previewInvoice,
+  previewGeneratedInvoice,
   getInvoicePdfUrl,
   downloadInvoicePdf,
   sendInvoiceEmail,

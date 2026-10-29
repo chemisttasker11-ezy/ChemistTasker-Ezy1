@@ -1,4 +1,5 @@
 import type { InvoiceDetailApi } from '../../contracts/invoiceDetail';
+import type { InvoiceAssignmentPreviewLine, InvoiceGenerationInput, InvoiceGenerationPreview } from '../../contracts/invoiceGeneration';
 import type { Invoice } from '../../types';
 import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
@@ -23,7 +24,10 @@ export function generateInvoice(data: unknown) {
     return fetchApi('/invoices/generate/', { method: 'POST', body });
 }
 export function previewInvoice(id: number | string) {
-    return fetchApi(`/invoices/preview/${id}/`);
+    return fetchApi<InvoiceAssignmentPreviewLine[]>(`/invoices/preview/${id}/`);
+}
+export function previewGeneratedInvoice(data: InvoiceGenerationInput) {
+    return fetchApi<InvoiceGenerationPreview>('/invoices/generate/preview/', { method: 'POST', body: JSON.stringify(data) });
 }
 /** Authenticated binary read: never interpret an invoice PDF as application JSON. */
 export async function downloadInvoicePdf(id: number | string): Promise<Blob> {
