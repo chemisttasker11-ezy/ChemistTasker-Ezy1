@@ -1189,6 +1189,106 @@ class BookingSafetyTests(ShiftActionFixture):
 
 @skipUnless(connection.vendor == 'postgresql', 'Requires PostgreSQL row locks')
 class OfferConfirmationRaceTests(TransactionTestCase):
+    def test_finalize_and_manual_assignment_serialize_on_the_same_occurrence(self):
+        from billing.utils import BILLING_STATE_FREE
+        from shifts.assignment import roster_direct_staff as real_roster_direct_staff
+        from shifts.offers import ShiftOfferViewSet
+
+        owner, pharmacy = make_owner_with_pharmacy('Finalize versus manual assignment')
+        shift = Shift.objects.create(
+            pharmacy=pharmacy,
+            created_by=owner,
+            role_needed='PHARMACIST',
+            employment_type='LOCUM',
+            visibility='LOCUM_CASUAL',
+            single_user_only=False,
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift,
+            date=DAY,
+            start_time=time(9),
+            end_time=time(17),
+            rate=Decimal('70'),
+        )
+        offered_worker = make_user('PHARMACIST')
+        offer = ShiftOffer.objects.create(
+            shift=shift,
+            slot=slot,
+            user=offered_worker,
+            offered_slot_date=DAY,
+        )
+        staff_worker = make_user('PHARMACIST')
+        Membership.objects.create(
+            user=staff_worker,
+            pharmacy=pharmacy,
+            role='PHARMACIST',
+            employment_type='FULL_TIME',
+            status=Membership.Status.ACCEPTED,
+            is_active=True,
+        )
+
+        barrier = Barrier(2)
+        original_get = ShiftOfferViewSet.get_object
+
+        def read_offer_together(view):
+            row = original_get(view)
+            barrier.wait(timeout=15)
+            return row
+
+        def roster_together(*, shift, candidate, assignments):
+            barrier.wait(timeout=15)
+            return real_roster_direct_staff(
+                shift=shift,
+                candidate=candidate,
+                assignments=assignments,
+            )
+
+        def accept_offer():
+            close_old_connections()
+            try:
+                return client_for(User.objects.get(pk=offered_worker.pk)).post(
+                    f'{API}shift-offers/{offer.pk}/accept/',
+                    {},
+                    format='json',
+                ).status_code
+            finally:
+                close_old_connections()
+
+        def manual_assign():
+            close_old_connections()
+            try:
+                return client_for(User.objects.get(pk=owner.pk)).post(
+                    f'{API}shifts/{shift.pk}/manual-assign/',
+                    {
+                        'user_id': staff_worker.pk,
+                        'assignments': [{'slot_id': slot.pk, 'slot_date': str(DAY)}],
+                    },
+                    format='json',
+                ).status_code
+            finally:
+                close_old_connections()
+
+        with mock.patch.object(ShiftOfferViewSet, 'get_object', read_offer_together), \
+                mock.patch('shifts.base.roster_direct_staff', side_effect=roster_together), \
+                mock.patch('shifts.engagement.build_shift_engagement_terms', return_value={}), \
+                mock.patch('billing.utils.get_billing_state_for_pharmacy', return_value=BILLING_STATE_FREE), \
+                mock.patch('shifts.offers.notify_shift_users'), mock.patch('shifts.offers.async_task'), \
+                mock.patch('shifts.offers.send_shift_payment_finalized_notifications'), \
+                ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda fn: fn(), (accept_offer, manual_assign)))
+
+        self.assertEqual(sorted(results), [200, 400], results)
+        assignments = list(ShiftSlotAssignment.objects.filter(slot=slot, slot_date=DAY))
+        self.assertEqual(len(assignments), 1)
+        self.assertIn(assignments[0].user_id, {offered_worker.pk, staff_worker.pk})
+        offer.refresh_from_db()
+        if assignments[0].user_id == offered_worker.pk:
+            self.assertEqual(assignments[0].source_offer_id, offer.pk)
+            self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED)
+        else:
+            self.assertIsNone(assignments[0].source_offer_id)
+            self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+
     def test_b54_only_one_simultaneous_worker_reserves_or_books_the_occurrence(self):
         from billing.utils import BILLING_STATE_PAYMENT_REQUIRED
         from shifts.offers import ShiftOfferViewSet
