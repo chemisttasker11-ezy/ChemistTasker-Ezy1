@@ -1,0 +1,5466 @@
+{
+  "schema": "chemisttasker-runtime-cycle-handover-v1",
+  "fixed_parent": "f97712b35cd746b27405e4506f0ceedeb6896b43",
+  "source": "Current source after onboarding encryption extraction; regenerate after every source change with the unchanged module_import_graph scanner.",
+  "module_edge_count": 104,
+  "delayed_edge_count": 69,
+  "direct_mutual_pairs": [],
+  "direct_components": [
+    [
+      "chat",
+      "client_profile",
+      "core",
+      "memberships",
+      "onboarding",
+      "organizations",
+      "shifts",
+      "talent"
+    ]
+  ],
+  "combined_components": [
+    [
+      "attendance",
+      "billing",
+      "chat",
+      "client_profile",
+      "core",
+      "invoicing",
+      "marketplace",
+      "memberships",
+      "notifications",
+      "onboarding",
+      "organizations",
+      "pharmacy_hub",
+      "public_hub",
+      "ratings",
+      "rewards",
+      "shifts",
+      "talent",
+      "users",
+      "worker_finance",
+      "workforce"
+    ]
+  ],
+  "direct_cyclic_edges": [
+    {
+      "from": "chat",
+      "to": "client_profile",
+      "sources": [
+        {
+          "import": "client_profile.models.common",
+          "line": 4,
+          "path": "chat/models.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "chat",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.models",
+          "line": 10,
+          "path": "chat/consumers.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 5,
+          "path": "chat/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 5,
+          "path": "chat/realtime.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 10,
+          "path": "chat/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.selectors",
+          "line": 11,
+          "path": "chat/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 13,
+          "path": "chat/signals.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 9,
+          "path": "chat/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "chat",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 10,
+          "path": "chat/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 17,
+          "path": "chat/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 41,
+          "path": "chat/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 226,
+          "path": "chat/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.access",
+          "line": 250,
+          "path": "chat/serializers.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "chat",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 11,
+          "path": "chat/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "client_profile",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.uploads",
+          "line": 6,
+          "path": "client_profile/models/common.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.uploads",
+          "line": 7,
+          "path": "client_profile/models/common.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.integrations.abr",
+          "line": 15,
+          "path": "client_profile/tasks.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "client_profile",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.serializers",
+          "line": 6,
+          "path": "client_profile/domains/common/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 8,
+          "path": "client_profile/models/common.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 7,
+          "path": "client_profile/models/memberships.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.tasks",
+          "line": 16,
+          "path": "client_profile/tasks.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "client_profile",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 14,
+          "path": "client_profile/models/common.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 7,
+          "path": "client_profile/models/onboarding.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.tasks",
+          "line": 22,
+          "path": "client_profile/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.verification.reminders",
+          "line": 30,
+          "path": "client_profile/tasks.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "client_profile",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "client_profile/models/orgs.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "client_profile",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.access",
+          "line": 7,
+          "path": "client_profile/domains/common/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 7,
+          "path": "client_profile/models/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.tasks",
+          "line": 35,
+          "path": "client_profile/tasks.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "chat",
+      "sources": [
+        {
+          "import": "chat.routing",
+          "line": 2,
+          "path": "core/routing.py",
+          "kind": "module"
+        },
+        {
+          "import": "chat.models",
+          "line": 31,
+          "path": "core/serializer_lifecycle.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 10,
+          "path": "core/sitemap.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "memberships",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.task_queue",
+          "line": 9,
+          "path": "memberships/applications.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 17,
+          "path": "memberships/invites.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 5,
+          "path": "memberships/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 16,
+          "path": "memberships/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "memberships",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 13,
+          "path": "memberships/applications.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 2,
+          "path": "memberships/role_resolution.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 5,
+          "path": "memberships/selectors.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "memberships",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.access",
+          "line": 6,
+          "path": "memberships/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "memberships/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 6,
+          "path": "memberships/account_management.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 30,
+          "path": "memberships/invites.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "memberships/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 10,
+          "path": "memberships/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 11,
+          "path": "memberships/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 27,
+          "path": "memberships/organization_management.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 28,
+          "path": "memberships/organization_management.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 6,
+          "path": "memberships/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 13,
+          "path": "memberships/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 9,
+          "path": "memberships/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.serializers",
+          "line": 15,
+          "path": "memberships/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 17,
+          "path": "memberships/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 4,
+          "path": "memberships/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "onboarding",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.task_queue",
+          "line": 7,
+          "path": "onboarding/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.uploads",
+          "line": 10,
+          "path": "onboarding/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_mixins",
+          "line": 13,
+          "path": "onboarding/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.numbers",
+          "line": 5,
+          "path": "onboarding/services/basic.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_lifecycle",
+          "line": 6,
+          "path": "onboarding/services/basic.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_lifecycle",
+          "line": 5,
+          "path": "onboarding/services/identity.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 6,
+          "path": "onboarding/services/identity.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 5,
+          "path": "onboarding/services/payment.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_lifecycle",
+          "line": 3,
+          "path": "onboarding/services/profile.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_lifecycle",
+          "line": 6,
+          "path": "onboarding/services/regulatory.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 7,
+          "path": "onboarding/services/regulatory.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 13,
+          "path": "onboarding/services/skills.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.integrations.abr",
+          "line": 24,
+          "path": "onboarding/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 25,
+          "path": "onboarding/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 18,
+          "path": "onboarding/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 572,
+          "path": "onboarding/tasks.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 294,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 336,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "organizations",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.task_queue",
+          "line": 18,
+          "path": "organizations/claims.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.uploads",
+          "line": 8,
+          "path": "organizations/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 12,
+          "path": "organizations/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_lifecycle",
+          "line": 13,
+          "path": "organizations/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_mixins",
+          "line": 14,
+          "path": "organizations/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 29,
+          "path": "organizations/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.integrations.abr",
+          "line": 30,
+          "path": "organizations/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "organizations",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 5,
+          "path": "organizations/claims.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 9,
+          "path": "organizations/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.skill_identity",
+          "line": 5,
+          "path": "organizations/pharmacy_profile.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 9,
+          "path": "organizations/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.models",
+          "line": 13,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 15,
+          "path": "shifts/assignment.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 13,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 8,
+          "path": "shifts/browse.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 15,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 11,
+          "path": "shifts/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 10,
+          "path": "shifts/engagement.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 11,
+          "path": "shifts/interest.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 10,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 2,
+          "path": "shifts/rate_visibility.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 9,
+          "path": "shifts/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.qualifications",
+          "line": 10,
+          "path": "shifts/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 14,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 18,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 13,
+          "path": "shifts/browse.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.skill_identity",
+          "line": 6,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.work_profile",
+          "line": 7,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.qualifications",
+          "line": 8,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.verification.policy",
+          "line": 9,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 16,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.skill_identity",
+          "line": 5,
+          "path": "shifts/context.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 12,
+          "path": "shifts/engagement.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 12,
+          "path": "shifts/interest.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 15,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 5,
+          "path": "shifts/pricing.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.work_profile",
+          "line": 4,
+          "path": "shifts/serialization/interests.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.skill_identity",
+          "line": 4,
+          "path": "shifts/serialization/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 6,
+          "path": "shifts/serialization/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 3,
+          "path": "shifts/serialization/worker_requests.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 110,
+          "path": "shifts/access.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 271,
+          "path": "shifts/base.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 324,
+          "path": "shifts/base.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 374,
+          "path": "shifts/base.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 255,
+          "path": "shifts/browse.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 283,
+          "path": "shifts/browse.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.services.work_profile",
+          "line": 46,
+          "path": "shifts/interest.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.policy",
+          "line": 47,
+          "path": "shifts/interest.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 84,
+          "path": "shifts/interest.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 337,
+          "path": "shifts/offers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 402,
+          "path": "shifts/offers.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 15,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.chains",
+          "line": 16,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.serializers",
+          "line": 17,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 9,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 37,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "shifts/browse.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 32,
+          "path": "shifts/browse.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 17,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "shifts/description_templates.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 14,
+          "path": "shifts/description_templates.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 4,
+          "path": "shifts/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.chains",
+          "line": 13,
+          "path": "shifts/escalation.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 3,
+          "path": "shifts/leave.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 6,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 39,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 40,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 41,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 8,
+          "path": "shifts/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 9,
+          "path": "shifts/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 34,
+          "path": "shifts/offers.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 3,
+          "path": "shifts/rate_visibility.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.chains",
+          "line": 4,
+          "path": "shifts/rate_visibility.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 7,
+          "path": "shifts/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 8,
+          "path": "shifts/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 9,
+          "path": "shifts/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 6,
+          "path": "shifts/serialization/offers.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.serializers",
+          "line": 5,
+          "path": "shifts/serialization/projections.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 11,
+          "path": "shifts/serialization/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 12,
+          "path": "shifts/serialization/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.serializers",
+          "line": 13,
+          "path": "shifts/serialization/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 14,
+          "path": "shifts/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 3,
+          "path": "shifts/worker_requests.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 9,
+          "path": "shifts/worker_requests.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "talent",
+      "sources": [
+        {
+          "import": "talent.models",
+          "line": 22,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "talent",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 3,
+          "path": "talent/serializers/explorer.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.skill_identity",
+          "line": 7,
+          "path": "talent/serializers/explorer.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.verification.policy",
+          "line": 9,
+          "path": "talent/serializers/explorer.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.verification.schema",
+          "line": 10,
+          "path": "talent/serializers/explorer.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 6,
+          "path": "talent/views/explorer.py",
+          "kind": "module"
+        }
+      ]
+    }
+  ],
+  "combined_cyclic_edges": [
+    {
+      "from": "attendance",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.models",
+          "line": 41,
+          "path": "attendance/credentials.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 36,
+          "path": "attendance/eligibility.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 42,
+          "path": "attendance/kiosk_api.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 32,
+          "path": "attendance/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "attendance",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.services",
+          "line": 346,
+          "path": "attendance/credentials.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "notifications.services",
+          "line": 483,
+          "path": "attendance/credentials.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "notifications.services",
+          "line": 882,
+          "path": "attendance/credentials.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "attendance",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 380,
+          "path": "attendance/eligibility.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.policy",
+          "line": 381,
+          "path": "attendance/eligibility.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "attendance",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 32,
+          "path": "attendance/approvals.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 39,
+          "path": "attendance/credentials.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 40,
+          "path": "attendance/credentials.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 31,
+          "path": "attendance/eligibility.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 32,
+          "path": "attendance/eligibility.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 43,
+          "path": "attendance/kiosk_api.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 44,
+          "path": "attendance/kiosk_api.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 15,
+          "path": "attendance/kiosk_review.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 29,
+          "path": "attendance/transitions.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 33,
+          "path": "attendance/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 34,
+          "path": "attendance/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 165,
+          "path": "attendance/approvals.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.models",
+          "line": 108,
+          "path": "attendance/kiosk_api.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "attendance",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 33,
+          "path": "attendance/approvals.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 15,
+          "path": "attendance/cover_terms.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 41,
+          "path": "attendance/eligibility.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 35,
+          "path": "attendance/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.engagement",
+          "line": 69,
+          "path": "attendance/approvals.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.pricing",
+          "line": 33,
+          "path": "attendance/cover_terms.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.engagement",
+          "line": 42,
+          "path": "attendance/cover_terms.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.engagement",
+          "line": 150,
+          "path": "attendance/cover_terms.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "attendance",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.models",
+          "line": 110,
+          "path": "attendance/credentials.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 117,
+          "path": "attendance/credentials.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.tasks",
+          "line": 854,
+          "path": "attendance/credentials.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.tasks",
+          "line": 997,
+          "path": "attendance/credentials.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.models",
+          "line": 106,
+          "path": "attendance/kiosk_api.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 107,
+          "path": "attendance/kiosk_api.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "attendance",
+      "to": "workforce",
+      "sources": [
+        {
+          "import": "workforce.roster.permissions",
+          "line": 42,
+          "path": "attendance/approvals.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.models",
+          "line": 104,
+          "path": "attendance/eligibility.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "billing",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.services",
+          "line": 51,
+          "path": "billing/payment_events.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "billing",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 6,
+          "path": "billing/checkout_context.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.models",
+          "line": 53,
+          "path": "billing/utils.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.access",
+          "line": 103,
+          "path": "billing/utils.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.models",
+          "line": 47,
+          "path": "billing/views.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "billing",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.finalize",
+          "line": 2,
+          "path": "billing/fulfillment.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.finalize",
+          "line": 12,
+          "path": "billing/shift_payments.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 13,
+          "path": "billing/shift_payments.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 49,
+          "path": "billing/fulfillment.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.finalize",
+          "line": 50,
+          "path": "billing/fulfillment.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.models",
+          "line": 29,
+          "path": "billing/payment_events.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.notifications",
+          "line": 86,
+          "path": "billing/payment_events.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.emails",
+          "line": 97,
+          "path": "billing/payment_events.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.emails",
+          "line": 66,
+          "path": "billing/shift_payments.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.models",
+          "line": 143,
+          "path": "billing/views.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.models",
+          "line": 173,
+          "path": "billing/views.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "billing",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.models",
+          "line": 3,
+          "path": "billing/utils.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 7,
+          "path": "billing/checkout_context.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.models",
+          "line": 100,
+          "path": "billing/payment_events.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "chat",
+      "to": "client_profile",
+      "sources": [
+        {
+          "import": "client_profile.models.common",
+          "line": 4,
+          "path": "chat/models.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "chat",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.models",
+          "line": 10,
+          "path": "chat/consumers.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 5,
+          "path": "chat/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 5,
+          "path": "chat/realtime.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 10,
+          "path": "chat/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.selectors",
+          "line": 11,
+          "path": "chat/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 13,
+          "path": "chat/signals.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 9,
+          "path": "chat/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "chat",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.services",
+          "line": 7,
+          "path": "chat/realtime.py",
+          "kind": "module"
+        },
+        {
+          "import": "notifications.models",
+          "line": 14,
+          "path": "chat/signals.py",
+          "kind": "module"
+        },
+        {
+          "import": "notifications.services",
+          "line": 15,
+          "path": "chat/signals.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "chat",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.verification.state",
+          "line": 211,
+          "path": "chat/consumers.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "chat",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 10,
+          "path": "chat/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 17,
+          "path": "chat/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 41,
+          "path": "chat/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 226,
+          "path": "chat/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.access",
+          "line": 250,
+          "path": "chat/serializers.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "chat",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 11,
+          "path": "chat/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "chat",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.jwt_ws",
+          "line": 12,
+          "path": "chat/consumers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.presentation",
+          "line": 5,
+          "path": "chat/identity.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.presentation",
+          "line": 13,
+          "path": "chat/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 29,
+          "path": "chat/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 30,
+          "path": "chat/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "client_profile",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.uploads",
+          "line": 6,
+          "path": "client_profile/models/common.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.uploads",
+          "line": 7,
+          "path": "client_profile/models/common.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.integrations.abr",
+          "line": 15,
+          "path": "client_profile/tasks.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "client_profile",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.serializers",
+          "line": 6,
+          "path": "client_profile/domains/common/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 8,
+          "path": "client_profile/models/common.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 7,
+          "path": "client_profile/models/memberships.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.tasks",
+          "line": 16,
+          "path": "client_profile/tasks.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "client_profile",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 14,
+          "path": "client_profile/models/common.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 7,
+          "path": "client_profile/models/onboarding.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.tasks",
+          "line": 22,
+          "path": "client_profile/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.verification.reminders",
+          "line": 30,
+          "path": "client_profile/tasks.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "client_profile",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "client_profile/models/orgs.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "client_profile",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.access",
+          "line": 7,
+          "path": "client_profile/domains/common/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 7,
+          "path": "client_profile/models/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.tasks",
+          "line": 35,
+          "path": "client_profile/tasks.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "chat",
+      "sources": [
+        {
+          "import": "chat.routing",
+          "line": 2,
+          "path": "core/routing.py",
+          "kind": "module"
+        },
+        {
+          "import": "chat.models",
+          "line": 31,
+          "path": "core/serializer_lifecycle.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "client_profile",
+      "sources": [
+        {
+          "import": "client_profile.characterization_support",
+          "line": 27,
+          "path": "core/websocket_testing.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "marketplace",
+      "sources": [
+        {
+          "import": "marketplace.models",
+          "line": 78,
+          "path": "core/sitemap.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.routing",
+          "line": 3,
+          "path": "core/routing.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.ahpra_test_lookup",
+          "line": 11,
+          "path": "core/admin_site.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.routing",
+          "line": 6,
+          "path": "core/routing.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 32,
+          "path": "core/serializer_lifecycle.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 33,
+          "path": "core/serializer_lifecycle.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "pharmacy_hub",
+      "sources": [
+        {
+          "import": "pharmacy_hub.models",
+          "line": 34,
+          "path": "core/serializer_lifecycle.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "public_hub",
+      "sources": [
+        {
+          "import": "public_hub.attachment_access",
+          "line": 12,
+          "path": "core/urls.py",
+          "kind": "module"
+        },
+        {
+          "import": "public_hub.media",
+          "line": 13,
+          "path": "core/urls.py",
+          "kind": "module"
+        },
+        {
+          "import": "public_hub.models",
+          "line": 64,
+          "path": "core/sitemap.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "public_hub.permissions",
+          "line": 65,
+          "path": "core/sitemap.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "public_hub.community",
+          "line": 70,
+          "path": "core/sitemap.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 10,
+          "path": "core/sitemap.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.views",
+          "line": 11,
+          "path": "core/api_v1_urls.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.jwt_ws",
+          "line": 14,
+          "path": "core/asgi.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 15,
+          "path": "core/task_queue.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.jwt_ws",
+          "line": 10,
+          "path": "core/websocket_testing.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 11,
+          "path": "core/websocket_testing.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "core",
+      "to": "worker_finance",
+      "sources": [
+        {
+          "import": "worker_finance",
+          "line": 12,
+          "path": "core/api_v1_urls.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "invoicing",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.task_queue",
+          "line": 13,
+          "path": "invoicing/tasks.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "invoicing",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.models",
+          "line": 5,
+          "path": "invoicing/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "invoicing",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.models",
+          "line": 7,
+          "path": "invoicing/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "notifications.services",
+          "line": 24,
+          "path": "invoicing/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "invoicing",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 3,
+          "path": "invoicing/services.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "invoicing",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 4,
+          "path": "invoicing/services.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 3,
+          "path": "invoicing/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 14,
+          "path": "invoicing/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 28,
+          "path": "invoicing/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "invoicing",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 5,
+          "path": "invoicing/services.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 4,
+          "path": "invoicing/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "invoicing",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.tasks",
+          "line": 14,
+          "path": "invoicing/tasks.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "invoicing",
+      "to": "worker_finance",
+      "sources": [
+        {
+          "import": "worker_finance.invoice_bridge",
+          "line": 23,
+          "path": "invoicing/generation_preview.py",
+          "kind": "module"
+        },
+        {
+          "import": "worker_finance.delivery_states",
+          "line": 3,
+          "path": "invoicing/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "worker_finance.invoice_bridge",
+          "line": 12,
+          "path": "invoicing/services.py",
+          "kind": "module"
+        },
+        {
+          "import": "worker_finance.invoice_bridge",
+          "line": 15,
+          "path": "invoicing/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "worker_finance.invoice_bridge",
+          "line": 421,
+          "path": "invoicing/services.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "worker_finance.invoice_bridge",
+          "line": 248,
+          "path": "invoicing/views.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "marketplace",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 5,
+          "path": "marketplace/policy.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "marketplace",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 5,
+          "path": "marketplace/listing_policy.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 6,
+          "path": "marketplace/policy.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 19,
+          "path": "marketplace/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 94,
+          "path": "marketplace/listing_policy.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "memberships",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.task_queue",
+          "line": 9,
+          "path": "memberships/applications.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 17,
+          "path": "memberships/invites.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 5,
+          "path": "memberships/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 16,
+          "path": "memberships/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "memberships",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.models",
+          "line": 29,
+          "path": "memberships/invites.py",
+          "kind": "module"
+        },
+        {
+          "import": "notifications.models",
+          "line": 8,
+          "path": "memberships/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "notifications.services",
+          "line": 9,
+          "path": "memberships/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "notifications.models",
+          "line": 26,
+          "path": "memberships/organization_management.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "memberships",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 13,
+          "path": "memberships/applications.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 2,
+          "path": "memberships/role_resolution.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 5,
+          "path": "memberships/selectors.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "memberships",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.access",
+          "line": 6,
+          "path": "memberships/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "memberships/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 6,
+          "path": "memberships/account_management.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 30,
+          "path": "memberships/invites.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "memberships/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 10,
+          "path": "memberships/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 11,
+          "path": "memberships/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 27,
+          "path": "memberships/organization_management.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 28,
+          "path": "memberships/organization_management.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 6,
+          "path": "memberships/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 13,
+          "path": "memberships/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 9,
+          "path": "memberships/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.serializers",
+          "line": 15,
+          "path": "memberships/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 17,
+          "path": "memberships/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 4,
+          "path": "memberships/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "memberships",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.engagement",
+          "line": 350,
+          "path": "memberships/serializers.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "memberships",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.models",
+          "line": 8,
+          "path": "memberships/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 9,
+          "path": "memberships/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 7,
+          "path": "memberships/account_management.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 14,
+          "path": "memberships/applications.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.normalization",
+          "line": 15,
+          "path": "memberships/applications.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 31,
+          "path": "memberships/invites.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.normalization",
+          "line": 32,
+          "path": "memberships/invites.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 12,
+          "path": "memberships/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 13,
+          "path": "memberships/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 29,
+          "path": "memberships/organization_management.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 30,
+          "path": "memberships/organization_management.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 14,
+          "path": "memberships/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.serializers",
+          "line": 10,
+          "path": "memberships/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.presentation",
+          "line": 13,
+          "path": "memberships/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.normalization",
+          "line": 14,
+          "path": "memberships/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 18,
+          "path": "memberships/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 19,
+          "path": "memberships/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.navigation",
+          "line": 20,
+          "path": "memberships/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.tasks",
+          "line": 21,
+          "path": "memberships/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.normalization",
+          "line": 15,
+          "path": "memberships/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 20,
+          "path": "memberships/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "memberships",
+      "to": "workforce",
+      "sources": [
+        {
+          "import": "workforce.employment_engagement_service",
+          "line": 152,
+          "path": "memberships/applications.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.models",
+          "line": 153,
+          "path": "memberships/applications.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.models",
+          "line": 254,
+          "path": "memberships/tasks.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.award_rates",
+          "line": 366,
+          "path": "memberships/views.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "notifications",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.jwt_ws",
+          "line": 9,
+          "path": "notifications/consumers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 4,
+          "path": "notifications/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 15,
+          "path": "notifications/services.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 14,
+          "path": "notifications/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "onboarding",
+      "to": "chat",
+      "sources": [
+        {
+          "import": "chat.realtime",
+          "line": 284,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "onboarding",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.task_queue",
+          "line": 7,
+          "path": "onboarding/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.uploads",
+          "line": 10,
+          "path": "onboarding/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_mixins",
+          "line": 13,
+          "path": "onboarding/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.numbers",
+          "line": 5,
+          "path": "onboarding/services/basic.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_lifecycle",
+          "line": 6,
+          "path": "onboarding/services/basic.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_lifecycle",
+          "line": 5,
+          "path": "onboarding/services/identity.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 6,
+          "path": "onboarding/services/identity.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 5,
+          "path": "onboarding/services/payment.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_lifecycle",
+          "line": 3,
+          "path": "onboarding/services/profile.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_lifecycle",
+          "line": 6,
+          "path": "onboarding/services/regulatory.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 7,
+          "path": "onboarding/services/regulatory.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 13,
+          "path": "onboarding/services/skills.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.integrations.abr",
+          "line": 24,
+          "path": "onboarding/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 25,
+          "path": "onboarding/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 18,
+          "path": "onboarding/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 572,
+          "path": "onboarding/tasks.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 294,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 336,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "onboarding",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.models",
+          "line": 225,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "memberships.models",
+          "line": 337,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "onboarding",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.services",
+          "line": 295,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "notifications.services",
+          "line": 338,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "onboarding",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 339,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "onboarding",
+      "to": "rewards",
+      "sources": [
+        {
+          "import": "rewards.services",
+          "line": 736,
+          "path": "onboarding/tasks.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "onboarding",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.access",
+          "line": 156,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.escalation",
+          "line": 171,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.interest",
+          "line": 172,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.interest",
+          "line": 176,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.access",
+          "line": 184,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.cancellation",
+          "line": 264,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.cancellation",
+          "line": 271,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.cancellation",
+          "line": 320,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "onboarding",
+      "to": "talent",
+      "sources": [
+        {
+          "import": "talent.models",
+          "line": 30,
+          "path": "onboarding/services/upgrade.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "onboarding",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.normalization",
+          "line": 5,
+          "path": "onboarding/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.role_labels",
+          "line": 6,
+          "path": "onboarding/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.presentation",
+          "line": 14,
+          "path": "onboarding/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.normalization",
+          "line": 5,
+          "path": "onboarding/services/referees.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.normalization",
+          "line": 47,
+          "path": "onboarding/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.permissions",
+          "line": 12,
+          "path": "onboarding/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.navigation",
+          "line": 17,
+          "path": "onboarding/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 31,
+          "path": "onboarding/services/upgrade.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.navigation",
+          "line": 570,
+          "path": "onboarding/tasks.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.models",
+          "line": 226,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.models",
+          "line": 340,
+          "path": "onboarding/verification/state.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "organizations",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.task_queue",
+          "line": 18,
+          "path": "organizations/claims.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.uploads",
+          "line": 8,
+          "path": "organizations/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 12,
+          "path": "organizations/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_lifecycle",
+          "line": 13,
+          "path": "organizations/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_mixins",
+          "line": 14,
+          "path": "organizations/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.task_queue",
+          "line": 29,
+          "path": "organizations/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.integrations.abr",
+          "line": 30,
+          "path": "organizations/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "organizations",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.models",
+          "line": 6,
+          "path": "organizations/claims.py",
+          "kind": "module"
+        },
+        {
+          "import": "notifications.models",
+          "line": 10,
+          "path": "organizations/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "organizations",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 5,
+          "path": "organizations/claims.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 9,
+          "path": "organizations/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.skill_identity",
+          "line": 5,
+          "path": "organizations/pharmacy_profile.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 9,
+          "path": "organizations/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "organizations",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.holidays",
+          "line": 226,
+          "path": "organizations/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.holidays",
+          "line": 232,
+          "path": "organizations/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.holidays",
+          "line": 238,
+          "path": "organizations/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.holidays",
+          "line": 312,
+          "path": "organizations/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.pricing_data",
+          "line": 313,
+          "path": "organizations/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.deletion",
+          "line": 69,
+          "path": "organizations/views.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.deletion",
+          "line": 94,
+          "path": "organizations/views.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "organizations",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.org_roles",
+          "line": 9,
+          "path": "organizations/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.normalization",
+          "line": 12,
+          "path": "organizations/claims.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.navigation",
+          "line": 13,
+          "path": "organizations/claims.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 21,
+          "path": "organizations/claims.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 22,
+          "path": "organizations/claims.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.utils",
+          "line": 23,
+          "path": "organizations/claims.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.serializers",
+          "line": 8,
+          "path": "organizations/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 16,
+          "path": "organizations/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 17,
+          "path": "organizations/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.permissions",
+          "line": 11,
+          "path": "organizations/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 34,
+          "path": "organizations/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 35,
+          "path": "organizations/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 138,
+          "path": "organizations/access.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 139,
+          "path": "organizations/access.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.models",
+          "line": 183,
+          "path": "organizations/access.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 184,
+          "path": "organizations/access.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "organizations",
+      "to": "workforce",
+      "sources": [
+        {
+          "import": "workforce.permissions",
+          "line": 171,
+          "path": "organizations/access.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "pharmacy_hub",
+      "to": "client_profile",
+      "sources": [
+        {
+          "import": "client_profile.models.common",
+          "line": 7,
+          "path": "pharmacy_hub/models.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "pharmacy_hub",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.task_queue",
+          "line": 10,
+          "path": "pharmacy_hub/posts.py",
+          "kind": "module"
+        },
+        {
+          "import": "core.serializer_mixins",
+          "line": 7,
+          "path": "pharmacy_hub/serialization/profiles.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "pharmacy_hub",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.models",
+          "line": 8,
+          "path": "pharmacy_hub/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 5,
+          "path": "pharmacy_hub/context.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 14,
+          "path": "pharmacy_hub/directory.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 6,
+          "path": "pharmacy_hub/groups.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 8,
+          "path": "pharmacy_hub/models.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 23,
+          "path": "pharmacy_hub/polls.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 3,
+          "path": "pharmacy_hub/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 3,
+          "path": "pharmacy_hub/serialization/common.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 3,
+          "path": "pharmacy_hub/serialization/groups.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 4,
+          "path": "pharmacy_hub/serialization/posts.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 6,
+          "path": "pharmacy_hub/serializers.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "pharmacy_hub",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.services",
+          "line": 4,
+          "path": "pharmacy_hub/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "notifications.services",
+          "line": 17,
+          "path": "pharmacy_hub/posts.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "pharmacy_hub",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 9,
+          "path": "pharmacy_hub/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 4,
+          "path": "pharmacy_hub/serialization/common.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "pharmacy_hub",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 10,
+          "path": "pharmacy_hub/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 6,
+          "path": "pharmacy_hub/context.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 3,
+          "path": "pharmacy_hub/serialization/profiles.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "pharmacy_hub/serializers.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "pharmacy_hub",
+      "to": "public_hub",
+      "sources": [
+        {
+          "import": "public_hub.models",
+          "line": 201,
+          "path": "pharmacy_hub/posts.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "public_hub.models",
+          "line": 264,
+          "path": "pharmacy_hub/posts.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "public_hub.models",
+          "line": 305,
+          "path": "pharmacy_hub/posts.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "pharmacy_hub",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.models",
+          "line": 6,
+          "path": "pharmacy_hub/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 7,
+          "path": "pharmacy_hub/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 4,
+          "path": "pharmacy_hub/context.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.presentation",
+          "line": 17,
+          "path": "pharmacy_hub/directory.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.presentation",
+          "line": 6,
+          "path": "pharmacy_hub/serialization/common.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.presentation",
+          "line": 8,
+          "path": "pharmacy_hub/serialization/posts.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.presentation",
+          "line": 6,
+          "path": "pharmacy_hub/serialization/profiles.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "public_hub",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.task_queue",
+          "line": 165,
+          "path": "public_hub/content_views.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "core.sitemap",
+          "line": 12,
+          "path": "public_hub/sitemap.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "public_hub",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 38,
+          "path": "public_hub/permissions.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "public_hub",
+      "to": "pharmacy_hub",
+      "sources": [
+        {
+          "import": "pharmacy_hub.models",
+          "line": 14,
+          "path": "public_hub/attachment_access.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "pharmacy_hub.access",
+          "line": 23,
+          "path": "public_hub/attachment_access.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "pharmacy_hub.models",
+          "line": 22,
+          "path": "public_hub/community.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "pharmacy_hub.models",
+          "line": 151,
+          "path": "public_hub/community.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "pharmacy_hub.models",
+          "line": 169,
+          "path": "public_hub/community.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "pharmacy_hub.models",
+          "line": 144,
+          "path": "public_hub/content_views.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "pharmacy_hub.models",
+          "line": 331,
+          "path": "public_hub/content_views.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "pharmacy_hub.models",
+          "line": 360,
+          "path": "public_hub/content_views.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "pharmacy_hub.models",
+          "line": 84,
+          "path": "public_hub/editorial.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "public_hub",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 210,
+          "path": "public_hub/community.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.models",
+          "line": 304,
+          "path": "public_hub/content_views.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.models",
+          "line": 325,
+          "path": "public_hub/content_views.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "public_hub",
+      "to": "talent",
+      "sources": [
+        {
+          "import": "talent.models",
+          "line": 207,
+          "path": "public_hub/community.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "talent.models",
+          "line": 305,
+          "path": "public_hub/content_views.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "talent.models",
+          "line": 322,
+          "path": "public_hub/content_views.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "public_hub",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.browser_session",
+          "line": 2,
+          "path": "public_hub/integration_urls.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.tasks",
+          "line": 176,
+          "path": "public_hub/content_views.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "ratings",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 3,
+          "path": "ratings/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 8,
+          "path": "ratings/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "ratings",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 4,
+          "path": "ratings/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "ratings",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.models",
+          "line": 11,
+          "path": "ratings/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 12,
+          "path": "ratings/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "rewards",
+      "to": "billing",
+      "sources": [
+        {
+          "import": "billing.models",
+          "line": 98,
+          "path": "rewards/services.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "rewards",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.services",
+          "line": 227,
+          "path": "rewards/services.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "rewards",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 8,
+          "path": "rewards/signals.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "rewards",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.access",
+          "line": 38,
+          "path": "rewards/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "rewards",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 10,
+          "path": "rewards/services.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 3,
+          "path": "rewards/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.finalize",
+          "line": 13,
+          "path": "rewards/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.emails",
+          "line": 14,
+          "path": "rewards/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "rewards",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.tasks",
+          "line": 244,
+          "path": "rewards/services.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "attendance",
+      "sources": [
+        {
+          "import": "attendance.models",
+          "line": 8,
+          "path": "shifts/history.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "billing",
+      "sources": [
+        {
+          "import": "billing.utils",
+          "line": 338,
+          "path": "shifts/offers.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "invoicing",
+      "sources": [
+        {
+          "import": "invoicing.models",
+          "line": 9,
+          "path": "shifts/history.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "invoicing.services",
+          "line": 74,
+          "path": "shifts/serialization/projections.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.models",
+          "line": 13,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 15,
+          "path": "shifts/assignment.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 13,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 8,
+          "path": "shifts/browse.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 15,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 11,
+          "path": "shifts/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 10,
+          "path": "shifts/engagement.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 11,
+          "path": "shifts/interest.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 10,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 2,
+          "path": "shifts/rate_visibility.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.models",
+          "line": 18,
+          "path": "shifts/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "notifications.services",
+          "line": 10,
+          "path": "shifts/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "notifications.services",
+          "line": 203,
+          "path": "shifts/emails.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "notifications.services",
+          "line": 404,
+          "path": "shifts/emails.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 9,
+          "path": "shifts/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.qualifications",
+          "line": 10,
+          "path": "shifts/access.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 14,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 18,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 13,
+          "path": "shifts/browse.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.skill_identity",
+          "line": 6,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.work_profile",
+          "line": 7,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.qualifications",
+          "line": 8,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.verification.policy",
+          "line": 9,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 16,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.skill_identity",
+          "line": 5,
+          "path": "shifts/context.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 12,
+          "path": "shifts/engagement.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 12,
+          "path": "shifts/interest.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 15,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 5,
+          "path": "shifts/pricing.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.work_profile",
+          "line": 4,
+          "path": "shifts/serialization/interests.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.skill_identity",
+          "line": 4,
+          "path": "shifts/serialization/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 6,
+          "path": "shifts/serialization/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 3,
+          "path": "shifts/serialization/worker_requests.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 110,
+          "path": "shifts/access.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 271,
+          "path": "shifts/base.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 324,
+          "path": "shifts/base.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 374,
+          "path": "shifts/base.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 255,
+          "path": "shifts/browse.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 283,
+          "path": "shifts/browse.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.services.work_profile",
+          "line": 46,
+          "path": "shifts/interest.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.policy",
+          "line": 47,
+          "path": "shifts/interest.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 84,
+          "path": "shifts/interest.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 337,
+          "path": "shifts/offers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.verification.state",
+          "line": 402,
+          "path": "shifts/offers.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 15,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.chains",
+          "line": 16,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.serializers",
+          "line": 17,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 9,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 37,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "shifts/browse.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 32,
+          "path": "shifts/browse.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 17,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 7,
+          "path": "shifts/description_templates.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 14,
+          "path": "shifts/description_templates.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 4,
+          "path": "shifts/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.chains",
+          "line": 13,
+          "path": "shifts/escalation.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 3,
+          "path": "shifts/leave.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 6,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 39,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 40,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 41,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 8,
+          "path": "shifts/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 9,
+          "path": "shifts/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 34,
+          "path": "shifts/offers.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 3,
+          "path": "shifts/rate_visibility.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.chains",
+          "line": 4,
+          "path": "shifts/rate_visibility.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 7,
+          "path": "shifts/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 8,
+          "path": "shifts/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 9,
+          "path": "shifts/selectors.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 6,
+          "path": "shifts/serialization/offers.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.serializers",
+          "line": 5,
+          "path": "shifts/serialization/projections.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 11,
+          "path": "shifts/serialization/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 12,
+          "path": "shifts/serialization/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.serializers",
+          "line": 13,
+          "path": "shifts/serialization/shifts.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 14,
+          "path": "shifts/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 3,
+          "path": "shifts/worker_requests.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 9,
+          "path": "shifts/worker_requests.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "talent",
+      "sources": [
+        {
+          "import": "talent.models",
+          "line": 22,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.task_dispatch",
+          "line": 12,
+          "path": "shifts/announcements.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 14,
+          "path": "shifts/assignment.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.serializers",
+          "line": 38,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 85,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 100,
+          "path": "shifts/base.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 30,
+          "path": "shifts/browse.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 10,
+          "path": "shifts/cancellation.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 14,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.serializers",
+          "line": 32,
+          "path": "shifts/candidates.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 11,
+          "path": "shifts/counter_offers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.role_labels",
+          "line": 5,
+          "path": "shifts/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 13,
+          "path": "shifts/emails.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 13,
+          "path": "shifts/interest.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 11,
+          "path": "shifts/leave.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 34,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 38,
+          "path": "shifts/lifecycle.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 6,
+          "path": "shifts/notifications.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.role_labels",
+          "line": 28,
+          "path": "shifts/offers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 30,
+          "path": "shifts/offers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.presentation",
+          "line": 7,
+          "path": "shifts/serialization/offers.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 13,
+          "path": "shifts/tasks.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.task_dispatch",
+          "line": 13,
+          "path": "shifts/worker_requests.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 16,
+          "path": "shifts/worker_requests.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 17,
+          "path": "shifts/worker_requests.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 41,
+          "path": "shifts/leave.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "shifts",
+      "to": "workforce",
+      "sources": [
+        {
+          "import": "workforce.models",
+          "line": 101,
+          "path": "shifts/engagement.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.award_rates",
+          "line": 489,
+          "path": "shifts/engagement.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.models",
+          "line": 10,
+          "path": "shifts/history.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.models",
+          "line": 26,
+          "path": "shifts/leave.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.leave_service",
+          "line": 77,
+          "path": "shifts/leave.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.leave_service",
+          "line": 84,
+          "path": "shifts/leave.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.leave_service",
+          "line": 88,
+          "path": "shifts/leave.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.leave_service",
+          "line": 99,
+          "path": "shifts/leave.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.leave_service",
+          "line": 113,
+          "path": "shifts/leave.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.leave_service",
+          "line": 125,
+          "path": "shifts/leave.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.leave_service",
+          "line": 137,
+          "path": "shifts/leave.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.models",
+          "line": 267,
+          "path": "shifts/models.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.models",
+          "line": 285,
+          "path": "shifts/models.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.award_rates",
+          "line": 108,
+          "path": "shifts/pricing_data.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "workforce.roster.worker_actions",
+          "line": 241,
+          "path": "shifts/worker_requests.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "talent",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 3,
+          "path": "talent/serializers/explorer.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.services.skill_identity",
+          "line": 7,
+          "path": "talent/serializers/explorer.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.verification.policy",
+          "line": 9,
+          "path": "talent/serializers/explorer.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.verification.schema",
+          "line": 10,
+          "path": "talent/serializers/explorer.py",
+          "kind": "module"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 6,
+          "path": "talent/views/explorer.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "talent",
+      "to": "ratings",
+      "sources": [
+        {
+          "import": "ratings.models",
+          "line": 63,
+          "path": "talent/views/explorer.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "users",
+      "to": "billing",
+      "sources": [
+        {
+          "import": "billing.utils",
+          "line": 425,
+          "path": "users/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "billing.utils",
+          "line": 496,
+          "path": "users/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "billing.utils",
+          "line": 123,
+          "path": "users/sessions.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "users",
+      "to": "chat",
+      "sources": [
+        {
+          "import": "chat.realtime",
+          "line": 26,
+          "path": "users/tokens.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "users",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.services",
+          "line": 34,
+          "path": "users/tasks.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "notifications.services",
+          "line": 25,
+          "path": "users/tokens.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "users",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 25,
+          "path": "users/account_deletion.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 115,
+          "path": "users/api_account.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.services.upgrade",
+          "line": 121,
+          "path": "users/api_account.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 416,
+          "path": "users/api_otp.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 27,
+          "path": "users/role_labels.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 123,
+          "path": "users/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.models",
+          "line": 186,
+          "path": "users/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.services.work_profile",
+          "line": 426,
+          "path": "users/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.services.work_profile",
+          "line": 497,
+          "path": "users/serializers.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "onboarding.services.work_profile",
+          "line": 126,
+          "path": "users/sessions.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "users",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.models",
+          "line": 30,
+          "path": "users/navigation.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.models",
+          "line": 257,
+          "path": "users/org_roles.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "users",
+      "to": "public_hub",
+      "sources": [
+        {
+          "import": "public_hub.permissions",
+          "line": 127,
+          "path": "users/sessions.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "users",
+      "to": "rewards",
+      "sources": [
+        {
+          "import": "rewards.services",
+          "line": 191,
+          "path": "users/serializers.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "users",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 195,
+          "path": "users/serializers.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "users",
+      "to": "talent",
+      "sources": [
+        {
+          "import": "talent.models",
+          "line": 98,
+          "path": "users/account_deletion.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "worker_finance",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.integrations.abr",
+          "line": 90,
+          "path": "worker_finance/views.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "worker_finance",
+      "to": "invoicing",
+      "sources": [
+        {
+          "import": "invoicing.views",
+          "line": 35,
+          "path": "worker_finance/legacy.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "invoicing.views",
+          "line": 43,
+          "path": "worker_finance/legacy.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "invoicing.views",
+          "line": 51,
+          "path": "worker_finance/legacy.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "worker_finance",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.access",
+          "line": 337,
+          "path": "worker_finance/views.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "workforce",
+      "to": "attendance",
+      "sources": [
+        {
+          "import": "attendance.approvals",
+          "line": 9,
+          "path": "workforce/attendance_edits.py",
+          "kind": "module"
+        },
+        {
+          "import": "attendance.models",
+          "line": 10,
+          "path": "workforce/attendance_edits.py",
+          "kind": "module"
+        },
+        {
+          "import": "attendance.models",
+          "line": 12,
+          "path": "workforce/signals.py",
+          "kind": "module"
+        },
+        {
+          "import": "attendance.models",
+          "line": 9,
+          "path": "workforce/timesheet_builder.py",
+          "kind": "module"
+        },
+        {
+          "import": "attendance.approvals",
+          "line": 6,
+          "path": "workforce/timesheet_data.py",
+          "kind": "module"
+        },
+        {
+          "import": "attendance.models",
+          "line": 16,
+          "path": "workforce/timesheet_data.py",
+          "kind": "module"
+        },
+        {
+          "import": "attendance.models",
+          "line": 3,
+          "path": "workforce/timesheet_serialization.py",
+          "kind": "module"
+        },
+        {
+          "import": "attendance.models",
+          "line": 18,
+          "path": "workforce/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "workforce",
+      "to": "core",
+      "sources": [
+        {
+          "import": "core.task_queue",
+          "line": 15,
+          "path": "workforce/leave_service.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "workforce",
+      "to": "memberships",
+      "sources": [
+        {
+          "import": "memberships.models",
+          "line": 10,
+          "path": "workforce/employment_engagement_service.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 10,
+          "path": "workforce/leave_service.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 6,
+          "path": "workforce/roster/periods.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 9,
+          "path": "workforce/roster/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 7,
+          "path": "workforce/roster/validation.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 3,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.serializers",
+          "line": 7,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 23,
+          "path": "workforce/roster/worker_actions.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 7,
+          "path": "workforce/timesheet_data.py",
+          "kind": "module"
+        },
+        {
+          "import": "memberships.models",
+          "line": 15,
+          "path": "workforce/views.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "workforce",
+      "to": "notifications",
+      "sources": [
+        {
+          "import": "notifications.services",
+          "line": 19,
+          "path": "workforce/roster/publication.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "notifications.services",
+          "line": 249,
+          "path": "workforce/roster/publication.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "workforce",
+      "to": "onboarding",
+      "sources": [
+        {
+          "import": "onboarding.models",
+          "line": 11,
+          "path": "workforce/employment_engagement_service.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "workforce",
+      "to": "organizations",
+      "sources": [
+        {
+          "import": "organizations.timezone",
+          "line": 11,
+          "path": "workforce/attendance_edits.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 11,
+          "path": "workforce/leave_service.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 13,
+          "path": "workforce/leave_service.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 12,
+          "path": "workforce/roster/command_api.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 2,
+          "path": "workforce/roster/permissions.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 3,
+          "path": "workforce/roster/v2_views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 10,
+          "path": "workforce/roster/validation.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 4,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 29,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 26,
+          "path": "workforce/roster/worker_actions.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 6,
+          "path": "workforce/timesheet_core.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.models",
+          "line": 16,
+          "path": "workforce/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 19,
+          "path": "workforce/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "organizations.access",
+          "line": 14,
+          "path": "workforce/permissions.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.access",
+          "line": 42,
+          "path": "workforce/permissions.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.access",
+          "line": 56,
+          "path": "workforce/permissions.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 42,
+          "path": "workforce/signals.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "organizations.timezone",
+          "line": 166,
+          "path": "workforce/signals.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "workforce",
+      "to": "shifts",
+      "sources": [
+        {
+          "import": "shifts.models",
+          "line": 12,
+          "path": "workforce/leave_service.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.emails",
+          "line": 14,
+          "path": "workforce/leave_service.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 4,
+          "path": "workforce/roster/assignment_rates.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 4,
+          "path": "workforce/roster/bulk_edit.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.engagement",
+          "line": 7,
+          "path": "workforce/roster/bulk_edit.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.assignment",
+          "line": 8,
+          "path": "workforce/roster/bulk_edit.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 5,
+          "path": "workforce/roster/copying.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.engagement",
+          "line": 8,
+          "path": "workforce/roster/copying.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.history",
+          "line": 5,
+          "path": "workforce/roster/edit_guards.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 5,
+          "path": "workforce/roster/periods.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 7,
+          "path": "workforce/roster/publication.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 13,
+          "path": "workforce/roster/revisions.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 10,
+          "path": "workforce/roster/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.serializers",
+          "line": 11,
+          "path": "workforce/roster/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.escalation",
+          "line": 12,
+          "path": "workforce/roster/serializers.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.assignment",
+          "line": 10,
+          "path": "workforce/roster/slot_edit.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.engagement",
+          "line": 11,
+          "path": "workforce/roster/slot_edit.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 12,
+          "path": "workforce/roster/slot_edit.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.pricing",
+          "line": 13,
+          "path": "workforce/roster/slot_edit.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 10,
+          "path": "workforce/roster/slot_edit_inputs.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 14,
+          "path": "workforce/roster/slot_locking.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 4,
+          "path": "workforce/roster/v2_views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 8,
+          "path": "workforce/roster/validation.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 5,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.serializers",
+          "line": 11,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.pricing",
+          "line": 20,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.limits",
+          "line": 21,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.notifications",
+          "line": 22,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.engagement",
+          "line": 23,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.assignment",
+          "line": 24,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.escalation",
+          "line": 30,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.history",
+          "line": 31,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 5,
+          "path": "workforce/roster/week_templates.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.engagement",
+          "line": 8,
+          "path": "workforce/roster/week_templates.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 16,
+          "path": "workforce/roster/worker_actions.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 10,
+          "path": "workforce/signals.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.models",
+          "line": 8,
+          "path": "workforce/timesheet_data.py",
+          "kind": "module"
+        },
+        {
+          "import": "shifts.pricing",
+          "line": 19,
+          "path": "workforce/roster/assignment_rates.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.pricing",
+          "line": 80,
+          "path": "workforce/roster/periods.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.models",
+          "line": 216,
+          "path": "workforce/roster/publication.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.models",
+          "line": 250,
+          "path": "workforce/roster/publication.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.models",
+          "line": 201,
+          "path": "workforce/roster/v2_views.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.models",
+          "line": 220,
+          "path": "workforce/roster/v2_views.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.access",
+          "line": 42,
+          "path": "workforce/roster/validation.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.assignment",
+          "line": 57,
+          "path": "workforce/roster/worker_actions.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.engagement",
+          "line": 68,
+          "path": "workforce/roster/worker_actions.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.limits",
+          "line": 399,
+          "path": "workforce/roster/worker_actions.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "shifts.escalation",
+          "line": 400,
+          "path": "workforce/roster/worker_actions.py",
+          "kind": "delayed"
+        }
+      ]
+    },
+    {
+      "from": "workforce",
+      "to": "talent",
+      "sources": [
+        {
+          "import": "talent.models",
+          "line": 9,
+          "path": "workforce/roster/validation.py",
+          "kind": "module"
+        }
+      ]
+    },
+    {
+      "from": "workforce",
+      "to": "users",
+      "sources": [
+        {
+          "import": "users.models",
+          "line": 16,
+          "path": "workforce/leave_service.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 17,
+          "path": "workforce/leave_service.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 15,
+          "path": "workforce/roster/slot_locking.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 28,
+          "path": "workforce/roster/views.py",
+          "kind": "module"
+        },
+        {
+          "import": "users.models",
+          "line": 18,
+          "path": "workforce/permissions.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 19,
+          "path": "workforce/permissions.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 43,
+          "path": "workforce/permissions.py",
+          "kind": "delayed"
+        },
+        {
+          "import": "users.org_roles",
+          "line": 57,
+          "path": "workforce/permissions.py",
+          "kind": "delayed"
+        }
+      ]
+    }
+  ]
+}

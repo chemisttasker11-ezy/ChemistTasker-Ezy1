@@ -141,7 +141,7 @@ class ModuleImportGraphTests(unittest.TestCase):
         )
 
     def test_real_guard_allowlist_is_parseable_without_django_import(self):
-        self.assertGreaterEqual(len(approved_mutual_pairs()), 1)
+        self.assertEqual(approved_mutual_pairs(), set())
 
 
 if __name__ == "__main__":

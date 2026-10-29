@@ -1,8 +1,8 @@
 {
   "schema": "chemisttasker-backend-cycle-baseline-v1",
-  "recorded_sha": "e13b7008708e96ffa3077a37b6bfd20ed40d2e53",
-  "source": "Identity/organization module boundary and shared policy facts; see DEPENDENCY_CYCLE_REMOVAL_PLAN_20261029.md",
-  "notes": "Direct users-to-organizations is removed. Direct cyclic edges fall 38 to 23 and the SCC shrinks from 11 to eight apps. Existing delayed scope/navigation imports remain; combined cyclic edges remain 124. Shared access-control facts have no business import and belong to no cyclic component.",
+  "recorded_sha": "f97712b35cd746b27405e4506f0ceedeb6896b43",
+  "source": "Onboarding encryption boundary with preserved migration metadata; see DEPENDENCY_CYCLE_REMOVAL_PLAN_20261029.md",
+  "notes": "No direct mutual pairs or exemptions remain. onboarding-to-client_profile is removed at every depth; the identical encryption implementation is infrastructure-owned and historical migration metadata is bound by the compatibility facade during model discovery. Actual direct cyclic edges fall 23 to 22; combined cyclic edges fall 124 to 123. Longer cycles remain.",
   "strongly_connected_components": [
     [
       "chat",
@@ -39,6 +39,10 @@
     [
       "client_profile",
       "memberships"
+    ],
+    [
+      "client_profile",
+      "onboarding"
     ],
     [
       "client_profile",
