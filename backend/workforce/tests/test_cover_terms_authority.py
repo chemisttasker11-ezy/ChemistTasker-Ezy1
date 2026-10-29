@@ -2,8 +2,10 @@
 from copy import deepcopy
 from datetime import timedelta
 from decimal import Decimal
+from unittest import skipUnless
 from unittest.mock import patch
 
+from django.db import connection
 from django.test import TestCase
 
 from attendance.test_cover_terms_acceptance import CoverTermsFixture
@@ -15,6 +17,8 @@ from workforce.roster.assignment_rates import refresh_assignment_rate
 from workforce.roster.serializers import RosterAssignmentSerializer
 
 
+# Skip before TestCase opens its class transaction; the fixture requires PostgreSQL.
+@skipUnless(connection.vendor == "postgresql", "Cover terms authority contracts require PostgreSQL.")
 class CoverTermsAuthorityTests(CoverTermsFixture, TestCase):
     def test_manager_patch_cannot_forge_worker_consent_or_routing(self):
         assignment = self.cover().backfill_assignment
@@ -101,6 +105,7 @@ class CoverTermsAuthorityTests(CoverTermsFixture, TestCase):
         self.assert_unaccepted(assignment)
 
 
+@skipUnless(connection.vendor == "postgresql", "Cover terms authority contracts require PostgreSQL.")
 class CoverTermsRosterReviewTests(CoverTermsFixture, TestCase):
     def prepare(self, *, accepted=True, rostered=False):
         review = self.cover()
@@ -176,6 +181,40 @@ class CoverTermsRosterReviewTests(CoverTermsFixture, TestCase):
         response = client_for(self.owner).delete(f"/api/v1/roster-shifts/{assignment.shift_id}/")
         self.assertEqual(response.status_code, 204, response.content[:300])
         self.assertFalse(Shift.objects.filter(pk=assignment.shift_id).exists())
+
+    def test_archiving_period_preserves_accepted_cover_and_invoice_sources(self):
+        from invoicing.services import generate_preview_invoice_lines
+        from worker_finance.services import internal_invoice_sources
+
+        assignment = self.prepare(rostered=True)
+        self.assertIsNone(assignment.source_offer_id)
+        self.assert_accepted(assignment, self.review)
+        period = RosterPeriod.objects.create(
+            pharmacy=self.pharmacy,
+            week_start=assignment.slot_date - timedelta(days=assignment.slot_date.weekday()),
+            created_by=self.owner,
+        )
+        slot = assignment.slot
+        slot.roster_period = period
+        slot.save(update_fields=["roster_period"])
+        period.status = RosterPeriod.Status.PUBLISHED
+        period.save(update_fields=["status"])
+        sources = internal_invoice_sources(self.worker)
+        preview = generate_preview_invoice_lines(assignment.shift, self.worker)
+
+        response = client_for(self.owner).post("/api/v1/attendance/roster/archive/", {
+            "period_id": period.pk,
+        }, format="json")
+
+        self.assertEqual(response.status_code, 200, response.content[:300])
+        period.refresh_from_db()
+        slot.refresh_from_db()
+        self.assertEqual(period.status, RosterPeriod.Status.ARCHIVED)
+        self.assertEqual(slot.roster_period_id, period.pk)
+        self.assert_history_kept(assignment)
+        self.assertEqual(internal_invoice_sources(self.worker), sources)
+        self.assertEqual(generate_preview_invoice_lines(assignment.shift, self.worker), preview)
+        self.assert_no_payment()
 
 
 def same_worker_operation(route, accepted):
