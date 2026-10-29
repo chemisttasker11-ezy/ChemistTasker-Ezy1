@@ -90,7 +90,7 @@ jobs:
           core.test_promoted_model_import_ownership
           core.test_module_size_ratchet
           core.test_backend_ownership_boundaries
-          core.test_upload_infrastructure_contract core.test_serializer_values_boundary core.test_encrypted_field_boundary core.test_runtime_ownership_cleanup core.test_serializer_runtime_boundary users.test_cross_client_authority_contract
+          core.test_upload_infrastructure_contract core.test_serializer_values_boundary core.test_encrypted_field_boundary core.test_runtime_ownership_cleanup core.test_serializer_runtime_boundary users.test_cross_client_authority_contract users.test_worker_organization_boundary
           core.test_public_error_surface
           core.test_serializer_lifecycle_ownership
           chat.test_api.ChatAttachmentTests

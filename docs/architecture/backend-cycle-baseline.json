@@ -1,8 +1,8 @@
 {
   "schema": "chemisttasker-backend-cycle-baseline-v1",
-  "recorded_sha": "parent:90534bbe; serializer runtime composition",
+  "recorded_sha": "parent:4cba7134; worker organisation selector ownership",
   "source": "All direct runtime cycles are removed. Function-local cycle debt is independently bounded.",
-  "notes": "Direct SCCs and cyclic edges are zero; combined cyclic edges decrease 120 to 114 with no added cyclic edge or component expansion. Explicit file references belong to application composition, bound at worker-safe startup; infrastructure imports no domain. Historical facades remain.",
+  "notes": "Direct cyclic edges and components remain zero. Combined cyclic edges decrease 114 to 113 by removing users-to-organizations at all import depths. No combined cyclic edge is added; the twenty-app component does not expand. Organisation query semantics and worker bootstrap remain preserved.",
   "strongly_connected_components": [],
   "unapproved_cycle_edges": [],
   "combined_components": [
@@ -425,10 +425,6 @@
     [
       "users",
       "onboarding"
-    ],
-    [
-      "users",
-      "organizations"
     ],
     [
       "users",
