@@ -6,6 +6,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { finance, financeStatus, financeToday, type FinanceCustomer, type FinanceCustomerInput, type FinanceItem, type FinanceItemInput, type FinanceInvoice, type FinanceExpense, type FinanceExpenseInput, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import FinanceInvoiceEditor from './FinanceInvoiceEditor';
+import { nativeFileBytes } from '@/features/parity/nativeFileBytes';
 
 const money = (value: string | number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 // Idempotency identity only; no secrets or authentication use.
@@ -42,9 +43,10 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     const blob = version == null
       ? (received ? await finance.receivedPdf(invoice.id) : await finance.pdf(invoice.id))
       : (received ? await finance.receivedRevisionPdf(invoice.id, version) : await finance.invoiceRevisionPdf(invoice.id, version));
+    const bytes = await nativeFileBytes(blob);
     const file = new File(Paths.cache, invoice.number + '-revision-' + targetVersion + '.pdf');
     file.create({ overwrite: true });
-    file.write(new Uint8Array(await blob.arrayBuffer()));
+    file.write(bytes);
     await Sharing.shareAsync(file.uri, {
       dialogTitle: 'Share ' + invoice.number + ' revision ' + targetVersion,
       mimeType: 'application/pdf',
