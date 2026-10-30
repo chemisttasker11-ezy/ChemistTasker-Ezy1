@@ -111,6 +111,9 @@ jobs:
           CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
           EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
           USE_AZURE_STORAGE = False
+          # Captured test mail must not depend on external runner hostname DNS.
+          from django.core.mail.utils import DNS_NAME
+          DNS_NAME._fqdn = "native-smoke.localhost"
           PY
           rm -f /tmp/chemisttasker-native-smoke.sqlite3
           (
@@ -572,6 +575,9 @@ jobs:
           CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
           EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
           USE_AZURE_STORAGE = False
+          # Captured test mail must not depend on external runner hostname DNS.
+          from django.core.mail.utils import DNS_NAME
+          DNS_NAME._fqdn = "native-smoke.localhost"
           PY
           rm -f /tmp/chemisttasker-native-smoke.sqlite3
           (

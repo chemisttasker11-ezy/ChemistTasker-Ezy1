@@ -77,3 +77,32 @@ requires real authenticated Shift Center and Clock & breaks destinations, the
 camera, both invoice revisions and actual PDF sharing, followed by independent
 saved-record/PDF verification. Merely seeing the login screen cannot pass those
 assertions. No application source or business acceptance assertion changes.
+
+
+## Captured email Message-ID hostname
+
+The 7420821 iOS artifact reaches both saved invoice revisions with the correct
+577.50 and 616.00 amounts. Its Send email request then outlives the unchanged
+30-second UI wait. A targeted macOS job on immutable 7420821 reproduces the
+actual HTTP Save/revise/send path using real PDF generation and captured email.
+
+The send succeeds in 70.482 seconds. A server traceback identifies the delay in
+socket.getfqdn, called by Django CachedDnsName while EmailMessage.message builds
+the Message-ID, before sending. It is not a failure of invoice arithmetic or PDF
+generation. Probe run 41045452916 / job 124028314640 also verifies both persisted
+revisions, rendered PDF totals, immutable original shift terms and one sent
+delivery.
+
+Configure the generated native-smoke settings' shared Django DNS_NAME cache with
+native-smoke.localhost for captured test mail on both platforms. The same macOS
+probe then succeeds in 0.282 seconds (run 41046224512 / job 124030856929), with the
+same independent persisted-record/PDF checks. No renderer, MIME, SMTP acceptance,
+status transition, retry, fee or application source is changed. The native Send
+wait remains 30 seconds, and all actual business/share assertions remain.
+
+This isolates the test runner's external hostname resolver from a fixture that
+already requires APP_ENV=test and locmem email. Production hostname/provider
+configuration is unchanged and still requires authorized staging verification.
+Django 5.2.17's cache implementation is pinned here:
+https://github.com/django/django/blob/5.2.17/django/core/mail/utils.py.
+Final-head native verification remains required.
