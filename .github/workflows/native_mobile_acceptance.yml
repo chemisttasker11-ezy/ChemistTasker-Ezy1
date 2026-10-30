@@ -822,9 +822,13 @@ jobs:
                 all: allow
           - openLink: "frontendmobile://admin/shifts"
           - extendedWaitUntil:
-              visible: 'Open in .*ChemistTasker.*'
+              visible: 'Open in .*ChemistTasker.*|Go to Login|Welcome back'
               timeout: 30000
-          - tapOn: "Open"
+          - runFlow:
+              when:
+                visible: 'Open in .*ChemistTasker.*'
+              commands:
+                - tapOn: "Open"
           YAML
           maestro --device "$SIM_UDID" test /tmp/native-link-consent.yaml
           sleep 5

@@ -60,3 +60,20 @@ Platform conditions follow Maestro's documented runFlow when/platform syntax:
 https://docs.maestro.dev/maestro-flows/flow-control-and-logic/conditions.
 YAML and artifact-target controls are checked locally; a final-head native run is
 still required. Do not count the earlier iOS failure as a passing business journey.
+
+## iOS link-consent setup
+
+At 026f2cb63984e14db3a9621e8c1678d68fca1d6c, all seven non-native workflows
+and Android native acceptance passed. iOS job 123989882519 stopped before the
+business flow, at native-link-consent step 005: it required an Open in ChemistTasker
+prompt. Artifact 12968483996 instead shows the app already open at Welcome back,
+with no consent dialog. No invoice or keyboard-dismissing result is established
+by that run.
+
+Accept either the actual prompt or the already-open unauthenticated app in this
+preparatory session, and tap Open only when that prompt is present. Keep the
+separate XCUITest session boundary used for consent delivery. The main flow still
+requires real authenticated Shift Center and Clock & breaks destinations, the
+camera, both invoice revisions and actual PDF sharing, followed by independent
+saved-record/PDF verification. Merely seeing the login screen cannot pass those
+assertions. No application source or business acceptance assertion changes.
