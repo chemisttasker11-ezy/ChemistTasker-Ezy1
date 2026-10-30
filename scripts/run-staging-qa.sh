@@ -82,7 +82,7 @@ backend_run() {
 
 backend_run python manage.py check --settings=core.contract_test_settings
 backend_run python manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
-backend_run python manage.py test users.tests users.test_task_dispatch_boundary users.test_membership_read_boundary users.test_organization_boundary billing.tests billing.test_checkout_reservations --settings=core.contract_test_settings
+backend_run python manage.py test users.tests users.test_task_dispatch_boundary users.test_membership_read_boundary users.test_organization_boundary billing.tests billing.test_cancellation_policy_evidence shifts.test_operational_outages billing.test_checkout_reservations --settings=core.contract_test_settings
 backend_run python manage.py test shifts.test_dependency_boundary core.test_task_dispatch_registration core.test_task_contracts --settings=core.contract_test_settings
 backend_run python manage.py test chat.test_api.ChatAttachmentTests core.test_client_profile_api_composition core.test_serializer_values_boundary core.test_encrypted_field_boundary core.test_runtime_ownership_cleanup core.test_serializer_runtime_boundary users.test_cross_client_authority_contract users.test_worker_organization_boundary --settings=core.contract_test_settings
 backend_run python manage.py test organizations memberships client_profile.test_admin_invitations client_profile.test_characterization_chains client_profile.test_characterization_claims --settings=core.contract_test_settings

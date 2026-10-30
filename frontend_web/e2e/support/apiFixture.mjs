@@ -107,6 +107,8 @@ export async function installApiFixture(page, user, extra) {
     if (path.includes('/notifications')) return json(route, { results: [], unread_count: 0, count: 0 });
     if (path.endsWith('/pharmacies/')) return json(route, []);
     if (path.endsWith('/my-memberships/')) return json(route, []);
+    if (path.endsWith('/attendance/worker/cover-terms/')) return json(route, []);
+    if (path.endsWith('/attendance/manager/kiosk-review/pending/')) return json(route, []);
     if (path.endsWith('/attendance/worker/status/')) {
       return json(route, { has_active_session: false, session_id: null, pharmacy_id: null, pharmacy_name: null });
     }

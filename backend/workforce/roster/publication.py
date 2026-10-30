@@ -1,6 +1,7 @@
 """Publishing rosters: publish (with warnings), unpublish, archive, the workers' notification, and the published
 roster a worker sees."""
 from datetime import timedelta
+import logging
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -13,6 +14,7 @@ from workforce.roster.publication_contract import reviewed_validation
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def _notify_roster_publication(period_id, worker_ids, revision):
@@ -20,11 +22,15 @@ def _notify_roster_publication(period_id, worker_ids, revision):
     period = RosterPeriod.objects.select_related("pharmacy").get(pk=period_id)
     for worker in User.objects.filter(pk__in=worker_ids):
         role_path = {"PHARMACIST": "pharmacist", "OTHER_STAFF": "otherstaff", "EXPLORER": "explorer"}.get(worker.role, "owner")
-        notify_users([worker.pk], title="Roster published",
-                     body=f"Your roster at {period.pharmacy.name} for {period.week_start} is ready for acknowledgement.",
-                     action_url=f"/dashboard/{role_path}/roster",
-                     payload={"roster_period_id": period.pk, "revision_number": revision,
-                              "notification_kind": "roster_published"})
+        try:
+            notify_users([worker.pk], title="Roster published",
+                         body=f"Your roster at {period.pharmacy.name} for {period.week_start} is ready for acknowledgement.",
+                         action_url=f"/dashboard/{role_path}/roster",
+                         payload={"roster_period_id": period.pk, "revision_number": revision,
+                                  "notification_kind": "roster_published"})
+        except Exception:
+            logger.exception('Roster publication notice failed for period %s worker %s revision %s',
+                             period.pk, worker.pk, revision)
 
 
 def publish_roster_period(roster_period, published_by, force_warnings=False, *, acknowledged_warning_keys=None):
@@ -324,13 +330,16 @@ def republish_roster_shift(slot, user, notify="worker"):
                     if worker.pk in slot_workers
                     else f"The roster at {pharmacy.name} for the week of {period.week_start} was updated."
                 )
-                notify_users(
-                    [worker.pk],
-                    title="Roster updated",
-                    body=body,
-                    action_url=f"/dashboard/{role_path}/roster",
-                    payload={"slot_id": locked.pk, "notification_kind": "roster_shift_republished"},
-                )
+                try:
+                    notify_users(
+                        [worker.pk],
+                        title="Roster updated",
+                        body=body,
+                        action_url=f"/dashboard/{role_path}/roster",
+                        payload={"slot_id": locked.pk, "notification_kind": "roster_shift_republished"},
+                    )
+                except Exception:
+                    logger.exception('Roster shift notice failed for slot %s worker %s', locked.pk, worker.pk)
 
         if recipients:
             transaction.on_commit(_notify, robust=True)
