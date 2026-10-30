@@ -17,7 +17,6 @@ test('real invoice preview, Save, immutable revisions, PDF and captured delivery
   const save = browser.waitForResponse(/\/finance\/invoices\/$/);
   await screen.getByRole('button', 'Save invoice', { exact: true }).tap();
   expect((await save).status).toBe(201);
-  await expect(screen.getByRole('button', 'Open', { exact: true })).toBeVisible();
   const first = await browser.evaluate(async () => {
     const response = await fetch('/api/v1/finance/invoices/', { credentials: 'include' });
     const body = await response.json();
@@ -29,7 +28,10 @@ test('real invoice preview, Save, immutable revisions, PDF and captured delivery
   });
   expect(first.version).toBe(1);
   expect(first.payable).toBe('577.50');
-  await screen.getByRole('button', 'Open', { exact: true }).tap();
+  const invoiceRow = screen.getByRole('listitem').filter({
+    has: screen.getByRole('button', `More actions for ${first.number}`, { exact: true }),
+  });
+  await invoiceRow.getByRole('button', 'Open', { exact: true }).tap();
   await expect(screen.getByRole('button', 'Save revision', { exact: true })).toBeVisible();
   const revisedPreview = browser.waitForResponse(/\/finance\/invoices\/preview\/$/);
   await screen.getByLabel('Qty', { exact: true }).fill('8');

@@ -230,6 +230,8 @@ jobs:
         run: python backend/manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
       - name: Auth and account contracts
         run: python backend/manage.py test users billing --settings=core.contract_test_settings
+      - name: Bounded notification outage contracts
+        run: python backend/manage.py test shifts.test_operational_outages --settings=core.contract_test_settings
       - name: Marketplace contracts
         run: python backend/manage.py test marketplace.tests marketplace.test_listing_policy ethical_marketplace.tests ethical_marketplace.test_finalisation marketplace.test_pr201_b24_b25 --settings=core.contract_test_settings
       - name: Large-module ratchet
