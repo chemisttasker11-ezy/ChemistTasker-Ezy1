@@ -120,3 +120,16 @@ keyboard, rather than proving the quantity field was edited. Give the real nativ
 quantity input a stable testID and use that control in Maestro; assert the edited
 value before dismissing the keyboard. This is test targeting metadata only, with no
 calculation, layout or interaction policy change. Native rerun is still required.
+
+A final HTTP-boundary review found that a plain staff roster rate PATCH could receive
+an unhandled Django payroll-lock error. Map only locked_payroll_period into the
+existing HTTP 400 validation envelope; keep all other exception handling unchanged.
+The source write still rolls back, the original manifest/rate remains, and the same
+authorized PATCH succeeds after the existing audited period correction. Worker access
+remains denied. This is error translation, not a new rate-setting permission.
+
+Final HTTP-boundary regression selection: 57/57 passed, zero skips. Native quantity
+targeting: 15 component contracts passed, mobile typecheck and Maestro YAML passed.
+Historical fixture ownership: four contracts passed. Recovery comparator: five
+positive/negative controls passed. These selections overlap prior suites and are not
+summed into a platform test total. Final-head hosted acceptance remains authoritative.

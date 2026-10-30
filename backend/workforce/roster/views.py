@@ -80,6 +80,12 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
+    def handle_exception(self, exc):
+        if isinstance(exc, DjangoValidationError) and getattr(exc, 'code', None) == 'locked_payroll_period':
+            exc = DRFValidationError({'code': exc.code, 'detail': exc.message,
+                                      'period_ids': exc.params['period_ids']})
+        return super().handle_exception(exc)
+
     def get_queryset(self):
         user = self.request.user
         # Include all assignments for controlled pharmacies (historical records

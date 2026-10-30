@@ -204,3 +204,32 @@ class AssignmentFreezeContracts(AssignmentFreezeFixture, TestCase):
         with patch('workforce.signals._enqueue') as enqueue:
             ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).delete()
         enqueue.assert_called_once()
+
+    def test_manager_payroll_rate_patch_returns_validation_and_preserves_correction(self):
+        from workforce.timesheets import correct_locked_period
+        with patch('workforce.signals.rebuild_timesheet_task.delay'):
+            self.assertEqual(self.activate().status_code, 200)
+            self.assignment.refresh_from_db()
+            self.assignment.source_offer = None  # Model a plain staff roster assignment, not a marketplace booking.
+            self.assignment.save(update_fields=['source_offer'])
+        self.review()
+        manifest = self.freeze()
+        rate = self.assignment.unit_rate
+        url = f'/api/v1/roster-owner/{self.assignment.pk}/'
+        response = client_for(self.manager).patch(url, {'unit_rate': '99.00'}, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(response.data['code'], 'locked_payroll_period')
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.unit_rate, rate)
+        self.assertEqual(TimesheetManifest.objects.get(pk=manifest.pk).manifest_hash, manifest.manifest_hash)
+        correct_locked_period(self.period, self.manager, 'Review the staff payroll rate adjustment')
+        with patch('workforce.signals.rebuild_timesheet_task.delay'):
+            corrected = client_for(self.manager).patch(url, {'unit_rate': '99.00'}, format='json')
+        self.assertEqual(corrected.status_code, 200, corrected.data)
+        self.assignment.refresh_from_db()
+        self.assertEqual(str(self.assignment.unit_rate), '99.00')
+
+    def test_worker_cannot_use_manager_payroll_patch(self):
+        response = client_for(self.worker).patch(f'/api/v1/roster-owner/{self.assignment.pk}/',
+                                                 {'unit_rate': '99.00'}, format='json')
+        self.assertEqual(response.status_code, 404)
