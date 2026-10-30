@@ -121,7 +121,7 @@ docker run --rm \
   -e LOCAL_DB_HOST=127.0.0.1 \
   -e LOCAL_DB_PORT=5432 \
   "$backend_image" \
-  python manage.py test client_profile.test_postgres_concurrency billing.test_checkout_reservations_postgres --settings=core.postgres_test_settings
+  python manage.py test client_profile.test_postgres_concurrency billing.test_checkout_reservations_postgres workforce.tests.test_payroll_activation_locking workforce.tests.test_assignment_freeze workforce.tests.test_assignment_freeze_postgres --settings=core.postgres_test_settings
 
 echo "== Tauri / Rust QA =="
 docker run --rm   -v "$ROOT_DIR:/src:ro"   rust:1-bookworm   bash -lc '

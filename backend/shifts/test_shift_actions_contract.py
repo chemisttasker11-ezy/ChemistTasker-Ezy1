@@ -1168,6 +1168,7 @@ class BookingSafetyTests(ShiftActionFixture):
                          [offer.offered_slot_date])
         self.assertEqual(ShiftSlotAssignment.objects.filter(shift=shift).count(), 1)
         offer.offered_slot_date = slot.date + timedelta(days=21)
+        offer.save(update_fields=['offered_slot_date'])
         with self.assertRaises(ValidationError):
             finalize_shift_offer(offer)
         self.assertEqual(ShiftSlotAssignment.objects.filter(shift=shift).count(), 1)

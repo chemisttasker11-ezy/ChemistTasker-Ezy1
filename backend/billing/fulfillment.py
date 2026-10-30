@@ -77,7 +77,9 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
         except ValidationError as exc:
             if unbookable is None:
                 raise
-            if not isinstance(exc.detail, dict) or exc.detail.get("code") != "checkout_reserved":
+            if isinstance(exc.detail, dict):
+                offer._fulfillment_refusal_code = str(exc.detail.get("code", ""))
+            if getattr(offer, "_fulfillment_refusal_code", "") not in {"checkout_reserved", "locked_payroll_period", "checkout_selection_changed"}:
                 offer.status = ShiftOffer.Status.EXPIRED
                 offer.save(update_fields=['status', 'updated_at'])
             unbookable.append(offer)

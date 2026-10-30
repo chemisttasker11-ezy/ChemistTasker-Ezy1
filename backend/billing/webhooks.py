@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from .models import StripeWebhookEvent
 from .payment_events import handle_charge_refunded, handle_payment_checkout
+from .paid_fulfillment import PAYROLL_CORRECTION_PENDING
 from .stripe_support import stripe
 from .subscription_events import (
     handle_invoice_paid,
@@ -28,7 +29,7 @@ def _process_stripe_event(event):
         if session.mode == 'subscription':
             handle_subscription_checkout(session, metadata, subscription_kind)
         elif session.mode == 'payment' and session.payment_status == 'paid':
-            handle_payment_checkout(session, metadata)
+            return handle_payment_checkout(session, metadata)
     elif event.type == 'customer.subscription.updated':
         handle_subscription_updated(event)
     elif event.type == 'invoice.paid':
@@ -75,11 +76,17 @@ def receive_stripe_webhook(payload, sig_header):
             delivery.failed_at = None
             delivery.save(update_fields=['event_type', 'status', 'failed_at'])
 
-            _process_stripe_event(event)
-
-            delivery.status = StripeWebhookEvent.Status.PROCESSED
-            delivery.processed_at = timezone.now()
-            delivery.save(update_fields=['status', 'processed_at'])
+            pending_correction = _process_stripe_event(event) == PAYROLL_CORRECTION_PENDING
+            if pending_correction:
+                # Commit the paid ledger and retained reservation, but let Stripe
+                # retry this exact event after the existing audited correction.
+                delivery.status = StripeWebhookEvent.Status.FAILED
+                delivery.failed_at = timezone.now()
+                delivery.processed_at = None
+            else:
+                delivery.status = StripeWebhookEvent.Status.PROCESSED
+                delivery.processed_at = timezone.now()
+            delivery.save(update_fields=['status', 'processed_at', 'failed_at'])
     except Exception:
         logger.exception(
             'Stripe webhook processing failed for event_id=%s event_type=%s',
@@ -99,4 +106,4 @@ def receive_stripe_webhook(payload, sig_header):
                 delivery.save(update_fields=['status', 'failed_at'])
         return HttpResponse(status=500)
 
-    return HttpResponse(status=200)
+    return HttpResponse(status=503 if pending_correction else 200)

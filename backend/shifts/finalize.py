@@ -3,6 +3,7 @@ from shifts.pricing import expand_shift_slots, get_locked_rate_for_slot
 from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from decimal import Decimal
 from django.db import transaction
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from shifts.engagement import KIND_STAFF_EMPLOYMENT, staff_assignment_defaults
@@ -54,6 +55,11 @@ def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
     with transaction.atomic():
         Shift.objects.select_for_update().get(pk=shift.pk)
         list(ShiftSlot.objects.select_for_update().filter(shift=shift).order_by('pk'))
+        offer.refresh_from_db(from_queryset=ShiftOffer.objects.select_for_update(of=("self",)))
+        if offer.shift_id != shift.pk:
+            raise ValidationError({'detail': 'The selected offer changed. Refresh before fulfillment.'})
+        slot_obj = offer.slot
+        slots_to_assign = [slot_obj] if slot_obj else shift.slots.all()
         before_fulfillment.send(sender=ShiftOffer, offer=offer, checkout_id=checkout_id)
         # A whole-shift snapshot lists only each slot's first date, so only slot offers narrow to their occurrences.
         occurrences = ((offer.engagement_terms_snapshot or {}).get('occurrences') or []) if slot_obj else []
@@ -108,22 +114,28 @@ def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
                         "offer_id": offer.id,
                     }
 
-                assn = ShiftSlotAssignment.objects.create(
-                    shift=shift,
-                    slot=slot,
-                    slot_date=slot_date,
-                    user=offer.user,
-                    unit_rate=rate,
-                    rate_reason=reason,
-                    is_rostered=True,
-                    payment_preference_snapshot=staff_defaults.get('payment_preference_snapshot', offer.payment_preference_snapshot),
-                    settlement_channel=staff_defaults.get('settlement_channel', offer.settlement_channel),
-                    engagement_kind=staff_defaults.get('engagement_kind', offer.engagement_kind),
-                    engagement_terms_snapshot=staff_defaults.get('engagement_terms_snapshot', offer.engagement_terms_snapshot),
-                    engagement_terms_accepted_at=staff_defaults.get('engagement_terms_accepted_at', offer.engagement_terms_accepted_at),
-                    payroll_activated_at=offer.payroll_activated_at,
-                    source_offer=offer,
-                )
+                try:
+                    assn = ShiftSlotAssignment.objects.create(
+                        shift=shift,
+                        slot=slot,
+                        slot_date=slot_date,
+                        user=offer.user,
+                        unit_rate=rate,
+                        rate_reason=reason,
+                        is_rostered=True,
+                        payment_preference_snapshot=staff_defaults.get('payment_preference_snapshot', offer.payment_preference_snapshot),
+                        settlement_channel=staff_defaults.get('settlement_channel', offer.settlement_channel),
+                        engagement_kind=staff_defaults.get('engagement_kind', offer.engagement_kind),
+                        engagement_terms_snapshot=staff_defaults.get('engagement_terms_snapshot', offer.engagement_terms_snapshot),
+                        engagement_terms_accepted_at=staff_defaults.get('engagement_terms_accepted_at', offer.engagement_terms_accepted_at),
+                        payroll_activated_at=offer.payroll_activated_at,
+                        source_offer=offer,
+                    )
+                except DjangoValidationError as exc:
+                    if getattr(exc, 'code', None) != 'locked_payroll_period':
+                        raise
+                    raise ValidationError({'code': exc.code, 'detail': exc.message,
+                                           'period_ids': exc.params['period_ids']}) from exc
                 assignment_ids.append(assn.id)
                 assignment_rates.append(assn.unit_rate)
 

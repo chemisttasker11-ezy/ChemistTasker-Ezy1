@@ -273,3 +273,30 @@ class CheckoutReservationTests(TestCase):
         self.assertEqual(accepted.status_code, 200, accepted.content)
         self.assertEqual(ShiftPayment.objects.count(), 1)
         self.assertEqual(ShiftSlotAssignment.objects.count(), 1)
+
+    def test_changed_occurrence_after_checkout_retains_payment_and_original_selection(self):
+        self.charge()
+        original = set(self.attempt().reservations.values_list('occurrence_key', flat=True))
+        self.slot.date += timedelta(days=1)
+        self.slot.save(update_fields=['date'])
+        self.pay()
+        self.assertEqual(ShiftPayment.objects.get().reconciliation_reason, 'paid_work_unavailable')
+        self.assertFalse(ShiftSlotAssignment.objects.exists())
+        self.assertEqual(set(self.attempt().reservations.values_list('occurrence_key', flat=True)), original)
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+    def test_changed_worker_after_checkout_cannot_redirect_paid_booking(self):
+        self.charge()
+        self.offer.user = make_user('PHARMACIST')
+        self.offer.save(update_fields=['user'])
+        self.pay()
+        self.assertTrue(ShiftPayment.objects.get().reconciliation_required)
+        self.assertFalse(ShiftSlotAssignment.objects.exists())
+
+    def test_changed_selection_metadata_cannot_bind_to_original_paid_attempt(self):
+        self.charge()
+        metadata = dict(self.attempt().parameters['metadata'], fulfillment_selection_hash='different')
+        self.pay(metadata=metadata)
+        self.assertEqual(ShiftPayment.objects.get().reconciliation_reason, 'checkout_metadata_mismatch')
+        self.assertFalse(ShiftSlotAssignment.objects.exists())

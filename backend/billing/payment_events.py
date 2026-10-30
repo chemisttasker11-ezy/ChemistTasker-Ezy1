@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .fulfillment import _finalize_pending_offers_for_shift
+from .paid_fulfillment import finalize_paid_selection, PAYROLL_CORRECTION_PENDING
 from .models import ShiftPayment
 from .stripe_support import _stripe_object_value, stripe
 from .checkout_reservations import bind_paid_checkout
@@ -43,13 +44,19 @@ def handle_payment_checkout(session, metadata):
                 'paid_at': timezone.now(),
             },
         )
-        if not created:
-            # A duplicate checkout completion must not re-finalize
-            # offers or turn a refunded payment back into paid.
+        if not created and not (
+            payment.status == 'paid' and payment.reconciliation_required
+            and payment.reconciliation_reason == 'locked_payroll_period'
+            and metadata.get('fulfillment_checkout_id')
+        ):
+            # Ordinary paid/refunded replay remains a no-op. A known frozen-payroll
+            # refusal may retry the same bound payment after the existing correction.
             return
 
         attempt, binding_error = bind_paid_checkout(session, metadata, payment)
         if binding_error:
+            if not created:
+                return PAYROLL_CORRECTION_PENDING
             payment.reconciliation_required = True
             payment.reconciliation_reason = binding_error
             payment.save(update_fields=["reconciliation_required", "reconciliation_reason"])
@@ -84,56 +91,30 @@ def handle_payment_checkout(session, metadata):
 
         # Mark shift paid, then finalize pending offers waiting on payment.
         try:
-            unbookable_offers = []
-            finalized_count, finalized_offers = _finalize_pending_offers_for_shift(
-                shift_obj,
-                candidate_id=metadata.get('candidate_id'),
-                slot_id=metadata.get('slot_id'),
-                slot_ids=metadata.get('slot_ids'),
-                offer_ids=metadata.get('offer_ids'),
-                return_offers=True,
-                unbookable=unbookable_offers,
-                **({"checkout_id": attempt.pk} if attempt is not None else {}),
+            finalized_count, finalized_offers, correction_pending = finalize_paid_selection(
+                shift_obj, payment, attempt, metadata, created=created, finalize=_finalize_pending_offers_for_shift, log=logger,
             )
-            if unbookable_offers or not finalized_count:
-                payment.reconciliation_required = True
-                payment.reconciliation_reason = "paid_work_unavailable"
-                payment.save(update_fields=["reconciliation_required", "reconciliation_reason"])
-                # The payment stays recorded; a lost occurrence needs a refund, not a Stripe retry.
-                lost_ids = [offer.id for offer in unbookable_offers]
-                logger.error(
-                    'Paid shift checkout %s could not book offers %s: refund or manual action required.',
-                    payment.pk, lost_ids,
-                )
-                from shifts.notifications import notify_shift_managers
-                # The unique payment intent gates alert creation in this transaction too.
-                notify_shift_managers(
-                    shift_obj,
-                    title='Shift payment needs a refund',
-                    body='A paid shift offer could not be booked because it is no longer available. '
-                         'The payment needs a refund or manual follow-up.',
-                    kind='shift_payment_refund_required',
-                    payload={'payment_id': payment.pk, 'offer_ids': lost_ids},
-                    deliver_on_commit=True,
-                )
             from shifts.emails import (
                 send_shift_payment_finalized_notifications,
             )
             from users.models import User
             paid_by_user = User.objects.filter(id=metadata.get('actor_user_id')).first()
             # Notifications must see committed payment and offer changes.
-            transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
-                shift=shift_obj,
-                offers=finalized_offers,
-                paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
-                payment_method='stripe',
-            ), robust=True)
+            if finalized_count:
+                transaction.on_commit(lambda: send_shift_payment_finalized_notifications(
+                    shift=shift_obj,
+                    offers=finalized_offers,
+                    paid_by=paid_by_user or getattr(shift_obj, 'created_by', None),
+                    payment_method='stripe',
+                ), robust=True)
             has_pending_payment = ShiftOffer.objects.filter(
                 shift=shift_obj,
                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
             ).exists()
             shift_obj.payment_status = 'PENDING' if has_pending_payment else 'PAID'
             shift_obj.save(update_fields=['payment_status'])
+            if correction_pending:
+                return PAYROLL_CORRECTION_PENDING
         except Exception as e:
             logger.warning('Could not finalize paid shift offers: %s', e)
             # Roll back payment and offer changes together so Stripe can
