@@ -1,0 +1,71 @@
+name: Inspect native acceptance evidence
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - '.github/workflows/native_evidence_inspection.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    if: github.head_ref == 'diagnostics/ios-evidence-7420821-20261030'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download recorded iOS evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          repository: chemisttasker11-ezy/ChemistTasker-Ezy1
+          run-id: 41038607269
+          name: native-ios-diagnostics
+          path: ios-evidence
+      - name: Summarize failed commands and recorded screens
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, re
+          root = Path('ios-evidence')
+          assert root.is_dir()
+          print('EVIDENCE_SOURCE=742082198b53f67dbafd1392663988b0a35e28d8 RUN=41038607269 ARTIFACT=12971217983')
+          count = 0
+          for p in sorted(root.rglob('commands.json')):
+              for row in json.loads(p.read_text()):
+                  m = row.get('metadata', {})
+                  if m.get('status') != 'FAILED':
+                      continue
+                  count += 1
+                  print('FAILED_COMMAND=' + json.dumps({'file': str(p), 'command_types': list(row.get('command', {})), 'depth': m.get('depth'), 'sequence': m.get('sequenceNumber'), 'error': m.get('error')}, ensure_ascii=False)[:3500])
+                  for artifact in m.get('artifacts', []):
+                      if artifact.get('type') != 'SCREEN_HIERARCHY':
+                          continue
+                      h = p.parent / artifact['path']
+                      if not h.is_file():
+                          continue
+                      labels = []
+                      def visit(v):
+                          if isinstance(v, dict):
+                              a = v.get('attributes', {})
+                              label = a.get('accessibilityText') or a.get('text')
+                              if label:
+                                  labels.append({'label': label, 'bounds': a.get('bounds'), 'id': a.get('resource-id')})
+                              for value in v.values():
+                                  visit(value)
+                          elif isinstance(v, list):
+                              for value in v:
+                                  visit(value)
+                      visit(json.loads(h.read_text()))
+                      unique = list({json.dumps(x, ensure_ascii=False): x for x in labels}.values())
+                      print('FAILED_SCREEN=' + json.dumps(unique[:120], ensure_ascii=False)[:18000])
+          print('FAILED_COMMAND_COUNT=' + str(count))
+          for p in sorted(root.rglob('*.log')):
+              if p.name not in {'native-backend.log', 'maestro.log', 'chemisttasker-ios.log'}:
+                  continue
+              lines = p.read_text(errors='replace').splitlines()
+              if p.name == 'chemisttasker-ios.log':
+                  lines = [s for s in lines if re.search(r'TypeError|ReferenceError|Unhandled|Fatal|Exception', s, re.I)]
+              print('LOG=' + str(p))
+              print('\n'.join(lines[-35:])[-6000:])
+          PY
