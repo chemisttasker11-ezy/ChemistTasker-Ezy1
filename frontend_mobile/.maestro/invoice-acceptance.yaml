@@ -17,12 +17,14 @@ appId: com.chemisttasker.app
 - tapOn: "Native Pharmacy A"
 - scrollUntilVisible:
     element:
-      text: "Qty"
+      id: "invoice-quantity-1"
     direction: DOWN
     timeout: 30000
-- tapOn: "Qty"
+- tapOn:
+    id: "invoice-quantity-1"
 - eraseText: 20
 - inputText: "7.5"
+- assertVisible: "7.5"
 - hideKeyboard
 - scrollUntilVisible:
     element:
@@ -37,12 +39,14 @@ appId: com.chemisttasker.app
 - tapOn: "Edit invoice"
 - scrollUntilVisible:
     element:
-      text: "Qty"
+      id: "invoice-quantity-1"
     direction: DOWN
     timeout: 30000
-- tapOn: "Qty"
+- tapOn:
+    id: "invoice-quantity-1"
 - eraseText: 20
 - inputText: "8"
+- assertVisible: "8"
 - hideKeyboard
 - tapOn: "Save revision"
 - extendedWaitUntil:

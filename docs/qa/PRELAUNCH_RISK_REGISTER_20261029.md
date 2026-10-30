@@ -117,3 +117,14 @@ including Full Isolated QA `40887999239`. Its PostgreSQL job passed 474/474 with
 The active source continuation is `PAYROLL_PERIOD_FREEZE_20261030.md`; it does not inherit
 those passes. P8 above now describes the explicit correction guard under implementation.
 M4 remains open; no merge, deployment or release certification is implied.
+
+## 30 October continuation (supersedes the earlier progress rows)
+
+#229 implements durable fulfillment ownership; its hosted PG job passed 488 tests.
+#230 adds genuine invoice UI/revision/PDF acceptance and TCP SMTP uncertainty tests.
+#231 repairs a reproduced internal preview 404. #232 protects PAYROLL booking writes
+and delayed paid fulfillment through the existing audited correction process. #233
+isolates roster recipient failures and reproduces bounded cancellation/buzz/reveal
+risks without changing policy. See FIXED_CANDIDATE_RECOVERY_20261030.md for the combined
+milestones and access limits, and BOUNDED_CANCELLATION_NOTIFICATION_20261030.md for
+owner decisions. None of these source changes constitutes full production acceptance.
