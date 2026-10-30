@@ -14,7 +14,7 @@ appId: com.chemisttasker.app
     visible: "Choose accepted shift"
     timeout: 30000
 - tapOn: "Choose accepted shift"
-- tapOn: "Native Pharmacy A"
+- tapOn: "Native Pharmacy A(, .*)?"
 - scrollUntilVisible:
     element:
       id: "invoice-quantity-1"

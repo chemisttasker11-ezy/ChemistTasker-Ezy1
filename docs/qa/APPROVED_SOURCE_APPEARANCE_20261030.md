@@ -30,3 +30,10 @@ candidate self-capture negative control passed. Actual Windows execution remains
 required; no new visual pass is claimed before CI completes. Source identity and
 reference images are available in that run's artifacts. This changes the test's
 reference to the already-approved main source, not to the current unreviewed view.
+
+The parent's iOS diagnostic artifact also identifies one fixture targeting mismatch:
+iOS exposes the accepted-shift list row as the combined accessibility label
+“Native Pharmacy A, date · hours/rate”, while Android exposes the title separately.
+Match that exact pharmacy title with its optional description suffix. Keep the same
+row selection and invoice assertions; no application or permission change. Native
+rerun is required.
