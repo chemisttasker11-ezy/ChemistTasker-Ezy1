@@ -37,3 +37,26 @@ iOS exposes the accepted-shift list row as the combined accessibility label
 Match that exact pharmacy title with its optional description suffix. Keep the same
 row selection and invoice assertions; no application or permission change. Native
 rerun is required.
+
+## Final native interaction correction
+
+At 51569b645fb794066ea7b1cea6e3eb4df71dff5e, all 24 strict visual comparisons,
+authenticated browser, Full Isolated QA, Shared Core and recovery workflows passed.
+PostgreSQL ran 511 tests successfully. Android native acceptance also passed,
+including invoice revisions, captured delivery, PDF sharing and saved-data checks.
+These results describe that exact source, not a later untested commit.
+
+iOS run 41002254547, job 123889128871, reached the edited 7.5 quantity and failed
+only at Maestro's hideKeyboard command. Artifact 12954717782 records step 053:
+the standard iOS decimal pad has digits, decimal and Delete but no dismiss action.
+The same screen exposes the static Items & services heading within the editor's
+ScrollView. Use that existing non-interactive heading to dismiss on iOS after each
+quantity edit. The installed React Native ScrollView's handled-tap responder already
+blurs the focused input for this unhandled child tap. Keep Android's passing
+hideKeyboard command, and preserve all amount, Save, revision, send, PDF-share and
+backend saved-data assertions. No application source or keyboard behavior is changed.
+
+Platform conditions follow Maestro's documented runFlow when/platform syntax:
+https://docs.maestro.dev/maestro-flows/flow-control-and-logic/conditions.
+YAML and artifact-target controls are checked locally; a final-head native run is
+still required. Do not count the earlier iOS failure as a passing business journey.
