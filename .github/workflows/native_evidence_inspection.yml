@@ -46,7 +46,7 @@ env:
 jobs:
   inspect:
     if: github.head_ref == 'diagnostics/ios-evidence-7420821-20261030'
-    runs-on: ubuntu-latest
+    runs-on: macos-15
     timeout-minutes: 10
     steps:
       - name: Download recorded iOS evidence
@@ -57,6 +57,23 @@ jobs:
           run-id: 41046784008
           name: native-ios-diagnostics
           path: ios-evidence
+      - name: Checkout diagnostic verifier
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Verify recorded system share sheet with positive and negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          swiftc scripts/verify-ios-share-sheet.swift -o /tmp/verify-ios-share-sheet
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          images = sorted(Path("ios-evidence").rglob("step-082-assertCondition-CopySave_to_FilesQuick_S.png"))
+          assert images
+          subprocess.run(["/tmp/verify-ios-share-sheet", "--image", str(images[0]), "--expected-name", "INV-000001-revision-2", "--validate-controls"], check=True)
+          PY
       - name: Summarize failed commands and recorded screens
         shell: bash
         run: |
