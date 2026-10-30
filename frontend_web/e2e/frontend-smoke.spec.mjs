@@ -177,6 +177,7 @@ async function installApiFixture(page, user) {
       });
     }
 
+    if (path.endsWith('/attendance/worker/cover-terms/') || path.endsWith('/attendance/manager/kiosk-review/pending/')) return json(route, []);
     if (method === 'GET') return json(route, { results: [], count: 0, next: null, previous: null });
     return json(route, { ok: true, id: 999 });
   });

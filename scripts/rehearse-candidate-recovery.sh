@@ -16,23 +16,23 @@ baseline_dir="$(mktemp -d)"
 git worktree add --detach "$baseline_dir" "$baseline"
 trap 'git worktree remove --force "$baseline_dir"' EXIT
 # Use the same synthetic seed and identity checks against the historical code.
-cp backend/testing/recovery_fixture.py "$evidence/recovery_fixture.py"
+cp backend/core/test_recovery_fixture.py "$evidence/recovery_fixture.py"
 (cd "$baseline_dir" && python backend/manage.py migrate --noinput --settings=core.postgres_test_settings)
 (cd "$baseline_dir" && PYTHONPATH="$evidence:$baseline_dir/backend" python backend/manage.py shell --settings=core.postgres_test_settings -c "from recovery_fixture import seed_baseline, inventory; seed_baseline(); inventory('$evidence/baseline.json')")
 docker exec "$PG_SERVICE_CONTAINER" pg_dump -U postgres -Fc ct_release_candidate > "$evidence/before-upgrade.dump"
 python backend/manage.py migrate --noinput --settings=core.postgres_test_settings
 python backend/manage.py makemigrations --check --dry-run --settings=core.postgres_test_settings
-python backend/manage.py shell --settings=core.postgres_test_settings -c "from testing.recovery_fixture import verify_identity, seed_candidate, inventory; verify_identity(); inventory('$evidence/upgraded.json'); seed_candidate(); inventory('$evidence/candidate.json')"
+python backend/manage.py shell --settings=core.postgres_test_settings -c "from core.test_recovery_fixture import verify_identity, seed_candidate, inventory; verify_identity(); inventory('$evidence/upgraded.json'); seed_candidate(); inventory('$evidence/candidate.json')"
 docker exec "$PG_SERVICE_CONTAINER" pg_dump -U postgres -Fc ct_release_candidate > "$evidence/candidate.dump"
 for db in ct_release_candidate_restore ct_release_baseline_restore; do
   docker exec "$PG_SERVICE_CONTAINER" createdb -U postgres "$db"
 done
 docker exec -i "$PG_SERVICE_CONTAINER" pg_restore -U postgres -d ct_release_candidate_restore --exit-on-error < "$evidence/candidate.dump"
-LOCAL_DB_NAME=ct_release_candidate_restore python backend/manage.py shell --settings=core.postgres_test_settings -c "from testing.recovery_fixture import verify_candidate, inventory; verify_candidate(); inventory('$evidence/restored-candidate.json')"
-cmp "$evidence/candidate.json" "$evidence/restored-candidate.json"
+LOCAL_DB_NAME=ct_release_candidate_restore python backend/manage.py shell --settings=core.postgres_test_settings -c "from core.test_recovery_fixture import verify_candidate, inventory; verify_candidate(); inventory('$evidence/restored-candidate.json')"
+python scripts/compare-recovery-inventories.py "$evidence/candidate.json" "$evidence/restored-candidate.json"
 docker exec -i "$PG_SERVICE_CONTAINER" pg_restore -U postgres -d ct_release_baseline_restore --exit-on-error < "$evidence/before-upgrade.dump"
 (cd "$baseline_dir" && LOCAL_DB_NAME=ct_release_baseline_restore PYTHONPATH="$evidence:$baseline_dir/backend" python backend/manage.py shell --settings=core.postgres_test_settings -c "from recovery_fixture import inventory; inventory('$evidence/restored-baseline.json')")
-cmp "$evidence/baseline.json" "$evidence/restored-baseline.json"
+python scripts/compare-recovery-inventories.py "$evidence/baseline.json" "$evidence/restored-baseline.json"
 # Compare all pre-existing application rows before adding candidate-only fixtures.
 python - "$evidence" <<'PY'
 import json,sys

@@ -1,0 +1,49 @@
+{
+  "source_job": 123872738280,
+  "before": {
+    "constraints": [
+      [
+        "attendance_provisionalattendance",
+        "provisional_decision_timestamp_matches_status",
+        "CHECK ((((decided_at IS NULL) AND ((status)::text = 'PENDING'::text)) OR ((decided_at IS NOT NULL) AND ((status)::text = ANY ((ARRAY['APPROVED'::character varying, 'REJECTED'::character varying])::text[])))))"
+      ]
+    ],
+    "tables": {
+      "billing_shiftpayment": [
+        1,
+        "4ef456994dfe3e41869a0eb752748b11"
+      ]
+    },
+    "sequences": [
+      [
+        "attendance_attendancecorrection_id_seq",
+        1,
+        1,
+        null
+      ]
+    ]
+  },
+  "after": {
+    "constraints": [
+      [
+        "attendance_provisionalattendance",
+        "provisional_decision_timestamp_matches_status",
+        "CHECK ((((decided_at IS NULL) AND ((status)::text = 'PENDING'::text)) OR ((decided_at IS NOT NULL) AND ((status)::text = ANY (ARRAY[('APPROVED'::character varying)::text, ('REJECTED'::character varying)::text])))))"
+      ]
+    ],
+    "tables": {
+      "billing_shiftpayment": [
+        1,
+        "4ef456994dfe3e41869a0eb752748b11"
+      ]
+    },
+    "sequences": [
+      [
+        "attendance_attendancecorrection_id_seq",
+        1,
+        1,
+        null
+      ]
+    ]
+  }
+}

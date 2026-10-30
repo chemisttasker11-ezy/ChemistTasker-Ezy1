@@ -78,5 +78,4 @@ test('real invoice preview, Save, immutable revisions, PDF and captured delivery
   expect(recovery.detail).toContain('already been attempted');
   expect(recovery.delivery).toBe('sent');
   expect(recovery.payable).toBe('616.00');
-  await app.screenshot('invoice-saved-revision-two-captured-delivery');
 });

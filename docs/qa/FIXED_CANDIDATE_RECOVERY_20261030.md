@@ -46,7 +46,7 @@ The separate CI jobs are evidence for their recorded commit, not a release appro
 | M2 integration | Current main is an ancestor of the stack; rehearsal now upgrades populated main and exercises restore under both code versions. Require successful hosted result on the final head. No merge was performed. |
 | M3 bounded dependencies | Assessed candidates retained. Zero direct cycles and 113 combined cyclic edges remain guarded; no further extraction to reach a numerical target. |
 | P4 paid-checkout ownership | #229 has real PostgreSQL reservation-race evidence (488 tests passed in its PG job); #232 tightens worker/occurrence binding and payroll-lock recovery. Require current-head PostgreSQL success, real Stripe test-account lifecycle/replay, and reconciliation of historical open sessions before rollout. |
-| P8 payroll freeze | #232 source guards and existing correction/re-lock contracts passed locally (282 passed, 15 PG-only skips). New PG orderings and ABN-cover preservation controls are queued. Emergency-cover freeze policy remains a separate decision, not an implemented change. |
+| P8 payroll freeze | #232 source guards and existing correction/re-lock contracts passed locally (282 passed, 15 PG-only skips). Hosted PostgreSQL job 123870323044 passed all 509 tests, including both new orderings and ABN-cover preservation controls. Emergency-cover freeze policy remains a separate decision, not an implemented change. |
 | P5/P7 | #233 repairs one reproduced roster fan-out defect. Cancellation scope/time/obligation and uncertain buzz/reveal delivery decisions are recorded in BOUNDED_CANCELLATION_NOTIFICATION_20261030.md. Those decisions are not closed by green characterization tests. |
 | M4 operational hardening | Real SMTP protocol tests and genuine invoice UI/revision/PDF acceptance are implemented. Configured email provider, test-mode Stripe and deployed invoice journeys remain unverified without access. |
 | M5 final acceptance | Modern recovery and production checks are prepared for the exact head, alongside full QA, browser and native CI. Passing these is not deployed staging, physical-device or actual production restore evidence. No final release sign-off yet. |
@@ -77,3 +77,39 @@ The demonstrated cancellation charging exposure requires an explicit policy or a
 verified feature restriction before launch. Emergency-cover correction scope and
 ambiguous reminder/reveal delivery require their documented decisions. These are
 reported for the owner; they were not silently decided to finish a checklist.
+
+## Acceptance triage on 30 October
+
+#233's real browser journey reached all invoice business assertions successfully:
+preview, Save, two revisions, both PDF responses, captured delivery and stale/replay
+fencing. Its only final failure was the runner denying an optional screenshot after
+secret entry (POLICY_DENIED). Remove that optional capture; preserve every business
+assertion and the runner's secret protection. It is not yet a green run.
+
+The 390px appearance artifact was inspected against its stored baseline. The header
+actions are 44px in the candidate versus 38px in the old screenshot, shifting the
+page down by 6px. Git blame traces that source change to 54f1550a7 (26 October),
+explicitly the C038/F14 44px touch-target repair; it is already on main and predates
+this architecture/payroll work. Do not revert it to satisfy a pre-repair screenshot.
+Other mobile wrapping differences remain part of the visual review. No application
+style or approved golden was changed in this continuation.
+
+The first recovery run passed all 94 identity/route/task startup tests and production
+security. Candidate migration, synthetic invoice PDFs, dump and restore ran, but raw
+constraint text differed in one PostgreSQL deparser spelling: an array-wide text cast
+versus identical per-item text casts for provisional_decision_timestamp_matches_status.
+The comparator accepts only those two exact complete predicates for that exact table
+and constraint, while preserving strict comparisons for all data, schema, sequences
+and other constraints. Both raw inventories remain in the evidence artifact. Added
+negative controls reject changed predicates, rows and sequence state. No application
+constraint or migration was changed. Re-run recovery is required before claiming pass.
+
+The broad serializer suites identified two ownership violations in the new synthetic
+fixture's historical-compatibility imports (not application runtime). Move that helper
+under core/test_recovery_fixture.py, its actual test-only owner, so historical-path
+assertions remain in the test boundary. The production import guard is unchanged.
+
+The older fixture browser suite improved from 11 failures to one: 191 passed and
+29 intentional skips on #233. The remaining attendance approval case uses its own
+local API fixture; give its two array endpoints the same corrected responses. Keep
+its real permission, approval body, pharmacy scope and timezone assertions unchanged.

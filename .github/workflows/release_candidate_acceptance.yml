@@ -61,6 +61,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r backend/requirements.txt
+      - name: Strict inventory comparison controls
+        run: python -m unittest discover -s scripts -p test_recovery_inventory_comparison.py -v
       - name: Historical identity, route and task startup contracts
         run: python backend/manage.py test core.test_encrypted_field_boundary core.test_task_dispatch_registration core.test_task_contracts core.test_client_profile_api_composition core.test_signal_registry_contract --settings=core.postgres_test_settings
       - name: Rehearse main upgrade, candidate restore and pre-upgrade rollback
