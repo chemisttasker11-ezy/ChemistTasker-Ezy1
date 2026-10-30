@@ -113,3 +113,10 @@ The older fixture browser suite improved from 11 failures to one: 191 passed and
 29 intentional skips on #233. The remaining attendance approval case uses its own
 local API fixture; give its two array endpoints the same corrected responses. Keep
 its real permission, approval body, pharmacy scope and timezone assertions unchanged.
+
+Android #231 now receives HTTP 200 for invoice preview. Its failure artifact shows
+the app on Home after the test tapped the floating Qty label and then hid an absent
+keyboard, rather than proving the quantity field was edited. Give the real native
+quantity input a stable testID and use that control in Maestro; assert the edited
+value before dismissing the keyboard. This is test targeting metadata only, with no
+calculation, layout or interaction policy change. Native rerun is still required.
