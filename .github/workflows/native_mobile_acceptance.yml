@@ -736,6 +736,16 @@ jobs:
             ios-ccache-${{ runner.os }}-${{ hashFiles('frontend_mobile/package-lock.json') }}-
             ios-ccache-${{ runner.os }}-
 
+      - name: Build native iOS system-share assertion runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! ruby -e "gem 'xcodeproj', '= 1.27.0'; require 'xcodeproj'"; then
+            gem install --user-install --no-document xcodeproj -v 1.27.0
+          fi
+          ruby frontend_mobile/scripts/prepare-native-share-acceptance.rb /tmp/native-share-acceptance
+          xcodebuild build-for-testing -project /tmp/native-share-acceptance/NativeShareAcceptance.xcodeproj -scheme NativeShareAcceptance -configuration Debug -sdk iphonesimulator -destination "generic/platform=iOS Simulator" -derivedDataPath /tmp/native-share-derived CODE_SIGNING_ALLOWED=NO
+
       - name: Prebuild and compile iOS simulator acceptance build with embedded JavaScript
         shell: bash
         run: |
@@ -922,6 +932,12 @@ jobs:
           - runFlow: /tmp/invoice-acceptance.yaml
           YAML
           maestro --device "$SIM_UDID" test /tmp/native-acceptance.yaml
+
+      - name: Verify revision-2 PDF in actual iOS system share sheet
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild test-without-building -project /tmp/native-share-acceptance/NativeShareAcceptance.xcodeproj -scheme NativeShareAcceptance -configuration Debug -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath /tmp/native-share-derived -resultBundlePath /tmp/native-share-acceptance.xcresult -parallel-testing-enabled NO -maximum-test-execution-time-allowance 90 CODE_SIGNING_ALLOWED=NO
           python backend/manage.py shell -c "from testing.invoice_acceptance_fixture import verify_invoice_work; verify_invoice_work()"
 
       - name: Capture iOS diagnostics
@@ -947,5 +963,7 @@ jobs:
             /tmp/ios-simulator.png
             /tmp/chemisttasker-ios.log
             /tmp/ios-entitlements.txt
+            /tmp/native-share-acceptance.xcresult
             ~/.maestro/tests
           if-no-files-found: ignore
+

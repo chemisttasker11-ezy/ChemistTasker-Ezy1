@@ -93,6 +93,13 @@ appId: com.chemisttasker.app
 - tapOn:
     text: "Share PDF"
     index: 0
-- extendedWaitUntil:
-    visible: "Copy|Save to Files|Quick Share|Bluetooth|Nearby Share"
-    timeout: 30000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: "Copy|Save to Files|Quick Share|Bluetooth|Nearby Share"
+          timeout: 30000
+# iOS verifies the same system sheet with NativeShareAcceptance immediately
+# after this flow. Maestro's foreground hierarchy omits SharingUIService.
+
