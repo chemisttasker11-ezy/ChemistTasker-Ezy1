@@ -106,8 +106,8 @@ jobs:
                   continue
               lines = p.read_text(errors='replace').splitlines()
               if p.name == 'chemisttasker-ios.log':
-                  lines = [s for s in lines if re.search(r'TypeError|ReferenceError|Unhandled|Fatal|Exception|Sharing|sharing|UIActivity|presentViewController|Attempt to present|already presenting|FilePermission|FileSystem|Unable to|No current|activity controller', s, re.I)]
+                  lines = [s for s in lines if re.search(r'TypeError|ReferenceError|Unhandled|Fatal|Exception|ShareSheet|Sharing|sharing|UIActivity|presentViewController|Attempt to present|already presenting|FilePermission|FileSystem|Unable to|No current|activity controller', s, re.I)]
               print('LOG=' + str(p))
-              print('\n'.join(lines[-90:])[-16000:])
+              print('\n'.join(lines[-140:])[-18000:])
           PY
 
