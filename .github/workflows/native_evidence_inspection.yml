@@ -96,13 +96,18 @@ jobs:
                       unique = list({json.dumps(x, ensure_ascii=False): x for x in labels}.values())
                       print('FAILED_SCREEN=' + json.dumps(unique[:120], ensure_ascii=False)[:18000])
           print('FAILED_COMMAND_COUNT=' + str(count))
+          for p in sorted(root.rglob('commands.json')):
+              for row in json.loads(p.read_text()):
+                  m = row.get('metadata', {})
+                  if m.get('depth') == 1 and 76 <= m.get('sequenceNumber', -1) <= 82:
+                      print('SHARE_COMMAND=' + json.dumps(row, ensure_ascii=False)[:5000])
           for p in sorted(root.rglob('*.log')):
               if p.name not in {'native-backend.log', 'maestro.log', 'chemisttasker-ios.log'}:
                   continue
               lines = p.read_text(errors='replace').splitlines()
               if p.name == 'chemisttasker-ios.log':
-                  lines = [s for s in lines if re.search(r'TypeError|ReferenceError|Unhandled|Fatal|Exception', s, re.I)]
+                  lines = [s for s in lines if re.search(r'TypeError|ReferenceError|Unhandled|Fatal|Exception|Sharing|sharing|UIActivity|presentViewController|Attempt to present|already presenting|FilePermission|FileSystem|Unable to|No current|activity controller', s, re.I)]
               print('LOG=' + str(p))
-              print('\n'.join(lines[-35:])[-6000:])
+              print('\n'.join(lines[-90:])[-16000:])
           PY
 
