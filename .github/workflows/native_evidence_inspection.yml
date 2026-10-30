@@ -62,11 +62,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+          path: diagnostic-source
       - name: Verify recorded system share sheet with positive and negative controls
         shell: bash
         run: |
           set -euo pipefail
-          swiftc scripts/verify-ios-share-sheet.swift -o /tmp/verify-ios-share-sheet
+          swiftc diagnostic-source/scripts/verify-ios-share-sheet.swift -o /tmp/verify-ios-share-sheet
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
