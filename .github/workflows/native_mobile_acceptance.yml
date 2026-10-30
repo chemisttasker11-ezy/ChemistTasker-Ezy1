@@ -744,7 +744,7 @@ jobs:
             gem install --user-install --no-document xcodeproj -v 1.27.0
           fi
           ruby frontend_mobile/scripts/prepare-native-share-acceptance.rb /tmp/native-share-acceptance
-          xcodebuild build-for-testing -project /tmp/native-share-acceptance/NativeShareAcceptance.xcodeproj -scheme NativeShareAcceptance -configuration Debug -sdk iphonesimulator -destination "generic/platform=iOS Simulator" -derivedDataPath /tmp/native-share-derived CODE_SIGNING_ALLOWED=NO
+          xcodebuild build-for-testing -project /tmp/native-share-acceptance/NativeShareAcceptance.xcodeproj -scheme NativeShareAcceptance -configuration Debug -sdk iphonesimulator -destination "generic/platform=iOS Simulator" -derivedDataPath /tmp/native-share-derived CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/native-share-build.log
 
       - name: Prebuild and compile iOS simulator acceptance build with embedded JavaScript
         shell: bash
@@ -937,7 +937,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          xcodebuild test-without-building -project /tmp/native-share-acceptance/NativeShareAcceptance.xcodeproj -scheme NativeShareAcceptance -configuration Debug -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath /tmp/native-share-derived -resultBundlePath /tmp/native-share-acceptance.xcresult -parallel-testing-enabled NO -maximum-test-execution-time-allowance 90 CODE_SIGNING_ALLOWED=NO
+          xcodebuild test-without-building -project /tmp/native-share-acceptance/NativeShareAcceptance.xcodeproj -scheme NativeShareAcceptance -configuration Debug -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath /tmp/native-share-derived -resultBundlePath /tmp/native-share-acceptance.xcresult -parallel-testing-enabled NO -maximum-test-execution-time-allowance 90 CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/native-share-test.log
           python backend/manage.py shell -c "from testing.invoice_acceptance_fixture import verify_invoice_work; verify_invoice_work()"
 
       - name: Capture iOS diagnostics
@@ -964,6 +964,8 @@ jobs:
             /tmp/chemisttasker-ios.log
             /tmp/ios-entitlements.txt
             /tmp/native-share-acceptance.xcresult
+            /tmp/native-share-build.log
+            /tmp/native-share-test.log
             ~/.maestro/tests
           if-no-files-found: ignore
 
