@@ -415,9 +415,11 @@ class ShiftSlot(models.Model):
                 raise ValidationError({'recurring_end_date': 'Should be empty for non-recurring slots.'})
 
     def save(self, *args, **kwargs):
-        _assert_roster_slot_mutable(self)
-        self.full_clean()
-        super().save(*args, **kwargs)
+        from shifts.assignment_lifecycle import persist_slot
+        def validate():
+            _assert_roster_slot_mutable(self)
+            self.full_clean()
+        return persist_slot(self, super().save, validate, args, kwargs)
 
     def delete(self, *args, **kwargs):
         _assert_roster_slot_mutable(self)
@@ -521,8 +523,8 @@ class ShiftSlotAssignment(models.Model):
         return f"{self.user.get_full_name()} assigned to slot {self.slot.id}"
 
     def save(self, *args, **kwargs):
-        _assert_roster_assignment_mutable(self)
-        return super().save(*args, **kwargs)
+        from shifts.assignment_lifecycle import persist_assignment
+        return persist_assignment(self, super().save, _assert_roster_assignment_mutable, args, kwargs)
 
     def delete(self, *args, **kwargs):
         _assert_roster_assignment_mutable(self)

@@ -46,6 +46,12 @@ def occurrence_keys(offer):
     return result or {f"{offer.shift_id}:whole"}
 
 
+def selection_fingerprint(offers):
+    selection = {str(offer.pk): {'worker': offer.user_id, 'shift': offer.shift_id,
+                               'occurrences': sorted(occurrence_keys(offer))} for offer in offers}
+    return sha256(json.dumps(selection, sort_keys=True).encode()).hexdigest()
+
+
 def prepare_checkout(*, shift_id, actor, offer_ids, parameters):
     parameters = json.loads(json.dumps(parameters))
     fingerprint = sha256(json.dumps(parameters, sort_keys=True, default=str).encode()).hexdigest()
@@ -84,6 +90,7 @@ def prepare_checkout(*, shift_id, actor, offer_ids, parameters):
                                       for row in parameters['line_items']),
         )
         attempt.parameters["metadata"]["fulfillment_checkout_id"] = str(attempt.pk)
+        attempt.parameters["metadata"]["fulfillment_selection_hash"] = selection_fingerprint(offers)
         attempt.save(update_fields=["parameters", "updated_at"])
         FulfillmentReservation.objects.bulk_create([
             FulfillmentReservation(checkout=attempt, occurrence_key=key) for key in sorted(requested)
@@ -163,6 +170,13 @@ def guard_fulfillment(*, offer, checkout_id=None):
         state=FulfillmentCheckout.State.EXPIRED,
     ):
         if checkout_id is not None and str(attempt.pk) == str(checkout_id):
+            expected = attempt.parameters.get('metadata', {}).get('fulfillment_selection_hash')
+            selected = ShiftOffer.objects.filter(shift_id=offer.shift_id, pk__in=attempt.offer_ids).select_related('shift')
+            if (offer.status not in (ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, ShiftOffer.Status.ACCEPTED)
+                    or offer.pk not in attempt.offer_ids or not keys <= set(attempt.reservations.filter(active=True)
+                    .values_list('occurrence_key', flat=True)) or (expected and selection_fingerprint(selected) != expected)):
+                raise ValidationError({'code': 'checkout_selection_changed',
+                                       'detail': 'The accepted work changed after checkout. Reconcile the original payment.'})
             continue
         active = set(attempt.reservations.filter(active=True).values_list("occurrence_key", flat=True))
         if (attempt.state == FulfillmentCheckout.State.COMPLETE and offer.pk in attempt.offer_ids
@@ -188,7 +202,7 @@ def bind_paid_checkout(session, metadata, payment):
         return attempt, "unknown_checkout_binding"
     expected = attempt.parameters.get("metadata", {})
     for field in ("shift_id", "type", "offer_ids", "slot_ids", "slot_id", "candidate_id", "owner_user_id",
-                  "organization_id", "billing_contact_user_id", "billing_scope", "actor_user_id"):
+                  "organization_id", "billing_contact_user_id", "billing_scope", "actor_user_id", "fulfillment_selection_hash"):
         normalize = lambda value: "" if value is None else str(value)
         if normalize(expected.get(field)) != normalize(metadata.get(field)):
             return attempt, "checkout_metadata_mismatch"
