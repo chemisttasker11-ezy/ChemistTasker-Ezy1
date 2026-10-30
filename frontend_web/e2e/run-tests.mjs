@@ -9,6 +9,17 @@ const port = Number(process.env.PLAYWRIGHT_PORT || 4173);
 const viteBin = resolve(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js');
 const playwrightCli = resolve(testRoot, 'node_modules', '@playwright', 'test', 'cli.js');
 
+if (process.env.CT_CAPTURE_APPROVED_SOURCE_BASELINE === '1') {
+  const approvedSource = '25ef200f0c32b2b6fc764a4d05a648b604038794';
+  const identity = spawnSync('git', ['-C', projectRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
+  const sourceClean = spawnSync('git', ['-C', projectRoot, 'diff', '--quiet', 'HEAD', '--', 'src', '../shared-core/src']);
+  if (sourceClean.status !== 0 || identity.status !== 0 || identity.stdout.trim() !== approvedSource
+      || projectRoot === resolve(testRoot, '..') || !process.argv.includes('--update-snapshots')) {
+    throw new Error('Approved-source capture requires the separate immutable main worktree and explicit snapshot capture');
+  }
+  console.log(`APPROVED_APPEARANCE_SOURCE=${approvedSource}`);
+}
+
 const env = {
   ...process.env,
   PLAYWRIGHT_PORT: String(port),

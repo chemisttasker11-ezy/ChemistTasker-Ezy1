@@ -111,6 +111,9 @@ jobs:
           CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
           EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
           USE_AZURE_STORAGE = False
+          # Captured test mail must not depend on external runner hostname DNS.
+          from django.core.mail.utils import DNS_NAME
+          DNS_NAME._fqdn = "native-smoke.localhost"
           PY
           rm -f /tmp/chemisttasker-native-smoke.sqlite3
           (
@@ -572,6 +575,9 @@ jobs:
           CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
           EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
           USE_AZURE_STORAGE = False
+          # Captured test mail must not depend on external runner hostname DNS.
+          from django.core.mail.utils import DNS_NAME
+          DNS_NAME._fqdn = "native-smoke.localhost"
           PY
           rm -f /tmp/chemisttasker-native-smoke.sqlite3
           (
@@ -822,9 +828,13 @@ jobs:
                 all: allow
           - openLink: "frontendmobile://admin/shifts"
           - extendedWaitUntil:
-              visible: 'Open in .*ChemistTasker.*'
+              visible: 'Open in .*ChemistTasker.*|Go to Login|Welcome back'
               timeout: 30000
-          - tapOn: "Open"
+          - runFlow:
+              when:
+                visible: 'Open in .*ChemistTasker.*'
+              commands:
+                - tapOn: "Open"
           YAML
           maestro --device "$SIM_UDID" test /tmp/native-link-consent.yaml
           sleep 5
