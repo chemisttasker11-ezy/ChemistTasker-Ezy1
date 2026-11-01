@@ -170,7 +170,16 @@ class SignalRegistryContractTests(SimpleTestCase):
             if app == "composition":
                 self.assertEqual(
                     ast.dump(ast.Module(body=node.body, type_ignores=[])),
-                    ast.dump(ast.parse("from .file_references import configure_file_cleanup\nconfigure_file_cleanup()\nfrom .identity_organizations import configure_identity_organization_reads\nconfigure_identity_organization_reads()")),
+                    ast.dump(ast.parse(
+                        "from .organization_memberships import configure_organization_memberships\n"
+                        "from .identity_memberships import configure_identity_memberships\n"
+                        "configure_organization_memberships()\nconfigure_identity_memberships()\n"
+                        "from .file_references import configure_file_cleanup\nconfigure_file_cleanup()\n"
+                        "from .identity_organizations import configure_identity_organization_reads\n"
+                        "configure_identity_organization_reads()\n"
+                        "from .foundation_services import configure_foundation_services\n"
+                        "configure_foundation_services()"
+                    )),
                     "Only the explicit, no-I/O application registry binding is allowed at composition startup.",
                 )
                 continue

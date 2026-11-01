@@ -1,4 +1,5 @@
 """Organisation API: organisations, pharmacies, chains and pharmacy admins."""
+from organizations.feature_port import pharmacy_features
 import hashlib
 import json
 
@@ -66,7 +67,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_destroy(self, instance):
-        from shifts.deletion import protect_pharmacy_shift_deletion
+        protect_pharmacy_shift_deletion = pharmacy_features().protect_pharmacy_shift_deletion
 
         organization = get_object_or_404(Organization.objects.select_for_update(), pk=instance.pk)
         pharmacy_ids = list(
@@ -91,7 +92,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_destroy(self, instance):
-        from shifts.deletion import protect_pharmacy_shift_deletion
+        protect_pharmacy_shift_deletion = pharmacy_features().protect_pharmacy_shift_deletion
 
         pharmacy = get_object_or_404(Pharmacy.objects.select_for_update(), pk=instance.pk)
         self.check_object_permissions(self.request, pharmacy)

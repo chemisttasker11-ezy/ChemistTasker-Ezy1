@@ -26,5 +26,5 @@ def configure_membership_services(services: MembershipServices) -> None:
 
 def membership_services() -> MembershipServices:
     if _services is None:
-        raise ImproperlyConfigured('Application URL composition must configure identity membership services.')
+        raise ImproperlyConfigured('Application startup must configure identity membership services.')
     return _services

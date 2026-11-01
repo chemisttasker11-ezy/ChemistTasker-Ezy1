@@ -1,5 +1,9 @@
 # Behaviour-preserving removal of the remaining dependency cycles
 
+## 2026-11-02 continuation
+
+The revised ownership/compatibility completion is recorded in [ARCHITECTURE_COMPLETION_20261102.md](ARCHITECTURE_COMPLETION_20261102.md). Startup-safe membership binding, shared occurrence selection and explicit foundation feature contracts reduce combined cyclic edges from 113 to 37 while direct cycles stay zero. The old twenty-app component splits into groups of eight, five and four; exact historical/project facades remain bounded. Historical checkpoints below are retained as history, not current completion status.
+
 29 October 2026. Starting source: PR #215 at `86979ca5dc4ec91dfd153c0f689a507eb3282948`; its chat correctness fix stays on a fixed head while this separate architectural branch proceeds. Billing decomposition is retained. The user requested assessment, a plan and implementation while the upload gates finish.
 
 ## Completion standard and current assessment

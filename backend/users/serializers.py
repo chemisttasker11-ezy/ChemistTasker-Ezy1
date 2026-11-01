@@ -1,3 +1,4 @@
+from users.feature_port import user_features
 # users/serializers.py
 from users.membership_port import membership_services
 from users.organization_port import organization_reads
@@ -188,23 +189,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             ExplorerOnboarding.objects.create(user=user, role_type=newcomer_type, date_of_birth=date_of_birth)
 
         if referral_code:
-            from rewards.services import claim_referral_code, RewardError
-
-            shift = None
-            if referral_shift_id:
-                from shifts.models import Shift  # shifts builds on users: look the referral shift up at call time
-
-                shift = Shift.objects.filter(pk=referral_shift_id).first()
-            try:
-                claim_referral_code(
-                    referred_user=user,
-                    code=referral_code,
-                    shift=shift,
-                    referral_event_id=referral_event_id,
-                    award=False,
-                )
-            except RewardError:
-                pass
+            user_features().claim_signup_referral(
+                user=user, code=referral_code,
+                shift_id=referral_shift_id, event_id=referral_event_id,
+            )
 
         return user
 
@@ -422,7 +410,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         ]
 
         # 3) Combined user payload (+ is_mobile_verified added)
-        from billing.utils import is_billing_active, is_in_free_trial
+        is_billing_active = user_features().is_billing_active
+        is_in_free_trial = user_features().is_in_free_trial
         from onboarding.services.work_profile import newcomer_type as current_newcomer_type
         data['user'] = {
             'id':       self.user.id,
@@ -493,7 +482,8 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                 for assignment in admin_assignments
             ]
 
-            from billing.utils import is_billing_active, is_in_free_trial
+            is_billing_active = user_features().is_billing_active
+            is_in_free_trial = user_features().is_in_free_trial
             from onboarding.services.work_profile import newcomer_type as current_newcomer_type
             data['user'] = {
                 'id': user.id,

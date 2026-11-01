@@ -1,4 +1,4 @@
-"""No-DB guards: cross-app bindings that broke cycles must stay deferred.
+"""No-DB guards: preserve permission bridges and owned feature boundaries.
 
 Only the import timing changes; the called permission is the existing
 workforce function. Never reimplement owner/manager/org policy in attendance.
@@ -40,12 +40,10 @@ class AttendanceWorkforceDependencyTest(unittest.TestCase):
 
 
 class TalentUsersDependencyTest(unittest.TestCase):
-    def test_rating_and_reward_imports_stay_at_call_sites(self):
+    def test_rating_import_stays_at_its_call_site(self):
         cases = (
             ('talent/views/explorer.py', 'ExplorerPostViewSet', 'get_queryset',
              'ratings.models', ['Rating']),
-            ('users/serializers.py', 'UserRegistrationSerializer', 'create',
-             'rewards.services', ['claim_referral_code', 'RewardError']),
         )
         for path, class_name, method_name, module, names in cases:
             with self.subTest(path=path):
@@ -61,10 +59,21 @@ class TalentUsersDependencyTest(unittest.TestCase):
 
     def test_no_module_level_talent_ratings_or_users_rewards_edge(self):
         direct, delayed, _ = extract_edges()
-        for edge in (('talent', 'ratings'), ('users', 'rewards')):
-            with self.subTest(edge=edge):
-                self.assertNotIn(edge, direct)
-                self.assertIn(edge, delayed)
+        self.assertNotIn(('talent', 'ratings'), direct)
+        self.assertIn(('talent', 'ratings'), delayed)
+        # Identity now uses an explicitly composed feature contract at every depth.
+        self.assertNotIn(('users', 'rewards'), direct)
+        self.assertNotIn(('users', 'rewards'), delayed)
+
+    def test_registration_still_calls_the_identity_owned_referral_contract(self):
+        tree = ast.parse((ROOT / 'backend/users/serializers.py').read_text(encoding='utf-8'))
+        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'UserRegistrationSerializer')
+        method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == 'create')
+        calls = [n for n in ast.walk(method) if isinstance(n, ast.Call)
+                 and isinstance(n.func, ast.Attribute) and n.func.attr == 'claim_signup_referral'
+                 and isinstance(n.func.value, ast.Call) and isinstance(n.func.value.func, ast.Name)
+                 and n.func.value.func.id == 'user_features']
+        self.assertEqual(len(calls), 1)
 
 
 if __name__ == '__main__':

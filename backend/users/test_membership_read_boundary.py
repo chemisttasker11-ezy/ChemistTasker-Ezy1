@@ -110,6 +110,7 @@ class MembershipServiceCompositionTests(SimpleTestCase):
         with mock.patch('django.db.backends.utils.CursorWrapper.execute', side_effect=AssertionError('startup SQL')), \
                 mock.patch('celery.app.base.Celery.send_task', side_effect=AssertionError('startup delivery')):
             importlib.reload(identity_memberships)
+            identity_memberships.configure_identity_memberships()
         services = membership_services()
         self.assertIs(services.accepted_for_user, identity_reads.accepted_for_user)
         self.assertIs(services.directory_memberships, identity_reads.directory_memberships)

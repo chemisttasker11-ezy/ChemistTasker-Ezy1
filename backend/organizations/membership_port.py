@@ -33,5 +33,5 @@ def configure_membership_operations(operations: MembershipOperations) -> None:
 
 def membership_operations() -> MembershipOperations:
     if _operations is None:
-        raise ImproperlyConfigured('The application URL composition must configure membership operations.')
+        raise ImproperlyConfigured('Application startup must configure membership operations.')
     return _operations

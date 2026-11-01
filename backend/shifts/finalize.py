@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from shifts.engagement import KIND_STAFF_EMPLOYMENT, staff_assignment_defaults
 from shifts.events import before_fulfillment
+from shifts.occurrences import accepted_occurrence_pairs, accepted_occurrences
 
 
 def offer_occurrence_key(offer):
@@ -61,19 +62,13 @@ def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
         slot_obj = offer.slot
         slots_to_assign = [slot_obj] if slot_obj else shift.slots.all()
         before_fulfillment.send(sender=ShiftOffer, offer=offer, checkout_id=checkout_id)
-        # A whole-shift snapshot lists only each slot's first date, so only slot offers narrow to their occurrences.
-        occurrences = ((offer.engagement_terms_snapshot or {}).get('occurrences') or []) if slot_obj else []
-        accepted_pairs = {(str(entry.get('slot_id')), str(entry.get('date'))) for entry in occurrences}
+        accepted_pairs = accepted_occurrence_pairs(offer)
         matched_pairs = set()
         for slot in slots_to_assign:
-            for entry in expand_shift_slots(shift):
+            for entry in accepted_occurrences(offer, expand_shift_slots(shift)):
                 if entry["slot"].id != slot.id:
                     continue
                 slot_date = entry["date"]
-                if accepted_pairs and (str(slot.id), str(slot_date)) not in accepted_pairs:
-                    continue
-                if offer.slot_id and offer.offered_slot_date and slot_date != offer.offered_slot_date:
-                    continue
                 matched_pairs.add((str(slot.id), str(slot_date)))
                 existing = ShiftSlotAssignment.objects.filter(slot=slot, slot_date=slot_date).first()
                 if existing and existing.source_offer_id != offer.pk:

@@ -1,5 +1,6 @@
 """Authenticated sessions: browser vs native clients, the httpOnly JWT cookies and the signed-in user
 payload."""
+from users.feature_port import user_features
 from users.membership_port import membership_services
 from users.organization_port import organization_reads
 from users.models import OrganizationMembership
@@ -120,11 +121,13 @@ def _build_authenticated_user_payload(user):
         for assignment in admin_assignments
     ]
 
-    from billing.utils import is_billing_active, is_in_free_trial
+    is_billing_active = user_features().is_billing_active
+    is_in_free_trial = user_features().is_in_free_trial
     # Onboarding models depend on the users app: resolve this helper at call time,
     # so importing users.sessions cannot form a module-level app dependency cycle.
     from onboarding.services.work_profile import newcomer_type
-    from public_hub.permissions import capabilities, member_hubs
+    capabilities = user_features().content_capabilities
+    member_hubs = user_features().member_hubs
 
     return {
         "id": user.id,

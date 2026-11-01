@@ -63,6 +63,7 @@ print('membership composition ready')
                 mock.patch('celery.app.base.Celery.send_task', side_effect=AssertionError('queue during wiring')), \
                 mock.patch('celery.app.task.Task.apply_async', side_effect=AssertionError('task during wiring')):
             importlib.reload(organization_memberships)
+            organization_memberships.configure_organization_memberships()
         operations = membership_operations()
         for name in operations.__dataclass_fields__:
             self.assertIs(getattr(operations, name), getattr(organization_management, name))

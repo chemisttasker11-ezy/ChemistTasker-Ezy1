@@ -11,6 +11,7 @@ from rest_framework.exceptions import APIException, ValidationError
 
 from shifts.models import Shift, ShiftOffer, ShiftSlotAssignment
 from shifts.pricing import expand_shift_slots
+from shifts.occurrences import accepted_occurrences
 from .models import FulfillmentCheckout, FulfillmentReservation
 from .stripe_support import stripe, _stripe_object_value
 from .checkout_prices import FULFILLMENT_PRICES
@@ -30,17 +31,9 @@ class CheckoutUncertain(APIException):
 
 def occurrence_keys(offer):
     """Use finalization's accepted selection; reservations never change fee quantity."""
-    occurrences = ((offer.engagement_terms_snapshot or {}).get("occurrences") or []) if offer.slot_id else []
-    accepted = {(str(row.get("slot_id")), str(row.get("date"))) for row in occurrences}
     result = set()
-    for entry in expand_shift_slots(offer.shift):
+    for entry in accepted_occurrences(offer, expand_shift_slots(offer.shift)):
         slot_id, work_date = entry["slot"].pk, entry["date"]
-        if offer.slot_id and slot_id != offer.slot_id:
-            continue
-        if accepted and (str(slot_id), str(work_date)) not in accepted:
-            continue
-        if offer.slot_id and offer.offered_slot_date and work_date != offer.offered_slot_date:
-            continue
         result.add(f"{offer.shift_id}:{slot_id}:{work_date}")
     # Keep historical no-slot fee records exclusive to their whole shift.
     return result or {f"{offer.shift_id}:whole"}

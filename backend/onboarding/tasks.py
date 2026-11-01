@@ -4,6 +4,7 @@ Every task keeps its deployed name (`client_profile.tasks.*`), queue and signatu
 messages address tasks by these names. `client_profile.tasks` re-exports these objects; it does not register them
 again.
 """
+from onboarding.feature_port import verification_features
 import datetime
 import logging
 import os
@@ -733,7 +734,7 @@ def final_evaluation(model_name, object_pk, retry_count=0, is_reminder=False):
     obj.verified = True
     obj.save(update_fields=['verified'])
     try:
-        from rewards.services import award_verified_referrals_for_user
+        award_verified_referrals_for_user = verification_features().award_verified_referrals
         transaction.on_commit(lambda user_id=obj.user_id: award_verified_referrals_for_user(get_user_model().objects.get(id=user_id)))
     except Exception:
         logger.exception("[FINAL EVALUATION] Failed to schedule pill referral award for pk=%s", object_pk)

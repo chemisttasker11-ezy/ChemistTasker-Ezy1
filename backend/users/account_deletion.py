@@ -2,6 +2,7 @@
 documents.
 
 Logs go to the historical "users.views" channel that operators filter on."""
+from users.feature_port import user_features
 import logging
 from django.utils import timezone
 from django.contrib.sessions.models import Session
@@ -94,10 +95,7 @@ def _revoke_user_tokens(user):
 
 
 def _anonymize_user(user):
-    from django.db.models import Q
-    from talent.models import ExplorerPost
-
-    ExplorerPost.objects.filter(Q(author_user=user) | Q(explorer_profile__user=user)).delete()
+    user_features().delete_talent_posts(user)
     original_email = (user.email or "").strip()
     update_fields = ["is_active", "deleted_at"]
 

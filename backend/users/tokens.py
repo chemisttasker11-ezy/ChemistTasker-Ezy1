@@ -23,7 +23,7 @@ class RefreshToken(BaseRefreshToken):
 
 def notify_auth_changed(user_id, sid=None):
     from notifications.services import _broadcast
-    from chat.realtime import USER_GROUP_FMT
+    from infrastructure.channel_groups import USER_GROUP_FMT
 
     try:
         _broadcast(user_id, 'auth.changed', {'sid': sid})
