@@ -625,11 +625,6 @@ class KioskWorkerSetupPinView(APIView):
                 # Same worker lock as clock_in/clock_out, held from the precheck through the auto clock-in,
                 # so a concurrent clock action cannot make clock_in prompt after the OTP was consumed.
                 User.objects.select_for_update(no_key=True).get(pk=candidate_membership.user_id)
-                check_clock_in_double_guard(
-                    user=candidate_membership.user,
-                    pharmacy=device.pharmacy,
-                    confirm_opposite=confirm_opposite,
-                )
 
                 membership, worker_pin = setup_worker_kiosk_pin(
                     kiosk_device=device,
@@ -637,6 +632,13 @@ class KioskWorkerSetupPinView(APIView):
                     verification_code=verification_code,
                     new_pin=new_pin,
                     consume_otp=False,
+                )
+                # Only after the OTP is verified, so the prompt never reveals clock times to an unverified caller.
+                # A 409 here rolls back the PIN; the OTP is consumed only on commit, so it stays usable.
+                check_clock_in_double_guard(
+                    user=candidate_membership.user,
+                    pharmacy=device.pharmacy,
+                    confirm_opposite=confirm_opposite,
                 )
 
                 worker = membership.user

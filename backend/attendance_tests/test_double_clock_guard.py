@@ -259,6 +259,22 @@ class KioskDoubleClockGuardTests(OppositeActionContracts, DoubleClockFixture):
             self.assertIsNone(cache.get(cache_key))
             self.assertEqual(AttendanceEvent.objects.count(), len(before[1]) + 1)
 
+    def test_pin_setup_with_wrong_code_never_reveals_the_recent_clock_action(self):
+        self.establish_last_action("out")
+        self.now += timedelta(seconds=30)
+        cache = LocMemCache("clock-setup-wrong", {})
+        cache_key = f"{credentials.WORKER_PIN_OTP_CACHE_PREFIX}{self.worker.pk}"
+        cache.set(cache_key, {"otp": "123456", "membership_id": self.membership.pk, "pharmacy_id": self.pharmacy.pk})
+        body = {"identifier": self.worker.email, "verification_code": "000000", "new_pin": "2468"}
+        before = self.attendance_snapshot()
+        with patch.object(credentials, "security_cache", cache), patch("users.tasks.send_async_email"):
+            response = self.post_kiosk(body, view=KioskWorkerSetupPinView)
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertNotIn("last_action_at", response.data)
+        self.assertNotIn("code", response.data)
+        self.assertTrue(WorkerPIN.objects.get(membership=self.membership).check_pin("1357"))
+        self.assertEqual(self.attendance_snapshot(), before)
+
 
 class MobileQRDoubleClockGuardTests(OppositeActionContracts, DoubleClockFixture):
     channel = "qr"
