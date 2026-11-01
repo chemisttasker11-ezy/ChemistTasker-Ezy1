@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework.exceptions import APIException, ValidationError
 
-from shifts.models import Shift, ShiftOffer
+from shifts.models import Shift, ShiftOffer, ShiftSlotAssignment
 from shifts.pricing import expand_shift_slots
 from .models import FulfillmentCheckout, FulfillmentReservation
 from .stripe_support import stripe, _stripe_object_value
@@ -52,11 +52,28 @@ def selection_fingerprint(offers):
     return sha256(json.dumps(selection, sort_keys=True).encode()).hexdigest()
 
 
+def release_cancelled_paid_work(shift_id):
+    """Free occurrences whose paid booking no longer exists. The caller holds the shift lock.
+
+    A refund alone never frees work: only removed assignments do, and never while an offer awaits finalization.
+    """
+    for attempt in FulfillmentCheckout.objects.filter(original_shift_id=shift_id, state=FulfillmentCheckout.State.COMPLETE):
+        if ShiftOffer.objects.filter(pk__in=attempt.offer_ids, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists():
+            continue
+        booked = {f"{row.shift_id}:{row.slot_id}:{row.slot_date or row.slot.date}" for row in
+                  ShiftSlotAssignment.objects.filter(source_offer_id__in=attempt.offer_ids).select_related("slot")}
+        released = [row.pk for row in attempt.reservations.filter(active=True)
+                    if not (booked if row.occurrence_key.endswith(":whole") else row.occurrence_key in booked)]
+        if released:
+            FulfillmentReservation.objects.filter(pk__in=released).update(active=False)
+
+
 def prepare_checkout(*, shift_id, actor, offer_ids, parameters):
     parameters = json.loads(json.dumps(parameters))
     fingerprint = sha256(json.dumps(parameters, sort_keys=True, default=str).encode()).hexdigest()
     with transaction.atomic(durable=True):
         shift = Shift.objects.select_for_update().get(pk=shift_id)
+        release_cancelled_paid_work(shift.pk)
         offers = list(ShiftOffer.objects.select_for_update(of=("self",)).filter(
             shift=shift, pk__in=offer_ids, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
         ).select_related("shift").order_by("pk"))
@@ -164,6 +181,7 @@ def expire_checkout(attempt):
 
 def guard_fulfillment(*, offer, checkout_id=None):
     """Called under the booking owner's shift lock, including free/pill booking."""
+    release_cancelled_paid_work(offer.shift_id)
     keys = occurrence_keys(offer)
     whole = f"{offer.shift_id}:whole"
     for attempt in FulfillmentCheckout.objects.filter(original_shift_id=offer.shift_id).exclude(

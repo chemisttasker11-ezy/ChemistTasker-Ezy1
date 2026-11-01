@@ -202,6 +202,39 @@ class CheckoutReservationTests(TestCase):
         self.assertTrue(second.reconciliation_required)
         self.assertEqual(second.reconciliation_reason, 'duplicate_paid_checkout_intent')
 
+    def _replacement_after_paid_booking(self, *, cancel):
+        self.charge()
+        self.pay()
+        if cancel:
+            # Same writes as shifts.cancellation.cancel_upcoming_assignments (AHPRA pause).
+            ShiftSlotAssignment.objects.filter(source_offer=self.offer).delete()
+            ShiftOffer.objects.filter(pk=self.offer.pk).update(status=ShiftOffer.Status.DECLINED)
+        self.checkout.return_value = fixtures._StripeObject(id='cs_replacement', url='https://checkout.example.test/new')
+        return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+                                         status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+    def test_cancelled_paid_booking_frees_occurrence_for_card_replacement(self):
+        replacement = self._replacement_after_paid_booking(cancel=True)
+        response = self.charge(replacement)
+        self.assertEqual(response.status_code, 200, response.data)
+        payment = ShiftPayment.objects.get()
+        self.assertEqual((payment.status, FulfillmentCheckout.objects.filter(payment=payment).count()), ('paid', 1))
+
+    def test_cancelled_paid_booking_frees_occurrence_for_free_route(self):
+        replacement = self._replacement_after_paid_booking(cancel=True)
+        with patch('billing.views.get_billing_state_for_account', return_value='PRE_LIVE'):
+            response = self.charge(replacement)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(source_offer=replacement).exists())
+
+    def test_booked_or_only_refunded_paid_occurrence_stays_reserved(self):
+        replacement = self._replacement_after_paid_booking(cancel=False)
+        ShiftPayment.objects.update(status='refunded', refunded_amount_aud=Decimal('30'))
+        self.assertEqual(self.charge(replacement).status_code, 409)
+        with patch('billing.views.get_billing_state_for_account', return_value='PRE_LIVE'):
+            self.assertEqual(self.charge(replacement).status_code, 400)
+        self.assertFalse(ShiftSlotAssignment.objects.filter(source_offer=replacement).exists())
+
     def test_late_payment_after_expiry_does_not_consume_new_reserved_work(self):
         self.charge()
         old = self.attempt()
