@@ -94,9 +94,8 @@ def publish_roster_period(roster_period, published_by, force_warnings=False, *, 
             validation_snapshot=validation,
         )
 
-        # Mark assignments as is_rostered
+        # Roster assignments are created is_rostered=True; publishing never converts marketplace bookings.
         assignments = get_roster_period_assignments(period)
-        assignments.filter(is_rostered=False).update(is_rostered=True)
 
         worker_ids = list(assignments.values_list("user_id", flat=True).distinct())
         transaction.on_commit(lambda: _notify_roster_publication(period.pk, worker_ids, rev), robust=True)
