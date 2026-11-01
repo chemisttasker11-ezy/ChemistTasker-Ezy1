@@ -179,6 +179,25 @@ def expire_checkout(attempt):
         current.reservations.update(active=False)
 
 
+def expire_unreconciled_checkout(attempt):
+    """Operator expiry for an attempt that never got a provider session id; the operator checked the provider.
+
+    Only after 24 h, the longest a provider session can stay open, so no session from the original request is payable.
+    """
+    with transaction.atomic():
+        # Same order as preparation/webhook: shift, then attempt/reservations.
+        Shift.objects.select_for_update().filter(pk=attempt.original_shift_id).first()
+        current = FulfillmentCheckout.objects.select_for_update().get(pk=attempt.pk)
+        if (current.state not in (FulfillmentCheckout.State.PREPARED, FulfillmentCheckout.State.UNKNOWN)
+                or current.stripe_session_id or current.payment_id):
+            raise CheckoutConflict("Only an unpaid attempt without a provider session can be expired here.")
+        if timezone.now() - current.created_at < timedelta(hours=24):
+            raise CheckoutConflict("Wait until the attempt is 24 hours old; its provider session may still be open.")
+        current.state = FulfillmentCheckout.State.EXPIRED
+        current.save(update_fields=["state", "updated_at"])
+        current.reservations.update(active=False)
+
+
 def guard_fulfillment(*, offer, checkout_id=None):
     """Called under the booking owner's shift lock, including free/pill booking."""
     release_cancelled_paid_work(offer.shift_id)

@@ -333,3 +333,60 @@ class CheckoutReservationTests(TestCase):
         self.pay(metadata=metadata)
         self.assertEqual(ShiftPayment.objects.get().reconciliation_reason, 'checkout_metadata_mismatch')
         self.assertFalse(ShiftSlotAssignment.objects.exists())
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class CheckoutReconciliationAdminTests(TestCase):
+    """F2: a provider-unknown attempt past retry age is freed only by a superuser with a reason."""
+    setUp = CheckoutReservationTests.setUp
+    charge = CheckoutReservationTests.charge
+    attempt = CheckoutReservationTests.attempt
+
+    def stuck_attempt(self, age=timedelta(hours=24)):
+        self.checkout.side_effect = TimeoutError('provider may have accepted')
+        self.assertEqual(self.charge().status_code, 503)
+        FulfillmentCheckout.objects.update(created_at=timezone.now() - age)
+        self.checkout.side_effect = None
+        return self.attempt()
+
+    def run_action(self, user, attempt, reason='Checked Stripe dashboard: no session'):
+        from django.test import Client
+        from django_otp import DEVICE_ID_SESSION_KEY
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+        admin = Client()
+        admin.force_login(user)
+        session = admin.session
+        session[DEVICE_ID_SESSION_KEY] = TOTPDevice.objects.create(user=user, confirmed=True).persistent_id
+        session.save()
+        return admin.post(reverse('otpadmin:billing_fulfillmentcheckout_changelist'), {
+            'action': 'mark_expired_after_reconciliation', '_selected_action': [str(attempt.pk)], 'reason': reason,
+        })
+
+    def test_superuser_expires_stuck_attempt_with_reason_and_work_is_payable_again(self):
+        from django.contrib.admin.models import LogEntry
+        attempt = self.stuck_attempt()
+        self.assertEqual(self.charge().status_code, 503)  # Before: permanently blocked.
+        self.run_action(make_user(is_staff=True, is_superuser=True), attempt)
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.state, FulfillmentCheckout.State.EXPIRED)
+        self.assertFalse(FulfillmentReservation.objects.filter(active=True).exists())
+        self.assertIn('no session', LogEntry.objects.get(object_id=str(attempt.pk)).change_message)
+        self.checkout.return_value = fixtures._StripeObject(id='cs_new', url='https://checkout.example.test/new')
+        self.assertEqual(self.charge().status_code, 200)
+
+    def test_refusals_leave_the_reservation_in_place(self):
+        from django.contrib.auth.models import Permission
+        superuser = make_user(is_staff=True, is_superuser=True)
+        staff = make_user(is_staff=True)  # Can view checkouts, but the action is superuser-only.
+        staff.user_permissions.add(*Permission.objects.filter(codename='view_fulfillmentcheckout'))
+        attempt = self.stuck_attempt(age=timedelta(hours=23))
+        cases = [('younger than 24 h', 23, {}, superuser, 'checked'), ('no reason', 25, {}, superuser, ''),
+                 ('not a superuser', 25, {}, staff, 'checked'),
+                 ('has a provider session', 25, {'stripe_session_id': 'cs_known'}, superuser, 'checked')]
+        for label, hours, fields, user, reason in cases:
+            with self.subTest(label):
+                FulfillmentCheckout.objects.update(created_at=timezone.now() - timedelta(hours=hours), **fields)
+                self.run_action(user, attempt, reason)
+                attempt.refresh_from_db()
+                self.assertNotEqual(attempt.state, FulfillmentCheckout.State.EXPIRED)
+                self.assertTrue(FulfillmentReservation.objects.filter(active=True).exists())
