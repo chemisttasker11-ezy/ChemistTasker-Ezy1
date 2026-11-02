@@ -84,7 +84,7 @@ async function kiosk({ desktop = false, lastAction = 'CLOCK_IN', reject = true, 
       if (reject && body.confirm_opposite !== true) {
         throw { response: { status: 409, data: {
           code: 'CONFIRM_OPPOSITE_ACTION', last_action: lastAction,
-          pending_action: lastAction === 'CLOCK_IN' ? 'CLOCK_OUT' : 'CLOCK_IN',
+          pending_action: lastAction === 'CLOCK_IN' ? 'CLOCK_OUT' : 'CLOCK_IN', observed_session_id: 41,
           last_action_at: new ControlledDate(now - 30000).toISOString(),
           message: lastAction === 'CLOCK_IN' ? 'You just clocked in. Clock out now?' : 'You just clocked out. Clock in now?',
         } } };
@@ -229,6 +229,8 @@ for (const [lastAction, wording] of [['CLOCK_IN', 'You just clocked in. Clock ou
     assert.equal(ui.calls.length, 2);
     assert.equal(ui.calls[1].body.confirm_opposite, true);
     assert.equal(ui.calls[1].body.request_id, first.body.request_id, 'Confirmation must reuse the uncommitted request ID');
+    assert.equal(ui.calls[1].body.expected_action, lastAction === 'CLOCK_IN' ? 'CLOCK_OUT' : 'CLOCK_IN', 'Confirmation must echo the prompted action');
+    assert.equal(ui.calls[1].body.observed_session_id, 41, 'Confirmation must echo the session the prompt was computed from');
     assert.equal(ui.calls[1].body.identifier, first.body.identifier);
     assert.equal(ui.calls[1].body.pin, first.body.pin);
     assert.equal(ui.calls[1].config.headers['X-Device-Token'], 'device-token');

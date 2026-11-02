@@ -248,7 +248,9 @@ class AttendanceAPITests(unittest.TestCase):
         self.assertIsNone(AttendanceSession.objects.get(user=self.worker_user).ended_at)
         clock_out_resp = kiosk_client.post(
             "/attendance/kiosk/pin-clock/",
-            {"device_token": raw_token, "identifier": self.worker_user.email, "pin": "1234", "confirm_opposite": True},
+            {"device_token": raw_token, "identifier": self.worker_user.email, "pin": "1234", "confirm_opposite": True,
+             "expected_action": clock_out_resp.data["pending_action"],
+             "observed_session_id": clock_out_resp.data["observed_session_id"]},
             format="json",
         )
         self.assertEqual(clock_out_resp.status_code, status.HTTP_200_OK)
@@ -277,7 +279,9 @@ class AttendanceAPITests(unittest.TestCase):
         self.assertEqual(out.status_code, status.HTTP_409_CONFLICT, out.data)
         self.assertEqual(out.data["code"], "CONFIRM_OPPOSITE_ACTION")
         self.assertIsNone(AttendanceSession.objects.get(user=self.worker_user).ended_at)
-        out = kiosk_client.post("/attendance/kiosk/pin-clock/", {**body, "confirm_opposite": True}, format="json")
+        out = kiosk_client.post("/attendance/kiosk/pin-clock/", {
+            **body, "confirm_opposite": True, "expected_action": out.data["pending_action"],
+            "observed_session_id": out.data["observed_session_id"]}, format="json")
         self.assertEqual(out.status_code, status.HTTP_200_OK, out.data)
         out_retry = kiosk_client.post("/attendance/kiosk/pin-clock/", body)
         self.assertEqual(out.data["action"], "CLOCKED_OUT")

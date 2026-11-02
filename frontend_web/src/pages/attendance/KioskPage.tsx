@@ -118,6 +118,9 @@ export default function KioskPage() {
     isDesktop: boolean;
     setup?: boolean;
     requestId?: string;
+    // Echoed on confirm so the server refuses a prompt that no longer matches the worker's state.
+    expectedAction?: string;
+    observedSessionId?: number | null;
     identifier: string;
     pin: string;
     desktopAction?: "CLOCK_IN" | "CLOCK_OUT" | "BREAK_START" | "BREAK_END";
@@ -772,6 +775,8 @@ export default function KioskPage() {
           message: err.response.data.message || (err.response.data.last_action === "CLOCK_IN" ? "You just clocked in. Clock out now?" : "You just clocked out. Clock in now?"),
           isDesktop: false,
           requestId: pinRetry.current?.requestId,
+          expectedAction: err.response.data.pending_action,
+          observedSessionId: err.response.data.observed_session_id ?? null,
           identifier: identifier.trim(),
           pin: pin,
         });
@@ -808,6 +813,8 @@ export default function KioskPage() {
             pin: pending.pin,
             request_id: pending.requestId,
             confirm_opposite: true,
+            expected_action: pending.expectedAction,
+            observed_session_id: pending.observedSessionId,
           },
           { headers: { "X-Device-Token": deviceToken } }
         );

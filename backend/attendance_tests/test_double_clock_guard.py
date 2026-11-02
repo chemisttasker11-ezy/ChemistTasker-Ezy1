@@ -147,7 +147,9 @@ class OppositeActionContracts:
         self.assert_confirmation(prompt, last_kind, last_at)
         self.assertEqual(self.attendance_snapshot(), before)
         # No event exists for the refused request, so confirmation may reuse its ID.
-        response = self.action(kind, request_id=request_id, confirm_opposite=True)
+        response = self.action(kind, request_id=request_id, confirm_opposite=True,
+                               expected_action=prompt.data["pending_action"],
+                               observed_session_id=prompt.data["observed_session_id"])
         self.assert_action(response, kind)
         self.assertEqual(AttendanceEvent.objects.count(), len(before[1]) + 1)
         session = AttendanceSession.objects.get(pk=response.data["session_id"])

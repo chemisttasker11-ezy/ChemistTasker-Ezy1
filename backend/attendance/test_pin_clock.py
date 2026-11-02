@@ -27,10 +27,11 @@ class KioskPinClockTests(TestCase):
         self.addCleanup(p.stop)
         self.view = KioskPinClockView.as_view()
 
-    def submit(self, request_id=None, *, confirm_opposite=False, expected_status=200):
+    def submit(self, request_id=None, *, confirm_opposite=False, expected_status=200, context=None):
         body = {"identifier": self.worker.email, "pin": "1357"}
         if confirm_opposite:
-            body["confirm_opposite"] = True
+            # A confirmation echoes the prompt it answers (stale-intent check).
+            body.update(confirm_opposite=True, **(self.prompt_context if context is None else context))
         if request_id is not None:
             body["request_id"] = request_id
         req = RequestFactory().post("/api/v1/attendance/kiosk/pin-clock/",
@@ -38,8 +39,10 @@ class KioskPinClockTests(TestCase):
                                     content_type="application/json", HTTP_X_DEVICE_TOKEN=self.token)
         r = self.view(req)
         self.assertEqual(r.status_code, expected_status, r.data)
-        if expected_status == 409:
+        if expected_status == 409 and r.data["code"] != "STALE_CONFIRMATION":
             self.assertEqual(r.data["code"], "CONFIRM_OPPOSITE_ACTION")
+            self.prompt_context = {"expected_action": r.data["pending_action"],
+                                   "observed_session_id": r.data["observed_session_id"]}
         return r.data
 
     def age_sessions(self, seconds=60):
@@ -118,3 +121,35 @@ class KioskPinClockTests(TestCase):
         self.assertEqual(AttendanceEvent.objects.filter(request_id=request_id).count(), 2)
         self.assertEqual(self.submit(request_id, confirm_opposite=True)["action"], "CLOCKED_OUT")
         self.assertEqual(AttendanceEvent.objects.filter(request_id=request_id).count(), 3)
+
+    # R2: a confirmation authorizes only the prompted action against the session it was computed from.
+    def assert_stale(self, context=None):
+        from attendance.models import AttendanceEvent
+        before = AttendanceEvent.objects.count()
+        response = self.submit(confirm_opposite=True, expected_status=409, context=context)
+        self.assertEqual(response["code"], "STALE_CONFIRMATION")
+        self.assertEqual(AttendanceEvent.objects.count(), before)
+
+    def test_confirmation_is_refused_after_another_device_clocked_the_worker_out(self):
+        from attendance.models import AttendanceSession
+        self.assertEqual(self.submit()["action"], "CLOCKED_IN")
+        self.submit(expected_status=409)  # Kiosk A: "Clock out now?"
+        AttendanceSession.objects.filter(user=self.worker).update(ended_at=timezone.now())  # Kiosk B clocked out.
+        self.assert_stale()
+        self.assertFalse(AttendanceSession.objects.filter(user=self.worker, ended_at__isnull=True).exists())
+
+    def test_same_action_on_a_new_session_is_refused(self):
+        from attendance.models import AttendanceSession
+        self.assertEqual(self.submit()["action"], "CLOCKED_IN")
+        self.submit(expected_status=409)
+        old = AttendanceSession.objects.get(user=self.worker)
+        old.ended_at = timezone.now()
+        old.save()
+        AttendanceSession.objects.create(user=self.worker, pharmacy=self.pharmacy, started_at=timezone.now())
+        self.assert_stale()  # Still "clock out", but not of the session the worker was shown.
+
+    def test_confirmation_without_prompt_context_is_refused(self):
+        self.assertEqual(self.submit()["action"], "CLOCKED_IN")
+        self.submit(expected_status=409)
+        self.assert_stale(context={})
+        self.assertEqual(self.submit(confirm_opposite=True)["action"], "CLOCKED_OUT")  # Fresh context still works.

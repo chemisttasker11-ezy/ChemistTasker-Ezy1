@@ -34,8 +34,11 @@ User = get_user_model()
 
 
 class ConfirmOppositeActionRequired(Exception):
-    def __init__(self, *, last_action: str, pending_action: str, last_action_at, message: str):
+    def __init__(self, *, last_action: str, pending_action: str, last_action_at, message: str,
+                 observed_session_id=None):
         self.code = "CONFIRM_OPPOSITE_ACTION"
+        # The session the prompt was computed from; a confirmation must echo it (stale-intent check).
+        self.observed_session_id = observed_session_id
         self.last_action = last_action
         self.pending_action = pending_action
         self.last_action_at = last_action_at
@@ -53,6 +56,7 @@ class ConfirmOppositeActionRequired(Exception):
             "last_action": self.last_action,
             "last_action_at": last_action_at_str,
             "pending_action": self.pending_action,
+            "observed_session_id": self.observed_session_id,
             "message": self.message,
         }
 
@@ -93,6 +97,7 @@ def check_clock_in_double_guard(
             pending_action="CLOCK_IN",
             last_action_at=last_closed_session.ended_at,
             message="You just clocked out. Clock in now?",
+            observed_session_id=last_closed_session.id,
         )
 
 
@@ -402,6 +407,7 @@ def clock_out(
                     pending_action="CLOCK_OUT",
                     last_action_at=session.started_at,
                     message="You just clocked in. Clock out now?",
+                    observed_session_id=session.id,
                 )
 
         # If currently on break, auto-close the break with BREAK_END first

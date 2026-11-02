@@ -424,6 +424,22 @@ class KioskQRView(APIView):
             return _unexpected_error_response(request, "generate the QR code")
 
 
+def _stale_confirmation(request, worker, device, status_info, at_this_pharmacy):
+    """A confirmation authorizes only the prompted action against the session it was computed from.
+
+    The caller holds the worker lock, so the comparison and the transition see the same state.
+    Missing context (an older open page) is stale too: the worker re-enters the PIN.
+    """
+    if at_this_pharmacy:
+        action, observed = "CLOCK_OUT", status_info["session_id"]
+    else:
+        action = "CLOCK_IN"
+        observed = (AttendanceSession.objects.filter(user=worker, pharmacy=device.pharmacy, ended_at__isnull=False)
+                    .order_by("-ended_at").values_list("id", flat=True).first())
+    return (request.data.get("expected_action") != action
+            or str(request.data.get("observed_session_id")) != str(observed))
+
+
 class KioskPinClockView(APIView):
     """
     POST /api/v1/attendance/kiosk/pin-clock/
@@ -481,6 +497,11 @@ class KioskPinClockView(APIView):
                 else:
                     status_info = get_active_session_status(worker)
                     at_this_pharmacy = status_info is not None and status_info["pharmacy_id"] == device.pharmacy_id
+                    if confirm_opposite and _stale_confirmation(request, worker, device, status_info, at_this_pharmacy):
+                        return Response({
+                            "code": "STALE_CONFIRMATION",
+                            "error": "This worker's attendance changed since the prompt. Enter the PIN again.",
+                        }, status=status.HTTP_409_CONFLICT)
                     if at_this_pharmacy:
                         session, event = clock_out(
                             user=worker,
