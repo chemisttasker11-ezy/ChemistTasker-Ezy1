@@ -310,6 +310,19 @@ class KioskReviewContracts(KioskReviewFixture, TestCase):
                     self.assertEqual(response.status_code, 403, response.data)
                 self.assert_no_decision(evidence, 0)
 
+    def test_pending_projection_uses_the_shared_store_timezone_resolver(self):
+        worker, _ = self.prepare_worker()
+        self.queue(worker)
+        for fields, expected in (({"timezone": "", "state": "QLD"}, "Australia/Brisbane"),
+                                 ({"timezone": "Not/AZone", "state": "NSW"}, "Australia/Sydney"),
+                                 ({"timezone": "", "state": "NSW", "postcode": "2880"}, "Australia/Broken_Hill"),
+                                 ({"timezone": "Australia/Perth", "state": "QLD"}, "Australia/Perth")):
+            with self.subTest(fields=fields):
+                type(self.pharmacy).objects.filter(pk=self.pharmacy.pk).update(**fields)
+                response = self.api.get(PENDING, {"pharmacy_id": self.pharmacy.pk})
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual({row["pharmacy_timezone"] for row in response.data}, {expected})
+
     def test_pending_projection_is_scoped_safe_and_reports_approval_availability(self):
         worker, _ = self.prepare_worker()
         evidence = self.queue(worker)

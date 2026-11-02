@@ -13,6 +13,7 @@ from attendance.models import AttendanceSession, KioskAttendanceEvent, KioskAtte
 from attendance.approvals import is_authorized_attendance_manager
 from attendance.protocol import _apply_business_event, _parse_aware_datetime
 from organizations.models import Pharmacy
+from organizations.timezone import get_pharmacy_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class ManagerPendingKioskReviewView(APIView):
                 "event_type": event.event_type,
                 "device_id": event.device.pk,
                 "device_name": event.device.device_name,
-                "pharmacy_timezone": event.device.pharmacy.timezone or "UTC",
+                "pharmacy_timezone": get_pharmacy_timezone(event.device.pharmacy).key,
                 "device_timestamp": event.device_timestamp.isoformat(),
                 "trusted_time_estimate": event.trusted_time_estimate.isoformat() if event.trusted_time_estimate else None,
                 "integrity_flags": event.integrity_flags or [],
