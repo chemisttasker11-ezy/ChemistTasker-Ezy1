@@ -26,7 +26,7 @@ if tool=='git':
     sys.exit(0)
 if tool!='docker': sys.exit(0)
 if args[0]=='compose':
-    operation=next(x for x in args if x in ['config','build','ps','up','restart','stop','exec','run'])
+    operation=next(x for x in args if x in ['config','build','ps','up','restart','stop','exec','run','start'])
     if operation=='config' and '--format' in args:
         services={'gateway':{'image':'nginx:1.27.5-alpine'}}
         if '--profile' in args and args[args.index('--profile')+1]=='release':
@@ -276,6 +276,12 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.assertLess(prepare,start)
         self.assertIn('RUN_MIGRATIONS=0',calls[prepare])
         self.assertEqual(calls[prepare][-1],'migration')
+
+    def test_refresh_waits_for_gateway_health_before_public_smoke(self):
+        result,calls=self.refresh(UNHEALTHY_GATEWAY='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('did not become healthy',result.stderr)
+        self.assertFalse(any(x[0]=='curl' for x in calls))
 
     def test_migration_failure_never_starts_web_or_kills_migration(self):
         self.assertNotEqual(self.release(FAIL_MIGRATION='1').returncode, 0)

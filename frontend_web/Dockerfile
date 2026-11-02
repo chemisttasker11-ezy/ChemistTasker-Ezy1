@@ -27,7 +27,7 @@ RUN if [ "$REQUIRE_WEB_INTEGRATIONS" = "1" ]; then \
       test -n "$VITE_RECAPTCHA_SITE_KEY"; \
     fi && npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.30.6-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
 
 COPY --from=build /workspace/frontend_web/dist /usr/share/nginx/html
 COPY frontend_web/nginx-spa.conf /etc/nginx/conf.d/default.conf

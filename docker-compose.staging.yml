@@ -284,7 +284,7 @@ services:
   # gateway address only when it loads, so recreating the container can break
   # staging routing. deploy-staging.sh restarts it instead.
   gateway:
-    image: nginx:1.27.5-alpine
+    image: nginx:1.30.6-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
     container_name: chemisttasker_gateway_staging
     restart: unless-stopped
     depends_on:

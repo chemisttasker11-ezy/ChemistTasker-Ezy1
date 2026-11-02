@@ -1,6 +1,7 @@
 """Verify real staging/Vite Nginx compression through an isolated Docker proxy."""
 import gzip
 import http.client
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -12,6 +13,10 @@ import uuid
 class StagingAssetProxyTests(unittest.TestCase):
     def test_gateway_negotiates_gzip_for_vite_javascript(self):
         root=Path(__file__).resolve().parents[1]
+        # Exercise the same pinned gateway image as the staging declaration.
+        match=re.search(r'^    image:\s*(nginx:\S+)\s*$', (root/'docker-compose.staging.yml').read_text(), re.MULTILINE)
+        self.assertIsNotNone(match, 'Staging must declare its NGINX image')
+        image=match.group(1)
         with tempfile.TemporaryDirectory() as directory:
             html=Path(directory)
             html.chmod(0o755)  # Nginx workers must traverse the bind mount on Linux.
@@ -19,13 +24,13 @@ class StagingAssetProxyTests(unittest.TestCase):
             body=b'console.log("staging asset proxy regression");\n'*2000
             (html/'js/app.review.js').write_bytes(body)
             name='ct-staging-asset-test-'+uuid.uuid4().hex[:10]
-            args=['docker','run','-d','--name',name,
+            args=['docker','run','-d','--name',name,'--memory','128m','--cpus','0.5','--pids-limit','64',
                   '--add-host','frontend:127.0.0.1','--add-host','web:127.0.0.1','--add-host','landing:127.0.0.1',
                   '-p','127.0.0.1::8080',
                   '--mount',f'type=bind,source={root/"nginx/staging.conf"},target=/etc/nginx/conf.d/staging.conf,readonly',
                   '--mount',f'type=bind,source={root/"frontend_web/nginx-spa.conf"},target=/etc/nginx/conf.d/default.conf,readonly',
                   '--mount',f'type=bind,source={html},target=/usr/share/nginx/html,readonly',
-                  'nginx:1.27.5-alpine']
+                  image]
             try:
                 subprocess.run(args,check=True,stdout=subprocess.DEVNULL)
                 port=int(subprocess.check_output(['docker','inspect','-f',

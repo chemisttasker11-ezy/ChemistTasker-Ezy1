@@ -66,6 +66,12 @@ rollback_path="$rollback_dir/staging-before-production-refresh-${timestamp}.dump
 mkdir -p "$rollback_dir"
 chmod 700 "$rollback_dir"
 
+gateway_id="$(compose ps --all -q gateway)"
+[[ -n "$gateway_id" ]] || { echo "DB refresh requires the existing staging gateway; install it in a separate maintenance step." >&2; exit 1; }
+[[ "$(docker inspect -f '{{.State.Running}}' "$gateway_id")" == true ]] || {
+  echo "Start and verify the existing gateway before a destructive DB refresh; no data was changed." >&2; exit 1;
+}
+gateway_networks="$(docker inspect -f '{{range $name, $network := .NetworkSettings.Networks}}{{$name}}={{$network.IPAddress}}/{{$network.GlobalIPv6Address}};{{end}}' "$gateway_id")"
 compose up -d --no-recreate --wait postgres redis redis_cache
 # Queue/security state must be protected before changing application topology.
 policy="$(docker exec chemisttasker_redis_staging redis-cli --raw CONFIG GET maxmemory-policy | tail -n 1)"
@@ -100,6 +106,7 @@ docker exec chemisttasker_postgres_staging \
 chmod 600 "$rollback_path"
 # Confirm the rollback archive is readable before destroying the staging schema.
 docker exec -i chemisttasker_postgres_staging pg_restore --list < "$rollback_path" >/dev/null
+echo "Rollback backup: $rollback_path"
 
 docker exec chemisttasker_postgres_staging \
   psql --username=chemisttasker_staging --dbname=chemisttasker_staging \
@@ -125,11 +132,23 @@ docker exec chemisttasker_postgres_staging \
              UNION ALL SELECT 'memberships=' || count(*) FROM client_profile_membership;"
 
 compose build web frontend landing
-# Refresh static assets using the new image without applying schema changes.
+# Prepare current static assets without applying schema changes to restored data.
 compose --profile release run -T --rm --no-deps -e RUN_MIGRATIONS=0 migration < /dev/null
-compose up -d --no-deps web frontend landing gateway
+compose up -d --no-deps --wait --wait-timeout 300 web frontend landing
+compose start gateway
+test "$(compose ps --all -q gateway)" = "$gateway_id"
+current_gateway_networks="$(docker inspect -f '{{range $name, $network := .NetworkSettings.Networks}}{{$name}}={{$network.IPAddress}}/{{$network.GlobalIPv6Address}};{{end}}' "$gateway_id")"
+if [[ "$current_gateway_networks" != "$gateway_networks" ]]; then
+  printf 'Gateway address changed. Expected: %s Observed: %s. Validate the shared proxy route before serving traffic.\n' "$gateway_networks" "$current_gateway_networks" >&2
+  exit 1
+fi
 
 echo "Restored production data into the isolated staging PostgreSQL container."
 echo "Automatic migrations and Celery workers remain disabled."
-echo "Rollback backup: $rollback_path"
+for _ in $(seq 1 30); do
+  [[ "$(docker inspect -f '{{.State.Health.Status}}' "$gateway_id")" == healthy ]] && break
+  sleep 2
+done
+[[ "$(docker inspect -f '{{.State.Health.Status}}' "$gateway_id")" == healthy ]] || { echo 'Staging gateway did not become healthy after refresh.' >&2; exit 1; }
+bash scripts/smoke-staging.sh https://staging.chemisttasker.com.au
 compose ps
