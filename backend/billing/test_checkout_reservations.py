@@ -481,3 +481,8 @@ class CheckoutReconciliationAdminTests(TestCase):
         # Kept for the normal provider-confirmed expiry; never shown as a payable checkout URL.
         self.assertEqual((attempt.state, attempt.stripe_session_id, attempt.checkout_url),
                          (FulfillmentCheckout.State.UNKNOWN, 'cs_orphan', ''))
+        self.assertTrue(attempt.reservations.filter(active=True).exists(), 'The possibly payable orphan owns its work again')
+        replacement = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+                                                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.checkout.side_effect = None
+        self.assertEqual(self.charge(replacement).status_code, 409)

@@ -526,6 +526,8 @@ class KioskPinClockView(APIView):
                             user_identifier=identifier,
                             request_id=request_id,
                             confirm_opposite=confirm_opposite,
+                            expected_closed_session_id=(
+                                int(request.data["observed_session_id"]) if confirm_opposite else None),
                         )
 
                 clocked_out = event.event_type == AttendanceEvent.EventType.CLOCK_OUT

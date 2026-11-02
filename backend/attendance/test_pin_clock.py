@@ -171,3 +171,16 @@ class KioskPinClockTests(TestCase):
                       confirm_opposite=True, expected_session_id=session.pk + 1)
         self.assertEqual(AttendanceEvent.objects.count(), before)
         self.assertTrue(AttendanceSession.objects.get(pk=session.pk).is_open)
+
+    def test_clock_in_rechecks_the_last_closed_session_under_its_lock(self):
+        from attendance.models import AttendanceSession
+        from attendance.transitions import StaleConfirmation, clock_in
+        self.assertEqual(self.submit()["action"], "CLOCKED_IN")
+        self.age_sessions()
+        self.assertEqual(self.submit()["action"], "CLOCKED_OUT")
+        closed = AttendanceSession.objects.get(user=self.worker)
+        with self.assertRaises(StaleConfirmation):  # Verified sync closed another session after validation.
+            clock_in(user=self.worker, pharmacy=self.pharmacy, kiosk_device=self.device, raw_pin="1357",
+                     user_identifier=self.worker.email, confirm_opposite=True,
+                     expected_closed_session_id=closed.pk + 1)
+        self.assertFalse(AttendanceSession.objects.filter(user=self.worker, ended_at__isnull=True).exists())

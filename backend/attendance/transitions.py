@@ -119,6 +119,7 @@ def clock_in(
     assignment_id: Optional[int] = None,
     request_id=None,
     confirm_opposite: bool = False,
+    expected_closed_session_id=None,
 ) -> Tuple[AttendanceSession, AttendanceEvent]:
     """
     Clock in a worker at a pharmacy transactionally.
@@ -139,6 +140,13 @@ def clock_in(
             .filter(user=user, ended_at__isnull=True)
             .first()
         )
+
+        if expected_closed_session_id is not None:
+            # Re-checked after the locked open-session read: verified sync does not take the worker lock.
+            last_closed = (AttendanceSession.objects.filter(user=user, pharmacy=pharmacy, ended_at__isnull=False)
+                           .order_by("-ended_at").values_list("id", flat=True).first())
+            if existing_session is not None or last_closed != expected_closed_session_id:
+                raise StaleConfirmation()
 
         if existing_session is not None:
             # Idempotent retry: if exact same pharmacy clocked in within 30 seconds, return existing

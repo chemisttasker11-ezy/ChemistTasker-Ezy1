@@ -169,9 +169,25 @@ def _expire_orphaned_session(attempt_id, session_id):
         # Keep the orphan on the attempt so expire_checkout can retry it; a payment on it is ledgered, never booked.
         log.exception("Could not expire orphaned provider session %s for recovered attempt %s; reconcile it now",
                       session_id, attempt_id)
-        FulfillmentCheckout.objects.filter(pk=attempt_id, stripe_session_id__isnull=True).update(
-            stripe_session_id=session_id, state=FulfillmentCheckout.State.UNKNOWN)
+        _reclaim_orphaned_attempt(attempt_id, session_id)
         raise CheckoutUncertain("A late provider session could not be expired. Reconcile it before taking payment.")
+
+
+def _reclaim_orphaned_attempt(attempt_id, session_id):
+    """The orphan may still be paid: own its work again unless a replacement already holds it."""
+    with transaction.atomic():
+        attempt = FulfillmentCheckout.objects.get(pk=attempt_id)
+        # Same order as preparation/webhook: shift, then attempt/reservations.
+        Shift.objects.select_for_update().filter(pk=attempt.original_shift_id).first()
+        attempt = FulfillmentCheckout.objects.select_for_update().get(pk=attempt_id)
+        if attempt.stripe_session_id or attempt.state != FulfillmentCheckout.State.EXPIRED:
+            return
+        held = set(FulfillmentReservation.objects.filter(
+            checkout__original_shift_id=attempt.original_shift_id, active=True,
+        ).exclude(checkout=attempt).values_list("occurrence_key", flat=True))
+        attempt.reservations.exclude(occurrence_key__in=held).update(active=True)
+        attempt.stripe_session_id, attempt.state = session_id, FulfillmentCheckout.State.UNKNOWN
+        attempt.save(update_fields=["stripe_session_id", "state", "updated_at"])
 
 
 def expire_checkout(attempt):
