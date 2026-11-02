@@ -184,3 +184,20 @@ class KioskPinClockTests(TestCase):
                      user_identifier=self.worker.email, confirm_opposite=True,
                      expected_closed_session_id=closed.pk + 1)
         self.assertFalse(AttendanceSession.objects.filter(user=self.worker, ended_at__isnull=True).exists())
+
+    def test_clock_in_rolls_back_when_sync_changed_history_during_the_insert(self):
+        from unittest.mock import patch
+        from attendance.models import AttendanceEvent, AttendanceSession
+        from attendance.transitions import StaleConfirmation, clock_in
+        self.assertEqual(self.submit()["action"], "CLOCKED_IN")
+        self.age_sessions()
+        self.assertEqual(self.submit()["action"], "CLOCKED_OUT")
+        closed = AttendanceSession.objects.get(user=self.worker).pk
+        before = AttendanceEvent.objects.count()
+        # The check before the insert sees the prompt's session; sync then opens and closes another one.
+        with patch("attendance.transitions._last_closed_id", side_effect=[closed, closed + 1]):
+            with self.assertRaises(StaleConfirmation):
+                clock_in(user=self.worker, pharmacy=self.pharmacy, kiosk_device=self.device, raw_pin="1357",
+                         user_identifier=self.worker.email, confirm_opposite=True, expected_closed_session_id=closed)
+        self.assertFalse(AttendanceSession.objects.filter(user=self.worker, ended_at__isnull=True).exists())
+        self.assertEqual(AttendanceEvent.objects.count(), before)

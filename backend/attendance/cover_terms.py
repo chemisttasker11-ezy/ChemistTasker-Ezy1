@@ -163,6 +163,8 @@ def accept_cover_terms(user, assignment_id, data):
         from shifts.engagement import freeze_accepted_terms, require_acceptance_payload
         terms, blocked = _invoice_terms(provisional, assignment, user)
         if terms is None:
+            if data.get("terms_version"):
+                raise TermsChanged()  # The reviewed invoice terms no longer apply (e.g. routing changed).
             raise ValidationError({"detail": blocked["notice"]})
         if data.get("terms_version") != _terms_version(terms):
             raise TermsChanged()  # Rate, dates or routing changed since the worker reviewed them (D2).

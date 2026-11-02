@@ -61,6 +61,11 @@ class ConfirmOppositeActionRequired(Exception):
         }
 
 
+def _last_closed_id(user, pharmacy):
+    return (AttendanceSession.objects.filter(user=user, pharmacy=pharmacy, ended_at__isnull=False)
+            .order_by("-ended_at").values_list("id", flat=True).first())
+
+
 class StaleConfirmation(Exception):
     """The confirmed session is no longer the worker's open session (e.g. verified sync changed it)."""
 
@@ -141,12 +146,10 @@ def clock_in(
             .first()
         )
 
-        if expected_closed_session_id is not None:
+        if expected_closed_session_id is not None and (
+                existing_session is not None or _last_closed_id(user, pharmacy) != expected_closed_session_id):
             # Re-checked after the locked open-session read: verified sync does not take the worker lock.
-            last_closed = (AttendanceSession.objects.filter(user=user, pharmacy=pharmacy, ended_at__isnull=False)
-                           .order_by("-ended_at").values_list("id", flat=True).first())
-            if existing_session is not None or last_closed != expected_closed_session_id:
-                raise StaleConfirmation()
+            raise StaleConfirmation()
 
         if existing_session is not None:
             # Idempotent retry: if exact same pharmacy clocked in within 30 seconds, return existing
@@ -229,6 +232,9 @@ def clock_in(
             ended_at=None,
             is_provisional=eligibility.is_provisional,
         )
+        if expected_closed_session_id is not None and _last_closed_id(user, pharmacy) != expected_closed_session_id:
+            # Sync can open and close a session with no row for us to lock; re-check after our insert, roll back.
+            raise StaleConfirmation()
 
         # Create immutable CLOCK_IN event
         event = AttendanceEvent.objects.create(

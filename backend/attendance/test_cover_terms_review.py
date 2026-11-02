@@ -215,6 +215,16 @@ class RealCoverRoutingReviewTests(RealCoverRoutingFixture, TestCase):
         # Accepted replay returns the frozen terms even with the stale version.
         self.assertEqual(self.accept(assignment, payload={**CONSENT, "terms_version": shown}).status_code, 200)
 
+    def test_d2_reviewed_invoice_terms_that_no_longer_apply_are_terms_changed(self):
+        self.pharmacy_rate()
+        assignment = self.approve_real(self.real_review("UNBOOKED_LOCUM_COVER"))
+        shown = self.shown_version(assignment)
+        self.member()  # The worker became this pharmacy's staff after reviewing invoice terms (E18: staff wins).
+        response = self.accept(assignment, payload={**CONSENT, "terms_version": shown})
+        self.assertEqual((response.status_code, response.json().get("code")), (409, "TERMS_CHANGED"))
+        self.assert_unaccepted(assignment)
+        self.assert_sources(assignment, False)
+
     def test_gap2_existing_zero_assignment_rate_cannot_be_frozen(self):
         self.pharmacy_rate()
         assignment = self.approve_real(self.real_review("UNBOOKED_LOCUM_COVER"))
