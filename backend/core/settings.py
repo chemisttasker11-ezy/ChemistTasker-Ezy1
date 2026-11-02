@@ -662,6 +662,9 @@ MOBILE_IOS_STORE_URL = env(
 
 # Stripe Settings
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
+# New live collection is enabled per accepted capability; test-mode staging stays usable.
+BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED = env.bool("BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED", default=False)
+BILLING_LIVE_SHIFT_PENALTY_ENABLED = env.bool("BILLING_LIVE_SHIFT_PENALTY_ENABLED", default=False)
 STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
 
 # Billing Honeymoon & Free Trial

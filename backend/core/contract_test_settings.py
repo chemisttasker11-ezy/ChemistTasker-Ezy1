@@ -15,3 +15,9 @@ CACHES = {**CACHES, 'ahpra': {'BACKEND': 'django.core.cache.backends.locmem.LocM
 
 # Test client requests are HTTP in CI; do not redirect them before endpoint assertions.
 SECURE_SSL_REDIRECT = False
+
+# Provider calls in contract tests are captured; a nonfunctional key explicitly selects test mode.
+STRIPE_SECRET_KEY = "sk_test_disposablecontractonly"
+
+BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED = False
+BILLING_LIVE_SHIFT_PENALTY_ENABLED = False

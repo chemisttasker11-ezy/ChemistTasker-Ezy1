@@ -7,3 +7,5 @@ class BillingConfig(AppConfig):
 
     def ready(self):
         from . import signals  # noqa: F401
+        from .release_guards import validate_provider_preflight
+        validate_provider_preflight()

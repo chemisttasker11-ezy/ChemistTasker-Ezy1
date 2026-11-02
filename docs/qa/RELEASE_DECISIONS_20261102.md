@@ -16,6 +16,8 @@ stays restricted until it is settled. **Before enabling** names the feature that
 | 8 | Cancellation charging (`billing/shift_payments.py` `charge_penalty`) | Inherited behaviour: ambient timezone, every assignment on the shift, the submitted slot selection ignored, and no persisted obligation or idempotency key. `billing.test_cancellation_policy_evidence` characterises it. | Real cancellation payments |
 | 9 | When should the minimatch 3.1.5 exception for GHSA-g3hv-75wg-m249 be removed? | The gate accepts only the fingerprinted root copy, which lacks the vulnerable `firstPhasePreProcess`. | Remove it when Expo/React Native leave glob 7 or the advisory range is corrected |
 
+New live shift fulfillment and penalty collection are now closed by default through separate server-side capabilities; see [the live collection guard matrix](LIVE_SHIFT_COLLECTION_GUARDS.md). Resolve the payment-policy decisions and provider acceptance before enabling either capability. Existing signed payment accounting remains active.
+
 ## Operational steps before real payments
 - Drain and reconcile every pre-rollout collectible Stripe session, and verify the account prices.
 - A stalled provider request cannot be proven stopped. Use the 48-hour floor plus a recorded operator reconciliation.

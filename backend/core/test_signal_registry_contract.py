@@ -2,7 +2,7 @@
 
 RECORDED pins every model-signal receiver the project connects (sender -> receiver). A receiver that appears twice,
 from a compatibility path or from a new module shows up here for review instead of silently changing what a save
-does. Domain ready() hooks only import their own signals. The composition hook has one exact,
+does. Domain ready() hooks import their own signals; billing additionally performs its exact no-I/O provider-key preflight. The composition hook has one exact,
 configuration-only binding sequence, checked in a cold process: no queries, HTTP or task dispatch.
 Third-party receivers (axes) and Django's post_migrate handlers are not pinned.
 """
@@ -167,6 +167,17 @@ class SignalRegistryContractTests(SimpleTestCase):
         hooks = list(ready_hooks())
         self.assertTrue(hooks)
         for app, node in hooks:
+            if app == "billing":
+                self.assertEqual(
+                    ast.dump(ast.Module(body=node.body, type_ignores=[])),
+                    ast.dump(ast.parse(
+                        "from . import signals\n"
+                        "from .release_guards import validate_provider_preflight\n"
+                        "validate_provider_preflight()"
+                    )),
+                    "Billing startup may only register signals and reject live staging keys without I/O.",
+                )
+                continue
             if app == "composition":
                 self.assertEqual(
                     ast.dump(ast.Module(body=node.body, type_ignores=[])),

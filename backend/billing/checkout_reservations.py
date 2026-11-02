@@ -13,6 +13,7 @@ from shifts.models import Shift, ShiftOffer, ShiftSlotAssignment
 from shifts.pricing import expand_shift_slots
 from shifts.occurrences import accepted_occurrences
 from .models import FulfillmentCheckout, FulfillmentReservation
+from .release_guards import assert_can_create_shift_charge
 from .stripe_support import stripe, _stripe_object_value
 from .checkout_prices import FULFILLMENT_PRICES
 
@@ -65,6 +66,7 @@ def release_cancelled_paid_work(shift_id):
 
 
 def prepare_checkout(*, shift_id, actor, offer_ids, parameters):
+    assert_can_create_shift_charge("fulfillment")
     parameters = json.loads(json.dumps(parameters))
     fingerprint = sha256(json.dumps(parameters, sort_keys=True, default=str).encode()).hexdigest()
     with transaction.atomic(durable=True):
@@ -120,6 +122,7 @@ def open_checkout(attempt):
         raise CheckoutConflict("This checkout has already been paid. Refresh the shift.")
     if attempt.state == FulfillmentCheckout.State.EXPIRED:
         raise CheckoutConflict("This checkout has expired. Refresh before creating another checkout.")
+    assert_can_create_shift_charge("fulfillment")
     if attempt.checkout_url:
         return attempt.checkout_url
     if timezone.now() - attempt.created_at >= timedelta(hours=23):
