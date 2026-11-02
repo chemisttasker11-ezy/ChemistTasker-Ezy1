@@ -732,7 +732,8 @@ jobs:
           mkdir -p "$HOME/.ccache-ios"
 
       - name: Restore iOS native compile cache
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        id: ios_compile_cache
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809
         with:
           path: ~/.ccache-ios
           key: ios-ccache-${{ runner.os }}-${{ hashFiles('frontend_mobile/package-lock.json') }}-${{ github.sha }}
@@ -809,6 +810,15 @@ jobs:
           xcrun simctl uninstall "$SIM_UDID" com.chemisttasker.app 2>/dev/null || true
           xcrun simctl install "$SIM_UDID" "$APP_PATH"
 
+      - name: Save successful iOS compile before device tests
+        if: success() && steps.ios_compile_cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ~/.ccache-ios
+          key: ${{ steps.ios_compile_cache.outputs.cache-primary-key }}
+
       - name: Install pinned Maestro
         shell: bash
         run: |
@@ -851,6 +861,10 @@ jobs:
                 - tapOn: "Open"
           YAML
           bash frontend_mobile/scripts/run-ios-link-consent.sh "$SIM_UDID" /tmp/native-link-consent.yaml /tmp/ios-maestro-bootstrap
+          sleep 5
+          # A confirmation can appear only after the first XCTest session exits.
+          # Dismiss it in another short session, then let its URL delivery finish.
+          bash frontend_mobile/scripts/run-ios-link-consent.sh "$SIM_UDID" frontend_mobile/.maestro/ios-link-consent-finish.yaml /tmp/ios-maestro-consent-finish
           sleep 5
 
           cp frontend_mobile/.maestro/invoice-acceptance.yaml /tmp/invoice-acceptance.yaml
@@ -965,6 +979,7 @@ jobs:
             /tmp/native-npm-install-*.log
             /tmp/maestro-version-ios.txt
             /tmp/ios-maestro-bootstrap-*.log
+            /tmp/ios-maestro-consent-finish-*.log
             /tmp/ios-simulator.png
             /tmp/chemisttasker-ios.log
             /tmp/ios-entitlements.txt
