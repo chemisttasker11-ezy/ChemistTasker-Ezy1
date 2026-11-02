@@ -222,7 +222,14 @@ export default function WorkerAttendancePage() {
       setSuccessMsg("Engagement terms accepted for your approved cover.");
       await fetchCovers();
     } catch (err: any) {
-      setCoverError(err?.message || "Could not accept the terms. Try again.");
+      if (err?.status === 409 && err?.payload?.code === "TERMS_CHANGED") {
+        // Discard the rejected preview before fetching a new version and consents.
+        setCovers((current) => current.filter((cover) => cover.assignment_id !== coverDialogId));
+        setCoverError("These terms have changed. Review the updated terms and confirm both agreements again.");
+        await fetchCovers();
+      } else {
+        setCoverError(err?.message || "Could not accept the terms. Try again.");
+      }
     } finally {
       setAcceptingCover(false);
     }

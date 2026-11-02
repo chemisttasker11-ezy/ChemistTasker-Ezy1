@@ -45,7 +45,7 @@ export function text(node) {
   return [node.props?.label, node.props?.title, node.props?.body, node.props?.subtitle, text(node.props?.children), text(node.props?.action)].filter(value => value != null).join(' ');
 }
 
-async function mount(platform, { rows = [cover], loadError = false, acceptError = false, pending = false, acceptPending = false, dialogOnly = false, pathname = '/dashboard/pharmacist/attendance', role = 'PHARMACIST' } = {}) {
+async function mount(platform, { rows = [cover], loadError = false, acceptError = false, termsChanged = false, refreshError = false, pending = false, acceptPending = false, dialogOnly = false, pathname = '/dashboard/pharmacist/attendance', role = 'PHARMACIST' } = {}) {
   const mobile = platform === 'mobile';
   // Resolve from the app under test: clean CI installs each app separately.
   const ts = createRequire(new URL(mobile ? 'frontend_mobile/package.json' : 'frontend_web/package.json', root))('typescript');
@@ -90,13 +90,20 @@ async function mount(platform, { rows = [cover], loadError = false, acceptError 
     async getWorkerCoverTerms() {
       calls.push(['covers']); loads++;
       if (pending && loads === 1) await deferred;
-      if (loadError && loads === 1) throw new Error('Cover terms unavailable');
+      if ((loadError && loads === 1) || (refreshError && loads > 1)) throw new Error('Cover terms unavailable');
       return structuredClone(rows);
     },
     async acceptWorkerCoverTerms(id, payload) {
       calls.push(['accept', id, structuredClone(payload)]); attempts++;
       if (acceptPending && attempts === 1) await accepting;
       if (acceptError && attempts === 1) throw new Error('Could not accept cover terms');
+      if (termsChanged && attempts === 1) {
+        rows = rows.map(row => ({ ...row, engagement_terms_preview: {
+          ...row.engagement_terms_preview, terms_version: 'v-updated-82.50',
+          occurrences: row.engagement_terms_preview.occurrences.map(item => ({ ...item, agreed_rate: '82.50' })),
+        } }));
+        throw { status: 409, payload: { code: 'TERMS_CHANGED' } };
+      }
       rows = rows.map(row => {
         if (row.assignment_id !== id) return row;
         const { engagement_terms_accepted_at: _oldTimestamp, ...originalRow } = row;
@@ -214,6 +221,29 @@ async function mount(platform, { rows = [cover], loadError = false, acceptError 
 }
 
 export function coverTermsTests(platform) {
+  test(`${platform} changed terms refresh the preview and require fresh consent`, async () => {
+    const ui = await mount(platform, { termsChanged: true }); await ui.open();
+    await ui.consent(0); await ui.consent(1); await ui.click(ui.confirm());
+    assert.equal(ui.loads, 2);
+    assert.match(text(ui.dialog()), /82\.50/);
+    assert.doesNotMatch(text(ui.dialog()), /73\.50/);
+    assert.match(text(ui.dialog()), /terms have changed/i);
+    assert.ok(ui.confirm().props.disabled);
+    assert.equal(ui.calls.filter(call => call[0] === 'accept').length, 1);
+    await ui.consent(0); assert.ok(ui.confirm().props.disabled);
+    await ui.consent(1); await ui.click(ui.confirm());
+    assert.equal(ui.calls.filter(call => call[0] === 'accept')[1][2].termsVersion, 'v-updated-82.50');
+  });
+  test(`${platform} failed changed-terms refresh removes stale acceptance and offers retry`, async () => {
+    const ui = await mount(platform, { termsChanged: true, refreshError: true }); await ui.open();
+    await ui.consent(0); await ui.consent(1); await ui.click(ui.confirm());
+    assert.equal(ui.loads, 2);
+    assert.equal(nodes(ui.tree, 'Dialog').length, 0);
+    assert.match(text(ui.tree), /unable|failed|unavailable/i);
+    assert.ok(ui.button(/retry|try again|refresh/i));
+    assert.equal(ui.calls.filter(call => call[0] === 'accept').length, 1);
+  });
+
   test(`${platform} FE-B1 accepted backend LIST row shows Terms accepted without Accept terms`, async () => {
     const ui = await mount(platform, { rows: [acceptedCover] });
     assert.equal(ui.loads, 1);

@@ -181,7 +181,14 @@ function CoverTerms() {
       await attendance.acceptWorkerCoverTerms(selectedId,{...payload,termsVersion:selected?.engagement_terms_preview.terms_version});
       setSelectedId(null);
       await loadCovers();
-    }catch(e:any){setAcceptError(errorMessage(e,'Could not accept the terms. Try again.'));}
+    }catch(e:any){
+      if(e?.status===409&&e?.payload?.code==='TERMS_CHANGED'){
+        // Discard the rejected preview before fetching a new version and consents.
+        setCovers((current)=>current.filter((cover)=>cover.assignment_id!==selectedId));
+        setAcceptError('These terms have changed. Review the updated terms and confirm both agreements again.');
+        await loadCovers();
+      }else setAcceptError(errorMessage(e,'Could not accept the terms. Try again.'));
+    }
     finally{acceptingRef.current=false;setAccepting(false);}
   };
 
