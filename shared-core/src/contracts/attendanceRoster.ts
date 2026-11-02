@@ -232,6 +232,7 @@ export interface WorkerCoverTermsPreview {
   payment_profile_incomplete?: boolean;
   /** The pharmacy has no usable pay rate yet; only the pharmacy can fix it. */
   pricing_missing?: boolean;
+  terms_version?: string;
   notice?: string | null;
   occurrences: WorkerCoverTermsOccurrence[];
 }
@@ -251,6 +252,8 @@ export interface WorkerCoverTerms {
 export interface AcceptWorkerCoverTermsPayload {
   engagementTermsAccepted?: boolean;
   independentContractorStatusConfirmed?: boolean;
+  /** The preview's terms_version: the server refuses acceptance of terms that changed since review. */
+  termsVersion?: string;
 }
 
 export interface KioskReviewDecisionResponse {

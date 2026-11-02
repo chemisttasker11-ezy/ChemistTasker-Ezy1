@@ -6,7 +6,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from attendance.models import ProvisionalAttendance
-from attendance.test_cover_terms_acceptance import CoverTermsFixture
+from attendance.test_cover_terms_acceptance import CONSENT, CoverTermsFixture
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy
 from invoicing.services import generate_preview_invoice_lines
 from organizations.models import Chain, Organization
@@ -192,6 +192,28 @@ class RealCoverRoutingReviewTests(RealCoverRoutingFixture, TestCase):
         self.assertEqual(assignment.engagement_terms_snapshot["occurrences"][0]["agreed_rate"], "68.25")
         self.assert_sources(assignment, True)
         self.assert_no_payment()
+
+    def test_d2_acceptance_of_terms_that_changed_after_review_writes_nothing(self):
+        self.pharmacy_rate()
+        assignment = self.approve_real(self.real_review("UNBOOKED_LOCUM_COVER"))
+        shown = self.shown_version(assignment)
+        self.assertTrue(shown)
+        # The pharmacy reprices before the worker presses accept on the $68.25 preview.
+        self.pharmacy.default_fixed_rate = self.pharmacy.rate_weekday = Decimal("40.00")
+        self.pharmacy.save()
+        response = self.accept(assignment, payload={**CONSENT, "terms_version": shown})
+        self.assertEqual((response.status_code, response.json().get("code")), (409, "TERMS_CHANGED"))
+        self.assert_unaccepted(assignment)
+        self.assert_sources(assignment, False)
+        for payload in ({**CONSENT}, {**CONSENT, "terms_version": None}):
+            with self.subTest(payload=payload):
+                self.assertEqual(self.accept(assignment, payload={**payload, "terms_version": payload.get("terms_version")}).status_code, 409)
+        response = self.accept(assignment)  # Reviews the refreshed $40 terms, then accepts them.
+        self.assertEqual(response.status_code, 200, response.content[:300])
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.engagement_terms_snapshot["occurrences"][0]["agreed_rate"], "40.00")
+        # Accepted replay returns the frozen terms even with the stale version.
+        self.assertEqual(self.accept(assignment, payload={**CONSENT, "terms_version": shown}).status_code, 200)
 
     def test_gap2_existing_zero_assignment_rate_cannot_be_frozen(self):
         self.pharmacy_rate()

@@ -178,7 +178,7 @@ function CoverTerms() {
     acceptingRef.current=true;
     setAccepting(true);setAcceptError('');
     try{
-      await attendance.acceptWorkerCoverTerms(selectedId,payload);
+      await attendance.acceptWorkerCoverTerms(selectedId,{...payload,termsVersion:selected?.engagement_terms_preview.terms_version});
       setSelectedId(null);
       await loadCovers();
     }catch(e:any){setAcceptError(errorMessage(e,'Could not accept the terms. Try again.'));}

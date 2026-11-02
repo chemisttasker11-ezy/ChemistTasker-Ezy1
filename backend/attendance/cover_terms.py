@@ -3,6 +3,8 @@
 Manager approval never stamps acceptance; only this worker step makes approved INVOICE cover an invoice source.
 Lock order: ProvisionalAttendance + AttendanceSession (one statement, same as approve/reject) -> ShiftSlotAssignment.
 """
+import hashlib
+import json
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import F
@@ -84,12 +86,22 @@ def _invoice_terms(provisional, assignment, user):
     }, None
 
 
+def _terms_version(terms):
+    """Fingerprint of everything the worker is asked to accept; acceptance must echo the version it was shown."""
+    return hashlib.sha256(json.dumps(terms, sort_keys=True, default=str).encode()).hexdigest()
+
+
+class TermsChanged(Exception):
+    pass
+
+
 def _row(provisional, assignment, user):
     if assignment.engagement_terms_accepted_at:
         preview = {**assignment.engagement_terms_snapshot, "blocked": False, "payment_profile_incomplete": False}
     else:
         terms, blocked = _invoice_terms(provisional, assignment, user)
-        preview = {**terms, "blocked": False, "payment_profile_incomplete": False} if terms else {
+        preview = {**terms, "blocked": False, "payment_profile_incomplete": False,
+                   "terms_version": _terms_version(terms)} if terms else {
             **blocked, "blocked": True, "accepted_at": None, "occurrences": [_occurrence(assignment)],
         }
     return {
@@ -152,6 +164,8 @@ def accept_cover_terms(user, assignment_id, data):
         terms, blocked = _invoice_terms(provisional, assignment, user)
         if terms is None:
             raise ValidationError({"detail": blocked["notice"]})
+        if data.get("terms_version") != _terms_version(terms):
+            raise TermsChanged()  # Rate, dates or routing changed since the worker reviewed them (D2).
         require_acceptance_payload(terms=terms, data=data)
         accepted_terms, accepted_at = freeze_accepted_terms(terms=terms, user=user)
         assignment.payment_preference_snapshot = accepted_terms["payment_preference"]
@@ -194,5 +208,9 @@ class WorkerAcceptCoverTermsView(APIView):
             return Response(accept_cover_terms(request.user, assignment_id, request.data))
         except PermissionDenied as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except TermsChanged:
+            return Response({"code": "TERMS_CHANGED",
+                             "detail": "These terms changed since you reviewed them. Review the updated terms."},
+                            status=status.HTTP_409_CONFLICT)
         except ValidationError as exc:
             return Response(getattr(exc, "message_dict", {"detail": exc.messages}), status=status.HTTP_400_BAD_REQUEST)

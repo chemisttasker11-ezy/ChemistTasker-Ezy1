@@ -14,6 +14,7 @@ from shifts.models import ShiftSlotAssignment
 class CoverTermsConcurrencyTests(CoverTermsFixture, TransactionTestCase):
     def start_accept(self, assignment, reached, outcomes, writes):
         worker_pk = self.worker.pk
+        version = self.shown_version(assignment)
         tables = [connection.ops.quote_name(model._meta.db_table) for model in
                   (ProvisionalAttendance, AttendanceSession, ShiftSlotAssignment)]
 
@@ -32,7 +33,8 @@ class CoverTermsConcurrencyTests(CoverTermsFixture, TransactionTestCase):
                     cursor.execute("SET statement_timeout = '12s'")
                 worker = type(self.worker).objects.get(pk=worker_pk)
                 with connection.execute_wrapper(observe):
-                    response = client_for(worker).post(LIST + f"{assignment.pk}/accept/", CONSENT, format="json")
+                    response = client_for(worker).post(LIST + f"{assignment.pk}/accept/",
+                                                       {**CONSENT, "terms_version": version}, format="json")
                 outcomes.put((response.status_code, getattr(response, "data", response.content[:300])))
             except Exception as exc:
                 outcomes.put(("ERROR", repr(exc)))

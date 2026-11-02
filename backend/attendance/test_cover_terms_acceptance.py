@@ -68,11 +68,21 @@ class CoverTermsFixture(LocumCoverFixture):
                 assignment.save(update_fields=["unit_rate", "rate_reason"])
         return review
 
+    def shown_version(self, assignment):
+        """The terms_version the worker was shown (D2: acceptance must echo it)."""
+        rows = client_for(self.worker).get(LIST).json()
+        row = next((row for row in rows if row["assignment_id"] == assignment.pk), None)
+        return (row or {}).get("engagement_terms_preview", {}).get("terms_version")
+
     def accept(self, assignment, *, actor=None, payload=None):
+        body = dict(CONSENT if payload is None else payload)
+        if isinstance(payload, dict) and "terms_version" in payload:
+            pass
+        else:
+            body["terms_version"] = self.shown_version(assignment)
         with TestCase.captureOnCommitCallbacks(execute=True):
             return client_for(actor or self.worker).post(
-                LIST + f"{assignment.pk}/accept/", CONSENT if payload is None else payload,
-                format="json",
+                LIST + f"{assignment.pk}/accept/", body, format="json",
             )
 
     def discover(self, actor=None):

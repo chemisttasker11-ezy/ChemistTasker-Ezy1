@@ -12,7 +12,7 @@ export const acceptedCover = JSON.parse(readFileSync(new URL('./acceptedCoverBac
 const terms = {
   version: 1, acceptance_required: true, engagement_kind: 'INDEPENDENT_CONTRACTOR',
   settlement_channel: 'INVOICE', payment_preference: 'ABN', accepted_at: null, blocked: false,
-  provider_abn: '51824753556', provider_entity_name: 'Cover Provider',
+  terms_version: 'v-shown-73.50', provider_abn: '51824753556', provider_entity_name: 'Cover Provider',
   relationship_notice: 'The parties intend independent services.',
   occurrences: [{ slot_id: 31, date: '2026-10-29', start_time: '08:00:00', end_time: '10:00:00', agreed_rate: '73.50' }],
 };
@@ -321,7 +321,9 @@ export function coverTermsTests(platform) {
     await ui.click(ui.confirm());
     const accepts = ui.calls.filter(call => call[0] === 'accept');
     assert.equal(accepts.length, 1);
-    assert.deepEqual(accepts[0], ['accept', 41, { engagementTermsAccepted: true, independentContractorStatusConfirmed: true }]);
+    // D2: acceptance echoes the version of the terms the worker reviewed.
+    assert.deepEqual(accepts[0], ['accept', 41, { engagementTermsAccepted: true, independentContractorStatusConfirmed: true,
+      termsVersion: 'v-shown-73.50' }]);
     assert.ok(ui.loads >= 2, 'Refresh authoritative server state after acceptance');
     assert.equal(nodes(ui.tree, 'Button').filter(node => /^Accept (?:engagement )?terms$/i.test(text(node).trim())).length, 0);
   });

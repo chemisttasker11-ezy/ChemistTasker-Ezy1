@@ -214,7 +214,10 @@ export default function WorkerAttendancePage() {
     setAcceptingCover(true);
     setCoverError(null);
     try {
-      await attendance.acceptWorkerCoverTerms(coverDialogId, payload);
+      const shown = covers.find((cover) => cover.assignment_id === coverDialogId);
+      await attendance.acceptWorkerCoverTerms(coverDialogId, {
+        ...payload, termsVersion: shown?.engagement_terms_preview.terms_version,
+      });
       setCoverDialogId(null);
       setSuccessMsg("Engagement terms accepted for your approved cover.");
       await fetchCovers();

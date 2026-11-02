@@ -31,6 +31,7 @@ export const attendance = {
             body: {
                 engagement_terms_accepted: payload.engagementTermsAccepted,
                 independent_contractor_status_confirmed: payload.independentContractorStatusConfirmed,
+                terms_version: payload.termsVersion,
             },
         }),
     breakStart: () => operationalRequest<AttendanceBreakResult>(API_ENDPOINTS.attendance.workerBreakStart, { method: 'POST', body: {} }),
