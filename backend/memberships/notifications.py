@@ -2,7 +2,7 @@
 the dashboard links they carry (per recipient role)."""
 from django.conf import settings
 
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from memberships.access import user_can_invite_members_to_pharmacy
 from memberships.models import Membership
 from notifications.models import Notification

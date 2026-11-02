@@ -4,11 +4,12 @@ from django.db import transaction
 from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from workforce.roster.permissions import is_authorized_attendance_manager
-from shifts.engagement import staff_assignment_defaults
+from shifts.engagement import keep_accepted_terms, staff_assignment_defaults
 from shifts.assignment import guard_roster_assignment
 from workforce.roster.assignment_rates import _validate_and_price
 from workforce.roster.edit_guards import _delete_empty_shift, _parse_date, _parse_time, _protect_assignment_history, _protect_marketplace_slot
 from workforce.roster.periods import get_roster_period_assignments
+from workforce.roster.slot_locking import lock_roster_shifts
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -64,6 +65,16 @@ def bulk_edit_roster_period(roster_period, operations, user):
                         except (TypeError, ValueError):
                             raise ValidationError("Worker ID must be an integer.")
         list(User.objects.select_for_update().filter(pk__in=worker_ids).order_by("pk"))
+
+        # Finalization locks Shift before Slot. Lock every existing target parent in one
+        # order before taking slot locks, including the deferred FK check of a new assignment.
+        slot_ids = [op.get("slot_id") for op in operations if isinstance(op, dict) and op.get("action")
+                    in {"assign_worker", "delete_slot", "update_slot_times", "move_shift"}]
+        assignment_ids = [op.get("assignment_id") for op in operations
+                          if isinstance(op, dict) and op.get("action") == "unassign_worker"]
+        shift_ids = set(ShiftSlot.objects.filter(pk__in=slot_ids).values_list("shift_id", flat=True))
+        shift_ids.update(ShiftSlotAssignment.objects.filter(pk__in=assignment_ids).values_list("shift_id", flat=True))
+        lock_roster_shifts(shift_ids)
 
         changed_slots = set()
         for idx, op in enumerate(operations):
@@ -158,12 +169,12 @@ def bulk_edit_roster_period(roster_period, operations, user):
                 ShiftSlotAssignment.objects.update_or_create(
                     slot=slot,
                     slot_date=slot.date,
-                    defaults={
+                    defaults=keep_accepted_terms({
                         "shift": slot.shift,
                         "user": worker,
                         "is_rostered": True,
                         **assignment_defaults,
-                    },
+                    }, slot=slot, slot_date=slot.date),
                 )
                 changed_slots.add(slot.pk)
                 summary["assigned"] += 1
@@ -256,9 +267,14 @@ def bulk_edit_roster_period(roster_period, operations, user):
 
                     if target_date != slot.date:
                         guard_roster_assignment(shift=slot.shift, slot=slot, slot_date=target_date)
+                        attached_assignments = list(slot.assignments.all())
+                        for assignment in attached_assignments:
+                            _protect_assignment_history(assignment)
                         slot.date = target_date
                         slot.save(update_fields=["date"])
-                        slot.assignments.all().update(slot_date=target_date)
+                        slot.assignments.filter(
+                            pk__in=[assignment.pk for assignment in attached_assignments]
+                        ).update(slot_date=target_date)
                 else:
                     target_date = slot.date
 
@@ -281,13 +297,13 @@ def bulk_edit_roster_period(roster_period, operations, user):
                         )
                         ShiftSlotAssignment.objects.update_or_create(
                             slot=slot,
-                            defaults={
+                            defaults=keep_accepted_terms({
                                 "shift": slot.shift,
                                 "user": worker,
                                 "slot_date": target_date,
                                 "is_rostered": True,
                                 **assignment_defaults,
-                            },
+                            }, slot=slot, slot_date=target_date),
                         )
                 changed_slots.add(slot.pk)
                 summary["updated"] += 1

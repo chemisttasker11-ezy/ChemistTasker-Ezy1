@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -15,9 +15,13 @@ import {
   Typography,
   Alert,
 } from "@mui/material";
-import { CalendarCheck, Clock, Coffee, KeyRound, LogOut, Pause, Play, QrCode } from "lucide-react";
+import { CalendarCheck, Clock, Coffee, FileText, KeyRound, LogOut, Pause, Play, QrCode } from "lucide-react";
 import moment from "moment";
-import { attendance, rosterV2 } from "@chemisttasker/shared-core";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import { attendance, rosterV2, formatAttendanceMinutes } from "@chemisttasker/shared-core";
+import type { ShiftOffer, WorkerCoverTerms } from "@chemisttasker/shared-core";
+import ShiftEngagementTermsDialog from "../dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog";
 import PageHeader from "../../components/ui/PageHeader";
 import IconTile from "../../components/ui/IconTile";
 import DashboardContentState from "../../components/dashboard/DashboardContentState";
@@ -42,8 +46,35 @@ export interface WorkerRosterShift {
   is_acknowledged: boolean;
 }
 
+// The cover-terms API is snake_case; the shared terms dialog reads the camelCase offer preview.
+const camelize = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(camelize)
+    : value && typeof value === "object"
+      ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key.replace(/_([a-z])/g, (_, c) => c.toUpperCase()), camelize(item)]))
+      : value;
+
+const canAcceptCover = (cover: WorkerCoverTerms) => {
+  const terms = cover.engagement_terms_preview;
+  return !terms.blocked && terms.acceptance_required && terms.settlement_channel === "INVOICE";
+};
+
 export default function WorkerAttendancePage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const roleSegment = user?.role === "OTHER_STAFF" ? "otherstaff" : user?.role === "PHARMACIST" ? "pharmacist" : null;
+  const openPaymentProfile = roleSegment ? () => navigate(`/dashboard/${roleSegment}/onboarding?step=payment`) : undefined;
   const [loading, setLoading] = useState(true);
+  const [covers, setCovers] = useState<WorkerCoverTerms[]>([]);
+  const [coversFailed, setCoversFailed] = useState(false);
+  const [coverDialogId, setCoverDialogId] = useState<number | null>(null);
+  const [acceptingCover, setAcceptingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  const dialogCover = covers.find((cover) => cover.assignment_id === coverDialogId);
+  const dialogOffers = useMemo(
+    () => (dialogCover ? ([{ engagementTermsPreview: camelize(dialogCover.engagement_terms_preview) }] as unknown as ShiftOffer[]) : null),
+    [dialogCover],
+  );
   const [statusInfo, setStatusInfo] = useState<{
     has_active_session: boolean;
     session_id?: number | null;
@@ -52,9 +83,10 @@ export default function WorkerAttendancePage() {
     started_at?: string | null;
     is_provisional?: boolean;
     is_on_break?: boolean;
+    cover_type?: string | null;
   } | null>(null);
 
-  const [elapsedDuration, setElapsedDuration] = useState<string>("00:00:00");
+  const [elapsedDuration, setElapsedDuration] = useState<string>(() => formatAttendanceMinutes(0));
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -62,6 +94,7 @@ export default function WorkerAttendancePage() {
   const [scanModalOpen, setScanModalOpen] = useState(false);
   const [scanAction, setScanAction] = useState<"CLOCK_IN" | "CLOCK_OUT">("CLOCK_IN");
   const [qrInputToken, setQrInputToken] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; action: "CLOCK_IN" | "CLOCK_OUT"; token: string } | null>(null);
   const [submittingAction, setSubmittingAction] = useState(false);
 
   // Kiosk PIN self-service state
@@ -69,19 +102,36 @@ export default function WorkerAttendancePage() {
   const [newPin, setNewPin] = useState("");
   const [confirmNewPin, setConfirmNewPin] = useState("");
   const [submittingPin, setSubmittingPin] = useState(false);
-  const [pinUpdateError, setPinUpdateError] = useState<string | null>(null);
+  const [pinLoadError, setPinLoadError] = useState<string | null>(null);
+  const [pinSaveError, setPinSaveError] = useState<string | null>(null);
+  const [loadingPinPharmacies, setLoadingPinPharmacies] = useState(false);
+  const [pinPharmaciesLoaded, setPinPharmaciesLoaded] = useState(false);
   const [pinPharmacies, setPinPharmacies] = useState<Array<{ id: number; name: string }>>([]);
   const [pinPharmacyId, setPinPharmacyId] = useState('');
+
   useEffect(() => {
     if (!pinModalOpen) return;
     let active = true;
-    setPinPharmacies([]); setPinPharmacyId(''); setPinUpdateError(null);
+    setLoadingPinPharmacies(true);
+    setPinPharmaciesLoaded(false);
+    setPinPharmacies([]);
+    setPinPharmacyId('');
+    setPinLoadError(null);
+    setPinSaveError(null);
     attendance.getPinPharmacies().then((data: any) => {
       if (!active) return;
       const pharmacies = Array.isArray(data?.pharmacies) ? data.pharmacies : [];
       setPinPharmacies(pharmacies);
+      setPinPharmaciesLoaded(true);
       if (pharmacies.length === 1) setPinPharmacyId(String(pharmacies[0].id));
-    }).catch(() => { if (active) setPinUpdateError('Unable to load your pharmacies. Close this dialog and try again.'); });
+    }).catch(() => {
+      if (active) {
+        setPinLoadError('Unable to load your pharmacies. Close this dialog and try again.');
+        setPinPharmaciesLoaded(false);
+      }
+    }).finally(() => {
+      if (active) setLoadingPinPharmacies(false);
+    });
     return () => { active = false; };
   }, [pinModalOpen]);
 
@@ -93,18 +143,18 @@ export default function WorkerAttendancePage() {
   const [acknowledgingPeriodId, setAcknowledgingPeriodId] = useState<number | null>(null);
 
   const handleUpdatePin = async () => {
-    if (!pinPharmacyId) { setPinUpdateError('Select a pharmacy.'); return; }
+    if (!pinPharmacyId) { setPinSaveError('Select a pharmacy.'); return; }
     if (newPin.length < 4 || newPin.length > 6) {
-      setPinUpdateError("PIN must be between 4 and 6 numeric digits.");
+      setPinSaveError("PIN must be between 4 and 6 numeric digits.");
       return;
     }
     if (newPin !== confirmNewPin) {
-      setPinUpdateError("PINs do not match. Please re-enter.");
+      setPinSaveError("PINs do not match. Please re-enter.");
       return;
     }
 
     setSubmittingPin(true);
-    setPinUpdateError(null);
+    setPinSaveError(null);
     try {
       await attendance.updatePin(Number(pinPharmacyId), newPin);
       setSuccessMsg("Attendance PIN updated for the selected pharmacy. Connect its terminal to the internet when first using the new PIN.");
@@ -112,7 +162,7 @@ export default function WorkerAttendancePage() {
       setNewPin("");
       setConfirmNewPin("");
     } catch (err: any) {
-      setPinUpdateError(err?.message || "Failed to update PIN.");
+      setPinSaveError(err?.message || "Failed to update PIN.");
     } finally {
       setSubmittingPin(false);
     }
@@ -149,6 +199,35 @@ export default function WorkerAttendancePage() {
     }
   };
 
+  // Approved emergency cover is closed, so it is listed apart from the live clock-in status.
+  const fetchCovers = async () => {
+    try {
+      setCovers(await attendance.getWorkerCoverTerms());
+      setCoversFailed(false);
+    } catch {
+      setCoversFailed(true);
+    }
+  };
+
+  const handleAcceptCover = async (payload: { engagementTermsAccepted?: boolean; independentContractorStatusConfirmed?: boolean }) => {
+    if (coverDialogId == null) return;
+    setAcceptingCover(true);
+    setCoverError(null);
+    try {
+      const shown = covers.find((cover) => cover.assignment_id === coverDialogId);
+      await attendance.acceptWorkerCoverTerms(coverDialogId, {
+        ...payload, termsVersion: shown?.engagement_terms_preview.terms_version,
+      });
+      setCoverDialogId(null);
+      setSuccessMsg("Engagement terms accepted for your approved cover.");
+      await fetchCovers();
+    } catch (err: any) {
+      setCoverError(err?.message || "Could not accept the terms. Try again.");
+    } finally {
+      setAcceptingCover(false);
+    }
+  };
+
   // Acknowledge a published roster period
   const handleAcknowledgePeriod = async (periodId: number) => {
     try {
@@ -169,24 +248,21 @@ export default function WorkerAttendancePage() {
   useEffect(() => {
     fetchStatus();
     fetchRosterShifts();
+    fetchCovers();
   }, []);
 
   // Live stopwatch timer
   useEffect(() => {
     if (!statusInfo?.has_active_session || !statusInfo?.started_at) {
-      setElapsedDuration("00:00:00");
+      setElapsedDuration(formatAttendanceMinutes(0));
       return;
     }
 
     const updateTimer = () => {
       const startMs = new Date(statusInfo.started_at!).getTime();
       const diffSec = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
-      const hours = Math.floor(diffSec / 3600);
-      const minutes = Math.floor((diffSec % 3600) / 60);
-      const seconds = diffSec % 60;
-      setElapsedDuration(
-        `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
-      );
+      const minutes = Math.floor(diffSec / 60);
+      setElapsedDuration(formatAttendanceMinutes(minutes));
     };
 
     updateTimer();
@@ -233,8 +309,9 @@ export default function WorkerAttendancePage() {
   };
 
   // Submit Clock In / Out
-  const handleQrSubmit = async () => {
-    if (!qrInputToken.trim()) {
+  const handleQrSubmit = async (confirmOpposite = false) => {
+    const token = confirmDialog?.token || qrInputToken.trim();
+    if (!token) {
       setErrorMsg("Please scan or paste the kiosk QR code token.");
       return;
     }
@@ -242,21 +319,35 @@ export default function WorkerAttendancePage() {
     setSubmittingAction(true);
     setErrorMsg(null);
 
+    const action = confirmDialog?.action || scanAction;
+
     try {
-      if (scanAction === "CLOCK_IN") {
-        const data = await attendance.clockIn(qrInputToken.trim()) as any;
+      if (action === "CLOCK_IN") {
+        const data = await attendance.clockIn(token, confirmOpposite ? { confirm_opposite: true } : undefined) as any;
         setSuccessMsg(
           data.is_provisional
             ? `Clocked in provisionally at ${data.pharmacy_name}. Pending manager review.`
             : `Clocked in successfully at ${data.pharmacy_name}.`
         );
       } else {
-        const data = await attendance.clockOut(qrInputToken.trim()) as any;
+        const data = await attendance.clockOut(token, confirmOpposite ? { confirm_opposite: true } : undefined) as any;
         setSuccessMsg(`Clocked out successfully from ${data.pharmacy_name}.`);
       }
       setScanModalOpen(false);
+      setConfirmDialog(null);
       await fetchStatus();
     } catch (err: any) {
+      // shared-core ApiError carries the server body in `payload`.
+      const errData = err?.payload;
+      const is409 = err?.status === 409 && errData?.code === 'CONFIRM_OPPOSITE_ACTION';
+      if (is409) {
+        setConfirmDialog({
+          message: errData?.message || (action === "CLOCK_IN" ? "You just clocked out. Clock in now?" : "You just clocked in. Clock out now?"),
+          action,
+          token,
+        });
+        return;
+      }
       setErrorMsg(err?.message || "QR verification or clock transition failed.");
     } finally {
       setSubmittingAction(false);
@@ -281,6 +372,10 @@ export default function WorkerAttendancePage() {
       .filter((shift, index) => shift.period_id && rosterShifts.findIndex((s) => s.period_id === shift.period_id) === index)
       .map((shift) => shift.assignment_id),
   );
+  const shownCovers = covers.filter((cover) =>
+    cover.status === "APPROVED"
+    && (cover.engagement_terms_accepted_at || cover.engagement_terms_preview.payment_profile_incomplete
+      || cover.engagement_terms_preview.pricing_missing || canAcceptCover(cover)));
   const statusPill = isClockedIn
     ? isOnBreak
       ? <Pill tone="amber" label="On break" />
@@ -336,6 +431,7 @@ export default function WorkerAttendancePage() {
                       <Alert severity="warning" sx={{ width: "100%", textAlign: "left" }}>
                         <strong>Provisional attendance.</strong> This shift wasn't on the roster (or is cover at another
                         site). Your hours are still recorded and sent to the pharmacy manager to review.
+                        {statusInfo.cover_type === "UNBOOKED_LOCUM_COVER" && " A manager must approve it before it is payable."}
                       </Alert>
                     )}
 
@@ -445,7 +541,10 @@ export default function WorkerAttendancePage() {
             onClick={() => {
               setNewPin("");
               setConfirmNewPin("");
-              setPinUpdateError(null);
+              setPinLoadError(null);
+              setPinSaveError(null);
+              setPinPharmaciesLoaded(false);
+              setLoadingPinPharmacies(true);
               setPinModalOpen(true);
             }}
             sx={{ mt: 2, minHeight: 44 }}
@@ -454,6 +553,77 @@ export default function WorkerAttendancePage() {
           </Button>
         </Paper>
       </Box>
+
+      {/* Approved cover awaiting the worker's engagement terms */}
+      {(coversFailed || shownCovers.length > 0) && (
+        <Paper component="section" aria-labelledby="cover-terms-heading" sx={{ ...cardSx, p: { xs: 2, md: 2.5 }, mt: 3 }}>
+          <Stack direction="row" spacing={1.5} alignItems="flex-start">
+            <IconTile icon={<FileText size={22} />} tone="blue" />
+            <Box sx={{ minWidth: 0 }}>
+              <Typography id="cover-terms-heading" component="h2" sx={cardTitleSx}>Approved cover</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Accept the engagement terms for cover a manager approved so it can be invoiced.
+              </Typography>
+            </Box>
+          </Stack>
+          {coversFailed && (
+            <Alert severity="error" sx={{ mt: 2 }} action={<Button color="inherit" size="small" onClick={() => void fetchCovers()}>Try again</Button>}>
+              Unable to load your approved cover terms.
+            </Alert>
+          )}
+          <Stack spacing={1.5} sx={{ mt: 2 }}>
+            {shownCovers.map((cover) => {
+              const terms = cover.engagement_terms_preview;
+              const first = terms.occurrences[0];
+              return (
+                <Box key={cover.assignment_id} sx={{ border: "1px solid var(--ct-border-color)", borderRadius: "var(--ct-card-radius)", p: 1.5 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" sx={{ gap: 1 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography fontWeight={600}>{cover.pharmacy_name}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {humanizeEnum(cover.cover_type)}
+                        {first ? ` · ${first.date} · ${first.start_time.slice(0, 5)}–${first.end_time.slice(0, 5)}` : ""}
+                      </Typography>
+                    </Box>
+                    {cover.engagement_terms_accepted_at ? (
+                      <Pill tone="green" label="Terms accepted" />
+                    ) : terms.blocked ? null : (
+                      <Button variant="contained" sx={{ minHeight: 44 }} onClick={() => { setCoverError(null); setCoverDialogId(cover.assignment_id); }}>
+                        Accept terms
+                      </Button>
+                    )}
+                  </Stack>
+                  {!cover.engagement_terms_accepted_at && terms.payment_profile_incomplete && (
+                    <Alert
+                      severity="warning"
+                      sx={{ mt: 1.5 }}
+                      action={openPaymentProfile ? <Button color="inherit" size="small" onClick={openPaymentProfile}>Complete payment profile</Button> : undefined}
+                    >
+                      {terms.notice || "Your payment details are incomplete."}
+                    </Alert>
+                  )}
+                  {!cover.engagement_terms_accepted_at && terms.pricing_missing && (
+                    <Alert severity="info" sx={{ mt: 1.5 }}>
+                      {terms.notice || "Ask the pharmacy to set its pay rates before you can accept these terms."}
+                    </Alert>
+                  )}
+                </Box>
+              );
+            })}
+          </Stack>
+        </Paper>
+      )}
+      {dialogOffers && (
+        <ShiftEngagementTermsDialog
+          open
+          offers={dialogOffers}
+          loading={acceptingCover}
+          error={coverError}
+          onClose={() => setCoverDialogId(null)}
+          onConfirm={handleAcceptCover}
+          onOpenPaymentProfile={openPaymentProfile}
+        />
+      )}
 
       {/* Published shifts & acknowledgements */}
       <Box component="section" aria-labelledby="published-shifts-heading" sx={{ mt: 3 }}>
@@ -596,11 +766,32 @@ export default function WorkerAttendancePage() {
           <Button
             variant="contained"
             color={scanAction === "CLOCK_IN" ? "primary" : "error"}
-            onClick={handleQrSubmit}
+            onClick={() => void handleQrSubmit()}
             disabled={submittingAction || !qrInputToken.trim()}
             startIcon={submittingAction ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
             {scanAction === "CLOCK_IN" ? "Clock in" : "Clock out"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Double Clock Confirmation Dialog */}
+      <Dialog open={Boolean(confirmDialog)} onClose={() => setConfirmDialog(null)}>
+        <DialogTitle>Confirm Clock Action</DialogTitle>
+        <DialogContent>
+          <Typography>{confirmDialog?.message}</Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setConfirmDialog(null)} disabled={submittingAction}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleQrSubmit(true)}
+            variant="contained"
+            color="primary"
+            disabled={submittingAction}
+          >
+            Confirm
           </Button>
         </DialogActions>
       </Dialog>
@@ -612,46 +803,91 @@ export default function WorkerAttendancePage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Choose a 4–6 digit PIN for clocking in on this pharmacy's counter screen.
           </Typography>
-          {pinUpdateError && (
+          {pinLoadError && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {pinUpdateError}
+              {pinLoadError}
             </Alert>
           )}
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField select label="Pharmacy" value={pinPharmacyId} onChange={e => setPinPharmacyId(e.target.value)} disabled={submittingPin} fullWidth>
-              {pinPharmacies.map(pharmacy => <MenuItem key={pharmacy.id} value={String(pharmacy.id)}>{pharmacy.name}</MenuItem>)}
-            </TextField>
-            <TextField
-              label="New PIN (4–6 digits)"
-              type="password"
-              value={newPin}
-              onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-              fullWidth
-              autoFocus
-              inputProps={{ maxLength: 6, inputMode: "numeric" }}
-            />
-            <TextField
-              label="Confirm new PIN"
-              type="password"
-              value={confirmNewPin}
-              onChange={(e) => setConfirmNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-              error={confirmNewPin.length > 0 && confirmNewPin !== newPin}
-              helperText={confirmNewPin.length > 0 && confirmNewPin !== newPin ? "PINs don't match yet" : " "}
-              fullWidth
-              inputProps={{ maxLength: 6, inputMode: "numeric" }}
-            />
-          </Stack>
+          {pinSaveError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {pinSaveError}
+            </Alert>
+          )}
+          {loadingPinPharmacies && (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+              <CircularProgress size={24} />
+            </Box>
+          )}
+          {!loadingPinPharmacies && pinPharmaciesLoaded && !pinLoadError && pinPharmacies.length === 0 && (
+            <Stack spacing={1.5} sx={{ mt: 1 }}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: "var(--ct-card-radius, 12px)",
+                  bgcolor: "var(--ct-subtle-bg, rgba(0, 0, 0, 0.03))",
+                  border: "1px solid var(--ct-border-color, rgba(0, 0, 0, 0.12))",
+                }}
+              >
+                <Typography variant="body2" sx={{ color: "var(--ct-text-primary, inherit)", lineHeight: 1.6, mb: 1.5 }}>
+                  Setting a kiosk PIN requires an accepted staff membership at that pharmacy.
+                </Typography>
+                <Typography variant="body2" sx={{ color: "var(--ct-text-primary, inherit)", lineHeight: 1.6, mb: 1.5 }}>
+                  Booked locums clock in using the mobile app by scanning the pharmacy QR code on the counter terminal.
+                </Typography>
+                <Typography variant="body2" sx={{ color: "var(--ct-text-secondary, text.secondary)", lineHeight: 1.6 }}>
+                  Have a pending invite? Check your{" "}
+                  <a
+                    href="/dashboard/admin-invitations"
+                    style={{ color: "var(--ct-primary, #00bdd2)", fontWeight: 600, textDecoration: "underline" }}
+                  >
+                    invitations
+                  </a>{" "}
+                  to accept it.
+                </Typography>
+              </Box>
+            </Stack>
+          )}
+          {!loadingPinPharmacies && pinPharmaciesLoaded && !pinLoadError && pinPharmacies.length > 0 && (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField select label="Pharmacy" value={pinPharmacyId} onChange={e => setPinPharmacyId(e.target.value)} disabled={submittingPin} fullWidth>
+                {pinPharmacies.map(pharmacy => <MenuItem key={pharmacy.id} value={String(pharmacy.id)}>{pharmacy.name}</MenuItem>)}
+              </TextField>
+              <TextField
+                label="New PIN (4–6 digits)"
+                type="password"
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                fullWidth
+                autoFocus
+                inputProps={{ maxLength: 6, inputMode: "numeric" }}
+              />
+              <TextField
+                label="Confirm new PIN"
+                type="password"
+                value={confirmNewPin}
+                onChange={(e) => setConfirmNewPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                error={confirmNewPin.length > 0 && confirmNewPin !== newPin}
+                helperText={confirmNewPin.length > 0 && confirmNewPin !== newPin ? "PINs don't match yet" : " "}
+                fullWidth
+                inputProps={{ maxLength: 6, inputMode: "numeric" }}
+              />
+            </Stack>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setPinModalOpen(false)} disabled={submittingPin}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleUpdatePin}
-            disabled={submittingPin || !pinPharmacyId || newPin.length < 4 || newPin !== confirmNewPin}
-            startIcon={submittingPin ? <CircularProgress size={16} color="inherit" /> : undefined}
-          >
-            Save PIN
+          <Button onClick={() => setPinModalOpen(false)} disabled={submittingPin}>
+            {!loadingPinPharmacies && pinPharmaciesLoaded && !pinLoadError && pinPharmacies.length === 0 ? "Close" : "Cancel"}
           </Button>
+          {!loadingPinPharmacies && pinPharmaciesLoaded && !pinLoadError && pinPharmacies.length > 0 && (
+            <Button
+              variant="contained"
+              onClick={handleUpdatePin}
+              disabled={submittingPin || !pinPharmacyId || newPin.length < 4 || newPin !== confirmNewPin}
+              startIcon={submittingPin ? <CircularProgress size={16} color="inherit" /> : undefined}
+            >
+              Save PIN
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

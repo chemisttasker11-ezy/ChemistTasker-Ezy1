@@ -1,4 +1,5 @@
 """client_profile models, organised by domain. Every model and helper is re-exported here, so `from client_profile.models import X` keeps working and Django registers every model on app load."""
+from client_profile import fields as _fields  # migration metadata before model discovery
 from client_profile.models.common import (
     GENDER_CHOICES,
     _safe_ext,

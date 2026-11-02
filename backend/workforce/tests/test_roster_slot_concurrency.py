@@ -2,10 +2,10 @@
 from datetime import date, time, timedelta
 from queue import Queue
 from threading import Barrier, Thread
-from unittest import skipUnless
+from unittest import mock, skipUnless
 
 from django.core.exceptions import ValidationError
-from django.db import close_old_connections, connection
+from django.db import OperationalError, close_old_connections, connection, transaction
 from django.test import TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
@@ -102,6 +102,16 @@ class RosterSlotConcurrencyTests(TransactionTestCase):
             self.assertTrue(indices, f"Missing lock for {table}")
             positions.append(indices[0])
         self.assertEqual(positions, sorted(positions))
+
+    def test_roster_lock_does_not_hide_unrelated_database_failures(self):
+        from workforce.roster.slot_locking import lock_roster_shifts
+
+        error = OperationalError("Connection interrupted")
+        error.__cause__ = type("ConnectionFailure", (Exception,), {"sqlstate": "08006"})()
+        with transaction.atomic(), mock.patch.object(Shift.objects, "select_for_update", side_effect=error):
+            with self.assertRaises(OperationalError) as raised:
+                lock_roster_shifts([self.shift.pk])
+            self.assertIs(raised.exception, error)
 
     def test_edit_and_republish_cannot_leave_an_editable_published_row_or_lose_identity(self):
         def republish():

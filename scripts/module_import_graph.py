@@ -164,7 +164,7 @@ def unapproved_internal_cycle_edges(edges, allowed_pairs):
 
 
 def check_cycle_baseline(report, baseline):
-    """Reject new cyclic module edges or newly joined SCCs without blessing legacy debt.
+    """Reject new cyclic edges or newly joined SCCs without blessing legacy debt.
 
     Existing SCCs can shrink; a new dependency inside the same legacy SCC is
     still a regression, even when the names of the SCC members do not change.
@@ -178,10 +178,20 @@ def check_cycle_baseline(report, baseline):
         group for group in report["strongly_connected_components"]
         if not any(set(group).issubset(existing) for existing in accepted_groups)
     ]
-    return {
+    result = {
         "new_unapproved_cycle_edges": sorted(observed_edges - accepted_edges),
         "new_strongly_connected_components": new_groups,
     }
+    if "combined_cyclic_edges" in baseline:
+        edges = {(row["from"], row["to"]) for row in report["module_edges"] + report["delayed_edges"]}
+        groups = strongly_connected_components(edges)
+        cyclic = {(a, b) for group in groups for a, b in edges if a in group and b in group}
+        accepted = {tuple(edge) for edge in baseline["combined_cyclic_edges"]}
+        accepted_groups = [set(group) for group in baseline["combined_components"]]
+        result["new_combined_cyclic_edges"] = sorted(cyclic - accepted)
+        result["new_combined_components"] = [list(group) for group in groups
+            if not any(set(group).issubset(existing) for existing in accepted_groups)]
+    return result
 
 
 def approved_mutual_pairs(guard=OWNERSHIP_GUARD):

@@ -39,8 +39,8 @@ class SubscriptionEntitlementContracts(TestCase):
         event_id = f"evt_f08_n2_{StripeWebhookEvent.objects.count()}"
         event = StripeObject(id=event_id, type=event_type, data=StripeObject(object=obj))
         with (
-            patch("billing.views.stripe.Webhook.construct_event", return_value=event),
-            patch("billing.views.stripe.Subscription.retrieve", return_value=provider) as retrieve,
+            patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=event),
+            patch("billing.stripe_support.stripe.Subscription.retrieve", return_value=provider) as retrieve,
         ):
             response = self.client.post("/api/v1/billing/webhook/", b"{}", content_type="application/json")
         self.assertEqual(response.status_code, 200, response.content)

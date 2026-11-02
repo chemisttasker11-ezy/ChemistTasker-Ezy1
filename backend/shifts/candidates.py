@@ -11,7 +11,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from memberships.models import Membership
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Chain

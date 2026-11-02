@@ -4,6 +4,7 @@ The tasks keep their deployed names (`client_profile.tasks.email_membership_appl
 callers dispatch them by name, and queued messages carry those names. `client_profile.tasks` re-exports these
 objects; it does not register them again.
 """
+from memberships.employment_port import employment_services
 import logging
 
 from celery import shared_task
@@ -251,13 +252,7 @@ def email_membership_application_approved(app_id: int):
     employment_terms = None
     if pharmacy.use_chemisttasker_payroll and app.approved_membership_id:
         try:
-            from workforce.models import EmploymentEngagement
-            engagement = (
-                EmploymentEngagement.objects
-                .filter(membership_id=app.approved_membership_id)
-                .order_by("-effective_from", "-id")
-                .first()
-            )
+            engagement = employment_services().latest_engagement(app.approved_membership_id)
         except Exception:
             logger.exception("Unable to load employment terms for approved application %s", app_id)
             engagement = None

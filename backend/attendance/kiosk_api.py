@@ -29,12 +29,22 @@ from attendance.credentials import (
     verify_kiosk_worker_pin,
 )
 from attendance.throttles import KioskPINRateThrottle, KioskQRRateThrottle
-from attendance.transitions import clock_in, clock_out, end_break, get_active_session_status, start_break
+from attendance.transitions import (
+    ConfirmOppositeActionRequired,
+    StaleConfirmation,
+    check_clock_in_double_guard,
+    clock_in,
+    clock_out,
+    end_break,
+    get_active_session_status,
+    start_break,
+)
 from attendance.protocol import sync_offline_batch
 from memberships.models import Membership
 from organizations.models import Pharmacy
+from organizations.timezone import get_pharmacy_timezone
 from attendance.models import AttendanceEvent, AttendanceSession, KioskDevice, WorkerPIN
-from attendance.api_support import _get_kiosk_device_from_request, _unexpected_error_response
+from attendance.api_support import _confirm_opposite, _get_kiosk_device_from_request, _unexpected_error_response
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -129,7 +139,7 @@ class KioskRequestPairingCodeView(APIView):
                 | Q(pk__in=scoped_pharmacy_ids)
             )
         return Response({"pharmacies": [{"id": pharmacy.pk, "name": pharmacy.name,
-                                         "timezone": pharmacy.timezone}
+                                         "timezone": str(get_pharmacy_timezone(pharmacy))}
             for pharmacy in pharmacies if is_authorized_kiosk_manager(request.user, pharmacy)]})
 
     def post(self, request):
@@ -415,6 +425,29 @@ class KioskQRView(APIView):
             return _unexpected_error_response(request, "generate the QR code")
 
 
+STALE_CONFIRMATION_RESPONSE = {
+    "code": "STALE_CONFIRMATION",
+    "error": "This worker's attendance changed since the prompt. Enter the PIN again.",
+}
+
+
+def _stale_confirmation(request, worker, device, status_info, at_this_pharmacy):
+    """A confirmation authorizes only the prompted action against the session it was computed from.
+
+    The caller holds the worker lock, so the comparison and the transition see the same state.
+    Missing context (an older open page) is stale too: the worker re-enters the PIN.
+    """
+    if at_this_pharmacy:
+        action, observed = "CLOCK_OUT", status_info["session_id"]
+    else:
+        action = "CLOCK_IN"
+        observed = (AttendanceSession.objects.filter(user=worker, pharmacy=device.pharmacy, ended_at__isnull=False)
+                    .order_by("-ended_at").values_list("id", flat=True).first())
+    # A prompt is always computed from a real session, so a missing or null id is never valid context.
+    return (observed is None or request.data.get("expected_action") != action
+            or str(request.data.get("observed_session_id")) != str(observed))
+
+
 class KioskPinClockView(APIView):
     """
     POST /api/v1/attendance/kiosk/pin-clock/
@@ -452,6 +485,7 @@ class KioskPinClockView(APIView):
 
             worker = membership.user
             request_id = request.data.get("request_id")
+            confirm_opposite = _confirm_opposite(request)
             if request_id is not None:
                 try:
                     request_id = UUID(str(request_id))
@@ -460,7 +494,7 @@ class KioskPinClockView(APIView):
 
             with transaction.atomic():
                 # Serialize lookup and toggle, including when the worker has no open session.
-                User.objects.select_for_update().get(pk=worker.pk)
+                User.objects.select_for_update(no_key=True).get(pk=worker.pk)
                 event = None
                 if request_id is not None:
                     event = AttendanceEvent.objects.select_related("session").filter(
@@ -471,6 +505,8 @@ class KioskPinClockView(APIView):
                 else:
                     status_info = get_active_session_status(worker)
                     at_this_pharmacy = status_info is not None and status_info["pharmacy_id"] == device.pharmacy_id
+                    if confirm_opposite and _stale_confirmation(request, worker, device, status_info, at_this_pharmacy):
+                        return Response(STALE_CONFIRMATION_RESPONSE, status=status.HTTP_409_CONFLICT)
                     if at_this_pharmacy:
                         session, event = clock_out(
                             user=worker,
@@ -478,6 +514,8 @@ class KioskPinClockView(APIView):
                             raw_pin=pin,
                             user_identifier=identifier,
                             request_id=request_id,
+                            confirm_opposite=confirm_opposite,
+                            expected_session_id=status_info["session_id"] if confirm_opposite else None,
                         )
                     else:
                         session, event = clock_in(
@@ -487,6 +525,9 @@ class KioskPinClockView(APIView):
                             raw_pin=pin,
                             user_identifier=identifier,
                             request_id=request_id,
+                            confirm_opposite=confirm_opposite,
+                            expected_closed_session_id=(
+                                int(request.data["observed_session_id"]) if confirm_opposite else None),
                         )
 
                 clocked_out = event.event_type == AttendanceEvent.EventType.CLOCK_OUT
@@ -501,6 +542,10 @@ class KioskPinClockView(APIView):
                     "pharmacy_name": device.pharmacy.name,
                 })
 
+        except ConfirmOppositeActionRequired as e:
+            return Response(e.to_dict(), status=status.HTTP_409_CONFLICT)
+        except StaleConfirmation:
+            return Response(STALE_CONFIRMATION_RESPONSE, status=status.HTTP_409_CONFLICT)
         except (DjangoPermissionDenied, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except DjangoValidationError as e:
@@ -598,23 +643,52 @@ class KioskWorkerSetupPinView(APIView):
                     "error": "Staff identifier, verification code, and new PIN are required.",
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            membership, worker_pin = setup_worker_kiosk_pin(
-                kiosk_device=device,
-                user_identifier=identifier,
-                verification_code=verification_code,
-                new_pin=new_pin,
-            )
+            confirm_opposite = _confirm_opposite(request)
 
-            worker = membership.user
+            from attendance.credentials import _find_kiosk_candidate_membership
+            candidate_membership = _find_kiosk_candidate_membership(device, identifier, require_pin=False)
+            if candidate_membership is None:
+                return Response({
+                    "error": "No active staff record found matching this email or ID.",
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Automatically clock in the worker
-            session, in_event = clock_in(
-                user=worker,
-                pharmacy=device.pharmacy,
-                kiosk_device=device,
-                raw_pin=new_pin,
-                user_identifier=identifier,
-            )
+            with transaction.atomic():
+                # Same worker lock as clock_in/clock_out, held from the precheck through the auto clock-in,
+                # so a concurrent clock action cannot make clock_in prompt after the OTP was consumed.
+                User.objects.select_for_update(no_key=True).get(pk=candidate_membership.user_id)
+
+                membership, worker_pin = setup_worker_kiosk_pin(
+                    kiosk_device=device,
+                    user_identifier=identifier,
+                    verification_code=verification_code,
+                    new_pin=new_pin,
+                    consume_otp=False,
+                )
+                # Only after the OTP is verified, so the prompt never reveals clock times to an unverified caller.
+                # A 409 here rolls back the PIN; the OTP is consumed only on commit, so it stays usable.
+                check_clock_in_double_guard(
+                    user=candidate_membership.user,
+                    pharmacy=device.pharmacy,
+                    confirm_opposite=confirm_opposite,
+                )
+
+                worker = membership.user
+
+                # Automatically clock in the worker; a refused clock-in keeps the new PIN and spends the OTP on commit,
+                # but a 409 prompt rolls the PIN back and leaves the OTP usable for the confirmed retry.
+                try:
+                    with transaction.atomic():
+                        session, in_event = clock_in(
+                            user=worker,
+                            pharmacy=device.pharmacy,
+                            kiosk_device=device,
+                            raw_pin=new_pin,
+                            user_identifier=identifier,
+                            confirm_opposite=confirm_opposite,
+                        )
+                except DjangoValidationError as e:
+                    msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
+                    return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
 
             return Response({
                 "success": True,
@@ -628,6 +702,8 @@ class KioskWorkerSetupPinView(APIView):
                 "message": "PIN created successfully! You are now clocked in.",
             }, status=status.HTTP_201_CREATED)
 
+        except ConfirmOppositeActionRequired as e:
+            return Response(e.to_dict(), status=status.HTTP_409_CONFLICT)
         except (DjangoPermissionDenied, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except DjangoValidationError as e:

@@ -11,9 +11,11 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from attendance.credentials import find_kiosk_pin_membership
 from attendance.transitions import clock_in, clock_out, end_break, start_break
 from attendance.eligibility import _find_matching_assignment
 from attendance.models import AttendanceEvent, KioskAttendanceEvent, KioskDevice
@@ -247,6 +249,10 @@ def ingest_offline_event(device, raw_event):
     )
     if device.revoked_at or not device.is_active:
         flags.append("DEVICE_REVOKED_DRAIN")
+    # E12: a cached PIN whose membership became ineligible is kept as evidence for a manager, never applied live.
+    # No WorkerPIN prerequisite: deleting the membership cascades the PIN row away.
+    if employee is not None and find_kiosk_pin_membership(device, Q(user=employee), require_pin=False) is None:
+        flags.append("PIN_MEMBERSHIP_INELIGIBLE")
     attendance_event = None
     rejection_reason = (
         "Device was revoked; signed attendance evidence was retained for manager review."
@@ -320,7 +326,12 @@ def sync_offline_batch(device, events, *, app_version=""):
     if len(events) > 100:
         raise ValidationError("A sync batch may contain at most 100 events.")
 
-    device = KioskDevice.objects.select_for_update().select_related("pharmacy").get(pk=device.pk)
+    # NO KEY UPDATE of the device row only: online kiosk events (FK KEY SHARE on device) and the
+    # joined pharmacy (FK KEY SHARE from new sessions) must not wait on a sync batch.
+    device = (
+        KioskDevice.objects.select_for_update(no_key=True, of=("self",))
+        .select_related("pharmacy").get(pk=device.pk)
+    )
     if device.client_kind != "NATIVE_OFFLINE":
         raise ValidationError("This device is not authorized for offline attendance sync.")
 

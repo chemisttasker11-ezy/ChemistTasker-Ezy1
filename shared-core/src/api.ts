@@ -314,6 +314,7 @@ export {
   deleteInvoice,
   generateInvoice,
   previewInvoice,
+  previewGeneratedInvoice,
   getInvoicePdfUrl,
   downloadInvoicePdf,
   sendInvoiceEmail,
@@ -492,5 +493,7 @@ export {
   getCurrentSubscription,
   updateSubscriptionSeats,
   chargeShiftFulfillment,
+  resumeFulfillmentCheckout,
+  expireFulfillmentCheckout,
   chargeShiftPenalty,
 } from './domains/billing/api';

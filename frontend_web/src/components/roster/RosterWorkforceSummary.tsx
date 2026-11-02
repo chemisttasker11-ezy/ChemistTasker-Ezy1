@@ -1,5 +1,5 @@
 import { Alert, Box, Button, Chip, Divider, Stack, Typography } from '@mui/material';
-import type { RosterAssignment } from '@chemisttasker/shared-core';
+import { formatAttendanceMinutes, type RosterAssignment } from '@chemisttasker/shared-core';
 
 type Props = {
   assignment: RosterAssignment;
@@ -7,7 +7,7 @@ type Props = {
   onOpenWorkforce?: () => void;
 };
 
-const minutes = (value?: number | null) => value == null ? '—' : `${(value / 60).toFixed(2)} h`;
+
 
 const settlementLabel = (value?: string | null) => {
   if (value === 'PAYROLL') return 'ChemistTasker Payroll';
@@ -61,15 +61,15 @@ export default function RosterWorkforceSummary({ assignment, onOpenTimesheets, o
             </Box>
             <Box>
               <Typography variant="caption" color="text.secondary">Rostered</Typography>
-              <Typography variant="body2" fontWeight={700}>{minutes(timesheet.rosteredMinutes)}</Typography>
+              <Typography variant="body2" fontWeight={700}>{formatAttendanceMinutes(timesheet.rosteredMinutes)}</Typography>
             </Box>
             <Box>
               <Typography variant="caption" color="text.secondary">Worked</Typography>
-              <Typography variant="body2" fontWeight={700}>{minutes(timesheet.workedMinutes)}</Typography>
+              <Typography variant="body2" fontWeight={700}>{formatAttendanceMinutes(timesheet.workedMinutes)}</Typography>
             </Box>
             <Box>
               <Typography variant="caption" color="text.secondary">Reviewed</Typography>
-              <Typography variant="body2" fontWeight={700}>{minutes(timesheet.reviewedMinutes)}</Typography>
+              <Typography variant="body2" fontWeight={700}>{formatAttendanceMinutes(timesheet.reviewedMinutes)}</Typography>
             </Box>
             {(timesheet.blockingChecks > 0 || timesheet.warningChecks > 0) && (
               <Box>

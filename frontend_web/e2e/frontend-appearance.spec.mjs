@@ -8,7 +8,8 @@ test.skip(process.platform !== 'win32', 'Run the appearance suite on Windows aga
 // The approved baselines use Australian date fields and AEST. GitHub's Windows runner otherwise defaults to US date placeholders and UTC clock formatting.
 test.use({ locale: 'en-AU', timezoneId: 'Australia/Brisbane', launchOptions: { args: ['--lang=en-AU'] } });
 
-// Baselines are captured from the branch before the architecture extraction (3df951b), never approved from a changed view.
+// Local stored baselines predate the 44px touch-target repair. CI captures its reference
+// from immutable main 25ef200f in a separate worktree, then compares this candidate.
 const views = [
   ['invoices', roleUsers.pharmacist, '/dashboard/pharmacist/invoice', 'Invoices'],
   ['invoice-review', roleUsers.owner, '/dashboard/owner/invoice?invoice=41', 'INV-0041'],
@@ -53,7 +54,7 @@ for (const width of [390, 1440]) for (const mode of ['light', 'dark']) for (cons
     const snapshotName = `${name}-${mode}-${width}.png`;
     // Capture candidate baselines only in the explicit review workflow; never silently
     // replace the approved screenshots in the normal regression gate.
-    if (name === 'shift-filters' && process.env.CT_CAPTURE_SHIFT_BASELINE === '1') {
+    if (process.env.CT_CAPTURE_APPROVED_SOURCE_BASELINE === '1' || (name === 'shift-filters' && process.env.CT_CAPTURE_SHIFT_BASELINE === '1')) {
       await expect(page).toHaveScreenshot(snapshotName, { animations: 'disabled', caret: 'hide', maxDiffPixels: 0 });
     } else if (width === 1440 && (name === 'invoices' || name === 'shift-filters')) {
       await assertAppearanceOutsideDateText(page, test.info(), snapshotName, name);

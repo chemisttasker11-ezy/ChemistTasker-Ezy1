@@ -28,8 +28,8 @@ class B01CheckoutPricing(TestCase):
         )
         with (
             patch("billing.views.get_billing_state_for_account", return_value="PAYMENT_REQUIRED"),
-            patch("billing.views.stripe.checkout.Session.create",
-                  return_value=SimpleNamespace(url="https://checkout.example.test/b01")) as create,
+            patch("billing.stripe_support.stripe.checkout.Session.create",
+                  return_value=SimpleNamespace(id=f"cs_b01_{shift.pk}", url="https://checkout.example.test/b01")) as create,
         ):
             response = client_for(self.owner).post(
                 f"/api/v1/billing/charge-fulfillment/{shift.pk}/",

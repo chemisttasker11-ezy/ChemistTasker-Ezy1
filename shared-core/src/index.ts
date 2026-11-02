@@ -59,6 +59,7 @@ export * from './policy/rosterPolicy';
 
 // Re-export pricing utils
 export * from './utils/pricing';
+export * from './utils/attendanceDisplay';
 
 // Shared mobile/desktop offline kiosk protocol.
 export * from './kioskProtocol';
@@ -70,6 +71,7 @@ export type { AsyncScope, AsyncScopeTicket } from "./utils/asyncScope";
 
 export type {CurrentUserApi, OnboardingApi} from './contracts/accounts';
 export type {InvoiceDetailApi, InvoiceLineItemApi} from './contracts/invoiceDetail';
+export * from './contracts/invoiceGeneration';
 
 export * from './skills';
 export * from './pharmacyProfile';

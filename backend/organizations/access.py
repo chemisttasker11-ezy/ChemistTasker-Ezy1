@@ -1,4 +1,5 @@
 from __future__ import annotations
+from organizations.feature_port import pharmacy_features
 
 from typing import Iterable, Optional
 
@@ -168,7 +169,7 @@ def user_can_manage_pharmacy(user, pharmacy) -> bool:
 
     # A Region Admin's M2M assignment alone cannot grant roster authority.
     # Workforce remains the sole capability/organization boundary.
-    from workforce.permissions import can_manage_roster_pharmacy
+    can_manage_roster_pharmacy = pharmacy_features().can_manage_roster_pharmacy
     return can_manage_roster_pharmacy(user, pharmacy)
 
 

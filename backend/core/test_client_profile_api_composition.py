@@ -1,5 +1,7 @@
+from django.conf import settings
 from django.test import SimpleTestCase
-from django.urls import Resolver404, resolve, reverse
+from django.urls import Resolver404, get_resolver, resolve, reverse
+from rest_framework.permissions import IsAuthenticated
 
 from worker_finance import legacy as finance_legacy
 
@@ -44,6 +46,34 @@ class ApiV1CompositionContractTests(SimpleTestCase):
         "work-notes",
         "calendar-feed",
     ]
+
+    def test_composition_preserves_all_historical_route_objects(self):
+        from composition.urls import urlpatterns as composed_patterns
+        from core.urls import urlpatterns as historical_patterns
+
+        self.assertEqual(settings.ROOT_URLCONF, "composition.urls")
+        self.assertIs(composed_patterns, historical_patterns)
+        self.assertIs(get_resolver().url_patterns, historical_patterns)
+        for path in ["/health/", *[f"/api/v1/{prefix}/" for prefix in self.expected_prefixes]]:
+            with self.subTest(path=path):
+                historical = resolve(path, urlconf="core.urls")
+                composed = resolve(path)
+                self.assertIs(composed.func, historical.func)
+                self.assertEqual(composed.view_name, historical.view_name)
+                self.assertEqual(composed.kwargs, historical.kwargs)
+
+    def test_protected_routes_keep_canonical_handlers_and_authentication(self):
+        from chat.views import ConversationViewSet, MessageViewSet
+        from organizations.views import PharmacyViewSet
+
+        for path, view_class in (
+            ("/api/v1/pharmacies/", PharmacyViewSet),
+            ("/api/v1/rooms/", ConversationViewSet),
+            ("/api/v1/messages/", MessageViewSet),
+        ):
+            with self.subTest(path=path):
+                self.assertIs(resolve(path).func.cls, view_class)
+                self.assertIn(IsAuthenticated, view_class.permission_classes)
 
     def test_domain_owned_router_paths_are_composed_under_api_v1(self):
         for prefix in self.expected_prefixes:

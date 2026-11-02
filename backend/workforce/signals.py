@@ -3,11 +3,15 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
+from shifts.events import payroll_activated, assignment_changing
+from shifts.assignment_lifecycle import assignment_facts, payroll_booking
+from .assignment_freeze import protect_assignment_change
 from workforce.models import RosterPeriod
 from attendance.models import AttendanceCorrection, AttendanceEvent, AttendanceSession, ProvisionalAttendance
 
@@ -53,6 +57,20 @@ def _session_dates(session):
     return min(dates), max(dates)
 
 
+@receiver(payroll_activated)
+def payroll_settlement_changed(sender, pharmacy_id, user_id, work_dates, **kwargs):
+    protect_assignment_change(
+        [(pharmacy_id, user_id, day) for day in work_dates], _enqueue,
+        message="Correct the locked timesheet period with an audit reason before activating payroll, then recalculate and review it.",
+    )
+
+
+@receiver(assignment_changing)
+def assignment_settlement_changing(sender, instance, facts, using='default', **kwargs):
+    protect_assignment_change(facts, _enqueue, using=using)
+    instance._workforce_preinvalidated = True
+
+
 @receiver(post_save, sender=AttendanceSession)
 def attendance_session_changed(sender, instance, **kwargs):
     _enqueue(instance.pharmacy_id, instance.user_id, *_session_dates(instance))
@@ -76,18 +94,22 @@ def provisional_attendance_changed(sender, instance, **kwargs):
     _enqueue(session.pharmacy_id, session.user_id, *_session_dates(session))
 
 
-def _assignment_changed(instance):
+def _assignment_changed(instance, *, invalidate=True):
     try:
         if instance.is_rostered:
             bump_for_assignment(instance)
         work_date = instance.slot_date or instance.slot.date
-        _enqueue(instance.shift.pharmacy_id, instance.user_id, work_date)
+        if invalidate:
+            _enqueue(instance.shift.pharmacy_id, instance.user_id, work_date)
     except Exception:
         log.exception("Failed to invalidate workforce projections for assignment %s", getattr(instance, "pk", None))
 
 
 @receiver(pre_delete, sender=ShiftSlotAssignment)
-def assignment_before_delete(sender, instance, **kwargs):
+def assignment_before_delete(sender, instance, using='default', **kwargs):
+    if payroll_booking(instance):
+        protect_assignment_change(assignment_facts(instance), _enqueue, using=using)
+        instance._workforce_preinvalidated = True
     try:
         if instance.is_rostered:
             work_date = instance.slot_date or instance.slot.date
@@ -102,7 +124,8 @@ def assignment_before_delete(sender, instance, **kwargs):
 
 @receiver(post_save, sender=ShiftSlotAssignment)
 def assignment_saved(sender, instance, **kwargs):
-    _assignment_changed(instance)
+    invalidated = instance.__dict__.pop('_workforce_preinvalidated', False)
+    _assignment_changed(instance, invalidate=not invalidated)
 
 
 @receiver(post_delete, sender=ShiftSlotAssignment)
@@ -113,11 +136,12 @@ def assignment_deleted(sender, instance, **kwargs):
             bump_roster_revision(period_id)
         except Exception:
             log.exception("Failed to bump deleted assignment roster period %s", period_id)
-    try:
-        work_date = instance.slot_date or instance.slot.date
-        _enqueue(instance.shift.pharmacy_id, instance.user_id, work_date)
-    except Exception:
-        log.exception("Failed to invalidate deleted assignment %s", getattr(instance, "pk", None))
+    if not instance.__dict__.pop("_workforce_preinvalidated", False):
+        try:
+            work_date = instance.slot_date or instance.slot.date
+            _enqueue(instance.shift.pharmacy_id, instance.user_id, work_date)
+        except Exception:
+            log.exception("Failed to invalidate deleted assignment %s", getattr(instance, "pk", None))
 
 
 

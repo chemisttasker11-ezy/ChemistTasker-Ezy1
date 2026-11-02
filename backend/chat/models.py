@@ -1,7 +1,7 @@
 """Chat: conversations (pharmacy community groups and direct messages), their participants, messages and reactions."""
 from django.db import models
 from django.conf import settings
-from client_profile.models.common import chat_upload_path
+from chat.uploads import chat_upload_path
 from memberships.models import Membership
 
 

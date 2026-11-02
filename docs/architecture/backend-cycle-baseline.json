@@ -1,51 +1,47 @@
 {
   "schema": "chemisttasker-backend-cycle-baseline-v1",
-  "recorded_sha": "2545f52096b254d9239624fde61fbcc31dd48bbe",
-  "source": "Shared Core Consolidation architecture-audit job 118986249355, successful exact-head run 39527740762",
-  "notes": "Grandfather existing cyclic imports only; no new cyclic edges or SCC expansions are accepted. Reductions are allowed.",
-  "strongly_connected_components": [
+  "recorded_sha": "parent:b0996c45; startup-safe foundation service ownership",
+  "source": "Direct import cycles remain zero; remaining combined coupling is bounded by actual source.",
+  "notes": "Architecture completion 2026-11-02: combined cyclic edges 113 to 37; the 20-app component splits into groups of eight, five and four. Operational foundation imports are forbidden at every depth; nine exact compatibility imports retain six facade app edges. No new combined cyclic edge or expanded component is accepted.",
+  "strongly_connected_components": [],
+  "unapproved_cycle_edges": [],
+  "combined_components": [
+    [
+      "attendance",
+      "billing",
+      "invoicing",
+      "ratings",
+      "shifts",
+      "talent",
+      "worker_finance",
+      "workforce"
+    ],
+    [
+      "client_profile",
+      "core",
+      "pharmacy_hub",
+      "public_hub"
+    ],
+    [
+      "memberships",
+      "notifications",
+      "onboarding",
+      "organizations",
+      "users"
+    ]
+  ],
+  "combined_cyclic_edges": [
+    [
+      "attendance",
+      "shifts"
+    ],
     [
       "attendance",
       "workforce"
     ],
     [
-      "chat",
-      "client_profile",
-      "core",
-      "memberships",
-      "notifications",
-      "onboarding",
-      "organizations",
-      "public_hub",
-      "shifts",
-      "talent",
-      "users"
-    ]
-  ],
-  "unapproved_cycle_edges": [
-    [
-      "chat",
-      "client_profile"
-    ],
-    [
-      "chat",
-      "memberships"
-    ],
-    [
-      "chat",
-      "notifications"
-    ],
-    [
-      "chat",
-      "organizations"
-    ],
-    [
-      "chat",
+      "billing",
       "shifts"
-    ],
-    [
-      "chat",
-      "users"
     ],
     [
       "client_profile",
@@ -53,27 +49,23 @@
     ],
     [
       "client_profile",
-      "memberships"
-    ],
-    [
-      "client_profile",
-      "organizations"
-    ],
-    [
-      "client_profile",
-      "shifts"
+      "pharmacy_hub"
     ],
     [
       "core",
-      "notifications"
+      "client_profile"
     ],
     [
       "core",
       "public_hub"
     ],
     [
-      "memberships",
-      "core"
+      "invoicing",
+      "shifts"
+    ],
+    [
+      "invoicing",
+      "worker_finance"
     ],
     [
       "memberships",
@@ -82,6 +74,14 @@
     [
       "memberships",
       "onboarding"
+    ],
+    [
+      "memberships",
+      "organizations"
+    ],
+    [
+      "memberships",
+      "users"
     ],
     [
       "notifications",
@@ -89,7 +89,15 @@
     ],
     [
       "onboarding",
-      "core"
+      "memberships"
+    ],
+    [
+      "onboarding",
+      "notifications"
+    ],
+    [
+      "onboarding",
+      "organizations"
     ],
     [
       "onboarding",
@@ -97,10 +105,6 @@
     ],
     [
       "organizations",
-      "core"
-    ],
-    [
-      "organizations",
       "notifications"
     ],
     [
@@ -108,24 +112,36 @@
       "onboarding"
     ],
     [
-      "public_hub",
+      "organizations",
       "users"
     ],
     [
-      "shifts",
-      "memberships"
+      "pharmacy_hub",
+      "public_hub"
+    ],
+    [
+      "public_hub",
+      "core"
+    ],
+    [
+      "public_hub",
+      "pharmacy_hub"
+    ],
+    [
+      "ratings",
+      "shifts"
     ],
     [
       "shifts",
-      "notifications"
+      "attendance"
     ],
     [
       "shifts",
-      "onboarding"
+      "billing"
     ],
     [
       "shifts",
-      "organizations"
+      "invoicing"
     ],
     [
       "shifts",
@@ -133,11 +149,35 @@
     ],
     [
       "shifts",
-      "users"
+      "workforce"
     ],
     [
       "talent",
+      "ratings"
+    ],
+    [
+      "users",
+      "notifications"
+    ],
+    [
+      "users",
       "onboarding"
+    ],
+    [
+      "worker_finance",
+      "invoicing"
+    ],
+    [
+      "workforce",
+      "attendance"
+    ],
+    [
+      "workforce",
+      "shifts"
+    ],
+    [
+      "workforce",
+      "talent"
     ]
   ]
 }

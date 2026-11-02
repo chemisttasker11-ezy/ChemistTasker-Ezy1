@@ -1,4 +1,5 @@
 """Serializers for memberships, invite links and membership applications."""
+from memberships.employment_port import employment_services
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -347,7 +348,7 @@ def _application_payment_profile_status(application):
             "missing_fields": ["worker_account", "onboarding", "payment_preference"],
         }
 
-    from shifts.engagement import worker_payment_profile_status
+    worker_payment_profile_status = employment_services().worker_payment_profile_status
 
     status = worker_payment_profile_status(worker)
     return {

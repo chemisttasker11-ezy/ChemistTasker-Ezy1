@@ -21,7 +21,7 @@ class SerializerLifecycleOwnershipTests(SimpleTestCase):
         old_file = SimpleNamespace(name="old/certificate.pdf", storage=storage, delete=mock.Mock())
         instance = SimpleNamespace(certificate="new/certificate.pdf")
 
-        with mock.patch("core.serializer_lifecycle._known_file_references", return_value=[]):
+        with mock.patch("infrastructure.serializer_lifecycle._known_file_references", return_value=[]):
             deleted = _delete_file_if_unreferenced(old_file, current_instance=instance)
 
         self.assertTrue(deleted)
@@ -31,13 +31,13 @@ class SerializerLifecycleOwnershipTests(SimpleTestCase):
 
     def test_lifecycle_helpers_are_defined_by_their_owners(self):
         expected = {
-            verification_fields_changed: "core.serializer_lifecycle",
-            _file_has_changed: "core.serializer_lifecycle",
-            _delete_file_if_unreferenced: "core.serializer_lifecycle",
-            _should_clear_flag: "core.serializer_lifecycle",
-            _update_locked_user_fields: "core.serializer_lifecycle",
-            RemoveOldFilesMixin: "core.serializer_lifecycle",
-            UploadValidationMixin: "core.serializer_mixins",
+            verification_fields_changed: "infrastructure.serializer_lifecycle",
+            _file_has_changed: "infrastructure.serializer_lifecycle",
+            _delete_file_if_unreferenced: "infrastructure.serializer_lifecycle",
+            _should_clear_flag: "infrastructure.serializer_lifecycle",
+            _update_locked_user_fields: "users.identity_updates",
+            RemoveOldFilesMixin: "infrastructure.serializer_lifecycle",
+            UploadValidationMixin: "infrastructure.serializer_mixins",
             _build_absolute_media_url: "users.presentation",
             _get_user_short_bio: "users.presentation",
         }

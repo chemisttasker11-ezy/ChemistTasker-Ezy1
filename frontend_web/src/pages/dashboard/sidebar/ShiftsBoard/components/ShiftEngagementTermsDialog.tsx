@@ -23,6 +23,7 @@ type Props = {
   open: boolean;
   offers: ShiftOffer[];
   loading?: boolean;
+  error?: string | null;
   onClose: () => void;
   onConfirm: (payload: ShiftOfferAcceptancePayload) => Promise<void> | void;
   onOpenPaymentProfile?: () => void;
@@ -35,6 +36,7 @@ export default function ShiftEngagementTermsDialog({
   open,
   offers,
   loading = false,
+  error = null,
   onClose,
   onConfirm,
   onOpenPaymentProfile,
@@ -70,6 +72,7 @@ export default function ShiftEngagementTermsDialog({
       <DialogTitle>Review shift engagement terms</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
+          {error && <Alert severity="error">{error}</Alert>}
           {blocked && (
             <Alert
               severity="error"

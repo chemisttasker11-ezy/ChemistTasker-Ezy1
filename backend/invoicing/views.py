@@ -14,6 +14,7 @@ from rest_framework.decorators import api_view, permission_classes
 from organizations.access import pharmacies_user_admins, user_can_manage_pharmacy
 from django.shortcuts import get_object_or_404
 import json
+import logging
 from django.db.models import Q
 from invoicing.services import (
     generate_invoice_from_shifts,
@@ -21,12 +22,15 @@ from invoicing.services import (
     render_invoice_to_pdf,
 )
 from notifications.services import notify_users
-from core.task_queue import async_task
 from django.db import transaction
 from django.http import HttpResponse
 from invoicing.serializers import InvoiceSerializer
 from organizations.access import _get_org_pharmacies_queryset
 from invoicing.navigation import invoice_action_url
+from invoicing.generation_preview import preview_invoice_generation
+
+
+logger = logging.getLogger(__name__)
 
 
 # Invoices
@@ -83,8 +87,12 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return _invoice_queryset_for_user(self.request.user)
 
+    @transaction.atomic
     def perform_update(self, serializer):
-        invoice = self.get_object()
+        # Authorization has used the visibility queryset. Lock the bare row;
+        # SELECT FOR UPDATE cannot safely be added to that DISTINCT queryset.
+        invoice = get_object_or_404(Invoice.objects.select_for_update(), pk=serializer.instance.pk)
+        serializer.instance = invoice
         user = self.request.user
         requested_fields = set(self.request.data.keys())
 
@@ -97,6 +105,11 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
                     "This invoice is managed by the new Invoices & finances workspace. "
                     "Use its Save, Send/Resend and Mark paid actions so revision and delivery history are preserved."
                 )
+            content_fields = set(serializer.validated_data) - {"status"}
+            if content_fields and invoice.deliveries.filter(version=invoice.version).exists():
+                # Preserve legacy editing while fencing old queued callbacks.
+                # The submitted status keeps its established meaning.
+                invoice.version += 1
             serializer.save()
             return
 
@@ -115,11 +128,15 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         serializer.save(status=next_status)
 
+    @transaction.atomic
     def perform_destroy(self, instance):
+        instance = get_object_or_404(Invoice.objects.select_for_update(), pk=instance.pk)
         if instance.user_id != self.request.user.id:
             raise PermissionDenied("Only the invoice issuer can delete this invoice.")
         if instance.request_key is not None:
             raise PermissionDenied("Finance-workspace invoices keep their revision history and cannot be deleted through the legacy editor.")
+        if instance.deliveries.exclude(status="failed").exists():
+            raise PermissionDenied("This invoice has pending or published delivery history and cannot be deleted.")
         instance.delete()
 
 
@@ -185,6 +202,16 @@ class GenerateInvoiceView(APIView):
         return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def preview_generated_invoice(request):
+    try:
+        return Response(preview_invoice_generation(request.user, request.data))
+    except DjangoValidationError as exc:
+        payload = exc.message_dict if hasattr(exc, "message_dict") else {"error": exc.messages}
+        return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def preview_invoice_lines(request, shift_id):
@@ -217,15 +244,19 @@ def invoice_pdf_view(request, invoice_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def send_invoice_email(request, invoice_id):
-    # Serialize send attempts so the legacy screen and the newer finance
-    # workspace cannot send the same canonical document twice concurrently.
+    from invoicing.tasks import queue_invoice_email, validate_email_payload
+    from worker_finance.invoice_bridge import preparation_failed, reserve_delivery
+
+    publication = {}
     with transaction.atomic():
         invoice = get_object_or_404(
             Invoice.objects.select_for_update(),
             pk=invoice_id,
             user=request.user,
         )
-        if invoice.status != 'draft':
+        previous = invoice.deliveries.filter(version=invoice.version).first()
+        retryable_publication = previous is not None and previous.status == "legacy_failed"
+        if invoice.status != 'draft' and not retryable_publication:
             return Response(
                 {"status": invoice.status, "detail": "This invoice has already been issued."},
                 status=status.HTTP_409_CONFLICT,
@@ -235,15 +266,21 @@ def send_invoice_email(request, invoice_id):
         if not to_email:
             return Response({"detail": "Missing bill_to_email on invoice."}, status=400)
 
+        delivery, created = reserve_delivery(invoice, to_email)
+        if not created:
+            return Response({
+                "status": invoice.status,
+                "detail": "This send has already been attempted. Check delivery status before retrying.",
+            }, status=status.HTTP_409_CONFLICT)
+
         cc_list = []
         if invoice.cc_emails:
             cc_list = [e.strip() for e in invoice.cc_emails.split(",") if e.strip()]
 
-        pdf_bytes = render_invoice_to_pdf(invoice)
         filename = f"invoice_{invoice.id}.pdf"
         full_bill_to_name = f"{(invoice.bill_to_first_name or '').strip()} {(invoice.bill_to_last_name or '').strip()}".strip()
         context = {
-            "invoice": invoice,
+            "invoice": {"id": invoice.pk},
             "client_name": (
                 (invoice.custom_bill_to_name or "").strip()
                 or full_bill_to_name
@@ -258,28 +295,37 @@ def send_invoice_email(request, invoice_id):
             "due_date": str(invoice.due_date or ""),
         }
 
-        # Preserve the existing async email path. The DB row lock prevents a
-        # second request from queuing the same canonical invoice concurrently.
-        async_task(
-            'users.tasks.send_async_email',
-            subject=f"Invoice #{invoice.id} from ChemistTasker",
-            recipient_list=[to_email],
-            template_name="emails/invoice_sent.html",
-            context=context,
-            text_template=None,
-            cc=cc_list,
-            attachments=[(filename, pdf_bytes, "application/pdf")],
-        )
+        try:
+            email = {
+                "subject": f"Invoice #{invoice.id} from ChemistTasker",
+                "recipient_list": [to_email],
+                "template_name": "emails/invoice_sent.html", "context": context,
+                "text_template": None, "cc": cc_list,
+                "attachments": [(filename, render_invoice_to_pdf(invoice), "application/pdf")],
+            }
+            validate_email_payload(delivery.pk, email)
+        except Exception:
+            preparation_failed(delivery.pk)
+            logger.exception("Invoice %s email preparation failed before publication", invoice.pk)
+            return Response({"detail": "Email preparation failed. No email was attempted; you can retry."}, status=503)
 
-        invoice.status = 'sent'
-        invoice.save(update_fields=['status'])
+        def publish_after_commit():
+            publication["accepted"] = queue_invoice_email(delivery.pk, email)
 
-        # If this invoice belongs to the finance workspace, record the
-        # legacy send against the current revision through the explicit bridge.
-        from worker_finance.invoice_bridge import record_legacy_invoice_send
-        record_legacy_invoice_send(invoice, to_email)
+        transaction.on_commit(publish_after_commit)
 
-    return Response({"status": "sent"})
+    if publication.get("accepted") is False:
+        return Response({
+            "detail": "Email queue acceptance is uncertain. Do not resend until delivery status has been checked.",
+        }, status=503)
+    invoice.refresh_from_db()
+    return Response({
+        "status": invoice.status,
+        "detail": (
+            "Invoice email queued for delivery." if publication.get("accepted")
+            else "Invoice email will be queued after the transaction commits."
+        ),
+    })
 
 
 @api_view(['POST'])

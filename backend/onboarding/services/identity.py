@@ -2,8 +2,8 @@
 details, with verification resets on change, per-type validation on submit and the document check queued on submit."""
 from rest_framework import serializers
 
-from core.serializer_lifecycle import _delete_file_if_unreferenced
-from core.task_queue import async_task
+from infrastructure.serializer_lifecycle import _delete_file_if_unreferenced
+from users.task_dispatch import async_task
 from onboarding.models import OwnerOnboarding
 from onboarding.verification.policy import revoke_for_changed_evidence
 

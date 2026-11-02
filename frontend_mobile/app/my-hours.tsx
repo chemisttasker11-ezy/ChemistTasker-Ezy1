@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
-import { workforce } from '@chemisttasker/shared-core';
+import { formatAttendanceMinutes, workforce } from '@chemisttasker/shared-core';
 
 type Row = {
   id: number;
@@ -20,7 +20,7 @@ type Row = {
   warning_checks: number;
 };
 
-const hours = (value?: number | null) => value == null ? '—' : `${(value / 60).toFixed(2)} h`;
+
 
 export default function MyHoursScreen() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -78,10 +78,10 @@ export default function MyHoursScreen() {
                 <Chip compact>{row.status.replaceAll('_', ' ')}</Chip>
               </View>
               <View style={styles.metricRow}>
-                <View><Text variant="labelSmall">Rostered</Text><Text variant="titleMedium">{hours(row.rostered_minutes)}</Text></View>
-                <View><Text variant="labelSmall">Worked</Text><Text variant="titleMedium">{hours(row.worked_minutes)}</Text></View>
-                <View><Text variant="labelSmall">Leave</Text><Text variant="titleMedium">{hours(row.approved_leave_minutes)}</Text></View>
-                <View><Text variant="labelSmall">Reviewed</Text><Text variant="titleMedium">{hours(row.reviewed_minutes)}</Text></View>
+                <View><Text variant="labelSmall">Rostered</Text><Text variant="titleMedium">{formatAttendanceMinutes(row.rostered_minutes)}</Text></View>
+                <View><Text variant="labelSmall">Worked</Text><Text variant="titleMedium">{formatAttendanceMinutes(row.worked_minutes)}</Text></View>
+                <View><Text variant="labelSmall">Leave</Text><Text variant="titleMedium">{formatAttendanceMinutes(row.approved_leave_minutes)}</Text></View>
+                <View><Text variant="labelSmall">Reviewed</Text><Text variant="titleMedium">{formatAttendanceMinutes(row.reviewed_minutes)}</Text></View>
               </View>
               <View style={styles.checkRow}>
                 {row.blocking_checks > 0 && <Chip compact style={styles.blocker}>{row.blocking_checks} blocking</Chip>}

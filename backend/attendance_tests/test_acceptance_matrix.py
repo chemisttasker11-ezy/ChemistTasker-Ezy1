@@ -441,7 +441,7 @@ class FullAcceptanceMatrixTests(unittest.TestCase):
         self.assertFalse(status["is_on_break"])
 
         # 5. Clock out
-        clock_out(self.worker1, signed_qr_token=qr_payload["signed_token"])
+        clock_out(self.worker1, signed_qr_token=qr_payload["signed_token"], confirm_opposite=True)
         session.refresh_from_db()
         self.assertFalse(session.is_open)
         self.assertIsNotNone(session.ended_at)
@@ -473,7 +473,7 @@ class FullAcceptanceMatrixTests(unittest.TestCase):
         self.assertEqual(provisional.status, "PENDING")
 
         # Clock out
-        clock_out(self.cross_worker, signed_qr_token=qr_payload["signed_token"])
+        clock_out(self.cross_worker, signed_qr_token=qr_payload["signed_token"], confirm_opposite=True)
         session.refresh_from_db()
         self.assertFalse(session.is_open)
 

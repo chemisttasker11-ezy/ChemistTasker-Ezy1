@@ -1,5 +1,9 @@
 """Characterization of the chat REST API (/rooms/, /messages/, /messages/<id>/react/, /chat-participants/)."""
-from django.test import TestCase
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 
 from client_profile.models import Membership
 from chat.models import Conversation, Message, MessageReaction, Participant
@@ -178,6 +182,154 @@ class RoomMessageTests(ChatBase):
         client_for(self.alice).post(f"{ROOMS}{self.room}/messages/", {"body": "hi"}, format="json")
         self.assertIsNotNone(Participant.objects.get(membership=self.alice_m, conversation_id=self.room).last_read_at)
         self.assertIsNone(Participant.objects.get(membership=self.bob_m, conversation_id=self.room).last_read_at)
+
+
+class ChatAttachmentTests(ChatBase):
+    """Exercise both multipart writers with the real validator and local storage."""
+
+    def setUp(self):
+        super().setUp()
+        media = TemporaryDirectory()
+        self.addCleanup(media.cleanup)
+        settings_override = override_settings(MEDIA_ROOT=media.name)
+        settings_override.enable()
+        self.addCleanup(settings_override.disable)
+        self.media_root = Path(media.name)
+        self.room = self.dm(self.alice, self.bob).json()["id"]
+        self.urls = (f"{ROOMS}{self.room}/messages/", MESSAGES)
+
+    def test_valid_pdf_and_image_persist_complete_bytes_and_attachment_metadata(self):
+        samples = (
+            ("cover.pdf", b"%PDF-1.7\n" + b"pdf payload\n" * 900 + b"%%EOF\n", "application/pdf"),
+            ("photo.png", b"\x89PNG\r\n\x1a\n" + b"image payload" * 900, "image/png"),
+        )
+        for url in self.urls:
+            for name, content, content_type in samples:
+                with self.subTest(url=url, filename=name):
+                    response = client_for(self.alice).post(url, {
+                        "conversation": self.room,
+                        "body": "Attachment caption",
+                        "attachment": SimpleUploadedFile(name, content, content_type=content_type),
+                    }, format="multipart")
+                    self.assertEqual(response.status_code, 201, response.content)
+                    message = Message.objects.get(pk=response.data["id"])
+                    self.assertEqual((message.conversation_id, message.sender_id, message.body),
+                                     (self.room, self.alice_m.pk, "Attachment caption"))
+                    self.assertEqual(message.attachment_filename, name)
+                    self.assertEqual(response.data["attachment_filename"], Path(message.attachment.name).name)
+                    self.assertTrue(response.data["attachment_url"].endswith(message.attachment.name))
+                    self.assertTrue(response.data["attachment"].endswith(message.attachment.name))
+                    # Signature inspection must restore the stream before storage reads it.
+                    with message.attachment.open("rb") as persisted:
+                        self.assertEqual(persisted.read(), content)
+                    listing = client_for(self.bob).get(f"{ROOMS}{self.room}/messages/")
+                    self.assertEqual(listing.status_code, 200, listing.content)
+                    received = next(row for row in self.rows(listing) if row["id"] == message.pk)
+                    self.assertEqual(received["attachment_filename"], response.data["attachment_filename"])
+                    self.assertEqual(received["attachment_url"], response.data["attachment_url"])
+        self.assertEqual(Message.objects.filter(conversation_id=self.room).count(), 4)
+
+    def test_disguised_attachment_is_rejected_without_a_message_or_stored_file(self):
+        for url in self.urls:
+            with self.subTest(url=url):
+                response = client_for(self.alice).post(url, {
+                    "conversation": self.room,
+                    "body": "Must not persist",
+                    "attachment": SimpleUploadedFile("disguised.pdf", b"not a PDF", content_type="application/pdf"),
+                }, format="multipart")
+                self.assertEqual(response.status_code, 400, response.content)
+                self.assertEqual(response.json(), ["attachment type is not allowed."])
+                self.assertFalse(Message.objects.filter(conversation_id=self.room).exists())
+                self.assertEqual([p for p in self.media_root.rglob("*") if p.is_file()], [])
+
+    def test_multiple_valid_attachments_keep_order_and_caption_on_first_message(self):
+        samples = (("first.pdf", b"%PDF-1.7\nfirst\n%%EOF\n"),
+                   ("second.pdf", b"%PDF-1.7\nsecond\n%%EOF\n"))
+        response = client_for(self.alice).post(self.urls[0], {
+            "body": "Two attachments",
+            "attachment": [SimpleUploadedFile(name, content, content_type="application/pdf")
+                           for name, content in samples],
+        }, format="multipart")
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual([row["body"] for row in response.data], ["Two attachments", ""])
+        self.assertEqual(Message.objects.filter(conversation_id=self.room).count(), 2)
+        for row, (name, content) in zip(response.data, samples):
+            message = Message.objects.get(pk=row["id"])
+            self.assertEqual((message.sender_id, message.attachment_filename), (self.alice_m.pk, name))
+            with message.attachment.open("rb") as persisted:
+                self.assertEqual(persisted.read(), content)
+
+    def test_invalid_attachment_anywhere_rejects_batch_without_side_effects(self):
+        existing = client_for(self.alice).post(self.urls[0], {
+            "body": "Existing attachment",
+            "attachment": SimpleUploadedFile("existing.pdf", b"%PDF-1.7\nexisting\n%%EOF\n",
+                                             content_type="application/pdf"),
+        }, format="multipart")
+        self.assertEqual(existing.status_code, 201, existing.content)
+        original_ids = list(Message.objects.filter(conversation_id=self.room).values_list("pk", flat=True))
+        original_files = {p.relative_to(self.media_root): p.read_bytes()
+                          for p in self.media_root.rglob("*") if p.is_file()}
+        original_updated_at = Conversation.objects.get(pk=self.room).updated_at
+        original_read_positions = dict(Participant.objects.filter(conversation_id=self.room)
+                                       .values_list("pk", "last_read_at"))
+
+        for invalid_position in range(3):
+            with self.subTest(invalid_position=invalid_position):
+                attachments = [SimpleUploadedFile(f"valid-{index}.pdf", b"%PDF-1.7\nvalid\n%%EOF\n",
+                                                  content_type="application/pdf") for index in range(2)]
+                attachments.insert(invalid_position, SimpleUploadedFile(
+                    "disguised.pdf", b"not a PDF", content_type="application/pdf"))
+                with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                    response = client_for(self.alice).post(self.urls[0], {
+                        "body": "Rejected batch",
+                        "attachment": attachments,
+                    }, format="multipart")
+                self.assertEqual(response.status_code, 400, response.content)
+                self.assertEqual(response.json(), ["attachment type is not allowed."])
+                self.assertEqual(list(Message.objects.filter(conversation_id=self.room)
+                                      .values_list("pk", flat=True)), original_ids)
+                self.assertEqual({p.relative_to(self.media_root): p.read_bytes()
+                                  for p in self.media_root.rglob("*") if p.is_file()}, original_files)
+                self.assertEqual(Conversation.objects.get(pk=self.room).updated_at, original_updated_at)
+                self.assertEqual(dict(Participant.objects.filter(conversation_id=self.room)
+                                      .values_list("pk", "last_read_at")), original_read_positions)
+                self.assertEqual(callbacks, [])
+
+    def test_extension_and_size_rejections_do_not_store_an_earlier_valid_attachment(self):
+        from infrastructure.file_validation import ATTACHMENT_UPLOAD_POLICY
+
+        for name, content, error in (
+            ("blocked.exe", b"%PDF-1.7\n", "attachment must be one of:"),
+            ("oversized.pdf", b"%PDF-1.7\n" + b"x" * ATTACHMENT_UPLOAD_POLICY.max_size_bytes,
+             "attachment must be 15 MB or smaller."),
+        ):
+            with self.subTest(filename=name):
+                with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                    response = client_for(self.alice).post(self.urls[0], {
+                        "attachment": [
+                            SimpleUploadedFile("first.pdf", b"%PDF-1.7\nfirst\n%%EOF\n",
+                                               content_type="application/pdf"),
+                            SimpleUploadedFile(name, content, content_type="application/pdf"),
+                        ],
+                    }, format="multipart")
+                self.assertEqual(response.status_code, 400, response.content)
+                self.assertIn(error, response.json()[0])
+                self.assertFalse(Message.objects.filter(conversation_id=self.room).exists())
+                self.assertEqual([p for p in self.media_root.rglob("*") if p.is_file()], [])
+                self.assertEqual(callbacks, [])
+
+    def test_non_participant_cannot_upload_through_either_writer(self):
+        for url, denied_status in zip(self.urls, (404, 403)):
+            with self.subTest(url=url):
+                response = client_for(self.no_role).post(url, {
+                    "conversation": self.room,
+                    "attachment": SimpleUploadedFile("private.pdf", b"%PDF-1.7\n%%EOF\n", content_type="application/pdf"),
+                }, format="multipart")
+                self.assertEqual(response.status_code, denied_status, response.content)
+                self.assertFalse(Message.objects.filter(conversation_id=self.room).exists())
+                self.assertEqual([p for p in self.media_root.rglob("*") if p.is_file()], [])
 
 
 class MessageEndpointTests(ChatBase):

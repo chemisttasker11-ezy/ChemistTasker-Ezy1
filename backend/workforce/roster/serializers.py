@@ -57,6 +57,10 @@ class RosterAssignmentSerializer(serializers.ModelSerializer):
             "leave_request",
             "origin",
         ]
+        # Routing and consent come from server-built terms and the worker's own acceptance, never a manager PATCH.
+        read_only_fields = [
+            "payment_preference_snapshot", "settlement_channel", "engagement_kind", "engagement_terms_accepted_at",
+        ]
 
     # A coworker's pay, contact and leave details belong to them and their managers only.
     COWORKER_HIDDEN_FIELDS = (

@@ -142,11 +142,11 @@ function LegacyInvoiceList({ basePath }: Props) {
 
   const onSendEmail = async (id: number) => {
     try {
-      await sendInvoiceEmail(id);
+      const result = await sendInvoiceEmail(id);
       setInvoices((prev) => prev.map((invoice) => (
-        invoice.id === id ? { ...invoice, status: 'sent' } : invoice
+        invoice.id === id ? { ...invoice, status: result.status } : invoice
       )));
-      setSnackbar('Invoice email sent');
+      setSnackbar(result.detail || 'Invoice email request accepted.');
     } catch (err: any) {
       setSnackbar(err?.message || 'Failed to send email');
     }

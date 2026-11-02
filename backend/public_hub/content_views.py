@@ -162,7 +162,7 @@ def assignment_input(value):
 
 
 def send_invitation(invitation, immediate=False):
-    from core.task_queue import async_task
+    from users.task_dispatch import async_task
     token = secrets.token_urlsafe(32)
     invitation.token_hash = hashlib.sha256(token.encode()).hexdigest()
     invitation.expires_at = timezone.now() + timedelta(days=7)

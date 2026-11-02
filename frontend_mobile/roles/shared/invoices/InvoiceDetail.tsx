@@ -219,9 +219,9 @@ export default function InvoiceDetail({ basePath }: Props) {
     if (!invoice) return;
     setSending(true);
     try {
-      await sendInvoiceEmail(invoice.id);
-      setInvoice((current) => (current ? { ...current, status: 'sent' } : current));
-      setSnackbar('Email sent');
+      const result = await sendInvoiceEmail(invoice.id);
+      setInvoice((current) => (current ? { ...current, status: result.status } : current));
+      setSnackbar(result.detail || 'Invoice email request accepted.');
     } catch (err: any) {
       setSnackbar(err?.message || 'Failed to send email');
     } finally {
@@ -634,6 +634,7 @@ export default function InvoiceDetail({ basePath }: Props) {
                 icon="email-outline"
                 onPress={handleSendEmail}
                 loading={sending}
+                disabled={sending}
                 style={styles.actionBtn}
               >
                 Send email

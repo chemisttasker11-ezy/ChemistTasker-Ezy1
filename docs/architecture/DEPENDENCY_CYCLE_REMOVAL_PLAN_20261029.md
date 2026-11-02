@@ -1,0 +1,192 @@
+# Behaviour-preserving removal of the remaining dependency cycles
+
+## 2026-11-02 continuation
+
+The revised ownership/compatibility completion is recorded in [ARCHITECTURE_COMPLETION_20261102.md](ARCHITECTURE_COMPLETION_20261102.md). Startup-safe membership binding, shared occurrence selection and explicit foundation feature contracts reduce combined cyclic edges from 113 to 37 while direct cycles stay zero. The old twenty-app component splits into groups of eight, five and four; exact historical/project facades remain bounded. Historical checkpoints below are retained as history, not current completion status.
+
+29 October 2026. Starting source: PR #215 at `86979ca5dc4ec91dfd153c0f689a507eb3282948`; its chat correctness fix stays on a fixed head while this separate architectural branch proceeds. Billing decomposition is retained. The user requested assessment, a plan and implementation while the upload gates finish.
+
+## Completion standard and current assessment
+
+The starting direct graph has six mutual pairs, 42 actual SCC-internal cyclic edges and one 11-app cyclic component. The separate non-mutual longer-cycle ledger has 30 entries; it is not the complete cyclic-edge count. The combined module-plus-delayed graph is also cyclic and must be reassessed after every batch. A passing no-growth ratchet is not zero-cycle completion.
+
+No deferred financial, eligibility, settlement or notification policy is authorised by this plan. Preserve endpoint outputs and permissions, Stripe operations, all task names/queues, OTP immediate acceptance, notification timing/failure order, model/app/table identities, migration replay and historical imports. No scanner exclusions, import delays introduced to hide coupling or generic infrastructure importing business domains.
+
+Each batch: name the invariant; enumerate callers and writers; characterise existing positive/negative behaviour before movement; apply the smallest ownership change; prove equivalent behaviour and import/startup compatibility; compare full cycle-edge sets; tighten the actual baseline. Use targeted tests during coding. Final integrated acceptance follows the Senior Package process when the intended source work is complete.
+
+## Ordered work packages
+
+| Order / boundary | Source assessment and intended ownership | Concrete change and required proof |
+| --- | --- | --- |
+| 1. `core ↔ users` | All four reverse runtime imports reach `core.task_queue`. That module mixes generic Celery registry/options with email notification orchestration. Composition remains `core → users`; identity APIs should not depend back on core. | Place alias-free registry loading, its one lock and option conversion in domain-neutral infrastructure. Place the existing legacy email-aware dispatch adapter in users. Keep core as a compatibility facade, migrate the four users imports, and retire only this mutual-pair exemption. Prove alias resolution, direct/eager dispatch, return values, kwargs/options, exact callback order, queue errors, rollback, fresh/concurrent discovery, OTP and historical imports/task registration. |
+| 2. `core ↔ shifts` | The reverse imports are twelve task-dispatch imports plus neutral `json_list` parsing. Core's sitemap/composition may continue depending on shifts. | After package 1 is verified, migrate shifts to the authoritative adapter. Relocate neutral serializer parsing without changing its body/errors and retain its old path. Verify every call site, shift/offer/cancellation side effects, queue outages, serializers and cold task discovery; remove only the now-absent pair. Rebuild longer paths before claiming architectural closure. |
+| 3. `memberships ↔ organizations` | Membership models/facts legitimately reference pharmacies. Organisation views/claims currently orchestrate membership management and embed membership serializers. This is not a helper-only cycle. | Keep membership facts depending on organisations; extract cross-domain membership-management orchestration into its service owner. Retain HTTP route adapters and payload/validation order. Characterise claims, membership creation/removal, serializer projections, active/revoked managers and cross-pharmacy/organisation denials before relocation. Preserve all model identities and cascade/history guards. |
+| 4. `memberships ↔ users` | Membership facts depend on identity. The reverse direction is in user session payloads, serializers and organisation-account operations. | Separate identity primitives from membership projections and management orchestration. Keep the same session/authentication wire schema and action-specific permissions. Coordinate with package 3 so the removed direct pair is not replaced by a longer users/organisations/memberships cycle. Prove login, invitation, deletion, scoped management and real allowed/denied users. |
+| 5. `organizations ↔ users` | Organisation authorisation reads user role definitions; users contains organisation-account APIs and `OrganizationMembership` relations/admin choices. Model and policy ownership must be separated carefully. | Decide code ownership while preserving the existing policy: shared role/capability facts belong below orchestration, organisation-specific actions at their owner, identity stays identity. Relocate only with frozen serializer/permission contracts. Verify Django deconstruction, content/model/table identities, scope boundaries and startup order; no model relabel/migration shortcut. |
+| 6. `client_profile ↔ onboarding` | The reverse edge is the migration-bound encrypted field, while the compatibility kernel re-exports onboarding models/tasks. Historical migrations import `client_profile.fields.EncryptedTextField`. | Leave this compatibility work last. Preserve the historical class/deconstruction path and encryption/plaintext/corrupt-value behaviour through a verified adapter. Rehearse migrations and check model identity, import orders and saved encrypted values. Until that proof exists, classify it as retained compatibility debt; do not remove the exemption speculatively. |
+| 7. Remaining longer runtime cycles | Removing direct pairs alone is insufficient: composition, domain projections and historical exports still create longer paths. | Rebuild `scripts/module_import_graph.py --json` after every package, including delayed imports and each source location. Continue ownership work until actual mutual pairs, cyclic components and runtime cycle edges are zero. At that point enforce a gate over the full graph; the current `--check-all-cycles` checks the non-mutual ledger and must not be mistaken for proof that exempt mutual pairs are absent. |
+
+The prior full 87-location mutual-import ledger is in `docs/qa/NO_LOGIC_UPLOAD_REVIEW_FOLLOWUP_20261029.md`. Regenerate it from source after each batch rather than treating the snapshot's line numbers as permanently current.
+
+## Package 1 implementation checkpoint
+
+Package 1 is implemented in this branch: `infrastructure.task_queue` owns alias-free registry loading and the single shared lock/options converter; `users.task_dispatch` owns the legacy email-aware adapter; `core.task_queue` is an explicit compatibility facade. All four users runtime imports now point to their owner. The generic package imports no backend domain/composition module and contains no user task identity. Existing task names and registrations are unchanged.
+
+The original `async_task` function and option converter have identical ASTs at immutable parent `86979ca5`. The registry body is identical after its alias lookup is moved into the public compatibility wrapper. Callback registration, notification construction, provider call order and exception propagation remain unchanged. Historical core function/constant imports and the pickled global function path resolve to the canonical objects. Every caller shares one registry-loading lock.
+
+Before movement, ten new behaviour contracts passed on the unchanged implementation (0.327 seconds after setup). After movement, **220/220 targeted tests passed**, no skips/errors/failures (23.338 seconds after setup): `users`, `core.test_task_contracts`, `core.test_task_dispatch_registration`, `core.test_signal_registry_contract`, `core.test_backend_ownership_boundaries`, `core.test_module_size_ratchet`, `core.test_upload_infrastructure_contract`, and `invoicing.test_delivery`, using disposable SQLite / `core.contract_test_settings`. This includes four added ownership controls, actual identity/account/OTP endpoint contracts, existing task/beat/queue identities, cold/concurrent registry resolution, signal startup and invoice delivery/uncertain-state compatibility. No existing test assertion was weakened.
+
+Scanner unit tests: 11/11 passed. Graph/baseline, whitespace and script syntax checks passed. The new module is discovered by Shared Core's existing `users` selection and explicitly selected in both Serializer database variants and the isolated backend-image QA command. Migration drift reported no changes; hosted PostgreSQL proof for this new head must come from its own CI.
+
+Measured result: direct mutual pairs **6 → 5**, actual direct cyclic edges **42 → 41**, direct edges **101 → 101**, delayed edges **72 → 71**. The actual cyclic-edge set is a strict subset of the parent: only `users → core` is removed. The same 11-app direct component remains. The retained `core → users` composition edge is reclassified into the longer-cycle ledger, which becomes **31 rather than 30**; this is bookkeeping, not a new runtime cycle. The combined module-plus-delayed graph falls from 36 to 35 mutual pairs and retains the same 20-app component; it remains cyclic and is not declared complete.
+
+The remaining direct pairs are `core/shifts`, `memberships/organizations`, `memberships/users`, `organizations/users`, and `client_profile/onboarding`. Package 2 is next; packages 3–6 still need their own source-ledger and before/after domain proof. Preserve a fixed parent for each draft PR. Do not append the architecture work to approved PR #214 or the fixed PR #215 upload head. Every completed batch must report both the removed edge and the remaining debt; no global completion or deployment claim follows from a single boundary.
+
+## Package 2 implementation checkpoint
+
+Separate parent: PR #216 at `230ccff2d798d0672bea46d356616b758ea1148f`. The twelve shifts queue consumers now import `users.task_dispatch.async_task`, which is the identical object exposed through the historical core facade. The neutral `json_list` implementation is copied **byte-for-byte** into `infrastructure.serializer_values`; its historical core path re-exports `json_list`, `json` and `serializers`. `shifts.context` imports the lower-level parser. All thirteen affected shifts files differ from the parent only in those import statements; their operations, permissions, serializers and callbacks are otherwise unchanged.
+
+Four parser behaviour contracts passed before movement (0.001 seconds, no database). Five added ownership controls verify legacy object/pickle identity, absence of domain imports in infrastructure, no reverse core imports from shifts, identical dispatch objects at all twelve consumers and no duplicate parser implementation in the compatibility facade.
+
+After movement, the targeted affected-domain selection discovered **398 tests: 391 passed, seven skipped, zero failures/errors**, 36.192 seconds after migration setup on disposable SQLite. Selection: all `shifts` tests (including the required holiday, Award-floor and pricing contracts), `core.test_shift_domain_contract`, `core.test_serializer_values_boundary`, `core.test_task_contracts`, `core.test_task_dispatch_registration`, `core.test_signal_registry_contract`, `core.test_backend_ownership_boundaries`, `core.test_module_size_ratchet`, `users.test_task_dispatch_boundary`, and `invoicing.test_delivery`. Skipped tests are not counted as passes; PostgreSQL and locking evidence for this head must come from its configured hosted checks.
+
+Scanner unit tests: 11/11 passed. Graph/baseline, migration drift, whitespace and shell syntax passed. The parser source is byte-identical to the parent and every affected shifts file was compared against an import-only substitution of that immutable source. New parser ownership/behaviour tests are explicitly selected by Shared Core, both Serializer database variants and isolated backend-image QA. No new local PostgreSQL result, native/device or provider acceptance is claimed.
+
+The actual cyclic-edge set is again a strict subset of the parent: only `shifts → core` is removed. Direct mutual pairs fall **5 → 4**, actual cyclic edges **41 → 40**, module edges stay **101**, delayed edges stay **71**, and the same direct 11-app component remains. The retained `core → shifts` sitemap/composition edge moves into the non-mutual longer-cycle ledger, which becomes **32 instead of 31**. No new actual cycle is accepted. Remaining direct mutual pairs: `memberships/organizations`, `memberships/users`, `organizations/users`, and `client_profile/onboarding`.
+
+Core's existing composition imports remain legitimate. Other domains may still use its historical parser/queue facade while their own boundaries are addressed. Do not falsely mark all composition or runtime cycles removed because the two direct core reverse dependencies have gone.
+
+## Package 3 continuation — organisation/membership orchestration
+
+The continuation adopts the already completed PR #217 at `e88438810424472b5f1167b900a9f32a1fee8778`, including its parser tests and CI selections. The independently published core/shifts checkpoint is retained as history; it is not treated as another completed boundary. PRs #213–#217 keep their fixed heads.
+
+`memberships.organization_management` now owns eight existing admin/chain operations and the two owner/contact membership creation blocks. `organizations.views` and `organizations.claims` keep their public classes, route decorators, actor/serializer callbacks and surrounding transaction owners. Organisation code consumes an explicit immutable port defined in `organizations.membership_port`, with no membership import at any depth. The ten functions are wired in `composition.organization_memberships`. The configured `composition.urls` root wires them before re-exporting the exact existing `core.urls.urlpatterns` object. No domain imports this composition root, no AppConfig.ready hook changes, and no generic infrastructure gains a business dependency.
+
+All eight moved operation bodies have ASTs identical to immutable #217. The owner/contact writer blocks preserve statement and transaction order. The creation adapter retains the historical dispatch patch point and its lookup when the deferred callback executes. A pre-extraction selection passed **294/294**; three additional real endpoint callback/failure/denial contracts passed **3/3 on unchanged #217** in an isolated worktree. Initial post-extraction selection passed **383/383**, no skips, before the final two composition controls. Final integrated proof is recorded in `docs/qa/ORGANIZATION_MEMBERSHIP_BOUNDARY_20261029.md`. Both Serializer database variants and isolated-image QA select the membership/organisation, admin-invitation, chain and claim suites.
+
+The direct graph has **four → three mutual pairs**, **40 → 39 actual cyclic edges**, 103 module-level edges and 70 delayed edges. The combined graph has **34 → 33 mutual pairs** and **126 → 125 actual cyclic edges**. In both, `organizations → memberships` is the only removed actual cyclic edge and no actual cyclic edge is added. The direct 11-app and combined 20-app components remain unchanged; `composition` belongs to neither. The non-mutual ledger grows **32 → 33** by reclassifying the retained membership-to-organisation facts dependency. Models, app labels, tables, migrations and signal registrations are unchanged.
+
+**Remaining:** `memberships/users`, `organizations/users`, and `client_profile/onboarding`, followed by the longer runtime cycles. Packages 4–5 must separate identity-facing organisation/membership projections and management from identity primitives without changing session/token schema, scope policy, role choices or model identity. Package 6 preserves migration-bound encryption and historical deconstruction paths. No global cycle-removal or release-completion claim follows from this source batch.
+
+## Package 4 continuation — identity/membership reads and conversion
+
+Fixed parent: PR #218 at `50560020bb8049b7a5742b5d2a37b5fa87c329a9`. Its five applicable workflows passed at resumption; Full Isolated QA was skipped. Earlier PRs stay fixed.
+
+Identity now consumes an immutable `users.membership_port` contract for accepted-active membership selection, organization directory rows and pharmacy-manager account conversion. The owner implementations are `memberships.identity_reads` and `memberships.account_management`; `composition.identity_memberships` binds them above both domains. Existing identity HTTP/serializer projections remain in place, including the distinct session IDs, token and OTP shapes and directory handling of active pending rows. The original atomic user/membership/admin/profile conversion sequence is preserved through an explicit profile callback.
+
+Four real-route characterization tests passed on unchanged #218; initial extraction passed 284/284 affected tests. The accepted-member queries have equivalent ASTs and the account atomic block is identical after explicit actor normalization and callback inlining. Final integrated proof: **684 passed, seven PostgreSQL-only skips**, no errors/failures (691 discovered, 53.261 seconds after setup); all 845 backend Python hashes remained unchanged. Scanner, graph/baseline, migration drift, shell syntax and whitespace passed. Evidence: `docs/qa/IDENTITY_MEMBERSHIP_BOUNDARY_20261029.md`.
+
+Full graph comparison removes only `users → memberships` from actual cyclic edges, including delayed imports. No new cyclic edge appears. Module edges remain 103; delayed edges fall 70 → 69. Direct mutual pairs fall 3 → 2, direct cyclic edges 39 → 38, combined cyclic edges 125 → 124. The 11-app direct and 20-app combined components remain. The retained membership-to-identity edge moves into the non-mutual ledger (33 → 34). Only the acyclic composition-to-users edge is added.
+
+Remaining direct boundaries: `organizations/users` and `client_profile/onboarding`; existing longer runtime cycles remain. This source batch changes no model/schema/task/signal identity and establishes neither release acceptance nor global acyclicity.
+
+## Package 5 continuation — identity/organization module boundary
+
+Fixed parent: draft #219 at `e13b7008708e96ffa3077a37b6bfd20ed40d2e53`. Shared pharmacy-admin facts now belong to model-free `access_control.pharmacy_roles`, with identical enum/matrix objects consumed by the existing models and historical enum/pickle identity preserved. `OrganizationMembership` keeps its resolved `client_profile.Organization` relationship and original user-model/table/app identity. Organization-owned selectors supply unchanged identity HTTP projections and related-field validation through an immutable port bound by application URL composition. No model/schema, permissions, policy, signal or worker initialization changes.
+
+Five model/pickle/DRF-PK/navigation controls passed before movement. Initial extraction passed 265/265 affected tests. Migration drift is clean. Permanent tests also cover canonical binding without SQL/queue work and a cold worker using scope/navigation helpers before URL composition. Final integrated selection: **695 passed, seven PostgreSQL-only skips** (702 discovered), no errors/failures, 58.528 seconds after setup. All 852 backend Python hashes stayed unchanged. Full evidence: `docs/qa/IDENTITY_ORGANIZATION_BOUNDARY_20261029.md`.
+
+Only module-level `users → organizations` is removed; two acyclic edges to shared access-control facts are added. Module/delayed counts are 104/69. Direct mutual pairs fall 2 → 1, actual direct cyclic edges 38 → 23 and the SCC shrinks 11 → 8 apps; the non-mutual ledger tightens 34 → 21. The 14 additional edges leaving the cyclic set retain their actual imports but no longer lie inside the smaller SCC. Full combined cyclic edges stay 124 with the same 20-app component, and no new cyclic edge is accepted.
+
+**Explicit retained debt:** the original delayed organization imports in `users.org_roles.membership_visible_pharmacies` and `users.navigation._pharmacy_manager_dashboard_url` are unchanged. Workers use them without a URLconf, so they are not redirected through HTTP-only bindings. This is removal of the direct module pair, not all-depth organization/identity closure. No new deferred imports, ready hooks, scanner exclusions or hidden dynamic imports.
+
+The sole direct mutual pair is `client_profile/onboarding`; combined/runtime cycles remain package 7, including the two retained worker-side helpers above.
+
+## Package 6 continuation — neutral encryption with migration compatibility
+
+Fixed parent: draft #220 at `f97712b35cd746b27405e4506f0ceedeb6896b43`. The full encryption implementation moves byte-for-byte to `infrastructure.encrypted_fields`. Onboarding imports that owner. The historical field facade re-exports the identical class/helper objects and binds the old class module metadata before the kernel's model exports, preserving migration deconstruction, model field identity and pickle paths in both fresh import orders. No model/schema, key derivation, encrypted/plaintext/corrupt-value behavior, ready hook, signal or task change.
+
+The stale onboarding legacy-import exception is removed; all direct mutual-pair exceptions are retired. The scanner's real-allowlist test now requires exactly the empty set. Kernel code lines tighten 291 → 260. No scanner or string/import exclusion is added. Pre-extraction behavior/storage characterization, fixed saved ciphertext, both model storage round-trips, migration-state imports and byte-for-byte source equivalence are recorded in `docs/qa/ONBOARDING_ENCRYPTION_BOUNDARY_20261029.md`. Initial affected selection: 345 passed, one PostgreSQL-only skip; four ownership/import-order controls passed separately. Migration drift is clean. Final integrated selection: **953 passed, eight PostgreSQL-only skips** (961 discovered), no errors/failures, 66.872 seconds after setup; all 854 backend Python hashes unchanged. Eleven scanner tests, graph/baseline, shell syntax and whitespace pass.
+
+Full graph comparison removes only onboarding → client_profile from actual cyclic edges, including delayed imports. Direct mutual pairs fall 1 → 0, actual direct cyclic edges 23 → 22, combined cyclic edges 124 → 123, module/delayed edges remain 104/69. No new cyclic edge. The eight-app direct and 20-app combined components remain. Retained kernel-to-onboarding is reclassified into the non-mutual ledger (21 → 22).
+
+## Package 7 source handover — longer runtime cycles remain open
+
+`docs/architecture/RUNTIME_CYCLE_LEDGER_20261029.json` contains every current direct and combined cyclic edge with all source locations and import kinds. It is generated from the unchanged scanner and must be regenerated after each source batch. Zero direct mutual pairs is enforced, but the full graph still has 22 direct cyclic edges and 123 combined cyclic edges; zero-cycle completion is not claimed.
+
+Next bounded assessment: reverse domain-to-core task/utility imports and the migration-bound historical attachment upload helper, preserving existing function/pickle paths, task names and bootstrap order. Then separate remaining domain projections and workflow dependencies. The two original delayed identity/organization scope/navigation helpers require worker-safe ownership proof before movement; do not impose HTTP-only URL composition or hide those imports. Existing financial, eligibility, settlement and delivery policy remains unchanged. Enforce a true full-graph zero-cycle gate only when actual module and combined cycle sets, not just the mutual-pair allowlist, are empty.
+
+## Revised completion scope and package 7 checkpoint
+
+The user's revised direction prioritises ownership and import safety over a forced zero count.
+Preserve the existing TypeScript SDK and Django authority. The six direct pairs are closed.
+Continue only extractions with a concrete ownership benefit; retained domain dependencies are
+explicitly assessed debt. Do not describe a nonzero graph as acyclic.
+
+This continuation moves unchanged generic upload mechanics below core, puts attachment path
+functions in chat/pharmacy_hub, binds their historical migration/pickle metadata in the kernel,
+and redirects remaining queue callers to the identical users-owned dispatch adapter.
+No task registration, failure policy, file naming, model identity or database migration changes.
+The legacy core adapters remain available. Existing tests patching a function-local core dispatch
+lookup now patch the canonical users dispatch lookup; their assertions remain unchanged.
+
+The direct SCC shrinks 8 to 7 apps; direct cyclic edges 22 to 15; combined edges 123 to 120.
+The direct cyclic set shrinks; the combined set removes five edges and adds two explicit
+facade-to-owner compatibility edges without expanding the component. Full evidence and next decision boundaries are recorded in
+`docs/qa/RUNTIME_OWNERSHIP_AND_CLIENT_CONTRACTS_20261029.md`.
+
+Cross-client audit: Django remains authority; kiosk representative cases share one fixture
+with TypeScript, and multipart transport preserves FormData and lets transport set boundaries.
+Pricing helpers remain compatibility estimates; the inaccurate Django-import claim is removed.
+Any observed policy mismatch is documented for discussion instead of normalised silently.
+
+## Longer-cycle continuation — serializer/runtime composition
+
+Fixed parent: PR #222, `90534bbe93c5c64e586ffaaba86df089415731e7`. Hosted checks continue
+independently; the user explicitly requested further dependency work without waiting for gates.
+
+The remaining domain-to-core serializer and ABR imports close the seven-app direct component.
+Neutral cleanup/validation/numeric/provider mechanics move to infrastructure; locked identity
+updates move to users. The domain-aware file-reference list stays above the domains, in explicit
+application composition. Its configuration-only AppConfig hook runs after model discovery in
+workers and commands as well as HTTP; cold-process tests forbid startup SQL, HTTP and task dispatch.
+Historical core exports and old pickles still resolve to identical objects. No migration changes.
+
+Result: actual direct cyclic edges **15 → 0**, no direct SCCs/mutual pairs. Combined cyclic edges
+**120 → 114**, removing six edges with no additions or component expansion. Existing legitimate
+domain dependencies remain; removing the reverse core imports makes them acyclic at module level.
+The direct zero-cycle gate is enabled, and the baseline independently bounds function-local cycle
+edges and components. This is not a claim that the combined twenty-app runtime graph is acyclic.
+
+Next bounded work: worker-safe organisation scope/navigation ownership. Preserve existing
+query ordering and selection semantics, including the distinction between navigation and
+action-specific authorization; use the startup composition owner rather than HTTP-only binding.
+Financial, settlement and notification workflow decisions remain deferred as previously recorded.
+
+## Worker-side organisation ownership continuation
+
+Fixed parent: #223 at `4cba71348a912e599b8b2d2a84260677d2bb946b`. Organisation scope and manager
+dashboard queries now belong to organisation selectors, reached through the existing immutable
+identity port. The explicit application startup hook binds that port for workers, commands and HTTP.
+The scope body and navigation queryset preserve the parent's AST; navigation does not gain the
+stricter actor filtering of action authorization. No workflow or permission change.
+
+Direct runtime cycles remain zero; combined cyclic edges fall **114 → 113**, removing only
+users → organizations with no additions or component expansion. Seven baseline database controls
+passed before movement; worker-before-HTTP and no-startup-I/O controls cover the new binding.
+See `docs/qa/WORKER_ORGANIZATION_BOUNDARY_20261029.md` for verification and retained programme debt.
+
+## Release-hardening continuation
+
+The user has adopted M1–M5 release milestones and authorized implementation. The next
+work is integration and production integrity, not more dependency removal by count.
+#225's Full Isolated QA, Shared Core, authenticated E2E and security checks succeeded
+on `e80a89784d6481da2604dee86c342281bf92bbfe`. The isolated integration rehearsal used
+that exact tree above main; the bounded identity/discovery/verification assessment retains
+the reviewed owners. Source changes require their own new-head acceptance.
+
+`docs/qa/PRELAUNCH_RISK_REGISTER_20261029.md` is the current launch-impact register.
+This continuation repairs demonstrated payroll retry, projection invalidation and frozen
+settlement export defects while preserving accepted terms and already locked manifests.
+Paid fulfillment duplication remains an unresolved blocker for that enabled workflow;
+refund alerts do not establish prevention. Cancellation and notification candidates require
+bounded reproductions and policy separation. Zero direct cyclic edges and the retained
+113 combined edges remain guarded. M4 is in progress; M5 is not release-certified.
+
+30 October: #226's Full Isolated QA and all other non-skipped workflows passed, including
+474/474 PostgreSQL contracts. The next bounded batch guards deferred payroll activation
+against existing timesheet-period locks and requires the established audited correction
+workflow. `docs/qa/PAYROLL_PERIOD_FREEZE_20261030.md` records the real-HTTP reproduction,
+writer/caller map, local evidence and independent PostgreSQL race controls. New source
+needs new-head evidence. Paid obligation ownership remains the next financial repair;
+no key-only shortcut, merge or deployment is authorized by this checkpoint.

@@ -1,9 +1,9 @@
 """Authenticated sessions: browser vs native clients, the httpOnly JWT cookies and the signed-in user
 payload."""
+from users.feature_port import user_features
+from users.membership_port import membership_services
+from users.organization_port import organization_reads
 from users.models import OrganizationMembership
-from organizations.access import admin_assignments_for
-from memberships.models import Membership
-from organizations.models import Pharmacy
 from django.conf import settings
 from users.serializers import serialize_org_memberships
 
@@ -82,11 +82,7 @@ def _build_authenticated_user_payload(user):
     org_memberships = OrganizationMembership.objects.filter(user=user)
     org_payload = serialize_org_memberships(org_memberships)
 
-    pharm_memberships = Membership.objects.filter(
-        user=user,
-        is_active=True,
-        status=Membership.Status.ACCEPTED,
-    ).select_related("pharmacy")
+    pharm_memberships = membership_services().accepted_for_user(user)
     pharm_payload = [
         {
             "id": pm.id,
@@ -97,7 +93,7 @@ def _build_authenticated_user_payload(user):
         }
         for pm in pharm_memberships
     ]
-    owned_pharmacies = Pharmacy.objects.filter(owner__user=user)
+    owned_pharmacies = organization_reads().owned_pharmacies(user)
     for pharmacy in owned_pharmacies:
         pharm_payload.append(
             {
@@ -110,7 +106,7 @@ def _build_authenticated_user_payload(user):
         {entry["pharmacy_id"]: entry for entry in pharm_payload}.values()
     )
 
-    admin_assignments = admin_assignments_for(user).select_related("pharmacy")
+    admin_assignments = organization_reads().admin_assignments_for(user).select_related("pharmacy")
     admin_payload = [
         {
             "id": assignment.id,
@@ -125,11 +121,13 @@ def _build_authenticated_user_payload(user):
         for assignment in admin_assignments
     ]
 
-    from billing.utils import is_billing_active, is_in_free_trial
+    is_billing_active = user_features().is_billing_active
+    is_in_free_trial = user_features().is_in_free_trial
     # Onboarding models depend on the users app: resolve this helper at call time,
     # so importing users.sessions cannot form a module-level app dependency cycle.
     from onboarding.services.work_profile import newcomer_type
-    from public_hub.permissions import capabilities, member_hubs
+    capabilities = user_features().content_capabilities
+    member_hubs = user_features().member_hubs
 
     return {
         "id": user.id,

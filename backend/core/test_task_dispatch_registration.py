@@ -119,6 +119,7 @@ class TaskDispatchRegistrationTests(SimpleTestCase):
         names = dispatched_task_names()
         for expected in (
             "users.tasks.send_async_email",
+            "invoicing.tasks.deliver_invoice_email",
             "client_profile.tasks.verify_filefield_task",
             "client_profile.tasks.verify_abn_task",
             "client_profile.tasks.email_membership_application_submitted",

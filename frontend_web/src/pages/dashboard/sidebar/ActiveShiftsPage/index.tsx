@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
+    Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button,
     Container,
     Typography,
     Snackbar,
@@ -143,7 +144,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         return () => window.clearTimeout(timeout);
     }, [routeShiftId, routeSlotId, shifts]);
     const { pillPayingShiftId, paymentSlotSelection, setPaymentSlotSelection,
-        handlePayWithPills, handlePayWithStripe } = useShiftPaymentActions(loadShifts, showSnackbar);
+        handlePayWithPills, handlePayWithStripe, checkoutConflict, setCheckoutConflict, checkoutRecovering, recoverCheckout } = useShiftPaymentActions(loadShifts, showSnackbar);
     const {
         counterOffersByShift,
         counterOffersLoadingByShift,
@@ -287,6 +288,17 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                     }
                 />
 
+                <Dialog open={Boolean(checkoutConflict)} onClose={() => !checkoutRecovering && setCheckoutConflict(null)}>
+                    <DialogTitle>Checkout already in progress</DialogTitle>
+                    <DialogContent><DialogContentText>
+                        This work has an existing card checkout. Continue that checkout, or expire it before starting a replacement for your current selection. A paid or uncertain payment must be reconciled first.
+                    </DialogContentText></DialogContent>
+                    <DialogActions>
+                        <Button disabled={checkoutRecovering} onClick={() => setCheckoutConflict(null)}>Cancel</Button>
+                        <Button disabled={checkoutRecovering} onClick={() => void recoverCheckout('expire')}>Expire unpaid and replace</Button>
+                        <Button disabled={checkoutRecovering} onClick={() => void recoverCheckout('resume')}>Continue existing checkout</Button>
+                    </DialogActions>
+                </Dialog>
             </Container>
         </>
     );

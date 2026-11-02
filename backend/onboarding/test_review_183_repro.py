@@ -81,7 +81,7 @@ class Review183Repro(TestCase):
             'tab': 'basic', 'ahpra_number': 'PHA0007654321', 'submitted_for_verification': True,
         }, partial=True)
         self.assertTrue(serializer.is_valid(), serializer.errors)
-        with patch('onboarding.serializers.record_first_submission'), patch('core.task_queue.async_task'):
+        with patch('onboarding.serializers.record_first_submission'), patch('users.task_dispatch.async_task'):
             serializer.save()
         self.assertFalse(AhpraCheck.objects.filter(status='pending').exists())
 

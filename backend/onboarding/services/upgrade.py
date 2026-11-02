@@ -5,8 +5,8 @@ profile; the new role's verification applies from scratch (onboarding/verificati
 checked AHPRA registration, and the overseas mobile skip no longer applies. The New to pharmacy talent post is removed;
 the person posts again in the new role.
 """
+from onboarding.feature_port import verification_features
 from django.db import transaction
-from django.db.models import Q
 from rest_framework.exceptions import ValidationError
 
 STAFF_ROLES = ('INTERN', 'TECHNICIAN', 'ASSISTANT', 'STUDENT')
@@ -27,7 +27,6 @@ IDENTITY_BUNDLE = ('government_id', 'government_id_type', 'identity_secondary_fi
 def upgrade_newcomer(user_id, role, staff_role=None):
     """Return (user, staff_role) after converting the newcomer account; raises ValidationError when not allowed."""
     from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
-    from talent.models import ExplorerPost
     from users.models import User
 
     role = str(role or '').upper()
@@ -71,6 +70,5 @@ def upgrade_newcomer(user_id, role, staff_role=None):
         # once that profile is verified (the talent hub's normal publishing gate).
         # Newcomer posts by provenance: linked to the newcomer profile, or written by them as a newcomer (older rows may
         # have no role category). Posts are only ever written in the account's current role, which was EXPLORER.
-        newcomer_posts = Q(explorer_profile__user=user) | Q(author_user=user, role_category__in=('EXPLORER', '')) | Q(author_user=user, role_category__isnull=True)
-        ExplorerPost.objects.filter(newcomer_posts).delete()
+        verification_features().remove_newcomer_posts(user)
     return user, staff_role or 'PHARMACIST'

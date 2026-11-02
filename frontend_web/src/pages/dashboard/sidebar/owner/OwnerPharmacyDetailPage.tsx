@@ -11,13 +11,14 @@ import {
   BadgeCheck,
   Clock3,
   Inbox,
+  Monitor,
   Pencil,
   Plus,
   Star,
   UserPlus,
   Wallet
 } from "lucide-react";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import DashboardContentState from "../../../../components/dashboard/DashboardContentState";
 import { type Tone } from "../../../../components/ui/IconTile";
@@ -32,8 +33,10 @@ import { MembershipDTO, PharmacyAdminDTO, PharmacyDTO } from "./types";
 import PharmacyOverview from "./PharmacyOverview";
 import type { PharmacyProfileExtras } from "./PharmacyProfileCard";
 import PharmacySettings from "./PharmacySettings";
+import KioskPairingDialog from "../../../attendance/KioskPairingDialog";
 import { TabLabel } from "./pharmacyDetailParts";
 import { usePayrollSetting } from "./usePayrollSetting";
+import { attendance } from "@chemisttasker/shared-core";
 export type { PharmacyProfileExtras } from "./PharmacyProfileCard";
 
 /* ---------- helpers ---------- */
@@ -111,6 +114,27 @@ export default function OwnerPharmacyDetailPage({
   const [inviteStaff, setInviteStaff] = useState(0);
   const [inviteLocum, setInviteLocum] = useState(0);
   const [inviteAdmin, setInviteAdmin] = useState(0);
+  const [pairingOpen, setPairingOpen] = useState(false);
+  const [canPairTerminal, setCanPairTerminal] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    attendance
+      .getKioskPairingOptions("web")
+      .then((res) => {
+        if (!active) return;
+        const targetId = Number(pharmacy.id);
+        const manageable = (res?.pharmacies || []).some((p: { id: number }) => p.id === targetId);
+        setCanPairTerminal(manageable);
+      })
+      .catch(() => {
+        if (!active) return;
+        setCanPairTerminal(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [pharmacy.id]);
 
   const { payrollEnabled, payrollReady, payrollLoadError, payrollSaving, payrollSaveError, handlePayrollToggle, retryPayroll } = usePayrollSetting(Number(pharmacy.id));
 
@@ -214,6 +238,11 @@ export default function OwnerPharmacyDetailPage({
         subtitle={address || undefined}
         actions={
           <>
+            {canPairTerminal && (
+              <Button variant="outlined" startIcon={<Monitor size={16} />} onClick={() => setPairingOpen(true)} sx={{ minHeight: 44 }}>
+                Pair new terminal
+              </Button>
+            )}
             {pharmacy.can_edit !== false && (
               <Button variant="outlined" startIcon={<Pencil size={16} />} onClick={editPharmacy} sx={{ minHeight: 44 }}>
                 Edit details
@@ -285,6 +314,7 @@ export default function OwnerPharmacyDetailPage({
           onToggleAutoPublishWorkerRequests={pharmacy.can_edit !== false ? onToggleAutoPublishWorkerRequests : undefined} payrollEnabled={payrollEnabled} payrollReady={payrollReady}
           payrollLoadError={payrollLoadError} payrollSaving={payrollSaving} payrollSaveError={payrollSaveError} handlePayrollToggle={handlePayrollToggle}
           retryPayroll={retryPayroll} editPharmacy={pharmacy.can_edit !== false ? editPharmacy : undefined} />
+      <KioskPairingDialog open={pairingOpen} onClose={() => setPairingOpen(false)} pharmacyId={pharmacy.id} />
     </Box>
   );
 }

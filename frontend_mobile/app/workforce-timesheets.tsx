@@ -5,13 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Text, TextInput } from 'react-native-paper';
 import {
   fetchPharmaciesService,
+  formatAttendanceMinutes,
   type WorkforceTimesheetPeriod,
   type WorkforceTimesheetRow,
   type WorkforceTimesheetSummary,
   workforce,
 } from '@chemisttasker/shared-core';
 
-const hours = (minutes?: number | null) => minutes == null ? '—' : `${(minutes / 60).toFixed(2)} h`;
+
 
 function currentFortnight() {
   const now = new Date();
@@ -196,9 +197,9 @@ export default function WorkforceTimesheetsScreen() {
         {rows.map(row => <Card key={row.id}><Card.Content>
           <View style={styles.headerRow}><View style={{ flex: 1 }}><Text variant="titleMedium" style={styles.strong}>{row.worker.name}</Text><Text variant="bodySmall">{row.status.replaceAll('_', ' ')} · revision {row.revision_number ?? '—'}</Text></View><Chip compact>{row.needs_rebuild ? 'Rebuild needed' : row.status.replaceAll('_', ' ')}</Chip></View>
           <View style={styles.metrics}>
-            <View><Text variant="labelSmall">Rostered</Text><Text>{hours(row.rostered_minutes)}</Text></View>
-            <View><Text variant="labelSmall">Worked</Text><Text>{hours(row.worked_minutes)}</Text></View>
-            <View><Text variant="labelSmall">Reviewed</Text><Text>{hours(row.reviewed_minutes)}</Text></View>
+            <View><Text variant="labelSmall">Rostered</Text><Text>{formatAttendanceMinutes(row.rostered_minutes)}</Text></View>
+            <View><Text variant="labelSmall">Worked</Text><Text>{formatAttendanceMinutes(row.worked_minutes)}</Text></View>
+            <View><Text variant="labelSmall">Reviewed</Text><Text>{formatAttendanceMinutes(row.reviewed_minutes)}</Text></View>
             <View><Text variant="labelSmall">Checks</Text><Text>{row.blocking_checks} blocking · {row.warning_checks} warning</Text></View>
           </View>
           <View style={styles.actionRow}>

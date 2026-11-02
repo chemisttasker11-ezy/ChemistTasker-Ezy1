@@ -16,6 +16,8 @@ import {
     normalizeShiftWorkProfile,
     payShiftWithPills,
     chargeShiftFulfillment,
+    resumeFulfillmentCheckout,
+    expireFulfillmentCheckout,
     buzzShiftOffer,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
@@ -146,7 +148,30 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
                 showSnackbar('Payment session was not returned.');
             }
         } catch (err: any) {
-            showSnackbar(err?.message || 'Failed to initiate payment.');
+            const data = err?.response?.data ?? err?.payload;
+            if (err?.status === 409 && data?.checkout_id) {
+                const recover = async (action: 'resume' | 'expire') => {
+                    try {
+                        if (action === 'resume') {
+                            const result = await resumeFulfillmentCheckout(shift.id, data.checkout_id);
+                            await Linking.openURL(result.url);
+                        } else {
+                            await expireFulfillmentCheckout(shift.id, data.checkout_id);
+                            const result = await chargeShiftFulfillment(shift.id, { offerIds, platform: 'mobile' });
+                            if (result.url) await Linking.openURL(result.url);
+                            else { showSnackbar(result.message || 'Checkout updated.'); await loadShifts(); }
+                        }
+                    } catch (error: any) {
+                        showSnackbar(error?.message || 'Checkout recovery could not be confirmed.');
+                    }
+                };
+                Alert.alert('Checkout already in progress',
+                    'Continue the existing checkout, or expire it before replacing it with your current selection. Paid or uncertain payments require reconciliation.', [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Expire unpaid and replace', onPress: () => void recover('expire') },
+                        { text: 'Continue existing', onPress: () => void recover('resume') },
+                    ]);
+            } else showSnackbar(err?.message || 'Failed to initiate payment.');
         }
     }, [loadShifts, showSnackbar]);
     const {

@@ -4,14 +4,15 @@ Logs go to the historical "users.views" channel that operators filter on."""
 import secrets
 import logging
 import requests
+from users.membership_port import membership_services
+from users.organization_port import organization_reads
 from users.tokens import RefreshToken
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
-from organizations.access import admin_assignments_for
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from rest_framework.views import APIView
 from users.tasks import send_async_email
 from users.delivery import deliver_email_best_effort
@@ -209,7 +210,6 @@ class VerifyOTPView(APIView):
 
         # Build memberships payload exactly like your serializers
         from .models import OrganizationMembership
-        from memberships.models import Membership as PharmacyMembership
 
         org_memberships = OrganizationMembership.objects.filter(user=user)
         org_payload = [
@@ -222,11 +222,7 @@ class VerifyOTPView(APIView):
             for m in org_memberships
         ]
 
-        pharm_memberships = PharmacyMembership.objects.filter(
-            user=user,
-            is_active=True,
-            status=PharmacyMembership.Status.ACCEPTED,
-        ).select_related('pharmacy')
+        pharm_memberships = membership_services().accepted_for_user(user)
 
         pharm_payload = [
             {
@@ -238,7 +234,7 @@ class VerifyOTPView(APIView):
           ]
 
         admin_assignments = (
-            admin_assignments_for(user)
+            organization_reads().admin_assignments_for(user)
             .select_related("pharmacy")
         )
         admin_payload = [

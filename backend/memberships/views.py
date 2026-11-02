@@ -1,4 +1,5 @@
 """Membership API: memberships, invite links, magic-link information, applications and a user's own memberships."""
+from memberships.employment_port import employment_services
 from rest_framework import mixins, permissions, status, viewsets
 from memberships.models import Membership, MembershipApplication, MembershipInviteLink  # noqa: F401  (MembershipApplication: ownership contract)
 from organizations.models import (
@@ -13,7 +14,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from users.normalization import sanitize_email_text as clean_email
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from datetime import date
 from django.db import transaction
 from datetime import timedelta
@@ -363,7 +364,8 @@ class MembershipApplicationViewSet(mixins.ListModelMixin,
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        from workforce.award_rates import classification_options, resolve_award_schedule
+        classification_options = employment_services().classification_options
+        resolve_award_schedule = employment_services().resolve_award_schedule
 
         try:
             resolved = resolve_award_schedule(

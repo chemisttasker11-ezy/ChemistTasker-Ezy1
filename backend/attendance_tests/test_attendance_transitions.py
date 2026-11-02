@@ -217,6 +217,7 @@ class AttendanceTransitionsTests(unittest.TestCase):
         closed_session, out_event = clock_out(
             self.worker_user,
             signed_qr_token=qr_data_out["signed_token"],
+            confirm_opposite=True,
         )
         self.assertFalse(closed_session.is_open)
         self.assertIsNotNone(closed_session.ended_at)
@@ -243,6 +244,7 @@ class AttendanceTransitionsTests(unittest.TestCase):
             self.worker_user,
             kiosk_device=self.kiosk_a,
             raw_pin="123456",
+            confirm_opposite=True,
         )
         self.assertFalse(closed_session.is_open)
         self.assertEqual(out_event.event_type, AttendanceEvent.EventType.CLOCK_OUT)
@@ -337,7 +339,7 @@ class AttendanceTransitionsTests(unittest.TestCase):
         start_break(self.worker_user)
 
         # Clock out directly
-        closed_session, out_event = clock_out(self.worker_user, signed_qr_token=qr_a["signed_token"])
+        closed_session, out_event = clock_out(self.worker_user, signed_qr_token=qr_a["signed_token"], confirm_opposite=True)
         self.assertFalse(closed_session.is_open)
 
         # Verify event sequence: CLOCK_IN -> BREAK_START -> BREAK_END -> CLOCK_OUT
@@ -389,7 +391,7 @@ class AttendanceTransitionsTests(unittest.TestCase):
         self.local_membership.save(update_fields=["is_active"])
 
         # Clock-out still succeeds cleanly, closing the session
-        closed_session, out_event = clock_out(self.worker_user, signed_qr_token=qr_a["signed_token"])
+        closed_session, out_event = clock_out(self.worker_user, signed_qr_token=qr_a["signed_token"], confirm_opposite=True)
         self.assertFalse(closed_session.is_open)
         self.assertIsNotNone(closed_session.ended_at)
 

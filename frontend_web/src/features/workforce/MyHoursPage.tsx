@@ -12,9 +12,9 @@ import {
 } from '@mui/material';
 import { fetchMyHours, submitMyTimesheet } from './api';
 import TimesheetDetailDrawer from './TimesheetDetailDrawer';
+import { formatHours } from './timesheetDisplay';
 import type { TimesheetRow } from './types';
 
-const hours = (minutes: number | null | undefined) => minutes == null ? '—' : `${(minutes / 60).toFixed(2)} h`;
 type MyHoursRow = TimesheetRow & { pharmacy: { id: number; name: string }; start_date: string; end_date: string };
 
 export default function MyHoursPage() {
@@ -72,9 +72,9 @@ export default function MyHoursPage() {
                 </Stack>
               </Box>
               <Stack direction="row" spacing={2}>
-                <Box><Typography variant="caption" color="text.secondary">Rostered</Typography><Typography fontWeight={900}>{hours(row.rostered_minutes)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">Worked</Typography><Typography fontWeight={900}>{hours(row.worked_minutes)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">Reviewed</Typography><Typography fontWeight={900}>{hours(row.reviewed_minutes)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">Rostered</Typography><Typography fontWeight={900}>{formatHours(row.rostered_minutes)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">Worked</Typography><Typography fontWeight={900}>{formatHours(row.worked_minutes)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">Reviewed</Typography><Typography fontWeight={900}>{formatHours(row.reviewed_minutes)}</Typography></Box>
               </Stack>
               <Stack direction="row" spacing={1}>
                 <Button variant="outlined" onClick={() => setSelectedId(row.id)}>Review details</Button>

@@ -202,10 +202,10 @@ def approve_provisional_attendance(
             is_rostered=False,
         )
 
-        # 3b. Favourite-list emergency cover is paid the way the worker chose in onboarding: invoice (ABN) or
-        #     shift employment / payroll (TFN), exactly as if they had accepted an offer for this shift.
-        if provisional.cover_type == ProvisionalAttendance.CoverType.FAVOURITE_COVER:
-            _apply_worker_payment_terms(backfill_assignment, backfill_shift, session.user)
+        # 3b. Every cover tier records the worker's routing as if they had accepted an offer for this shift: staff
+        #     employment keeps precedence, else invoice (ABN) or shift employment / payroll (TFN). INVOICE cover
+        #     becomes billable only after the worker accepts the terms (attendance/cover_terms.py, E17).
+        _apply_worker_payment_terms(backfill_assignment, backfill_shift, session.user)
 
         # 4. Link assignment back to session and clear is_provisional
         session.assignment = backfill_assignment

@@ -33,7 +33,9 @@ test('real owner login preserves pharmacy scope, cookie session, refresh protect
   expect(proof.meStatus).toBe(200);
   expect(proof.role).toBe('OWNER');
   expect(proof.csrfStatus).toBe(403);
+  const logout = browser.waitForResponse(/\/users\/logout\/?$/);
   await browser.goto(`${url.origin}/dashboard/owner/logout`);
+  expect((await logout).status).toBe(200);
   await browser.waitForURL(/\/login(?:\?|$)/);
   expect((await browser.cookies()).some(cookie => cookie.name === 'ct_refresh')).toBe(false);
   await browser.goto(url.href);

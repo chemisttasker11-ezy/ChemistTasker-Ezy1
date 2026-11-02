@@ -1,0 +1,300 @@
+"""Persisted checkout preparation, recoverable provider calls and confirmed expiry."""
+from datetime import datetime, timedelta, timezone as datetime_timezone
+from hashlib import sha256
+import json
+import logging
+
+from django.db import transaction
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
+from rest_framework.exceptions import APIException, ValidationError
+
+from shifts.models import Shift, ShiftOffer, ShiftSlotAssignment
+from shifts.pricing import expand_shift_slots
+from shifts.occurrences import accepted_occurrences
+from .models import FulfillmentCheckout, FulfillmentReservation
+from .stripe_support import stripe, _stripe_object_value
+from .checkout_prices import FULFILLMENT_PRICES
+
+log = logging.getLogger(__name__)
+
+
+class CheckoutConflict(APIException):
+    status_code = 409
+    default_code = "checkout_in_progress"
+
+
+class CheckoutUncertain(APIException):
+    status_code = 503
+    default_code = "checkout_uncertain"
+
+
+def occurrence_keys(offer):
+    """Use finalization's accepted selection; reservations never change fee quantity."""
+    result = set()
+    for entry in accepted_occurrences(offer, expand_shift_slots(offer.shift)):
+        slot_id, work_date = entry["slot"].pk, entry["date"]
+        result.add(f"{offer.shift_id}:{slot_id}:{work_date}")
+    # Keep historical no-slot fee records exclusive to their whole shift.
+    return result or {f"{offer.shift_id}:whole"}
+
+
+def selection_fingerprint(offers):
+    selection = {str(offer.pk): {'worker': offer.user_id, 'shift': offer.shift_id,
+                               'occurrences': sorted(occurrence_keys(offer))} for offer in offers}
+    return sha256(json.dumps(selection, sort_keys=True).encode()).hexdigest()
+
+
+def release_cancelled_paid_work(shift_id):
+    """Free occurrences whose paid booking no longer exists. The caller holds the shift lock.
+
+    A refund alone never frees work: only removed assignments do, and never while an offer awaits finalization.
+    """
+    for attempt in FulfillmentCheckout.objects.filter(original_shift_id=shift_id, state=FulfillmentCheckout.State.COMPLETE):
+        if ShiftOffer.objects.filter(pk__in=attempt.offer_ids, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists():
+            continue
+        booked = {f"{row.shift_id}:{row.slot_id}:{row.slot_date or row.slot.date}" for row in
+                  ShiftSlotAssignment.objects.filter(source_offer_id__in=attempt.offer_ids).select_related("slot")}
+        # A slotless shift is booked by its accepted offer alone: it never gets an assignment row.
+        whole_owned = bool(booked) or ShiftOffer.objects.filter(
+            pk__in=attempt.offer_ids, status=ShiftOffer.Status.ACCEPTED).exists()
+        released = [row.pk for row in attempt.reservations.filter(active=True)
+                    if not (whole_owned if row.occurrence_key.endswith(":whole") else row.occurrence_key in booked)]
+        if released:
+            FulfillmentReservation.objects.filter(pk__in=released).update(active=False)
+
+
+def prepare_checkout(*, shift_id, actor, offer_ids, parameters):
+    parameters = json.loads(json.dumps(parameters))
+    fingerprint = sha256(json.dumps(parameters, sort_keys=True, default=str).encode()).hexdigest()
+    with transaction.atomic(durable=True):
+        shift = Shift.objects.select_for_update().get(pk=shift_id)
+        release_cancelled_paid_work(shift.pk)
+        offers = list(ShiftOffer.objects.select_for_update(of=("self",)).filter(
+            shift=shift, pk__in=offer_ids, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+        ).select_related("shift").order_by("pk"))
+        if len(offers) != len(offer_ids):
+            raise ValidationError("The selected offers changed. Refresh before checkout.")
+        requested = set()
+        for offer in offers:
+            keys = occurrence_keys(offer)
+            if requested & keys:
+                raise ValidationError("Select only one payable offer for each occurrence.")
+            requested |= keys
+        active = list(FulfillmentCheckout.objects.filter(original_shift_id=shift.pk)
+                      .exclude(state=FulfillmentCheckout.State.EXPIRED).order_by("created_at"))
+        for attempt in active:
+            keys = set(attempt.reservations.filter(active=True).values_list("occurrence_key", flat=True))
+            if attempt.state == FulfillmentCheckout.State.COMPLETE and not keys and not set(offer_ids) & set(attempt.offer_ids):
+                continue  # Paid work already released by cancellation owns nothing any more.
+            whole = f"{shift.pk}:whole"
+            overlaps = bool(requested & keys or whole in requested or whole in keys
+                            or set(offer_ids) & set(attempt.offer_ids))
+            if not overlaps:
+                continue
+            if attempt.offer_ids == sorted(offer_ids) and attempt.parameter_hash == fingerprint:
+                return attempt
+            raise CheckoutConflict({
+                "detail": "An overlapping checkout already exists. Complete or explicitly expire it before changing the selection or platform.",
+                "checkout_id": str(attempt.pk),
+            })
+        attempt = FulfillmentCheckout.objects.create(
+            shift=shift, original_shift_id=shift.pk, actor=actor,
+            offer_ids=sorted(offer_ids), parameters=parameters, parameter_hash=fingerprint,
+            expected_amount_cents=sum(FULFILLMENT_PRICES[row['price']] * row['quantity']
+                                      for row in parameters['line_items']),
+        )
+        attempt.parameters["metadata"]["fulfillment_checkout_id"] = str(attempt.pk)
+        attempt.parameters["metadata"]["fulfillment_selection_hash"] = selection_fingerprint(offers)
+        attempt.save(update_fields=["parameters", "updated_at"])
+        FulfillmentReservation.objects.bulk_create([
+            FulfillmentReservation(checkout=attempt, occurrence_key=key) for key in sorted(requested)
+        ])
+        return attempt
+
+
+def open_checkout(attempt):
+    """Called after preparation commits, so provider uncertainty cannot erase ownership."""
+    attempt.refresh_from_db()
+    if attempt.state == FulfillmentCheckout.State.COMPLETE:
+        raise CheckoutConflict("This checkout has already been paid. Refresh the shift.")
+    if attempt.state == FulfillmentCheckout.State.EXPIRED:
+        raise CheckoutConflict("This checkout has expired. Refresh before creating another checkout.")
+    if attempt.checkout_url:
+        return attempt.checkout_url
+    if timezone.now() - attempt.created_at >= timedelta(hours=23):
+        raise CheckoutUncertain("The provider outcome requires reconciliation before another checkout can be created.")
+    try:
+        session = stripe.checkout.Session.create(
+            **attempt.parameters, idempotency_key=f"shift-fulfillment:{attempt.pk}",
+        )
+        session_id = _stripe_object_value(session, "id")
+        url = _stripe_object_value(session, "url")
+        if not isinstance(session_id, str) or not session_id or not isinstance(url, str) or not url:
+            raise ValueError("Checkout response is missing its identity or URL")
+        # One locked decision: once the session id is saved here, operator recovery (which needs no id) is refused.
+        with transaction.atomic():
+            current = FulfillmentCheckout.objects.select_for_update().get(pk=attempt.pk)
+            orphaned = current.state == FulfillmentCheckout.State.EXPIRED and current.stripe_session_id != session_id
+            refused = current.state in (FulfillmentCheckout.State.COMPLETE, FulfillmentCheckout.State.EXPIRED)
+            if not refused:
+                if current.stripe_session_id and current.stripe_session_id != session_id:
+                    raise ValueError("The provider returned a different session for the same attempt")
+                current.stripe_session_id, current.checkout_url = session_id, url
+                expires = _stripe_object_value(session, "expires_at")
+                if isinstance(expires, (int, float)):
+                    current.provider_expires_at = datetime.fromtimestamp(expires, tz=datetime_timezone.utc)
+                current.state = FulfillmentCheckout.State.OPEN
+                current.save(update_fields=["stripe_session_id", "checkout_url", "provider_expires_at", "state", "updated_at"])
+        if orphaned:
+            # A delayed request resumed after operator recovery: its new session must never be payable.
+            _expire_orphaned_session(attempt.pk, session_id)
+        if refused:
+            raise CheckoutConflict("Checkout state changed. Refresh the shift before continuing.")
+        return url
+    except CheckoutConflict:
+        raise
+    except Exception:
+        log.exception("Checkout provider acknowledgment uncertain for attempt %s", attempt.pk)
+        FulfillmentCheckout.objects.filter(pk=attempt.pk, state=FulfillmentCheckout.State.PREPARED).update(
+            state=FulfillmentCheckout.State.UNKNOWN,
+        )
+        raise CheckoutUncertain("Checkout acceptance is uncertain. Retry this unchanged request; do not create another payment.")
+
+
+def _expire_orphaned_session(attempt_id, session_id):
+    try:
+        stripe.checkout.Session.expire(session_id)
+    except Exception:
+        # Keep the orphan on the attempt so expire_checkout can retry it. A payment on it books only the work the
+        # attempt reclaims below; work a replacement already holds is ledgered for refund, never booked twice.
+        log.exception("Could not expire orphaned provider session %s for recovered attempt %s; reconcile it now",
+                      session_id, attempt_id)
+        _reclaim_orphaned_attempt(attempt_id, session_id)
+        raise CheckoutUncertain("A late provider session could not be expired. Reconcile it before taking payment.")
+
+
+def _reclaim_orphaned_attempt(attempt_id, session_id):
+    """The orphan may still be paid: own its work again unless a replacement already holds it."""
+    with transaction.atomic():
+        attempt = FulfillmentCheckout.objects.get(pk=attempt_id)
+        # Same order as preparation/webhook: shift, then attempt/reservations.
+        Shift.objects.select_for_update().filter(pk=attempt.original_shift_id).first()
+        attempt = FulfillmentCheckout.objects.select_for_update().get(pk=attempt_id)
+        if attempt.stripe_session_id or attempt.state != FulfillmentCheckout.State.EXPIRED:
+            return
+        held = set(FulfillmentReservation.objects.filter(
+            checkout__original_shift_id=attempt.original_shift_id, active=True,
+        ).exclude(checkout=attempt).values_list("occurrence_key", flat=True))
+        attempt.reservations.exclude(occurrence_key__in=held).update(active=True)
+        attempt.stripe_session_id, attempt.state = session_id, FulfillmentCheckout.State.UNKNOWN
+        attempt.save(update_fields=["stripe_session_id", "state", "updated_at"])
+
+
+def expire_checkout(attempt):
+    """Keep reservations until the provider confirms expiry and no payment."""
+    if not attempt.stripe_session_id:
+        raise CheckoutUncertain("Reconcile the original provider request before expiring this checkout.")
+    session = stripe.checkout.Session.retrieve(attempt.stripe_session_id)
+    if _stripe_object_value(session, "status") == "open":
+        session = stripe.checkout.Session.expire(attempt.stripe_session_id)
+    if (_stripe_object_value(session, "id") != attempt.stripe_session_id
+            or _stripe_object_value(session, "status") != "expired"
+            or _stripe_object_value(session, "payment_status") != "unpaid"):
+        raise CheckoutConflict("The provider has not confirmed an expired, unpaid checkout. Reconcile its payment first.")
+    with transaction.atomic():
+        # Same order as preparation/webhook: shift, then attempt/reservations.
+        Shift.objects.select_for_update().get(pk=attempt.original_shift_id)
+        current = FulfillmentCheckout.objects.select_for_update().get(pk=attempt.pk)
+        if current.state == FulfillmentCheckout.State.COMPLETE or current.payment_id:
+            raise CheckoutConflict("This checkout has already been paid.")
+        current.state = FulfillmentCheckout.State.EXPIRED
+        current.save(update_fields=["state", "updated_at"])
+        current.reservations.update(active=False)
+
+
+# open_checkout may still reach the provider at 23 h and a session stays payable for 24 h (no expires_at is set).
+UNRECONCILED_EXPIRY_AGE = timedelta(hours=48)
+
+
+def expire_unreconciled_checkout(attempt):
+    """Operator expiry for an attempt that never got a provider session id.
+
+    Age alone is a precaution, not proof of provider expiry: the operator must first confirm with the provider that no
+    session or payment exists for this attempt and record that evidence as the reason. Callers log it atomically.
+    """
+    with transaction.atomic():
+        # Same order as preparation/webhook: shift, then attempt/reservations.
+        Shift.objects.select_for_update().filter(pk=attempt.original_shift_id).first()
+        current = FulfillmentCheckout.objects.select_for_update().get(pk=attempt.pk)
+        if (current.state not in (FulfillmentCheckout.State.PREPARED, FulfillmentCheckout.State.UNKNOWN)
+                or current.stripe_session_id or current.payment_id):
+            raise CheckoutConflict("Only an unpaid attempt without a provider session can be expired here.")
+        if timezone.now() - current.created_at < UNRECONCILED_EXPIRY_AGE:
+            raise CheckoutConflict("Wait until the attempt is 48 hours old; a late provider session may still be open.")
+        current.state = FulfillmentCheckout.State.EXPIRED
+        current.save(update_fields=["state", "updated_at"])
+        current.reservations.update(active=False)
+
+
+def guard_fulfillment(*, offer, checkout_id=None):
+    """Called under the booking owner's shift lock, including free/pill booking."""
+    release_cancelled_paid_work(offer.shift_id)
+    keys = occurrence_keys(offer)
+    whole = f"{offer.shift_id}:whole"
+    for attempt in FulfillmentCheckout.objects.filter(original_shift_id=offer.shift_id).exclude(
+        state=FulfillmentCheckout.State.EXPIRED,
+    ):
+        if checkout_id is not None and str(attempt.pk) == str(checkout_id):
+            expected = attempt.parameters.get('metadata', {}).get('fulfillment_selection_hash')
+            selected = ShiftOffer.objects.filter(shift_id=offer.shift_id, pk__in=attempt.offer_ids).select_related('shift')
+            if (offer.status not in (ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT, ShiftOffer.Status.ACCEPTED)
+                    or offer.pk not in attempt.offer_ids or not keys <= set(attempt.reservations.filter(active=True)
+                    .values_list('occurrence_key', flat=True)) or (expected and selection_fingerprint(selected) != expected)):
+                raise ValidationError({'code': 'checkout_selection_changed',
+                                       'detail': 'The accepted work changed after checkout. Reconcile the original payment.'})
+            continue
+        active = set(attempt.reservations.filter(active=True).values_list("occurrence_key", flat=True))
+        if (attempt.state == FulfillmentCheckout.State.COMPLETE and offer.pk in attempt.offer_ids
+                and keys <= active):
+            continue  # Idempotent finalization of this same paid, frozen selection.
+        if attempt.state == FulfillmentCheckout.State.COMPLETE and not active and offer.pk not in attempt.offer_ids:
+            continue  # Paid work already released by cancellation owns nothing any more.
+        if keys & active or whole in keys or whole in active or offer.pk in attempt.offer_ids:
+            raise ValidationError({
+                "code": "checkout_reserved",
+                "detail": "This work has an active or paid card checkout. Expire an unpaid checkout or reconcile its payment before using another payment route.",
+            })
+
+
+def bind_paid_checkout(session, metadata, payment):
+    """Return the server attempt and binding error; never drop an unmatched paid intent."""
+    checkout_id = metadata.get("fulfillment_checkout_id")
+    if not checkout_id:
+        return None, None  # Historical sessions retain their receipt/booking compatibility.
+    try:
+        attempt = FulfillmentCheckout.objects.select_for_update().filter(pk=checkout_id).first()
+    except (ValueError, TypeError, DjangoValidationError):
+        return None, "invalid_checkout_identity"
+    if attempt is None or str(attempt.original_shift_id) != str(metadata.get("shift_id")):
+        return attempt, "unknown_checkout_binding"
+    expected = attempt.parameters.get("metadata", {})
+    for field in ("shift_id", "type", "offer_ids", "slot_ids", "slot_id", "candidate_id", "owner_user_id",
+                  "organization_id", "billing_contact_user_id", "billing_scope", "actor_user_id", "fulfillment_selection_hash"):
+        normalize = lambda value: "" if value is None else str(value)
+        if normalize(expected.get(field)) != normalize(metadata.get(field)):
+            return attempt, "checkout_metadata_mismatch"
+    session_id = _stripe_object_value(session, "id")
+    if not session_id or attempt.stripe_session_id not in (None, session_id):
+        return attempt, "checkout_session_mismatch"
+    if _stripe_object_value(session, "currency") != "aud":
+        return attempt, "checkout_currency_mismatch"
+    if _stripe_object_value(session, "amount_total") != attempt.expected_amount_cents:
+        return attempt, "checkout_amount_mismatch"
+    if attempt.payment_id not in (None, payment.pk):
+        return attempt, "duplicate_paid_checkout_intent"
+    attempt.stripe_session_id = session_id
+    attempt.payment = payment
+    attempt.state = FulfillmentCheckout.State.COMPLETE
+    attempt.save(update_fields=["stripe_session_id", "payment", "state", "updated_at"])
+    return attempt, None

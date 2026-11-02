@@ -17,11 +17,15 @@ def shifts_managed_by(queryset, user):
 
 def _future_or_current_slot_q(now, today, prefix=''):
     result = Q(pk__in=[])
-    for tz_name in Pharmacy.objects.order_by().values_list('timezone', flat=True).distinct():
-        local_now = now.astimezone(get_pharmacy_timezone(Pharmacy(timezone=tz_name)))
+    pharmacy_ids_by_zone = {}
+    for pharmacy in Pharmacy.objects.only('pk', 'timezone', 'state', 'postcode'):
+        zone = get_pharmacy_timezone(pharmacy)
+        pharmacy_ids_by_zone.setdefault(zone, []).append(pharmacy.pk)
+    for zone, pharmacy_ids in pharmacy_ids_by_zone.items():
+        local_now = now.astimezone(zone)
         local_date = local_now.date()
         clock = local_now.time()
-        result |= Q(**{f'{prefix}shift__pharmacy__timezone': tz_name}) & (
+        result |= Q(**{f'{prefix}shift__pharmacy_id__in': pharmacy_ids}) & (
             Q(**{f'{prefix}is_recurring': True, f'{prefix}recurring_end_date__gt': local_date}) |
             Q(**{f'{prefix}is_recurring': True, f'{prefix}recurring_end_date': local_date, f'{prefix}end_time__gte': clock}) |
             Q(**{f'{prefix}date__gt': local_date}) |

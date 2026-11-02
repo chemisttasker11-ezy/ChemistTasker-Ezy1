@@ -6,7 +6,7 @@ from django.db import transaction
 from django.http import QueryDict
 from rest_framework.exceptions import ValidationError
 from pharmacy_hub.models import PharmacyHubAttachment
-from core.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
+from infrastructure.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
 from pharmacy_hub.access import HubScopeResolver
 
 

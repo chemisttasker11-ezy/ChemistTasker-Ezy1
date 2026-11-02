@@ -1,12 +1,13 @@
 """Deciding membership applications (the magic-link intake): approval creates or activates the worker's membership,
 rejection closes the application; the applicant is e-mailed after commit."""
+from memberships.employment_port import employment_services
 from datetime import date
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from memberships.access import user_can_decide_applications
 from memberships.invites import create_membership_invite
 from memberships.models import MembershipApplication
@@ -149,9 +150,6 @@ def approve_application(app, *, decided_by, data):
                 onboarding.save(update_fields=['date_of_birth'])
 
             if payroll_required:
-                from workforce.employment_engagement_service import build_employment_engagement_payload
-                from workforce.models import EmploymentEngagement
-
                 engagement_data = dict(payroll_terms)
                 engagement_data.setdefault('employment_type', employment_type)
                 engagement_data.setdefault('job_title', app.job_title or '')
@@ -183,22 +181,10 @@ def approve_application(app, *, decided_by, data):
                             'effective_to': ['Use YYYY-MM-DD for the employment terms end date.']
                         }) from exc
 
-                engagement_payload = build_employment_engagement_payload(
-                    engagement_data,
-                    membership,
-                    effective_from=effective_from,
-                    effective_to=effective_to,
+                engagement = employment_services().create_engagement(
+                    membership, engagement_data, effective_from=effective_from,
+                    effective_to=effective_to, actor=decided_by,
                 )
-                engagement = EmploymentEngagement(
-                    membership=membership,
-                    effective_from=effective_from,
-                    effective_to=effective_to,
-                    created_by=decided_by,
-                    updated_by=decided_by,
-                    **engagement_payload,
-                )
-                engagement.full_clean()
-                engagement.save()
                 employment_engagement_public_id = str(engagement.public_id)
 
             app.status = 'APPROVED'

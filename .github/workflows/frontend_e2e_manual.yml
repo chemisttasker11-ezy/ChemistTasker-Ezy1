@@ -60,6 +60,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -77,6 +79,27 @@ jobs:
       - name: Install Chromium
         working-directory: frontend_web/e2e
         run: npx playwright install chromium
+      - name: Capture reference from immutable approved main source
+        working-directory: frontend_web/e2e
+        shell: pwsh
+        run: |
+          $baselineRoot = Join-Path $env:RUNNER_TEMP 'approved-appearance-main'
+          git worktree add --detach $baselineRoot 25ef200f0c32b2b6fc764a4d05a648b604038794
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm ci --prefix (Join-Path $baselineRoot 'frontend_web')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PLAYWRIGHT_APP_ROOT = Join-Path $baselineRoot 'frontend_web'
+          $env:CT_CAPTURE_APPROVED_SOURCE_BASELINE = '1'
+          npm test -- frontend-appearance.spec.mjs --workers=2 --update-snapshots
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item Env:PLAYWRIGHT_APP_ROOT
+          Remove-Item Env:CT_CAPTURE_APPROVED_SOURCE_BASELINE
+      - name: Preserve independently captured reference for review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: approved-main-appearance-reference
+          path: frontend_web/e2e/frontend-appearance.spec.mjs-snapshots
+          if-no-files-found: error
       - name: Compare the existing mobile and desktop appearance
         working-directory: frontend_web/e2e
         run: npm test -- frontend-appearance.spec.mjs --workers=2

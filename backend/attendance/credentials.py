@@ -20,6 +20,7 @@ Provides the secure credential and physical-presence verification layer:
 from datetime import datetime, timedelta
 import base64
 import hashlib
+import logging
 import secrets
 import uuid
 from typing import Optional, Tuple
@@ -35,6 +36,7 @@ from django.utils.crypto import salted_hmac
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from organizations.access import _is_active_actor
 from organizations.models import Chain, Pharmacy, PharmacyAdmin
 from memberships.models import Membership
 from attendance.models import KioskDevice, KioskPairingAuthorization, PharmacyQRSession, WorkerPIN
@@ -43,6 +45,7 @@ from attendance.models import KioskDevice, KioskPairingAuthorization, PharmacyQR
 QR_SALT = "chemisttasker_attendance_kiosk_qr"
 DEVICE_TOKEN_PREFIX = "ctk_kiosk_"
 security_cache = caches["security"]
+logger = logging.getLogger(__name__)
 
 
 def _count_security_attempt(key: str, *, limit: int, window: int) -> None:
@@ -81,7 +84,7 @@ def hash_kiosk_token(raw_token: str) -> str:
 
 def is_authorized_kiosk_manager(user, pharmacy: Pharmacy) -> bool:
     """Check whether a user has authority to activate/manage kiosks or worker PINs."""
-    if not user or not pharmacy:
+    if not _is_active_actor(user) or not pharmacy:
         return False
     if user.is_superuser:
         return True
@@ -587,6 +590,17 @@ def verify_signed_pharmacy_qr(
 # 3. Worker Personal Code (PIN) Lifecycle & Verification
 # -----------------------------------------------------------------------------
 
+def pin_eligible_memberships(queryset=None):
+    """Memberships that may hold or use a kiosk PIN: active, ACCEPTED and not CONTACT (E5/E12)."""
+    queryset = Membership.objects.all() if queryset is None else queryset
+    return queryset.filter(is_active=True, status=Membership.Status.ACCEPTED).exclude(role="CONTACT")
+
+
+def _require_pin_eligible(membership: Membership) -> None:
+    if not pin_eligible_memberships().filter(pk=membership.pk).exists():
+        raise ValidationError("Only active, accepted staff memberships can use an attendance PIN.")
+
+
 def set_worker_personal_code(
     user,
     membership: Membership,
@@ -595,6 +609,7 @@ def set_worker_personal_code(
     """Set or reset a worker's hashed PIN; requires pharmacy owner or manager authority."""
     if not is_authorized_kiosk_manager(user, membership.pharmacy):
         raise PermissionDenied("Only the pharmacy owner or manager can set a worker's personal code.")
+    _require_pin_eligible(membership)
 
     worker_pin, _ = WorkerPIN.objects.get_or_create(membership=membership)
     worker_pin.set_pin(raw_pin)
@@ -610,6 +625,8 @@ def toggle_worker_personal_code(
     """Enable or disable the PIN requirement for a worker."""
     if not is_authorized_kiosk_manager(user, membership.pharmacy):
         raise PermissionDenied("Only the pharmacy owner or manager can toggle personal codes.")
+    if is_enabled:
+        _require_pin_eligible(membership)
 
     worker_pin, _ = WorkerPIN.objects.get_or_create(membership=membership)
     worker_pin.is_enabled = is_enabled
@@ -631,16 +648,20 @@ def _find_kiosk_candidate_membership(
     user_filter = Q(user__email__iexact=ident) | Q(user__username__iexact=ident)
     if ident.isdigit():
         user_filter |= Q(user__id=int(ident))
+    return find_kiosk_pin_membership(kiosk_device, user_filter, require_pin=require_pin)
 
+
+def find_kiosk_pin_membership(kiosk_device: KioskDevice, user_filter: Q, require_pin: bool = True) -> Optional[Membership]:
+    """PIN-eligible membership at the kiosk pharmacy or a same-owner/chain/organization sister site."""
     target_pharmacy = kiosk_device.pharmacy
 
-    local_kwargs = {"pharmacy": target_pharmacy, "is_active": True}
+    local_kwargs = {"pharmacy": target_pharmacy}
     if require_pin:
         local_kwargs["worker_pin__isnull"] = False
 
     # 1. Local membership
     local_mem = (
-        Membership.objects.filter(
+        pin_eligible_memberships().filter(
             user_filter,
             **local_kwargs,
         )
@@ -650,13 +671,13 @@ def _find_kiosk_candidate_membership(
     if local_mem is not None:
         return local_mem
 
-    remote_kwargs = {"is_active": True}
+    remote_kwargs = {}
     if require_pin:
         remote_kwargs["worker_pin__isnull"] = False
 
     # 2. Cross-site membership under same owner, active Chain, or organization
     remote_memberships = (
-        Membership.objects.filter(
+        pin_eligible_memberships().filter(
             user_filter,
             **remote_kwargs,
         )
@@ -717,7 +738,7 @@ def verify_kiosk_worker_pin(
     with transaction.atomic():
         try:
             worker_pin = (
-                WorkerPIN.objects.select_for_update()
+                WorkerPIN.objects.select_for_update(of=("self",))
                 .select_related("membership", "membership__user")
                 .get(pk=membership.worker_pin.pk)
             )
@@ -879,13 +900,23 @@ def send_worker_pin_setup_code(
     }
 
 
+def consume_worker_pin_otp(worker_id) -> None:
+    cache_key = f"{WORKER_PIN_OTP_CACHE_PREFIX}{worker_id}"
+    security_cache.delete_many([cache_key, f"{cache_key}:fail", f"{cache_key}:claim"])
+
+
 def setup_worker_kiosk_pin(
     kiosk_device: KioskDevice,
     user_identifier: str,
     verification_code: str,
     new_pin: str,
+    consume_otp: bool = True,
 ) -> Tuple[Membership, WorkerPIN]:
-    """Verify email OTP and set the worker's PIN from the kiosk."""
+    """Verify email OTP and set the worker's PIN from the kiosk.
+
+    consume_otp=False spends the code only when the transaction commits, so a rolled-back setup keeps it usable.
+    The caller must hold the worker's User lock: the claim check below relies on that serialization.
+    """
     if not kiosk_device or not kiosk_device.is_active:
         raise ValidationError("Kiosk device is inactive or revoked.")
 
@@ -901,6 +932,12 @@ def setup_worker_kiosk_pin(
     cached_data = security_cache.get(cache_key)
 
     if not cached_data or not isinstance(cached_data, dict):
+        raise ValidationError("Verification code expired or not requested. Please request a new code.")
+    # A claim whose PIN hash is committed means an earlier setup committed before its on_commit consumption ran;
+    # an uncommitted (rolled-back) claim is stale, since the User lock means that setup has finished.
+    claim = security_cache.get(f"{cache_key}:claim")
+    if claim and WorkerPIN.objects.filter(pk=claim["pin_id"], pin_hash=claim["pin_hash"]).exists():
+        consume_worker_pin_otp(worker.id)
         raise ValidationError("Verification code expired or not requested. Please request a new code.")
     if (
         cached_data.get("membership_id") != membership.id
@@ -925,9 +962,8 @@ def setup_worker_kiosk_pin(
     if not (4 <= len(cleaned_pin) <= 6) or not cleaned_pin.isdigit():
         raise ValidationError("PIN must be 4 to 6 numeric digits.")
 
-    # Code is valid, consume it immediately
-    security_cache.delete(cache_key)
-    security_cache.delete(f"{cache_key}:fail")
+    if consume_otp:
+        consume_worker_pin_otp(worker.id)
 
     # Save or update WorkerPIN
     worker_pin, _ = WorkerPIN.objects.get_or_create(membership=membership)
@@ -937,22 +973,46 @@ def setup_worker_kiosk_pin(
     worker_pin.locked_until = None
     worker_pin.save()
 
-    # Send confirmation email
-    try:
-        from users.tasks import send_async_email
-        pharmacy_name = kiosk_device.pharmacy.name
-        send_async_email(
-            subject=f"ChemistTasker - Attendance PIN Created",
-            message=(
-                f"Hello {worker.first_name or worker.username},\n\n"
-                f"Your attendance PIN has been successfully set on the counter kiosk at {pharmacy_name}.\n\n"
-                f"You can change this PIN at any time from your ChemistTasker web or mobile app dashboard.\n\n"
-                f"Thank you,\nChemistTasker Team"
-            ),
-            recipient_list=[worker.email],
+    if not consume_otp:
+        security_cache.set(
+            f"{cache_key}:claim", {"pin_id": worker_pin.pk, "pin_hash": worker_pin.pin_hash},
+            timeout=WORKER_PIN_OTP_TTL,
         )
-    except Exception:
-        pass
+        transaction.on_commit(lambda: consume_worker_pin_otp(worker.id))
+
+    # Announce the saved PIN only after its enclosing transaction commits.
+    # Capture message values now rather than reading mutable model objects in the callback.
+    recipient = worker.email
+    worker_id, pharmacy_id = worker.pk, kiosk_device.pharmacy_id
+    pharmacy_name = kiosk_device.pharmacy.name
+    confirmation_message = (
+        f"Hello {worker.first_name or worker.username},\n\n"
+        f"Your attendance PIN has been successfully set on the counter kiosk at {pharmacy_name}.\n\n"
+        f"You can change this PIN at any time from your ChemistTasker web or mobile app dashboard.\n\n"
+        f"Thank you,\nChemistTasker Team"
+    )
+
+    def send_confirmation():
+        try:
+            from users.tasks import send_async_email
+
+            accepted = send_async_email(
+                subject="ChemistTasker - Attendance PIN Created",
+                message=confirmation_message,
+                recipient_list=[recipient],
+            )
+            if not accepted:
+                logger.warning(
+                    "PIN confirmation email was not accepted for worker %s at pharmacy %s.",
+                    worker_id, pharmacy_id,
+                )
+        except Exception:
+            logger.exception(
+                "Failed to send PIN confirmation email for worker %s at pharmacy %s.",
+                worker_id, pharmacy_id,
+            )
+
+    transaction.on_commit(send_confirmation, robust=True)
 
     return membership, worker_pin
 
@@ -966,9 +1026,7 @@ def worker_update_own_pin(user, new_pin: str, pharmacy_id=None) -> WorkerPIN:
     if not (4 <= len(cleaned_pin) <= 6) or not cleaned_pin.isdigit():
         raise ValidationError("PIN must be 4 to 6 numeric digits.")
 
-    memberships = Membership.objects.filter(
-        user=user, is_active=True, status=Membership.Status.ACCEPTED,
-    )
+    memberships = pin_eligible_memberships().filter(user=user)
     if pharmacy_id is not None:
         memberships = memberships.filter(pharmacy_id=pharmacy_id)
     elif memberships.count() > 1:

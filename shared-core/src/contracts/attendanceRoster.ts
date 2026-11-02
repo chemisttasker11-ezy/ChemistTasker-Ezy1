@@ -9,6 +9,7 @@ export interface AttendanceWorkerStatus {
   is_provisional: boolean;
   is_on_break: boolean;
   last_event_type: string | null;
+  cover_type?: string | null;
 }
 
 export interface AttendanceClockResult {
@@ -19,6 +20,19 @@ export interface AttendanceClockResult {
   ended_at?: string | null;
   is_provisional?: boolean;
   status: 'CLOCKED_IN' | 'CLOCKED_OUT';
+}
+
+export interface AttendanceClockOptions {
+  confirm_opposite?: boolean;
+  request_id?: string;
+}
+
+export interface AttendanceConfirmRequiredResponse {
+  code: 'CONFIRM_OPPOSITE_ACTION';
+  last_action: 'CLOCK_IN' | 'CLOCK_OUT';
+  last_action_at: string;
+  pending_action: 'CLOCK_IN' | 'CLOCK_OUT';
+  message: string;
 }
 
 export interface AttendanceBreakResult {
@@ -170,3 +184,80 @@ export interface RosterAudit {
   created_at: string;
 }
 
+
+
+export interface PendingKioskReview {
+  event_id: string;
+  employee_id: number;
+  worker_name: string;
+  event_type: string;
+  device_id: number;
+  device_name: string;
+  pharmacy_timezone: string;
+  device_timestamp: string;
+  trusted_time_estimate: string | null;
+  received_at: string;
+  integrity_flags: string[];
+  can_approve: boolean;
+  approval_block_reason: string | null;
+}
+
+export interface DecideKioskReviewPayload {
+  event_id: string;
+  decision: 'APPROVED' | 'REJECTED';
+  reason: string;
+  corrected_timestamp?: string;
+}
+
+export interface WorkerCoverTermsOccurrence {
+  slot_id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+  agreed_rate?: string | null;
+}
+
+export interface WorkerCoverTermsPreview {
+  version: number;
+  acceptance_required: boolean;
+  settlement_channel: string;
+  engagement_kind: string;
+  payment_preference: string;
+  worker_id?: number;
+  provider_abn?: string | null;
+  provider_entity_name?: string | null;
+  relationship_notice?: string | null;
+  accepted_at: string | null;
+  blocked?: boolean;
+  payment_profile_incomplete?: boolean;
+  /** The pharmacy has no usable pay rate yet; only the pharmacy can fix it. */
+  pricing_missing?: boolean;
+  terms_version?: string;
+  notice?: string | null;
+  occurrences: WorkerCoverTermsOccurrence[];
+}
+
+export interface WorkerCoverTerms {
+  assignment_id: number;
+  provisional_id: number;
+  session_id: number;
+  pharmacy_id: number;
+  pharmacy_name: string;
+  cover_type: string;
+  status: string;
+  engagement_terms_accepted_at: string | null;
+  engagement_terms_preview: WorkerCoverTermsPreview;
+}
+
+export interface AcceptWorkerCoverTermsPayload {
+  engagementTermsAccepted?: boolean;
+  independentContractorStatusConfirmed?: boolean;
+  /** The preview's terms_version: the server refuses acceptance of terms that changed since review. */
+  termsVersion?: string;
+}
+
+export interface KioskReviewDecisionResponse {
+  decision: string;
+  review_id: number;
+  attendance_event_id: number | null;
+}

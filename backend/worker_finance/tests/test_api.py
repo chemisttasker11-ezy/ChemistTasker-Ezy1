@@ -436,6 +436,33 @@ class FinanceApiTests(TestCase):
         self.assertEqual(self.post(path, {'version': 1, 'confirmed': True}).status_code, 200)
         self.assertEqual(len(mail.outbox), 1)
 
+    @patch('worker_finance.documents.render_pdf', return_value=b'%PDF-test-only')
+    def test_send_inside_outer_transaction_fails_safely_and_can_retry(self, _render):
+        from django.db import transaction
+        from worker_finance.models import Delivery
+
+        record = self.create()
+        path = f'invoices/{record["id"]}/send/'
+        data = {'version': 1, 'confirmed': True}
+        self.client.raise_request_exception = False
+        # This explicit block is a real boundary, unlike TestCase's enclosing
+        # atomic block, which Django deliberately exempts from durable checks.
+        with transaction.atomic():
+            response = self.post(path, data)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(response.status_code, 503, response.content)
+        failed = Delivery.objects.get(invoice_id=record['id'], version=1)
+        self.assertEqual(failed.status, 'failed')
+        self.assertEqual(Invoice.objects.get(pk=record['id']).status, 'draft')
+
+        retried = self.post(path, data)
+        self.assertEqual(retried.status_code, 200, retried.content)
+        self.assertEqual(len(mail.outbox), 1)
+        completed = Delivery.objects.get(invoice_id=record['id'], version=1)
+        self.assertNotEqual(completed.pk, failed.pk)
+        self.assertEqual(completed.status, 'sent')
+        self.assertEqual(retried.data['document']['status'], 'sent')
+
     def test_super_payment_requires_fund_confirmation_and_never_increases_gst_sales(self):
         record = self.issue(self.create())
         self.post('items/seed/', {})

@@ -1,4 +1,5 @@
 """Serializers for organisations, pharmacies, chains, pharmacy admins and pharmacy claims."""
+from organizations.feature_port import pharmacy_features
 import logging
 
 from rest_framework import serializers
@@ -9,10 +10,10 @@ from users.serializers import UserProfileSerializer
 from django.db import transaction
 from organizations.access import org_wide_admin_organization_ids, user_can_edit_pharmacy_record, user_can_manage_pharmacy
 from organizations.chains import active_owner_chains_for_pharmacy
-from core.task_queue import async_task
-from core.serializer_lifecycle import RemoveOldFilesMixin
-from core.serializer_mixins import UploadValidationMixin
-from core.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
+from users.task_dispatch import async_task
+from infrastructure.serializer_lifecycle import RemoveOldFilesMixin
+from infrastructure.serializer_mixins import UploadValidationMixin
+from infrastructure.file_validation import DOCUMENT_UPLOAD_POLICY, IMAGE_UPLOAD_POLICY
 from users.models import OrganizationMembership
 from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
@@ -223,19 +224,19 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
     _hours_day_names = _weekday_day_names + ("saturdays", "sundays", "public_holidays")
 
     def get_public_holiday_dates(self, obj):
-        from shifts.holidays import full_day_public_holidays
+        full_day_public_holidays = pharmacy_features().full_day_public_holidays
         return full_day_public_holidays(
             getattr(obj, "state", ""), getattr(obj, "public_holiday_region", ""),
         )
 
     def get_public_holiday_windows(self, obj):
-        from shifts.holidays import part_day_public_holidays
+        part_day_public_holidays = pharmacy_features().part_day_public_holidays
         return part_day_public_holidays(
             getattr(obj, "state", ""), getattr(obj, "public_holiday_region", ""),
         )
 
     def get_public_holiday_calendar_status(self, obj):
-        from shifts.holidays import holiday_calendar_status
+        holiday_calendar_status = pharmacy_features().holiday_calendar_status
         return holiday_calendar_status(
             getattr(obj, "state", ""), getattr(obj, "public_holiday_region", ""),
         )
@@ -309,8 +310,8 @@ class PharmacySerializer(RemoveOldFilesMixin, UploadValidationMixin, serializers
                 raise serializers.ValidationError(
                     {"abn": ["This ABN is locked after verification and confirmation."]}
                 )
-        from shifts.holidays import region_details
-        from shifts.pricing_data import PricingDataError
+        region_details = pharmacy_features().region_details
+        PricingDataError = pharmacy_features().pricing_data_error()
 
         state = attrs.get("state", getattr(self.instance, "state", None))
         region = attrs.get(

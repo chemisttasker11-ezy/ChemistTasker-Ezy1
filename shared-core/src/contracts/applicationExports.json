@@ -427,6 +427,8 @@
   "createSubscriptionCheckout": "domains/billing/api.ts",
   "getCurrentSubscription": "domains/billing/api.ts",
   "updateSubscriptionSeats": "domains/billing/api.ts",
+  "resumeFulfillmentCheckout": "domains/billing/api.ts",
+  "expireFulfillmentCheckout": "domains/billing/api.ts",
   "chargeShiftFulfillment": "domains/billing/api.ts",
   "chargeShiftPenalty": "domains/billing/api.ts"
 }

@@ -1,4 +1,5 @@
 """Current-number AHPRA state shared by onboarding, access checks and employers."""
+from onboarding.feature_port import verification_features
 from datetime import date, timedelta
 import logging
 
@@ -153,7 +154,7 @@ def member_suspension_note(status):
 def require_ahpra_application(user):
     if not settings.AHPRA_ENFORCEMENT_ENABLED:
         return
-    from shifts.access import ShiftActionRefused
+    ShiftActionRefused = verification_features().shift_refusal_type()
     profile = ahpra_profile(user)
     state = ahpra_state(profile)
     if state['state'] == 'suspended' and not ahpra_frozen(user, state):
@@ -168,12 +169,11 @@ def require_ahpra_application(user):
 
 
 def require_public_ahpra(user, shift):
-    from shifts.escalation import PUBLIC_LEVEL
-    from shifts.interest import is_public_shift_member_access
+    is_public_shift_member_access = verification_features().is_public_shift_member_access
 
-    if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(user, shift):
+    if verification_features().is_public_shift(shift) and not is_public_shift_member_access(user, shift):
         require_ahpra_application(user)
-        from shifts.interest import _require_public_shift_onboarding
+        _require_public_shift_onboarding = verification_features().require_public_shift_onboarding
         _require_public_shift_onboarding(user)
         transaction.on_commit(lambda: queue_public_recheck(user), robust=True)
 
@@ -181,7 +181,7 @@ def require_public_ahpra(user, shift):
 def lock_public_ahpra(user, shift, *, manager=False):
     """Inside the booking transaction: lock the worker's AHPRA profile row (apply_state_transition holds the same
     lock) and re-check, so a booking cannot commit around a suspension that has not yet cancelled bookings."""
-    from shifts.access import ShiftActionRefused
+    ShiftActionRefused = verification_features().shift_refusal_type()
     profile = ahpra_profile(user)
     if profile is not None:
         type(profile).objects.select_for_update().filter(pk=profile.pk).first()
@@ -261,14 +261,14 @@ def apply_state_transition(profile, previous):
         return
     adverse_transition = current['state'] in ('suspended', 'type_not_accepted') and previous['state'] != current['state']
     if adverse_transition:
-        from shifts.cancellation import cancel_upcoming_assignments
+        cancel_upcoming_assignments = verification_features().cancel_upcoming_assignments
         reason = ('their AHPRA registration type is not accepted for pharmacist shifts'
                   if current['state'] == 'type_not_accepted' else 'their AHPRA registration is paused')
         bookings = cancel_upcoming_assignments(profile.user, reason=reason)
         transaction.on_commit(lambda: announce_suspension(profile, current, bookings), robust=True)
     if current['state'] == 'rejected' and previous['state'] != 'rejected':
         # A rejection keeps bookings: the pharmacy and our team resolve them by hand.
-        from shifts.cancellation import cancel_upcoming_assignments
+        cancel_upcoming_assignments = verification_features().cancel_upcoming_assignments
         bookings = cancel_upcoming_assignments(profile.user, cancel=False)['retained']
         if bookings:
             transaction.on_commit(lambda: announce_rejected_bookings(profile, bookings), robust=True)
@@ -281,7 +281,7 @@ def apply_state_transition(profile, previous):
 def close_chat_sockets(user_id):
     from asgiref.sync import async_to_sync
     from channels.layers import get_channel_layer
-    from chat.realtime import USER_GROUP_FMT
+    from infrastructure.channel_groups import USER_GROUP_FMT
 
     layer = get_channel_layer()
     if layer:
@@ -291,7 +291,7 @@ def close_chat_sockets(user_id):
 def announce_suspension(profile, state, bookings):
     from django.conf import settings
     from django.core.mail import send_mail
-    from core.task_queue import async_task
+    from users.task_dispatch import async_task
     from notifications.services import notify_users
 
     type_not_accepted = state['state'] == 'type_not_accepted'
@@ -317,7 +317,7 @@ def announce_suspension(profile, state, bookings):
 
 def announce_rejected_bookings(profile, bookings):
     from django.core.mail import send_mail
-    from shifts.cancellation import announce_bookings
+    announce_bookings = verification_features().announce_bookings
 
     name = profile.user.get_full_name() or profile.user.email
     announce_bookings(bookings, title='Booking needs immediate resolution',
@@ -333,7 +333,7 @@ def announce_rejected_bookings(profile, bookings):
 
 
 def announce_member_suspension(user, status):
-    from core.task_queue import async_task
+    from users.task_dispatch import async_task
     from memberships.models import Membership
     from notifications.services import notify_users
     from organizations.models import PharmacyAdmin

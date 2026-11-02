@@ -115,6 +115,7 @@ def post_shift(
         shift = Shift.objects.create(**validated_data)
         for slot in slots_data:
             ShiftSlot.objects.create(shift=shift, **slot)
+        # Announcements cannot undo a committed shift or suppress the next independent callback.
         transaction.on_commit(
             lambda: announce_posted_shift(
                 shift,
@@ -122,9 +123,10 @@ def post_shift(
                 notify_pharmacy_staff=notify_pharmacy_staff,
                 notify_favorite_staff=notify_favorite_staff,
                 notify_chain_members=notify_chain_members,
-            )
+            ),
+            robust=True,
         )
-        transaction.on_commit(lambda: announce_availability_matches(shift))
+        transaction.on_commit(lambda: announce_availability_matches(shift), robust=True)
         if apply_rates_to_pharmacy and validated_data.get('role_needed') == 'PHARMACIST':
             sync_pharmacy_rate_defaults(
                 pharmacy,
@@ -210,7 +212,7 @@ def revise_shift(
                 request_data=rate_request_data,
             )
 
-        transaction.on_commit(lambda: send_shift_updated_notifications(instance))
+        transaction.on_commit(lambda: send_shift_updated_notifications(instance), robust=True)
     return instance
 
 

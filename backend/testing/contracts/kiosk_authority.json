@@ -1,0 +1,81 @@
+[
+  {
+    "name": "manager-own-site",
+    "target_id": 7,
+    "user": {
+      "role": "PHARMACIST",
+      "admin_assignments": [
+        {
+          "pharmacy_id": 7,
+          "admin_level": "MANAGER"
+        }
+      ]
+    },
+    "expected": true
+  },
+  {
+    "name": "manager-other-site",
+    "target_id": 7,
+    "user": {
+      "role": "PHARMACIST",
+      "admin_assignments": [
+        {
+          "pharmacy_id": 8,
+          "admin_level": "MANAGER"
+        }
+      ]
+    },
+    "expected": false
+  },
+  {
+    "name": "roster-manager",
+    "target_id": 7,
+    "user": {
+      "role": "PHARMACIST",
+      "admin_assignments": [
+        {
+          "pharmacy_id": 7,
+          "admin_level": "ROSTER_MANAGER"
+        }
+      ]
+    },
+    "expected": false
+  },
+  {
+    "name": "communication-manager",
+    "target_id": 7,
+    "user": {
+      "role": "PHARMACIST",
+      "admin_assignments": [
+        {
+          "pharmacy_id": 7,
+          "admin_level": "COMMUNICATION_MANAGER"
+        }
+      ]
+    },
+    "expected": false
+  },
+  {
+    "name": "owner-admin",
+    "target_id": 7,
+    "user": {
+      "role": "PHARMACIST",
+      "admin_assignments": [
+        {
+          "pharmacy_id": 7,
+          "admin_level": "OWNER"
+        }
+      ]
+    },
+    "expected": true
+  },
+  {
+    "name": "ordinary-worker",
+    "target_id": 7,
+    "user": {
+      "role": "PHARMACIST",
+      "admin_assignments": []
+    },
+    "expected": false
+  }
+]

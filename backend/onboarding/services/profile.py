@@ -1,6 +1,6 @@
 """Profile data shared by the onboarding roles: the profile photo (basic tab) and the profile tab (resume and short
 bio), with old files deleted when replaced or cleared."""
-from core.serializer_lifecycle import _delete_file_if_unreferenced, _file_has_changed, _should_clear_flag
+from infrastructure.serializer_lifecycle import _delete_file_if_unreferenced, _file_has_changed, _should_clear_flag
 
 
 def apply_profile_photo(instance, vdata: dict, initial_data, update_fields: list):

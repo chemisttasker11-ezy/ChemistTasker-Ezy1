@@ -128,18 +128,6 @@ def module_level_app_edges():
 
 # (file, module) -> (names, reason). Keep this list short and every reason specific.
 ALLOWED_LEGACY_IMPORTS = {
-    ("chat/models.py", "client_profile.models.common"): (
-        {"chat_upload_path"},
-        "upload_to callable that chat.0001_initial and client_profile.0001 reference by its client_profile path",
-    ),
-    ("pharmacy_hub/models.py", "client_profile.models.common"): (
-        {"hub_attachment_upload_path"},
-        "upload_to callable that client_profile.0001 references by its client_profile path",
-    ),
-    ("onboarding/models.py", "client_profile.fields"): (
-        {"EncryptedTextField"},
-        "migrations deconstruct the field by its client_profile.fields path; moving it would generate migrations",
-    ),
     ("core/websocket_testing.py", "client_profile.characterization_support"): (
         {"make_owner_with_pharmacy", "make_staff_member", "make_user"},
         "test-support factories shared by the chat and notifications WebSocket tests",
@@ -177,24 +165,12 @@ LEGACY_CELERY_TASKS = {
     "workforce.tasks.rebuild_timesheet_task",
 }
 
-# Pairs of apps that already import each other at module level: mostly `users` (identity models plus the account API,
-# which reads organisations, memberships and shifts) and `core` (settings, URLs, shared utilities). New pairs fail.
-ALLOWED_MUTUAL_APP_PAIRS = {
-    # core is the composition root (URLconfs, ASGI, WebSocket routing, sitemap) and the shared utility package
-    ("chat", "core"),
-    ("core", "shifts"),
-    ("core", "users"),
-    # the kernel facade re-exports onboarding; onboarding.models uses the migration-bound client_profile.fields
-    ("client_profile", "onboarding"),
-    # memberships link users to pharmacies and organisations; the organisation, account and session APIs read them
-    ("memberships", "organizations"),
-    ("memberships", "users"),
-    ("organizations", "users"),
-
-}
+# All reviewed module-level mutual pairs have been removed. Longer cycles are
+# independently retained in the full graph ledger; this is not global acyclicity.
+ALLOWED_MUTUAL_APP_PAIRS = set()
 
 # Upper bound of code lines (no blank, comment or docstring lines) in the kernel's runtime modules.
-KERNEL_CODE_LINE_CEILING = 291
+KERNEL_CODE_LINE_CEILING = 259
 
 # Top-level definitions per kernel runtime module. A module may lose names; it may not gain any.
 KERNEL_DEFINITIONS = {
@@ -203,7 +179,7 @@ KERNEL_DEFINITIONS = {
     "client_profile/domains/__init__.py": set(),
     "client_profile/domains/common/__init__.py": set(),
     "client_profile/domains/common/access.py": set(),
-    "client_profile/fields.py": {"ENCRYPTED_VALUE_PREFIX", "EncryptedTextField", "_build_fernet"},
+    "client_profile/fields.py": {"EncryptedTextField"},
     "client_profile/models/__init__.py": set(),
     "client_profile/models/common.py": {"chat_upload_path", "hub_attachment_upload_path"},
     "client_profile/models/memberships.py": set(),

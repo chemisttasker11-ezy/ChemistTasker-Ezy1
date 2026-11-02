@@ -672,7 +672,7 @@ class TimesheetPeriodListCreateView(APIView):
                 start_date=start_date,
                 end_date=end_date,
                 defaults={
-                    "timezone": str(getattr(pharmacy, "timezone", "") or "Australia/Brisbane"),
+                    "timezone": str(get_pharmacy_timezone(pharmacy)),
                     "created_by": request.user,
                 },
             )

@@ -32,7 +32,7 @@ def append_missing_punch(*, timesheet: Timesheet, manager, session_id: int, even
 
     with transaction.atomic():
         session = (
-            AttendanceSession.objects.select_for_update()
+            AttendanceSession.objects.select_for_update(of=("self",))
             .select_related("pharmacy", "user")
             .prefetch_related("events__corrections")
             .get(pk=session_id)

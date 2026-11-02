@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Alert, Linking, StyleSheet, View } from 'react-native';
 import { Button, Chip, Icon, Text } from 'react-native-paper';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { attendance, canManageKioskDevices, workforce } from '@chemisttasker/shared-core';
+import type { ShiftOffer, WorkerCoverTerms } from '@chemisttasker/shared-core';
+import ShiftEngagementTermsDialog from '../../roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useAuth } from '@/context/AuthContext';
 import { ActionButtons, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
@@ -106,7 +108,8 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
     return <ParityPage title={titles[screen]} subtitle="Review provisional and cross-site attendance before it becomes rostered history." loading={loading} error={error} onRetry={load} onRefresh={()=>{setRefreshing(true);void load();}} refreshing={refreshing}>
       <MetricGrid items={[{label:'Pending',value:pending.length,tone:pending.length?'warning':'success'}]}/>
       <Section title="Pending provisional shifts">
-        {pending.length?pending.map((row:any)=><DataRow key={row.provisional_id} title={row.worker_name||row.worker_email||'Worker'} subtitle={`${replaceUnderscore(row.cover_type)} · ${dateLabel(row.started_at)}`} status={row.status||'PENDING'} onPress={()=>router.push(`/attendance/reviews/${row.provisional_id}` as any)}/>):<EmptyState title="Nothing to review" body="No provisional attendance is waiting for a manager decision."/>}
+        {pending.some((row:any)=>coverInfo(row.cover_type).hint)?<InfoNote title="Unbooked locum cover" tone="warning">{UNBOOKED_HINT}</InfoNote>:null}
+        {pending.length?pending.map((row:any)=><DataRow key={row.provisional_id} title={row.worker_name||row.worker_email||'Worker'} subtitle={`${coverInfo(row.cover_type).label} · ${dateLabel(row.started_at)}`} status={row.status||'PENDING'} onPress={()=>router.push(`/attendance/reviews/${row.provisional_id}` as any)}/>):<EmptyState title="Nothing to review" body="No provisional attendance is waiting for a manager decision."/>}
       </Section>
     </ParityPage>;
   }
@@ -122,7 +125,8 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
       {label:'Pharmacy',value:status?.pharmacy_name||'—'},
       {label:'Break',value:status?.is_on_break?'On break':'Working',tone:status?.is_on_break?'warning':'success'},
     ]}/>
-    {status?.is_provisional?<InfoNote title="Provisional attendance" tone="warning">This session needs manager review before it is treated as approved roster history.</InfoNote>:null}
+    <ProvisionalNote status={status}/>
+    <CoverTerms/>
     <Section title="Attendance tools">
       <ScreenLink title="Clock & breaks" subtitle="Clock in/out from a pharmacy QR token and manage breaks." onPress={()=>router.push('/attendance/clock' as any)}/>
       <ScreenLink title="Attendance correction" subtitle={manager?'Append an audited correction to a recorded event.':'Request a missing-punch correction through your timesheet.'} onPress={()=>router.push('/attendance/corrections/new' as any)}/>
@@ -133,6 +137,84 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
   </ParityPage>;
 }
 
+const UNBOOKED_HINT='No booking or membership here: a manager must approve this before any time is payable.';
+function coverInfo(type:string){
+  return type==='UNBOOKED_LOCUM_COVER'?{label:'Unbooked locum cover',hint:UNBOOKED_HINT}:{label:replaceUnderscore(type),hint:''};
+}
+
+// The cover-terms API is snake_case; the shared terms dialog reads the camelCase offer preview.
+function camelize(value:any):any{
+  if(Array.isArray(value)) return value.map(camelize);
+  if(value&&typeof value==='object') return Object.fromEntries(Object.entries(value).map(([key,item])=>[key.replace(/_([a-z])/g,(_,c)=>c.toUpperCase()),camelize(item)]));
+  return value;
+}
+
+// Approved emergency cover is closed, so it is listed apart from the live clock-in status.
+function CoverTerms() {
+  const router=useRouter();
+  const {user}=useAuth();
+  const [covers,setCovers]=useState<WorkerCoverTerms[]>([]);
+  const [failed,setFailed]=useState(false);
+  const [selectedId,setSelectedId]=useState<number|null>(null);
+  const [accepting,setAccepting]=useState(false);
+  const [acceptError,setAcceptError]=useState('');
+  const acceptingRef=useRef(false);
+  const paymentPath=user?.role==='PHARMACIST'?'/pharmacist/profile-payment':user?.role==='OTHER_STAFF'?'/otherstaff/profile-payment':null;
+  const loadCovers=useCallback(async()=>{
+    try{setCovers(asArray(await attendance.getWorkerCoverTerms()));setFailed(false);}
+    catch{setFailed(true);}
+  },[]);
+  useEffect(()=>{void loadCovers();},[loadCovers]);
+
+  const selected=covers.find((cover)=>cover.assignment_id===selectedId);
+  const offers=useMemo(()=>selected?([{engagementTermsPreview:camelize(selected.engagement_terms_preview)}] as unknown as ShiftOffer[]):null,[selected]);
+  const shown=covers.filter((cover)=>{
+    const terms=cover.engagement_terms_preview;
+    return cover.status==='APPROVED'&&(cover.engagement_terms_accepted_at||terms.payment_profile_incomplete||terms.pricing_missing||(terms.acceptance_required&&terms.settlement_channel==='INVOICE'));
+  });
+  const openPaymentProfile=paymentPath?()=>router.push(paymentPath as any):undefined;
+  const accept=async(payload:{engagementTermsAccepted?:boolean;independentContractorStatusConfirmed?:boolean})=>{
+    if(selectedId==null||acceptingRef.current) return;
+    acceptingRef.current=true;
+    setAccepting(true);setAcceptError('');
+    try{
+      await attendance.acceptWorkerCoverTerms(selectedId,{...payload,termsVersion:selected?.engagement_terms_preview.terms_version});
+      setSelectedId(null);
+      await loadCovers();
+    }catch(e:any){setAcceptError(errorMessage(e,'Could not accept the terms. Try again.'));}
+    finally{acceptingRef.current=false;setAccepting(false);}
+  };
+
+  if(!failed&&!shown.length) return null;
+  return <Section title="Approved cover" description="Accept the engagement terms for cover a manager approved so it can be invoiced.">
+    {failed?<>
+      <InfoNote title="Cover terms" tone="warning">Unable to load your approved cover terms.</InfoNote>
+      <Button mode="outlined" onPress={()=>void loadCovers()}>Try again</Button>
+    </>:null}
+    {shown.map((cover)=>{
+      const terms=cover.engagement_terms_preview;
+      const first=terms.occurrences[0];
+      const accepted=Boolean(cover.engagement_terms_accepted_at);
+      const when=first?` · ${first.date} ${first.start_time.slice(0,5)}–${first.end_time.slice(0,5)}`:'';
+      return <View key={cover.assignment_id} style={scannerStyles.coverRow}>
+        <DataRow title={cover.pharmacy_name} subtitle={`${coverInfo(cover.cover_type).label}${when}${accepted?' · Terms accepted':''}`}/>
+        {!accepted&&terms.payment_profile_incomplete?<>
+          <InfoNote title="Payment details incomplete" tone="warning">{terms.notice||'Your payment details are incomplete.'}</InfoNote>
+          {openPaymentProfile?<Button mode="outlined" onPress={openPaymentProfile}>Complete payment profile</Button>:null}
+        </>:null}
+        {!accepted&&terms.pricing_missing?<InfoNote title="Pay rate not set" tone="info">{terms.notice||'Ask the pharmacy to set its pay rates before you can accept these terms.'}</InfoNote>:null}
+        {!accepted&&!terms.blocked?<ActionButtons><Button mode="contained" onPress={()=>{setAcceptError('');setSelectedId(cover.assignment_id);}}>Accept terms</Button></ActionButtons>:null}
+      </View>;
+    })}
+    {offers?<ShiftEngagementTermsDialog visible offers={offers} loading={accepting} error={acceptError} onDismiss={()=>setSelectedId(null)} onConfirm={accept} onOpenPaymentProfile={openPaymentProfile}/>:null}
+  </Section>;
+}
+
+function ProvisionalNote({status}:{status:any}) {
+  if(!status?.is_provisional) return null;
+  return <InfoNote title="Provisional attendance" tone="warning">{status.cover_type==='UNBOOKED_LOCUM_COVER'?'Unbooked cover: a manager at this pharmacy must approve this session before it is payable.':'This session needs manager review before it is treated as approved roster history.'}</InfoNote>;
+}
+
 function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const [qrToken,setQrToken]=useState('');
   const [busy,setBusy]=useState(false);
@@ -141,18 +223,40 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
   const [scanLocked,setScanLocked]=useState(false);
   const [permission,requestPermission]=useCameraPermissions();
   const active=Boolean(status?.has_active_session);
-  const run=async(kind:'in'|'out'|'break-start'|'break-end',scannedToken?:string)=>{
+  const run=async(kind:'in'|'out'|'break-start'|'break-end',scannedToken?:string,confirmOpposite?:boolean)=>{
     const token=(scannedToken??qrToken).trim();
     setBusy(true);setLocalError('');
     try{
-      if(kind==='in') await attendance.clockIn(token);
-      if(kind==='out') await attendance.clockOut(token);
+      if(kind==='in') await attendance.clockIn(token, confirmOpposite ? { confirm_opposite: true } : undefined);
+      if(kind==='out') await attendance.clockOut(token, confirmOpposite ? { confirm_opposite: true } : undefined);
       if(kind==='break-start') await attendance.breakStart();
       if(kind==='break-end') await attendance.breakEnd();
       setQrToken('');
       setScannerOpen(false);
       await onReload();
-    }catch(e){setLocalError(errorMessage(e,'Attendance action failed.'));}
+    }catch(e: any){
+      // shared-core ApiError carries the server body in `payload`.
+      const errData = e?.payload;
+      const is409 = e?.status === 409 && errData?.code === 'CONFIRM_OPPOSITE_ACTION';
+      if (is409) {
+        const message = errData?.message || (kind === 'out' ? 'You just clocked in. Clock out now?' : 'You just clocked out. Clock in now?');
+        Alert.alert(
+          'Confirm clock action',
+          message,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Confirm',
+              onPress: () => {
+                void run(kind, token, true);
+              },
+            },
+          ]
+        );
+        return;
+      }
+      setLocalError(errorMessage(e,'Attendance action failed.'));
+    }
     finally{setBusy(false);setScanLocked(false);}
   };
 
@@ -188,6 +292,7 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
   return <ParityPage title="Clock & breaks" subtitle="Scan the rotating pharmacy kiosk QR to clock in or out. Break actions use your active session." loading={loading} error={error||localError}>
     <MetricGrid minItemWidth={140} items={[{label:'Status',value:active?'Clocked in':'Not clocked in',tone:active?'success':'primary'},{label:'Pharmacy',value:status?.pharmacy_name||'—'},{label:'Started',value:status?.started_at?dateLabel(status.started_at):'—'}]}/>
 
+    <ProvisionalNote status={status}/>
     <Section title={active?'Scan to clock out':'Scan to clock in'} description="The kiosk QR changes regularly and is valid only for its pharmacy.">
       {scannerOpen ? <View style={scannerStyles.scannerShell}>
         <View style={scannerStyles.cameraFrame}>
@@ -239,6 +344,7 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
 }
 
 const scannerStyles=StyleSheet.create({
+  coverRow:{gap:8},
   scannerShell:{gap:12},
   cameraFrame:{height:360,borderRadius:16,overflow:'hidden',backgroundColor:'#07111F',position:'relative'},
   scanOverlay:{...StyleSheet.absoluteFillObject,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(7,17,31,0.24)'},
@@ -269,7 +375,8 @@ function ReviewDetail({screen,row,timeline,loading,error,onReload}:{screen:Atten
   return <ParityPage title={titles[screen]} subtitle="Session chronology and audit-safe manager decision." loading={loading} error={error||localError}>
     {!row?<EmptyState title="Attendance record not found" body="This provisional attendance item is no longer pending for the selected pharmacy."/>:<>
       <Section title={row.worker_name||'Worker'} description={row.worker_email}>
-        <MetricGrid items={[{label:'Cover type',value:replaceUnderscore(row.cover_type)},{label:'Started',value:dateLabel(row.started_at)},{label:'Ended',value:row.ended_at?dateLabel(row.ended_at):'In progress',tone:row.ended_at?'success':'warning'}]}/>
+        <MetricGrid items={[{label:'Cover type',value:coverInfo(row.cover_type).label},{label:'Started',value:dateLabel(row.started_at)},{label:'Ended',value:row.ended_at?dateLabel(row.ended_at):'In progress',tone:row.ended_at?'success':'warning'}]}/>
+        {coverInfo(row.cover_type).hint?<InfoNote title="Unbooked locum cover" tone="warning">{UNBOOKED_HINT}</InfoNote>:null}
         {row.source_pharmacy_name?<DataRow title="Home pharmacy" subtitle={row.source_pharmacy_name}/>:null}
       </Section>
       <Section title="Session chronology">

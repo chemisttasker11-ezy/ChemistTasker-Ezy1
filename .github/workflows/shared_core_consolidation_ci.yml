@@ -117,6 +117,9 @@ jobs:
       - name: WebSocket URL tests
         run: node --test scripts/ws-url.test.mjs
         working-directory: frontend_web
+      - name: Attendance and kiosk tests
+        run: node --test src/pages/attendance/KioskEvidenceReview.test.mjs src/pages/attendance/KioskPairingDialog.test.mjs src/pages/attendance/KioskDoubleClock.test.mjs src/pages/attendance/WorkerDoubleClock.test.mjs src/pages/attendance/WorkerAttendancePinGuidance.test.mjs src/pages/attendance/KioskLocumGuidance.test.mjs src/pages/attendance/ManagerLocumReview.test.mjs src/pages/attendance/WorkerCoverTerms.test.mjs
+        working-directory: frontend_web
       - name: Build Vite app
         run: npx vite build
         working-directory: frontend_web
@@ -198,8 +201,8 @@ jobs:
       - name: Mobile dependency exploit and compatibility regressions
         run: npm run test:security
         working-directory: frontend_mobile
-      - name: Mobile calendar request budget contract
-        run: node --test scripts/calendar-request-budget.test.cjs
+      - name: Mobile calendar, attendance and invoice contracts
+        run: node --test scripts/calendar-request-budget.test.cjs scripts/attendance-double-clock.test.cjs scripts/attendance-pin-guidance.test.cjs scripts/invoice-generation.test.cjs scripts/native-file-bytes.test.cjs features/parity/attendanceLocum.test.mjs features/parity/attendanceCoverTerms.test.mjs
         working-directory: frontend_mobile
       - name: Verify patched runtime dependencies and reject new advisories
         run: npm run security:dependencies
@@ -227,6 +230,8 @@ jobs:
         run: python backend/manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
       - name: Auth and account contracts
         run: python backend/manage.py test users billing --settings=core.contract_test_settings
+      - name: Bounded notification outage contracts
+        run: python backend/manage.py test shifts.test_operational_outages --settings=core.contract_test_settings
       - name: Marketplace contracts
         run: python backend/manage.py test marketplace.tests marketplace.test_listing_policy ethical_marketplace.tests ethical_marketplace.test_finalisation marketplace.test_pr201_b24_b25 --settings=core.contract_test_settings
       - name: Large-module ratchet
@@ -234,15 +239,15 @@ jobs:
       - name: Public content contracts
         run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
       - name: Membership, engagement and invoice contracts
-        run: python backend/manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity --settings=core.contract_test_settings
+        run: python backend/manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity worker_finance.test_preview_source invoicing.test_smtp_protocol core.test_invoice_acceptance_fixture --settings=core.contract_test_settings
       - name: Real PDF rendering contract
         run: python backend/manage.py test core.test_pdf_rendering_contract --settings=core.contract_test_settings
       - name: Kernel and domain app tests
-        run: python backend/manage.py test client_profile attendance chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar core.test_admin_registry_contract --settings=core.contract_test_settings
+        run: python backend/manage.py test client_profile attendance.test_approval_locking attendance.test_favourite_cover attendance.test_helpers attendance.test_pin_clock attendance.test_rostered_corrections attendance.test_timezone_resolution chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar core.test_admin_registry_contract --settings=core.contract_test_settings
       - name: Pharmacy authorization and multipart preservation contracts
         run: python backend/manage.py test organizations.test_pharmacy_access_characterization organizations.test_pharmacy_upload_contract --settings=core.contract_test_settings
       - name: Promoted domain app and architecture contracts
-        run: python backend/manage.py test shifts memberships organizations onboarding dashboards core.test_client_profile_api_composition core.test_shift_domain_contract core.test_membership_domain_contract core.test_organization_domain_contract core.test_onboarding_domain_contract core.test_dashboard_read_model_contract core.test_client_profile_common_contract core.test_kernel_utility_ownership core.test_operational_model_import_ownership core.test_promoted_model_import_ownership core.test_serializer_lifecycle_ownership core.test_backend_ownership_boundaries core.test_public_error_surface core.test_task_contracts core.test_task_dispatch_registration --settings=core.contract_test_settings
+        run: python backend/manage.py test shifts memberships organizations onboarding dashboards core.test_client_profile_api_composition core.test_shift_domain_contract core.test_membership_domain_contract core.test_organization_domain_contract core.test_onboarding_domain_contract core.test_dashboard_read_model_contract core.test_client_profile_common_contract core.test_kernel_utility_ownership core.test_upload_infrastructure_contract core.test_serializer_values_boundary core.test_encrypted_field_boundary core.test_runtime_ownership_cleanup core.test_serializer_runtime_boundary core.test_foundation_startup core.test_foundation_dependencies users.test_cross_client_authority_contract users.test_worker_organization_boundary core.test_operational_model_import_ownership core.test_promoted_model_import_ownership core.test_serializer_lifecycle_ownership core.test_backend_ownership_boundaries core.test_public_error_surface core.test_task_contracts core.test_task_dispatch_registration --settings=core.contract_test_settings
       - name: Public hub editorial and community contracts
         env:
           PUBLIC_COMMUNITY_ENABLED: "true"
@@ -265,7 +270,7 @@ jobs:
           python -m unittest attendance_tests.test_security_boundaries
           python -m unittest attendance_tests.test_roster_worker_actions.RosterWorkerActionsTests.test_acknowledgement_action_available_only_on_published_week
       - name: Workforce and finance contracts
-        run: python backend/manage.py test workforce.tests worker_finance.tests --settings=core.contract_test_settings
+        run: python backend/manage.py test workforce.tests.test_assignment_protection workforce.tests.test_employment workforce.tests.test_pr201_roster workforce.tests.test_publication_contract workforce.tests.test_roster_admin_capabilities workforce.tests.test_roster_escalation workforce.tests.test_roster_escalation_lock workforce.tests.test_roster_revision workforce.tests.test_roster_shift_republish workforce.tests.test_roster_slot_concurrency workforce.tests.test_roster_slot_http_contract workforce.tests.test_rostered_corrections workforce.tests.test_timesheet_state_machine workforce.tests.test_payroll_activation_locking workforce.tests.test_assignment_freeze workforce.tests.test_assignment_freeze_postgres workforce.tests.test_timesheets workforce.tests.test_timezone_resolution worker_finance.tests --settings=core.contract_test_settings
       - name: Isolated finance API contracts
         run: python backend/manage.py test worker_finance.tests --settings=worker_finance.tests.settings
       - name: Signal and startup contracts
@@ -306,7 +311,7 @@ jobs:
       - name: PostgreSQL migration rehearsal
         run: python backend/manage.py migrate --noinput --settings=core.postgres_test_settings
       - name: PostgreSQL concurrency contracts
-        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards billing.test_pr201_finance_pg ethical_marketplace.test_pr201_b31_pg marketplace.tests marketplace.test_pr201_b24_b25 attendance.test_approval_locking onboarding.test_verification_transitions shifts.test_shift_actions_contract workforce.tests.test_publication_contract workforce.tests.test_roster_slot_concurrency workforce.tests.test_timesheets --settings=core.postgres_test_settings
+        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards billing.test_pr201_finance_pg billing.test_checkout_reservations_postgres worker_finance.test_preview_source ethical_marketplace.test_pr201_b31_pg marketplace.tests marketplace.test_pr201_b24_b25 attendance.test_approval_locking attendance.test_kiosk_pairing attendance.test_kiosk_review attendance.test_clock_locking attendance.test_pin_eligibility attendance.test_unbooked_locum_cover attendance.test_cover_terms_acceptance attendance.test_cover_terms_concurrency attendance.test_cover_terms_review invoicing.test_assignment_terms_postgres invoicing.test_delivery_postgres workforce.tests.test_cover_terms_authority workforce.tests.test_locum_approval_gate attendance_tests.test_double_clock_guard onboarding.test_verification_transitions shifts.test_shift_actions_contract workforce.tests.test_publication_contract workforce.tests.test_roster_slot_concurrency workforce.tests.test_timesheets workforce.tests.test_timesheet_state_machine workforce.tests.test_payroll_activation_locking workforce.tests.test_assignment_freeze workforce.tests.test_assignment_freeze_postgres client_profile.test_membership_application_integrity.DeferredPayrollActivationTests --settings=core.postgres_test_settings
 
   boundary-audit:
     runs-on: ubuntu-latest
@@ -356,8 +361,10 @@ jobs:
         run: python3 -m unittest discover -s scripts -p 'test_module_import_graph.py' -v
       - name: Verify attendance-workforce import ownership without permission drift
         run: python3 -m unittest discover -s scripts -p 'test_attendance_workforce_dependency.py' -v
-      - name: Reject new unapproved Django module cycles
-        run: python3 scripts/module_import_graph.py --check --check-baseline
+      - name: Reject every Django module cycle and growth of combined runtime cycles
+        run: python3 scripts/module_import_graph.py --check --check-all-cycles --check-baseline
+      - name: Verify complete runtime cycle ledger
+        run: python3 scripts/runtime_cycle_ledger.py --check
       - run: node scripts/audit-architecture-boundaries.mjs
       - run: node scripts/audit-shared-core-package.mjs
       - run: node --test scripts/audit-api-v1-cutover.test.mjs

@@ -2,8 +2,8 @@
 (pharmacist, owner), role classification (other staff, explorer) and the owner's pharmacy details."""
 from rest_framework import serializers
 
-from core.numbers import coerce_float_6 as q6
-from core.serializer_lifecycle import _update_locked_user_fields
+from infrastructure.numbers import coerce_float_6 as q6
+from users.identity_updates import _update_locked_user_fields
 from onboarding.services.profile import apply_profile_photo
 
 

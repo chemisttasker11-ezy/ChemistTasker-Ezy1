@@ -365,25 +365,19 @@ class TimesheetTransitionPostgresLockingTests(TransactionTestCase):
         queries = list(captured.captured_queries)
         period_table = connection.ops.quote_name(TimesheetPeriod._meta.db_table)
         timesheet_table = connection.ops.quote_name(Timesheet._meta.db_table)
-        period_from = f"FROM {period_table}"
-        timesheet_from = f"FROM {timesheet_table}"
-        period_locks = [
-            index
-            for index, query in enumerate(queries)
-            if "FOR UPDATE" in query["sql"].upper()
-            and period_from in query["sql"]
-        ]
-        timesheet_locks = [
-            index
-            for index, query in enumerate(queries)
-            if "FOR UPDATE" in query["sql"].upper()
-            and timesheet_from in query["sql"]
-        ]
-        self.assertTrue(period_locks, "builder must lock the timesheet period")
-        self.assertTrue(timesheet_locks, "builder must lock the timesheet row")
+        locks = []
+        for table, mode in ((period_table, "FOR NO KEY UPDATE"), (timesheet_table, "FOR UPDATE")):
+            matching = [
+                (index, query["sql"])
+                for index, query in enumerate(queries)
+                if f"FROM {table} " in query["sql"] and " FOR " in query["sql"]
+            ]
+            self.assertEqual(len(matching), 1, f"Expected exactly one builder lock for {table}: {matching}")
+            self.assertTrue(matching[0][1].endswith(f"{mode} OF {table}"), matching[0][1])
+            locks.append(matching[0][0])
         self.assertLess(
-            period_locks[0],
-            timesheet_locks[0],
+            locks[0],
+            locks[1],
             "builder lock order must be period then timesheet to match transition/period locking",
         )
 

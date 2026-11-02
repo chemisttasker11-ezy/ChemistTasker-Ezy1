@@ -17,6 +17,8 @@ from django.db.models import Avg
 from django.utils import timezone
 from shifts.pricing import expand_shift_slots
 from shifts.finalize import finalize_shift_offer
+from shifts.events import payroll_activated
+from shifts.payroll import activation_work_dates
 from shifts.emails import (
     active_shift_url_for_user,
     build_offer_shift_details,
@@ -27,7 +29,7 @@ from shifts.emails import (
 )
 from users.role_labels import user_work_role_label
 from shifts.notifications import notify_shift_users
-from core.task_queue import async_task
+from users.task_dispatch import async_task
 from shifts.access import Http400
 from django.db import transaction
 from decimal import Decimal
@@ -35,7 +37,6 @@ from organizations.access import managed_pharmacies as managed_pharmacies_for, u
 from shifts.base import SHIFT_OFFER_BUZZ_COOLDOWN
 from shifts.assignment import slot_locked_for_shift_offer
 from shifts.access import _user_can_perform_shift_role
-from shifts.interest import _require_public_shift_onboarding, is_public_shift_member_access
 from shifts.serializers import (
     ShiftInterestSerializer,
     ShiftOfferSerializer,
@@ -360,8 +361,6 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         slot_obj = offer.slot
         if not _user_can_perform_shift_role(offer.user, shift.role_needed):
             return Response({'detail': 'Your role does not cover this shift.'}, status=status.HTTP_400_BAD_REQUEST)
-        if shift.visibility == 'PLATFORM' and not is_public_shift_member_access(offer.user, shift):
-            _require_public_shift_onboarding(offer.user)
         if slot_obj is None:
             locked = shift.slot_assignments.exists() or shift.offers.filter(
                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -443,6 +442,11 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                     ).exclude(id=offer.id).update(status=ShiftOffer.Status.EXPIRED, updated_at=timezone.now())
 
         def send_acceptance_notifications():
+            def enqueue_confirmation_email(**kwargs):
+                def enqueue():
+                    async_task('users.tasks.send_async_email', **kwargs)
+                transaction.on_commit(enqueue, robust=True)
+
             if not requires_payment:
                 send_shift_payment_finalized_notifications(
                     shift=shift,
@@ -484,8 +488,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                         **offer_details,
                     },
                 )
-                async_task(
-                    'users.tasks.send_async_email',
+                enqueue_confirmation_email(
                     subject=(
                         f"Thanks for confirming your shift at {pharmacy_display} - owner payment pending"
                         if requires_payment
@@ -533,8 +536,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                         **offer_details,
                     },
                 )
-                async_task(
-                    'users.tasks.send_async_email',
+                enqueue_confirmation_email(
                     subject=f"{worker_role_label} confirmed shift offer at {pharmacy_display}" + (" - Action Required" if requires_payment else ""),
                     recipient_list=[owner_user.email],
                     template_name="emails/owner_worker_confirmed.html",
@@ -566,7 +568,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         with transaction.atomic():
             offer = (
                 ShiftOffer.objects
-                .select_for_update()
+                .select_for_update(of=("self",))
                 .select_related("shift__pharmacy", "user")
                 .get(pk=pk)
             )
@@ -612,22 +614,51 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            activated_at = timezone.now()
-            offer.settlement_channel = SETTLEMENT_PAYROLL
-            offer.payroll_activated_at = activated_at
-            offer.save(update_fields=[
-                "settlement_channel",
-                "payroll_activated_at",
-                "updated_at",
-            ])
-            assignment_count = ShiftSlotAssignment.objects.filter(
+            activated_at = offer.payroll_activated_at or timezone.now()
+            offer_changed = offer.settlement_channel != SETTLEMENT_PAYROLL or offer.payroll_activated_at is None
+            if offer_changed:
+                offer.settlement_channel = SETTLEMENT_PAYROLL
+                offer.payroll_activated_at = activated_at
+                offer.save(update_fields=[
+                    "settlement_channel",
+                    "payroll_activated_at",
+                    "updated_at",
+                ])
+            assignments = list(ShiftSlotAssignment.objects.filter(
                 source_offer=offer,
                 payment_preference_snapshot=PAYMENT_TFN,
                 engagement_kind=KIND_SHIFT_EMPLOYMENT,
-            ).update(
-                settlement_channel=SETTLEMENT_PAYROLL,
-                payroll_activated_at=activated_at,
-            )
+            ).select_related("slot").order_by("pk"))
+            assignment_count = len(assignments)
+            changed = [row for row in assignments if (
+                row.settlement_channel != SETTLEMENT_PAYROLL or row.payroll_activated_at != activated_at
+            )]
+            if changed:
+                # Settlement activation is not a published-roster edit. Keep the
+                # bounded bulk write, then let workforce invalidate its projections.
+                ShiftSlotAssignment.objects.filter(pk__in=[row.pk for row in changed]).update(
+                    settlement_channel=SETTLEMENT_PAYROLL,
+                    payroll_activated_at=activated_at,
+                )
+            if changed or offer_changed:
+                try:
+                    payroll_activated.send(
+                        sender=ShiftOffer,
+                        pharmacy_id=shift.pharmacy_id,
+                        user_id=offer.user_id,
+                        work_dates=activation_work_dates(offer, changed, include_pending=offer_changed),
+                    )
+                except DjangoValidationError as exc:
+                    if getattr(exc, "code", None) != "locked_payroll_period":
+                        raise
+                    # The workforce refusal happens inside this transaction;
+                    # returning a conflict must roll back offer and assignment writes.
+                    transaction.set_rollback(True)
+                    return Response({
+                        "code": exc.code,
+                        "detail": exc.message,
+                        "period_ids": exc.params["period_ids"],
+                    }, status=status.HTTP_409_CONFLICT)
 
         return Response({
             'status': 'payroll_activated',

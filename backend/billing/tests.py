@@ -23,8 +23,8 @@ class _StripeObject(dict):
 
 @override_settings(STRIPE_WEBHOOK_SECRET='whsec-test')
 class StripeWebhookIdempotencyTests(TestCase):
-    @patch('billing.views.stripe.Webhook.construct_event')
-    @patch('billing.views._finalize_pending_offers_for_shift')
+    @patch('billing.stripe_support.stripe.Webhook.construct_event')
+    @patch("billing.payment_events._finalize_pending_offers_for_shift")
     def test_failed_fulfillment_rolls_back_payment_and_allows_retry(self, finalize, construct_event):
         owner = get_user_model().objects.create_user(email='billing-owner@example.test', role='OWNER')
         pharmacy = Pharmacy.objects.create(name='Billing test pharmacy')
@@ -52,9 +52,9 @@ class StripeWebhookIdempotencyTests(TestCase):
         shift.refresh_from_db()
         self.assertEqual(shift.payment_status, 'PAID')
 
-    @patch('billing.views.logger.exception')
-    @patch('billing.views._process_stripe_event', side_effect=RuntimeError('failed attempt'))
-    @patch('billing.views.stripe.Webhook.construct_event')
+    @patch('billing.webhooks.logger.exception')
+    @patch('billing.webhooks._process_stripe_event', side_effect=RuntimeError('failed attempt'))
+    @patch('billing.stripe_support.stripe.Webhook.construct_event')
     def test_failed_attempt_cannot_downgrade_a_completed_retry(self, construct_event, process, log):
         construct_event.return_value = self._event('evt_interleaved')
         # Reproduce the interleaving after rollback but before recording failure.
@@ -76,8 +76,8 @@ class StripeWebhookIdempotencyTests(TestCase):
             data=_StripeObject(object=_StripeObject()),
         )
 
-    @patch('billing.views._process_stripe_event')
-    @patch('billing.views.stripe.Webhook.construct_event')
+    @patch('billing.webhooks._process_stripe_event')
+    @patch('billing.stripe_support.stripe.Webhook.construct_event')
     def test_replayed_processed_event_is_not_processed_twice(self, construct_event, process_event):
         construct_event.return_value = self._event()
 
@@ -101,8 +101,8 @@ class StripeWebhookIdempotencyTests(TestCase):
         self.assertEqual(delivery.status, StripeWebhookEvent.Status.PROCESSED)
         self.assertIsNotNone(delivery.processed_at)
 
-    @patch('billing.views._process_stripe_event')
-    @patch('billing.views.stripe.Webhook.construct_event')
+    @patch('billing.webhooks._process_stripe_event')
+    @patch('billing.stripe_support.stripe.Webhook.construct_event')
     def test_failed_event_can_be_retried_and_then_marked_processed(self, construct_event, process_event):
         construct_event.return_value = self._event(event_id='evt_retry')
         process_event.side_effect = [RuntimeError('synthetic failure'), None]
@@ -155,7 +155,7 @@ class ShiftFulfillmentCheckoutTests(TestCase):
         billing_state = patch('billing.views.get_billing_state_for_account', return_value='PAYMENT_REQUIRED')
         billing_state.start()
         self.addCleanup(billing_state.stop)
-        checkout = patch('billing.views.stripe.checkout.Session.create')
+        checkout = patch('billing.stripe_support.stripe.checkout.Session.create')
         self.checkout = checkout.start()
         self.addCleanup(checkout.stop)
         self.checkout.return_value = _StripeObject(id='cs_test', url='https://checkout.example.test/cs_test')
@@ -203,10 +203,11 @@ class ShiftFulfillmentCheckoutTests(TestCase):
         second = self.client.post(self.url, selection, format='json')
         self.assertEqual(first.status_code, 200, first.data)
         self.assertEqual(second.status_code, 200, second.data)
-        self.assertEqual(self.checkout.call_count, 2)
+        self.assertEqual(self.checkout.call_count, 1)
         first_key = self.checkout.call_args_list[0].kwargs.get('idempotency_key')
         self.assertTrue(first_key)
-        self.assertEqual(first_key, self.checkout.call_args_list[1].kwargs.get('idempotency_key'))
+        self.assertEqual(first.data['checkout_id'], second.data['checkout_id'])
+        self.assertEqual(self.checkout.call_count, 1)
 
     def test_slot_selection_and_offer_selection_use_same_idempotency_key(self):
         first = self.client.post(self.url, {'slot_ids': [self.slot.pk]}, format='json')
@@ -215,33 +216,35 @@ class ShiftFulfillmentCheckoutTests(TestCase):
         self.assertEqual(second.status_code, 200, second.data)
         first_key = self.checkout.call_args_list[0].kwargs.get('idempotency_key')
         self.assertTrue(first_key)
-        self.assertEqual(first_key, self.checkout.call_args_list[1].kwargs.get('idempotency_key'))
+        self.assertEqual(first.data['checkout_id'], second.data['checkout_id'])
+        self.assertEqual(self.checkout.call_count, 1)
 
-    def test_offer_order_does_not_change_key_but_selection_does(self):
-        from shifts.models import ShiftOffer
-
+    def test_offer_order_reuses_attempt_and_overlapping_subset_conflicts(self):
+        from datetime import time
+        from shifts.models import ShiftOffer, ShiftSlot
+        slot = ShiftSlot.objects.create(shift=self.shift, date=self.slot.date, start_time=time(18), end_time=time(21))
         other_offer = ShiftOffer.objects.create(
-            shift=self.shift, user=self.worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            shift=self.shift, slot=slot, user=self.worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
         )
-        for offer_ids in ([self.offer.pk, other_offer.pk], [other_offer.pk, self.offer.pk], [self.offer.pk]):
+        for offer_ids in ([self.offer.pk, other_offer.pk], [other_offer.pk, self.offer.pk]):
             response = self.client.post(self.url, {'offer_ids': offer_ids}, format='json')
             self.assertEqual(response.status_code, 200, response.data)
-        keys = [call.kwargs.get('idempotency_key') for call in self.checkout.call_args_list]
-        self.assertTrue(keys[0])
-        self.assertEqual(keys[0], keys[1])
-        self.assertNotEqual(keys[0], keys[2])
-        self.assertEqual(self.checkout.call_args_list[0].kwargs['line_items'][0]['quantity'], 2)
+        response = self.client.post(self.url, {'offer_ids': [self.offer.pk]}, format='json')
+        self.assertEqual(response.status_code, 409, response.data)
+        self.checkout.assert_called_once()
+        self.assertEqual(self.checkout.call_args.kwargs['line_items'][0]['quantity'], 2)
 
-    def test_changed_params_or_next_day_get_a_new_idempotency_key(self):
+    def test_changed_platform_conflicts_and_next_day_reuses_collectible_session(self):
         from datetime import timedelta
-
         selection = {'offer_ids': [self.offer.pk]}
-        self.client.post(self.url, selection, format='json')
-        self.client.post(self.url, {**selection, 'platform': 'mobile'}, format='json')
-        with patch('billing.views.timezone.now', return_value=timezone.now() + timedelta(days=1)):
-            self.client.post(self.url, selection, format='json')
-        keys = [call.kwargs.get('idempotency_key') for call in self.checkout.call_args_list]
-        self.assertEqual(len(set(keys)), 3)
+        first = self.client.post(self.url, selection, format='json')
+        changed = self.client.post(self.url, {**selection, 'platform': 'mobile'}, format='json')
+        self.assertEqual(changed.status_code, 409, changed.data)
+        with patch('django.utils.timezone.now', return_value=timezone.now() + timedelta(days=1)):
+            replay = self.client.post(self.url, selection, format='json')
+        self.assertEqual(replay.status_code, 200, replay.data)
+        self.assertEqual(first.data, replay.data)
+        self.checkout.assert_called_once()
 
     def test_candidate_mismatch_does_not_charge_offers_the_webhook_would_skip(self):
         mismatch = self.client.post(self.url, {'candidate_id': self.worker.pk + 999, 'offer_ids': [self.offer.pk]}, format='json')
@@ -371,7 +374,7 @@ class OrganizationBillingScopeTests(TestCase):
                 self.assertEqual(account["billing_contact"], self.org_admin)
 
     @patch('billing.views.get_billing_state_for_account', return_value='PRE_LIVE')
-    @patch('billing.views._finalize_pending_offers_for_shift', return_value=(0, []))
+    @patch("billing.shift_payments._finalize_pending_offers_for_shift", return_value=(0, []))
     @patch('shifts.emails.send_shift_payment_finalized_notifications')
     def test_http_shift_charge_allows_operational_payer_but_subscription_stays_restricted(
         self, notify, finalize, billing_state,
@@ -473,8 +476,8 @@ class StripePaymentIsolationContracts(TestCase):
             )),
         )
         with (
-            patch("billing.views.stripe.Webhook.construct_event", return_value=event),
-            patch("billing.views._finalize_pending_offers_for_shift", return_value=(0, [])) as finalize,
+            patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=event),
+            patch("billing.payment_events._finalize_pending_offers_for_shift", return_value=(0, [])) as finalize,
             patch("shifts.emails.send_shift_payment_finalized_notifications"),
         ):
             response = client_for().post(
@@ -508,8 +511,8 @@ class PenaltyMoneyContracts(TestCase):
         self.assignment.unit_rate = Decimal(rate)
         self.assignment.save(update_fields=["unit_rate"])
         with (
-            patch("billing.views.timezone.now", return_value=self.now),
-            patch("billing.views.stripe.checkout.Session.create", return_value=_StripeObject(url="https://checkout.example.test")) as checkout,
+            patch("django.utils.timezone.now", return_value=self.now),
+            patch("billing.stripe_support.stripe.checkout.Session.create", return_value=_StripeObject(url="https://checkout.example.test")) as checkout,
         ):
             response = client_for(self.owner).post(self.url, {}, format="json")
         self.assertEqual(response.status_code, 200, response.data)
@@ -544,9 +547,9 @@ class PaymentWebhookCommitContracts(TestCase):
             )),
         )
         for target, value in (
-            ("billing.views.stripe.Webhook.construct_event", self.event),
+            ("billing.stripe_support.stripe.Webhook.construct_event", self.event),
             # A normal paid checkout books its offer; booking nothing is the refund-alert case.
-            ("billing.views._finalize_pending_offers_for_shift", (1, [object()])),
+            ("billing.payment_events._finalize_pending_offers_for_shift", (1, [object()])),
         ):
             mock = patch(target, return_value=value)
             mock.start()
@@ -625,7 +628,7 @@ class PaidOfferLosingOccurrenceContracts(TestCase):
             )),
         )
         with (
-            patch("billing.views.stripe.Webhook.construct_event", return_value=event),
+            patch("billing.stripe_support.stripe.Webhook.construct_event", return_value=event),
             patch("shifts.finalize.get_locked_rate_for_slot", return_value=(Decimal("70"), {})),
             patch("shifts.emails.send_shift_payment_finalized_notifications"),
             patch("shifts.notifications.notify_shift_managers",
@@ -654,7 +657,9 @@ class PaidOfferLosingOccurrenceContracts(TestCase):
                 self.assertEqual(alert.user_id, self.owner.pk)
                 self.assertEqual(alert.payload["payment_id"], ShiftPayment.objects.get(
                     stripe_payment_intent_id="pi_durable_refund").pk)
-            send.assert_called_once()
+            self.assertEqual([call.args[1] for call in send.call_args_list], [
+                "notification.created", "notification.counter",
+            ])
         self.assertEqual(ShiftPayment.objects.count(), 1)
 
     def test_refund_alert_delivers_after_commit_when_transport_is_healthy(self):
@@ -724,7 +729,7 @@ class PaidOfferLosingOccurrenceContracts(TestCase):
         loser.refresh_from_db()
         self.assertEqual(loser.status, ShiftOffer.Status.EXPIRED)
 
-        with patch("billing.views.logger.error") as log:
+        with patch("billing.payment_events.logger.error") as log:
             response, notify = self.pay(loser, "pi_second_checkout")
             self.assertEqual(response.status_code, 200, response.content)
             payment = ShiftPayment.objects.get(stripe_payment_intent_id="pi_second_checkout")

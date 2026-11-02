@@ -9,7 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping, MutableMapping, Sequence
 
-from organizations.models import PharmacyAdmin
+from access_control.pharmacy_roles import PharmacyAdminPolicy
+from users.organization_port import organization_reads
 
 
 class OrgCapability:
@@ -24,10 +25,10 @@ class OrgCapability:
 
 
 PHARMACY_ADMIN_CAPABILITIES = {
-    OrgCapability.MANAGE_ADMINS: PharmacyAdmin.CAPABILITY_MANAGE_ADMINS,
-    OrgCapability.MANAGE_STAFF: PharmacyAdmin.CAPABILITY_MANAGE_STAFF,
-    OrgCapability.MANAGE_ROSTER: PharmacyAdmin.CAPABILITY_MANAGE_ROSTER,
-    OrgCapability.MANAGE_COMMS: PharmacyAdmin.CAPABILITY_MANAGE_COMMS,
+    OrgCapability.MANAGE_ADMINS: PharmacyAdminPolicy.CAPABILITY_MANAGE_ADMINS,
+    OrgCapability.MANAGE_STAFF: PharmacyAdminPolicy.CAPABILITY_MANAGE_STAFF,
+    OrgCapability.MANAGE_ROSTER: PharmacyAdminPolicy.CAPABILITY_MANAGE_ROSTER,
+    OrgCapability.MANAGE_COMMS: PharmacyAdminPolicy.CAPABILITY_MANAGE_COMMS,
 }
 
 
@@ -40,8 +41,8 @@ class AdminLevelDefinition:
 
 
 ADMIN_LEVEL_DEFINITIONS: Mapping[str, AdminLevelDefinition] = {
-    PharmacyAdmin.AdminLevel.MANAGER: AdminLevelDefinition(
-        key=PharmacyAdmin.AdminLevel.MANAGER,
+    PharmacyAdminPolicy.AdminLevel.MANAGER: AdminLevelDefinition(
+        key=PharmacyAdminPolicy.AdminLevel.MANAGER,
         label="Manager",
         description=(
             "Full pharmacy manager: can invite and manage members/admins, control roster,"
@@ -54,8 +55,8 @@ ADMIN_LEVEL_DEFINITIONS: Mapping[str, AdminLevelDefinition] = {
             OrgCapability.MANAGE_COMMS,
         ),
     ),
-    PharmacyAdmin.AdminLevel.ROSTER_MANAGER: AdminLevelDefinition(
-        key=PharmacyAdmin.AdminLevel.ROSTER_MANAGER,
+    PharmacyAdminPolicy.AdminLevel.ROSTER_MANAGER: AdminLevelDefinition(
+        key=PharmacyAdminPolicy.AdminLevel.ROSTER_MANAGER,
         label="Roster Manager",
         description=(
             "Roster-focused manager: can post/accept shifts and participate in communications."
@@ -65,8 +66,8 @@ ADMIN_LEVEL_DEFINITIONS: Mapping[str, AdminLevelDefinition] = {
             OrgCapability.MANAGE_COMMS,
         ),
     ),
-    PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER: AdminLevelDefinition(
-        key=PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER,
+    PharmacyAdminPolicy.AdminLevel.COMMUNICATION_MANAGER: AdminLevelDefinition(
+        key=PharmacyAdminPolicy.AdminLevel.COMMUNICATION_MANAGER,
         label="Communication Manager",
         description=(
             "Communication-only admin: can access chats, announcements, and organisation hub tools."
@@ -107,11 +108,11 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
             "Primary organisation owner. Full control to claim/create pharmacies, invite staff,"
             " assign admins, and manage every pharmacy tied to the organisation."
         ),
-        default_admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+        default_admin_level=PharmacyAdminPolicy.AdminLevel.MANAGER,
         allowed_admin_levels=(
-            PharmacyAdmin.AdminLevel.MANAGER,
-            PharmacyAdmin.AdminLevel.ROSTER_MANAGER,
-            PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER,
+            PharmacyAdminPolicy.AdminLevel.MANAGER,
+            PharmacyAdminPolicy.AdminLevel.ROSTER_MANAGER,
+            PharmacyAdminPolicy.AdminLevel.COMMUNICATION_MANAGER,
         ),
         organisation_capabilities=(
             OrgCapability.MANAGE_ADMINS,
@@ -133,11 +134,11 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
             "Organisation-wide administrator. Same capabilities as an organisation admin across every"
             " pharmacy tied to the organisation, but cannot create or change organisation admins."
         ),
-        default_admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+        default_admin_level=PharmacyAdminPolicy.AdminLevel.MANAGER,
         allowed_admin_levels=(
-            PharmacyAdmin.AdminLevel.MANAGER,
-            PharmacyAdmin.AdminLevel.ROSTER_MANAGER,
-            PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER,
+            PharmacyAdminPolicy.AdminLevel.MANAGER,
+            PharmacyAdminPolicy.AdminLevel.ROSTER_MANAGER,
+            PharmacyAdminPolicy.AdminLevel.COMMUNICATION_MANAGER,
         ),
         organisation_capabilities=(
             OrgCapability.MANAGE_ADMINS,
@@ -160,11 +161,11 @@ ROLE_DEFINITIONS: Mapping[str, OrgRoleDefinition] = {
             " Capabilities mirror a pharmacy admin at the selected admin level but only for"
             " the pharmacies explicitly assigned to them."
         ),
-        default_admin_level=PharmacyAdmin.AdminLevel.MANAGER,
+        default_admin_level=PharmacyAdminPolicy.AdminLevel.MANAGER,
         allowed_admin_levels=(
-            PharmacyAdmin.AdminLevel.MANAGER,
-            PharmacyAdmin.AdminLevel.ROSTER_MANAGER,
-            PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER,
+            PharmacyAdminPolicy.AdminLevel.MANAGER,
+            PharmacyAdminPolicy.AdminLevel.ROSTER_MANAGER,
+            PharmacyAdminPolicy.AdminLevel.COMMUNICATION_MANAGER,
         ),
         # Roster/staff/admin/comms capabilities come from the chosen admin level.
         organisation_capabilities=(
@@ -254,19 +255,21 @@ def membership_has_org_wide_scope(membership) -> bool:
 
 
 def membership_visible_pharmacies(membership):
-    from organizations.models import Pharmacy  # Local import to avoid circular loading
-
-    if not membership:
-        return Pharmacy.objects.none()
-
-    if membership_has_org_wide_scope(membership):
-        return Pharmacy.objects.filter(organization=membership.organization)
-
-    if membership.role == 'REGION_ADMIN':
-        return membership.pharmacies.filter(organization_id=membership.organization_id)
-
-    return Pharmacy.objects.none()
+    return organization_reads().visible_pharmacies_for_membership(membership)
 
 
 def membership_visible_pharmacy_ids(membership) -> list[int]:
     return list(membership_visible_pharmacies(membership).values_list('id', flat=True))
+
+
+def membership_covers_pharmacy(membership, pharmacy) -> bool:
+    """Resolve organisation scope only; callers retain their actor and action-capability checks."""
+    if not membership or not pharmacy:
+        return False
+    organization_id = getattr(membership, "organization_id", None)
+    if organization_id is None or organization_id != getattr(pharmacy, "organization_id", None):
+        return False
+    return (
+        membership_has_org_wide_scope(membership)
+        or pharmacy.pk in membership_visible_pharmacy_ids(membership)
+    )

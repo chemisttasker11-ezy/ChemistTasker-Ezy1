@@ -30,8 +30,9 @@ import {
   Typography,
 } from "@mui/material";
 import { Check, ClipboardCheck, History, PencilLine, RefreshCw, X } from "lucide-react";
-import { attendance, fetchPharmaciesService } from "@chemisttasker/shared-core";
+import { attendance, fetchPharmaciesService, formatAttendanceMinutes } from "@chemisttasker/shared-core";
 import PageHeader from "../../components/ui/PageHeader";
+import KioskEvidenceReview from "./KioskEvidenceReview";
 import DashboardContentState from "../../components/dashboard/DashboardContentState";
 import { InitialsAvatar } from "../../components/ui/InitialsAvatar";
 import { Pill } from "../../components/ui/Pill";
@@ -46,6 +47,7 @@ const COVER_TYPES: Record<string, { label: string; tone: StatusTone; hint: strin
   UNROSTERED_LOCAL: { label: "Not on the roster", tone: "blue", hint: "Worked at this pharmacy without a rostered shift." },
   CROSS_SITE_CHAIN: { label: "Cover from a sister store", tone: "violet", hint: "Usually works at another pharmacy in your chain." },
   CROSS_SITE_ORG: { label: "Cover from your organisation", tone: "amber", hint: "Usually works at another pharmacy in your organisation." },
+  UNBOOKED_LOCUM_COVER: { label: "Unbooked locum cover", tone: "amber", hint: "Verified pharmacist with no booking or membership here. Approve before any time is payable." },
 };
 
 const EVENT_TONES: Record<string, StatusTone> = { CLOCK_IN: "green", CLOCK_OUT: "navy" };
@@ -59,7 +61,7 @@ type PendingReview = {
   worker_email: string;
   started_at: string;
   ended_at: string | null;
-  cover_type: "UNROSTERED_LOCAL" | "CROSS_SITE_CHAIN" | "CROSS_SITE_ORG";
+  cover_type: "UNROSTERED_LOCAL" | "CROSS_SITE_CHAIN" | "CROSS_SITE_ORG" | "UNBOOKED_LOCUM_COVER";
   source_pharmacy_name: string | null;
   status: string;
   decision_reason: string | null;
@@ -343,7 +345,7 @@ export default function ManagerAttendanceReviewPage() {
         {pendingReviews.map((row) => {
           const startTime = new Date(row.started_at);
           const endTime = row.ended_at ? new Date(row.ended_at) : null;
-          const hours = endTime ? (endTime.getTime() - startTime.getTime()) / (1000 * 3600) : null;
+          const durationMinutes = endTime ? (endTime.getTime() - startTime.getTime()) / 60000 : null;
           const cover = COVER_TYPES[row.cover_type] ?? { label: humanizeEnum(row.cover_type), tone: "neutral" as StatusTone, hint: "" };
           const time = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -366,10 +368,15 @@ export default function ManagerAttendanceReviewPage() {
                     {row.worker_email}
                     {row.source_pharmacy_name ? ` · usually at ${row.source_pharmacy_name}` : ""}
                   </Typography>
+                  {row.cover_type === "UNBOOKED_LOCUM_COVER" && (
+                    <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+                      {cover.hint}
+                    </Typography>
+                  )}
                   <Typography variant="body2" sx={{ mt: 0.5, color: "var(--ct-text-primary)", fontVariantNumeric: "tabular-nums" }}>
                     {startTime.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })} · {time(startTime)} – {endTime ? time(endTime) : "still clocked in"}
                     {" · "}
-                    <strong>{hours === null ? "In progress" : `${hours.toFixed(1)} h`}</strong>
+                    <strong>{durationMinutes === null ? "In progress" : formatAttendanceMinutes(durationMinutes)}</strong>
                   </Typography>
                 </Box>
               </Stack>
@@ -418,6 +425,10 @@ export default function ManagerAttendanceReviewPage() {
       )}
 
       {body}
+
+      {selectedPharmacyId && !pharmaciesLoading && (
+        <KioskEvidenceReview key={selectedPharmacyId} pharmacyId={Number(selectedPharmacyId)} />
+      )}
 
       {/* Approval Confirmation Dialog */}
       <Dialog open={!!approvingItem} onClose={isApproving ? undefined : () => setApprovingItem(null)} maxWidth="sm" fullWidth>

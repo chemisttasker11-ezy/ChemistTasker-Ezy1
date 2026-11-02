@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+import uuid
 
 User = get_user_model()
 
@@ -101,6 +102,8 @@ class ShiftPayment(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(blank=True, null=True)
+    reconciliation_required = models.BooleanField(default=False)
+    reconciliation_reason = models.CharField(max_length=160, blank=True)
 
     class Meta:
         constraints = [
@@ -137,3 +140,44 @@ class StripeWebhookEvent(models.Model):
 
     def __str__(self):
         return f"{self.event_type} {self.event_id} ({self.status})"
+
+
+class FulfillmentCheckout(models.Model):
+    """Durable provider attempt; reservations survive ambiguous network outcomes."""
+    class State(models.TextChoices):
+        PREPARED = "prepared", "Prepared"
+        OPEN = "open", "Open"
+        UNKNOWN = "unknown", "Provider outcome unknown"
+        COMPLETE = "complete", "Paid"
+        EXPIRED = "expired", "Confirmed expired and unpaid"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    shift = models.ForeignKey("client_profile.Shift", on_delete=models.SET_NULL, null=True,
+                              related_name="fulfillment_checkouts")
+    original_shift_id = models.PositiveBigIntegerField()
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="fulfillment_checkouts")
+    offer_ids = models.JSONField(default=list)
+    parameters = models.JSONField(default=dict)
+    parameter_hash = models.CharField(max_length=64)
+    expected_amount_cents = models.PositiveIntegerField()
+    state = models.CharField(max_length=16, choices=State.choices, default=State.PREPARED)
+    stripe_session_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
+    checkout_url = models.TextField(blank=True)
+    provider_expires_at = models.DateTimeField(null=True, blank=True)
+    payment = models.OneToOneField(ShiftPayment, on_delete=models.PROTECT, null=True, blank=True,
+                                  related_name="fulfillment_checkout")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["original_shift_id", "state"], name="billing_checkout_shift_state")]
+
+
+class FulfillmentReservation(models.Model):
+    checkout = models.ForeignKey(FulfillmentCheckout, on_delete=models.PROTECT, related_name="reservations")
+    occurrence_key = models.CharField(max_length=160)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["occurrence_key"], condition=models.Q(active=True),
+                                                name="billing_one_active_fulfillment")]

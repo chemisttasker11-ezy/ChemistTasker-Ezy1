@@ -20,7 +20,7 @@ from django.db.models import Count, Q
 from shifts.pricing import get_locked_rate_for_slot
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.notifications import notify_shift_users
-from shifts.engagement import staff_assignment_defaults
+from shifts.engagement import keep_accepted_terms, staff_assignment_defaults
 from shifts.assignment import guard_roster_assignment
 from datetime import date, datetime
 from django.db import transaction
@@ -29,6 +29,7 @@ from users.models import User
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.escalation import PUBLIC_LEVEL, apply_escalation, resolve_current_index
 from shifts.history import _protect_assignment_history
+from shifts.deletion import protect_shift_payment_deletion
 
 
 def _slot_locked_by_published_roster(slot):
@@ -80,6 +81,12 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
+    def handle_exception(self, exc):
+        if isinstance(exc, DjangoValidationError) and getattr(exc, 'code', None) == 'locked_payroll_period':
+            exc = DRFValidationError({'code': exc.code, 'detail': exc.message,
+                                      'period_ids': exc.params['period_ids']})
+        return super().handle_exception(exc)
+
     def get_queryset(self):
         user = self.request.user
         # Include all assignments for controlled pharmacies (historical records
@@ -127,6 +134,9 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
             target = serializer.validated_data.get(field)
             if target is not None and target.pk != getattr(instance, f'{field}_id'):
                 raise DRFValidationError({field: 'Cannot reassign a roster assignment to another shift or slot.'})
+        target_user = serializer.validated_data.get('user')
+        if instance.engagement_terms_accepted_at and target_user is not None and target_user.pk != instance.user_id:
+            raise DRFValidationError({'user': 'Terms accepted by this worker cannot be transferred to another worker.'})
         shift, slot = instance.shift, instance.slot
         slot_date = serializer.validated_data.get("slot_date", instance.slot_date)
         if not can_manage_roster_pharmacy(self.request.user, shift.pharmacy):
@@ -140,6 +150,19 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
         ):
             raise DRFValidationError({"slot_date": "Date is not a valid slot occurrence."})
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        with transaction.atomic():
+            # Validate and save the locked current row (slot -> assignment, as roster writers lock): a full save
+            # of a stale copy would erase terms the worker accepted meanwhile.
+            ShiftSlot.objects.select_for_update().get(pk=instance.slot_id)
+            instance = ShiftSlotAssignment.objects.select_for_update(of=("self",)).get(pk=instance.pk)
+            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+        return Response(serializer.data)
+
     def perform_update(self, serializer):
         self._validate_assignment_scope(serializer)
         if _slot_locked_by_published_roster(serializer.instance.slot):
@@ -149,6 +172,10 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
         instance = serializer.instance
         with transaction.atomic():
             _guard_booked_occurrences(instance, instance.slot_date, serializer.validated_data.get("slot_date", instance.slot_date))
+            target_user = serializer.validated_data.get("user")
+            if ((target_user is not None and target_user.pk != instance.user_id)
+                    or serializer.validated_data.get("slot_date", instance.slot_date) != instance.slot_date):
+                _protect_removed_assignments([instance])
             super().perform_update(serializer)
 
     def perform_destroy(self, instance):
@@ -210,6 +237,9 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                     or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()):
                 return Response({'detail': 'This shift has a booked or payment-pending worker and cannot be deleted.'},
                                 status=status.HTTP_409_CONFLICT)
+            protect_shift_payment_deletion(shift)  # A live checkout outlives its offer.
+            # Worked, accepted or invoiced cover must not cascade away with the shift.
+            _protect_removed_assignments(shift.slot_assignments.all())
             self.perform_destroy(shift)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -294,17 +324,18 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                 ShiftSlotAssignment.objects.update_or_create(
                     slot=slot,
                     slot_date=slot_date,
-                    defaults={
+                    defaults=keep_accepted_terms({
                         'shift': shift_instance,
                         'user': newly_assigned_user,
                         'unit_rate': rate,
                         'rate_reason': rate_reason,
                         'is_rostered': True,
                         **assignment_defaults,
-                    }
+                    }, slot=slot, slot_date=slot_date),
                 )
 
             obsolete = [assignment for key, assignment in existing_assignments.items() if key not in desired_keys]
+            _protect_removed_assignments(obsolete)
             for assignment in obsolete:
                 _guard_booked_occurrences(assignment, assignment.slot_date)
             if obsolete:

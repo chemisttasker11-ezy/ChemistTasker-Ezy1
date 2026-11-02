@@ -2,7 +2,7 @@
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
-from organizations.models import Organization, PharmacyAdmin
+from access_control.pharmacy_roles import PharmacyAdminPolicy
 
 class CustomUserManager(BaseUserManager):
     use_in_migrations = True
@@ -103,14 +103,14 @@ class OrganizationMembership(models.Model):
     )
 
     user         = models.ForeignKey(User, on_delete=models.CASCADE, related_name='organization_memberships')
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='memberships')
+    organization = models.ForeignKey('client_profile.Organization', on_delete=models.CASCADE, related_name='memberships')
     role         = models.CharField(max_length=30, choices=ROLE_CHOICES)
     region       = models.CharField(max_length=255, blank=True, null=True)
     job_title    = models.CharField(max_length=255, blank=True)
     admin_level  = models.CharField(
         max_length=32,
-        choices=PharmacyAdmin.AdminLevel.choices,
-        default=PharmacyAdmin.AdminLevel.MANAGER,
+        choices=PharmacyAdminPolicy.AdminLevel.choices,
+        default=PharmacyAdminPolicy.AdminLevel.MANAGER,
     )
     pharmacies   = models.ManyToManyField(
         'client_profile.Pharmacy',

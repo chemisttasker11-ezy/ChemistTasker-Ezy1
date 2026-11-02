@@ -1,4 +1,8 @@
+from users.feature_port import user_features
 # users/serializers.py
+from users.membership_port import membership_services
+from users.organization_port import organization_reads
+from users.organization_fields import OrganizationPrimaryKeyField, PharmacyPrimaryKeyField
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
@@ -9,14 +13,10 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, Toke
 from users.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.conf import settings
-from organizations.models import Organization
 from .models import OrganizationMembership, ContactMessage, RevokedSession
 import secrets
 from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
-from organizations.models import Pharmacy
-from memberships.models import Membership as PharmacyMembership
-from organizations.access import admin_assignments_for
 from .org_roles import (
     ADMIN_LEVEL_DEFINITIONS,
     ROLE_DEFINITIONS,
@@ -34,7 +34,7 @@ def serialize_org_memberships(queryset):
     memberships = list(queryset)
     org_admin_ids = {membership.organization_id for membership in memberships if membership_has_org_wide_scope(membership)}
     organization_pharmacies = {}
-    for pharmacy in Pharmacy.objects.filter(organization_id__in=org_admin_ids).values('id', 'name', 'organization_id'):
+    for pharmacy in organization_reads().organization_pharmacy_summaries(org_admin_ids):
         organization_pharmacies.setdefault(pharmacy['organization_id'], []).append({
             'id': pharmacy['id'], 'name': pharmacy['name'],
         })
@@ -189,23 +189,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             ExplorerOnboarding.objects.create(user=user, role_type=newcomer_type, date_of_birth=date_of_birth)
 
         if referral_code:
-            from rewards.services import claim_referral_code, RewardError
-
-            shift = None
-            if referral_shift_id:
-                from shifts.models import Shift  # shifts builds on users: look the referral shift up at call time
-
-                shift = Shift.objects.filter(pk=referral_shift_id).first()
-            try:
-                claim_referral_code(
-                    referred_user=user,
-                    code=referral_code,
-                    shift=shift,
-                    referral_event_id=referral_event_id,
-                    award=False,
-                )
-            except RewardError:
-                pass
+            user_features().claim_signup_referral(
+                user=user, code=referral_code,
+                shift_id=referral_shift_id, event_id=referral_event_id,
+            )
 
         return user
 
@@ -322,7 +309,7 @@ class OrganizationMembershipDetailSerializer(serializers.ModelSerializer):
             if not org_id:
                 raise serializers.ValidationError({'organization': 'Organization is required.'})
             unique_ids = list(dict.fromkeys(pharmacy_ids))
-            qs = Pharmacy.objects.filter(id__in=unique_ids, organization_id=org_id)
+            qs = organization_reads().pharmacies_in_organization(unique_ids, org_id)
             if qs.count() != len(unique_ids):
                 raise serializers.ValidationError({'pharmacy_ids': 'All pharmacies must belong to this organization.'})
             self._validated_pharmacy_ids = unique_ids
@@ -379,11 +366,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         org_payload = serialize_org_memberships(org_memberships)
 
         # 2) Pharmacy memberships
-        pharm_memberships = PharmacyMembership.objects.filter(
-            user=self.user,
-            is_active=True,
-            status=PharmacyMembership.Status.ACCEPTED,
-        ).select_related('pharmacy')
+        pharm_memberships = membership_services().accepted_for_user(self.user)
 
         pharm_payload = [
             {
@@ -395,7 +378,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             for pm in pharm_memberships
         ]
 
-        owned_pharmacies = Pharmacy.objects.filter(owner__user=self.user)
+        owned_pharmacies = organization_reads().owned_pharmacies(self.user)
         owned_payload = [
             {
                 'pharmacy_id':   pharmacy.id,
@@ -411,7 +394,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         combined_pharm_payload = list(pharmacy_map.values())
 
-        admin_assignments = admin_assignments_for(self.user).select_related("pharmacy")
+        admin_assignments = organization_reads().admin_assignments_for(self.user).select_related("pharmacy")
         admin_payload = [
             {
                 'id': assignment.id,
@@ -427,7 +410,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         ]
 
         # 3) Combined user payload (+ is_mobile_verified added)
-        from billing.utils import is_billing_active, is_in_free_trial
+        is_billing_active = user_features().is_billing_active
+        is_in_free_trial = user_features().is_in_free_trial
         from onboarding.services.work_profile import newcomer_type as current_newcomer_type
         data['user'] = {
             'id':       self.user.id,
@@ -455,11 +439,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             org_memberships = OrganizationMembership.objects.filter(user=user)
             org_payload = serialize_org_memberships(org_memberships)
 
-            pharm_memberships = PharmacyMembership.objects.filter(
-                user=user,
-                is_active=True,
-                status=PharmacyMembership.Status.ACCEPTED,
-            ).select_related('pharmacy')
+            pharm_memberships = membership_services().accepted_for_user(user)
 
             pharm_payload = [
                 {
@@ -471,7 +451,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                 for pm in pharm_memberships
             ]
 
-            owned_pharmacies = Pharmacy.objects.filter(owner__user=user)
+            owned_pharmacies = organization_reads().owned_pharmacies(user)
             owned_payload = [
                 {
                     'pharmacy_id': pharmacy.id,
@@ -487,7 +467,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
 
             combined_pharm_payload = list(pharmacy_map.values())
 
-            admin_assignments = admin_assignments_for(user).select_related("pharmacy")
+            admin_assignments = organization_reads().admin_assignments_for(user).select_related("pharmacy")
             admin_payload = [
                 {
                     'id': assignment.id,
@@ -502,7 +482,8 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                 for assignment in admin_assignments
             ]
 
-            from billing.utils import is_billing_active, is_in_free_trial
+            is_billing_active = user_features().is_billing_active
+            is_in_free_trial = user_features().is_in_free_trial
             from onboarding.services.work_profile import newcomer_type as current_newcomer_type
             data['user'] = {
                 'id': user.id,
@@ -567,13 +548,12 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
 
 class InviteOrgUserSerializer(serializers.Serializer):
     email        = serializers.EmailField()
-    organization = serializers.PrimaryKeyRelatedField(queryset=Organization.objects.all())
+    organization = OrganizationPrimaryKeyField()
     role         = serializers.ChoiceField(choices=OrganizationMembership.ROLE_CHOICES)
     admin_level  = serializers.ChoiceField(choices=ADMIN_LEVEL_CHOICES, required=False)
     job_title    = serializers.CharField(required=False, allow_blank=True)
     region       = serializers.CharField(required=False, allow_blank=True)
-    pharmacies   = serializers.PrimaryKeyRelatedField(
-        queryset=Pharmacy.objects.all(),
+    pharmacies   = PharmacyPrimaryKeyField(
         many=True,
         required=False,
     )
