@@ -132,24 +132,25 @@ def open_checkout(attempt):
         url = _stripe_object_value(session, "url")
         if not isinstance(session_id, str) or not session_id or not isinstance(url, str) or not url:
             raise ValueError("Checkout response is missing its identity or URL")
+        # One locked decision: once the session id is saved here, operator recovery (which needs no id) is refused.
         with transaction.atomic():
             current = FulfillmentCheckout.objects.select_for_update().get(pk=attempt.pk)
             orphaned = current.state == FulfillmentCheckout.State.EXPIRED and current.stripe_session_id != session_id
+            refused = current.state in (FulfillmentCheckout.State.COMPLETE, FulfillmentCheckout.State.EXPIRED)
+            if not refused:
+                if current.stripe_session_id and current.stripe_session_id != session_id:
+                    raise ValueError("The provider returned a different session for the same attempt")
+                current.stripe_session_id, current.checkout_url = session_id, url
+                expires = _stripe_object_value(session, "expires_at")
+                if isinstance(expires, (int, float)):
+                    current.provider_expires_at = datetime.fromtimestamp(expires, tz=datetime_timezone.utc)
+                current.state = FulfillmentCheckout.State.OPEN
+                current.save(update_fields=["stripe_session_id", "checkout_url", "provider_expires_at", "state", "updated_at"])
         if orphaned:
             # A delayed request resumed after operator recovery: its new session must never be payable.
             _expire_orphaned_session(attempt.pk, session_id)
-        with transaction.atomic():
-            current = FulfillmentCheckout.objects.select_for_update().get(pk=attempt.pk)
-            if current.state in (FulfillmentCheckout.State.COMPLETE, FulfillmentCheckout.State.EXPIRED):
-                raise CheckoutConflict("Checkout state changed. Refresh the shift before continuing.")
-            if current.stripe_session_id and current.stripe_session_id != session_id:
-                raise ValueError("The provider returned a different session for the same attempt")
-            current.stripe_session_id, current.checkout_url = session_id, url
-            expires = _stripe_object_value(session, "expires_at")
-            if isinstance(expires, (int, float)):
-                current.provider_expires_at = datetime.fromtimestamp(expires, tz=datetime_timezone.utc)
-            current.state = FulfillmentCheckout.State.OPEN
-            current.save(update_fields=["stripe_session_id", "checkout_url", "provider_expires_at", "state", "updated_at"])
+        if refused:
+            raise CheckoutConflict("Checkout state changed. Refresh the shift before continuing.")
         return url
     except CheckoutConflict:
         raise
@@ -165,8 +166,12 @@ def _expire_orphaned_session(attempt_id, session_id):
     try:
         stripe.checkout.Session.expire(session_id)
     except Exception:
+        # Keep the orphan on the attempt so expire_checkout can retry it; a payment on it is ledgered, never booked.
         log.exception("Could not expire orphaned provider session %s for recovered attempt %s; reconcile it now",
                       session_id, attempt_id)
+        FulfillmentCheckout.objects.filter(pk=attempt_id, stripe_session_id__isnull=True).update(
+            stripe_session_id=session_id, state=FulfillmentCheckout.State.UNKNOWN)
+        raise CheckoutUncertain("A late provider session could not be expired. Reconcile it before taking payment.")
 
 
 def expire_checkout(attempt):

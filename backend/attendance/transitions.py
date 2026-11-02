@@ -61,6 +61,10 @@ class ConfirmOppositeActionRequired(Exception):
         }
 
 
+class StaleConfirmation(Exception):
+    """The confirmed session is no longer the worker's open session (e.g. verified sync changed it)."""
+
+
 def _lock_online_worker(user):
     """Serialize a worker's online clock actions; always the first lock, before any session.
 
@@ -325,6 +329,7 @@ def clock_out(
     occurred_at=None,
     request_id=None,
     confirm_opposite: bool = False,
+    expected_session_id=None,
 ) -> Tuple[AttendanceSession, AttendanceEvent]:
     """
     Clock out a worker from their active attendance session.
@@ -342,6 +347,9 @@ def clock_out(
             .filter(user=user, ended_at__isnull=True)
             .first()
         )
+        # Re-checked under the session lock: verified sync does not take the worker lock.
+        if expected_session_id is not None and (session is None or session.pk != expected_session_id):
+            raise StaleConfirmation()
 
         if session is None:
             # Idempotent retry check: recently closed within 30s

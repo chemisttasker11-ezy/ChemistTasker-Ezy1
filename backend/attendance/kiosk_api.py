@@ -31,6 +31,7 @@ from attendance.credentials import (
 from attendance.throttles import KioskPINRateThrottle, KioskQRRateThrottle
 from attendance.transitions import (
     ConfirmOppositeActionRequired,
+    StaleConfirmation,
     check_clock_in_double_guard,
     clock_in,
     clock_out,
@@ -424,6 +425,12 @@ class KioskQRView(APIView):
             return _unexpected_error_response(request, "generate the QR code")
 
 
+STALE_CONFIRMATION_RESPONSE = {
+    "code": "STALE_CONFIRMATION",
+    "error": "This worker's attendance changed since the prompt. Enter the PIN again.",
+}
+
+
 def _stale_confirmation(request, worker, device, status_info, at_this_pharmacy):
     """A confirmation authorizes only the prompted action against the session it was computed from.
 
@@ -436,7 +443,8 @@ def _stale_confirmation(request, worker, device, status_info, at_this_pharmacy):
         action = "CLOCK_IN"
         observed = (AttendanceSession.objects.filter(user=worker, pharmacy=device.pharmacy, ended_at__isnull=False)
                     .order_by("-ended_at").values_list("id", flat=True).first())
-    return (request.data.get("expected_action") != action
+    # A prompt is always computed from a real session, so a missing or null id is never valid context.
+    return (observed is None or request.data.get("expected_action") != action
             or str(request.data.get("observed_session_id")) != str(observed))
 
 
@@ -498,10 +506,7 @@ class KioskPinClockView(APIView):
                     status_info = get_active_session_status(worker)
                     at_this_pharmacy = status_info is not None and status_info["pharmacy_id"] == device.pharmacy_id
                     if confirm_opposite and _stale_confirmation(request, worker, device, status_info, at_this_pharmacy):
-                        return Response({
-                            "code": "STALE_CONFIRMATION",
-                            "error": "This worker's attendance changed since the prompt. Enter the PIN again.",
-                        }, status=status.HTTP_409_CONFLICT)
+                        return Response(STALE_CONFIRMATION_RESPONSE, status=status.HTTP_409_CONFLICT)
                     if at_this_pharmacy:
                         session, event = clock_out(
                             user=worker,
@@ -510,6 +515,7 @@ class KioskPinClockView(APIView):
                             user_identifier=identifier,
                             request_id=request_id,
                             confirm_opposite=confirm_opposite,
+                            expected_session_id=status_info["session_id"] if confirm_opposite else None,
                         )
                     else:
                         session, event = clock_in(
@@ -536,6 +542,8 @@ class KioskPinClockView(APIView):
 
         except ConfirmOppositeActionRequired as e:
             return Response(e.to_dict(), status=status.HTTP_409_CONFLICT)
+        except StaleConfirmation:
+            return Response(STALE_CONFIRMATION_RESPONSE, status=status.HTTP_409_CONFLICT)
         except (DjangoPermissionDenied, PermissionDenied) as e:
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except DjangoValidationError as e:

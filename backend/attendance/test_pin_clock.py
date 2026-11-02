@@ -20,7 +20,7 @@ class KioskPinClockTests(TestCase):
             user=self.worker, pharmacy=self.pharmacy, role="PHARMACIST", employment_type="FULL_TIME",
             status=Membership.Status.ACCEPTED, is_active=True,
         )
-        _, self.token = activate_kiosk_device(self.owner, self.pharmacy, "Front")
+        self.device, self.token = activate_kiosk_device(self.owner, self.pharmacy, "Front")
         set_worker_personal_code(self.owner, membership, "1357")
         p = patch.object(KioskPinClockView, "throttle_classes", [])
         p.start()
@@ -153,3 +153,21 @@ class KioskPinClockTests(TestCase):
         self.submit(expected_status=409)
         self.assert_stale(context={})
         self.assertEqual(self.submit(confirm_opposite=True)["action"], "CLOCKED_OUT")  # Fresh context still works.
+
+    def test_confirmation_without_any_session_history_is_refused(self):
+        from attendance.models import AttendanceSession
+        self.assert_stale(context={"expected_action": "CLOCK_IN"})  # No prompt was ever possible here.
+        self.assertFalse(AttendanceSession.objects.filter(user=self.worker).exists())
+
+    def test_clock_out_rechecks_the_confirmed_session_under_its_own_lock(self):
+        from attendance.models import AttendanceEvent, AttendanceSession
+        from attendance.transitions import StaleConfirmation, clock_out
+        self.assertEqual(self.submit()["action"], "CLOCKED_IN")
+        session = AttendanceSession.objects.get(user=self.worker)
+        before = AttendanceEvent.objects.count()
+        # Verified sync replaced the session after the view validated the prompt.
+        with self.assertRaises(StaleConfirmation):
+            clock_out(user=self.worker, kiosk_device=self.device, raw_pin="1357", user_identifier=self.worker.email,
+                      confirm_opposite=True, expected_session_id=session.pk + 1)
+        self.assertEqual(AttendanceEvent.objects.count(), before)
+        self.assertTrue(AttendanceSession.objects.get(pk=session.pk).is_open)

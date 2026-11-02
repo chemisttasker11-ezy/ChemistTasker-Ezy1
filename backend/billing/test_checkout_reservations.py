@@ -462,3 +462,22 @@ class CheckoutReconciliationAdminTests(TestCase):
         expire.assert_called_once_with('cs_orphan')
         attempt.refresh_from_db()
         self.assertEqual((attempt.state, attempt.stripe_session_id), (FulfillmentCheckout.State.EXPIRED, None))
+
+    def test_orphan_that_cannot_be_expired_is_kept_on_the_attempt_for_reconciliation(self):
+        from billing.checkout_reservations import CheckoutUncertain, expire_unreconciled_checkout, open_checkout
+        self.checkout.side_effect = TimeoutError('provider may have accepted')
+        self.assertEqual(self.charge().status_code, 503)
+        attempt = self.attempt()
+
+        def resumes_after_recovery(**kwargs):
+            FulfillmentCheckout.objects.update(created_at=timezone.now() - timedelta(hours=49))
+            expire_unreconciled_checkout(attempt)
+            return fixtures._StripeObject(id='cs_orphan', url='https://checkout.example.test/orphan')
+        self.checkout.side_effect = resumes_after_recovery
+        with patch('billing.stripe_support.stripe.checkout.Session.expire', side_effect=TimeoutError('provider down')):
+            with self.assertRaises(CheckoutUncertain):
+                open_checkout(attempt)
+        attempt.refresh_from_db()
+        # Kept for the normal provider-confirmed expiry; never shown as a payable checkout URL.
+        self.assertEqual((attempt.state, attempt.stripe_session_id, attempt.checkout_url),
+                         (FulfillmentCheckout.State.UNKNOWN, 'cs_orphan', ''))
