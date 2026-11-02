@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.helpers import ActionForm
+from django.db import transaction
 
 from .checkout_reservations import CheckoutConflict, expire_unreconciled_checkout
 from .models import FulfillmentCheckout, OwnerSubscription, ShiftPayment
@@ -104,9 +105,10 @@ class FulfillmentCheckoutAdmin(admin.ModelAdmin):
             return
         for attempt in queryset:
             try:
-                expire_unreconciled_checkout(attempt)
+                with transaction.atomic():  # Release and its audit entry commit together or not at all.
+                    expire_unreconciled_checkout(attempt)
+                    self.log_change(request, attempt, f'Marked expired after manual reconciliation: {reason}')
             except CheckoutConflict as error:
                 self.message_user(request, f'{attempt.pk}: {error.detail}', messages.ERROR)
                 continue
-            self.log_change(request, attempt, f'Marked expired after manual reconciliation: {reason}')
             self.message_user(request, f'{attempt.pk}: expired, reservations released.')

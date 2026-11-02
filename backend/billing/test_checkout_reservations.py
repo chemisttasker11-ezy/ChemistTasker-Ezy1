@@ -235,6 +235,41 @@ class CheckoutReservationTests(TestCase):
             self.assertEqual(self.charge(replacement).status_code, 400)
         self.assertFalse(ShiftSlotAssignment.objects.filter(source_offer=replacement).exists())
 
+    def test_partial_recurrence_cancellation_frees_only_the_cancelled_date(self):
+        self.slot.is_recurring, self.slot.recurring_days = True, list(range(7))
+        self.slot.recurring_end_date = self.slot.date + timedelta(days=2)
+        self.slot.save()
+        self.assertEqual(self.charge().status_code, 200)
+        self.pay()
+        cancelled, kept = self.slot.date, self.slot.date + timedelta(days=1)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(source_offer=self.offer, slot_date=kept).exists())
+        ShiftSlotAssignment.objects.filter(source_offer=self.offer, slot_date=cancelled).delete()
+        self.checkout.return_value = fixtures._StripeObject(id='cs_replacement', url='https://checkout.example.test/new')
+        for work_date, expected in ((kept, 409), (cancelled, 200)):
+            with self.subTest(work_date=work_date):
+                replacement = ShiftOffer.objects.create(
+                    shift=self.shift, slot=self.slot, offered_slot_date=work_date, user=make_user('PHARMACIST'),
+                    status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+                self.assertEqual(self.charge(replacement).status_code, expected)
+
+    def test_paid_slotless_shift_stays_reserved_until_its_offer_is_cancelled(self):
+        from billing.checkout_reservations import release_cancelled_paid_work
+        self.slot.delete()  # A slotless shift is booked by its accepted offer and never gets an assignment.
+        self.offer.refresh_from_db()
+        self.assertEqual(occurrence_keys(self.offer), {f'{self.shift.pk}:whole'})
+        self.assertEqual(self.charge().status_code, 200)
+        FulfillmentCheckout.objects.update(state=FulfillmentCheckout.State.COMPLETE)
+        ShiftOffer.objects.filter(pk=self.offer.pk).update(status=ShiftOffer.Status.ACCEPTED)
+        release_cancelled_paid_work(self.shift.pk)
+        self.assertTrue(FulfillmentReservation.objects.filter(active=True).exists())
+        ShiftOffer.objects.filter(pk=self.offer.pk).update(status=ShiftOffer.Status.DECLINED)
+        release_cancelled_paid_work(self.shift.pk)
+        self.assertFalse(FulfillmentReservation.objects.filter(active=True).exists())
+        replacement = ShiftOffer.objects.create(shift=self.shift, user=make_user('PHARMACIST'),
+                                                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.checkout.return_value = fixtures._StripeObject(id='cs_replacement', url='https://checkout.example.test/new')
+        self.assertEqual(self.charge(replacement).status_code, 200)  # Released paid work no longer blocks.
+
     def test_late_payment_after_expiry_does_not_consume_new_reserved_work(self):
         self.charge()
         old = self.attempt()
@@ -342,7 +377,7 @@ class CheckoutReconciliationAdminTests(TestCase):
     charge = CheckoutReservationTests.charge
     attempt = CheckoutReservationTests.attempt
 
-    def stuck_attempt(self, age=timedelta(hours=24)):
+    def stuck_attempt(self, age=timedelta(hours=48)):
         self.checkout.side_effect = TimeoutError('provider may have accepted')
         self.assertEqual(self.charge().status_code, 503)
         FulfillmentCheckout.objects.update(created_at=timezone.now() - age)
@@ -379,10 +414,10 @@ class CheckoutReconciliationAdminTests(TestCase):
         superuser = make_user(is_staff=True, is_superuser=True)
         staff = make_user(is_staff=True)  # Can view checkouts, but the action is superuser-only.
         staff.user_permissions.add(*Permission.objects.filter(codename='view_fulfillmentcheckout'))
-        attempt = self.stuck_attempt(age=timedelta(hours=23))
-        cases = [('younger than 24 h', 23, {}, superuser, 'checked'), ('no reason', 25, {}, superuser, ''),
-                 ('not a superuser', 25, {}, staff, 'checked'),
-                 ('has a provider session', 25, {'stripe_session_id': 'cs_known'}, superuser, 'checked')]
+        attempt = self.stuck_attempt(age=timedelta(hours=47))
+        cases = [('within the late provider window', 47, {}, superuser, 'checked'), ('no reason', 49, {}, superuser, ''),
+                 ('not a superuser', 49, {}, staff, 'checked'),
+                 ('has a provider session', 49, {'stripe_session_id': 'cs_known'}, superuser, 'checked')]
         for label, hours, fields, user, reason in cases:
             with self.subTest(label):
                 FulfillmentCheckout.objects.update(created_at=timezone.now() - timedelta(hours=hours), **fields)
@@ -390,3 +425,21 @@ class CheckoutReconciliationAdminTests(TestCase):
                 attempt.refresh_from_db()
                 self.assertNotEqual(attempt.state, FulfillmentCheckout.State.EXPIRED)
                 self.assertTrue(FulfillmentReservation.objects.filter(active=True).exists())
+
+    def test_audit_failure_rolls_back_the_release(self):
+        attempt = self.stuck_attempt()
+        with patch('billing.admin.FulfillmentCheckoutAdmin.log_change', side_effect=RuntimeError('audit down')):
+            with self.assertRaises(RuntimeError):
+                self.run_action(make_user(is_staff=True, is_superuser=True), attempt)
+        attempt.refresh_from_db()
+        self.assertNotEqual(attempt.state, FulfillmentCheckout.State.EXPIRED)
+        self.assertTrue(FulfillmentReservation.objects.filter(active=True).exists())
+
+    def test_late_paid_session_after_recovery_is_ledgered_without_booking(self):
+        attempt = self.stuck_attempt()
+        self.run_action(make_user(is_staff=True, is_superuser=True), attempt)
+        # The lost provider request had created a session after all, and it is paid now.
+        CheckoutReservationTests.pay(self, session_id='cs_late', intent='pi_late')
+        payment = ShiftPayment.objects.get()
+        self.assertTrue(payment.reconciliation_required)
+        self.assertFalse(ShiftSlotAssignment.objects.exists())

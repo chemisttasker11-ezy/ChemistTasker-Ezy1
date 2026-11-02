@@ -55,8 +55,11 @@ def release_cancelled_paid_work(shift_id):
             continue
         booked = {f"{row.shift_id}:{row.slot_id}:{row.slot_date or row.slot.date}" for row in
                   ShiftSlotAssignment.objects.filter(source_offer_id__in=attempt.offer_ids).select_related("slot")}
+        # A slotless shift is booked by its accepted offer alone: it never gets an assignment row.
+        whole_owned = bool(booked) or ShiftOffer.objects.filter(
+            pk__in=attempt.offer_ids, status=ShiftOffer.Status.ACCEPTED).exists()
         released = [row.pk for row in attempt.reservations.filter(active=True)
-                    if not (booked if row.occurrence_key.endswith(":whole") else row.occurrence_key in booked)]
+                    if not (whole_owned if row.occurrence_key.endswith(":whole") else row.occurrence_key in booked)]
         if released:
             FulfillmentReservation.objects.filter(pk__in=released).update(active=False)
 
@@ -82,6 +85,8 @@ def prepare_checkout(*, shift_id, actor, offer_ids, parameters):
                       .exclude(state=FulfillmentCheckout.State.EXPIRED).order_by("created_at"))
         for attempt in active:
             keys = set(attempt.reservations.filter(active=True).values_list("occurrence_key", flat=True))
+            if attempt.state == FulfillmentCheckout.State.COMPLETE and not keys and not set(offer_ids) & set(attempt.offer_ids):
+                continue  # Paid work already released by cancellation owns nothing any more.
             whole = f"{shift.pk}:whole"
             overlaps = bool(requested & keys or whole in requested or whole in keys
                             or set(offer_ids) & set(attempt.offer_ids))
@@ -172,10 +177,15 @@ def expire_checkout(attempt):
         current.reservations.update(active=False)
 
 
-def expire_unreconciled_checkout(attempt):
-    """Operator expiry for an attempt that never got a provider session id; the operator checked the provider.
+# open_checkout may still reach the provider at 23 h and a session stays payable for 24 h (no expires_at is set).
+UNRECONCILED_EXPIRY_AGE = timedelta(hours=48)
 
-    Only after 24 h, the longest a provider session can stay open, so no session from the original request is payable.
+
+def expire_unreconciled_checkout(attempt):
+    """Operator expiry for an attempt that never got a provider session id.
+
+    Age alone is a precaution, not proof of provider expiry: the operator must first confirm with the provider that no
+    session or payment exists for this attempt and record that evidence as the reason. Callers log it atomically.
     """
     with transaction.atomic():
         # Same order as preparation/webhook: shift, then attempt/reservations.
@@ -184,8 +194,8 @@ def expire_unreconciled_checkout(attempt):
         if (current.state not in (FulfillmentCheckout.State.PREPARED, FulfillmentCheckout.State.UNKNOWN)
                 or current.stripe_session_id or current.payment_id):
             raise CheckoutConflict("Only an unpaid attempt without a provider session can be expired here.")
-        if timezone.now() - current.created_at < timedelta(hours=24):
-            raise CheckoutConflict("Wait until the attempt is 24 hours old; its provider session may still be open.")
+        if timezone.now() - current.created_at < UNRECONCILED_EXPIRY_AGE:
+            raise CheckoutConflict("Wait until the attempt is 48 hours old; a late provider session may still be open.")
         current.state = FulfillmentCheckout.State.EXPIRED
         current.save(update_fields=["state", "updated_at"])
         current.reservations.update(active=False)
@@ -212,6 +222,8 @@ def guard_fulfillment(*, offer, checkout_id=None):
         if (attempt.state == FulfillmentCheckout.State.COMPLETE and offer.pk in attempt.offer_ids
                 and keys <= active):
             continue  # Idempotent finalization of this same paid, frozen selection.
+        if attempt.state == FulfillmentCheckout.State.COMPLETE and not active and offer.pk not in attempt.offer_ids:
+            continue  # Paid work already released by cancellation owns nothing any more.
         if keys & active or whole in keys or whole in active or offer.pk in attempt.offer_ids:
             raise ValidationError({
                 "code": "checkout_reserved",
