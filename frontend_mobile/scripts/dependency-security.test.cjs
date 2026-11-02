@@ -235,6 +235,22 @@ test('security gate rejects new advisories and unpatched duplicate dependency co
   assert.throws(() => verifyAudit(report), /Unresolved advisory/);
 });
 
+test('legacy minimatch 3.1.5 has no globParts amplification and only its root copy is accepted', () => {
+  const { readFileSync } = require('node:fs');
+  const source = readFileSync(require.resolve('minimatch'), 'utf8');
+  assert.doesNotMatch(source, /firstPhasePreProcess|optimizationLevel/);
+  const minimatch = require('minimatch');
+  const pattern = Array(64).fill('**/..').join('/') + '/x';
+  assert.equal(new minimatch.Minimatch(pattern).set.length, 1);
+  assert.equal(minimatch('a/b/x', '**/x'), true);
+  const report = { auditReportVersion: 2, metadata: { vulnerabilities: { total: 1 } }, vulnerabilities: {
+    minimatch: { nodes: ['node_modules/minimatch'], via: [{ url: 'https://github.com/advisories/GHSA-g3hv-75wg-m249' }] },
+  } };
+  verifyAudit(report);
+  report.vulnerabilities.minimatch.nodes.push('node_modules/glob/node_modules/minimatch');
+  assert.throws(() => verifyAudit(report), /unpatched duplicate/);
+});
+
 test('security gate reports every new advisory and only accepts the fingerprinted deepmerge location', () => {
   const report = { auditReportVersion: 2, metadata: { vulnerabilities: { total: 1 } }, vulnerabilities: {
     deepmerge: { nodes: ['node_modules/deepmerge'], via: [{ url: 'https://github.com/advisories/GHSA-gcqx-w48m-w2h4' }] },

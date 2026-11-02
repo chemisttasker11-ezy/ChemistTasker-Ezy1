@@ -37,6 +37,8 @@ function verifyInstalled() {
   assert.equal(lock.packages['node_modules/@expo/cli/node_modules/minimatch'].version, '11.0.1');
   assert.equal(lock.packages['node_modules/@expo/fingerprint/node_modules/minimatch'].version, '11.0.1');
   assert.equal(lock.packages['node_modules/glob/node_modules/minimatch'].version, '11.0.1');
+  assert.equal(lock.packages['node_modules/minimatch'].version, '3.1.5');
+  assert.equal(mobileRequire('minimatch/package.json').version, '3.1.5');
   assert.equal(lock.packages['node_modules/@isaacs/nonrecursive-glob-match'].version, '1.0.1');
   assert.equal(lock.packages['node_modules/fast-uri'].version, '3.1.9');
   assert.equal(mobileRequire('fast-uri/package.json').version, '3.1.9');
@@ -77,6 +79,9 @@ function verifyAudit(report) {
     'https://github.com/advisories/GHSA-86w9-cpqp-85rv': 'node-forge',
     // No upstream fixed release: both shipped builds are fingerprinted above.
     'https://github.com/advisories/GHSA-gcqx-w48m-w2h4': 'deepmerge',
+    // Flagged as <11.0.1, but the flaw is firstPhasePreProcess (optimizationLevel >= 2), which 3.1.5 lacks.
+    // Only the single fingerprinted 3.1.5 copy (old glob 7 consumers, build tooling) is accepted.
+    'https://github.com/advisories/GHSA-g3hv-75wg-m249': 'minimatch',
   };
   const seenAdvisories = new Set();
   const unresolved = new Set();
