@@ -23,6 +23,7 @@ from shifts.access import ShiftActionRefused
 class Review183FixTests(TestCase):
     def setUp(self):
         caches['ahpra'].clear()
+        caches['verifier_presence'].clear()
         self.profile = profile_fixture()
 
     @override_settings(AHPRA_SOURCE='scrapingbee')
@@ -54,7 +55,7 @@ class Review183FixTests(TestCase):
         self.assertEqual(len(claim_checks(stage='bridge')), 1)
 
     def test_limited_dispatch_leaves_backlog_unleased_while_extension_connected(self):
-        caches['ahpra'].set('ahpra_verifier_presence_extension', True, timeout=None)
+        caches['verifier_presence'].set('ahpra_verifier_presence_extension', True, timeout=None)
         first = check_fixture(self.profile, stage='extension')
         second = check_fixture(profile_fixture(), stage='extension')
         self.assertEqual(claim_checks(stage='extension', limit=1)[0]['check_id'], first.pk)
@@ -72,6 +73,7 @@ class Review183FixTests(TestCase):
         for status in ('Registered', 'Unknown'):  # normal (1 per hour) and unreadable (3 instant) paths
             with self.subTest(status=status):
                 caches['ahpra'].clear()
+                caches['verifier_presence'].clear()
                 AhpraCheck.objects.all().delete()
                 check_fixture(self.profile, status='done', outcome='verified', completed_at=timezone.now() - timedelta(days=1),
                               register_data={'registration_status': status, 'registration_type': 'General'})

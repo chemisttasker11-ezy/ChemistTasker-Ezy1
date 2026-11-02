@@ -29,6 +29,7 @@ from shifts.models import ShiftOffer, ShiftSlotAssignment
 class AhpraAccessTests(TestCase):
     def setUp(self):
         caches['ahpra'].clear()
+        caches['verifier_presence'].clear()
         self.profile = profile_fixture()
         self.user = self.profile.user
         self.user.is_otp_verified = self.user.is_mobile_verified = True

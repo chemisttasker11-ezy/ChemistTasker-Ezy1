@@ -114,11 +114,18 @@ if ((frontend_only)); then
   }
 fi
 
+check_protected_policy() {
+  policy="$(docker exec chemisttasker_redis_staging redis-cli --raw CONFIG GET maxmemory-policy | tail -n 1)"
+  [[ "$policy" == noeviction ]] || { echo 'Protected Redis must use noeviction; complete the reviewed Redis maintenance first.' >&2; exit 1; }
+}
+if ((!frontend_only)); then check_protected_policy; fi
+
 phase=build
 if ((frontend_only)); then compose build frontend landing; else compose build web frontend landing; fi
 
 if ((!frontend_only)); then
   docker ps --format '{{.Names}}' | grep -qx chemisttasker_postgres_staging || { echo 'A running staging database is required before backend release.' >&2; exit 1; }
+  check_protected_policy
   phase=quiesce
   grace="${STAGING_STOP_TIMEOUT:-120}"
   [[ "$grace" =~ ^[1-9][0-9]*$ && "$grace" -le 3600 ]] || { echo 'Invalid writer grace period.' >&2; exit 1; }
@@ -156,7 +163,7 @@ for path in files[10:]:
 PY
   [[ "$(git rev-parse HEAD)" == "$expected_sha" && -z "$(git status --porcelain)" ]] || { echo 'Source changed during build.' >&2; exit 1; }
   sha256sum -c "$attempt_dir/env.before" >/dev/null
-  compose up -d --no-recreate --wait --wait-timeout 300 postgres redis
+  compose up -d --no-recreate --wait --wait-timeout 300 postgres redis redis_cache
   phase=migration
   # No web health deadline and no trap-driven kill can interrupt this one-shot owner.
   printf '%s\n' "$phase" > "$attempt_dir/phase"

@@ -33,6 +33,7 @@ if args[0]=='compose':
             services['migration']={'environment':{'RUN_MIGRATIONS':'0' if os.environ.get('DISABLE_MIGRATIONS') else '1'}}
         print(json.dumps({'services':services}))
     if operation=='build' and os.environ.get('FAIL_BUILD'): sys.exit(10)
+    if operation=='build' and os.environ.get('POLICY_CHANGED_DURING_BUILD'): (root/'policy-changed').touch()
     if operation=='run' and os.environ.get('FAIL_MIGRATION'): sys.exit(15)
     if operation=='up' and 'web' in args:
         (root/'web-started').touch()
@@ -61,6 +62,9 @@ elif args[0]=='inspect':
     else:
         changed=(os.environ.get('CHANGED_ADDRESS') and (root/'restarted').exists()) or (os.environ.get('PRODUCTION_DRIFT') and args[-1]=='chemisttasker_backend_prod' and (root/'web-started').exists())
         print(json.dumps({'network':{'IPAddress':'172.20.0.9' if changed else '172.20.0.2'}}))
+elif args[0]=='exec' and 'CONFIG' in args:
+    print('maxmemory-policy')
+    print('allkeys-lru' if os.environ.get('EVICTING_STATE') or (root/'policy-changed').exists() else 'noeviction')
 elif args[0]=='exec' and 'pg_dump' in args:
     if os.environ.get('FAIL_BACKUP'): sys.exit(11)
     print('fake-custom-format-archive')
@@ -112,6 +116,8 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         ups=self.operations('up')
         infra=next(x for x in ups if 'postgres' in x)
         self.assertIn('--no-recreate',infra)
+        self.assertIn('redis_cache',infra)
+        self.assertIn('--wait',infra)
         self.assertTrue(all('gateway' not in x for x in ups))
         self.assertEqual(len(self.operations('restart')),1)
         self.assertTrue(any('celery_worker' in x for x in ups))
@@ -139,6 +145,25 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.assertFalse(self.operations('build'))
         self.assertFalse(self.operations('up'))
         self.assertFalse(self.operations('restart'))
+
+    def test_evicting_protected_state_refuses_before_build_or_writer_pause(self):
+        result=self.release(EVICTING_STATE='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('noeviction',result.stderr)
+        self.assertFalse(self.operations('build'))
+        self.assertFalse(any(x[:2]==['docker','kill'] or 'pg_dump' in x for x in self.calls))
+
+    def test_refresh_evicting_protected_state_refuses_before_writer_pause(self):
+        result,calls=self.refresh(EVICTING_STATE='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('noeviction',result.stderr)
+        self.assertFalse(any(x[:2]==['docker','kill'] or 'pg_dump' in x or 'DROP SCHEMA' in ' '.join(x) for x in calls))
+
+    def test_policy_change_during_build_refuses_before_writer_pause(self):
+        result=self.release(POLICY_CHANGED_DURING_BUILD='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertTrue(self.operations('build'))
+        self.assertFalse(any(x[:2]==['docker','kill'] or 'pg_dump' in x for x in self.calls))
 
     def test_explicit_worker_opt_out(self):
         result=self.release('--without-workers')
@@ -242,6 +267,7 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         start=next(i for i,x in enumerate(calls) if x[:2]==['docker','compose'] and 'up' in x and 'web' in x)
         infrastructure=next(i for i,x in enumerate(calls) if x[:2]==['docker','compose'] and 'up' in x and 'redis' in x)
         self.assertIn('--no-recreate',calls[infrastructure])
+        self.assertIn('redis_cache',calls[infrastructure])
         self.assertLess(infrastructure,prepare)
         dump=next(i for i,x in enumerate(calls) if 'pg_dump' in x)
         self.assertTrue(all(i<dump for i,x in enumerate(calls) if x[:2]==['docker','kill']))

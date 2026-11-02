@@ -27,6 +27,7 @@ ACCEPT = {'engagement_terms_accepted': True, 'independent_contractor_status_conf
 class Review183Repro(TestCase):
     def setUp(self):
         caches['ahpra'].clear()
+        caches['verifier_presence'].clear()
         self.profile = profile_fixture()
         self.user = self.profile.user
         self.user.is_otp_verified = self.user.is_mobile_verified = True
@@ -160,7 +161,7 @@ class Review183Repro(TestCase):
     def test_f9_queued_backlog_not_stolen_from_connected_extension(self):
         other = PharmacistOnboarding.objects.create(
             user=make_user('PHARMACIST', first_name='Jane', last_name='Doe'), ahpra_number='PHA0007654321')
-        caches['ahpra'].set('ahpra_verifier_presence_extension', True, timeout=None)
+        caches['verifier_presence'].set('ahpra_verifier_presence_extension', True, timeout=None)
         first = check_fixture(self.profile, status='pending', stage='extension')
         second = AhpraCheck.objects.create(model_name='PharmacistOnboarding', object_pk=other.pk,
                                            registration_number='PHA0007654321', reason='onboarding',

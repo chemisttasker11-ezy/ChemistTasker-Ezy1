@@ -1,5 +1,8 @@
 """Synchronous desktop-verifier persistence; no applicant identity leaves the server."""
 from datetime import date, timedelta
+import logging
+
+from redis.exceptions import RedisError
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -17,11 +20,25 @@ from onboarding.models import AhpraCheck
 from onboarding.verification.ahpra import _update_ahpra_fields, evaluate_ahpra_record
 from onboarding.verification.ahpra_numbers import full_registration_number
 
+logger = logging.getLogger(__name__)
+
 PROFILE_MODELS = ('PharmacistOnboarding', 'OwnerOnboarding', 'OtherStaffOnboarding')
 
 
 def verifier_seen(kind):
-    caches['ahpra'].set(f'ahpra_verifier_presence_{kind}', True, timeout=120)
+    try:
+        caches['verifier_presence'].set(f'ahpra_verifier_presence_{kind}', True, timeout=120)
+    except RedisError:
+        logger.warning('Verifier presence heartbeat unavailable; presence will expire normally.')
+
+
+def extension_verifier_present():
+    try:
+        return bool(caches['verifier_presence'].get('ahpra_verifier_presence_extension'))
+    except RedisError:
+        # Presence is a hint; never apply this fallback to security or AHPRA limits.
+        logger.warning('Verifier presence unavailable; using bridge routing.')
+        return False
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -77,7 +94,7 @@ def enqueue_check(profile, number, reason, *, register_data=None):
         status__in=['pending', 'sent'], defaults={
             'reason': reason, 'status': 'pending',
             'register_data': register_data or {},
-            'stage': 'extension' if caches['ahpra'].get('ahpra_verifier_presence_extension') else 'bridge',
+            'stage': 'extension' if extension_verifier_present() else 'bridge',
         },
     )
     # A user's Re-check takes over a queued automatic one, lifting its failure hold.
@@ -86,9 +103,15 @@ def enqueue_check(profile, number, reason, *, register_data=None):
         check.save(update_fields=['reason'])
         created = True
     if created:
-        transaction.on_commit(lambda: async_to_sync(get_channel_layer().group_send)(
-            f'ahpra_verifiers_{check.stage}', {'type': 'ahpra.check', 'check_id': check.pk},
-        ))
+        def notify_verifier():
+            try:
+                async_to_sync(get_channel_layer().group_send)(
+                    f'ahpra_verifiers_{check.stage}', {'type': 'ahpra.check', 'check_id': check.pk},
+                )
+            except RedisError:
+                # The row is already committed; verifier heartbeat polling recovers dispatch.
+                logger.warning('Verifier notification unavailable; persisted check awaits polling.')
+        transaction.on_commit(notify_verifier)
     return check
 
 
@@ -97,7 +120,7 @@ def claim_checks(check_id=None, stage='extension', limit=None):
     stale = Q(status='sent', sent_at__lt=now - timedelta(minutes=5))
     eligible = Q(status='pending') | stale
     if stage == 'bridge':
-        fallback = Q(pk__in=[]) if caches['ahpra'].get('ahpra_verifier_presence_extension') else Q(status__in=['pending', 'sent'])
+        fallback = Q(pk__in=[]) if extension_verifier_present() else Q(status__in=['pending', 'sent'])
         abandoned = AhpraCheck.objects.filter(fallback, stage='extension')
         if settings.AHPRA_SOURCE != 'desktop':
             abandoned = abandoned.filter(model_name='AhpraTestLookup')

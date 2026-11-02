@@ -66,7 +66,10 @@ rollback_path="$rollback_dir/staging-before-production-refresh-${timestamp}.dump
 mkdir -p "$rollback_dir"
 chmod 700 "$rollback_dir"
 
-compose up -d --no-recreate --wait postgres redis
+compose up -d --no-recreate --wait postgres redis redis_cache
+# Queue/security state must be protected before changing application topology.
+policy="$(docker exec chemisttasker_redis_staging redis-cli --raw CONFIG GET maxmemory-policy | tail -n 1)"
+[[ "$policy" == noeviction ]] || { echo 'Protected Redis must use noeviction; complete the reviewed Redis maintenance first.' >&2; exit 1; }
 # Refuse an unreadable input archive before pausing any application writer.
 docker exec -i chemisttasker_postgres_staging pg_restore --list < "$backup_path" >/dev/null
 # Drain writers without force-killing a task or an in-flight request before backup.
