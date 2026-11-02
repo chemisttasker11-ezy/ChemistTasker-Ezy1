@@ -17,7 +17,7 @@ function loadComponent(filename, imports) {
   return exports;
 }
 
-async function dialog() {
+async function dialog({ zone = 'Australia/Brisbane', events } = {}) {
   const state = [];
   const effects = [];
   let cursor = 0;
@@ -45,7 +45,7 @@ async function dialog() {
     'Alert', 'Box', 'Button', 'CircularProgress', 'Dialog', 'DialogActions', 'DialogContent',
     'DialogTitle', 'Grid', 'Stack', 'TextField', 'Typography',
   ].map((name) => [name, name]));
-  const timeline = [
+  const timeline = events ?? [
     { event_id: 1, event_type: 'CLOCK_IN', original_timestamp: '2026-01-05T08:00:00+10:00', effective_timestamp: '2026-01-05T08:00:00+10:00' },
     { event_id: 2, event_type: 'CLOCK_OUT', original_timestamp: '2026-01-05T16:00:00+10:00', effective_timestamp: '2026-01-05T16:00:00+10:00' },
   ];
@@ -56,7 +56,7 @@ async function dialog() {
     async getManagerTimeline() {
       calls.push('refresh');
       if (failures.refresh) throw new Error('Refresh unavailable');
-      return { pharmacy_timezone: 'Australia/Brisbane', timeline: structuredClone(timeline) };
+      return { pharmacy_timezone: zone, timeline: structuredClone(timeline) };
     },
     async correct(id, timestamp) {
       calls.push(['correct', id, timestamp]);
@@ -158,6 +158,22 @@ for (const [start, finish, rejected, saved] of [
     assert.deepEqual(ui.calls.filter(Array.isArray).map((call) => call[1]), [saved, rejected, rejected]);
   });
 }
+
+test('a valid edit inside the repeated DST hour validates the instants Save submits', async (t) => {
+  // The defect needs a Sydney browser: Day.js fold parsing follows the host zone (honoured on Linux/CI).
+  const host = process.env.TZ;
+  process.env.TZ = 'Australia/Sydney';
+  t.after(() => { if (host === undefined) delete process.env.TZ; else process.env.TZ = host; });
+  const ui = await dialog({ zone: 'Australia/Sydney', events: [
+    { event_id: 1, event_type: 'CLOCK_IN', original_timestamp: '2026-04-05T02:10:00+11:00', effective_timestamp: '2026-04-05T02:10:00+11:00' },
+    { event_id: 2, event_type: 'CLOCK_OUT', original_timestamp: '2026-04-05T02:10:00+10:00', effective_timestamp: '2026-04-05T02:10:00+10:00' },
+  ] });
+  ui.edit('Start', '2026-04-05T02:15'); // 02:15+11:00, 55 minutes before the unchanged 02:10+10:00 finish.
+  ui.edit('Reason', 'Manager reviewed');
+  assert.equal(Boolean(ui.save().disabled), false);
+  await ui.submit();
+  assert.deepEqual(ui.calls.filter(Array.isArray), [['correct', 1, '2026-04-04T15:15:00.000Z']]);
+});
 
 test('failed timeline refresh blocks saves until Retry loads current corrections', async () => {
   const ui = await dialog();

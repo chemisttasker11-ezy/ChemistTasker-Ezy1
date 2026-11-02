@@ -192,8 +192,12 @@ export default function TimesheetAdjustTimesDialog({
     }
 
     if (startLocal && finishLocal) {
-      const startDayjs = dayjs.tz(startLocal, pharmacyTimezone);
-      const finishDayjs = dayjs.tz(finishLocal, pharmacyTimezone);
+      // Validate the instants Save submits; a bare local minute is ambiguous in the repeated DST hour.
+      const instant = (local: string, event?: { effective_timestamp: string } | null) => (event
+        ? dayjs(correctionTimestamp(local, event.effective_timestamp, pharmacyTimezone))
+        : dayjs.tz(local, pharmacyTimezone));
+      const startDayjs = instant(startLocal, startEvent);
+      const finishDayjs = instant(finishLocal, finishEvent);
 
       if (!finishDayjs.isAfter(startDayjs)) {
         return 'Start time must be before finish time.';
